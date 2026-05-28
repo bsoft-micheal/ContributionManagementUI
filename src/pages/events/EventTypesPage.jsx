@@ -2,20 +2,27 @@ import React, { useEffect, useState } from "react";
 import { FormControlLabel, Switch, Typography, Box, IconButton, Tooltip } from "@mui/material";
 import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon } from "@mui/icons-material";
 
-import { useAppToast } from "../components/common/AppToast";
-import AppInput from "../components/common/AppInput";
-import AppButton from "../components/common/AppButton";
-import AppDataTable from "../components/common/AppDataTable";
-import AppDialog from "../components/common/AppDialog";
-import { GetEventTypes, CreateEventType, UpdateEventType } from "../services/eventTypeService";
+import { useAppToast } from "../../components/common/AppToast";
+import { useAuth } from "../../contexts/AuthContext";
+import { getRightsForPage } from "../../utils/rightsHelper";
+import AppInput from "../../components/common/AppInput";
+import AppButton from "../../components/common/AppButton";
+import AppDataTable from "../../components/common/AppDataTable";
+import AppDialog from "../../components/common/AppDialog";
+import { GetEventTypes, CreateEventType, UpdateEventType } from "../../services/eventTypeService";
 
 const initialForm = { eventTypeName: "", isActive: true };
 
 export default function EventTypesPage() {
+  const { authState } = useAuth();
+  const rights = getRightsForPage("Event Types", authState?.role);
+  const hasWriteAccess = rights.write;
+
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
+  const [errors, setErrors] = useState({});
   const toast = useAppToast();
 
   useEffect(() => {
@@ -30,6 +37,17 @@ export default function EventTypesPage() {
   }
 
   async function handleSubmit() {
+    const newErrors = {};
+    if (!form.eventTypeName?.trim()) {
+      newErrors.eventTypeName = "This field is required";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error("Please fill all the required fields");
+      return;
+    }
+
     try {
       if (form.eventTypeId) {
         await UpdateEventType(form.eventTypeId, form);
@@ -49,10 +67,12 @@ export default function EventTypesPage() {
     {
       label: "Action",
       render: (row) => (
-        <Tooltip title="Edit Category">
-          <IconButton size="small" sx={{ p: 0.3 }} onClick={() => { setForm(row); setDialogOpen(true); }}>
-            <EditIcon sx={{ fontSize: "1.1rem", color: "#4a3f6b" }} />
-          </IconButton>
+        <Tooltip title={hasWriteAccess ? "Edit Category" : "Read Only Mode"}>
+          <span>
+            <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}>
+              <EditIcon sx={{ fontSize: "1.1rem", color: hasWriteAccess ? "#4a3f6b" : "#cbd5e1" }} />
+            </IconButton>
+          </span>
         </Tooltip>
       )
     },
@@ -91,7 +111,8 @@ export default function EventTypesPage() {
           <AppButton
             size="small"
             variant="contained"
-            onClick={() => { setForm(initialForm); setDialogOpen(true); }}
+            disabled={!hasWriteAccess}
+            onClick={() => { setForm(initialForm); setErrors({}); setDialogOpen(true); }}
           >
             Add
           </AppButton>
@@ -104,8 +125,8 @@ export default function EventTypesPage() {
         title={form.eventTypeId ? "Modify Category" : "Add Strategic Category"}
         actions={
           <>
+            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
             <AppButton variant="text" color="inherit" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
-            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit}>Save Changes</AppButton>
           </>
         }
       >
@@ -114,7 +135,15 @@ export default function EventTypesPage() {
             label="Event Type Name" 
             fullWidth 
             value={form.eventTypeName} 
-            onChange={(e) => setForm(f => ({ ...f, eventTypeName: e.target.value }))} 
+            onChange={(e) => {
+              setForm(f => ({ ...f, eventTypeName: e.target.value }));
+              if (errors.eventTypeName) {
+                setErrors(prev => ({ ...prev, eventTypeName: "" }));
+              }
+            }} 
+            error={!!errors.eventTypeName}
+            helperText={errors.eventTypeName}
+            required
           />
           <FormControlLabel
             control={

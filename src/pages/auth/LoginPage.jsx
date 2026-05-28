@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Alert, Box, Card, CardContent, Stack, Typography } from "@mui/material";
-import AppInput from "../components/common/AppInput";
-import AppButton from "../components/common/AppButton";
+import AppInput from "../../components/common/AppInput";
+import AppButton from "../../components/common/AppButton";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAppToast } from "../components/common/AppToast";
-import { useAuth } from "../contexts/AuthContext";
+import { useAppToast } from "../../components/common/AppToast";
+import { useAuth } from "../../contexts/AuthContext";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "admin@teamcontribution.local", password: "Admin@123" });
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,6 +18,17 @@ export default function LoginPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    
+    const newErrors = {};
+    if (!form.email?.trim()) newErrors.email = "This field is required";
+    if (!form.password?.trim()) newErrors.password = "This field is required";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error("Please fill all the required fields");
+      return;
+    }
+
     setLoading(true);
     try {
       await login(form);
@@ -109,16 +121,28 @@ export default function LoginPage() {
             <Box component="form" onSubmit={handleSubmit}>
               <Stack spacing={2.5}>
                 <AppInput
-                  label="Email Address"
+                  label="Email"
                   value={form.email}
-                  onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))}
+                  onChange={(e) => {
+                    setForm((c) => ({ ...c, email: e.target.value }));
+                    if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
+                  }}
+                  error={!!errors.email}
+                  helperText={errors.email}
+                  placeholder={"Enter Email"}
                   required
                 />
                 <AppInput
                   label="Password"
                   type="password"
                   value={form.password}
-                  onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))}
+                  onChange={(e) => {
+                    setForm((c) => ({ ...c, password: e.target.value }));
+                    if (errors.password) setErrors(prev => ({ ...prev, password: "" }));
+                  }}
+                  error={!!errors.password}
+                  helperText={errors.password}
+                  placeholder={"Enter Password"}
                   required
                 />
                 <AppButton

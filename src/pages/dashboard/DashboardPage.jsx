@@ -9,11 +9,11 @@ import {
   CardContent,
 } from "@mui/material";
 import dayjs from "dayjs";
-import MetricCard from "../components/MetricCard";
-import AppInput from "../components/common/AppInput";
-import AppSelect from "../components/common/AppSelect";
-import { GetDashboardSummary } from "../services/dashboardService";
-import AppDataTable from "../components/common/AppDataTable";
+import MetricCard from "../../components/MetricCard";
+import AppInput from "../../components/common/AppInput";
+import AppSelect from "../../components/common/AppSelect";
+import { GetDashboardSummary } from "../../services/dashboardService";
+import AppDataTable from "../../components/common/AppDataTable";
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
@@ -64,7 +64,7 @@ export default function DashboardPage() {
           alignItems: "center",
         }}>
           <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#ffffff", fontSize: "0.85rem" }}>
-            Performance Dashboard
+            Dashboard
           </Typography>
         </Box>
 
@@ -142,4 +142,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

@@ -8,14 +8,19 @@ import {
   Typography,
 } from "@mui/material";
 import dayjs from "dayjs";
-import apiClient from "../services/apiClient";
-import { exportSheets } from "../utils/exportToExcel";
-import AppDataTable from "../components/common/AppDataTable";
-import AppSelect from "../components/common/AppSelect";
-import AppInput from "../components/common/AppInput";
-import AppButton from "../components/common/AppButton";
+import apiClient from "../../services/apiClient";
+import { exportSheets } from "../../utils/exportToExcel";
+import AppDataTable from "../../components/common/AppDataTable";
+import AppSelect from "../../components/common/AppSelect";
+import AppInput from "../../components/common/AppInput";
+import AppButton from "../../components/common/AppButton";
+import { useAuth } from "../../contexts/AuthContext";
+import { getRightsForPage } from "../../utils/rightsHelper";
 
 export default function ReportsPage() {
+  const { authState } = useAuth();
+  const hasWriteAccess = getRightsForPage("Reports", authState?.role).write;
+
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ month: dayjs().month() + 1, year: dayjs().year() });
@@ -75,14 +80,24 @@ export default function ReportsPage() {
           <AppButton
             size="small"
             variant="contained"
-            sx={{ bgcolor: "#2a1b4d", borderRadius: "3px", fontSize: "0.75rem", py: 0.3, px: 2, "&:hover": { bgcolor: "#1a1033" } }}
-            onClick={() =>
+            disabled={!hasWriteAccess}
+            sx={{ 
+              bgcolor: "#2a1b4d", 
+              borderRadius: "3px", 
+              fontSize: "0.75rem", 
+              py: 0.3, 
+              px: 2, 
+              "&:hover": { bgcolor: "#1a1033" },
+              ...( !hasWriteAccess ? { bgcolor: "#cbd5e1 !important", color: "#94a3b8 !important" } : {} )
+            }}
+            onClick={() => {
+              if (!hasWriteAccess) return;
               exportSheets("team-contribution-reports.xlsx", [
                 { name: "Event Collections", data: report?.eventCollections ?? [] },
                 { name: "Member History", data: report?.memberContributionHistory ?? [] },
                 { name: "Pending Dues", data: report?.pendingDues ?? [] },
-              ])
-            }
+              ]);
+            }}
           >
             Export Excel
           </AppButton>
@@ -119,10 +134,8 @@ export default function ReportsPage() {
           <Box sx={{ p: 4 }}>
             <Grid container spacing={3}>
               <Grid size={{ xs: 12 }}>
-                <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 2, color: "text.secondary", textTransform: "uppercase" }}>
-                   Event-wise Collection Audit
-                </Typography>
                 <AppDataTable
+                  title="Event-wise Collection Audit"
                   columns={eventColumns}
                   data={report?.eventCollections ?? []}
                   loading={loading}
@@ -130,10 +143,8 @@ export default function ReportsPage() {
               </Grid>
               
               <Grid size={{ xs: 12, lg: 6 }}>
-                <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 2, color: "text.secondary", textTransform: "uppercase" }}>
-                   Member Contribution Velocity
-                </Typography>
                 <AppDataTable
+                  title="Member Contribution Velocity"
                   columns={memberColumns}
                   data={report?.memberContributionHistory ?? []}
                   loading={loading}
@@ -141,10 +152,8 @@ export default function ReportsPage() {
               </Grid>
 
               <Grid size={{ xs: 12, lg: 6 }}>
-                <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 2, color: "text.secondary", textTransform: "uppercase" }}>
-                   High Priority Dues (Pending Receipt)
-                </Typography>
                 <AppDataTable
+                  title="High Priority Dues (Pending Receipt)"
                   columns={pendingColumns}
                   data={report?.pendingDues ?? []}
                   loading={loading}
@@ -157,4 +166,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

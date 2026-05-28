@@ -9,40 +9,32 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TablePagination,
-  TableSortLabel,
   Typography,
   IconButton,
   Tooltip,
   InputAdornment,
   TextField,
+  Collapse,
+  Button,
+  Popover,
+  Checkbox,
+  FormControlLabel,
+  Select,
+  MenuItem,
+  TableSortLabel,
 } from "@mui/material";
 import {
   PictureAsPdf as PdfIcon,
   GridOn as ExcelIcon,
   Print as PrintIcon,
   Search as SearchIcon,
-  FilterList as FilterIcon,
-  GridView as GridIcon,
   Fullscreen as FullscreenIcon,
   FullscreenExit as FullscreenExitIcon,
+  FirstPage as FirstPageIcon,
+  LastPage as LastPageIcon,
+  ViewColumn as ColumnsIcon,
+  Download as DownloadIcon,
 } from "@mui/icons-material";
-import { Collapse } from "@mui/material";
-
-// ─── Theme Tokens (matches sidebar purple) ─────────────────────────────────
-const THEME = {
-  header: "#4a3f6b",        // Primary Mauve Header
-  headerText: "#ffffff",
-  toolbarBg: "#ffffff",
-  exportIcon: "#5b4e8c",    // Slightly darker purple for icons
-  tableHeaderBg: "#f8f7fd", // Very subtle lavender tint
-  tableHeaderText: "#4a3f6b",
-  rowHover: "#f5f4fb",
-  rowAlt: "#fafafa",
-  addBtn: "#2a1b4d",        // Darkest purple for primary action
-  borderColor: "rgba(74, 63, 107, 0.12)",
-  sortActive: "#4a3f6b",
-};
 
 // ─── CSV Export Helper ──────────────────────────────────────────────────────
 function exportToCSV(columns, data, filename = "export.csv") {
@@ -61,7 +53,7 @@ function exportToCSV(columns, data, filename = "export.csv") {
   URL.revokeObjectURL(url);
 }
 
-function handlePrint(title) {
+function handlePrint() {
   window.print();
 }
 
@@ -78,8 +70,25 @@ export default function AppDataTable({
   const [orderBy, setOrderBy] = useState("");
   const [order, setOrder] = useState("asc");
   const [search, setSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Column visibility state
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    return columns.reduce((acc, col) => {
+      acc[col.label] = true;
+      return acc;
+    }, {});
+  });
+
+  // Columns Popover Anchor
+  const [anchorEl, setAnchorEl] = useState(null);
+  const handleColumnsClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleColumnsClose = () => {
+    setAnchorEl(null);
+  };
+  const openPopover = Boolean(anchorEl);
 
   // ── Sorting ───────────────────────────────────────────────────────────────
   const handleSort = (key) => {
@@ -115,31 +124,42 @@ export default function AppDataTable({
     }
 
     return result;
-  }, [data, search, orderBy, order, columns]);
+  }, [data, search, orderBy, order]);
 
   const paginatedData = processedData.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
 
-  // ── Re-order columns so Action is always first ────────────────────────────
-  const orderedColumns = [
-    ...columns.filter(c => c.label === "Action"),
-    ...columns.filter(c => c.label !== "Action"),
-  ];
+  // Re-order columns so Action is always first, then filter by visibility
+  const orderedColumns = useMemo(() => {
+    const list = [
+      ...columns.filter(c => c.label === "Action"),
+      ...columns.filter(c => c.label !== "Action"),
+    ];
+    return list.filter(c => visibleColumns[c.label] !== false);
+  }, [columns, visibleColumns]);
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
   };
 
+  // Pagination metrics
+  const totalRows = processedData.length;
+  const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+  const startRow = totalRows === 0 ? 0 : page * rowsPerPage + 1;
+  const endRow = Math.min((page + 1) * rowsPerPage, totalRows);
+
   return (
     <Paper
       elevation={isFullscreen ? 5 : 0}
       sx={{
-        border: isFullscreen ? "none" : `1px solid ${THEME.borderColor}`,
-        borderRadius: isFullscreen ? "0" : "6px",
+        border: "1px solid rgba(224, 224, 224, 1)",
+        borderRadius: isFullscreen ? "0" : "8px",
         overflow: "hidden",
         bgcolor: "#ffffff",
+        display: "flex",
+        flexDirection: "column",
         ...(isFullscreen && {
           position: "fixed",
           top: 0,
@@ -147,47 +167,47 @@ export default function AppDataTable({
           width: "100vw",
           height: "100vh",
           zIndex: 1400,
-          display: "flex",
-          flexDirection: "column"
         })
       }}
     >
-      {/* ── 1. Header Bar ─────────────────────────────────────────────────── */}
+      {/* ── 1. Top Header Bar (Store Dispatch / Member Directory layout) ──── */}
       <Box
         sx={{
-          background: `linear-gradient(90deg, ${THEME.header} 0%, #5d528b 100%)`,
-          color: THEME.headerText,
-          px: 2,
-          py: 0.5,
-          minHeight: 36,
+          background: "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+          color: "#ffffff",
+          px: 3,
+          py: 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          minHeight: 46,
         }}
       >
         <Typography
           variant="subtitle2"
           fontWeight={700}
-          sx={{ fontSize: "0.85rem", letterSpacing: "0.01em" }}
+          sx={{ fontSize: "0.95rem", letterSpacing: "0.02em" }}
         >
           {title}
         </Typography>
 
-        {/* Add / Custom Action Button - Restored to Header */}
         {actions && (
           <Box
             sx={{
               "& .MuiButton-root": {
-                bgcolor: "#2a1b4d !important", // Dark boxed style
+                bgcolor: "#2a1b4d !important", // Deep indigo/purple button to match theme
                 color: "#ffffff !important",
-                borderRadius: "3px !important",
+                borderRadius: "4px !important",
                 fontSize: "0.75rem !important",
                 fontWeight: 700,
-                py: "3px !important",
+                py: "5px !important",
                 px: "14px !important",
                 minWidth: "unset",
                 textTransform: "none",
                 boxShadow: "none !important",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
                 "&:hover": { bgcolor: "#1a1033 !important" },
               },
             }}
@@ -197,254 +217,428 @@ export default function AppDataTable({
         )}
       </Box>
 
-      {/* ── 2. Toolbar: Export | Search | View Icons ──────────────────────── */}
-      <Box
-        sx={{
-          px: 2,
-          py: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: `1px solid ${THEME.borderColor}`,
-          bgcolor: THEME.toolbarBg,
-          flexWrap: "wrap",
-          gap: 2,
-        }}
-      >
-        {/* Left: Export Icons */}
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.05em" }}>
-            Export
-          </Typography>
-          <Box sx={{ display: "flex", gap: 0.5 }}>
-            <Tooltip title="Export CSV">
-              <IconButton
-                size="small"
-                sx={{ p: 0.5, color: THEME.exportIcon, bgcolor: "rgba(74,63,107,0.04)", borderRadius: "4px", "&:hover": { bgcolor: "rgba(74,63,107,0.08)" } }}
-                onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
-              >
-                <ExcelIcon sx={{ fontSize: "1.1rem" }} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Print Report">
-              <IconButton
-                size="small"
-                sx={{ p: 0.5, color: THEME.exportIcon, bgcolor: "rgba(74,63,107,0.04)", borderRadius: "4px", "&:hover": { bgcolor: "rgba(74,63,107,0.08)" } }}
-                onClick={() => handlePrint(title)}
-              >
-                <PrintIcon sx={{ fontSize: "1.1rem" }} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Save PDF">
-              <IconButton
-                size="small"
-                sx={{ p: 0.5, color: THEME.exportIcon, bgcolor: "rgba(74,63,107,0.04)", borderRadius: "4px", "&:hover": { bgcolor: "rgba(74,63,107,0.08)" } }}
-                onClick={() => handlePrint(title)}
-              >
-                <PdfIcon sx={{ fontSize: "1.1rem" }} />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Stack>
-
-        {/* Right: Search + Quick Tools */}
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <TextField
-            size="small"
-            placeholder="Quick search records..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(0); }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ fontSize: "1rem", color: "#8b81b3" }} />
-                </InputAdornment>
-              ),
-              sx: {
-                height: 34,
-                width: { xs: "100%", sm: 240 },
-                fontSize: "0.82rem",
-                borderRadius: "6px",
-                bgcolor: "#fcfcff",
-                "& fieldset": { borderColor: "rgba(74,63,107,0.15)" },
-                "&:hover fieldset": { borderColor: "rgba(74,63,107,0.3)" },
-                "&.Mui-focused fieldset": { borderColor: THEME.header },
-              },
-            }}
-          />
-          <Box sx={{ display: "flex", gap: 0.5, pl: 1, borderLeft: "1px solid rgba(74,63,107,0.1)" }}>
-             <Tooltip title={showFilters ? "Hide Filters" : "Show Advanced Filters"}>
-                <IconButton 
-                  size="small" 
-                  sx={{ color: showFilters ? THEME.header : "#8b81b3", p: 0.6 }}
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <FilterIcon sx={{ fontSize: "1.05rem" }} />
-                </IconButton>
-             </Tooltip>
-             <Tooltip title={isFullscreen ? "Exit Full Screen" : "Full Screen"}>
-                <IconButton 
-                  size="small" 
-                  sx={{ color: isFullscreen ? THEME.header : "#8b81b3", p: 0.6 }}
-                  onClick={toggleFullscreen}
-                >
-                  {isFullscreen ? <FullscreenExitIcon sx={{ fontSize: "1.05rem" }} /> : <FullscreenIcon sx={{ fontSize: "1.05rem" }} />}
-                </IconButton>
-             </Tooltip>
-          </Box>
-        </Stack>
-      </Box>
-
-      {/* ── 3. Filter Panel ───────────────────────────────────────────────── */}
-      <Collapse in={showFilters && !!filterPanel}>
+      {/* ── 2. Filter Panel ─────────────────────────────────────────────── */}
+      {filterPanel && (
         <Box
           sx={{
-            bgcolor: "#faf9fd",
-            px: 2,
-            py: 1.2,
-            borderBottom: `1px solid ${THEME.borderColor}`,
+            bgcolor: "#fcfcff",
+            px: 3,
+            py: 2,
+            borderBottom: "1px solid rgba(224, 224, 224, 0.8)",
           }}
         >
           {filterPanel}
         </Box>
-      </Collapse>
+      )}
 
-      {/* ── 4. Table ──────────────────────────────────────────────────────── */}
+      {/* ── 2. Toolbar: Export (Left) | Columns & Search (Right) ──────────── */}
+      <Box
+        sx={{
+          px: 3,
+          py: 1.5,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid rgba(224, 224, 224, 0.8)",
+          bgcolor: "#ffffff",
+          flexWrap: "wrap",
+          gap: 2,
+        }}
+      >
+        {/* Left: Export Toolbar */}
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Typography
+            variant="caption"
+            sx={{
+              fontWeight: 700,
+              color: "#475569",
+              fontSize: "0.75rem",
+              mr: 0.5
+            }}
+          >
+            Export :
+          </Typography>
+          <Tooltip title="Export Excel">
+            <IconButton
+              size="small"
+              onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
+              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+            >
+              <ExcelIcon sx={{ fontSize: "1.1rem" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Save PDF">
+            <IconButton
+              size="small"
+              onClick={handlePrint}
+              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+            >
+              <PdfIcon sx={{ fontSize: "1.1rem" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Print Report">
+            <IconButton
+              size="small"
+              onClick={handlePrint}
+              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+            >
+              <PrintIcon sx={{ fontSize: "1.1rem" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Download CSV">
+            <IconButton
+              size="small"
+              onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
+              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+            >
+              <DownloadIcon sx={{ fontSize: "1.1rem" }} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+
+        {/* Right: Columns Button, Fullscreen & Search */}
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={handleColumnsClick}
+            startIcon={<ColumnsIcon sx={{ fontSize: "1rem" }} />}
+            sx={{
+              color: "#4a3f6b",
+              borderColor: "rgba(74, 63, 107, 0.3)",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              textTransform: "none",
+              height: 32,
+              px: 1.5,
+              borderRadius: "4px",
+              "&:hover": {
+                borderColor: "#4a3f6b",
+                bgcolor: "rgba(74, 63, 107, 0.04)",
+              },
+            }}
+          >
+            Columns
+          </Button>
+
+          <Tooltip title={isFullscreen ? "Exit Full Screen" : "Full Screen"}>
+            <IconButton
+              size="small"
+              sx={{
+                color: "#4a3f6b",
+                p: 0.6,
+                border: "1px solid rgba(74, 63, 107, 0.2)",
+                borderRadius: "4px",
+                height: 32,
+                width: 32,
+              }}
+              onClick={toggleFullscreen}
+            >
+              {isFullscreen ? (
+                <FullscreenExitIcon sx={{ fontSize: "1.1rem" }} />
+              ) : (
+                <FullscreenIcon sx={{ fontSize: "1.1rem" }} />
+              )}
+            </IconButton>
+          </Tooltip>
+
+          <TextField
+            size="small"
+            placeholder="Search"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(0); }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <SearchIcon sx={{ fontSize: "1rem", color: "#8b81b3" }} />
+                </InputAdornment>
+              ),
+              sx: {
+                height: 32,
+                width: { xs: "100%", sm: 200 },
+                fontSize: "0.78rem",
+                borderRadius: "4px",
+                bgcolor: "#ffffff",
+                "& fieldset": { borderColor: "rgba(74, 63, 107, 0.2)" },
+                "&:hover fieldset": { borderColor: "rgba(74, 63, 107, 0.4)" },
+                "&.Mui-focused fieldset": { borderColor: "#4a3f6b" },
+              },
+            }}
+          />
+        </Stack>
+      </Box>
+
+      {/* Column Picker Popover */}
+      <Popover
+        open={openPopover}
+        anchorEl={anchorEl}
+        onClose={handleColumnsClose}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "right",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "right",
+        }}
+        PaperProps={{
+          sx: { p: 2, maxWidth: 240, maxHeight: 320, overflowY: "auto", borderRadius: "6px" }
+        }}
+      >
+        <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1, fontSize: "0.8rem", color: "#4a3f6b" }}>
+          Toggle Columns
+        </Typography>
+        <Stack spacing={0.5}>
+          {columns.map((col, idx) => (
+            <FormControlLabel
+              key={idx}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={visibleColumns[col.label] !== false}
+                  onChange={(e) => {
+                    setVisibleColumns(prev => ({
+                      ...prev,
+                      [col.label]: e.target.checked
+                    }));
+                  }}
+                  sx={{ py: 0.3 }}
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontSize: "0.78rem" }}>{col.label}</Typography>}
+            />
+          ))}
+        </Stack>
+      </Popover>
+
+      {/* ── 3. Table ──────────────────────────────────────────────────────── */}
       <Box sx={{ overflowX: "auto", flexGrow: isFullscreen ? 1 : 0 }}>
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
-            <CircularProgress size={30} sx={{ color: THEME.header }} />
+            <CircularProgress size={30} sx={{ color: "#4a3f6b" }} />
           </Box>
         ) : (
-          <>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: THEME.tableHeaderBg }}>
-                  {orderedColumns.map((column, index) => (
-                    <TableCell
-                      key={index}
-                      align={column.align || "left"}
-                      sortDirection={orderBy === column.key ? order : false}
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: "0.75rem",
-                        color: THEME.tableHeaderText,
-                        py: 0.8,
-                        px: 2,
-                        borderRight: `1px solid ${THEME.borderColor}`,
-                        "&:last-child": { borderRight: "none" },
-                        whiteSpace: "nowrap",
-                        ...column.sx,
-                      }}
-                    >
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: "#eef4f8" }}>
+                {orderedColumns.map((column, index) => (
+                  <TableCell
+                    key={index}
+                    align={column.align || "left"}
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: "0.75rem",
+                      color: "#1e293b",
+                      py: 1,
+                      px: 2,
+                      borderRight: "1px solid rgba(224, 224, 224, 0.8)",
+                      borderBottom: "1px solid rgba(224, 224, 224, 1)",
+                      "&:last-child": { borderRight: "none" },
+                      whiteSpace: "nowrap",
+                      ...column.sx,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: column.align === "right" ? "flex-end" : "space-between", width: "100%", gap: 1 }}>
                       {column.key ? (
                         <TableSortLabel
                           active={orderBy === column.key}
                           direction={orderBy === column.key ? order : "asc"}
                           onClick={() => handleSort(column.key)}
+                          IconComponent={() => (
+                            <Typography variant="caption" sx={{ ml: 0.5, fontSize: "0.85rem", color: "inherit", opacity: 0.7 }}>⇅</Typography>
+                          )}
                           sx={{
-                            color: `${THEME.tableHeaderText} !important`,
-                            "& .MuiTableSortLabel-icon": {
-                              color: `${THEME.sortActive} !important`,
-                            },
+                            color: "inherit !important",
+                            fontWeight: "inherit",
                           }}
                         >
                           {column.label}
                         </TableSortLabel>
                       ) : (
-                        column.label
+                        <span>{column.label}</span>
                       )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-
-              <TableBody>
-                {paginatedData.length > 0 ? (
-                  paginatedData.map((row, rowIndex) => (
-                    <TableRow
-                      key={rowIndex}
-                      hover
-                      sx={{
-                        bgcolor: rowIndex % 2 === 1 ? THEME.rowAlt : "#ffffff",
-                        "&:hover": { bgcolor: THEME.rowHover },
-                        "& td": {
-                          borderRight: `1px solid ${THEME.borderColor}`,
-                        },
-                        "& td:last-child": { borderRight: "none" },
-                      }}
-                    >
-                      {orderedColumns.map((column, colIndex) => (
-                        <TableCell
-                          key={colIndex}
-                          align={column.align || "left"}
-                          sx={{
-                            py: 0.6,
-                            px: 2,
-                            fontSize: "0.8rem",
-                            color: "#333",
-                            ...column.cellSx,
-                          }}
-                        >
-                          {column.render ? (
-                            column.render(row)
-                          ) : (
-                            <Typography
-                              variant="body2"
-                              sx={{ fontSize: "inherit", color: "inherit" }}
-                            >
-                              {row[column.key] ?? "--"}
-                            </Typography>
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={orderedColumns.length}
-                      align="center"
-                      sx={{ py: 6 }}
-                    >
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        fontWeight={500}
+                      <IconButton
+                        size="small"
+                        onClick={handleColumnsClick}
+                        sx={{ p: 0.1, color: "inherit", opacity: 0.5, "&:hover": { opacity: 1 } }}
                       >
-                        No records found.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                        <Typography variant="caption" sx={{ fontSize: "0.85rem", fontWeight: 700 }}>⋮</Typography>
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
 
-            {/* ── 5. Pagination ─────────────────────────────────────────── */}
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 15, 25, 50]}
-              component="div"
-              count={processedData.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={(_, newPage) => setPage(newPage)}
-              onRowsPerPageChange={e => {
-                setRowsPerPage(parseInt(e.target.value, 10));
+            <TableBody>
+              {paginatedData.length > 0 ? (
+                paginatedData.map((row, rowIndex) => (
+                  <TableRow
+                    key={rowIndex}
+                    hover
+                    sx={{
+                      bgcolor: rowIndex % 2 === 1 ? "#fafafa" : "#ffffff",
+                      "&:hover": { bgcolor: "#f5f7fa" },
+                      "& td": {
+                        borderRight: "1px solid rgba(224, 224, 224, 0.8)",
+                        borderBottom: "1px solid rgba(224, 224, 224, 0.8)",
+                      },
+                      "& td:last-child": { borderRight: "none" },
+                    }}
+                  >
+                    {orderedColumns.map((column, colIndex) => (
+                      <TableCell
+                        key={colIndex}
+                        align={column.align || "left"}
+                        sx={{
+                          py: 0.8,
+                          px: 2,
+                          fontSize: "0.78rem",
+                          color: "#334155",
+                          ...column.cellSx,
+                        }}
+                      >
+                        {column.render ? (
+                          column.render(row)
+                        ) : (
+                          <Typography
+                            variant="body2"
+                            sx={{ fontSize: "inherit", color: "inherit" }}
+                          >
+                            {row[column.key] ?? "--"}
+                          </Typography>
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={orderedColumns.length}
+                    align="center"
+                    sx={{ py: 6 }}
+                  >
+                    <Typography variant="body2" color="text.secondary" fontWeight={500}>
+                      No records found.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </Box>
+
+      {/* ── 4. Custom Footer / Pagination (Mockup matching) ──────────────── */}
+      <Box
+        sx={{
+          px: 3,
+          py: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderTop: "1px solid rgba(224, 224, 224, 1)",
+          bgcolor: "#ffffff",
+          flexWrap: "wrap",
+          gap: 2
+        }}
+      >
+        {/* Left Pagination metrics */}
+        <Stack direction="row" alignItems="center" spacing={2}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, color: "#64748b", fontSize: "0.75rem" }}>
+              Rows per page:
+            </Typography>
+            <Select
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
                 setPage(0);
               }}
+              size="small"
               sx={{
-                borderTop: `1px solid ${THEME.borderColor}`,
-                "& .MuiTablePagination-toolbar": { minHeight: 40 },
-                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  color: "text.secondary",
-                },
-                "& .MuiSelect-select": { fontSize: "0.75rem" },
+                height: 28,
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                color: "#1e293b",
+                "& .MuiSelect-select": { py: 0.5, px: 1 },
+                "& fieldset": { borderColor: "rgba(0,0,0,0.1)" },
               }}
-            />
-          </>
-        )}
+            >
+              {[5, 10, 15, 25, 50].map((val) => (
+                <MenuItem key={val} value={val} sx={{ fontSize: "0.75rem" }}>
+                  {val}
+                </MenuItem>
+              ))}
+            </Select>
+          </Box>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: "#64748b", fontSize: "0.75rem" }}>
+            Rows {totalRows} • Page {page + 1} of {totalPages}
+          </Typography>
+        </Stack>
+
+        {/* Right Pagination buttons */}
+        <Stack direction="row" alignItems="center" spacing={0.5}>
+          <IconButton
+            size="small"
+            disabled={page === 0}
+            onClick={() => setPage(0)}
+            sx={{ border: "1px solid rgba(224, 224, 224, 0.8)", borderRadius: "4px", p: 0.5 }}
+          >
+            <FirstPageIcon sx={{ fontSize: "1.1rem" }} />
+          </IconButton>
+          <Button
+            size="small"
+            disabled={page === 0}
+            onClick={() => setPage(prev => prev - 1)}
+            sx={{
+              border: "1px solid rgba(224, 224, 224, 0.8)",
+              borderRadius: "4px",
+              color: "#334155",
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              textTransform: "none",
+              px: 1.5,
+              minWidth: "unset",
+              height: 28,
+              "&:disabled": { color: "#cbd5e1" }
+            }}
+          >
+            Prev
+          </Button>
+          <Typography variant="caption" sx={{ mx: 1.5, fontWeight: 700, fontSize: "0.75rem", color: "#1e293b" }}>
+            {page + 1} / {totalPages}
+          </Typography>
+          <Button
+            size="small"
+            disabled={page >= totalPages - 1}
+            onClick={() => setPage(prev => prev + 1)}
+            sx={{
+              border: "1px solid rgba(224, 224, 224, 0.8)",
+              borderRadius: "4px",
+              color: "#334155",
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              textTransform: "none",
+              px: 1.5,
+              minWidth: "unset",
+              height: 28,
+              "&:disabled": { color: "#cbd5e1" }
+            }}
+          >
+            Next
+          </Button>
+          <IconButton
+            size="small"
+            disabled={page >= totalPages - 1}
+            onClick={() => setPage(totalPages - 1)}
+            sx={{ border: "1px solid rgba(224, 224, 224, 0.8)", borderRadius: "4px", p: 0.5 }}
+          >
+            <LastPageIcon sx={{ fontSize: "1.1rem" }} />
+          </IconButton>
+        </Stack>
       </Box>
     </Paper>
   );

@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Box, Grid, Typography, Card, CardContent, Divider, Chip } from "@mui/material";
 import dayjs from "dayjs";
-import { GetMembers } from "../services/memberService";
-import { GetRoles } from "../services/roleService";
-import AppDataTable from "../components/common/AppDataTable";
-import AppSelect from "../components/common/AppSelect";
-import AppButton from "../components/common/AppButton";
-import AppDialog from "../components/common/AppDialog";
-import { GetContributionsByEvent, RecordPayment } from "../services/contributionService";
-import { GetEvents } from "../services/eventService";
+import { GetMembers } from "../../services/memberService";
+import { GetRoles } from "../../services/roleService";
+import AppDataTable from "../../components/common/AppDataTable";
+import AppSelect from "../../components/common/AppSelect";
+import AppButton from "../../components/common/AppButton";
+import AppDialog from "../../components/common/AppDialog";
+import { GetContributionsByEvent, RecordPayment } from "../../services/contributionService";
+import { GetEvents } from "../../services/eventService";
+import { useAppToast } from "../../components/common/AppToast";
 
 export default function ContributionCalculationPage() {
   const [members, setMembers] = useState([]);
@@ -17,6 +18,8 @@ export default function ContributionCalculationPage() {
   const [loading, setLoading] = useState(true);
   const [calculationData, setCalculationData] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState("");
+  const [filterEventId, setFilterEventId] = useState("");
+  const toast = useAppToast();
 
   useEffect(() => {
     loadBaseData();
@@ -33,7 +36,10 @@ export default function ContributionCalculationPage() {
       setMembers(mems);
       setRoles(rls);
       setEvents(evts);
-      if (evts.length > 0) setSelectedEventId(evts[0].eventId);
+      if (evts.length > 0) {
+        setSelectedEventId(evts[0].eventId);
+        setFilterEventId(evts[0].eventId);
+      }
     } catch (error) {
       console.error("Error loading calculation data:", error);
     } finally {
@@ -112,15 +118,63 @@ export default function ContributionCalculationPage() {
         loading={loading}
         filterPanel={
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppSelect
-                label="Target Event for Calculation"
-                value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
-                options={events.map(e => ({ label: e.eventName, value: e.eventId }))}
-              />
+            <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <Box sx={{ minWidth: 220 }}>
+                <AppSelect
+                  label="Target Event"
+                  value={filterEventId}
+                  onChange={(e) => setFilterEventId(e.target.value)}
+                  options={events.map(e => ({ label: e.eventName, value: e.eventId }))}
+                  fullWidth
+                />
+              </Box>
+              <AppButton
+                variant="contained"
+                size="small"
+                onClick={() => {
+                  setSelectedEventId(filterEventId);
+                  toast.success("Calculation target updated");
+                }}
+                sx={{
+                  bgcolor: "#4a3f6b !important",
+                  color: "#ffffff",
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  "&:hover": { bgcolor: "#3b325c !important" }
+                }}
+              >
+                Filter
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  if (events.length > 0) {
+                    const firstEventId = events[0].eventId;
+                    setFilterEventId(firstEventId);
+                    setSelectedEventId(firstEventId);
+                  }
+                  toast.success("Filters reset to default");
+                }}
+                sx={{
+                  color: "#ef4444",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  "&:hover": {
+                    borderColor: "#ef4444",
+                    bgcolor: "rgba(239, 68, 68, 0.05)"
+                  }
+                }}
+              >
+                × Clear Filter
+              </AppButton>
             </Grid>
-            <Grid size={{ xs: 12, md: 8 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ p: 1.5, bgcolor: "rgba(108, 92, 231, 0.05)", borderRadius: "8px", border: "1px solid rgba(108, 92, 231, 0.1)" }}>
                 <Typography variant="caption" fontWeight={800} color="primary.main" sx={{ textTransform: "uppercase" }}>
                   Policy Summary
