@@ -19,6 +19,23 @@ export function AuthProvider({ children }) {
 
   async function login(credentials) {
     const { data } = await apiClient.post("/auth/login", credentials);
+    
+    // Save fetched menu rights dynamically to local storage for immediate routing and access control enforcement
+    if (data.rights && data.role) {
+      const savedRights = localStorage.getItem("projectRightsConfig");
+      let rightsMap = savedRights ? JSON.parse(savedRights) : {};
+      
+      rightsMap[data.role] = data.rights.map((r, idx) => ({
+        id: idx + 1,
+        module: r.module,
+        subModule: r.subModule,
+        page: r.page,
+        access: r.access
+      }));
+      
+      localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
+    }
+
     setAuthState(data);
     return data;
   }

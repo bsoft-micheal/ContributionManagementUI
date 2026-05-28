@@ -13,6 +13,7 @@ import ReportsPage from "../pages/reports/ReportsPage";
 import ContributionCalculationPage from "../pages/contributions/ContributionCalculationPage";
 import ExitProcessPage from "../pages/members/ExitProcessPage";
 import UserRightsPage from "../pages/members/UserRightsPage";
+import UsersPage from "../pages/members/UsersPage";
 
 export default function AppRoutes() {
   return (
@@ -36,6 +37,7 @@ export default function AppRoutes() {
         <Route path="/contribution-calculation" element={<ProtectedRoute><ContributionCalculationPage /></ProtectedRoute>} />
         <Route path="/exit-process" element={<ProtectedRoute><ExitProcessPage /></ProtectedRoute>} />
         <Route path="/user-rights" element={<ProtectedRoute roles={["Admin", "Manager"]}><UserRightsPage /></ProtectedRoute>} />
+        <Route path="/users" element={<ProtectedRoute roles={["Admin", "Manager"]}><UsersPage /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

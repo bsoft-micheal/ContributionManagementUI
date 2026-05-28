@@ -166,14 +166,14 @@ export default function ContributionsPage() {
         paymentDate: payment.paymentDate?.toISOString(),
         amount: payment.amount === "" ? null : Number(payment.amount),
       });
-      toast.success("Contribution marked as paid.");
+      toast.success("Saved successfully");
       setDialogOpen(false);
       
       // Reload the global list which automatically triggers the dependency recalculation
       const allData = await GetContributions();
       setAllContributions(allData);
     } catch (error) {
-      toast.error(error.response?.data?.message ?? "Unable to update contribution.");
+      toast.error(error.response?.data?.message ?? "Unable to save.");
     }
   }
 
@@ -185,7 +185,7 @@ export default function ContributionsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.3, alignItems: "center" }}>
-          <Tooltip title={row.paymentStatus === "Paid" ? "Already Paid" : (hasWriteAccess ? "Record Payment" : "Read Only Mode")}>
+          <Tooltip title={row.paymentStatus === "Paid" ? "Already Paid" : (hasWriteAccess ? "Record Payment" : "")}>
             <span>
               <IconButton
                 size="small"
@@ -271,7 +271,7 @@ export default function ContributionsPage() {
                 size="small"
                 onClick={() => {
                   setSelectedEventId(filterEventId);
-                  toast.success("Contributions filter applied");
+                 
                 }}
                 sx={{
                   bgcolor: "#4a3f6b !important",
@@ -294,7 +294,7 @@ export default function ContributionsPage() {
                     setFilterEventId(firstEventId);
                     setSelectedEventId(firstEventId);
                   }
-                  toast.success("Filter reset to default");
+                 
                 }}
                 sx={{
                   color: "#ef4444",
@@ -309,14 +309,14 @@ export default function ContributionsPage() {
                   }
                 }}
               >
-                × Clear Filter
+                Clear Filter
               </AppButton>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: "flex", gap: 3, alignItems: "center", justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Box>
                   <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.65rem" }}>
-                    Net Realized
+                   Total Income
                   </Typography>
                   <Typography variant="body1" fontWeight={900} color="success.main" sx={{ lineHeight: 1 }}>
                     ₹{contributions.filter(c => c.paymentStatus === "Paid").reduce((sum, c) => sum + c.amount, 0)}
@@ -324,7 +324,7 @@ export default function ContributionsPage() {
                 </Box>
                 <Box sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)", pl: 3 }}>
                   <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.65rem" }}>
-                     Enrollment
+                    Total Members
                   </Typography>
                   <Typography variant="body2" fontWeight={800} sx={{ lineHeight: 1 }}>{contributions.length} Members</Typography>
                 </Box>

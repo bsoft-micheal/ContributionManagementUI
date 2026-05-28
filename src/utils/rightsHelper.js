@@ -36,8 +36,9 @@ export function getRightsForPath(path, roleName) {
     else if (path === "/contribution-calculation") targetName = "Calculation";
     else if (path === "/reports") targetName = "Reports";
     else if (path === "/user-rights") targetName = "User Rights"; // Admin-only
+    else if (path === "/users")       targetName = "Users";        // Admin & Manager only
 
-    if (targetName === "User Rights") {
+    if (targetName === "User Rights" || targetName === "Users") {
       if (roleName === "Admin" || roleName === "Manager") {
         return { read: true, write: true, deny: false };
       }
@@ -67,7 +68,7 @@ export function getRightsForPage(pageName, roleName) {
     return { read: false, write: false, deny: true };
   }
 
-  if (pageName.toLowerCase() === "user rights") {
+  if (pageName.toLowerCase() === "user rights" || pageName.toLowerCase() === "users") {
     if (roleName === "Admin" || roleName === "Manager") {
       return { read: true, write: true, deny: false };
     }

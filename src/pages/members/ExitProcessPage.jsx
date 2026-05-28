@@ -60,7 +60,7 @@ export default function ExitProcessPage() {
 
       setExitCandidates(candidates);
     } catch (error) {
-      console.error("Error loading exit candidates:", error);
+      console.error("Failed to load", error);
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ export default function ExitProcessPage() {
 
   async function handleFinalExit(member) {
     if (!hasWriteAccess) {
-      toast.error("Access Denied: You do not have write permissions for this portal.");
+    
       return;
     }
     if (member.pendingAmount > 0) {
@@ -81,10 +81,10 @@ export default function ExitProcessPage() {
 
     try {
       await UpdateMember(member.memberId, { ...member, isExited: true, isActive: false });
-      toast.success(`${member.name} has been processed for exit.`);
+      toast.success("Saved successfully");
       loadExitData();
     } catch (error) {
-      toast.error("Failed to process member exit.");
+      toast.error("Failed to save");
     }
   }
 
@@ -153,7 +153,7 @@ export default function ExitProcessPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Member Exit Clearance Portal"
+        title="Member Exit Clearance"
         columns={columns}
         data={exitCandidates}
         loading={loading}

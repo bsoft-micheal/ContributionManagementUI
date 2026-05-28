@@ -9,6 +9,7 @@ import CalculateRoundedIcon from "@mui/icons-material/CalculateRounded";
 import PersonRemoveRoundedIcon from "@mui/icons-material/PersonRemoveRounded";
 import SettingsSuggestRoundedIcon from "@mui/icons-material/SettingsSuggestRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
+import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
 
 export const navigationItems = [
   { label: "Dashboard",                 path: "/",              icon: <DashboardRoundedIcon fontSize="small" /> },
@@ -25,6 +26,7 @@ export const navigationItems = [
       { label: "Event Types",             path: "/event-types",  icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { label: "Exit Process",            path: "/exit-process", icon: <PersonRemoveRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { label: "User Rights",             path: "/user-rights",  icon: <AdminPanelSettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { label: "Users",                     path: "/users",         icon: <ManageAccountsRoundedIcon    sx={{ fontSize: "1rem" }} /> },
     ]
   },
   { label: "Reports",                   path: "/reports",       icon: <AssessmentRoundedIcon fontSize="small" /> },

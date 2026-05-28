@@ -53,15 +53,15 @@ export default function RolesPage() {
     try {
       if (form.roleId) {
         await UpdateRole(form.roleId, form);
-        toast.success("Strategic role updated");
+        toast.success("Saved successfully");
       } else {
         await CreateRole(form);
-        toast.success("New operational role established");
+        toast.success("Saved successfully");
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error("Role synchronization failed");
+      toast.error("Failed to save");
     }
   }
 
@@ -92,7 +92,7 @@ export default function RolesPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Institutional Role Configuration"
+        title="Manage Employer Role"
         columns={columns}
         data={roles}
         loading={loading}
@@ -110,7 +110,7 @@ export default function RolesPage() {
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title={form.roleId ? "Modify Role Designation" : "Establish New Role"}
+        title={form.roleId ? "Edit Role" : "Add Role"}
         actions={
           <>
             <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
@@ -121,7 +121,7 @@ export default function RolesPage() {
         <Grid container spacing={3}>
           <Grid size={{ xs: 12 }}>
             <AppInput 
-              label="Role Name" 
+              label="Role" 
               fullWidth 
               value={form.roleName} 
               onChange={(e) => {
@@ -137,7 +137,7 @@ export default function RolesPage() {
           </Grid>
           <Grid size={{ xs: 12 }}>
             <AppInput 
-              label="Default Contribution" 
+              label="Contribution" 
               type="number" 
               fullWidth 
               value={form.defaultContributionAmount} 

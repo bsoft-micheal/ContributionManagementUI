@@ -41,7 +41,7 @@ export default function ContributionCalculationPage() {
         setFilterEventId(evts[0].eventId);
       }
     } catch (error) {
-      console.error("Error loading calculation data:", error);
+      console.error("Failed to load calculation data:", error);
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ export default function ContributionCalculationPage() {
   const columns = [
     { label: "Member Name", key: "name", render: (row) => <Typography variant="body2" fontWeight={700}>{row.name}</Typography> },
     { label: "Joining Date", key: "joiningDate", render: (row) => dayjs(row.joiningDate).format("DD/MM/YYYY") },
-    { label: "Tenure (Yrs)", key: "tenure", align: "right" },
+    { label: "No of Years", key: "tenure", align: "right" },
     { 
       label: "Rule Applied", 
       render: (row) => (
@@ -112,7 +112,7 @@ export default function ContributionCalculationPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Contribution Calculation Matrix"
+        title="Contribution Calculation"
         columns={columns}
         data={calculationData}
         loading={loading}
@@ -121,7 +121,7 @@ export default function ContributionCalculationPage() {
             <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
               <Box sx={{ minWidth: 220 }}>
                 <AppSelect
-                  label="Target Event"
+                  label="Planned Event"
                   value={filterEventId}
                   onChange={(e) => setFilterEventId(e.target.value)}
                   options={events.map(e => ({ label: e.eventName, value: e.eventId }))}
@@ -133,7 +133,7 @@ export default function ContributionCalculationPage() {
                 size="small"
                 onClick={() => {
                   setSelectedEventId(filterEventId);
-                  toast.success("Calculation target updated");
+                 
                 }}
                 sx={{
                   bgcolor: "#4a3f6b !important",
@@ -156,7 +156,7 @@ export default function ContributionCalculationPage() {
                     setFilterEventId(firstEventId);
                     setSelectedEventId(firstEventId);
                   }
-                  toast.success("Filters reset to default");
+               
                 }}
                 sx={{
                   color: "#ef4444",
@@ -171,16 +171,16 @@ export default function ContributionCalculationPage() {
                   }
                 }}
               >
-                × Clear Filter
+                Clear Filter
               </AppButton>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ p: 1.5, bgcolor: "rgba(108, 92, 231, 0.05)", borderRadius: "8px", border: "1px solid rgba(108, 92, 231, 0.1)" }}>
                 <Typography variant="caption" fontWeight={800} color="primary.main" sx={{ textTransform: "uppercase" }}>
-                  Policy Summary
+                Policy Details
                 </Typography>
                 <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-                  Members with tenure &lt; 1 year pay 50%. Tenure is calculated relative to the event date.
+                Members with less than 1 year of membership should pay 50%. Membership duration is calculated based on the event date.
                 </Typography>
               </Box>
             </Grid>

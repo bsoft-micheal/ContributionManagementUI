@@ -92,18 +92,18 @@ export default function EventsPage() {
           ...form,
           eventDate: dayjs(form.eventDate).hour(12).toISOString()
         });
-        toast.success("Operational event modified");
+        toast.success("Saved successfully");
       } else {
         await CreateEvent({
           ...form,
           eventDate: dayjs(form.eventDate).hour(12).toISOString()
         });
-        toast.success("New operational cycle scheduled");
+        toast.success("Saved successfully");
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error("Failed to synchronize event scheduling");
+      toast.error("Failed to save");
     }
   }
 
@@ -174,7 +174,7 @@ export default function EventsPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Active Scheduled Events"
+        title="Manage Active Events"
         columns={columns}
         data={events}
         actions={
@@ -212,7 +212,7 @@ export default function EventsPage() {
                 size="small"
                 onClick={() => {
                   setFilters({ month: filterMonth, year: filterYear });
-                  toast.success("Event filters applied");
+                 
                 }}
                 sx={{
                   bgcolor: "#4a3f6b !important",
@@ -250,13 +250,13 @@ export default function EventsPage() {
                   }
                 }}
               >
-                × Clear Filter
+                Clear Filter
               </AppButton>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 3, justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: "uppercase", fontSize: "0.65rem" }}>Projected Revenue</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: "uppercase", fontSize: "0.65rem" }}>Expected Amount</Typography>
                   <Typography variant="body2" fontWeight={800} color="primary.main" display="block">₹{events.reduce((sum, e) => sum + e.totalExpectedAmount, 0)}</Typography>
                 </Box>
               </Box>
@@ -349,7 +349,7 @@ export default function EventsPage() {
       <AppDialog
         open={viewDialogOpen}
         onClose={() => setViewDialogOpen(false)}
-        title="Event Details Overview"
+        title="Event Details"
         maxWidth="md"
         actions={<AppButton variant="text" color="inherit" onClick={() => setViewDialogOpen(false)}>Close</AppButton>}
       >

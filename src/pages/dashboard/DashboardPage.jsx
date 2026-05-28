@@ -34,20 +34,22 @@ export default function DashboardPage() {
     loadData();
   }, [filters]);
 
-  const monthOptions = Array.from({ length: 12 }, (_, i) => ({ 
-    label: dayjs().month(i).format("MMMM"), 
-    value: i + 1 
+  const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+    label: dayjs().month(i).format("MMMM"),
+    value: i + 1
   }));
 
   const columns = [
-    { label: "Event",    key: "eventName",    render: (row) => <Typography variant="body2" fontWeight={700} color="primary.main">{row.eventName}</Typography> },
-    { label: "Category", key: "eventTypeName", render: (row) => (
-      <Typography variant="caption" fontWeight={700}
-        sx={{ bgcolor: "rgba(74,63,107,0.08)", color: "#4a3f6b", px: 1.2, py: 0.3, borderRadius: "3px", fontSize: "0.75rem" }}
-      >{row.eventTypeName}</Typography>
-    )},
-    { label: "Date",     key: "eventDate",    render: (row) => dayjs(row.eventDate).format("DD MMM YYYY") },
-    { label: "Amount",   key: "expectedAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{row.expectedAmount}</Typography> },
+    { label: "Event", key: "eventName", render: (row) => <Typography variant="body2" fontWeight={700} color="primary.main">{row.eventName}</Typography> },
+    {
+      label: "Category", key: "eventTypeName", render: (row) => (
+        <Typography variant="caption" fontWeight={700}
+          sx={{ bgcolor: "rgba(74,63,107,0.08)", color: "#4a3f6b", px: 1.2, py: 0.3, borderRadius: "3px", fontSize: "0.75rem" }}
+        >{row.eventTypeName}</Typography>
+      )
+    },
+    { label: "Date", key: "eventDate", render: (row) => dayjs(row.eventDate).format("DD MMM YYYY") },
+    { label: "Amount", key: "expectedAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{row.expectedAmount}</Typography> },
   ];
 
   return (
@@ -101,35 +103,35 @@ export default function DashboardPage() {
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   <Grid size={{ xs: 12, md: 4 }}>
                     <MetricCard
-                      label="Active Cycles"
+                      label="Active Events"
                       value={summary?.monthlyEventsCount ?? 0}
-                      helper="Event operations registered for current window"
+                      helper="Current Event Information"
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 4 }}>
                     <MetricCard
-                      label="Net Collections"
+                      label="Total Collections"
                       value={`₹${summary?.totalContributions ?? 0}`}
-                      helper="Gross realized capital across all active events"
+                      helper="Total Collection Amount for the Current Event"
                       accent="secondary.main"
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 4 }}>
                     <MetricCard
-                      label="Compliance Gap"
+                      label="Short Fall"
                       value={summary?.pendingPayments ?? 0}
-                      helper="Pending member transactions requiring audit"
+                      helper="Pending Collections for the Current Event"
                       accent="error.main"
                     />
                   </Grid>
                 </Grid>
 
                 <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 2, color: "text.secondary", textTransform: "uppercase" }}>
-                  Strategic Forecast (Next 14 Days)
+                  Upcoming Events
                 </Typography>
-                
+
                 <AppDataTable
-                  title="Forecasted Operations (Next 14 Days)"
+                  title="Upcoming Events (Next 14 Days)"
                   columns={columns}
                   data={summary?.upcomingEvents ?? []}
                   loading={false}

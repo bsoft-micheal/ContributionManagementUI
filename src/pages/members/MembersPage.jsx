@@ -99,15 +99,15 @@ export default function MembersPage() {
     try {
       if (form.memberId) {
         await UpdateMember(form.memberId, form);
-        toast.success("Personnel record updated successfully");
+        toast.success("Saved successfully");
       } else {
         await CreateMember(form);
-        toast.success("New personnel successfully onboarded");
+        toast.success("Saved successfully");
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error("Critical synchronization error encountered");
+      toast.error("Failed to save");
     }
   }
 
@@ -120,10 +120,10 @@ export default function MembersPage() {
     if (memberToDelete) {
       try {
         await DeleteMember(memberToDelete);
-        toast.info("Record moved to historical archives");
+        toast.success("Deleted successfully");
         loadData();
       } catch (error) {
-        toast.error("Failed to archive record");
+        toast.error("Failed to delete");
       } finally {
         setDeleteConfirmOpen(false);
         setMemberToDelete(null);
@@ -142,7 +142,7 @@ export default function MembersPage() {
       sx: { width: 90 },
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title={hasWriteAccess ? "Edit" : "Read Only Mode"}>
+          <Tooltip title={hasWriteAccess ? "Edit" : ""}>
             <span>
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => {
                 setForm({
@@ -157,7 +157,7 @@ export default function MembersPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete" : "Read Only Mode"}>
+          <Tooltip title={hasWriteAccess ? "Delete" : ""}>
             <span>
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => handleDeleteRequest(row.memberId)}>
                 <DeleteIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? "#4a3f6b" : "#cbd5e1" }} />
@@ -195,7 +195,7 @@ export default function MembersPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Member Directory"
+        title="Manage Members Details"
         columns={columns}
         data={filteredMembers}
         loading={loading}
@@ -218,11 +218,12 @@ export default function MembersPage() {
             <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
               <Box sx={{ minWidth: 200 }}>
                 <AppSelect
-                  label="Filter by Role"
+                  label="Select Role"
                   value={filterRoleId}
                   onChange={(e) => setFilterRoleId(e.target.value)}
-                  options={[{ label: "All Roles", value: "" }, ...roleOptions]}
+                  options={[...roleOptions]}
                   size="small"
+                  placeholder="Select Role"
                   fullWidth
                 />
               </Box>
@@ -231,7 +232,7 @@ export default function MembersPage() {
                 size="small"
                 onClick={() => {
                   setAppliedRoleId(filterRoleId);
-                  toast.success(filterRoleId ? "Role filter applied" : "Filter cleared");
+                 
                 }}
                 sx={{
                   bgcolor: "#4a3f6b !important",
@@ -266,7 +267,7 @@ export default function MembersPage() {
                   }
                 }}
               >
-                × Clear Filter
+                Clear Filter
               </AppButton>
             </Grid>
           </Grid>
@@ -276,7 +277,7 @@ export default function MembersPage() {
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title={form.memberId ? "Update Personnel Record" : "New Personnel Enrollment"}
+        title={form.memberId ? "Edit Member" : "Add Member"}
         actions={
           <>
             <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
@@ -371,8 +372,8 @@ export default function MembersPage() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Confirm Archival"
-        content="Perform archival of this personnel record?"
+        title="Confirm"
+        content="Are you sure you want to delete this record?"
       />
     </div>
   );

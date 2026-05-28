@@ -121,7 +121,7 @@ export default function CalendarPage() {
 
   const handleDateClick = (day) => {
     if (!hasWriteAccess) {
-      toast.error("You do not have permission to schedule events (Read Only Mode)");
+      
       return;
     }
     setForm({
@@ -140,7 +140,7 @@ export default function CalendarPage() {
       const data = await GetContributionsByEvent(eventItem.eventId);
       setContributions(data);
     } catch (error) {
-      console.error("Error loading contributions for event:", error);
+      console.error("Failed to load:", error);
     }
   };
 
@@ -163,7 +163,7 @@ export default function CalendarPage() {
         ...form,
         eventDate: form.eventDate.hour(12).toISOString()
       });
-      toast.success("Event successfully scheduled and added to calendar");
+      toast.success("Saved successfully");
       setDialogOpen(false);
       loadCalendarData();
     } catch (error) {
@@ -195,7 +195,7 @@ export default function CalendarPage() {
               <Grid size={{ xs: 12, md: 3 }}>
                 <AppSelect
                   size="small"
-                  label="Contextual Month"
+                  label="Month"
                   value={filters.month}
                   onChange={(event) => setFilters((current) => ({ ...current, month: Number(event.target.value) }))}
                   options={monthOptions}
@@ -205,7 +205,7 @@ export default function CalendarPage() {
               <Grid size={{ xs: 12, md: 2 }}>
                 <AppInput
                   size="small"
-                  label="Fiscal Year"
+                  label="Year"
                   type="number"
                   value={filters.year}
                   onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
@@ -215,7 +215,7 @@ export default function CalendarPage() {
               <Grid size={{ xs: 12, md: 7 }}>
                  <Stack direction="column" justifyContent="center" sx={{ height: "100%", ml: { md: 2 } }}>
                    <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", mb: 0.2 }}>
-                     Organization Pulse (Current window)
+                    Current Month's Event Status
                    </Typography>
                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
                       {Object.entries(
@@ -342,7 +342,7 @@ export default function CalendarPage() {
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title="Schedule New Operation"
+        title="Add Events"
         actions={
           <>
             <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
@@ -424,7 +424,7 @@ export default function CalendarPage() {
       <AppDialog
         open={viewDialogOpen}
         onClose={() => setViewDialogOpen(false)}
-        title="Event Intelligence Overview"
+        title="Event Details"
         maxWidth="md"
         actions={<AppButton variant="text" color="inherit" onClick={() => setViewDialogOpen(false)}>Close</AppButton>}
       >

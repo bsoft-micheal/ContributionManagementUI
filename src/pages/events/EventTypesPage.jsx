@@ -51,15 +51,15 @@ export default function EventTypesPage() {
     try {
       if (form.eventTypeId) {
         await UpdateEventType(form.eventTypeId, form);
-        toast.success("Strategic category updated");
+        toast.success("Saved successfully");
       } else {
         await CreateEventType(form);
-        toast.success("New operational category established");
+        toast.success("Saved successfully");
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error("Failed to synchronize category records");
+      toast.error("Failed to save");
     }
   }
 
@@ -67,7 +67,7 @@ export default function EventTypesPage() {
     {
       label: "Action",
       render: (row) => (
-        <Tooltip title={hasWriteAccess ? "Edit Category" : "Read Only Mode"}>
+        <Tooltip title={hasWriteAccess ? "Edit Category" : ""}>
           <span>
             <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}>
               <EditIcon sx={{ fontSize: "1.1rem", color: hasWriteAccess ? "#4a3f6b" : "#cbd5e1" }} />
@@ -94,7 +94,7 @@ export default function EventTypesPage() {
             letterSpacing: "0.04em"
           }}
         >
-          {row.isActive ? "Active" : "Archived"}
+          {row.isActive ? "Active" : "Inactive"}
         </Typography>
       )
     },
@@ -103,7 +103,7 @@ export default function EventTypesPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Event Classification Registry"
+        title="Manage Event Type"
         columns={columns}
         data={types}
         loading={loading}
@@ -122,7 +122,7 @@ export default function EventTypesPage() {
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title={form.eventTypeId ? "Modify Category" : "Add Strategic Category"}
+        title={form.eventTypeId ? "Edit Event Type" : "Add Event Type"}
         actions={
           <>
             <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
@@ -132,7 +132,7 @@ export default function EventTypesPage() {
       >
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <AppInput 
-            label="Event Type Name" 
+            label="Event Type" 
             fullWidth 
             value={form.eventTypeName} 
             onChange={(e) => {
@@ -152,7 +152,7 @@ export default function EventTypesPage() {
                 onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))} 
               />
             }
-            label={<Typography variant="body2" fontWeight={700}>Visible in Selection Menus</Typography>}
+            label={<Typography variant="body2" fontWeight={700}>Active Or InActive types</Typography>}
           />
         </Box>
       </AppDialog>

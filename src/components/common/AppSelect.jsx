@@ -1,4 +1,5 @@
-import { MenuItem, TextField, Box, Typography } from "@mui/material";
+import { MenuItem, TextField, Box, Typography, IconButton } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 
 export default function AppSelect({
   label,
@@ -43,6 +44,29 @@ export default function AppSelect({
         fullWidth={fullWidth}
         variant="outlined"
         size={size}
+        SelectProps={{
+          endAdornment: value && onChange && !props.disabled ? (
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange({ target: { value: "" } });
+              }}
+              sx={{
+                position: "absolute",
+                right: 28,
+                top: "50%",
+                transform: "translateY(-50%)",
+                padding: "2px",
+                color: "#9ca3af",
+                "&:hover": { color: "#ef4444" },
+                zIndex: 2,
+              }}
+            >
+              <CloseIcon sx={{ fontSize: "0.95rem" }} />
+            </IconButton>
+          ) : null
+        }}
         sx={{
           "& .MuiOutlinedInput-root": {
             fontSize: "0.82rem",
@@ -51,6 +75,7 @@ export default function AppSelect({
             height: size === "small" ? 34 : 40,
             "& .MuiSelect-select": {
               py: size === "small" ? 0.7 : 1,
+              pr: value && onChange && !props.disabled ? "40px !important" : "24px !important",
             },
             "& fieldset": {
               borderColor: "rgba(74, 63, 107, 0.2)",
