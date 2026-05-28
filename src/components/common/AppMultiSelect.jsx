@@ -13,6 +13,26 @@ export default function AppMultiSelect({
   required = false,
   ...props
 }) {
+  const allSelected = options.length > 0 && value.length === options.length;
+
+  const handleSelectChange = (event) => {
+    const {
+      target: { value: selectedValues },
+    } = event;
+
+    if (selectedValues.includes("select-all")) {
+      if (allSelected) {
+        // Deselect all
+        onChange({ target: { value: [] } });
+      } else {
+        // Select all
+        onChange({ target: { value: options.map((o) => o.value) } });
+      }
+    } else {
+      onChange(event);
+    }
+  };
+
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
       {label && (
@@ -39,7 +59,7 @@ export default function AppMultiSelect({
       <TextField
         select
         value={value}
-        onChange={onChange}
+        onChange={handleSelectChange}
         fullWidth={fullWidth}
         variant="outlined"
         size={size}
@@ -50,6 +70,7 @@ export default function AppMultiSelect({
               return <em style={{ color: "#9ca3af", fontSize: "0.85rem", fontStyle: "normal" }}>{placeholder}</em>;
             }
             return selected
+              .filter((val) => val !== "select-all")
               .map((val) => {
                 const opt = options.find((o) => o.value === val);
                 return opt ? opt.label : val;
@@ -85,6 +106,29 @@ export default function AppMultiSelect({
         helperText={helperText}
         {...props}
       >
+        {options.length > 0 && (
+          <MenuItem
+            key="select-all"
+            value="select-all"
+            sx={{ fontSize: "0.85rem", py: 0.5, fontWeight: "bold" }}
+          >
+            <Checkbox
+              checked={allSelected}
+              indeterminate={value.length > 0 && value.length < options.length}
+              size="small"
+              sx={{
+                color: "rgba(74, 63, 107, 0.4)",
+                "&.Mui-checked, &.MuiCheckbox-indeterminate": {
+                  color: "#4a3f6b",
+                },
+              }}
+            />
+            <ListItemText
+              primary="Select All"
+              primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: "bold" }}
+            />
+          </MenuItem>
+        )}
         {options.map((option) => {
           const isChecked = value.includes(option.value);
           return (

@@ -44,12 +44,33 @@ export function AuthProvider({ children }) {
     setAuthState(null);
   }
 
+  async function updateProfile(profileData) {
+    const payload = {
+      fullName: profileData.fullName,
+      email: profileData.email,
+      profileImage: profileData.profileImage,
+    };
+
+    const { data } = await apiClient.put("/users/profile", payload);
+
+    setAuthState((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        fullName: data.fullName || current.fullName,
+        email: data.email || current.email,
+        profileImage: data.profileImage,
+      };
+    });
+  }
+
   return (
     <AuthContext.Provider
       value={{
         authState,
         login,
         logout,
+        updateProfile,
         isAuthenticated: Boolean(authState?.token),
       }}
     >

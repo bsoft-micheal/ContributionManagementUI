@@ -127,7 +127,7 @@ export default function CalendarPage() {
     setForm({
       ...initialForm,
       eventDate: day,
-      participantIds: members.map(m => m.memberId), // Default to selecting all participants
+      participantIds: [], // Start with no members selected by default
     });
     setErrors({});
     setDialogOpen(true);

@@ -73,8 +73,13 @@ export default function ContributionsPage() {
           setSelectedEventId(data[0].eventId);
           setFilterEventId(data[0].eventId);
         }
-        const allData = await GetContributions();
-        setAllContributions(allData);
+        try {
+          const allData = await GetContributions();
+          setAllContributions(allData);
+        } catch (allDataErr) {
+          console.warn("Global contributions endpoint not available yet:", allDataErr);
+          setAllContributions([]);
+        }
       } catch (error) {
         console.error("Error loading events & contributions:", error);
       }
@@ -169,9 +174,29 @@ export default function ContributionsPage() {
       toast.success("Saved successfully");
       setDialogOpen(false);
       
-      // Reload the global list which automatically triggers the dependency recalculation
-      const allData = await GetContributions();
-      setAllContributions(allData);
+      // Reload the lists which automatically triggers the dependency recalculation
+      try {
+        const allData = await GetContributions();
+        setAllContributions(allData);
+      } catch (err) {
+        console.warn("Could not load global contributions for arrears, falling back to local reload:", err);
+        // Fallback: reload this event's contributions directly
+        if (selectedEventId) {
+          const data = await GetContributionsByEvent(selectedEventId);
+          const selectedEvent = events.find(e => e.eventId === selectedEventId);
+          const enrichedData = data.map(c => {
+            const member = members.find(m => m.memberId === c.memberId);
+            const role = member ? roles.find(r => r.roleId === member.roleId) : null;
+            const event = events.find(e => e.eventId === c.eventId) || selectedEvent;
+            return {
+              ...c,
+              previousUnpaid: 0,
+              totalAccumulated: getContributionOutstanding(c, member, role, event)
+            };
+          });
+          setContributions(enrichedData);
+        }
+      }
     } catch (error) {
       toast.error(error.response?.data?.message ?? "Unable to save.");
     }
