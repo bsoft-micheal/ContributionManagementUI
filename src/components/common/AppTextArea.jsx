@@ -7,6 +7,9 @@ export default function AppTextArea({
   fullWidth = true,
   placeholder,
   minRows = 3,
+  error = false,
+  helperText = "",
+  required = false,
   ...props
 }) {
   return (
@@ -25,6 +28,11 @@ export default function AppTextArea({
           }}
         >
           {label}
+          {required && (
+            <Box component="span" sx={{ color: "#d32f2f", ml: 0.5, fontSize: "1rem", lineHeight: 0 }}>
+              *
+            </Box>
+          )}
         </Typography>
       )}
       <TextField
@@ -71,6 +79,8 @@ export default function AppTextArea({
           },
           transition: "all 0.2s ease",
         }}
+        error={error}
+        helperText={helperText}
         {...props}
       />
     </Box>

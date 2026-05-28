@@ -11,11 +11,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
 
-import MetricCard from "../components/MetricCard";
-import apiClient from "../services/apiClient";
-import AppDataTable from "../components/common/AppDataTable";
-import AppButton from "../components/common/AppButton";
-import PageHeader from "../components/PageHeader";
+import MetricCard from "../../components/MetricCard";
+import apiClient from "../../services/apiClient";
+import AppDataTable from "../../components/common/AppDataTable";
+import AppButton from "../../components/common/AppButton";
+import PageHeader from "../../components/PageHeader";
 
 export default function EventDetailsPage() {
   const { id } = useParams();

@@ -8,6 +8,9 @@ export default function AppInput({
   fullWidth = true,
   placeholder,
   size = "small",
+  error = false,
+  helperText = "",
+  required = false,
   ...props
 }) {
   return (
@@ -26,6 +29,11 @@ export default function AppInput({
           }}
         >
           {label}
+          {required && (
+            <Box component="span" sx={{ color: "#d32f2f", ml: 0.5, fontSize: "1rem", lineHeight: 0 }}>
+              *
+            </Box>
+          )}
         </Typography>
       )}
       <TextField
@@ -58,6 +66,8 @@ export default function AppInput({
           },
           transition: "all 0.2s ease",
         }}
+        error={error}
+        helperText={helperText}
         {...props}
       />
     </Box>

@@ -13,46 +13,16 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
-import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";
-import EventRoundedIcon from "@mui/icons-material/EventRounded";
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
-import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
-import CategoryRoundedIcon from "@mui/icons-material/CategoryRounded";
-import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
-import CalculateRoundedIcon from '@mui/icons-material/CalculateRounded';
-import PersonRemoveRoundedIcon from '@mui/icons-material/PersonRemoveRounded';
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
-import SettingsSuggestRoundedIcon from '@mui/icons-material/SettingsSuggestRounded';
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { navigationItems } from "../../config/menuConfig";
+import { getRightsForPath } from "../../utils/rightsHelper";
 
 const drawerWidth = 240;
-
-const navigationItems = [
-  { label: "Dashboard",     path: "/",              icon: <DashboardRoundedIcon fontSize="small" /> },
-  { label: "Members",       path: "/members",        icon: <Diversity3RoundedIcon fontSize="small" />, adminOnly: true },
-  
-  { label: "Events",        path: "/events",         icon: <EventRoundedIcon fontSize="small" /> },
-  { label: "Contributions", path: "/contributions",  icon: <SavingsRoundedIcon fontSize="small" /> },
-  { label: "Calculation",   path: "/contribution-calculation", icon: <CalculateRoundedIcon fontSize="small" />, adminOnly: true },
-  { label: "Calendar",      path: "/calendar",       icon: <CalendarMonthRoundedIcon fontSize="small" /> },
-  { 
-    label: "Support Data",
-    id: "master",
-    icon: <SettingsSuggestRoundedIcon fontSize="small" />,
-    adminOnly: true,
-    children: [
-      { label: "Event Types",   path: "/event-types",    icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { label: "Exit Process",  path: "/exit-process",   icon: <PersonRemoveRoundedIcon sx={{ fontSize: "1rem" }} /> },
-    ]
-  },
-  { label: "Reports",       path: "/reports",        icon: <AssessmentRoundedIcon fontSize="small" />, adminOnly: true },
-];
 
 // ─── Sidebar colours (matches table header #4a3f6b family) ──────────────────
 const SIDEBAR = {
@@ -87,7 +57,18 @@ export default function AppLayout() {
   const renderNavItem = (item, isChild = false) => {
     if (item.adminOnly && authState?.role !== "Admin") return null;
 
+    if (item.path) {
+      const rights = getRightsForPath(item.path, authState?.role);
+      if (rights.deny) return null;
+    }
+
     if (item.children) {
+      const allChildrenDenied = item.children.every(child => {
+        const rights = getRightsForPath(child.path, authState?.role);
+        return rights.deny;
+      });
+      if (allChildrenDenied) return null;
+
       const open = masterOpen;
       const active = isChildActive(item);
 
@@ -243,7 +224,7 @@ export default function AppLayout() {
       </Box>
 
       {/* ── Sidebar ───────────────────────────────────────────────────────── */}
-      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
+      <Box component="nav" sx={{ width: { md: drawerWidth }, minWidth: { md: drawerWidth }, flexShrink: 0 }}>
         {/* Mobile */}
         <Drawer
           variant="temporary"
@@ -262,6 +243,8 @@ export default function AppLayout() {
           variant="permanent"
           sx={{
             display: { xs: "none", md: "block" },
+            width: drawerWidth,
+            flexShrink: 0,
             "& .MuiDrawer-paper": {
               width: drawerWidth,
               boxSizing: "border-box",
@@ -282,6 +265,7 @@ export default function AppLayout() {
           flexGrow: 1,
           p: { xs: 2, md: 3 },
           width: { md: `calc(100% - ${drawerWidth}px)` },
+          minWidth: 0, // Prevent table from overflowing flexbox
           minHeight: "100vh",
           bgcolor: "#f5f4fb",
         }}

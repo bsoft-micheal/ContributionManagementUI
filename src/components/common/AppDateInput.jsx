@@ -8,6 +8,9 @@ export default function AppDateInput({
   format = "DD/MM/YYYY",
   fullWidth = true,
   size = "small",
+  error = false,
+  helperText = "",
+  required = false,
   ...props
 }) {
   return (
@@ -26,6 +29,11 @@ export default function AppDateInput({
           }}
         >
           {label}
+          {required && (
+            <Box component="span" sx={{ color: "#d32f2f", ml: 0.5, fontSize: "1rem", lineHeight: 0 }}>
+              *
+            </Box>
+          )}
         </Typography>
       )}
       <DatePicker
@@ -37,6 +45,8 @@ export default function AppDateInput({
             fullWidth: fullWidth,
             size: size,
             placeholder: `Select ${label?.toLowerCase() || "date"}...`,
+            error: error,
+            helperText: helperText,
             InputProps: {
               sx: {
                 borderRadius: "6px",

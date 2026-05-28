@@ -2,14 +2,19 @@ import React, { useEffect, useState } from "react";
 import { Box, Grid, Typography, Chip, Tooltip, IconButton, Avatar } from "@mui/material";
 import { ExitToApp as ExitIcon, CheckCircle as CheckCircleIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
-import { GetMembers, UpdateMember } from "../services/memberService";
-import { GetContributions } from "../services/contributionService";
-import { GetEvents } from "../services/eventService";
-import AppDataTable from "../components/common/AppDataTable";
-import AppButton from "../components/common/AppButton";
-import { useAppToast } from "../components/common/AppToast";
+import { GetMembers, UpdateMember } from "../../services/memberService";
+import { GetContributions } from "../../services/contributionService";
+import { GetEvents } from "../../services/eventService";
+import AppDataTable from "../../components/common/AppDataTable";
+import AppButton from "../../components/common/AppButton";
+import { useAppToast } from "../../components/common/AppToast";
+import { useAuth } from "../../contexts/AuthContext";
+import { getRightsForPage } from "../../utils/rightsHelper";
 
 export default function ExitProcessPage() {
+  const { authState } = useAuth();
+  const hasWriteAccess = getRightsForPage("Exit Process", authState?.role).write;
+
   const [exitCandidates, setExitCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useAppToast();
@@ -62,6 +67,10 @@ export default function ExitProcessPage() {
   }
 
   async function handleFinalExit(member) {
+    if (!hasWriteAccess) {
+      toast.error("Access Denied: You do not have write permissions for this portal.");
+      return;
+    }
     if (member.pendingAmount > 0) {
       if (!window.confirm(`Member has ₹${member.pendingAmount} in outstanding dues. Proceed with exit anyway?`)) {
         return;
@@ -126,9 +135,14 @@ export default function ExitProcessPage() {
           size="small"
           variant="contained"
           color="error"
+          disabled={!hasWriteAccess}
           startIcon={<ExitIcon sx={{ fontSize: "1rem" }} />}
           onClick={() => handleFinalExit(row)}
-          sx={{ fontSize: "0.7rem", py: 0.5 }}
+          sx={{ 
+            fontSize: "0.7rem", 
+            py: 0.5,
+            ...( !hasWriteAccess ? { bgcolor: "#cbd5e1 !important", color: "#94a3b8 !important" } : {} )
+          }}
         >
           Process Exit
         </AppButton>
