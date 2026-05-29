@@ -58,6 +58,8 @@ export default function AppLayout() {
     fullName: "",
     email: "",
     profileImage: "",
+    password: "",
+    confirmPassword: "",
   });
   const [profileErrors, setProfileErrors] = useState({});
 
@@ -68,6 +70,8 @@ export default function AppLayout() {
         fullName: authState.fullName || "",
         email: authState.email || "",
         profileImage: authState.profileImage || "",
+        password: "",
+        confirmPassword: "",
       });
       setProfileErrors({});
     }
@@ -84,6 +88,15 @@ export default function AppLayout() {
       errors.email = "Invalid email address";
     }
 
+    if (profileForm.password) {
+      if (profileForm.password.length < 6) {
+        errors.password = "Password must be at least 6 characters";
+      }
+      if (profileForm.password !== profileForm.confirmPassword) {
+        errors.confirmPassword = "Passwords do not match";
+      }
+    }
+
     if (Object.keys(errors).length > 0) {
       setProfileErrors(errors);
       toast.error("Please correct the errors before saving");
@@ -95,6 +108,7 @@ export default function AppLayout() {
         fullName: profileForm.fullName.trim(),
         email: profileForm.email.trim(),
         profileImage: profileForm.profileImage,
+        password: profileForm.password || undefined,
       });
 
       toast.success("Profile updated successfully!");
@@ -354,7 +368,8 @@ export default function AppLayout() {
         open={profileDialogOpen}
         onClose={() => setProfileDialogOpen(false)}
         title="My Profile"
-        maxWidth="xs"
+        maxWidth="sm"
+        showCloseIcon={false}
         actions={
           <>
             <AppButton
@@ -380,39 +395,83 @@ export default function AppLayout() {
             helperText="Click or hover to change profile picture"
           />
 
-          <AppInput
-            label="Name"
-            value={profileForm.fullName}
-            onChange={(e) => {
-              setProfileForm((prev) => ({ ...prev, fullName: e.target.value }));
-              if (profileErrors.fullName) setProfileErrors((prev) => ({ ...prev, fullName: "" }));
-            }}
-            error={!!profileErrors.fullName}
-            helperText={profileErrors.fullName}
-            required
-          />
+          <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", sm: "row" } }}>
+            <Box sx={{ flex: 1 }}>
+              <AppInput
+                label="Name"
+                value={profileForm.fullName}
+                onChange={(e) => {
+                  setProfileForm((prev) => ({ ...prev, fullName: e.target.value }));
+                  if (profileErrors.fullName) setProfileErrors((prev) => ({ ...prev, fullName: "" }));
+                }}
+                error={!!profileErrors.fullName}
+                helperText={profileErrors.fullName}
+                required
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <AppInput
+                label="Email "
+                type="email"
+                value={profileForm.email}
+                onChange={(e) => {
+                  setProfileForm((prev) => ({ ...prev, email: e.target.value }));
+                  if (profileErrors.email) setProfileErrors((prev) => ({ ...prev, email: "" }));
+                }}
+                error={!!profileErrors.email}
+                helperText={profileErrors.email}
+                required
+              />
+            </Box>
 
-          <AppInput
-            label="Email "
-            type="email"
-            value={profileForm.email}
-            onChange={(e) => {
-              setProfileForm((prev) => ({ ...prev, email: e.target.value }));
-              if (profileErrors.email) setProfileErrors((prev) => ({ ...prev, email: "" }));
-            }}
-            error={!!profileErrors.email}
-            helperText={profileErrors.email}
-            required
-          />
+          </Box>
 
-          <AppInput
-            label="Role"
-            value={authState?.role || "Member"}
-            disabled
-            helperText="System role is managed by administrator"
-          />
+          <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", sm: "row" } }}>
+            <Box sx={{ flex: 1, maxWidth: { xs: "100%", sm: "calc(50% - 10px)" } }}>
+              <AppInput
+                label="Role"
+                value={authState?.role || "Member"}
+                disabled
+                helperText="System role is managed by administrator"
+              />
+            </Box>
+          </Box>
+          <Divider sx={{ my: 0.5, borderColor: "rgba(74, 63, 107, 0.08)" }} />
+
+          <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", mt: -1 }}>
+            Change Password (Optional)
+          </Typography>
+
+          <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", sm: "row" } }}>
+            <Box sx={{ flex: 1 }}>
+              <AppInput
+                label="New Password"
+                type="password"
+                value={profileForm.password}
+                onChange={(e) => {
+                  setProfileForm((prev) => ({ ...prev, password: e.target.value }));
+                  if (profileErrors.password) setProfileErrors((prev) => ({ ...prev, password: "" }));
+                }}
+                error={!!profileErrors.password}
+                helperText={profileErrors.password || "Leave blank to keep your current password"}
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <AppInput
+                label="Confirm Password"
+                type="password"
+                value={profileForm.confirmPassword}
+                onChange={(e) => {
+                  setProfileForm((prev) => ({ ...prev, confirmPassword: e.target.value }));
+                  if (profileErrors.confirmPassword) setProfileErrors((prev) => ({ ...prev, confirmPassword: "" }));
+                }}
+                error={!!profileErrors.confirmPassword}
+                helperText={profileErrors.confirmPassword}
+              />
+            </Box>
+          </Box>
         </Box>
-      </AppDialog>
-    </Box>
+      </AppDialog >
+    </Box >
   );
 }

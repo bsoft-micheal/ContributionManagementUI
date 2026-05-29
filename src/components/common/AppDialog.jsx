@@ -18,6 +18,7 @@ export default function AppDialog({
   actions,
   maxWidth = "sm",
   fullWidth = true,
+  showCloseIcon = true,
 }) {
   const handleClose = (event, reason) => {
     if (reason && reason === "backdropClick") return;
@@ -57,18 +58,20 @@ export default function AppDialog({
         >
           {title}
         </Typography>
-        <IconButton
-          size="small"
-          onClick={onClose}
-          sx={{
-            color: "rgba(255,255,255,0.7)",
-            p: 0.5,
-            borderRadius: "6px",
-            "&:hover": { color: "#ffffff", bgcolor: "rgba(255,255,255,0.12)" },
-          }}
-        >
-          <CloseRoundedIcon sx={{ fontSize: "1.1rem" }} />
-        </IconButton>
+        {showCloseIcon && (
+          <IconButton
+            size="small"
+            onClick={onClose}
+            sx={{
+              color: "rgba(255,255,255,0.7)",
+              p: 0.5,
+              borderRadius: "6px",
+              "&:hover": { color: "#ffffff", bgcolor: "rgba(255,255,255,0.12)" },
+            }}
+          >
+            <CloseRoundedIcon sx={{ fontSize: "1.1rem" }} />
+          </IconButton>
+        )}
       </Box>
 
       {/* ── Content ───────────────────────────────────────────────── */}

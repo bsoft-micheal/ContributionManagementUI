@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Avatar, Box, IconButton, Typography, Tooltip } from "@mui/material";
-import { PhotoCamera as UploadIcon, Delete as DeleteIcon } from "@mui/icons-material";
+import { PhotoCamera as UploadIcon, CloseRounded as CloseIcon } from "@mui/icons-material";
 
 export default function AppImageUpload({
   value, // Base64 string or URL of current image
@@ -141,18 +141,18 @@ export default function AppImageUpload({
                 position: "absolute",
                 top: -2,
                 right: -2,
-                bgcolor: "#ef4444",
+                bgcolor: "#4a3f6b",
                 color: "#ffffff",
-                boxShadow: "0 2px 8px rgba(239, 68, 68, 0.3)",
+                boxShadow: "0 2px 8px rgba(74, 63, 107, 0.35)",
                 p: 0.5,
                 "&:hover": {
-                  bgcolor: "#dc2626",
+                  bgcolor: "#3b325c",
                   transform: "scale(1.1)",
                 },
                 transition: "all 0.2s ease",
               }}
             >
-              <DeleteIcon sx={{ fontSize: "0.85rem" }} />
+              <CloseIcon sx={{ fontSize: "0.85rem" }} />
             </IconButton>
           </Tooltip>
         )}

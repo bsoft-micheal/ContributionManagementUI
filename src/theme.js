@@ -62,6 +62,10 @@ export const appTheme = createTheme({
           "&:hover": {
             background: "linear-gradient(135deg, #5c4f82 0%, #3a3065 100%)",
           },
+          "&.Mui-disabled": {
+            color: "rgba(255, 255, 255, 0.85) !important",
+            background: "linear-gradient(135deg, rgba(74, 63, 107, 0.7) 0%, rgba(45, 37, 80, 0.7) 100%) !important",
+          },
         },
       },
     },

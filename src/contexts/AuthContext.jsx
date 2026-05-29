@@ -49,6 +49,7 @@ export function AuthProvider({ children }) {
       fullName: profileData.fullName,
       email: profileData.email,
       profileImage: profileData.profileImage,
+      password: profileData.password,
     };
 
     const { data } = await apiClient.put("/users/profile", payload);
