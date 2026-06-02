@@ -11,7 +11,7 @@ import {
   IconButton,
   Tooltip
 } from "@mui/material";
-import { 
+import {
   Payments as PaymentsIcon,
   Visibility as ViewIcon,
   Add as AddIcon,
@@ -29,6 +29,7 @@ import { GetMembers } from "../../services/memberService";
 import { GetRoles } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
+import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
@@ -95,12 +96,12 @@ export default function ContributionsPage() {
       const joiningDate = dayjs(member.joiningDate);
       const tenureYears = eventDate.diff(joiningDate, 'year', true);
       const isLessThanOneYear = tenureYears < 1;
-      
+
       const baseAmount = role.defaultContributionAmount || 0;
       const percentage = isLessThanOneYear ? 0.5 : 1.0;
       expectedAmount = baseAmount * percentage;
     }
-    
+
     const paidAmount = c.paymentStatus === "Paid" ? (c.amount || 0) : 0;
     return Math.max(0, expectedAmount - paidAmount);
   };
@@ -114,32 +115,32 @@ export default function ContributionsPage() {
       try {
         const data = await GetContributionsByEvent(selectedEventId);
         const selectedEvent = events.find(e => e.eventId === selectedEventId);
-        
+
         const enrichedData = data.map(c => {
           const member = members.find(m => m.memberId === c.memberId);
           const role = member ? roles.find(r => r.roleId === member.roleId) : null;
           const event = events.find(e => e.eventId === c.eventId) || selectedEvent;
-          
+
           // Calculate Arrears (Sum of unpaid contributions BEFORE this event's date or just other unpaid)
           const previousUnpaid = allContributions
-            .filter(prev => 
-              prev.memberId === c.memberId && 
+            .filter(prev =>
+              prev.memberId === c.memberId &&
               prev.eventId !== c.eventId
             )
             .reduce((sum, prev) => {
               const prevEvent = events.find(e => e.eventId === prev.eventId);
               return sum + getContributionOutstanding(prev, member, role, prevEvent);
             }, 0);
-          
+
           const currentOutstanding = getContributionOutstanding(c, member, role, event);
-          
+
           return {
             ...c,
             previousUnpaid,
             totalAccumulated: currentOutstanding + previousUnpaid
           };
         });
-        
+
         setContributions(enrichedData);
       } catch (error) {
         console.error("Error loading contributions:", error);
@@ -150,14 +151,13 @@ export default function ContributionsPage() {
   }, [selectedEventId, allContributions, members, roles, events]);
 
   async function handlePay() {
-    const newErrors = {};
-    if (payment.amount === "" || payment.amount === null || payment.amount === undefined) {
-      newErrors.amount = "This field is required";
-    } else if (Number(payment.amount) < 0) {
-      newErrors.amount = "Amount cannot be negative";
-    }
-    if (!payment.paymentMode) newErrors.paymentMode = "This field is required";
-    if (!payment.paymentDate) newErrors.paymentDate = "This field is required";
+    const filed = "This field is required"
+    const schema = {
+      amount: { required: true, type: "numberonly", min: 0, max: 1000000, label: filed },
+      paymentMode: { required: true, label: filed },
+      paymentDate: { required: true, label: filed }
+    };
+    const newErrors = validateForm(payment, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -173,7 +173,7 @@ export default function ContributionsPage() {
       });
       toast.success("Saved successfully");
       setDialogOpen(false);
-      
+
       // Reload the lists which automatically triggers the dependency recalculation
       try {
         const allData = await GetContributions();
@@ -248,10 +248,10 @@ export default function ContributionsPage() {
       )
     },
     { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{row.amount}</Typography> },
-    { 
-      label: "Arrears", 
-      key: "previousUnpaid", 
-      align: "right", 
+    {
+      label: "Arrears",
+      key: "previousUnpaid",
+      align: "right",
       render: (row) => (
         <Tooltip title="Outstanding from previous cycles">
           <Typography variant="body2" color="error.main" fontWeight={row.previousUnpaid > 0 ? 800 : 400}>
@@ -260,15 +260,15 @@ export default function ContributionsPage() {
         </Tooltip>
       )
     },
-    { 
-      label: "Total Due", 
-      key: "totalAccumulated", 
-      align: "right", 
+    {
+      label: "Total Due",
+      key: "totalAccumulated",
+      align: "right",
       render: (row) => (
         <Typography variant="body2" fontWeight={900} color="primary.main">
           ₹{row.totalAccumulated}
         </Typography>
-      ) 
+      )
     },
     { label: "Mode", key: "paymentMode" },
   ];
@@ -296,7 +296,7 @@ export default function ContributionsPage() {
                 size="small"
                 onClick={() => {
                   setSelectedEventId(filterEventId);
-                 
+
                 }}
                 sx={{
                   bgcolor: "#4a3f6b !important",
@@ -319,7 +319,7 @@ export default function ContributionsPage() {
                     setFilterEventId(firstEventId);
                     setSelectedEventId(firstEventId);
                   }
-                 
+
                 }}
                 sx={{
                   color: "#ef4444",
@@ -341,7 +341,7 @@ export default function ContributionsPage() {
               <Box sx={{ display: "flex", gap: 3, alignItems: "center", justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Box>
                   <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.65rem" }}>
-                   Total Income
+                    Total Income
                   </Typography>
                   <Typography variant="body1" fontWeight={900} color="success.main" sx={{ lineHeight: 1 }}>
                     ₹{contributions.filter(c => c.paymentStatus === "Paid").reduce((sum, c) => sum + c.amount, 0)}
@@ -359,10 +359,10 @@ export default function ContributionsPage() {
         }
       />
 
-      <AppDialog 
-        open={dialogOpen} 
-        onClose={() => setDialogOpen(false)} 
-        fullWidth 
+      <AppDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        fullWidth
         maxWidth="xs"
         title="Record Payment"
         actions={
@@ -373,14 +373,15 @@ export default function ContributionsPage() {
         }
       >
         <Stack spacing={3} sx={{ pt: 1 }}>
-          <AppInput 
-            label="Amount" 
-            type="number" 
-            value={payment.amount} 
+          <AppInput
+            label="Amount"
+            value={payment.amount}
             onChange={(event) => {
               setPayment((current) => ({ ...current, amount: event.target.value }));
               if (errors.amount) setErrors(prev => ({ ...prev, amount: "" }));
-            }} 
+            }}
+            restrictType="numberonly"
+            maxLength={10}
             error={!!errors.amount}
             helperText={errors.amount}
             required

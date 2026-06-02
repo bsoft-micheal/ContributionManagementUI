@@ -29,6 +29,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import { validateForm } from "../../utils/validation";
 import { GetUsers, CreateUser, UpdateUser, DeleteUser } from "../../services/userService";
 
 // ─── Role color map ───────────────────────────────────────────────────────────
@@ -134,12 +135,13 @@ export default function UsersPage() {
 
   // ── Validation ─────────────────────────────────────────────────────────────
   function validate() {
-    const e = {};
-    if (!form.username?.trim()) e.username = "Username is required";
-    if (!form.email?.trim()) e.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
-      e.email = "Invalid email address";
-    if (!form.roleName) e.roleName = "Role is required";
+    const filed = "This field is required"
+    const schema = {
+      username: { required: true, type: "letterandnumber", min: 3, max: 30, label: filed },
+      email: { required: true, email: true, label: filed },
+      roleName: { required: true, label: filed },
+    };
+    const e = validateForm(form, schema);
 
     // Password required only on create; optional on edit (change password)
     if (!form.userId) {
@@ -166,7 +168,7 @@ export default function UsersPage() {
     const newErrors = validate();
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fix the validation errors");
+      toast.error("Please fill all the required fields");
       return;
     }
 
@@ -393,7 +395,7 @@ export default function UsersPage() {
                 onClick={() => {
                   setAppliedRole(filterRole);
                   setAppliedStatus(filterStatus);
-                  toast.success("Filter applied");
+
                 }}
                 sx={{
                   bgcolor: "#4a3f6b !important",
@@ -417,7 +419,7 @@ export default function UsersPage() {
                   setFilterStatus("");
                   setAppliedRole("");
                   setAppliedStatus("");
-                  toast.success("Filter cleared");
+
                 }}
                 sx={{
                   color: "#ef4444",
@@ -469,6 +471,8 @@ export default function UsersPage() {
               placeholder="Enter username"
               value={form.username}
               onChange={(e) => fieldChange("username", e.target.value)}
+              restrictType="letterandnumber"
+              maxLength={30}
               error={!!errors.username}
               helperText={errors.username}
               required
@@ -482,6 +486,7 @@ export default function UsersPage() {
               placeholder="Enter email address"
               value={form.email}
               onChange={(e) => fieldChange("email", e.target.value)}
+              maxLength={100}
               error={!!errors.email}
               helperText={errors.email}
               required
@@ -496,6 +501,7 @@ export default function UsersPage() {
               type={showPassword ? "text" : "password"}
               value={form.newPassword}
               onChange={(e) => fieldChange("newPassword", e.target.value)}
+              maxLength={50}
               error={!!errors.newPassword}
               helperText={errors.newPassword}
               required={!form.userId}
@@ -525,6 +531,7 @@ export default function UsersPage() {
               type={showConfirm ? "text" : "password"}
               value={form.confirmPassword}
               onChange={(e) => fieldChange("confirmPassword", e.target.value)}
+              maxLength={50}
               error={!!errors.confirmPassword}
               helperText={errors.confirmPassword}
               required={!form.userId || !!form.newPassword}

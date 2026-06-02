@@ -27,6 +27,7 @@ import AppInput from "../common/AppInput";
 import AppButton from "../common/AppButton";
 import AppImageUpload from "../common/AppImageUpload";
 import { useAppToast } from "../common/AppToast";
+import { validateForm } from "../../utils/validation";
 import { getImageUrl } from "../../services/apiClient";
 
 const drawerWidth = 240;
@@ -78,15 +79,12 @@ export default function AppLayout() {
   }, [profileDialogOpen, authState]);
 
   const handleSaveProfile = async () => {
-    const errors = {};
-    if (!profileForm.fullName?.trim()) {
-      errors.fullName = "Full Name is required";
-    }
-    if (!profileForm.email?.trim()) {
-      errors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(profileForm.email)) {
-      errors.email = "Invalid email address";
-    }
+    const filed = "This field is required"
+    const schema = {
+      fullName: { required: true, type: "letteronly", min: 2, max: 100, label: filed },
+      email: { required: true, email: true, label: filed }
+    };
+    const errors = validateForm(profileForm, schema);
 
     if (profileForm.password) {
       if (profileForm.password.length < 6) {
@@ -99,7 +97,7 @@ export default function AppLayout() {
 
     if (Object.keys(errors).length > 0) {
       setProfileErrors(errors);
-      toast.error("Please correct the errors before saving");
+      toast.error("Please fill all the required fields");
       return;
     }
 
@@ -404,6 +402,8 @@ export default function AppLayout() {
                   setProfileForm((prev) => ({ ...prev, fullName: e.target.value }));
                   if (profileErrors.fullName) setProfileErrors((prev) => ({ ...prev, fullName: "" }));
                 }}
+                restrictType="letteronly"
+                maxLength={100}
                 error={!!profileErrors.fullName}
                 helperText={profileErrors.fullName}
                 required
@@ -418,6 +418,7 @@ export default function AppLayout() {
                   setProfileForm((prev) => ({ ...prev, email: e.target.value }));
                   if (profileErrors.email) setProfileErrors((prev) => ({ ...prev, email: "" }));
                 }}
+                maxLength={100}
                 error={!!profileErrors.email}
                 helperText={profileErrors.email}
                 required
@@ -452,8 +453,9 @@ export default function AppLayout() {
                   setProfileForm((prev) => ({ ...prev, password: e.target.value }));
                   if (profileErrors.password) setProfileErrors((prev) => ({ ...prev, password: "" }));
                 }}
+                maxLength={50}
                 error={!!profileErrors.password}
-                helperText={profileErrors.password || "Leave blank to keep your current password"}
+                helperText={profileErrors.password}
               />
             </Box>
             <Box sx={{ flex: 1 }}>
@@ -465,6 +467,7 @@ export default function AppLayout() {
                   setProfileForm((prev) => ({ ...prev, confirmPassword: e.target.value }));
                   if (profileErrors.confirmPassword) setProfileErrors((prev) => ({ ...prev, confirmPassword: "" }));
                 }}
+                maxLength={50}
                 error={!!profileErrors.confirmPassword}
                 helperText={profileErrors.confirmPassword}
               />

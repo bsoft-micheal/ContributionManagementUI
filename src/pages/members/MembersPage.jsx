@@ -25,6 +25,7 @@ import { GetRoles } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import { validateForm } from "../../utils/validation";
 
 const initialForm = {
   name: "",
@@ -81,14 +82,17 @@ export default function MembersPage() {
   }
 
   async function handleSubmit() {
-    const newErrors = {};
-    if (!form.name?.trim()) newErrors.name = "This field is required";
-    if (!form.email?.trim()) newErrors.email = "This field is required";
-    if (!form.phone?.trim()) newErrors.phone = "This field is required";
-    if (!form.roleId) newErrors.roleId = "This field is required";
-    if (!form.gender) newErrors.gender = "This field is required";
-    if (!form.dateOfBirth) newErrors.dateOfBirth = "This field is required";
-    if (!form.joiningDate) newErrors.joiningDate = "This field is required";
+    const filed = "This field is required"
+    const schema = {
+      name: { required: true, type: "letteronly", min: 2, max: 100, label: filed },
+      email: { required: true, email: true, label: filed },
+      phone: { required: true, type: "numberonly", min: 10, max: 15, label: filed },
+      roleId: { required: true, label: filed },
+      gender: { required: true, label: filed },
+      dateOfBirth: { required: true, label: filed },
+      joiningDate: { required: true, label: filed },
+    };
+    const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -232,7 +236,7 @@ export default function MembersPage() {
                 size="small"
                 onClick={() => {
                   setAppliedRoleId(filterRoleId);
-                 
+
                 }}
                 sx={{
                   bgcolor: "#4a3f6b !important",
@@ -292,6 +296,8 @@ export default function MembersPage() {
                 setForm((c) => ({ ...c, name: e.target.value }));
                 if (errors.name) setErrors(prev => ({ ...prev, name: "" }));
               }}
+              restrictType="letteronly"
+              maxLength={100}
               error={!!errors.name}
               helperText={errors.name}
               required
@@ -303,6 +309,7 @@ export default function MembersPage() {
                 setForm((c) => ({ ...c, email: e.target.value }));
                 if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
               }}
+              maxLength={100}
               error={!!errors.email}
               helperText={errors.email}
               required
@@ -314,6 +321,8 @@ export default function MembersPage() {
                 setForm((c) => ({ ...c, phone: e.target.value }));
                 if (errors.phone) setErrors(prev => ({ ...prev, phone: "" }));
               }}
+              restrictType="numberonly"
+              maxLength={15}
               error={!!errors.phone}
               helperText={errors.phone}
               required

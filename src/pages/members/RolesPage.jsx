@@ -8,6 +8,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { GetRoles, CreateRole, UpdateRole } from "../../services/roleService";
+import { validateForm } from "../../utils/validation";
 
 const initialForm = { roleName: "", defaultContributionAmount: 0 };
 
@@ -36,13 +37,12 @@ export default function RolesPage() {
   }
 
   async function handleSubmit() {
-    const newErrors = {};
-    if (!form.roleName?.trim()) {
-      newErrors.roleName = "This field is required";
-    }
-    if (!form.defaultContributionAmount && form.defaultContributionAmount !== 0) {
-      newErrors.defaultContributionAmount = "This field is required";
-    }
+    const filed = "This field is required"
+    const schema = {
+      roleName: { required: true, type: "letteronly", min: 2, max: 50, label: filed },
+      defaultContributionAmount: { required: true, type: "numberonly", min: 0, max: 100000, label: filed }
+    };
+    const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -130,6 +130,8 @@ export default function RolesPage() {
                   setErrors(prev => ({ ...prev, roleName: "" }));
                 }
               }} 
+              restrictType="letteronly"
+              maxLength={50}
               error={!!errors.roleName}
               helperText={errors.roleName}
               required
@@ -138,7 +140,6 @@ export default function RolesPage() {
           <Grid size={{ xs: 12 }}>
             <AppInput 
               label="Contribution" 
-              type="number" 
               fullWidth 
               value={form.defaultContributionAmount} 
               onChange={(e) => {
@@ -147,6 +148,8 @@ export default function RolesPage() {
                   setErrors(prev => ({ ...prev, defaultContributionAmount: "" }));
                 }
               }} 
+              restrictType="numberonly"
+              maxLength={10}
               error={!!errors.defaultContributionAmount}
               helperText={errors.defaultContributionAmount}
               required

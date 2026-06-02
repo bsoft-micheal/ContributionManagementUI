@@ -10,6 +10,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { GetEventTypes, CreateEventType, UpdateEventType } from "../../services/eventTypeService";
+import { validateForm } from "../../utils/validation";
 
 const initialForm = { eventTypeName: "", isActive: true };
 
@@ -37,10 +38,11 @@ export default function EventTypesPage() {
   }
 
   async function handleSubmit() {
-    const newErrors = {};
-    if (!form.eventTypeName?.trim()) {
-      newErrors.eventTypeName = "This field is required";
-    }
+    const filed = "This field is required"
+    const schema = {
+      eventTypeName: { required: true, type: "letteronly", min: 2, max: 50, label: filed }
+    };
+    const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -141,6 +143,8 @@ export default function EventTypesPage() {
                 setErrors(prev => ({ ...prev, eventTypeName: "" }));
               }
             }} 
+            restrictType="letteronly"
+            maxLength={50}
             error={!!errors.eventTypeName}
             helperText={errors.eventTypeName}
             required

@@ -1,4 +1,5 @@
 import { TextField, Box, Typography } from "@mui/material";
+import { sanitizeInput } from "../../utils/validation";
 
 export default function AppInput({
   label,
@@ -11,8 +12,24 @@ export default function AppInput({
   error = false,
   helperText = "",
   required = false,
+  restrictType,
+  maxLength,
   ...props
 }) {
+  const handleInputChange = (e) => {
+    let val = e.target.value;
+    if (restrictType) {
+      val = sanitizeInput(val, restrictType);
+    }
+    if (maxLength !== undefined && maxLength !== null) {
+      val = val.slice(0, Number(maxLength));
+    }
+    e.target.value = val;
+    if (onChange) {
+      onChange(e);
+    }
+  };
+
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
       {label && (
@@ -38,7 +55,7 @@ export default function AppInput({
       )}
       <TextField
         value={value}
-        onChange={onChange}
+        onChange={handleInputChange}
         type={type}
         fullWidth={fullWidth}
         placeholder={placeholder || `Enter ${label?.toLowerCase() || "value"}...`}
@@ -68,6 +85,7 @@ export default function AppInput({
         }}
         error={error}
         helperText={helperText}
+        inputProps={{ maxLength, ...props.inputProps }}
         {...props}
       />
     </Box>

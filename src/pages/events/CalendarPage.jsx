@@ -9,6 +9,7 @@ import AppMultiSelect from "../../components/common/AppMultiSelect";
 import AppTextArea from "../../components/common/AppTextArea";
 import AppButton from "../../components/common/AppButton";
 import AppDialog from "../../components/common/AppDialog";
+import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import apiClient from "../../services/apiClient";
 import { GetMembers } from "../../services/memberService";
@@ -145,11 +146,15 @@ export default function CalendarPage() {
   };
 
   const handleSubmit = async () => {
-    const newErrors = {};
-    if (!form.eventName?.trim()) newErrors.eventName = "This field is required";
-    if (!form.baseAmount && form.baseAmount !== 0) newErrors.baseAmount = "This field is required";
-    if (!form.eventTypeId) newErrors.eventTypeId = "This field is required";
-    if (!form.eventDate) newErrors.eventDate = "This field is required";
+    
+        const filed = "This field is required"
+        const schema = {
+      eventName: { required: true, type: "letterandnumber", min: 3, max: 100, label: filed },
+      baseAmount: { required: true, type: "numberonly", min: 0, max: 1000000, label: filed },
+      eventTypeId: { required: true, label: filed },
+      eventDate: { required: true, label: filed }
+    };
+    const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -357,6 +362,8 @@ export default function CalendarPage() {
                 setForm((current) => ({ ...current, eventName: event.target.value }));
                 if (errors.eventName) setErrors(prev => ({ ...prev, eventName: "" }));
               }} 
+              restrictType="letterandnumber"
+              maxLength={100}
               error={!!errors.eventName}
               helperText={errors.eventName}
               required
@@ -368,6 +375,8 @@ export default function CalendarPage() {
                 setForm((current) => ({ ...current, baseAmount: event.target.value }));
                 if (errors.baseAmount) setErrors(prev => ({ ...prev, baseAmount: "" }));
               }} 
+              restrictType="numberonly"
+              maxLength={10}
               error={!!errors.baseAmount}
               helperText={errors.baseAmount}
               required
