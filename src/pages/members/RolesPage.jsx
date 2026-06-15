@@ -100,6 +100,7 @@ export default function RolesPage() {
           <AppButton
             size="small"
             variant="contained"
+            startIcon={<AddIcon />}
             onClick={() => { setForm(initialForm); setErrors({}); setDialogOpen(true); }}
           >
             Add

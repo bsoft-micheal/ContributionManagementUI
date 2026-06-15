@@ -49,3 +49,33 @@ export const ResetUserPassword = async (id, data) => {
     throw error;
   }
 };
+
+export const RequestForgotPasswordOtp = async (email) => {
+  try {
+    const result = await postApi("/auth/forgot-password/request", { email });
+    return result;
+  } catch (error) {
+    console.error('Error requesting forgot password OTP:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const VerifyForgotPasswordOtp = async (email, otp) => {
+  try {
+    const result = await postApi("/auth/forgot-password/verify", { email, otp });
+    return result;
+  } catch (error) {
+    console.error('Error verifying forgot password OTP:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const ResetPasswordWithOtp = async (email, otp, newPassword) => {
+  try {
+    const result = await postApi("/auth/forgot-password/reset", { email, otp, newPassword });
+    return result;
+  } catch (error) {
+    console.error('Error resetting password with OTP:', error.response?.data || error.message);
+    throw error;
+  }
+};

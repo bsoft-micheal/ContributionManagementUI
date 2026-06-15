@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FormControlLabel, Switch, Typography, Box, IconButton, Tooltip } from "@mui/material";
+import { FormControlLabel, Checkbox, Typography, Box, IconButton, Tooltip } from "@mui/material";
 import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
@@ -114,6 +114,7 @@ export default function EventTypesPage() {
             size="small"
             variant="contained"
             disabled={!hasWriteAccess}
+            startIcon={<AddIcon />}
             onClick={() => { setForm(initialForm); setErrors({}); setDialogOpen(true); }}
           >
             Add
@@ -150,13 +151,27 @@ export default function EventTypesPage() {
             required
           />
           <FormControlLabel
+            labelPlacement="start"
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              width: "100%",
+              m: 0,
+              gap: 2,
+            }}
             control={
-              <Switch 
+              <Checkbox 
                 checked={form.isActive} 
                 onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))} 
+                sx={{
+                  color: "rgba(74, 63, 107, 0.4)",
+                  "&.Mui-checked": {
+                    color: "#4a3f6b",
+                  },
+                }}
               />
             }
-            label={<Typography variant="body2" fontWeight={700}>Active Or InActive types</Typography>}
+            label={<Typography variant="body2" fontWeight={700} sx={{ color: "#4a3f6b" }}>Active Or InActive types</Typography>}
           />
         </Box>
       </AppDialog>

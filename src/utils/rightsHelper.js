@@ -34,7 +34,11 @@ export function getRightsForPath(path, roleName) {
     else if (path === "/event-types") targetName = "Event Types";
     else if (path === "/contributions") targetName = "Contributions";
     else if (path === "/contribution-calculation") targetName = "Calculation";
-    else if (path === "/reports") targetName = "Reports";
+    else if (path === "/reports/event-collection-audit" || path === "/reports") targetName = "Event Audit";
+    else if (path === "/reports/member-velocity") targetName = "Member Velocity";
+    else if (path === "/reports/pending-dues") targetName = "Pending Dues";
+    else if (path === "/reports/member-category-paid") targetName = "Member Category Paid";
+    else if (path === "/my-contributions") targetName = "My Contributions";
     else if (path === "/user-rights") targetName = "User Rights"; // Admin-only
     else if (path === "/users")       targetName = "Users";        // Admin & Manager only
 

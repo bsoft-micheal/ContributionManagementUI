@@ -49,6 +49,7 @@ const SIDEBAR = {
 export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [masterOpen, setMasterOpen] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
   const { authState, logout, updateProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,6 +64,17 @@ export default function AppLayout() {
     confirmPassword: "",
   });
   const [profileErrors, setProfileErrors] = useState({});
+
+  // Auto-expand menus based on current path
+  React.useEffect(() => {
+    if (location.pathname.startsWith("/reports") || location.pathname === "/my-contributions") {
+      setReportsOpen(true);
+    } else if (
+      ["/event-types", "/exit-process", "/user-rights", "/users"].includes(location.pathname)
+    ) {
+      setMasterOpen(true);
+    }
+  }, [location.pathname]);
 
   // Sync profileForm with authState when dialog opens
   React.useEffect(() => {
@@ -140,13 +152,13 @@ export default function AppLayout() {
       });
       if (allChildrenDenied) return null;
 
-      const open = masterOpen;
+      const open = item.id === "master" ? masterOpen : reportsOpen;
       const active = isChildActive(item);
 
       return (
         <React.Fragment key={item.id}>
           <ListItemButton
-            onClick={() => setMasterOpen(!open)}
+            onClick={() => item.id === "master" ? setMasterOpen(!open) : setReportsOpen(!open)}
             sx={{
               borderRadius: "8px",
               mb: 0.3,
@@ -214,10 +226,26 @@ export default function AppLayout() {
   };
 
   const drawer = (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: SIDEBAR.bg }}>
+    <Box sx={{ minHeight: "100%", display: "flex", flexDirection: "column", bgcolor: SIDEBAR.bg }}>
 
       {/* ── Brand ─────────────────────────────────────────────────────────── */}
-      <Box sx={{ px: 2.5, py: 3, display: "flex", alignItems: "center", gap: 1.8 }}>
+      <Box sx={{ px: 2.5, py: 3, display: "flex", alignItems: "center", gap: { xs: 1.2, md: 1.8 } }}>
+        {/* Mobile menu toggle close button */}
+        <Box sx={{ display: { xs: "block", md: "none" }, mr: 0.5 }}>
+          <IconButton
+            onClick={() => setMobileOpen(false)}
+            sx={{
+              color: SIDEBAR.text,
+              p: 0.8,
+              borderRadius: "8px",
+              bgcolor: "rgba(255, 255, 255, 0.03)",
+              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)", color: "#ffffff" }
+            }}
+          >
+            <MenuRoundedIcon />
+          </IconButton>
+        </Box>
+
         <Box sx={{
           width: 40, height: 40, borderRadius: "10px",
           bgcolor: "#ffffff", display: "flex",
@@ -303,12 +331,14 @@ export default function AppLayout() {
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f5f4fb" }}>
       {/* Mobile hamburger */}
       <Box sx={{ display: { xs: "flex", md: "none" }, position: "fixed", top: 12, left: 12, zIndex: 1300 }}>
-        <IconButton
-          onClick={() => setMobileOpen(true)}
-          sx={{ bgcolor: SIDEBAR.bg, color: "#fff", borderRadius: "8px", "&:hover": { bgcolor: SIDEBAR.active } }}
-        >
-          <MenuRoundedIcon />
-        </IconButton>
+        {!mobileOpen && (
+          <IconButton
+            onClick={() => setMobileOpen(true)}
+            sx={{ bgcolor: SIDEBAR.bg, color: "#fff", borderRadius: "8px", "&:hover": { bgcolor: SIDEBAR.active } }}
+          >
+            <MenuRoundedIcon />
+          </IconButton>
+        )}
       </Box>
 
       {/* ── Sidebar ───────────────────────────────────────────────────────── */}
@@ -321,7 +351,7 @@ export default function AppLayout() {
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: "block", md: "none" },
-            "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", border: "none" },
+            "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", border: "none", bgcolor: SIDEBAR.bg },
           }}
         >
           {drawer}
@@ -337,6 +367,7 @@ export default function AppLayout() {
               width: drawerWidth,
               boxSizing: "border-box",
               border: "none",
+              bgcolor: SIDEBAR.bg,
               boxShadow: "2px 0 16px rgba(0,0,0,0.12)",
             },
           }}
@@ -376,7 +407,7 @@ export default function AppLayout() {
               onClick={handleSaveProfile}
               sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}
             >
-              Save Changes
+              Save
             </AppButton>
             <AppButton variant="text" color="inherit" onClick={() => setProfileDialogOpen(false)}>
               Cancel

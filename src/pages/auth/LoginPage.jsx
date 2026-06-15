@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, Box, Card, FormControlLabel, Link, Stack, Switch, Typography } from "@mui/material";
 import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link as RouterLink } from "react-router-dom";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -60,7 +60,6 @@ export default function LoginPage() {
           flexDirection: { xs: "column", md: "row" },
           width: "100%",
           minHeight: "100vh",
-          height: { xs: "auto", md: "100vh" },
           borderRadius: 0,
           border: "none",
           boxShadow: "none",
@@ -156,18 +155,16 @@ export default function LoginPage() {
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            justifyContent: "center",
             alignItems: "center",
             background: "url(/right_login_bg.png) no-repeat center center",
             backgroundSize: "cover",
             p: { xs: 2.5, sm: 4, md: 6 },
-            minHeight: { xs: "100vh", md: "100%" },
-            height: { xs: "auto", md: "100%" },
-            overflowY: "auto",
+            minHeight: "100vh",
           }}
         >
           <Card
             sx={{
+              my: "auto",
               background: "#ffffff",
               boxShadow: "0 24px 64px rgba(30, 26, 46, 0.06), 0 8px 24px rgba(30, 26, 46, 0.04)",
               border: "1px solid rgba(74, 63, 107, 0.06)",
@@ -293,7 +290,8 @@ export default function LoginPage() {
                     }}
                   />
                   <Link
-                    href="#"
+                    component={RouterLink}
+                    to="/forgot-password"
                     sx={{
                       fontSize: "0.78rem",
                       fontWeight: 700,

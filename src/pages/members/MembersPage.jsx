@@ -10,6 +10,8 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Save as SaveIcon,
+  Visibility as ViewIcon,
+  PersonAdd as PersonAddIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
@@ -25,6 +27,7 @@ import { GetRoles } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import MemberDetailsDialog from "../../components/members/MemberDetailsDialog";
 import { validateForm } from "../../utils/validation";
 
 const initialForm = {
@@ -50,6 +53,8 @@ export default function MembersPage() {
   const [memberToDelete, setMemberToDelete] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
   const toast = useAppToast();
 
   const [filterRoleId, setFilterRoleId] = useState("");
@@ -86,7 +91,7 @@ export default function MembersPage() {
     const schema = {
       name: { required: true, type: "letteronly", min: 2, max: 100, label: filed },
       email: { required: true, email: true, label: filed },
-      phone: { required: true, type: "numberonly", min: 10, max: 15, label: filed },
+      phone: { required: true, type: "numberonly", min: 10, max: 10, label: filed },
       roleId: { required: true, label: filed },
       gender: { required: true, label: filed },
       dateOfBirth: { required: true, label: filed },
@@ -146,6 +151,14 @@ export default function MembersPage() {
       sx: { width: 90 },
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
+          <Tooltip title="View Details">
+            <IconButton size="small" sx={{ p: 0.3 }} onClick={() => {
+              setSelectedMember(row);
+              setViewDialogOpen(true);
+            }}>
+              <ViewIcon sx={{ fontSize: "1.05rem", color: "#4a3f6b" }} />
+            </IconButton>
+          </Tooltip>
           <Tooltip title={hasWriteAccess ? "Edit" : ""}>
             <span>
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => {
@@ -208,6 +221,7 @@ export default function MembersPage() {
             variant="contained"
             size="small"
             disabled={!hasWriteAccess}
+            startIcon={<PersonAddIcon />}
             onClick={() => {
               setForm(initialForm);
               setErrors({});
@@ -322,7 +336,7 @@ export default function MembersPage() {
                 if (errors.phone) setErrors(prev => ({ ...prev, phone: "" }));
               }}
               restrictType="numberonly"
-              maxLength={15}
+              maxLength={10}
               error={!!errors.phone}
               helperText={errors.phone}
               required
@@ -383,6 +397,12 @@ export default function MembersPage() {
         onConfirm={handleConfirmDelete}
         title="Confirm"
         content="Are you sure you want to delete this record?"
+      />
+
+      <MemberDetailsDialog
+        open={viewDialogOpen}
+        onClose={() => setViewDialogOpen(false)}
+        member={selectedMember}
       />
     </div>
   );

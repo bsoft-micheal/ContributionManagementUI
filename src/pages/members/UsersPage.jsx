@@ -7,7 +7,7 @@ import {
   Tooltip,
   Chip,
   InputAdornment,
-  Switch,
+  Checkbox,
   FormControlLabel,
 } from "@mui/material";
 import {
@@ -572,20 +572,28 @@ export default function UsersPage() {
             sx={{ display: "flex", alignItems: "flex-end", pb: 0.5 }}
           >
             <FormControlLabel
+              labelPlacement="start"
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                width: "100%",
+                m: 0,
+                gap: 2,
+              }}
               control={
-                <Switch
+                <Checkbox
                   checked={form.isActive}
                   onChange={(e) => fieldChange("isActive", e.target.checked)}
                   sx={{
-                    "& .MuiSwitch-switchBase.Mui-checked": { color: "#4a3f6b" },
-                    "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                      bgcolor: "#4a3f6b",
+                    color: "rgba(74, 63, 107, 0.4)",
+                    "&.Mui-checked": {
+                      color: "#4a3f6b",
                     },
                   }}
                 />
               }
               label={
-                <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.85rem" }}>
+                <Typography variant="body2" fontWeight={700} sx={{ color: "#4a3f6b" }}>
                   {form.isActive ? "Active Account" : "Inactive Account"}
                 </Typography>
               }

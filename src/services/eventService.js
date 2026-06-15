@@ -39,3 +39,13 @@ export const DeleteEvent = async (id) => {
     throw error;
   }
 };
+
+export const GetEventById = async (id) => {
+  try {
+    const result = await getApi(`/events/${id}`);
+    return result;
+  } catch (error) {
+    console.error('Error fetching event by ID:', error.response?.data || error.message);
+    throw error;
+  }
+};

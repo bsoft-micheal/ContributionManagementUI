@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { MenuItem, TextField, Box, Typography, Checkbox, ListItemText } from "@mui/material";
 
 export default function AppMultiSelect({
@@ -13,6 +14,7 @@ export default function AppMultiSelect({
   required = false,
   ...props
 }) {
+  const [open, setOpen] = useState(false);
   const allSelected = options.length > 0 && value.length === options.length;
 
   const handleSelectChange = (event) => {
@@ -28,9 +30,17 @@ export default function AppMultiSelect({
         // Select all
         onChange({ target: { value: options.map((o) => o.value) } });
       }
+      // Auto close when selecting/deselecting all
+      setOpen(false);
     } else {
       onChange(event);
     }
+  };
+
+  const handleRemoveValue = (valToRemove, event) => {
+    event.stopPropagation(); // Avoid triggering open dropdown list!
+    const newValues = value.filter((v) => v !== valToRemove);
+    onChange({ target: { value: newValues } });
   };
 
   return (
@@ -65,17 +75,77 @@ export default function AppMultiSelect({
         size={size}
         SelectProps={{
           multiple: true,
+          open: open,
+          onOpen: () => setOpen(true),
+          onClose: () => setOpen(false),
           renderValue: (selected) => {
             if (!selected || selected.length === 0) {
               return <em style={{ color: "#9ca3af", fontSize: "0.85rem", fontStyle: "normal" }}>{placeholder}</em>;
             }
-            return selected
-              .filter((val) => val !== "select-all")
-              .map((val) => {
-                const opt = options.find((o) => o.value === val);
-                return opt ? opt.label : val;
-              })
-              .join(", ");
+            return (
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>
+                {selected
+                  .filter((val) => val !== "select-all")
+                  .map((val) => {
+                    const opt = options.find((o) => o.value === val);
+                    const labelText = opt ? opt.label : val;
+                    return (
+                      <Box
+                        key={val}
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          bgcolor: "#4a3f6b",
+                          color: "#ffffff",
+                          borderRadius: "50px",
+                          px: 2.2,
+                          py: 0.6,
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          lineHeight: 1.2,
+                          cursor: "default",
+                          transition: "all 0.15s ease",
+                          "&:hover": {
+                            bgcolor: "#3b325c",
+                          },
+                        }}
+                      >
+                        {labelText}
+                        <Box
+                          component="span"
+                          onClick={(e) => handleRemoveValue(val, e)}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                          }}
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            ml: 0.8,
+                            width: 14,
+                            height: 14,
+                            borderRadius: "50%",
+                            border: "1.5px solid rgba(255, 255, 255, 0.8)",
+                            color: "rgba(255, 255, 255, 0.9)",
+                            fontSize: "8px",
+                            fontWeight: "bold",
+                            lineHeight: 1,
+                            cursor: "pointer",
+                            "&:hover": {
+                              bgcolor: "rgba(255, 255, 255, 0.25)",
+                              color: "#ffffff",
+                              borderColor: "#ffffff",
+                            },
+                          }}
+                        >
+                          ✕
+                        </Box>
+                      </Box>
+                    );
+                  })}
+              </Box>
+            );
           },
           displayEmpty: true,
         }}
@@ -83,11 +153,19 @@ export default function AppMultiSelect({
           "& .MuiOutlinedInput-root": {
             fontSize: "0.82rem",
             bgcolor: "#ffffff",
-            borderRadius: "6px",
-            minHeight: size === "small" ? 34 : 40,
+            borderRadius: "8px",
+            minHeight: size === "small" ? 36 : 42,
+            height: "auto !important",
             "& .MuiSelect-select": {
-              py: size === "small" ? 0.7 : 1,
-              pr: 4,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 0.5,
+              py: size === "small" ? "5px !important" : "7px !important",
+              pr: "40px !important",
+              minHeight: size === "small" ? "26px" : "32px",
+              height: "auto !important",
+              boxSizing: "border-box",
+              alignItems: "center",
             },
             "& fieldset": {
               borderColor: "rgba(74, 63, 107, 0.2)",

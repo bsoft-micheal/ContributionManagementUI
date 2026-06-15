@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Card,
   CardContent,
   Grid,
-  Stack,
   Typography,
 } from "@mui/material";
 import dayjs from "dayjs";
@@ -16,8 +15,10 @@ import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
+import { GetMembers } from "../../services/memberService";
+import { GetContributions } from "../../services/contributionService";
 
-export default function ReportsPage() {
+export default function ReportsPage({ mode }) {
   const { authState } = useAuth();
   const hasWriteAccess = getRightsForPage("Reports", authState?.role).write;
 
@@ -25,16 +26,45 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ month: dayjs().month() + 1, year: dayjs().year() });
 
-  useEffect(() => {
-    async function loadReports() {
-      setLoading(true);
-      const { data } = await apiClient.get("/reports/summary", { params: filters });
-      setReport(data);
-      setLoading(false);
-    }
+  // Member Category Report state
+  const [members, setMembers] = useState([]);
+  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [allContributions, setAllContributions] = useState([]);
 
-    loadReports();
-  }, [filters]);
+  useEffect(() => {
+    if (mode === "member-category") {
+      async function loadMemberCategoryData() {
+        setLoading(true);
+        try {
+          const membersList = await GetMembers();
+          setMembers(membersList);
+          if (membersList.length > 0) {
+            setSelectedMemberId(membersList[0].memberId);
+          }
+          const contributionsList = await GetContributions();
+          setAllContributions(contributionsList);
+        } catch (error) {
+          console.error("Failed to load member category report data:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+      loadMemberCategoryData();
+    } else {
+      async function loadReports() {
+        setLoading(true);
+        try {
+          const { data } = await apiClient.get("/reports/summary", { params: filters });
+          setReport(data);
+        } catch (error) {
+          console.error("Failed to load summary reports:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+      loadReports();
+    }
+  }, [filters, mode]);
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({ 
     label: dayjs().month(i).format("MMMM"), 
@@ -61,6 +91,34 @@ export default function ReportsPage() {
     { label: "Amount",  key: "amount",    align: "right", render: (row) => <Typography variant="body2" fontWeight={700} color="error.main">₹{row.amount}</Typography> },
   ];
 
+  // Grouped category paid amounts for the selected member
+  const memberCategoryData = useMemo(() => {
+    if (!selectedMemberId || allContributions.length === 0) return [];
+
+    // Filter contributions for selected member and status "Paid"
+    const memberPaidContribs = allContributions.filter(
+      c => c.memberId === selectedMemberId && c.paymentStatus === "Paid"
+    );
+
+    // Group by categoryName
+    const groups = {};
+    memberPaidContribs.forEach(c => {
+      const category = c.categoryName || "Uncategorized";
+      groups[category] = (groups[category] || 0) + c.amount;
+    });
+
+    // Convert to table rows
+    return Object.entries(groups).map(([category, amount]) => ({
+      categoryName: category,
+      totalPaidAmount: amount
+    }));
+  }, [selectedMemberId, allContributions]);
+
+  const memberCategoryColumns = [
+    { label: "Category",         key: "categoryName",    render: (row) => <Typography variant="body2" fontWeight={700}>{row.categoryName}</Typography> },
+    { label: "Total Paid",  key: "totalPaidAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700} color="success.main">₹{row.totalPaidAmount}</Typography> }
+  ];
+
   return (
     <div className="page-shell">
       <Card sx={{ border: "none", boxShadow: "0 2px 8px rgba(74,63,107,0.1)", borderRadius: "6px", overflow: "hidden" }}>
@@ -75,7 +133,11 @@ export default function ReportsPage() {
           justifyContent: "space-between",
         }}>
           <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#ffffff", fontSize: "0.85rem" }}>
-            Financial Analytics
+            {mode === "event" && "Event-wise Collection Audit"}
+            {mode === "member" && "Member Contribution Velocity"}
+            {mode === "pending" && "High Priority Dues (Pending Receipt)"}
+            {mode === "member-category" && "Member Category-wise Paid Analysis"}
+            {!mode && "Financial Analytics"}
           </Typography>
           <AppButton
             size="small"
@@ -92,11 +154,26 @@ export default function ReportsPage() {
             }}
             onClick={() => {
               if (!hasWriteAccess) return;
-              exportSheets("team-contribution-reports.xlsx", [
-                { name: "Event Collections", data: report?.eventCollections ?? [] },
-                { name: "Member History", data: report?.memberContributionHistory ?? [] },
-                { name: "Pending Dues", data: report?.pendingDues ?? [] },
-              ]);
+              if (mode === "member-category") {
+                const activeMember = members.find(m => m.memberId === selectedMemberId);
+                const memberName = activeMember ? activeMember.name : "Member";
+                exportSheets(`${memberName}-category-payments.xlsx`, [
+                  { 
+                    name: "Category Payments", 
+                    data: memberCategoryData.map((d, i) => ({ 
+                      "S.No": i + 1, 
+                      "Category": d.categoryName, 
+                      "Total Paid (₹)": d.totalPaidAmount 
+                    })) 
+                  }
+                ]);
+              } else {
+                exportSheets("team-contribution-reports.xlsx", [
+                  { name: "Event Collections", data: report?.eventCollections ?? [] },
+                  { name: "Member History", data: report?.memberContributionHistory ?? [] },
+                  { name: "Pending Dues", data: report?.pendingDues ?? [] },
+                ]);
+              }
             }}
           >
             Export Excel
@@ -106,59 +183,89 @@ export default function ReportsPage() {
         <CardContent sx={{ p: 0 }}>
           <Box sx={{ bgcolor: "#faf9fd", p: 2, borderBottom: "1px solid rgba(74,63,107,0.1)" }}>
             <Grid container spacing={3} alignItems="center">
-              <Grid size={{ xs: 12, md: 3 }}>
-                <AppSelect
-                  label="Month"
-                  value={filters.month}
-                  onChange={(event) => setFilters((current) => ({ ...current, month: Number(event.target.value) }))}
-                  options={monthOptions}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 2 }}>
-                <AppInput
-                  label="Year"
-                  type="number"
-                  value={filters.year}
-                  onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                 <Typography variant="caption" color="text.secondary">Collection Health Index</Typography>
-                 <Typography variant="body2" fontWeight={800}>
-                    ₹{report?.eventCollections?.reduce((s, r) => s + r.paidAmount, 0)} Realized / ₹{report?.eventCollections?.reduce((s, r) => s + r.expectedAmount, 0)} Projected
-                 </Typography>
-              </Grid>
+              {mode === "member-category" ? (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <AppSelect
+                    label="Select Member"
+                    value={selectedMemberId}
+                    onChange={(event) => setSelectedMemberId(event.target.value)}
+                    options={members.map(m => ({ label: m.name, value: m.memberId }))}
+                  />
+                </Grid>
+              ) : (
+                <>
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <AppSelect
+                      label="Month"
+                      value={filters.month}
+                      onChange={(event) => setFilters((current) => ({ ...current, month: Number(event.target.value) }))}
+                      options={monthOptions}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 2 }}>
+                    <AppInput
+                      label="Year"
+                      type="number"
+                      value={filters.year}
+                      onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                     <Typography variant="caption" color="text.secondary">Collection Health Index</Typography>
+                     <Typography variant="body2" fontWeight={800}>
+                        ₹{report?.eventCollections?.reduce((s, r) => s + r.paidAmount, 0)} Realized / ₹{report?.eventCollections?.reduce((s, r) => s + r.expectedAmount, 0)} Projected
+                     </Typography>
+                  </Grid>
+                </>
+              )}
             </Grid>
           </Box>
 
           <Box sx={{ p: 4 }}>
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12 }}>
-                <AppDataTable
-                  title="Event-wise Collection Audit"
-                  columns={eventColumns}
-                  data={report?.eventCollections ?? []}
-                  loading={loading}
-                />
-              </Grid>
+              {(!mode || mode === "event") && (
+                <Grid size={{ xs: 12 }}>
+                  <AppDataTable
+                    title="Event-wise Collection Audit"
+                    columns={eventColumns}
+                    data={report?.eventCollections ?? []}
+                    loading={loading}
+                  />
+                </Grid>
+              )}
               
-              <Grid size={{ xs: 12, lg: 6 }}>
-                <AppDataTable
-                  title="Member Contribution Velocity"
-                  columns={memberColumns}
-                  data={report?.memberContributionHistory ?? []}
-                  loading={loading}
-                />
-              </Grid>
+              {(!mode || mode === "member") && (
+                <Grid size={{ xs: 12 }}>
+                  <AppDataTable
+                    title="Member Contribution Velocity"
+                    columns={memberColumns}
+                    data={report?.memberContributionHistory ?? []}
+                    loading={loading}
+                  />
+                </Grid>
+              )}
 
-              <Grid size={{ xs: 12, lg: 6 }}>
-                <AppDataTable
-                  title="High Priority Dues (Pending Receipt)"
-                  columns={pendingColumns}
-                  data={report?.pendingDues ?? []}
-                  loading={loading}
-                />
-              </Grid>
+              {(!mode || mode === "pending") && (
+                <Grid size={{ xs: 12 }}>
+                  <AppDataTable
+                    title="High Priority Dues (Pending Receipt)"
+                    columns={pendingColumns}
+                    data={report?.pendingDues ?? []}
+                    loading={loading}
+                  />
+                </Grid>
+              )}
+
+              {mode === "member-category" && (
+                <Grid size={{ xs: 12 }}>
+                  <AppDataTable
+                    title="Category-wise Overall Paid Amount"
+                    columns={memberCategoryColumns}
+                    data={memberCategoryData}
+                    loading={loading}
+                  />
+                </Grid>
+              )}
             </Grid>
           </Box>
         </CardContent>

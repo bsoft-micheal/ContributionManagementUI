@@ -34,7 +34,10 @@ const defaultRows = [
   { id: 11, module: "Support Data", subModule: "Admin", page: "Users",       access: "readWrite" },
 
   // Reports Module
-  { id: 10, module: "Reports", subModule: "Analytics", page: "Reports", access: "readWrite" }
+  { id: 10, module: "Reports", subModule: "Analytics", page: "Event Audit", access: "readWrite" },
+  { id: 12, module: "Reports", subModule: "Analytics", page: "Member Velocity", access: "readWrite" },
+  { id: 13, module: "Reports", subModule: "Analytics", page: "Pending Dues", access: "readWrite" },
+  { id: 14, module: "Reports", subModule: "Analytics", page: "Member Category Paid", access: "readWrite" }
 ];
 
 export default function UserRightsPage() {
@@ -76,10 +79,19 @@ export default function UserRightsPage() {
       const serverRights = await GetUserRights(roleName);
       // Align with defaultRows to handle any schema discrepancies
       const alignedRights = defaultRows.map(defRow => {
-        const match = serverRights.find(
-          r => r.page === defRow.page || 
-               (r.subModule === defRow.subModule && r.module === defRow.module)
-        );
+        let match = serverRights.find(r => r.page === defRow.page);
+        
+        // Fallback for transition from single 'Reports' to split reports
+        if (!match && defRow.module === "Reports") {
+          match = serverRights.find(r => r.page === "Reports");
+        }
+        
+        if (!match) {
+          match = serverRights.find(
+            r => r.subModule === defRow.subModule && r.module === defRow.module
+          );
+        }
+
         return {
           ...defRow,
           access: match ? match.access : defRow.access

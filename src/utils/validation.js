@@ -84,10 +84,15 @@ export function validateField(value, config = {}) {
   }
 
   // 4. Min/Max bounds check
-  // - If it's a numeric type (or is a valid number and type is numberonly / numberspecialcharacter), check value.
-  // - Otherwise, check character count (string length).
-  const isNumeric = type === "numberonly" || (!isNaN(strVal) && !isNaN(parseFloat(strVal)));
-  if (isNumeric) {
+  // Smart heuristic: check if this is an explicit numeric value (amount, price, etc.) vs a numeric string (phone number, OTP)
+  const isNumericValCheck = (type === "numberonly") && (
+    min === 0 || 
+    (max !== undefined && max > 100) || 
+    /amount|price|fee|cost|contribution|value/i.test(label || "") ||
+    config.isNumericValue === true
+  );
+
+  if (isNumericValCheck) {
     const numVal = parseFloat(strVal);
     if (min !== undefined && numVal < min) {
       return `${label} must be at least ${min}`;
