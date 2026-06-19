@@ -7,9 +7,11 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import logo from "../../assets/logo.png";
+import loginBg from "../../assets/login_bg.png";
+import rightLoginBg from "../../assets/right_login_bg.png";
 
 export default function LoginPage() {
-  const loginBg = "/login_bg.png";
   const [form, setForm] = useState({ email: "admin@teamcontribution.local", password: "Admin@123" });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -156,7 +158,7 @@ export default function LoginPage() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            background: "url(/right_login_bg.png) no-repeat center center",
+            background: `url(${rightLoginBg}) no-repeat center center`,
             backgroundSize: "cover",
             p: { xs: 2.5, sm: 4, md: 6 },
             minHeight: "100vh",
@@ -191,7 +193,7 @@ export default function LoginPage() {
                   p: 0.7,
                 }}
               >
-                <img src="/logo.png" alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                <img src={logo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
               </Box>
               <Stack spacing={0} sx={{ textAlign: "left" }}>
                 <Typography sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 900, color: "#1e1a2e", fontSize: "0.85rem", letterSpacing: "0.02em", lineHeight: 1.1 }}>

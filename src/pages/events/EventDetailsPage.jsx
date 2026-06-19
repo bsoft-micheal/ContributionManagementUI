@@ -69,7 +69,7 @@ export default function EventDetailsPage() {
             color: row.paymentStatus === "Paid" ? "#16a34a" : "#dc2626",
             bgcolor: row.paymentStatus === "Paid" ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)",
             px: 1.2, py: 0.3, borderRadius: "3px",
-            textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: "0.04em"
+            fontSize: "0.7rem", letterSpacing: "0.04em"
           }}
         >
           {row.paymentStatus}

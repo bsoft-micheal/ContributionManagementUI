@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Card, CardContent, Grid, Stack, Typography, Paper } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -45,6 +46,7 @@ const getEventColor = (typeName) => {
 };
 
 export default function CalendarPage() {
+  const theme = useTheme();
   const { authState } = useAuth();
   const hasWriteAccess = useMemo(() => {
     return getRightsForPage("Calendar", authState?.role).write;
@@ -117,10 +119,10 @@ export default function CalendarPage() {
 
   return (
     <div className="page-shell">
-      <Card sx={{ border: "none", boxShadow: "0 2px 8px rgba(74,63,107,0.1)", borderRadius: "6px", overflow: "hidden" }}>
+      <Card sx={{ overflow: "hidden" }}>
         <Box sx={{
-          bgcolor: "#4a3f6b",
-          color: "#ffffff",
+          bgcolor: theme.palette.mode === "dark" ? "#1d2338" : "#4a3f6b",
+          color: theme.palette.mode === "dark" ? theme.palette.text.primary : "#ffffff",
           px: 2.5,
           py: 1.2,
           minHeight: 46,
@@ -128,13 +130,13 @@ export default function CalendarPage() {
           alignItems: "center",
           justifyContent: "space-between",
         }}>
-          <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#ffffff", fontSize: "0.9rem" }}>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ color: "inherit", fontSize: "0.9rem" }}>
             Event Calendar
           </Typography>
         </Box>
 
         <CardContent sx={{ p: 0 }}>
-          <Box sx={{ bgcolor: "#faf9fd", px: 2.5, py: 2, borderBottom: "1px solid rgba(74,63,107,0.1)" }}>
+          <Box sx={{ bgcolor: theme.palette.mode === "dark" ? "#171b2d" : "#faf9fd", px: 2.5, py: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
             <Grid container spacing={4} alignItems="center">
               <Grid size={{ xs: 12, md: 3 }}>
                 <AppSelect
@@ -158,7 +160,7 @@ export default function CalendarPage() {
               </Grid>
               <Grid size={{ xs: 12, md: 7 }}>
                  <Stack direction="column" justifyContent="center" sx={{ height: "100%", ml: { md: 2 } }}>
-                   <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", mb: 0.2 }}>
+                   <Typography variant="subtitle2" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.02em", mb: 0.5, fontSize: "0.95rem" }}>
                     Current Month's Event Status
                    </Typography>
                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
@@ -171,8 +173,8 @@ export default function CalendarPage() {
                         const palette = getEventColor(type);
                         return (
                           <Box key={type} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: palette.main }} />
-                            <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ fontSize: "0.8rem" }}>
+                            <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: palette.main }} />
+                            <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ fontSize: "0.9rem" }}>
                               {count} {type}{count > 1 ? "s" : ""}
                             </Typography>
                           </Box>
@@ -198,7 +200,7 @@ export default function CalendarPage() {
               {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map(d => (
                 <Typography key={d} variant="caption" fontWeight={900} sx={{ textAlign: "center", mb: 0.5, opacity: 0.4, letterSpacing: "0.1em", fontSize: "0.65rem" }}>{d}</Typography>
               ))}
-              
+
               {calendarDays.map((day) => {
                 const dayEvents = events.filter((eventItem) =>
                   dayjs(eventItem.eventDate).format("YYYY-MM-DD") === day.format("YYYY-MM-DD")
@@ -213,16 +215,18 @@ export default function CalendarPage() {
                     sx={{ 
                       p: 1,
                       minHeight: 80,
-                      border: "1px solid rgba(0,0,0,0.06)",
+                      border: `1px solid ${theme.palette.divider}`,
                       borderRadius: 1.5,
                       opacity: isDifferentMonth ? 0.3 : 1,
-                      bgcolor: day.isSame(dayjs(), "day") ? "rgba(74,63,107,0.06)" : "white",
+                      bgcolor: day.isSame(dayjs(), "day")
+                        ? (theme.palette.mode === "dark" ? "rgba(141,150,184,0.12)" : "rgba(74,63,107,0.06)")
+                        : theme.palette.background.paper,
                       cursor: hasWriteAccess ? "pointer" : "default",
                       transition: "all 0.15s ease",
                       "&:hover": hasWriteAccess ? { 
-                        bgcolor: "#f8fafc",
+                        bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
                         transform: "translateY(-1px)",
-                        boxShadow: "0 2px 4px -1px rgba(0,0,0,0.05)"
+                        boxShadow: theme.palette.mode === "dark" ? "0 2px 6px rgba(0,0,0,0.2)" : "0 2px 4px -1px rgba(0,0,0,0.05)"
                       } : {}
                     }}
                   >
@@ -232,7 +236,9 @@ export default function CalendarPage() {
                         fontWeight={day.isSame(dayjs(), "day") ? 900 : 700} 
                         sx={{ 
                           fontSize: "0.85rem",
-                          color: day.isSame(dayjs(), "day") ? "#4a3f6b" : "text.secondary"
+                          color: day.isSame(dayjs(), "day")
+                            ? (theme.palette.mode === "dark" ? "#d6dbef" : "#4a3f6b")
+                            : "text.secondary"
                         }}
                       >
                         {day.format("DD")}
@@ -257,7 +263,7 @@ export default function CalendarPage() {
                               py: 0.4,
                               borderRadius: 0.8,
                               bgcolor: palette.main,
-                              color: "#ffffff",
+                              color: theme.palette.getContrastText(palette.main),
                               lineHeight: 1,
                               cursor: "pointer",
                               boxShadow: "0 1px 2px rgba(0,0,0,0.1)",

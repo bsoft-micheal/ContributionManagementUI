@@ -22,9 +22,10 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { ResetPasswordWithOtp } from "../../services/userService";
+import loginBg from "../../assets/login_bg.png";
+import rightLoginBg from "../../assets/right_login_bg.png";
 
 export default function ForgotPasswordResetPage() {
-  const loginBg = "/login_bg.png";
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useAppToast();
@@ -171,7 +172,7 @@ export default function ForgotPasswordResetPage() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            background: "url(/right_login_bg.png) no-repeat center center",
+            background: `url(${rightLoginBg}) no-repeat center center`,
             backgroundSize: "cover",
             p: { xs: 2.5, sm: 4, md: 6 },
             height: { xs: "auto", md: "100vh" },

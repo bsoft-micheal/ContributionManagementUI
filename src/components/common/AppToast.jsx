@@ -97,13 +97,12 @@ export const ToastProvider = ({ children }) => {
                 fontSize: "0.78rem", 
                 letterSpacing: "0.05em",
                 mb: 0.2,
-                textTransform: "uppercase",
                 color: "#ffffff"
               }}
             >
-              {severity === "success" ? "SUCCESS" : 
-               severity === "error" ? "ERROR" : 
-               severity === "warning" ? "WARNING" : "INFORMATION"}
+              {severity === "success" ? "Success" : 
+               severity === "error" ? "Error" : 
+               severity === "warning" ? "Warning" : "Information"}
             </Typography>
             <Typography variant="inherit" sx={{ display: "block", color: "rgba(255,255,255,0.95)" }}>
               {message}

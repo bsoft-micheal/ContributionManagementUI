@@ -126,7 +126,7 @@ export default function AppImageUpload({
           }}
         >
           <UploadIcon sx={{ fontSize: "1.6rem", mb: 0.2 }} />
-          <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.6rem", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.6rem", letterSpacing: "0.05em" }}>
             Change
           </Typography>
         </Box>

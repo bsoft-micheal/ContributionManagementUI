@@ -27,7 +27,6 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -45,7 +44,6 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -63,7 +61,6 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -81,7 +78,6 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -99,7 +95,6 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -117,7 +112,6 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -132,7 +126,6 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
                   py: 0.3, 
                   borderRadius: "3px", 
                   fontSize: "0.7rem", 
-                  textTransform: "uppercase", 
                   letterSpacing: "0.04em",
                   display: "inline-block"
                 }}
@@ -149,7 +142,6 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -167,7 +159,6 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >

@@ -6,6 +6,7 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -25,6 +26,7 @@ import EventDetailsDialog from "../../components/events/EventDetailsDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 
 export default function EventsPage() {
+  const theme = useTheme();
   const [events, setEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
@@ -41,6 +43,7 @@ export default function EventsPage() {
   const hasWriteAccess = rights.write;
   const navigate = useNavigate();
   const toast = useAppToast();
+  const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
 
   async function loadData() {
     const [events, types, members] = await Promise.all([
@@ -94,7 +97,7 @@ export default function EventsPage() {
                   setViewDialogOpen(true); 
                 }}
               >
-                <ViewIcon sx={{ fontSize: "1.1rem", color: "#4a3f6b" }} />
+                <ViewIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
               </IconButton>
             </Tooltip>
             {hasWriteAccess && (
@@ -106,14 +109,14 @@ export default function EventsPage() {
                       setDialogOpen(true); 
                     }}
                   >
-                    <EditIcon sx={{ fontSize: "1.1rem", color: "#4a3f6b" }} />
+                    <EditIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Delete Event">
                   <IconButton size="small" sx={{ p: 0.3 }} 
                     onClick={() => handleDeleteRequest(row)}
                   >
-                    <DeleteIcon sx={{ fontSize: "1.1rem", color: "#4a3f6b" }} />
+                    <DeleteIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
                   </IconButton>
                 </Tooltip>
               </>
@@ -122,7 +125,7 @@ export default function EventsPage() {
       )
     },
     { label: "Event Name", key: "eventName", render: (row) => (
-        <Typography variant="body2" fontWeight={700} color="primary.main">{row.eventName}</Typography>
+        <Typography variant="body2" fontWeight={700} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }}>{row.eventName}</Typography>
     )},
     { label: "Category", key: "eventTypeName", render: (row) => <Typography variant="body2">{row.eventTypeName}</Typography> },
     { label: "Date", key: "eventDate", render: (row) => dayjs(row.eventDate).format("DD/MM/YYYY") },
@@ -221,8 +224,8 @@ export default function EventsPage() {
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 3, justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: "uppercase", fontSize: "0.65rem" }}>Expected Amount</Typography>
-                  <Typography variant="body2" fontWeight={800} color="primary.main" display="block">₹{events.reduce((sum, e) => sum + e.totalExpectedAmount, 0)}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, fontSize: "0.65rem" }}>Expected Amount</Typography>
+                  <Typography variant="body2" fontWeight={800} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }} display="block">₹{events.reduce((sum, e) => sum + e.totalExpectedAmount, 0)}</Typography>
                 </Box>
               </Box>
             </Grid>

@@ -57,7 +57,6 @@ export default function EventDetailsDialog({ open, onClose, event }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -75,7 +74,6 @@ export default function EventDetailsDialog({ open, onClose, event }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -93,7 +91,6 @@ export default function EventDetailsDialog({ open, onClose, event }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 fontSize: "0.65rem",
               }}
             >
@@ -118,7 +115,6 @@ export default function EventDetailsDialog({ open, onClose, event }) {
               sx={{
                 fontWeight: 800,
                 color: "text.secondary",
-                textTransform: "uppercase",
                 display: "block",
                 mb: 0.5,
                 fontSize: "0.65rem",
@@ -140,7 +136,6 @@ export default function EventDetailsDialog({ open, onClose, event }) {
                   sx={{
                     fontWeight: 800,
                     color: "text.secondary",
-                    textTransform: "uppercase",
                     fontSize: "0.65rem",
                   }}
                 >
@@ -158,7 +153,6 @@ export default function EventDetailsDialog({ open, onClose, event }) {
                   sx={{
                     fontWeight: 800,
                     color: "text.secondary",
-                    textTransform: "uppercase",
                     fontSize: "0.65rem",
                   }}
                 >
@@ -176,7 +170,6 @@ export default function EventDetailsDialog({ open, onClose, event }) {
                   sx={{
                     fontWeight: 800,
                     color: "text.secondary",
-                    textTransform: "uppercase",
                     fontSize: "0.65rem",
                   }}
                 >
@@ -205,7 +198,6 @@ export default function EventDetailsDialog({ open, onClose, event }) {
                 sx={{
                   fontWeight: 800,
                   color: "#dc2626",
-                  textTransform: "uppercase",
                   fontSize: "0.65rem",
                   display: "block",
                   mb: 1,

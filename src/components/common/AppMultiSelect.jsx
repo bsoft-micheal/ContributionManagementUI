@@ -53,7 +53,7 @@ export default function AppMultiSelect({
             mb: 0.5,
             fontWeight: 700,
             color: "#5b5280",
-            textTransform: "uppercase",
+            textTransform: "none",
             letterSpacing: "0.04em",
             fontSize: "0.7rem",
           }}
@@ -152,7 +152,7 @@ export default function AppMultiSelect({
         sx={{
           "& .MuiOutlinedInput-root": {
             fontSize: "0.82rem",
-            bgcolor: "#ffffff",
+            bgcolor: "background.paper",
             borderRadius: "8px",
             minHeight: size === "small" ? 36 : 42,
             height: "auto !important",

@@ -8,6 +8,7 @@ import {
   Box,
   IconButton,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 export default function AppDialog({
@@ -20,6 +21,7 @@ export default function AppDialog({
   fullWidth = true,
   showCloseIcon = true,
 }) {
+  const theme = useTheme();
   const handleClose = (event, reason) => {
     if (reason && reason === "backdropClick") return;
     onClose && onClose(event, reason);
@@ -35,14 +37,18 @@ export default function AppDialog({
         sx: {
           borderRadius: "10px",
           overflow: "hidden",
-          boxShadow: "0 20px 40px rgba(74,63,107,0.2)",
+          boxShadow: theme.palette.mode === "dark"
+            ? "0 24px 60px rgba(0,0,0,0.35)"
+            : "0 20px 40px rgba(74,63,107,0.2)",
+          bgcolor: theme.palette.background.paper,
+          border: `1px solid ${theme.palette.divider}`,
         },
       }}
     >
       {/* ── Header ────────────────────────────────────────────────── */}
       <Box
         sx={{
-          bgcolor: "#4a3f6b",
+          bgcolor: theme.palette.mode === "dark" ? "#1d2338" : "#4a3f6b",
           px: 3,
           py: 1.5,
           display: "flex",
@@ -54,7 +60,7 @@ export default function AppDialog({
         <Typography
           variant="subtitle2"
           fontWeight={700}
-          sx={{ color: "#ffffff", fontSize: "0.9rem" }}
+          sx={{ color: theme.palette.mode === "dark" ? theme.palette.text.primary : "#ffffff", fontSize: "0.9rem" }}
         >
           {title}
         </Typography>
@@ -63,10 +69,13 @@ export default function AppDialog({
             size="small"
             onClick={onClose}
             sx={{
-              color: "rgba(255,255,255,0.7)",
+              color: theme.palette.mode === "dark" ? theme.palette.text.secondary : "rgba(255,255,255,0.7)",
               p: 0.5,
               borderRadius: "6px",
-              "&:hover": { color: "#ffffff", bgcolor: "rgba(255,255,255,0.12)" },
+              "&:hover": {
+                color: theme.palette.mode === "dark" ? theme.palette.text.primary : "#ffffff",
+                bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.12)"
+              },
             }}
           >
             <CloseRoundedIcon sx={{ fontSize: "1.1rem" }} />
@@ -75,7 +84,7 @@ export default function AppDialog({
       </Box>
 
       {/* ── Content ───────────────────────────────────────────────── */}
-      <DialogContent sx={{ p: 3, pt: 2.5, bgcolor: "#ffffff" }}>
+      <DialogContent sx={{ p: 3, pt: 2.5, bgcolor: theme.palette.background.paper }}>
         {children}
       </DialogContent>
 
@@ -85,8 +94,8 @@ export default function AppDialog({
           sx={{
             px: 3,
             py: 2,
-            bgcolor: "#faf9fd",
-            borderTop: "1px solid rgba(74,63,107,0.1)",
+            bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#faf9fd",
+            borderTop: `1px solid ${theme.palette.divider}`,
             gap: 1,
           }}
         >

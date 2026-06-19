@@ -159,7 +159,7 @@ export default function ExitProcessPage() {
         loading={loading}
         filterPanel={
           <Box sx={{ p: 1.5, bgcolor: "rgba(220, 38, 38, 0.05)", borderRadius: "8px", border: "1px solid rgba(220, 38, 38, 0.1)" }}>
-            <Typography variant="caption" fontWeight={800} color="error.main" sx={{ textTransform: "uppercase", display: "block", mb: 0.5 }}>
+            <Typography variant="caption" fontWeight={800} color="error.main" sx={{ display: "block", mb: 0.5 }}>
               Exit Protocol Notice
             </Typography>
             <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>

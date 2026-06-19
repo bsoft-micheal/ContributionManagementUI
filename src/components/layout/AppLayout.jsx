@@ -13,12 +13,15 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import SaveIcon from "@mui/icons-material/Save";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../contexts/AuthContext";
 import { navigationItems } from "../../config/menuConfig";
 import { getRightsForPath } from "../../utils/rightsHelper";
@@ -29,6 +32,8 @@ import AppImageUpload from "../common/AppImageUpload";
 import { useAppToast } from "../common/AppToast";
 import { validateForm } from "../../utils/validation";
 import { getImageUrl } from "../../services/apiClient";
+import { useThemeMode } from "../../contexts/ThemeModeContext";
+import logo from "../../assets/logo.png";
 
 const drawerWidth = 240;
 
@@ -47,6 +52,7 @@ const SIDEBAR = {
 };
 
 export default function AppLayout() {
+  const theme = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [masterOpen, setMasterOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
@@ -54,6 +60,37 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useAppToast();
+  const { isDark, toggleMode } = useThemeMode();
+
+  const SIDEBAR = React.useMemo(() => {
+    if (theme.palette.mode === "dark") {
+      return {
+        bg: "#121628",
+        active: "#ffffff",
+        activeBg: "rgba(141, 150, 184, 0.14)",
+        hover: "rgba(255, 255, 255, 0.04)",
+        text: "#d6dbef",
+        activeText: "#e7ebf7",
+        icon: "#ffffff",
+        activeIcon: "#ffffff",
+        divider: "rgba(255,255,255,0.08)",
+        logoutHover: "rgba(239, 68, 68, 0.14)",
+      };
+    }
+
+    return {
+      bg: "#1e1a2e",
+      active: "#4a3f6b",
+      activeBg: "rgba(74, 63, 107, 0.25)",
+      hover: "rgba(255, 255, 255, 0.05)",
+      text: "#c4bde0",
+      activeText: "#ffffff",
+      icon: "#7b72a8",
+      activeIcon: "#c4bde0",
+      divider: "rgba(255,255,255,0.08)",
+      logoutHover: "rgba(220,38,38,0.15)",
+    };
+  }, [theme.palette.mode]);
 
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -239,7 +276,7 @@ export default function AppLayout() {
               p: 0.8,
               borderRadius: "8px",
               bgcolor: "rgba(255, 255, 255, 0.03)",
-              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)", color: "#ffffff" }
+              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)", color: theme.palette.mode === "dark" ? "#e7ebf7" : "#ffffff" }
             }}
           >
             <MenuRoundedIcon />
@@ -248,19 +285,19 @@ export default function AppLayout() {
 
         <Box sx={{
           width: 40, height: 40, borderRadius: "10px",
-          bgcolor: "#ffffff", display: "flex",
+          bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "#ffffff", display: "flex",
           alignItems: "center", justifyContent: "center",
           overflow: "hidden", flexShrink: 0,
           boxShadow: "0 4px 12px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(74,63,107,0.1)",
           p: 0.5
         }}>
-          <img src="/logo.png" alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          <img src={logo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </Box>
         <Box>
-          <Typography variant="body2" sx={{ fontWeight: 900, color: "#ffffff", lineHeight: 1, fontSize: "0.95rem", letterSpacing: "0.02em" }}>
+          <Typography variant="body2" sx={{ fontWeight: 900, color: SIDEBAR.activeText, lineHeight: 1, fontSize: "0.95rem", letterSpacing: "0.02em" }}>
             Contribution
           </Typography>
-          <Typography variant="body2" sx={{ fontWeight: 800, color: "#a78bfa", lineHeight: 1.3, fontSize: "0.88rem", letterSpacing: "0.01em" }}>
+          <Typography variant="body2" sx={{ fontWeight: 800, color: theme.palette.mode === "dark" ? SIDEBAR.text : "#a78bfa", lineHeight: 1.3, fontSize: "0.88rem", letterSpacing: "0.01em" }}>
             Management
           </Typography>
         </Box>
@@ -297,10 +334,10 @@ export default function AppLayout() {
             {(authState?.fullName ?? "A")[0].toUpperCase()}
           </Avatar>
           <Box sx={{ overflow: "hidden", flexGrow: 1, minWidth: 0 }}>
-            <Typography variant="body2" fontWeight={800} sx={{ color: "#ffffff", fontSize: "0.82rem" }} noWrap>
+            <Typography variant="body2" fontWeight={800} sx={{ color: theme.palette.mode === "dark" ? "#e7ebf7" : "#ffffff", fontSize: "0.82rem" }} noWrap>
               {authState?.fullName?.split(" ")[0] ?? "User"}
             </Typography>
-            <Typography variant="caption" sx={{ color: SIDEBAR.text, fontSize: "0.68rem", fontWeight: 600, textTransform: "uppercase" }} noWrap>
+            <Typography variant="caption" sx={{ color: SIDEBAR.text, fontSize: "0.68rem", fontWeight: 600 }} noWrap>
               {authState?.role}
             </Typography>
           </Box>
@@ -318,8 +355,26 @@ export default function AppLayout() {
                 "&:hover": { bgcolor: SIDEBAR.logoutHover, color: "#f87171" },
                 transition: "all 0.2s ease",
               }}
-            >
+              >
               <LogoutRoundedIcon sx={{ fontSize: "1.1rem" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={isDark ? "Switch to Day Theme" : "Switch to Night Theme"}>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleMode();
+              }}
+              sx={{
+                color: SIDEBAR.text,
+                p: 0.8,
+                borderRadius: "6px",
+                "&:hover": { bgcolor: SIDEBAR.hover, color: theme.palette.mode === "dark" ? "#e7ebf7" : "#ffffff" },
+                transition: "all 0.2s ease",
+              }}
+            >
+              {isDark ? <LightModeOutlinedIcon sx={{ fontSize: "1.05rem" }} /> : <DarkModeOutlinedIcon sx={{ fontSize: "1.05rem" }} />}
             </IconButton>
           </Tooltip>
         </Box>
@@ -328,13 +383,13 @@ export default function AppLayout() {
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f5f4fb" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
       {/* Mobile hamburger */}
       <Box sx={{ display: { xs: "flex", md: "none" }, position: "fixed", top: 12, left: 12, zIndex: 1300 }}>
         {!mobileOpen && (
           <IconButton
             onClick={() => setMobileOpen(true)}
-            sx={{ bgcolor: SIDEBAR.bg, color: "#fff", borderRadius: "8px", "&:hover": { bgcolor: SIDEBAR.active } }}
+            sx={{ bgcolor: SIDEBAR.bg, color: theme.palette.mode === "dark" ? theme.palette.text.primary : "#fff", borderRadius: "8px", "&:hover": { bgcolor: SIDEBAR.active } }}
           >
             <MenuRoundedIcon />
           </IconButton>
@@ -386,7 +441,7 @@ export default function AppLayout() {
           width: { md: `calc(100% - ${drawerWidth}px)` },
           minWidth: 0, // Prevent table from overflowing flexbox
           minHeight: "100vh",
-          bgcolor: "#f5f4fb",
+          bgcolor: "background.default",
         }}
       >
         <Outlet />
@@ -470,7 +525,7 @@ export default function AppLayout() {
           </Box>
           <Divider sx={{ my: 0.5, borderColor: "rgba(74, 63, 107, 0.08)" }} />
 
-          <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", mt: -1 }}>
+          <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", mt: -1 }}>
             Change Password (Optional)
           </Typography>
 

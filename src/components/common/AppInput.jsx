@@ -1,4 +1,5 @@
 import { TextField, Box, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { sanitizeInput } from "../../utils/validation";
 
 export default function AppInput({
@@ -16,6 +17,8 @@ export default function AppInput({
   maxLength,
   ...props
 }) {
+  const theme = useTheme();
+
   const handleInputChange = (e) => {
     let val = e.target.value;
     if (restrictType) {
@@ -39,8 +42,8 @@ export default function AppInput({
             display: "block",
             mb: 0.5,
             fontWeight: 700,
-            color: "#5b5280",
-            textTransform: "uppercase",
+            color: "text.secondary",
+            textTransform: "none",
             letterSpacing: "0.04em",
             fontSize: "0.7rem",
           }}
@@ -64,20 +67,20 @@ export default function AppInput({
         sx={{
           "& .MuiOutlinedInput-root": {
             fontSize: "0.82rem",
-            bgcolor: "#ffffff",
-            borderRadius: "6px",
+            bgcolor: "background.paper",
+            borderRadius: "12px",
             height: size === "small" ? 34 : 40,
             "& input": {
               py: size === "small" ? 0.8 : 1.2,
             },
             "& fieldset": {
-              borderColor: "rgba(74, 63, 107, 0.2)",
+              borderColor: theme.palette.divider,
             },
             "&:hover fieldset": {
-              borderColor: "rgba(74, 63, 107, 0.4)",
+              borderColor: "rgba(124, 58, 237, 0.45)",
             },
             "&.Mui-focused fieldset": {
-              borderColor: "#4a3f6b",
+              borderColor: "secondary.main",
               borderWidth: "1.5px",
             },
           },

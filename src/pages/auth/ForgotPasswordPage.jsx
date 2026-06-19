@@ -18,9 +18,10 @@ import { useAppToast } from "../../components/common/AppToast";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import { RequestForgotPasswordOtp } from "../../services/userService";
+import loginBg from "../../assets/login_bg.png";
+import rightLoginBg from "../../assets/right_login_bg.png";
 
 export default function ForgotPasswordPage() {
-  const loginBg = "/login_bg.png";
   const navigate = useNavigate();
   const toast = useAppToast();
 
@@ -133,7 +134,7 @@ export default function ForgotPasswordPage() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            background: "url(/right_login_bg.png) no-repeat center center",
+            background: `url(${rightLoginBg}) no-repeat center center`,
             backgroundSize: "cover",
             p: { xs: 2.5, sm: 4, md: 6 },
             height: { xs: "auto", md: "100vh" },

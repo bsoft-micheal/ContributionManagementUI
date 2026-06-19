@@ -71,7 +71,7 @@ export default function RolesPage() {
       render: (row) => (
         <Tooltip title="Edit Role">
           <IconButton size="small" sx={{ p: 0.3 }} onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}>
-            <EditIcon sx={{ fontSize: "1.1rem", color: "#4a3f6b" }} />
+            <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
           </IconButton>
         </Tooltip>
       )

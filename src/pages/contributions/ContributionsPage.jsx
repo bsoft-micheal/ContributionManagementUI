@@ -11,6 +11,7 @@ import {
   IconButton,
   Tooltip
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import {
   Payments as PaymentsIcon,
   Visibility as ViewIcon,
@@ -43,6 +44,7 @@ const initialPayment = {
 };
 
 export default function ContributionsPage() {
+  const theme = useTheme();
   const { authState } = useAuth();
   const rights = getRightsForPage("Contributions", authState?.role);
   const hasWriteAccess = rights.write;
@@ -58,6 +60,7 @@ export default function ContributionsPage() {
   const [roles, setRoles] = useState([]);
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
+  const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
 
   useEffect(() => {
     async function loadEvents() {
@@ -220,7 +223,7 @@ export default function ContributionsPage() {
                   setErrors({});
                   setDialogOpen(true);
                 }}
-                sx={{ p: 0.3, color: row.paymentStatus === "Paid" || !hasWriteAccess ? "#cbd5e1" : "#4a3f6b" }}
+                sx={{ p: 0.3, color: row.paymentStatus === "Paid" || !hasWriteAccess ? "#cbd5e1" : actionIconColor }}
               >
                 <PaymentsIcon sx={{ fontSize: "1.1rem" }} />
               </IconButton>
@@ -240,7 +243,7 @@ export default function ContributionsPage() {
             color: row.paymentStatus === "Paid" ? "#16a34a" : "#dc2626",
             bgcolor: row.paymentStatus === "Paid" ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)",
             px: 1.2, py: 0.3, borderRadius: "3px",
-            textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: "0.04em"
+            fontSize: "0.7rem", letterSpacing: "0.04em"
           }}
         >
           {row.paymentStatus}
@@ -265,7 +268,7 @@ export default function ContributionsPage() {
       key: "totalAccumulated",
       align: "right",
       render: (row) => (
-        <Typography variant="body2" fontWeight={900} color="primary.main">
+        <Typography variant="body2" fontWeight={900} color={theme.palette.mode === "dark" ? "#ffffff" : "primary.main"}>
           ₹{row.totalAccumulated}
         </Typography>
       )
@@ -299,13 +302,13 @@ export default function ContributionsPage() {
 
                 }}
                 sx={{
-                  bgcolor: "#4a3f6b !important",
+                  bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
                   color: "#ffffff",
                   height: 34,
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" }
+                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
                 }}
               >
                 Filter
@@ -340,7 +343,7 @@ export default function ContributionsPage() {
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: "flex", gap: 3, alignItems: "center", justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Box>
-                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.65rem" }}>
+                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", fontSize: "0.65rem" }}>
                     Total Income
                   </Typography>
                   <Typography variant="body1" fontWeight={900} color="success.main" sx={{ lineHeight: 1 }}>
@@ -348,7 +351,7 @@ export default function ContributionsPage() {
                   </Typography>
                 </Box>
                 <Box sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)", pl: 3 }}>
-                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.65rem" }}>
+                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", fontSize: "0.65rem" }}>
                     Total Members
                   </Typography>
                   <Typography variant="body2" fontWeight={800} sx={{ lineHeight: 1 }}>{contributions.length} Members</Typography>
@@ -367,7 +370,17 @@ export default function ContributionsPage() {
         title="Record Payment"
         actions={
           <>
-            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handlePay} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
+              <AppButton
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={handlePay}
+                sx={{
+                  bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
+                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
+                }}
+              >
+                Save
+              </AppButton>
             <AppButton variant="text" color="inherit" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
           </>
         }

@@ -23,7 +23,7 @@ export default function AppDateInput({
             mb: 0.5,
             fontWeight: 700,
             color: "#5b5280",
-            textTransform: "uppercase",
+            textTransform: "none",
             letterSpacing: "0.04em",
             fontSize: "0.7rem",
           }}
@@ -50,7 +50,7 @@ export default function AppDateInput({
             InputProps: {
               sx: {
                 borderRadius: "6px",
-                bgcolor: "#ffffff",
+                bgcolor: "background.paper",
                 fontSize: "0.82rem",
                 height: size === "small" ? 34 : 40,
                 "& .MuiOutlinedInput-input": { py: size === "small" ? 0.8 : 1.2 },

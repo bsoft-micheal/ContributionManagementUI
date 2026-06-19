@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Grid } from "@mui/material";
+import { Grid, Box, Typography } from "@mui/material";
 import { Save as SaveIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import AppInput from "../common/AppInput";
@@ -83,6 +83,23 @@ export default function EventFormDialog({
     }
   }, [open, event]);
 
+  const calculateBaseAmount = (eventTypeId, eventDate) => {
+    if (!eventTypeId) return 0;
+    const selectedType = eventTypes.find(t => t.eventTypeId === eventTypeId);
+    if (!selectedType) return 0;
+
+    const baseVal = selectedType.baseAmount || 0;
+
+    if (selectedType.eventTypeName.toLowerCase().includes("birthday")) {
+      if (!eventDate) return 0;
+      const targetMonth = dayjs(eventDate).month(); // 0-11
+      const count = members.filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === targetMonth).length;
+      return count * baseVal;
+    }
+
+    return baseVal;
+  };
+
   const handleSubmit = async () => {
     const filed = "This field is required";
     const schema = {
@@ -139,6 +156,19 @@ export default function EventFormDialog({
     value: m.memberId,
   }));
 
+  const getBirthdayCelebrators = () => {
+    if (!form.eventTypeId) return "";
+    const selectedType = eventTypes.find(t => t.eventTypeId === form.eventTypeId);
+    if (!selectedType || !selectedType.eventTypeName.toLowerCase().includes("birthday")) return "";
+
+    const targetMonth = dayjs(form.eventDate).month();
+    const celebrators = members.filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === targetMonth);
+    if (celebrators.length === 0) return "No birthdays this month";
+    
+    const names = celebrators.map(c => c.name).join(", ");
+    return `${names} celebrating birthday`;
+  };
+
   return (
     <AppDialog
       open={open}
@@ -166,17 +196,23 @@ export default function EventFormDialog({
     >
       <Grid container spacing={4}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <AppInput
-            label="Event Name"
-            value={form.eventName}
+          <AppSelect
+            label="Category"
+            value={form.eventTypeId}
             onChange={(e) => {
-              setForm((current) => ({ ...current, eventName: e.target.value }));
-              if (errors.eventName) setErrors((prev) => ({ ...prev, eventName: "" }));
+              const newTypeId = e.target.value;
+              const computedAmount = calculateBaseAmount(newTypeId, form.eventDate);
+              setForm((current) => ({ 
+                ...current, 
+                eventTypeId: newTypeId,
+                baseAmount: computedAmount
+              }));
+              if (errors.eventTypeId) setErrors((prev) => ({ ...prev, eventTypeId: "" }));
+              if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
             }}
-            restrictType="letteronly"
-            maxLength={100}
-            error={!!errors.eventName}
-            helperText={errors.eventName}
+            options={typeOptions}
+            error={!!errors.eventTypeId}
+            helperText={errors.eventTypeId}
             required
           />
         </Grid>
@@ -193,19 +229,21 @@ export default function EventFormDialog({
             error={!!errors.baseAmount}
             helperText={errors.baseAmount}
             required
+            disabled={!!form.eventTypeId}
           />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <AppSelect
-            label="Category"
-            value={form.eventTypeId}
+          <AppInput
+            label="Event Name"
+            value={form.eventName}
             onChange={(e) => {
-              setForm((current) => ({ ...current, eventTypeId: e.target.value }));
-              if (errors.eventTypeId) setErrors((prev) => ({ ...prev, eventTypeId: "" }));
+              setForm((current) => ({ ...current, eventName: e.target.value }));
+              if (errors.eventName) setErrors((prev) => ({ ...prev, eventName: "" }));
             }}
-            options={typeOptions}
-            error={!!errors.eventTypeId}
-            helperText={errors.eventTypeId}
+            restrictType="letteronly"
+            maxLength={100}
+            error={!!errors.eventName}
+            helperText={errors.eventName}
             required
           />
         </Grid>
@@ -214,14 +252,40 @@ export default function EventFormDialog({
             label="Event Date"
             value={form.eventDate}
             onChange={(newValue) => {
-              setForm((current) => ({ ...current, eventDate: newValue }));
+              const computedAmount = calculateBaseAmount(form.eventTypeId, newValue);
+              setForm((current) => ({ 
+                ...current, 
+                eventDate: newValue,
+                baseAmount: form.eventTypeId ? computedAmount : current.baseAmount
+              }));
               if (errors.eventDate) setErrors((prev) => ({ ...prev, eventDate: "" }));
+              if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
             }}
             error={!!errors.eventDate}
             helperText={errors.eventDate}
             required
           />
         </Grid>
+        {getBirthdayCelebrators() && (
+          <Grid size={{ xs: 12 }}>
+            <Box
+              sx={{
+                p: 1.5,
+                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.12)" : "rgba(34, 197, 94, 0.08)",
+                border: "1px solid",
+                borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.3)" : "rgba(34, 197, 94, 0.2)",
+                borderRadius: "6px",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#4ade80" : "#15803d" }}>
+                🎂 {getBirthdayCelebrators()}
+              </Typography>
+            </Box>
+          </Grid>
+        )}
         <Grid size={{ xs: 12 }}>
           <AppTextArea
             label="Description"

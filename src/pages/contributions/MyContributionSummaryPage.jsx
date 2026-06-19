@@ -7,6 +7,7 @@ import {
   Grid,
   Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
@@ -20,14 +21,16 @@ import { useAuth } from "../../contexts/AuthContext";
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ icon, label, value, color, bg }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   return (
     <Card
       sx={{
-        border: "none",
         borderRadius: "10px",
-        boxShadow: "0 2px 12px rgba(74,63,107,0.10)",
-        background: bg || "#fff",
+        boxShadow: isDark ? "0 10px 24px rgba(0,0,0,0.2)" : "0 2px 12px rgba(74,63,107,0.10)",
+        background: bg || (isDark ? "#171b2d" : "#fff"),
         height: "100%",
+        border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "transparent"}`,
       }}
     >
       <CardContent sx={{ p: 2.5 }}>
@@ -44,17 +47,17 @@ function StatCard({ icon, label, value, color, bg }) {
               flexShrink: 0,
             }}
           >
-            {React.cloneElement(icon, { sx: { color, fontSize: "1.4rem" } })}
+            {React.cloneElement(icon, { sx: { color: isDark ? "#ffffff" : color, fontSize: "1.4rem" } })}
           </Box>
           <Typography
             variant="caption"
             fontWeight={700}
-            sx={{ color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}
+            sx={{ color: isDark ? "#d6dbef" : "#6b7280", letterSpacing: "0.05em" }}
           >
             {label}
           </Typography>
         </Box>
-        <Typography variant="h5" fontWeight={900} sx={{ color, mt: 0.5 }}>
+        <Typography variant="h5" fontWeight={900} sx={{ color: isDark ? "#ffffff" : color, mt: 0.5 }}>
           {value}
         </Typography>
       </CardContent>
@@ -64,6 +67,7 @@ function StatCard({ icon, label, value, color, bg }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function MyContributionSummaryPage() {
+  const theme = useTheme();
   const { authState } = useAuth();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +93,7 @@ export default function MyContributionSummaryPage() {
       key: "categoryName",
       render: (row) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <CategoryRoundedIcon sx={{ fontSize: "1rem", color: "#4a3f6b" }} />
+          <CategoryRoundedIcon sx={{ fontSize: "1rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
           <Typography variant="body2" fontWeight={700}>{row.categoryName}</Typography>
         </Box>
       ),
@@ -102,7 +106,12 @@ export default function MyContributionSummaryPage() {
         <Chip
           label={row.eventCount}
           size="small"
-          sx={{ bgcolor: "rgba(74,63,107,0.1)", color: "#4a3f6b", fontWeight: 700, fontSize: "0.8rem" }}
+          sx={{ 
+            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74,63,107,0.1)", 
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", 
+            fontWeight: 700, 
+            fontSize: "0.8rem" 
+          }}
         />
       ),
     },
@@ -134,7 +143,12 @@ export default function MyContributionSummaryPage() {
           label={row.categoryName}
           size="small"
           variant="outlined"
-          sx={{ borderColor: "#4a3f6b", color: "#4a3f6b", fontWeight: 600, fontSize: "0.75rem" }}
+          sx={{ 
+            borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#4a3f6b", 
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", 
+            fontWeight: 600, 
+            fontSize: "0.75rem" 
+          }}
         />
       ),
     },
@@ -212,7 +226,7 @@ export default function MyContributionSummaryPage() {
       <Card
         sx={{
           border: "none",
-          boxShadow: "0 2px 8px rgba(74,63,107,0.1)",
+          boxShadow: theme.palette.mode === "dark" ? "0 12px 28px rgba(0,0,0,0.22)" : "0 2px 8px rgba(74,63,107,0.1)",
           borderRadius: "6px",
           overflow: "hidden",
           mb: 3,
@@ -220,7 +234,9 @@ export default function MyContributionSummaryPage() {
       >
         <Box
           sx={{
-            background: "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+            background: theme.palette.mode === "dark"
+              ? "linear-gradient(90deg, #171b2d 0%, #1d2338 100%)"
+              : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
             color: "#fff",
             px: 2.5,
             py: 0.5,
@@ -238,7 +254,7 @@ export default function MyContributionSummaryPage() {
             >
               My Contribution Summary
             </Typography>
-            <Typography variant="caption" sx={{ color: "#c4bde0", fontSize: "0.72rem" }}>
+            <Typography variant="caption" sx={{ color: theme.palette.mode === "dark" ? "#d6dbef" : "#c4bde0", fontSize: "0.72rem" }}>
               All-time • {memberName}
             </Typography>
           </Box>
@@ -261,7 +277,7 @@ export default function MyContributionSummaryPage() {
 
         <CardContent sx={{ p: 0 }}>
           {/* ── Stats row ──────────────────────────────────────────────────── */}
-          <Box sx={{ bgcolor: "#faf9fd", p: 2.5, borderBottom: "1px solid rgba(74,63,107,0.1)" }}>
+          <Box sx={{ bgcolor: theme.palette.mode === "dark" ? "#171b2d" : "#faf9fd", p: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 4 }}>
                 <StatCard
@@ -298,7 +314,7 @@ export default function MyContributionSummaryPage() {
                 <AppDataTable
                   title={
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <CategoryRoundedIcon sx={{ fontSize: "1rem", color: "#4a3f6b" }} />
+                      <CategoryRoundedIcon sx={{ fontSize: "1rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
                       Category-wise Paid Summary
                     </Box>
                   }
@@ -313,7 +329,7 @@ export default function MyContributionSummaryPage() {
                 <AppDataTable
                   title={
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <ReceiptLongRoundedIcon sx={{ fontSize: "1rem", color: "#4a3f6b" }} />
+                      <ReceiptLongRoundedIcon sx={{ fontSize: "1rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
                       Event-by-Event History
                     </Box>
                   }

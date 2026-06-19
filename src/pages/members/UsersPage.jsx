@@ -10,6 +10,7 @@ import {
   Checkbox,
   FormControlLabel,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
@@ -61,6 +62,7 @@ const initialForm = {
 };
 
 export default function UsersPage() {
+  const theme = useTheme();
   const { authState } = useAuth();
   const rights = getRightsForPage("Users", authState?.role);
   const hasWriteAccess = rights.write;
@@ -83,6 +85,7 @@ export default function UsersPage() {
   const [appliedStatus, setAppliedStatus] = useState("");
 
   const toast = useAppToast();
+  const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
 
   const filteredUsers = useMemo(() => {
     let result = users;
@@ -239,7 +242,7 @@ export default function UsersPage() {
                 disabled={!hasWriteAccess}
                 onClick={() => openEdit(row)}
               >
-                <EditIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? "#4a3f6b" : "#cbd5e1" }} />
+                <EditIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? actionIconColor : "#cbd5e1" }} />
               </IconButton>
             </span>
           </Tooltip>
@@ -251,7 +254,7 @@ export default function UsersPage() {
                 disabled={!hasWriteAccess}
                 onClick={() => handleDeleteRequest(row.userId)}
               >
-                <DeleteIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? "#4a3f6b" : "#cbd5e1" }} />
+                <DeleteIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? actionIconColor : "#cbd5e1" }} />
               </IconButton>
             </span>
           </Tooltip>
@@ -303,7 +306,6 @@ export default function UsersPage() {
               px: 1.2, py: 0.3,
               borderRadius: "3px",
               fontSize: "0.7rem",
-              textTransform: "uppercase",
               letterSpacing: "0.04em",
             }}
           >
@@ -319,7 +321,6 @@ export default function UsersPage() {
               px: 1.2, py: 0.3,
               borderRadius: "3px",
               fontSize: "0.7rem",
-              textTransform: "uppercase",
               letterSpacing: "0.04em",
             }}
           >

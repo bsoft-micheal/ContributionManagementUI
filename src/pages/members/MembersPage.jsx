@@ -156,7 +156,7 @@ export default function MembersPage() {
               setSelectedMember(row);
               setViewDialogOpen(true);
             }}>
-              <ViewIcon sx={{ fontSize: "1.05rem", color: "#4a3f6b" }} />
+              <ViewIcon sx={{ fontSize: "1.05rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
             </IconButton>
           </Tooltip>
           <Tooltip title={hasWriteAccess ? "Edit" : ""}>
@@ -170,14 +170,14 @@ export default function MembersPage() {
                 setErrors({});
                 setDialogOpen(true);
               }}>
-                <EditIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? "#4a3f6b" : "#cbd5e1" }} />
+                <EditIcon sx={{ fontSize: "1.05rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
               </IconButton>
             </span>
           </Tooltip>
           <Tooltip title={hasWriteAccess ? "Delete" : ""}>
             <span>
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => handleDeleteRequest(row.memberId)}>
-                <DeleteIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? "#4a3f6b" : "#cbd5e1" }} />
+                <DeleteIcon sx={{ fontSize: "1.05rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
               </IconButton>
             </span>
           </Tooltip>
@@ -192,7 +192,13 @@ export default function MembersPage() {
       key: "roleName",
       render: (row) => (
         <Typography variant="caption" fontWeight={700}
-          sx={{ bgcolor: "rgba(74,63,107,0.08)", color: "#4a3f6b", px: 1.2, py: 0.3, borderRadius: "3px", fontSize: "0.75rem" }}
+          sx={{ 
+            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74,63,107,0.08)", 
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", 
+            px: 1.2, py: 0.3, 
+            borderRadius: "3px", 
+            fontSize: "0.75rem" 
+          }}
         >
           {row.roleName}
         </Typography>
@@ -203,7 +209,7 @@ export default function MembersPage() {
       label: "Status",
       render: () => (
         <Typography variant="caption" fontWeight={800}
-          sx={{ color: "#16a34a", bgcolor: "rgba(22,163,74,0.08)", px: 1.2, py: 0.3, borderRadius: "3px", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.04em" }}
+          sx={{ color: "#16a34a", bgcolor: "rgba(22,163,74,0.08)", px: 1.2, py: 0.3, borderRadius: "3px", fontSize: "0.7rem", letterSpacing: "0.04em" }}
         >Verified</Typography>
       ),
     },
