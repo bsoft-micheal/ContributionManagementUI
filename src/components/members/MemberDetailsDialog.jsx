@@ -14,7 +14,19 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
       title="Member Details"
       maxWidth="sm"
       actions={
-        <AppButton variant="text" color="inherit" onClick={onClose}>
+        <AppButton 
+          variant="outlined" 
+          color="inherit" 
+          onClick={onClose}
+          sx={{
+            borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "rgba(74, 63, 107, 0.4)",
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+            "&:hover": {
+              borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
+            }
+          }}
+        >
           Close
         </AppButton>
       }
@@ -32,7 +44,7 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
             >
                Name
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 800, color: "#4a3f6b" }}>
+            <Typography variant="body2" sx={{ fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
               {member.name}
             </Typography>
           </Box>

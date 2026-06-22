@@ -2,7 +2,11 @@ import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
 export const GetEvents = async (params) => {
   try {
-    const result = await getApi("/events", params);
+    const apiParams = {
+      month: params.month === 0 ? null : params.month,
+      year: params.year === 0 ? null : params.year,
+    };
+    const result = await getApi("/events", apiParams);
     return result;
   } catch (error) {
     console.error('Error fetching events:', error.response?.data || error.message);

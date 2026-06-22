@@ -50,11 +50,11 @@ export default function AppConfirmDialog({
           </Box>
         </Box>
 
-        <Typography variant="h5" sx={{ fontWeight: 700, color: "#545454", mb: 2, fontFamily: "'Inter', sans-serif" }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#545454", mb: 2, fontFamily: "'Inter', sans-serif" }}>
           {title}
         </Typography>
 
-        <Typography sx={{ color: "#666666", fontSize: "1.05rem" }}>
+        <Typography sx={{ color: (theme) => theme.palette.mode === "dark" ? "#d1d5db" : "#666666", fontSize: "1.05rem" }}>
           {content}
         </Typography>
       </DialogContent>
@@ -76,13 +76,17 @@ export default function AppConfirmDialog({
           variant="contained"
           onClick={onClose}
           sx={{
-            backgroundColor: "#dce2e6 !important",
-            color: "#fff !important",
+            backgroundColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12) !important" : "#dce2e6 !important",
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#545454 !important",
+            border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
             textTransform: "none",
             px: 3,
             fontSize: "0.95rem",
             boxShadow: "none",
-            "&:hover": { backgroundColor: "#caced1 !important", boxShadow: "none" },
+            "&:hover": { 
+              backgroundColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2) !important" : "#caced1 !important", 
+              boxShadow: "none" 
+            },
           }}
         >
           {cancelText}

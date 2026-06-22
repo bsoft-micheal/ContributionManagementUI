@@ -26,7 +26,7 @@ export default function AppSelect({
             display: "block",
             mb: 0.5,
             fontWeight: 700,
-            color: "text.secondary",
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.secondary",
             textTransform: "none",
             letterSpacing: "0.04em",
             fontSize: "0.7rem",
@@ -76,9 +76,11 @@ export default function AppSelect({
             bgcolor: "background.paper",
             borderRadius: "12px",
             height: size === "small" ? 34 : 40,
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             "& .MuiSelect-select": {
               py: size === "small" ? 0.7 : 1,
               pr: value && onChange && !props.disabled ? "40px !important" : "24px !important",
+              color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             },
             "& fieldset": {
               borderColor: theme.palette.divider,

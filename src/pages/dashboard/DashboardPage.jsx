@@ -17,43 +17,81 @@ import AppSelect from "../../components/common/AppSelect";
 import { GetDashboardSummary } from "../../services/dashboardService";
 import AppDataTable from "../../components/common/AppDataTable";
 
-function SimpleBarChart({ items, valueKey = "value", labelKey = "label", height = 220 }) {
+function EventContributionChart({ items }) {
   const theme = useTheme();
-  const maxValue = Math.max(...items.map((item) => Number(item[valueKey]) || 0), 1);
 
   return (
-    <Stack spacing={1.5} sx={{ height: "100%" }}>
+    <Stack spacing={2.5} sx={{ height: "100%" }}>
       {items.map((item) => {
-        const value = Number(item[valueKey]) || 0;
-        const width = `${Math.max(8, (value / maxValue) * 100)}%`;
+        const expected = Number(item.expectedAmount) || 0;
+        const collected = Number(item.collectedAmount) || 0;
+        const pending = Number(item.pendingAmount) || 0;
+        
+        const total = Math.max(expected, 1);
+        const collectedWidth = `${(collected / total) * 100}%`;
+        const pendingWidth = `${(pending / total) * 100}%`;
 
         return (
-          <Box key={item[labelKey]} sx={{ display: "grid", gridTemplateColumns: "1fr 5fr auto", alignItems: "center", gap: 1.5 }}>
-            <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }} noWrap>
-              {item[labelKey]}
-            </Typography>
-            <Box sx={{ height: 12, borderRadius: 999, bgcolor: theme.palette.action.hover, overflow: "hidden" }}>
+          <Box key={item.eventId} sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.85rem" }} noWrap>
+                {item.eventName}
+              </Typography>
+              <Typography variant="subtitle2" fontWeight={800} color="text.primary">
+                {"\u20B9"}{expected.toLocaleString()}
+              </Typography>
+            </Stack>
+
+            {/* Stacked Progress Bar */}
+            <Box 
+              sx={{ 
+                height: 10, 
+                borderRadius: 999, 
+                bgcolor: theme.palette.action.hover, 
+                display: "flex", 
+                overflow: "hidden" 
+              }}
+            >
               <Box
                 sx={{
                   height: "100%",
-                  width,
-                  borderRadius: 999,
-                  background: theme.palette.mode === "dark"
-                    ? "linear-gradient(90deg, #59627b 0%, #40475d 100%)"
-                    : "linear-gradient(90deg, #7c3aed 0%, #4f46e5 100%)",
+                  width: collectedWidth,
+                  background: "linear-gradient(90deg, #10b981 0%, #059669 100%)",
+                  transition: "width 0.5s ease-in-out",
+                }}
+              />
+              <Box
+                sx={{
+                  height: "100%",
+                  width: pendingWidth,
+                  background: "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)",
+                  transition: "width 0.5s ease-in-out",
                 }}
               />
             </Box>
-            <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ minWidth: 74, textAlign: "right" }}>
-              {"\u20B9"}{value.toLocaleString()}
-            </Typography>
+
+            {/* Breakdown Legend */}
+            <Stack direction="row" spacing={2}>
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#10b981" }} />
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                  Collected: <span style={{ color: "#10b981", fontWeight: 700 }}>{"\u20B9"}{collected.toLocaleString()}</span>
+                </Typography>
+              </Stack>
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#f59e0b" }} />
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                  Pending: <span style={{ color: "#f59e0b", fontWeight: 700 }}>{"\u20B9"}{pending.toLocaleString()}</span>
+                </Typography>
+              </Stack>
+            </Stack>
           </Box>
         );
       })}
 
       {items.length === 0 && (
         <Box sx={{ flex: 1, display: "grid", placeItems: "center", color: "text.secondary" }}>
-          <Typography variant="body2">No upcoming events yet.</Typography>
+          <Typography variant="body2">No events for the selected month.</Typography>
         </Box>
       )}
     </Stack>
@@ -138,16 +176,25 @@ export default function DashboardPage() {
     loadData();
   }, [filters]);
 
-  const monthOptions = Array.from({ length: 12 }, (_, i) => ({
-    label: dayjs().month(i).format("MMMM"),
-    value: i + 1,
-  }));
+  const monthOptions = [
+    { label: "All", value: 0 },
+    ...Array.from({ length: 12 }, (_, i) => ({
+      label: dayjs().month(i).format("MMMM"),
+      value: i + 1,
+    }))
+  ];
+
+  const currentYear = dayjs().year();
+  const yearOptions = [
+    { label: "All", value: 0 },
+    ...Array.from({ length: 11 }, (_, i) => {
+      const y = currentYear - 5 + i;
+      return { label: String(y), value: y };
+    })
+  ];
 
   const upcomingEvents = summary?.upcomingEvents ?? [];
-  const upcomingBarData = upcomingEvents.slice(0, 6).map((event) => ({
-    label: event.eventName,
-    value: event.expectedAmount,
-  }));
+  const chartEventsData = upcomingEvents.slice(0, 6);
 
   const operationalHealth = useMemo(() => {
     if (!summary?.monthlyEventsCount) return 0;
@@ -211,18 +258,6 @@ export default function DashboardPage() {
           }}
         >
           <Stack spacing={2}>
-            <Box>
-              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: "0.2em", fontWeight: 800 }}>
-                Executive Overview
-              </Typography>
-              <Typography variant="h4" fontWeight={900}>
-                Dashboard
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                High-level collection status, upcoming activity, and event planning at a glance.
-              </Typography>
-            </Box>
-
             <Grid container spacing={2} alignItems="end">
               <Grid size={{ xs: 12, md: 3 }}>
                 <AppSelect
@@ -233,11 +268,11 @@ export default function DashboardPage() {
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 3 }}>
-                <AppInput
+                <AppSelect
                   label="Year"
-                  type="number"
                   value={filters.year}
                   onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
+                  options={yearOptions}
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -272,18 +307,19 @@ export default function DashboardPage() {
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                   <MetricCard
-                    label="Pending Payments"
-                    value={summary?.pendingPayments ?? 0}
-                    helper="Unsettled contributions"
+                    label="Total Pending"
+                    value={`\u20B9${Number(summary?.totalPendingAmount ?? 0).toLocaleString()}`}
+                    helper="Total pending amount for the month"
                     accent="error.main"
                   />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                  <Card sx={{ height: "100%" }}>
-                    <CardContent sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <ProgressRing value={operationalHealth} label="Health" sublabel="Operational readiness" />
-                    </CardContent>
-                  </Card>
+                  <MetricCard
+                    label="Pending Payments"
+                    value={summary?.pendingPayments ?? 0}
+                    helper="Number of unpaid contributions"
+                    accent="warning.main"
+                  />
                 </Grid>
               </Grid>
 
@@ -294,13 +330,13 @@ export default function DashboardPage() {
                       <Stack spacing={2}>
                         <Box>
                           <Typography variant="h6" fontWeight={900}>
-                            Upcoming Event Budget
+                            Event Collections Breakdown
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            Expected amount for the next 14 days.
+                            Collected vs Pending contributions per event.
                           </Typography>
                         </Box>
-                        <SimpleBarChart items={upcomingBarData} />
+                        <EventContributionChart items={chartEventsData} />
                       </Stack>
                     </CardContent>
                   </Card>
@@ -314,36 +350,45 @@ export default function DashboardPage() {
                             Planning Snapshot
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            Balance between upcoming events and unresolved dues.
+                            Pending payments status per event.
                           </Typography>
                         </Box>
-                        <Stack spacing={1.5}>
-                          <Box>
-                            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                              <Typography variant="body2" fontWeight={700}>
-                                Upcoming Events
-                              </Typography>
-                              <Typography variant="body2" fontWeight={800}>
-                                {summary?.monthlyEventsCount ?? 0}
-                              </Typography>
-                            </Stack>
-                            <Box sx={{ height: 10, borderRadius: 999, bgcolor: theme.palette.action.hover, overflow: "hidden" }}>
-                              <Box sx={{ width: "100%", height: "100%", bgcolor: "primary.main", borderRadius: 999 }} />
+                        <Stack spacing={2.5}>
+                          {chartEventsData.map((event) => {
+                            const pendingCount = event.pendingContributionsCount ?? 0;
+                            const totalCount = event.totalContributionsCount ?? 0;
+                            const percentage = totalCount > 0 ? (pendingCount / totalCount) * 100 : 0;
+
+                            return (
+                              <Box key={event.eventId}>
+                                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }} alignItems="center">
+                                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }} noWrap>
+                                    {event.eventName}
+                                  </Typography>
+                                  <Typography variant="caption" fontWeight={800} color={pendingCount > 0 ? "error.main" : "success.main"}>
+                                    {pendingCount} / {totalCount} Pending
+                                  </Typography>
+                                </Stack>
+                                <Box sx={{ height: 8, borderRadius: 999, bgcolor: theme.palette.action.hover, overflow: "hidden" }}>
+                                  <Box 
+                                    sx={{ 
+                                      width: `${percentage}%`, 
+                                      height: "100%", 
+                                      background: "linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)",
+                                      borderRadius: 999,
+                                      transition: "width 0.5s ease-in-out"
+                                    }} 
+                                  />
+                                </Box>
+                              </Box>
+                            );
+                          })}
+
+                          {chartEventsData.length === 0 && (
+                            <Box sx={{ py: 4, display: "grid", placeItems: "center", color: "text.secondary" }}>
+                              <Typography variant="body2">No events for the selected month.</Typography>
                             </Box>
-                          </Box>
-                          <Box>
-                            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                              <Typography variant="body2" fontWeight={700}>
-                                Pending Dues
-                              </Typography>
-                              <Typography variant="body2" fontWeight={800}>
-                                {summary?.pendingPayments ?? 0}
-                              </Typography>
-                            </Stack>
-                            <Box sx={{ height: 10, borderRadius: 999, bgcolor: theme.palette.action.hover, overflow: "hidden" }}>
-                              <Box sx={{ width: `${Math.min(100, ((summary?.pendingPayments ?? 0) / Math.max(summary?.monthlyEventsCount ?? 1, 1)) * 100)}%`, height: "100%", bgcolor: "error.main", borderRadius: 999 }} />
-                            </Box>
-                          </Box>
+                          )}
                         </Stack>
                       </Stack>
                     </CardContent>
@@ -351,7 +396,7 @@ export default function DashboardPage() {
                 </Grid>
               </Grid>
 
-              <AppDataTable title="Upcoming Events (Next 14 Days)" columns={columns} data={upcomingEvents} loading={false} />
+              <AppDataTable title="Events for Selected Month" columns={columns} data={upcomingEvents} loading={false} />
             </Stack>
           )}
         </CardContent>

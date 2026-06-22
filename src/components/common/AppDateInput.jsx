@@ -22,7 +22,7 @@ export default function AppDateInput({
             display: "block",
             mb: 0.5,
             fontWeight: 700,
-            color: "#5b5280",
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#5b5280",
             textTransform: "none",
             letterSpacing: "0.04em",
             fontSize: "0.7rem",
@@ -53,7 +53,15 @@ export default function AppDateInput({
                 bgcolor: "background.paper",
                 fontSize: "0.82rem",
                 height: size === "small" ? 34 : 40,
-                "& .MuiOutlinedInput-input": { py: size === "small" ? 0.8 : 1.2 },
+                color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
+                "& .MuiOutlinedInput-input": { 
+                  py: size === "small" ? 0.8 : 1.2,
+                  color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
+                  "&::placeholder": {
+                    color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.5)" : "inherit",
+                    opacity: 1,
+                  }
+                },
                 "& .MuiOutlinedInput-notchedOutline": {
                   borderColor: "rgba(74,63,107,0.2)",
                 },

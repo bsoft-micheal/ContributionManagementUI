@@ -60,10 +60,22 @@ export default function EventsPage() {
     loadData();
   }, [filters]);
 
-  const monthOptions = Array.from({ length: 12 }, (_, i) => ({ 
-    label: dayjs().month(i).format("MMMM"), 
-    value: i + 1 
-  }));
+  const monthOptions = [
+    { label: "All", value: 0 },
+    ...Array.from({ length: 12 }, (_, i) => ({ 
+      label: dayjs().month(i).format("MMMM"), 
+      value: i + 1 
+    }))
+  ];
+
+  const currentYear = dayjs().year();
+  const yearOptions = [
+    { label: "All", value: 0 },
+    ...Array.from({ length: 11 }, (_, i) => {
+      const y = currentYear - 5 + i;
+      return { label: String(y), value: y };
+    })
+  ];
 
   const handleDeleteRequest = (eventItem) => {
     setEventToDelete(eventItem);
@@ -168,11 +180,11 @@ export default function EventsPage() {
                 />
               </Box>
               <Box sx={{ minWidth: 120 }}>
-                <AppInput
+                <AppSelect
                   label="Year"
-                  type="number"
                   value={filterYear}
                   onChange={(event) => setFilterYear(Number(event.target.value))}
+                  options={yearOptions}
                 />
               </Box>
               <AppButton

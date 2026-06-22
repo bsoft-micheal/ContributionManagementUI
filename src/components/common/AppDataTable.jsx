@@ -280,10 +280,10 @@ export default function AppDataTable({
     <Paper
       elevation={isFullscreen ? 5 : 0}
       sx={{
-        border: "1px solid rgba(224, 224, 224, 1)",
+        border: theme.palette.mode === "dark" ? `1px solid ${borderColor}` : "1px solid rgba(224, 224, 224, 1)",
         borderRadius: isFullscreen ? "0" : "8px",
         overflow: "hidden",
-        bgcolor: "#ffffff",
+        bgcolor: surface,
         display: "flex",
         flexDirection: "column",
         ...(isFullscreen && {
@@ -347,10 +347,10 @@ export default function AppDataTable({
       {filterPanel && (
         <Box
           sx={{
-            bgcolor: "#fcfcff",
+            bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#fcfcff",
             px: 3,
             py: 2,
-            borderBottom: "1px solid rgba(224, 224, 224, 0.8)",
+            borderBottom: `1px solid ${borderColor}`,
           }}
         >
           {filterPanel}
@@ -365,8 +365,8 @@ export default function AppDataTable({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          borderBottom: "1px solid rgba(224, 224, 224, 0.8)",
-          bgcolor: "#ffffff",
+          borderBottom: `1px solid ${borderColor}`,
+          bgcolor: surface,
           flexWrap: "wrap",
           gap: 2,
         }}
@@ -377,7 +377,7 @@ export default function AppDataTable({
             variant="caption"
             sx={{
               fontWeight: 700,
-              color: "#475569",
+              color: textSecondary,
               fontSize: "0.75rem",
               mr: 0.5
             }}
@@ -431,8 +431,8 @@ export default function AppDataTable({
             onClick={handleColumnsClick}
             startIcon={<ColumnsIcon sx={{ fontSize: "1rem" }} />}
             sx={{
-              color: "#4a3f6b",
-              borderColor: "rgba(74, 63, 107, 0.3)",
+              color: theme.palette.mode === "dark" ? theme.palette.primary.light : "#4a3f6b",
+              borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(74, 63, 107, 0.3)",
               fontSize: "0.75rem",
               fontWeight: 700,
               textTransform: "none",
@@ -440,8 +440,8 @@ export default function AppDataTable({
               px: 1.5,
               borderRadius: "4px",
               "&:hover": {
-                borderColor: "#4a3f6b",
-                bgcolor: "rgba(74, 63, 107, 0.04)",
+                borderColor: theme.palette.mode === "dark" ? theme.palette.primary.light : "#4a3f6b",
+                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.04)",
               },
             }}
           >
@@ -452,9 +452,9 @@ export default function AppDataTable({
             <IconButton
               size="small"
               sx={{
-                color: "#4a3f6b",
+                color: theme.palette.mode === "dark" ? theme.palette.primary.light : "#4a3f6b",
                 p: 0.6,
-                border: "1px solid rgba(74, 63, 107, 0.2)",
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(74, 63, 107, 0.2)",
                 borderRadius: "4px",
                 height: 32,
                 width: 32,
@@ -485,10 +485,11 @@ export default function AppDataTable({
                 width: { xs: "100%", sm: 200 },
                 fontSize: "0.78rem",
                 borderRadius: "4px",
-                bgcolor: "#ffffff",
-                "& fieldset": { borderColor: "rgba(74, 63, 107, 0.2)" },
-                "&:hover fieldset": { borderColor: "rgba(74, 63, 107, 0.4)" },
-                "&.Mui-focused fieldset": { borderColor: "#4a3f6b" },
+                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
+                color: "inherit",
+                "& fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(74, 63, 107, 0.2)" },
+                "&:hover fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25)" : "rgba(74, 63, 107, 0.4)" },
+                "&.Mui-focused fieldset": { borderColor: theme.palette.mode === "dark" ? theme.palette.primary.main : "#4a3f6b" },
               },
             }}
           />
@@ -859,8 +860,8 @@ export default function AppDataTable({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          borderTop: "1px solid rgba(224, 224, 224, 1)",
-          bgcolor: "#ffffff",
+          borderTop: `1px solid ${borderColor}`,
+          bgcolor: surface,
           flexWrap: "wrap",
           gap: 2
         }}
@@ -868,7 +869,7 @@ export default function AppDataTable({
         {/* Left Pagination metrics */}
         <Stack direction="row" alignItems="center" spacing={2}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, color: "#64748b", fontSize: "0.75rem" }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, color: textSecondary, fontSize: "0.75rem" }}>
               Rows per page:
             </Typography>
             <Select
@@ -882,9 +883,9 @@ export default function AppDataTable({
                 height: 28,
                 fontSize: "0.75rem",
                 fontWeight: 600,
-                color: "#1e293b",
+                color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
                 "& .MuiSelect-select": { py: 0.5, px: 1 },
-                "& fieldset": { borderColor: "rgba(0,0,0,0.1)" },
+                "& fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(0,0,0,0.1)" },
               }}
             >
               {[5, 10, 15, 25, 50].map((val) => (
@@ -894,7 +895,7 @@ export default function AppDataTable({
               ))}
             </Select>
           </Box>
-          <Typography variant="caption" sx={{ fontWeight: 600, color: "#64748b", fontSize: "0.75rem" }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: textSecondary, fontSize: "0.75rem" }}>
             Rows {totalRows} • Page {page + 1} of {totalPages}
           </Typography>
         </Stack>
@@ -905,7 +906,12 @@ export default function AppDataTable({
             size="small"
             disabled={page === 0}
             onClick={() => setPage(0)}
-            sx={{ border: "1px solid rgba(224, 224, 224, 0.8)", borderRadius: "4px", p: 0.5 }}
+            sx={{
+              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
+              borderRadius: "4px",
+              p: 0.5,
+              color: "inherit"
+            }}
           >
             <FirstPageIcon sx={{ fontSize: "1.1rem" }} />
           </IconButton>
@@ -914,21 +920,21 @@ export default function AppDataTable({
             disabled={page === 0}
             onClick={() => setPage(prev => prev - 1)}
             sx={{
-              border: "1px solid rgba(224, 224, 224, 0.8)",
+              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
               borderRadius: "4px",
-              color: "#334155",
+              color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
               fontSize: "0.7rem",
               fontWeight: 700,
               textTransform: "none",
               px: 1.5,
               minWidth: "unset",
               height: 28,
-              "&:disabled": { color: "#cbd5e1" }
+              "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
             }}
           >
             Prev
           </Button>
-          <Typography variant="caption" sx={{ mx: 1.5, fontWeight: 700, fontSize: "0.75rem", color: "#1e293b" }}>
+          <Typography variant="caption" sx={{ mx: 1.5, fontWeight: 700, fontSize: "0.75rem", color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b" }}>
             {page + 1} / {totalPages}
           </Typography>
           <Button
@@ -936,16 +942,16 @@ export default function AppDataTable({
             disabled={page >= totalPages - 1}
             onClick={() => setPage(prev => prev + 1)}
             sx={{
-              border: "1px solid rgba(224, 224, 224, 0.8)",
+              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
               borderRadius: "4px",
-              color: "#334155",
+              color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
               fontSize: "0.7rem",
               fontWeight: 700,
               textTransform: "none",
               px: 1.5,
               minWidth: "unset",
               height: 28,
-              "&:disabled": { color: "#cbd5e1" }
+              "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
             }}
           >
             Next
@@ -954,7 +960,12 @@ export default function AppDataTable({
             size="small"
             disabled={page >= totalPages - 1}
             onClick={() => setPage(totalPages - 1)}
-            sx={{ border: "1px solid rgba(224, 224, 224, 0.8)", borderRadius: "4px", p: 0.5 }}
+            sx={{
+              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
+              borderRadius: "4px",
+              p: 0.5,
+              color: "inherit"
+            }}
           >
             <LastPageIcon sx={{ fontSize: "1.1rem" }} />
           </IconButton>

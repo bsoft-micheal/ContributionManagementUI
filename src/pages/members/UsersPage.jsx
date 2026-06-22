@@ -594,7 +594,7 @@ export default function UsersPage() {
                 />
               }
               label={
-                <Typography variant="body2" fontWeight={700} sx={{ color: "#4a3f6b" }}>
+                <Typography variant="body2" fontWeight={700} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
                   {form.isActive ? "Active Account" : "Inactive Account"}
                 </Typography>
               }

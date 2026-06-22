@@ -42,7 +42,7 @@ export default function AppInput({
             display: "block",
             mb: 0.5,
             fontWeight: 700,
-            color: "text.secondary",
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.secondary",
             textTransform: "none",
             letterSpacing: "0.04em",
             fontSize: "0.7rem",
@@ -70,8 +70,14 @@ export default function AppInput({
             bgcolor: "background.paper",
             borderRadius: "12px",
             height: size === "small" ? 34 : 40,
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             "& input": {
               py: size === "small" ? 0.8 : 1.2,
+              color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
+              "&::placeholder": {
+                color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.5)" : "inherit",
+                opacity: 1,
+              }
             },
             "& fieldset": {
               borderColor: theme.palette.divider,

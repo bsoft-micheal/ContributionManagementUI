@@ -108,7 +108,11 @@ export default function ReportsPage({ mode }) {
     async function loadReports() {
       setLoading(true);
       try {
-        const { data } = await apiClient.get("/reports/summary", { params: filters });
+        const apiParams = {
+          month: filters.month === 0 ? null : filters.month,
+          year: filters.year === 0 ? null : filters.year,
+        };
+        const { data } = await apiClient.get("/reports/summary", { params: apiParams });
         setReport(data);
       } finally {
         setLoading(false);
@@ -118,10 +122,22 @@ export default function ReportsPage({ mode }) {
     loadReports();
   }, [filters, mode]);
 
-  const monthOptions = Array.from({ length: 12 }, (_, i) => ({
-    label: dayjs().month(i).format("MMMM"),
-    value: i + 1,
-  }));
+  const monthOptions = [
+    { label: "All", value: 0 },
+    ...Array.from({ length: 12 }, (_, i) => ({
+      label: dayjs().month(i).format("MMMM"),
+      value: i + 1,
+    }))
+  ];
+
+  const currentYear = dayjs().year();
+  const yearOptions = [
+    { label: "All", value: 0 },
+    ...Array.from({ length: 11 }, (_, i) => {
+      const y = currentYear - 5 + i;
+      return { label: String(y), value: y };
+    })
+  ];
 
   const eventColumns = [
     { label: "Event", key: "eventName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.eventName}</Typography> },
@@ -283,11 +299,11 @@ export default function ReportsPage({ mode }) {
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 2 }}>
-                    <AppInput
+                    <AppSelect
                       label="Year"
-                      type="number"
                       value={filters.year}
                       onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
+                      options={yearOptions}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 7 }}>

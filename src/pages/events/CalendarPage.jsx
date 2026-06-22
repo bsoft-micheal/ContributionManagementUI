@@ -66,7 +66,11 @@ export default function CalendarPage() {
 
   const loadCalendarData = async () => {
     try {
-      const { data } = await apiClient.get("/events", { params: filters });
+      const apiParams = {
+        month: filters.month === 0 ? null : filters.month,
+        year: filters.year === 0 ? null : filters.year,
+      };
+      const { data } = await apiClient.get("/events", { params: apiParams });
       setEvents(data);
     } catch (error) {
       console.error("Error loading events:", error);
@@ -94,15 +98,29 @@ export default function CalendarPage() {
   }, []);
 
   const calendarDays = useMemo(() => {
-    const startOfMonth = dayjs(`${filters.year}-${String(filters.month).padStart(2, "0")}-01`);
+    const targetMonth = filters.month === 0 ? dayjs().month() + 1 : filters.month;
+    const targetYear = filters.year === 0 ? dayjs().year() : filters.year;
+    const startOfMonth = dayjs(`${targetYear}-${String(targetMonth).padStart(2, "0")}-01`);
     const startDay = startOfMonth.startOf("week");
     return Array.from({ length: 35 }, (_, index) => startDay.add(index, "day"));
   }, [filters]);
 
-  const monthOptions = Array.from({ length: 12 }, (_, i) => ({ 
-    label: dayjs().month(i).format("MMMM"), 
-    value: i + 1 
-  }));
+  const monthOptions = [
+    { label: "All", value: 0 },
+    ...Array.from({ length: 12 }, (_, i) => ({ 
+      label: dayjs().month(i).format("MMMM"), 
+      value: i + 1 
+    }))
+  ];
+
+  const currentYear = dayjs().year();
+  const yearOptions = [
+    { label: "All", value: 0 },
+    ...Array.from({ length: 11 }, (_, i) => {
+      const y = currentYear - 5 + i;
+      return { label: String(y), value: y };
+    })
+  ];
 
   const handleDateClick = (day) => {
     if (!hasWriteAccess) {
@@ -149,12 +167,12 @@ export default function CalendarPage() {
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 2 }}>
-                <AppInput
+                <AppSelect
                   size="small"
                   label="Year"
-                  type="number"
                   value={filters.year}
                   onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
+                  options={yearOptions}
                   fullWidth
                 />
               </Grid>
@@ -190,100 +208,140 @@ export default function CalendarPage() {
           </Box>
 
           <Box sx={{ p: 2 }}>
-            <Box
-              sx={{
-                display: "grid",
-                gap: 1,
-                gridTemplateColumns: "repeat(7, 1fr)",
-              }}
-            >
-              {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map(d => (
-                <Typography key={d} variant="caption" fontWeight={900} sx={{ textAlign: "center", mb: 0.5, opacity: 0.4, letterSpacing: "0.1em", fontSize: "0.65rem" }}>{d}</Typography>
-              ))}
+            {filters.month === 0 ? (
+              <Stack spacing={2} sx={{ maxH: 600, overflowY: "auto", p: 1 }}>
+                {events.map((eventItem) => {
+                  const palette = getEventColor(eventItem.eventTypeName);
+                  return (
+                    <Paper
+                      key={eventItem.eventId}
+                      onClick={() => handleEventClick(eventItem)}
+                      sx={{
+                        p: 2,
+                        borderLeft: `5px solid ${palette.main}`,
+                        bgcolor: theme.palette.background.paper,
+                        cursor: "pointer",
+                        "&:hover": { bgcolor: theme.palette.action.hover },
+                        borderRadius: 1.5,
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={800}>{eventItem.eventName}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {dayjs(eventItem.eventDate).format("DD MMM YYYY")} | {eventItem.eventTypeName}
+                          </Typography>
+                        </Box>
+                        <Typography variant="subtitle2" fontWeight={800} color="primary.main">
+                          ₹{Number(eventItem.totalExpectedAmount).toLocaleString()}
+                        </Typography>
+                      </Stack>
+                    </Paper>
+                  );
+                })}
+                {events.length === 0 && (
+                  <Typography variant="body2" sx={{ textAlign: "center", py: 4 }} color="text.secondary">
+                    No active scheduled events
+                  </Typography>
+                )}
+              </Stack>
+            ) : (
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 1,
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                }}
+              >
+                {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map(d => (
+                  <Typography key={d} variant="caption" fontWeight={900} sx={{ textAlign: "center", mb: 0.5, opacity: 0.4, letterSpacing: "0.1em", fontSize: "0.65rem" }}>{d}</Typography>
+                ))}
 
-              {calendarDays.map((day) => {
-                const dayEvents = events.filter((eventItem) =>
-                  dayjs(eventItem.eventDate).format("YYYY-MM-DD") === day.format("YYYY-MM-DD")
-                );
-                const isDifferentMonth = day.month() + 1 !== filters.month;
+                {calendarDays.map((day) => {
+                  const dayEvents = events.filter((eventItem) =>
+                    dayjs(eventItem.eventDate).format("YYYY-MM-DD") === day.format("YYYY-MM-DD")
+                  );
+                  const isDifferentMonth = day.month() + 1 !== filters.month;
 
-                return (
-                  <Paper 
-                    key={day.toString()} 
-                    elevation={0}
-                    onClick={() => handleDateClick(day)}
-                    sx={{ 
-                      p: 1,
-                      minHeight: 80,
-                      border: `1px solid ${theme.palette.divider}`,
-                      borderRadius: 1.5,
-                      opacity: isDifferentMonth ? 0.3 : 1,
-                      bgcolor: day.isSame(dayjs(), "day")
-                        ? (theme.palette.mode === "dark" ? "rgba(141,150,184,0.12)" : "rgba(74,63,107,0.06)")
-                        : theme.palette.background.paper,
-                      cursor: hasWriteAccess ? "pointer" : "default",
-                      transition: "all 0.15s ease",
-                      "&:hover": hasWriteAccess ? { 
-                        bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
-                        transform: "translateY(-1px)",
-                        boxShadow: theme.palette.mode === "dark" ? "0 2px 6px rgba(0,0,0,0.2)" : "0 2px 4px -1px rgba(0,0,0,0.05)"
-                      } : {}
-                    }}
-                  >
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 0.5 }}>
-                      <Typography 
-                        variant="body2" 
-                        fontWeight={day.isSame(dayjs(), "day") ? 900 : 700} 
-                        sx={{ 
-                          fontSize: "0.85rem",
-                          color: day.isSame(dayjs(), "day")
-                            ? (theme.palette.mode === "dark" ? "#d6dbef" : "#4a3f6b")
-                            : "text.secondary"
-                        }}
-                      >
-                        {day.format("DD")}
-                      </Typography>
-                      {day.isSame(dayjs(), "day") && (
-                        <Box sx={{ width: 4, height: 4, borderRadius: "50%", bgcolor: "primary.main" }} />
-                      )}
-                    </Box>
-                    
-                    <Stack spacing={0.4}>
-                      {dayEvents.map((eventItem) => {
-                        const palette = getEventColor(eventItem.eventTypeName);
-                        return (
-                          <Box
-                            key={eventItem.eventId}
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent opening the Add Event modal!
-                              handleEventClick(eventItem);
-                            }}
-                            sx={{
-                              px: 0.8,
-                              py: 0.4,
-                              borderRadius: 0.8,
-                              bgcolor: palette.main,
-                              color: theme.palette.getContrastText(palette.main),
-                              lineHeight: 1,
-                              cursor: "pointer",
-                              boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
-                              transition: "transform 0.1s ease",
-                              "&:hover": {
-                                transform: "scale(1.03)"
-                              }
-                            }}
-                          >
-                            <Typography sx={{ fontSize: "0.55rem", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {eventItem.eventName || eventItem.eventTypeName || eventItem.description || "Scheduled Event"}
-                            </Typography>
-                          </Box>
-                        );
-                      })}
-                    </Stack>
-                  </Paper>
-                );
-              })}
-            </Box>
+                  return (
+                    <Paper 
+                      key={day.toString()} 
+                      elevation={0}
+                      onClick={() => handleDateClick(day)}
+                      sx={{ 
+                        p: 1,
+                        minHeight: 80,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 1.5,
+                        opacity: isDifferentMonth ? 0.3 : 1,
+                        bgcolor: day.isSame(dayjs(), "day")
+                          ? (theme.palette.mode === "dark" ? "rgba(141,150,184,0.12)" : "rgba(74,63,107,0.06)")
+                          : theme.palette.background.paper,
+                        cursor: hasWriteAccess ? "pointer" : "default",
+                        transition: "all 0.15s ease",
+                        "&:hover": hasWriteAccess ? { 
+                          bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
+                          transform: "translateY(-1px)",
+                          boxShadow: theme.palette.mode === "dark" ? "0 2px 6px rgba(0,0,0,0.2)" : "0 2px 4px -1px rgba(0,0,0,0.05)"
+                        } : {}
+                      }}
+                    >
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 0.5 }}>
+                        <Typography 
+                          variant="body2" 
+                          fontWeight={day.isSame(dayjs(), "day") ? 900 : 700} 
+                          sx={{ 
+                            fontSize: "0.85rem",
+                            color: day.isSame(dayjs(), "day")
+                              ? (theme.palette.mode === "dark" ? "#d6dbef" : "#4a3f6b")
+                              : "text.secondary"
+                          }}
+                        >
+                          {day.format("DD")}
+                        </Typography>
+                        {day.isSame(dayjs(), "day") && (
+                          <Box sx={{ width: 4, height: 4, borderRadius: "50%", bgcolor: "primary.main" }} />
+                        )}
+                      </Box>
+                      
+                      <Stack spacing={0.4}>
+                        {dayEvents.map((eventItem) => {
+                          const palette = getEventColor(eventItem.eventTypeName);
+                          return (
+                            <Box
+                              key={eventItem.eventId}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEventClick(eventItem);
+                              }}
+                              sx={{
+                                px: 0.8,
+                                py: 0.4,
+                                borderRadius: 0.8,
+                                bgcolor: palette.main,
+                                color: theme.palette.getContrastText(palette.main),
+                                lineHeight: 1,
+                                cursor: "pointer",
+                                boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                                transition: "transform 0.1s ease",
+                                "&:hover": {
+                                  transform: "scale(1.03)"
+                                }
+                              }}
+                            >
+                              <Typography sx={{ fontSize: "0.55rem", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {eventItem.eventName || eventItem.eventTypeName || eventItem.description || "Scheduled Event"}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Stack>
+                    </Paper>
+                  );
+                })}
+              </Box>
+            )}
           </Box>
         </CardContent>
       </Card>

@@ -232,7 +232,7 @@ export default function EventTypesPage() {
                 }}
               />
             }
-            label={<Typography variant="body2" fontWeight={700} sx={{ color: "#4a3f6b" }}>Active Or InActive types</Typography>}
+            label={<Typography variant="body2" fontWeight={700} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>Active Or InActive types</Typography>}
           />
         </Box>
       </AppDialog>
