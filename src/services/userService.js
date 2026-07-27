@@ -40,6 +40,16 @@ export const DeleteUser = async (id) => {
   }
 };
 
+export const CreateUsersBulk = async (data) => {
+  try {
+    const result = await postApi("/users/bulk", data);
+    return result;
+  } catch (error) {
+    console.error('Error creating users in bulk:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export const ResetUserPassword = async (id, data) => {
   try {
     const result = await putApi(`/users/${id}/reset-password`, data);

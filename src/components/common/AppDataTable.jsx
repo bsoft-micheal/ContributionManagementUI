@@ -388,7 +388,7 @@ export default function AppDataTable({
             <IconButton
               size="small"
               onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
-              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <ExcelIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
@@ -397,7 +397,7 @@ export default function AppDataTable({
             <IconButton
               size="small"
               onClick={handlePrint}
-              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <PdfIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
@@ -406,7 +406,7 @@ export default function AppDataTable({
             <IconButton
               size="small"
               onClick={handlePrint}
-              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <PrintIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
@@ -415,7 +415,7 @@ export default function AppDataTable({
             <IconButton
               size="small"
               onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
-              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <DownloadIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
@@ -431,8 +431,8 @@ export default function AppDataTable({
             onClick={handleColumnsClick}
             startIcon={<ColumnsIcon sx={{ fontSize: "1rem" }} />}
             sx={{
-              color: theme.palette.mode === "dark" ? theme.palette.primary.light : "#4a3f6b",
-              borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(74, 63, 107, 0.3)",
+              color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+              borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(74, 63, 107, 0.3)",
               fontSize: "0.75rem",
               fontWeight: 700,
               textTransform: "none",
@@ -440,8 +440,8 @@ export default function AppDataTable({
               px: 1.5,
               borderRadius: "4px",
               "&:hover": {
-                borderColor: theme.palette.mode === "dark" ? theme.palette.primary.light : "#4a3f6b",
-                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.04)",
+                borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
               },
             }}
           >
@@ -452,12 +452,16 @@ export default function AppDataTable({
             <IconButton
               size="small"
               sx={{
-                color: theme.palette.mode === "dark" ? theme.palette.primary.light : "#4a3f6b",
+                color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
                 p: 0.6,
-                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(74, 63, 107, 0.2)",
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid rgba(74, 63, 107, 0.2)",
                 borderRadius: "4px",
                 height: 32,
                 width: 32,
+                "&:hover": {
+                  borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
+                },
               }}
               onClick={toggleFullscreen}
             >
@@ -513,7 +517,7 @@ export default function AppDataTable({
           sx: { p: 2, maxWidth: 240, maxHeight: 320, overflowY: "auto", borderRadius: "6px" }
         }}
       >
-        <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1, fontSize: "0.8rem", color: "#4a3f6b" }}>
+        <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1, fontSize: "0.8rem", color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
           Toggle Columns
         </Typography>
         <Stack spacing={0.5}>
@@ -725,7 +729,7 @@ export default function AppDataTable({
       <Box sx={{ overflowX: "auto", flexGrow: isFullscreen ? 1 : 0 }}>
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
-            <CircularProgress size={30} sx={{ color: "#4a3f6b" }} />
+            <CircularProgress size={30} sx={{ color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
           </Box>
         ) : (
           <Table size="small">

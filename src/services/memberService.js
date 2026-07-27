@@ -39,3 +39,13 @@ export const DeleteMember = async (id) => {
     throw error;
   }
 };
+
+export const CreateMembersBulk = async (data) => {
+  try {
+    const result = await postApi("/members/bulk", data);
+    return result;
+  } catch (error) {
+    console.error('Error creating members in bulk:', error.response?.data || error.message);
+    throw error;
+  }
+};

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FormControlLabel, Checkbox, Typography, Box, IconButton, Tooltip } from "@mui/material";
-import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon, Delete as DeleteIcon } from "@mui/icons-material";
+import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon, Delete as DeleteIcon, ToggleOn as ToggleOnIcon, ToggleOff as ToggleOffIcon } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -10,6 +10,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import AppSwitch from "../../components/common/AppSwitch";
 import { GetEventTypes, CreateEventType, UpdateEventType, DeleteEventType } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
 
@@ -32,6 +33,8 @@ export default function EventTypesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [typeToDelete, setTypeToDelete] = useState(null);
+  const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
+  const [typeToToggle, setTypeToToggle] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
@@ -96,6 +99,43 @@ export default function EventTypesPage() {
     }
   }
 
+  async function handleToggleStatus(row) {
+    try {
+      const payload = {
+        ...row,
+        isActive: !row.isActive,
+      };
+      await UpdateEventType(row.eventTypeId, payload);
+      toast.success("Status updated successfully");
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? "Failed to update status");
+    }
+  }
+
+  function handleToggleStatusRequest(row) {
+    setTypeToToggle(row);
+    setStatusConfirmOpen(true);
+  }
+
+  async function handleConfirmStatusToggle() {
+    if (!typeToToggle) return;
+    try {
+      const payload = {
+        ...typeToToggle,
+        isActive: !typeToToggle.isActive,
+      };
+      await UpdateEventType(typeToToggle.eventTypeId, payload);
+      toast.success("Category status updated successfully");
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? "Failed to update status");
+    } finally {
+      setStatusConfirmOpen(false);
+      setTypeToToggle(null);
+    }
+  }
+
   const columns = [
     {
       label: "Action",
@@ -112,6 +152,22 @@ export default function EventTypesPage() {
             <span>
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => handleDeleteRequest(row.eventTypeId)}>
                 <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={hasWriteAccess ? (row.isActive ? "Deactivate Category" : "Activate Category") : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => handleToggleStatusRequest(row)}
+              >
+                {row.isActive ? (
+                  <ToggleOnIcon sx={{ fontSize: "1.25rem", color: hasWriteAccess ? "#10b981" : "#cbd5e1" }} />
+                ) : (
+                  <ToggleOffIcon sx={{ fontSize: "1.25rem", color: hasWriteAccess ? "#ef4444" : "#cbd5e1" }} />
+                )}
               </IconButton>
             </span>
           </Tooltip>
@@ -179,61 +235,45 @@ export default function EventTypesPage() {
         }
       >
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <AppInput 
-            label="Event Type" 
-            fullWidth 
-            value={form.eventTypeName} 
+          <AppInput
+            label="Event Type"
+            fullWidth
+            value={form.eventTypeName}
             onChange={(e) => {
               setForm(f => ({ ...f, eventTypeName: e.target.value }));
               if (errors.eventTypeName) {
                 setErrors(prev => ({ ...prev, eventTypeName: "" }));
               }
-            }} 
+            }}
             restrictType="letteronly"
             maxLength={50}
             error={!!errors.eventTypeName}
             helperText={errors.eventTypeName}
             required
           />
-          <AppInput 
-            label="Base Amount" 
-            fullWidth 
-            value={formatBaseAmount(form.baseAmount)} 
+          <AppInput
+            label="Base Amount"
+            fullWidth
+            value={formatBaseAmount(form.baseAmount)}
             onChange={(e) => {
               const rawVal = e.target.value.replace(/[^0-9]/g, "");
               setForm(f => ({ ...f, baseAmount: rawVal ? Number(rawVal) : 0 }));
               if (errors.baseAmount) {
                 setErrors(prev => ({ ...prev, baseAmount: "" }));
               }
-            }} 
+            }}
             maxLength={15}
             error={!!errors.baseAmount}
             helperText={errors.baseAmount}
             required
           />
-          <FormControlLabel
-            labelPlacement="start"
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              width: "100%",
-              m: 0,
-              gap: 2,
-            }}
-            control={
-              <Checkbox 
-                checked={form.isActive} 
-                onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))} 
-                sx={{
-                  color: "rgba(74, 63, 107, 0.4)",
-                  "&.Mui-checked": {
-                    color: "#4a3f6b",
-                  },
-                }}
-              />
-            }
-            label={<Typography variant="body2" fontWeight={700} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>Active Or InActive types</Typography>}
-          />
+          {form.eventTypeId && (
+            <AppSwitch
+              label="Active Or InActive types"
+              checked={form.isActive}
+              onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))}
+            />
+          )}
         </Box>
       </AppDialog>
 
@@ -243,6 +283,14 @@ export default function EventTypesPage() {
         onConfirm={handleConfirmDelete}
         title="Confirm"
         content="Are you sure you want to delete this record?"
+      />
+
+      <AppConfirmDialog
+        open={statusConfirmOpen}
+        onClose={() => setStatusConfirmOpen(false)}
+        onConfirm={handleConfirmStatusToggle}
+        title="Confirm"
+        content={`Are you sure you want to ${typeToToggle?.isActive ? "deactivate" : "activate"} this category?`}
       />
     </div>
   );

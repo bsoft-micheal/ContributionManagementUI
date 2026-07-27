@@ -4,7 +4,8 @@ import {
   Grid,
   Typography,
   IconButton,
-  Tooltip
+  Tooltip,
+  Stack,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -12,22 +13,27 @@ import {
   Save as SaveIcon,
   Visibility as ViewIcon,
   PersonAdd as PersonAddIcon,
+  Description as ExcelIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+dayjs.extend(customParseFormat);
+
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
-import { GetMembers, CreateMember, UpdateMember, DeleteMember } from "../../services/memberService";
+import { GetMembers, CreateMember, UpdateMember, DeleteMember, CreateMembersBulk } from "../../services/memberService";
 import { GetRoles } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import MemberDetailsDialog from "../../components/members/MemberDetailsDialog";
+import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import { validateForm } from "../../utils/validation";
 
 const initialForm = {
@@ -51,6 +57,7 @@ export default function MembersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -70,6 +77,34 @@ export default function MembersPage() {
     { label: "Female", value: "Female" },
     { label: "Other", value: "Other" },
   ];
+
+  const templateValidations = useMemo(() => {
+    const roleNamesList = roles.map((r) => r.roleName).join(",");
+    return {
+      "Gender": {
+        type: "list",
+        formulae: [`"Male,Female,Other"`],
+        error: "Please select a gender from the list."
+      },
+      "Role": {
+        type: "list",
+        formulae: [`"${roleNamesList || "Admin,Manager,User,Member"}"`],
+        error: "Please select a role from the list."
+      },
+      "Date of Birth": {
+        type: "date",
+        operator: "lessThan",
+        formulae: [new Date()],
+        error: "Please enter a valid date of birth."
+      },
+      "Joining Date": {
+        type: "date",
+        operator: "lessThanOrEqual",
+        formulae: [new Date()],
+        error: "Please enter a valid joining date."
+      }
+    };
+  }, [roles]);
 
   useEffect(() => {
     loadData();
@@ -140,6 +175,94 @@ export default function MembersPage() {
     }
   }
 
+  const validateRow = (row, rowNum) => {
+    const name = row["name"] !== undefined && row["name"] !== null ? String(row["name"]).trim() : "";
+    const email = row["email"] !== undefined && row["email"] !== null ? String(row["email"]).trim() : "";
+    const phone = row["phone"] !== undefined && row["phone"] !== null ? String(row["phone"]).trim() : "";
+    const gender = row["gender"] !== undefined && row["gender"] !== null ? String(row["gender"]).trim() : "";
+    const roleName = row["role"] !== undefined && row["role"] !== null ? String(row["role"]).trim() : "";
+    const dobStr = row["date of birth"] !== undefined && row["date of birth"] !== null ? row["date of birth"] : (row["dob"] || "");
+    const joiningStr = row["joining date"] !== undefined && row["joining date"] !== null ? row["joining date"] : (row["joiningdate"] || "");
+
+    if (!name) return { error: `Row ${rowNum}: Name is required` };
+    if (!/^[a-zA-Z\s]+$/.test(name)) return { error: `Row ${rowNum}: Name must contain only letters` };
+    
+    if (!email) return { error: `Row ${rowNum}: Email is required` };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: `Row ${rowNum}: Invalid email format` };
+
+    if (!phone) return { error: `Row ${rowNum}: Phone number is required` };
+    if (!/^\d{10}$/.test(phone)) return { error: `Row ${rowNum}: Phone number must be exactly 10 digits` };
+
+    // Match gender
+    const normalizedGender = gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
+    if (!["Male", "Female", "Other"].includes(normalizedGender)) {
+      return { error: `Row ${rowNum}: Gender must be Male, Female, or Other` };
+    }
+
+    // Match role
+    const matchedRole = roles.find(r => r.roleName.toLowerCase() === roleName.toLowerCase());
+    if (!matchedRole) {
+      return { error: `Row ${rowNum}: Role '${roleName}' not found in system` };
+    }
+
+    // Helper to parse dates from Excel (supporting Date objects, serial numbers, and string values)
+    const parseExcelDate = (val) => {
+      if (val === undefined || val === null || val === "") return null;
+      if (val instanceof Date) {
+        const localDate = new Date(val.getUTCFullYear(), val.getUTCMonth(), val.getUTCDate());
+        return dayjs(localDate);
+      }
+      const num = Number(val);
+      if (!isNaN(num) && num > 10000 && num < 60000) {
+        const utcDate = new Date((num - 25568) * 86400 * 1000);
+        const localDate = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate());
+        return dayjs(localDate);
+      }
+      const parsed = dayjs(String(val).trim(), ["DD/MM/YYYY", "YYYY-MM-DD", "MM/DD/YYYY", "DD-MM-YYYY"], true);
+      if (parsed.isValid()) return parsed;
+      
+      const looseParsed = dayjs(String(val).trim());
+      if (looseParsed.isValid()) return looseParsed;
+      
+      return null;
+    };
+
+    // Match dates
+    const dob = parseExcelDate(dobStr);
+    if (!dob || !dob.isValid()) return { error: `Row ${rowNum}: Date of Birth must be a valid date (DD/MM/YYYY)` };
+    if (dayjs().diff(dob, "year") < 18) return { error: `Row ${rowNum}: Member must be at least 18 years old` };
+
+    const joiningDate = parseExcelDate(joiningStr);
+    if (!joiningDate || !joiningDate.isValid()) return { error: `Row ${rowNum}: Joining Date must be a valid date (DD/MM/YYYY)` };
+
+    return {
+      error: null,
+      parsed: {
+        name,
+        email,
+        phone,
+        gender: normalizedGender,
+        roleId: matchedRole.roleId,
+        dateOfBirth: dob.toISOString(),
+        joiningDate: joiningDate.toISOString(),
+      }
+    };
+  };
+
+  const handleBulkImport = async (validData) => {
+    if (!validData || validData.length === 0) return;
+    setLoading(true);
+    try {
+      await CreateMembersBulk(validData);
+      toast.success(`Successfully imported all ${validData.length} member(s)!`);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Failed to import members");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const roleOptions = roles.map((r) => ({
     label: r.roleName,
     value: r.roleId,
@@ -205,14 +328,7 @@ export default function MembersPage() {
       ),
     },
     { label: "Date of Birth", key: "dateOfBirth", render: (row) => row.dateOfBirth ? dayjs(row.dateOfBirth).format("DD/MM/YYYY") : "--" },
-    {
-      label: "Status",
-      render: () => (
-        <Typography variant="caption" fontWeight={800}
-          sx={{ color: "#16a34a", bgcolor: "rgba(22,163,74,0.08)", px: 1.2, py: 0.3, borderRadius: "3px", fontSize: "0.7rem", letterSpacing: "0.04em" }}
-        >Verified</Typography>
-      ),
-    },
+    { label: "Joining Date", key: "joiningDate", render: (row) => row.joiningDate ? dayjs(row.joiningDate).format("DD/MM/YYYY") : "--" },
   ];
 
   return (
@@ -223,19 +339,38 @@ export default function MembersPage() {
         data={filteredMembers}
         loading={loading}
         actions={
-          <AppButton
-            variant="contained"
-            size="small"
-            disabled={!hasWriteAccess}
-            startIcon={<PersonAddIcon />}
-            onClick={() => {
-              setForm(initialForm);
-              setErrors({});
-              setDialogOpen(true);
-            }}
-          >
-            Add
-          </AppButton>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <AppButton
+              variant="outlined"
+              size="small"
+              disabled={!hasWriteAccess}
+              startIcon={<ExcelIcon />}
+              onClick={() => setImportDialogOpen(true)}
+              sx={{
+                borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(74, 63, 107, 0.3)",
+                color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                "&:hover": {
+                  borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.04)",
+                },
+              }}
+            >
+              Import Excel
+            </AppButton>
+            <AppButton
+              variant="contained"
+              size="small"
+              disabled={!hasWriteAccess}
+              startIcon={<PersonAddIcon />}
+              onClick={() => {
+                setForm(initialForm);
+                setErrors({});
+                setDialogOpen(true);
+              }}
+            >
+              Add
+            </AppButton>
+          </Stack>
         }
         filterPanel={
           <Grid container spacing={2} alignItems="center">
@@ -409,6 +544,16 @@ export default function MembersPage() {
         open={viewDialogOpen}
         onClose={() => setViewDialogOpen(false)}
         member={selectedMember}
+      />
+
+      <ExcelImportDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        onImport={handleBulkImport}
+        title="Import Members"
+        templateHeaders={["Name", "Email", "Phone", "Role", "Gender", "Date of Birth", "Joining Date"]}
+        templateValidations={templateValidations}
+        validateRow={validateRow}
       />
     </div>
   );

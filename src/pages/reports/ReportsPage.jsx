@@ -27,29 +27,75 @@ function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
   const maxValue = Math.max(...items.map((item) => Number(item[valueKey]) || 0), 1);
 
   return (
-    <Stack spacing={1.25}>
+    <Stack spacing={1.5}>
       {items.map((item) => {
         const value = Number(item[valueKey]) || 0;
         const width = `${Math.max(8, (value / maxValue) * 100)}%`;
 
         return (
-          <Box key={item[labelKey]} sx={{ display: "grid", gridTemplateColumns: "1fr 5fr auto", alignItems: "center", gap: 1.5 }}>
-            <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }} noWrap>
+          <Box
+            key={item[labelKey]}
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "130px 1fr 90px",
+              alignItems: "center",
+              gap: 2,
+              "&:hover": {
+                "& .bar-fill": {
+                  filter: "brightness(1.15)",
+                },
+                "& .bar-label": {
+                  color: "primary.main",
+                }
+              }
+            }}
+          >
+            <Typography
+              className="bar-label"
+              variant="body2"
+              fontWeight={700}
+              sx={{
+                fontSize: "0.82rem",
+                transition: "color 0.2s ease",
+                color: "text.primary"
+              }}
+              noWrap
+            >
               {item[labelKey]}
             </Typography>
-            <Box sx={{ height: 12, borderRadius: 999, bgcolor: theme.palette.action.hover, overflow: "hidden" }}>
+            <Box
+              sx={{
+                height: 10,
+                borderRadius: 999,
+                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.05)",
+                overflow: "hidden",
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.03)" : "none"
+              }}
+            >
               <Box
+                className="bar-fill"
                 sx={{
                   height: "100%",
                   width,
                   borderRadius: 999,
                   background: theme.palette.mode === "dark"
-                    ? "linear-gradient(90deg, #59627b 0%, #40475d 100%)"
+                    ? "linear-gradient(90deg, #a78bfa 0%, #818cf8 100%)"
                     : "linear-gradient(90deg, #7c3aed 0%, #4f46e5 100%)",
+                  transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease",
                 }}
               />
             </Box>
-            <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ minWidth: 84, textAlign: "right" }}>
+            <Typography
+              variant="subtitle2"
+              fontWeight={800}
+              color="text.primary"
+              sx={{
+                minWidth: 84,
+                textAlign: "right",
+                fontFamily: '"Outfit", sans-serif',
+                fontSize: "0.85rem"
+              }}
+            >
               {"\u20B9"}{value.toLocaleString()}
             </Typography>
           </Box>
@@ -68,7 +114,50 @@ function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
 }
 
 function SummaryChip({ label, value, color = "primary" }) {
-  return <Chip label={`${label}: ${value}`} color={color} variant="outlined" sx={{ fontWeight: 700 }} />;
+  const theme = useTheme();
+  
+  const colorsMap = {
+    primary: {
+      bg: theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.12)" : "rgba(124, 58, 237, 0.06)",
+      border: theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.25)" : "rgba(124, 58, 237, 0.15)",
+      text: theme.palette.mode === "dark" ? "#a78bfa" : "#6d28d9",
+    },
+    success: {
+      bg: theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.12)" : "rgba(22, 163, 74, 0.06)",
+      border: theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.25)" : "rgba(22, 163, 74, 0.15)",
+      text: theme.palette.mode === "dark" ? "#4ade80" : "#15803d",
+    },
+    error: {
+      bg: theme.palette.mode === "dark" ? "rgba(220, 38, 38, 0.12)" : "rgba(220, 38, 38, 0.06)",
+      border: theme.palette.mode === "dark" ? "rgba(220, 38, 38, 0.25)" : "rgba(220, 38, 38, 0.15)",
+      text: theme.palette.mode === "dark" ? "#f87171" : "#b91c1c",
+    }
+  };
+
+  const style = colorsMap[color] || colorsMap.primary;
+
+  return (
+    <Chip
+      label={
+        <span>
+          {label}: <strong style={{ marginLeft: "4px" }}>{value}</strong>
+        </span>
+      }
+      sx={{
+        fontWeight: 600,
+        fontSize: "0.78rem",
+        bgcolor: style.bg,
+        borderColor: style.border,
+        color: style.text,
+        borderWidth: "1.5px",
+        px: 0.5,
+        height: 28,
+        borderRadius: "8px",
+        "& .MuiChip-label": { px: 1 }
+      }}
+      variant="outlined"
+    />
+  );
 }
 
 export default function ReportsPage({ mode }) {
@@ -151,6 +240,7 @@ export default function ReportsPage({ mode }) {
     { label: "Member", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
     { label: "Expected", key: "totalExpectedAmount", align: "right", render: (row) => `\u20B9${Number(row.totalExpectedAmount).toLocaleString()}` },
     { label: "Paid", key: "totalPaidAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="success.main">{"\u20B9"}{Number(row.totalPaidAmount).toLocaleString()}</Typography> },
+    { label: "Pending", key: "totalPendingAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="error.main">{"\u20B9"}{(row.totalExpectedAmount - row.totalPaidAmount).toLocaleString()}</Typography> },
   ];
 
   const pendingColumns = [
@@ -199,22 +289,15 @@ export default function ReportsPage({ mode }) {
   }, [mode, memberCategoryData, report]);
 
   const pageTitle =
-    mode === "event" ? "Event-wise Collection Audit" :
-    mode === "member" ? "Member Contribution Velocity" :
-    mode === "pending" ? "High Priority Dues" :
-    mode === "member-category" ? "Member Category-wise Paid Analysis" :
+    mode === "event" ? "Event Audit" :
+    mode === "member" ? "Member Velocity" :
+    mode === "pending" ? "Pending Dues" :
+    mode === "member-category" ? "Member Category Paid" :
     "Financial Analytics";
 
-  const pageSubtitle =
-    mode === "event"
-      ? "Compare expected, paid, and pending amounts for each event."
-      : mode === "member"
-      ? "See how individual member contributions trend across the selected period."
-      : mode === "pending"
-      ? "Focus on unpaid contributions that need immediate follow-up."
-      : mode === "member-category"
-      ? "Review how a selected member's paid contributions are distributed by category."
-      : "Clean financial reporting with export-ready tables and charts.";
+  const totalMemberPaid = useMemo(() => {
+    return memberCategoryData.reduce((sum, row) => sum + row.totalPaidAmount, 0);
+  }, [memberCategoryData]);
 
   const exportCurrentView = () => {
     if (!hasWriteAccess) return;
@@ -248,24 +331,18 @@ export default function ReportsPage({ mode }) {
         <Box
           sx={{
             px: { xs: 2, md: 3 },
-            py: 2.5,
+            py: 1.5,
             background: theme.palette.mode === "dark"
-              ? "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
+              ? "linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(79, 70, 229, 0.02) 100%)"
               : "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(79,70,229,0.10) 100%)",
             borderBottom: `1px solid ${theme.palette.divider}`,
           }}
         >
-          <Stack spacing={2}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap", alignItems: "start" }}>
+          <Stack spacing={1.5}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
               <Box>
-                <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: "0.2em", fontWeight: 800 }}>
-                  Reports
-                </Typography>
-                <Typography variant="h4" fontWeight={900}>
+                <Typography fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', color: "text.primary", fontSize: "1.2rem" }}>
                   {pageTitle}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {pageSubtitle}
                 </Typography>
               </Box>
               <AppButton
@@ -278,16 +355,23 @@ export default function ReportsPage({ mode }) {
               </AppButton>
             </Box>
 
-            <Grid container spacing={2} alignItems="end">
+            <Grid container spacing={2} alignItems="center">
               {mode === "member-category" ? (
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <AppSelect
-                    label="Select Member"
-                    value={selectedMemberId}
-                    onChange={(event) => setSelectedMemberId(event.target.value)}
-                    options={members.map((member) => ({ label: member.name, value: member.memberId }))}
-                  />
-                </Grid>
+                <>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <AppSelect
+                      label="Select Member"
+                      value={selectedMemberId}
+                      onChange={(event) => setSelectedMemberId(event.target.value)}
+                      options={members.map((member) => ({ label: member.name, value: member.memberId }))}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 8 }}>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent={{ xs: "flex-start", md: "flex-end" }} sx={{ mt: { xs: 1, md: 2.5 } }}>
+                      <SummaryChip label="Total Contributed" value={`\u20B9${Number(totalMemberPaid).toLocaleString()}`} color="success" />
+                    </Stack>
+                  </Grid>
+                </>
               ) : (
                 <>
                   <Grid size={{ xs: 12, md: 3 }}>
@@ -307,7 +391,7 @@ export default function ReportsPage({ mode }) {
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 7 }}>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent={{ xs: "flex-start", md: "flex-end" }}>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent={{ xs: "flex-start", md: "flex-end" }} sx={{ mt: { xs: 1, md: 2.5 } }}>
                       <SummaryChip label="Expected" value={`\u20B9${Number(report?.eventCollections?.reduce((sum, row) => sum + row.expectedAmount, 0) ?? 0).toLocaleString()}`} />
                       <SummaryChip label="Paid" value={`\u20B9${Number(report?.eventCollections?.reduce((sum, row) => sum + row.paidAmount, 0) ?? 0).toLocaleString()}`} color="success" />
                       <SummaryChip label="Pending" value={`\u20B9${Number(report?.eventCollections?.reduce((sum, row) => sum + row.pendingAmount, 0) ?? 0).toLocaleString()}`} color="error" />
@@ -328,15 +412,18 @@ export default function ReportsPage({ mode }) {
             <Stack spacing={3}>
               <Grid container spacing={2.5}>
                 <Grid size={{ xs: 12, lg: 7 }}>
-                  <Card sx={{ height: "100%" }}>
+                  <Card
+                    sx={{
+                      height: "100%",
+                      bgcolor: theme.palette.mode === "dark" ? "background.default" : "var(--app-surface-alt)",
+                      borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "var(--app-border)"
+                    }}
+                  >
                     <CardContent>
                       <Stack spacing={2}>
                         <Box>
-                          <Typography variant="h6" fontWeight={900}>
+                          <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1.05rem", color: "text.primary" }}>
                             Visualization
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            A quick read on the most important values in this report.
                           </Typography>
                         </Box>
                         <SimpleBarChart items={chartData} />
@@ -345,43 +432,77 @@ export default function ReportsPage({ mode }) {
                   </Card>
                 </Grid>
                 <Grid size={{ xs: 12, lg: 5 }}>
-                  <Card sx={{ height: "100%" }}>
+                  <Card
+                    sx={{
+                      height: "100%",
+                      bgcolor: theme.palette.mode === "dark" ? "background.default" : "var(--app-surface-alt)",
+                      borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "var(--app-border)"
+                    }}
+                  >
                     <CardContent>
                       <Stack spacing={2}>
                         <Box>
-                          <Typography variant="h6" fontWeight={900}>
-                            At a glance
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            The current report summary and export status.
+                          <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1.05rem", color: "text.primary" }}>
+                            At a Glance
                           </Typography>
                         </Box>
-                        <Stack spacing={1.5}>
+                        <Box sx={{ width: "100%" }}>
                           {mode === "member-category" ? (
-                            <>
+                            <Stack spacing={1.5}>
                               <Chip
                                 label={`Selected member: ${members.find((member) => member.memberId === selectedMemberId)?.name || "None"}`}
                                 variant="outlined"
-                                sx={{ alignSelf: "flex-start", fontWeight: 700 }}
+                                sx={{
+                                  alignSelf: "flex-start",
+                                  fontWeight: 700,
+                                  borderColor: "secondary.main",
+                                  color: "secondary.main"
+                                }}
                               />
-                              <Typography variant="body2" color="text.secondary">
+                              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                                 Paid category distribution helps identify where a member contributes most frequently.
                               </Typography>
-                            </>
+                            </Stack>
                           ) : (
-                            <>
-                              <Typography variant="body2" fontWeight={700}>
-                                Event collections: {report?.eventCollections?.length ?? 0}
-                              </Typography>
-                              <Typography variant="body2" fontWeight={700}>
-                                Member records: {report?.memberContributionHistory?.length ?? 0}
-                              </Typography>
-                              <Typography variant="body2" fontWeight={700}>
-                                Pending dues: {report?.pendingDues?.length ?? 0}
-                              </Typography>
-                            </>
+                            <Stack spacing={1.5} sx={{ mt: 1 }}>
+                              {[
+                                { label: "Event collections", value: report?.eventCollections?.length ?? 0 },
+                                { label: "Member records", value: report?.memberContributionHistory?.length ?? 0 },
+                                { label: "Pending dues", value: report?.pendingDues?.length ?? 0 }
+                              ].map((row) => (
+                                <Box
+                                  key={row.label}
+                                  sx={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    py: 1,
+                                    borderBottom: "1px solid",
+                                    borderColor: "divider",
+                                    "&:last-child": { borderBottom: "none" }
+                                  }}
+                                >
+                                  <Typography variant="body2" fontWeight={600} color="text.secondary">
+                                    {row.label}
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight={800}
+                                    sx={{
+                                      bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.05)",
+                                      px: 1.5,
+                                      py: 0.25,
+                                      borderRadius: "6px",
+                                      fontFamily: '"Outfit", sans-serif'
+                                    }}
+                                  >
+                                    {row.value}
+                                  </Typography>
+                                </Box>
+                              ))}
+                            </Stack>
                           )}
-                        </Stack>
+                        </Box>
                       </Stack>
                     </CardContent>
                   </Card>
@@ -389,19 +510,19 @@ export default function ReportsPage({ mode }) {
               </Grid>
 
               {(mode === "event" || !mode) && (
-                <AppDataTable title="Event-wise Collection Audit" columns={eventColumns} data={report?.eventCollections ?? []} loading={false} />
+                <AppDataTable title="Event Collection Audit" columns={eventColumns} data={report?.eventCollections ?? []} loading={false} />
               )}
 
               {(mode === "member" || !mode) && (
-                <AppDataTable title="Member Contribution Velocity" columns={memberColumns} data={report?.memberContributionHistory ?? []} loading={false} />
+                <AppDataTable title="Member Contribution Details" columns={memberColumns} data={report?.memberContributionHistory ?? []} loading={false} />
               )}
 
               {(mode === "pending" || !mode) && (
-                <AppDataTable title="High Priority Dues (Pending Receipt)" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
+                <AppDataTable title="Pending Dues Details" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
               )}
 
               {mode === "member-category" && (
-                <AppDataTable title="Category-wise Overall Paid Amount" columns={memberCategoryColumns} data={memberCategoryData} loading={false} />
+                <AppDataTable title="Category-wise Paid Summary" columns={memberCategoryColumns} data={memberCategoryData} loading={false} />
               )}
             </Stack>
           )}

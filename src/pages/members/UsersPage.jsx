@@ -9,6 +9,7 @@ import {
   InputAdornment,
   Checkbox,
   FormControlLabel,
+  Stack,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
@@ -18,20 +19,27 @@ import {
   Visibility,
   VisibilityOff,
   PersonAdd as PersonAddIcon,
+  ToggleOn as ToggleOnIcon,
+  ToggleOff as ToggleOffIcon,
+  Description as ExcelIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+dayjs.extend(customParseFormat);
+
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import { validateForm } from "../../utils/validation";
-import { GetUsers, CreateUser, UpdateUser, DeleteUser } from "../../services/userService";
+import { GetUsers, CreateUser, UpdateUser, DeleteUser, CreateUsersBulk } from "../../services/userService";
 
 // ─── Role color map ───────────────────────────────────────────────────────────
 const ROLE_COLORS = {
@@ -72,11 +80,22 @@ export default function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
+  const [userToToggle, setUserToToggle] = useState(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const templateValidations = {
+    "Role": {
+      type: "list",
+      formulae: ['"Admin,Manager,User,Member"'],
+      error: "Please select a role from the list."
+    }
+  };
 
   // Filter state
   const [filterRole, setFilterRole] = useState("");
@@ -221,6 +240,97 @@ export default function UsersPage() {
     }
   }
 
+  async function handleToggleStatus(row) {
+    try {
+      const payload = {
+        username: row.username,
+        email: row.email,
+        roleName: row.roleName,
+        isActive: !row.isActive,
+      };
+      await UpdateUser(row.userId, payload);
+      toast.success(`User status updated successfully`);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? "Failed to update status");
+    }
+  }
+
+  function handleToggleStatusRequest(row) {
+    setUserToToggle(row);
+    setStatusConfirmOpen(true);
+  }
+
+  async function handleConfirmStatusToggle() {
+    if (!userToToggle) return;
+    try {
+      const payload = {
+        username: userToToggle.username,
+        email: userToToggle.email,
+        roleName: userToToggle.roleName,
+        isActive: !userToToggle.isActive,
+      };
+      await UpdateUser(userToToggle.userId, payload);
+      toast.success("User status updated successfully");
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? "Failed to update status");
+    } finally {
+      setStatusConfirmOpen(false);
+      setUserToToggle(null);
+    }
+  }
+
+  const validateRow = (row, rowNum) => {
+    const username = row["username"] !== undefined && row["username"] !== null ? String(row["username"]).trim() : "";
+    const email = row["email"] !== undefined && row["email"] !== null ? String(row["email"]).trim() : "";
+    const roleName = row["role"] !== undefined && row["role"] !== null ? String(row["role"]).trim() : (row["rolename"] !== undefined && row["rolename"] !== null ? String(row["rolename"]).trim() : "");
+    const password = row["password"] !== undefined && row["password"] !== null ? String(row["password"]).trim() : "";
+
+    if (!username) return { error: `Row ${rowNum}: Username is required` };
+    if (!/^[a-zA-Z0-9]{3,30}$/.test(username)) {
+      return { error: `Row ${rowNum}: Username must be alphanumeric (3-30 characters)` };
+    }
+
+    if (!email) return { error: `Row ${rowNum}: Email is required` };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: `Row ${rowNum}: Invalid email format` };
+
+    // Match role case-insensitively
+    const matchedRole = USER_ROLES.find(r => r.value.toLowerCase() === roleName.toLowerCase());
+    if (!matchedRole) {
+      return { error: `Row ${rowNum}: Invalid role '${roleName}'. Allowed: Admin, Manager, User, Member` };
+    }
+
+    if (password && password.length < 6) {
+      return { error: `Row ${rowNum}: Password must be at least 6 characters` };
+    }
+
+    return {
+      error: null,
+      parsed: {
+        username,
+        email,
+        roleName: matchedRole.value,
+        isActive: true,
+        password: password || "Welcome@123", // secure temp default password
+      }
+    };
+  };
+
+  const handleBulkImport = async (validData) => {
+    if (!validData || validData.length === 0) return;
+    setLoading(true);
+    try {
+      await CreateUsersBulk(validData);
+      toast.success(`Successfully imported all ${validData.length} user(s)!`);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Failed to import users");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ── Helpers ────────────────────────────────────────────────────────────────
   function fieldChange(key, value) {
     setForm((c) => ({ ...c, [key]: value }));
@@ -231,7 +341,7 @@ export default function UsersPage() {
   const columns = [
     {
       label: "Action",
-      sx: { width: 90 },
+      sx: { width: 120 },
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
           <Tooltip title={hasWriteAccess ? "Edit User" : ""}>
@@ -255,6 +365,22 @@ export default function UsersPage() {
                 onClick={() => handleDeleteRequest(row.userId)}
               >
                 <DeleteIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? actionIconColor : "#cbd5e1" }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={hasWriteAccess ? (row.isActive ? "Deactivate User" : "Activate User") : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => handleToggleStatusRequest(row)}
+              >
+                {row.isActive ? (
+                  <ToggleOnIcon sx={{ fontSize: "1.25rem", color: hasWriteAccess ? "#10b981" : "#cbd5e1" }} />
+                ) : (
+                  <ToggleOffIcon sx={{ fontSize: "1.25rem", color: hasWriteAccess ? "#ef4444" : "#cbd5e1" }} />
+                )}
               </IconButton>
             </span>
           </Tooltip>
@@ -346,15 +472,34 @@ export default function UsersPage() {
         data={filteredUsers}
         loading={loading}
         actions={
-          <AppButton
-            variant="contained"
-            size="small"
-            disabled={!hasWriteAccess}
-            startIcon={<PersonAddIcon />}
-            onClick={openCreate}
-          >
-            Add User
-          </AppButton>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <AppButton
+              variant="outlined"
+              size="small"
+              disabled={!hasWriteAccess}
+              startIcon={<ExcelIcon />}
+              onClick={() => setImportDialogOpen(true)}
+              sx={{
+                borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(74, 63, 107, 0.3)",
+                color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                "&:hover": {
+                  borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.04)",
+                },
+              }}
+            >
+              Import Excel
+            </AppButton>
+            <AppButton
+              variant="contained"
+              size="small"
+              disabled={!hasWriteAccess}
+              startIcon={<PersonAddIcon />}
+              onClick={openCreate}
+            >
+              Add User
+            </AppButton>
+          </Stack>
         }
         filterPanel={
           <Grid container spacing={2} alignItems="center">
@@ -568,38 +713,18 @@ export default function UsersPage() {
             />
           </Grid>
 
-          {/* Is Active */}
-          <Grid size={{ xs: 12, md: 6 }}
-            sx={{ display: "flex", alignItems: "flex-end", pb: 0.5 }}
-          >
-            <FormControlLabel
-              labelPlacement="start"
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                width: "100%",
-                m: 0,
-                gap: 2,
-              }}
-              control={
-                <Checkbox
-                  checked={form.isActive}
-                  onChange={(e) => fieldChange("isActive", e.target.checked)}
-                  sx={{
-                    color: "rgba(74, 63, 107, 0.4)",
-                    "&.Mui-checked": {
-                      color: "#4a3f6b",
-                    },
-                  }}
-                />
-              }
-              label={
-                <Typography variant="body2" fontWeight={700} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
-                  {form.isActive ? "Active Account" : "Inactive Account"}
-                </Typography>
-              }
-            />
-          </Grid>
+          {/* Is Active — only shown in edit mode */}
+          {form.userId && (
+            <Grid size={{ xs: 12, md: 6 }}
+              sx={{ display: "flex", alignItems: "flex-end", pb: 0.5 }}
+            >
+              <AppSwitch
+                label={form.isActive ? "Active Account" : "Inactive Account"}
+                checked={form.isActive}
+                onChange={(e) => fieldChange("isActive", e.target.checked)}
+              />
+            </Grid>
+          )}
 
           {/* Created On — shown in edit mode only */}
           {form.userId && (
@@ -635,6 +760,25 @@ export default function UsersPage() {
         onConfirm={handleConfirmDelete}
         title="Confirm"
         content="Are you sure you want to delete this record?"
+      />
+
+      {/* ── Status Confirm ────────────────────────────────────────────────── */}
+      <AppConfirmDialog
+        open={statusConfirmOpen}
+        onClose={() => setStatusConfirmOpen(false)}
+        onConfirm={handleConfirmStatusToggle}
+        title="Confirm"
+        content={`Are you sure you want to ${userToToggle?.isActive ? "deactivate" : "activate"} this user account?`}
+      />
+
+      <ExcelImportDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        onImport={handleBulkImport}
+        title="Import Users"
+        templateHeaders={["Username", "Email", "Role", "Password"]}
+        templateValidations={templateValidations}
+        validateRow={validateRow}
       />
     </div>
   );
