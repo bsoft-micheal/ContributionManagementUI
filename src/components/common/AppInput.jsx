@@ -1,4 +1,6 @@
 import { TextField, Box, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { sanitizeInput } from "../../utils/validation";
 
 export default function AppInput({
   label,
@@ -11,8 +13,26 @@ export default function AppInput({
   error = false,
   helperText = "",
   required = false,
+  restrictType,
+  maxLength,
   ...props
 }) {
+  const theme = useTheme();
+
+  const handleInputChange = (e) => {
+    let val = e.target.value;
+    if (restrictType) {
+      val = sanitizeInput(val, restrictType);
+    }
+    if (maxLength !== undefined && maxLength !== null) {
+      val = val.slice(0, Number(maxLength));
+    }
+    e.target.value = val;
+    if (onChange) {
+      onChange(e);
+    }
+  };
+
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
       {label && (
@@ -22,8 +42,8 @@ export default function AppInput({
             display: "block",
             mb: 0.5,
             fontWeight: 700,
-            color: "#5b5280",
-            textTransform: "uppercase",
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.secondary",
+            textTransform: "none",
             letterSpacing: "0.04em",
             fontSize: "0.7rem",
           }}
@@ -38,7 +58,7 @@ export default function AppInput({
       )}
       <TextField
         value={value}
-        onChange={onChange}
+        onChange={handleInputChange}
         type={type}
         fullWidth={fullWidth}
         placeholder={placeholder || `Enter ${label?.toLowerCase() || "value"}...`}
@@ -47,20 +67,26 @@ export default function AppInput({
         sx={{
           "& .MuiOutlinedInput-root": {
             fontSize: "0.82rem",
-            bgcolor: "#ffffff",
-            borderRadius: "6px",
+            bgcolor: "background.paper",
+            borderRadius: "12px",
             height: size === "small" ? 34 : 40,
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             "& input": {
               py: size === "small" ? 0.8 : 1.2,
+              color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
+              "&::placeholder": {
+                color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.5)" : "inherit",
+                opacity: 1,
+              }
             },
             "& fieldset": {
-              borderColor: "rgba(74, 63, 107, 0.2)",
+              borderColor: theme.palette.divider,
             },
             "&:hover fieldset": {
-              borderColor: "rgba(74, 63, 107, 0.4)",
+              borderColor: "rgba(124, 58, 237, 0.45)",
             },
             "&.Mui-focused fieldset": {
-              borderColor: "#4a3f6b",
+              borderColor: "secondary.main",
               borderWidth: "1.5px",
             },
           },
@@ -68,6 +94,7 @@ export default function AppInput({
         }}
         error={error}
         helperText={helperText}
+        inputProps={{ maxLength, ...props.inputProps }}
         {...props}
       />
     </Box>

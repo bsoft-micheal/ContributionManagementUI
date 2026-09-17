@@ -8,6 +8,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { GetRoles, CreateRole, UpdateRole } from "../../services/roleService";
+import { validateForm } from "../../utils/validation";
 
 const initialForm = { roleName: "", defaultContributionAmount: 0 };
 
@@ -36,13 +37,12 @@ export default function RolesPage() {
   }
 
   async function handleSubmit() {
-    const newErrors = {};
-    if (!form.roleName?.trim()) {
-      newErrors.roleName = "This field is required";
-    }
-    if (!form.defaultContributionAmount && form.defaultContributionAmount !== 0) {
-      newErrors.defaultContributionAmount = "This field is required";
-    }
+    const filed = "This field is required"
+    const schema = {
+      roleName: { required: true, type: "letteronly", min: 2, max: 50, label: filed },
+      defaultContributionAmount: { required: true, type: "numberonly", min: 0, max: 100000, label: filed }
+    };
+    const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -53,15 +53,15 @@ export default function RolesPage() {
     try {
       if (form.roleId) {
         await UpdateRole(form.roleId, form);
-        toast.success("Strategic role updated");
+        toast.success("Saved successfully");
       } else {
         await CreateRole(form);
-        toast.success("New operational role established");
+        toast.success("Saved successfully");
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error("Role synchronization failed");
+      toast.error("Failed to save");
     }
   }
 
@@ -71,7 +71,7 @@ export default function RolesPage() {
       render: (row) => (
         <Tooltip title="Edit Role">
           <IconButton size="small" sx={{ p: 0.3 }} onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}>
-            <EditIcon sx={{ fontSize: "1.1rem", color: "#4a3f6b" }} />
+            <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
           </IconButton>
         </Tooltip>
       )
@@ -92,7 +92,7 @@ export default function RolesPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Institutional Role Configuration"
+        title="Manage Employer Role"
         columns={columns}
         data={roles}
         loading={loading}
@@ -100,6 +100,7 @@ export default function RolesPage() {
           <AppButton
             size="small"
             variant="contained"
+            startIcon={<AddIcon />}
             onClick={() => { setForm(initialForm); setErrors({}); setDialogOpen(true); }}
           >
             Add
@@ -110,7 +111,7 @@ export default function RolesPage() {
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title={form.roleId ? "Modify Role Designation" : "Establish New Role"}
+        title={form.roleId ? "Edit Role" : "Add Role"}
         actions={
           <>
             <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
@@ -121,7 +122,7 @@ export default function RolesPage() {
         <Grid container spacing={3}>
           <Grid size={{ xs: 12 }}>
             <AppInput 
-              label="Role Name" 
+              label="Role" 
               fullWidth 
               value={form.roleName} 
               onChange={(e) => {
@@ -130,6 +131,8 @@ export default function RolesPage() {
                   setErrors(prev => ({ ...prev, roleName: "" }));
                 }
               }} 
+              restrictType="letteronly"
+              maxLength={50}
               error={!!errors.roleName}
               helperText={errors.roleName}
               required
@@ -137,8 +140,7 @@ export default function RolesPage() {
           </Grid>
           <Grid size={{ xs: 12 }}>
             <AppInput 
-              label="Default Contribution" 
-              type="number" 
+              label="Contribution" 
               fullWidth 
               value={form.defaultContributionAmount} 
               onChange={(e) => {
@@ -147,6 +149,8 @@ export default function RolesPage() {
                   setErrors(prev => ({ ...prev, defaultContributionAmount: "" }));
                 }
               }} 
+              restrictType="numberonly"
+              maxLength={10}
               error={!!errors.defaultContributionAmount}
               helperText={errors.defaultContributionAmount}
               required

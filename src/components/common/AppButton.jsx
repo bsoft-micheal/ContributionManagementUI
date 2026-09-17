@@ -16,7 +16,7 @@ export default function AppButton({
       startIcon={startIcon}
       endIcon={endIcon}
       sx={{
-        borderRadius: "6px",
+        borderRadius: "12px",
         textTransform: "none",
         fontWeight: 700,
         fontSize: "0.85rem",

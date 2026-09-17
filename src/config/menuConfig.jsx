@@ -9,6 +9,11 @@ import CalculateRoundedIcon from "@mui/icons-material/CalculateRounded";
 import PersonRemoveRoundedIcon from "@mui/icons-material/PersonRemoveRounded";
 import SettingsSuggestRoundedIcon from "@mui/icons-material/SettingsSuggestRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
+import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
+import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
+import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
+import PriorityHighRoundedIcon from "@mui/icons-material/PriorityHighRounded";
+import LeaderboardRoundedIcon from "@mui/icons-material/LeaderboardRounded";
 
 export const navigationItems = [
   { label: "Dashboard",                 path: "/",              icon: <DashboardRoundedIcon fontSize="small" /> },
@@ -25,7 +30,19 @@ export const navigationItems = [
       { label: "Event Types",             path: "/event-types",  icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { label: "Exit Process",            path: "/exit-process", icon: <PersonRemoveRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { label: "User Rights",             path: "/user-rights",  icon: <AdminPanelSettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { label: "Users",                     path: "/users",         icon: <ManageAccountsRoundedIcon    sx={{ fontSize: "1rem" }} /> },
     ]
   },
-  { label: "Reports",                   path: "/reports",       icon: <AssessmentRoundedIcon fontSize="small" /> },
+  { 
+    label: "Reports",
+    id: "reports",
+    icon: <AssessmentRoundedIcon fontSize="small" />,
+    children: [
+      { label: "Event Audit",             path: "/reports/event-collection-audit",  icon: <EventNoteRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { label: "Member Velocity",         path: "/reports/member-velocity",         icon: <TrendingUpRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { label: "Pending Dues",            path: "/reports/pending-dues",            icon: <PriorityHighRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { label: "Member Category Paid",    path: "/reports/member-category-paid",    icon: <SavingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { label: "My Contributions",        path: "/my-contributions",               icon: <LeaderboardRoundedIcon sx={{ fontSize: "1rem" }} /> },
+    ]
+  },
 ];

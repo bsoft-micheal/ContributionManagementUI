@@ -60,7 +60,7 @@ export default function ExitProcessPage() {
 
       setExitCandidates(candidates);
     } catch (error) {
-      console.error("Error loading exit candidates:", error);
+      console.error("Failed to load", error);
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ export default function ExitProcessPage() {
 
   async function handleFinalExit(member) {
     if (!hasWriteAccess) {
-      toast.error("Access Denied: You do not have write permissions for this portal.");
+    
       return;
     }
     if (member.pendingAmount > 0) {
@@ -81,10 +81,10 @@ export default function ExitProcessPage() {
 
     try {
       await UpdateMember(member.memberId, { ...member, isExited: true, isActive: false });
-      toast.success(`${member.name} has been processed for exit.`);
+      toast.success("Saved successfully");
       loadExitData();
     } catch (error) {
-      toast.error("Failed to process member exit.");
+      toast.error("Failed to save");
     }
   }
 
@@ -153,13 +153,13 @@ export default function ExitProcessPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Member Exit Clearance Portal"
+        title="Member Exit Clearance"
         columns={columns}
         data={exitCandidates}
         loading={loading}
         filterPanel={
           <Box sx={{ p: 1.5, bgcolor: "rgba(220, 38, 38, 0.05)", borderRadius: "8px", border: "1px solid rgba(220, 38, 38, 0.1)" }}>
-            <Typography variant="caption" fontWeight={800} color="error.main" sx={{ textTransform: "uppercase", display: "block", mb: 0.5 }}>
+            <Typography variant="caption" fontWeight={800} color="error.main" sx={{ display: "block", mb: 0.5 }}>
               Exit Protocol Notice
             </Typography>
             <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>

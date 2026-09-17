@@ -69,7 +69,7 @@ export default function EventDetailsPage() {
             color: row.paymentStatus === "Paid" ? "#16a34a" : "#dc2626",
             bgcolor: row.paymentStatus === "Paid" ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)",
             px: 1.2, py: 0.3, borderRadius: "3px",
-            textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: "0.04em"
+            fontSize: "0.7rem", letterSpacing: "0.04em"
           }}
         >
           {row.paymentStatus}
@@ -99,13 +99,13 @@ export default function EventDetailsPage() {
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 4 }}>
-          <MetricCard label="Total Participants" value={eventDetails.participantCount} helper="Members assigned to this cycle." />
+          <MetricCard label="Total Members" value={eventDetails.participantCount} helper="Members assigned to this event." />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-          <MetricCard label="Expected Revenue" value={`₹${eventDetails.totalExpectedAmount}`} helper="Projected collections." />
+          <MetricCard label="Expected Amount" value={`₹${eventDetails.totalExpectedAmount}`} helper="Projected amount." />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-          <MetricCard label="Realized Capital" value={`₹${eventDetails.totalPaidAmount}`} helper="Confirmed transactions." accent="#16a34a" />
+          <MetricCard label="Received Amount" value={`₹${eventDetails.totalPaidAmount}`} helper="Confirmed amount." accent="#16a34a" />
         </Grid>
       </Grid>
 
@@ -113,7 +113,7 @@ export default function EventDetailsPage() {
         <Grid size={{ xs: 12, lg: 4 }}>
           <Card sx={{ height: "100%", boxShadow: "0 2px 8px rgba(74,63,107,0.1)", border: "1px solid rgba(74,63,107,0.08)" }}>
             <Box sx={{ bgcolor: "#4a3f6b", color: "#fff", px: 2, py: 1.2 }}>
-               <Typography variant="subtitle2" fontWeight={700}>Engagement Roster</Typography>
+               <Typography variant="subtitle2" fontWeight={700}>Current Active Members</Typography>
             </Box>
             <CardContent sx={{ p: 2 }}>
               <Stack spacing={1.5}>
@@ -139,7 +139,7 @@ export default function EventDetailsPage() {
 
         <Grid size={{ xs: 12, lg: 8 }}>
           <AppDataTable
-            title="Contribution Reconciliation"
+            title="Contribution Review"
             columns={columns}
             data={eventDetails.contributions}
             loading={false}

@@ -7,14 +7,18 @@ import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import App from "./App";
 import { AuthProvider } from "./contexts/AuthContext";
-import { appTheme } from "./theme";
+import { ThemeModeProvider, useThemeMode } from "./contexts/ThemeModeContext";
+import { createAppTheme } from "./theme";
 import "./styles.css";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <ThemeProvider theme={appTheme}>
+function ThemedApp() {
+  const { mode } = useThemeMode();
+  const theme = React.useMemo(() => createAppTheme(mode), [mode]);
+
+  return (
+    <ThemeProvider theme={theme}>
       <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <CssBaseline />
+        <CssBaseline enableColorScheme />
         <BrowserRouter>
           <AuthProvider>
             <ToastProvider>
@@ -24,5 +28,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         </BrowserRouter>
       </LocalizationProvider>
     </ThemeProvider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <ThemeModeProvider>
+      <ThemedApp />
+    </ThemeModeProvider>
   </React.StrictMode>
 );

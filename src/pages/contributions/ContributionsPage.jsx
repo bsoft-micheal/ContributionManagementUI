@@ -11,7 +11,8 @@ import {
   IconButton,
   Tooltip
 } from "@mui/material";
-import { 
+import { useTheme } from "@mui/material/styles";
+import {
   Payments as PaymentsIcon,
   Visibility as ViewIcon,
   Add as AddIcon,
@@ -29,6 +30,7 @@ import { GetMembers } from "../../services/memberService";
 import { GetRoles } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
+import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
@@ -42,6 +44,7 @@ const initialPayment = {
 };
 
 export default function ContributionsPage() {
+  const theme = useTheme();
   const { authState } = useAuth();
   const rights = getRightsForPage("Contributions", authState?.role);
   const hasWriteAccess = rights.write;
@@ -57,6 +60,7 @@ export default function ContributionsPage() {
   const [roles, setRoles] = useState([]);
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
+  const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
 
   useEffect(() => {
     async function loadEvents() {
@@ -73,8 +77,13 @@ export default function ContributionsPage() {
           setSelectedEventId(data[0].eventId);
           setFilterEventId(data[0].eventId);
         }
-        const allData = await GetContributions();
-        setAllContributions(allData);
+        try {
+          const allData = await GetContributions();
+          setAllContributions(allData);
+        } catch (allDataErr) {
+          console.warn("Global contributions endpoint not available yet:", allDataErr);
+          setAllContributions([]);
+        }
       } catch (error) {
         console.error("Error loading events & contributions:", error);
       }
@@ -90,12 +99,12 @@ export default function ContributionsPage() {
       const joiningDate = dayjs(member.joiningDate);
       const tenureYears = eventDate.diff(joiningDate, 'year', true);
       const isLessThanOneYear = tenureYears < 1;
-      
+
       const baseAmount = role.defaultContributionAmount || 0;
       const percentage = isLessThanOneYear ? 0.5 : 1.0;
       expectedAmount = baseAmount * percentage;
     }
-    
+
     const paidAmount = c.paymentStatus === "Paid" ? (c.amount || 0) : 0;
     return Math.max(0, expectedAmount - paidAmount);
   };
@@ -109,32 +118,32 @@ export default function ContributionsPage() {
       try {
         const data = await GetContributionsByEvent(selectedEventId);
         const selectedEvent = events.find(e => e.eventId === selectedEventId);
-        
+
         const enrichedData = data.map(c => {
           const member = members.find(m => m.memberId === c.memberId);
           const role = member ? roles.find(r => r.roleId === member.roleId) : null;
           const event = events.find(e => e.eventId === c.eventId) || selectedEvent;
-          
+
           // Calculate Arrears (Sum of unpaid contributions BEFORE this event's date or just other unpaid)
           const previousUnpaid = allContributions
-            .filter(prev => 
-              prev.memberId === c.memberId && 
+            .filter(prev =>
+              prev.memberId === c.memberId &&
               prev.eventId !== c.eventId
             )
             .reduce((sum, prev) => {
               const prevEvent = events.find(e => e.eventId === prev.eventId);
               return sum + getContributionOutstanding(prev, member, role, prevEvent);
             }, 0);
-          
+
           const currentOutstanding = getContributionOutstanding(c, member, role, event);
-          
+
           return {
             ...c,
             previousUnpaid,
             totalAccumulated: currentOutstanding + previousUnpaid
           };
         });
-        
+
         setContributions(enrichedData);
       } catch (error) {
         console.error("Error loading contributions:", error);
@@ -145,14 +154,13 @@ export default function ContributionsPage() {
   }, [selectedEventId, allContributions, members, roles, events]);
 
   async function handlePay() {
-    const newErrors = {};
-    if (payment.amount === "" || payment.amount === null || payment.amount === undefined) {
-      newErrors.amount = "This field is required";
-    } else if (Number(payment.amount) < 0) {
-      newErrors.amount = "Amount cannot be negative";
-    }
-    if (!payment.paymentMode) newErrors.paymentMode = "This field is required";
-    if (!payment.paymentDate) newErrors.paymentDate = "This field is required";
+    const filed = "This field is required"
+    const schema = {
+      amount: { required: true, type: "numberonly", min: 0, max: 1000000, label: filed },
+      paymentMode: { required: true, label: filed },
+      paymentDate: { required: true, label: filed }
+    };
+    const newErrors = validateForm(payment, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -166,14 +174,34 @@ export default function ContributionsPage() {
         paymentDate: payment.paymentDate?.toISOString(),
         amount: payment.amount === "" ? null : Number(payment.amount),
       });
-      toast.success("Contribution marked as paid.");
+      toast.success("Saved successfully");
       setDialogOpen(false);
-      
-      // Reload the global list which automatically triggers the dependency recalculation
-      const allData = await GetContributions();
-      setAllContributions(allData);
+
+      // Reload the lists which automatically triggers the dependency recalculation
+      try {
+        const allData = await GetContributions();
+        setAllContributions(allData);
+      } catch (err) {
+        console.warn("Could not load global contributions for arrears, falling back to local reload:", err);
+        // Fallback: reload this event's contributions directly
+        if (selectedEventId) {
+          const data = await GetContributionsByEvent(selectedEventId);
+          const selectedEvent = events.find(e => e.eventId === selectedEventId);
+          const enrichedData = data.map(c => {
+            const member = members.find(m => m.memberId === c.memberId);
+            const role = member ? roles.find(r => r.roleId === member.roleId) : null;
+            const event = events.find(e => e.eventId === c.eventId) || selectedEvent;
+            return {
+              ...c,
+              previousUnpaid: 0,
+              totalAccumulated: getContributionOutstanding(c, member, role, event)
+            };
+          });
+          setContributions(enrichedData);
+        }
+      }
     } catch (error) {
-      toast.error(error.response?.data?.message ?? "Unable to update contribution.");
+      toast.error(error.response?.data?.message ?? "Unable to save.");
     }
   }
 
@@ -185,7 +213,7 @@ export default function ContributionsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.3, alignItems: "center" }}>
-          <Tooltip title={row.paymentStatus === "Paid" ? "Already Paid" : (hasWriteAccess ? "Record Payment" : "Read Only Mode")}>
+          <Tooltip title={row.paymentStatus === "Paid" ? "Already Paid" : (hasWriteAccess ? "Record Payment" : "")}>
             <span>
               <IconButton
                 size="small"
@@ -195,7 +223,7 @@ export default function ContributionsPage() {
                   setErrors({});
                   setDialogOpen(true);
                 }}
-                sx={{ p: 0.3, color: row.paymentStatus === "Paid" || !hasWriteAccess ? "#cbd5e1" : "#4a3f6b" }}
+                sx={{ p: 0.3, color: row.paymentStatus === "Paid" || !hasWriteAccess ? "#cbd5e1" : actionIconColor }}
               >
                 <PaymentsIcon sx={{ fontSize: "1.1rem" }} />
               </IconButton>
@@ -215,7 +243,7 @@ export default function ContributionsPage() {
             color: row.paymentStatus === "Paid" ? "#16a34a" : "#dc2626",
             bgcolor: row.paymentStatus === "Paid" ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)",
             px: 1.2, py: 0.3, borderRadius: "3px",
-            textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: "0.04em"
+            fontSize: "0.7rem", letterSpacing: "0.04em"
           }}
         >
           {row.paymentStatus}
@@ -223,10 +251,10 @@ export default function ContributionsPage() {
       )
     },
     { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{row.amount}</Typography> },
-    { 
-      label: "Arrears", 
-      key: "previousUnpaid", 
-      align: "right", 
+    {
+      label: "Arrears",
+      key: "previousUnpaid",
+      align: "right",
       render: (row) => (
         <Tooltip title="Outstanding from previous cycles">
           <Typography variant="body2" color="error.main" fontWeight={row.previousUnpaid > 0 ? 800 : 400}>
@@ -235,15 +263,15 @@ export default function ContributionsPage() {
         </Tooltip>
       )
     },
-    { 
-      label: "Total Due", 
-      key: "totalAccumulated", 
-      align: "right", 
+    {
+      label: "Total Due",
+      key: "totalAccumulated",
+      align: "right",
       render: (row) => (
-        <Typography variant="body2" fontWeight={900} color="primary.main">
+        <Typography variant="body2" fontWeight={900} color={theme.palette.mode === "dark" ? "#ffffff" : "primary.main"}>
           ₹{row.totalAccumulated}
         </Typography>
-      ) 
+      )
     },
     { label: "Mode", key: "paymentMode" },
   ];
@@ -271,16 +299,16 @@ export default function ContributionsPage() {
                 size="small"
                 onClick={() => {
                   setSelectedEventId(filterEventId);
-                  toast.success("Contributions filter applied");
+
                 }}
                 sx={{
-                  bgcolor: "#4a3f6b !important",
+                  bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
                   color: "#ffffff",
                   height: 34,
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" }
+                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
                 }}
               >
                 Filter
@@ -294,7 +322,7 @@ export default function ContributionsPage() {
                     setFilterEventId(firstEventId);
                     setSelectedEventId(firstEventId);
                   }
-                  toast.success("Filter reset to default");
+
                 }}
                 sx={{
                   color: "#ef4444",
@@ -309,22 +337,22 @@ export default function ContributionsPage() {
                   }
                 }}
               >
-                × Clear Filter
+                Clear Filter
               </AppButton>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: "flex", gap: 3, alignItems: "center", justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Box>
-                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.65rem" }}>
-                    Net Realized
+                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", fontSize: "0.65rem" }}>
+                    Total Income
                   </Typography>
                   <Typography variant="body1" fontWeight={900} color="success.main" sx={{ lineHeight: 1 }}>
                     ₹{contributions.filter(c => c.paymentStatus === "Paid").reduce((sum, c) => sum + c.amount, 0)}
                   </Typography>
                 </Box>
                 <Box sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)", pl: 3 }}>
-                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.65rem" }}>
-                     Enrollment
+                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", fontSize: "0.65rem" }}>
+                    Total Members
                   </Typography>
                   <Typography variant="body2" fontWeight={800} sx={{ lineHeight: 1 }}>{contributions.length} Members</Typography>
                 </Box>
@@ -334,28 +362,39 @@ export default function ContributionsPage() {
         }
       />
 
-      <AppDialog 
-        open={dialogOpen} 
-        onClose={() => setDialogOpen(false)} 
-        fullWidth 
+      <AppDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        fullWidth
         maxWidth="xs"
         title="Record Payment"
         actions={
           <>
-            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handlePay} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
+              <AppButton
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={handlePay}
+                sx={{
+                  bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
+                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
+                }}
+              >
+                Save
+              </AppButton>
             <AppButton variant="text" color="inherit" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
           </>
         }
       >
         <Stack spacing={3} sx={{ pt: 1 }}>
-          <AppInput 
-            label="Amount" 
-            type="number" 
-            value={payment.amount} 
+          <AppInput
+            label="Amount"
+            value={payment.amount}
             onChange={(event) => {
               setPayment((current) => ({ ...current, amount: event.target.value }));
               if (errors.amount) setErrors(prev => ({ ...prev, amount: "" }));
-            }} 
+            }}
+            restrictType="numberonly"
+            maxLength={10}
             error={!!errors.amount}
             helperText={errors.amount}
             required

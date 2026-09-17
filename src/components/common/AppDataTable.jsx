@@ -22,7 +22,10 @@ import {
   Select,
   MenuItem,
   TableSortLabel,
+  Menu,
+  Divider,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import {
   PictureAsPdf as PdfIcon,
   GridOn as ExcelIcon,
@@ -34,6 +37,14 @@ import {
   LastPage as LastPageIcon,
   ViewColumn as ColumnsIcon,
   Download as DownloadIcon,
+  ArrowUpward as SortAscIcon,
+  ArrowDownward as SortDescIcon,
+  Clear as ClearIcon,
+  FilterAlt as FilterIcon,
+  PushPin as PinIcon,
+  VisibilityOff as HideIcon,
+  Visibility as ShowIcon,
+  Sort as SortIcon,
 } from "@mui/icons-material";
 
 // ─── CSV Export Helper ──────────────────────────────────────────────────────
@@ -65,6 +76,13 @@ export default function AppDataTable({
   actions,
   filterPanel,
 }) {
+  const theme = useTheme();
+  const surface = theme.palette.background.paper;
+  const surfaceAlt = theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "rgba(248,250,252,0.95)";
+  const borderColor = theme.palette.divider;
+  const primaryMain = theme.palette.primary.main;
+  const textSecondary = theme.palette.text.secondary;
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(15);
   const [orderBy, setOrderBy] = useState("");
@@ -90,6 +108,25 @@ export default function AppDataTable({
   };
   const openPopover = Boolean(anchorEl);
 
+  // Column Action Menu States
+  const [columnMenuAnchorEl, setColumnMenuAnchorEl] = useState(null);
+  const [activeColumn, setActiveColumn] = useState(null);
+  const [columnFilters, setColumnFilters] = useState({});
+  const [pinnedColumns, setPinnedColumns] = useState({});
+
+  const handleColumnMenuClick = (event, column) => {
+    event.stopPropagation(); // Stop sorting toggle when clicking the menu icon
+    setColumnMenuAnchorEl(event.currentTarget);
+    setActiveColumn(column);
+  };
+
+  const handleColumnMenuClose = () => {
+    setColumnMenuAnchorEl(null);
+    setActiveColumn(null);
+  };
+
+  const isColumnMenuOpen = Boolean(columnMenuAnchorEl);
+
   // ── Sorting ───────────────────────────────────────────────────────────────
   const handleSort = (key) => {
     if (!key) return;
@@ -107,16 +144,37 @@ export default function AppDataTable({
       const q = search.toLowerCase();
       result = result.filter(row =>
         Object.values(row).some(val =>
+          
           val != null && val.toString().toLowerCase().includes(q)
         )
       );
     }
 
-    // Sort
+    // 2. Column-specific filters
+    Object.keys(columnFilters).forEach(key => {
+      const filterVal = columnFilters[key];
+      if (filterVal && filterVal.trim()) {
+        const q = filterVal.toLowerCase();
+        result = result.filter(row => {
+          const val = row[key];
+          return val != null && val.toString().toLowerCase().includes(q);
+        });
+      }
+    });
+
+    // 3. Sort
     if (orderBy) {
       result.sort((a, b) => {
         const va = a[orderBy] ?? "";
         const vb = b[orderBy] ?? "";
+        
+        // Handle sorting of numeric strings or normal comparison
+        const numA = Number(va);
+        const numB = Number(vb);
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return order === "asc" ? numA - numB : numB - numA;
+        }
+
         if (va < vb) return order === "asc" ? -1 : 1;
         if (va > vb) return order === "asc" ? 1 : -1;
         return 0;
@@ -124,21 +182,89 @@ export default function AppDataTable({
     }
 
     return result;
-  }, [data, search, orderBy, order]);
+  }, [data, search, columnFilters, orderBy, order]);
 
   const paginatedData = processedData.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
 
-  // Re-order columns so Action is always first, then filter by visibility
+  // Re-order columns so pinned left are first, then normal (Action first), then pinned right, then filter by visibility
   const orderedColumns = useMemo(() => {
-    const list = [
-      ...columns.filter(c => c.label === "Action"),
-      ...columns.filter(c => c.label !== "Action"),
+    const visible = columns.filter(c => visibleColumns[c.label] !== false);
+
+    const leftPinned = [];
+    const unpinned = [];
+    const rightPinned = [];
+
+    visible.forEach(col => {
+      const pin = pinnedColumns[col.label];
+      if (pin === "left") {
+        leftPinned.push(col);
+      } else if (pin === "right") {
+        rightPinned.push(col);
+      } else {
+        unpinned.push(col);
+      }
+    });
+
+    // Sort unpinned: keep 'Action' first
+    const sortedUnpinned = [
+      ...unpinned.filter(c => c.label === "Action"),
+      ...unpinned.filter(c => c.label !== "Action"),
     ];
-    return list.filter(c => visibleColumns[c.label] !== false);
-  }, [columns, visibleColumns]);
+
+    return [...leftPinned, ...sortedUnpinned, ...rightPinned];
+  }, [columns, visibleColumns, pinnedColumns]);
+
+  // Compute left offsets for left-pinned columns
+  const columnLeftOffsets = useMemo(() => {
+    const offsets = {};
+    let currentOffset = 0;
+    const leftPinned = orderedColumns.filter(c => pinnedColumns[c.label] === "left");
+    leftPinned.forEach(col => {
+      offsets[col.label] = currentOffset;
+      const width = col.sx?.width || 120;
+      currentOffset += typeof width === "number" ? width : parseInt(width) || 120;
+    });
+    return offsets;
+  }, [orderedColumns, pinnedColumns]);
+
+  // Compute right offsets for right-pinned columns
+  const columnRightOffsets = useMemo(() => {
+    const offsets = {};
+    let currentOffset = 0;
+    const rightPinned = [...orderedColumns].reverse().filter(c => pinnedColumns[c.label] === "right");
+    rightPinned.forEach(col => {
+      offsets[col.label] = currentOffset;
+      const width = col.sx?.width || 120;
+      currentOffset += typeof width === "number" ? width : parseInt(width) || 120;
+    });
+    return offsets;
+  }, [orderedColumns, pinnedColumns]);
+
+  const getPinStyles = (column, isHeader = false) => {
+    const pin = pinnedColumns[column.label];
+    if (!pin) return {};
+
+    const isLeft = pin === "left";
+    const offset = isLeft ? columnLeftOffsets[column.label] : columnRightOffsets[column.label];
+    const width = column.sx?.width || 120;
+
+    return {
+      position: "sticky",
+      [isLeft ? "left" : "right"]: offset,
+      zIndex: isHeader ? 3 : 2,
+      width: width,
+      minWidth: width,
+      boxShadow: isLeft 
+        ? "2px 0 5px -2px rgba(0,0,0,0.12)" 
+        : "-2px 0 5px -2px rgba(0,0,0,0.12)",
+      bgcolor: isHeader
+        ? (theme.palette.mode === "dark" ? "#1d2338" : "#eef4f8")
+        : (theme.palette.mode === "dark" ? "#1e293b" : "#ffffff"),
+    };
+  };
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
@@ -154,10 +280,10 @@ export default function AppDataTable({
     <Paper
       elevation={isFullscreen ? 5 : 0}
       sx={{
-        border: "1px solid rgba(224, 224, 224, 1)",
+        border: theme.palette.mode === "dark" ? `1px solid ${borderColor}` : "1px solid rgba(224, 224, 224, 1)",
         borderRadius: isFullscreen ? "0" : "8px",
         overflow: "hidden",
-        bgcolor: "#ffffff",
+        bgcolor: surface,
         display: "flex",
         flexDirection: "column",
         ...(isFullscreen && {
@@ -221,10 +347,10 @@ export default function AppDataTable({
       {filterPanel && (
         <Box
           sx={{
-            bgcolor: "#fcfcff",
+            bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#fcfcff",
             px: 3,
             py: 2,
-            borderBottom: "1px solid rgba(224, 224, 224, 0.8)",
+            borderBottom: `1px solid ${borderColor}`,
           }}
         >
           {filterPanel}
@@ -239,8 +365,8 @@ export default function AppDataTable({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          borderBottom: "1px solid rgba(224, 224, 224, 0.8)",
-          bgcolor: "#ffffff",
+          borderBottom: `1px solid ${borderColor}`,
+          bgcolor: surface,
           flexWrap: "wrap",
           gap: 2,
         }}
@@ -251,7 +377,7 @@ export default function AppDataTable({
             variant="caption"
             sx={{
               fontWeight: 700,
-              color: "#475569",
+              color: textSecondary,
               fontSize: "0.75rem",
               mr: 0.5
             }}
@@ -262,7 +388,7 @@ export default function AppDataTable({
             <IconButton
               size="small"
               onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
-              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <ExcelIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
@@ -271,7 +397,7 @@ export default function AppDataTable({
             <IconButton
               size="small"
               onClick={handlePrint}
-              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <PdfIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
@@ -280,7 +406,7 @@ export default function AppDataTable({
             <IconButton
               size="small"
               onClick={handlePrint}
-              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <PrintIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
@@ -289,7 +415,7 @@ export default function AppDataTable({
             <IconButton
               size="small"
               onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
-              sx={{ p: 0.4, color: "#64748b", "&:hover": { color: "#4a3f6b" } }}
+              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <DownloadIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
@@ -305,8 +431,8 @@ export default function AppDataTable({
             onClick={handleColumnsClick}
             startIcon={<ColumnsIcon sx={{ fontSize: "1rem" }} />}
             sx={{
-              color: "#4a3f6b",
-              borderColor: "rgba(74, 63, 107, 0.3)",
+              color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+              borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(74, 63, 107, 0.3)",
               fontSize: "0.75rem",
               fontWeight: 700,
               textTransform: "none",
@@ -314,8 +440,8 @@ export default function AppDataTable({
               px: 1.5,
               borderRadius: "4px",
               "&:hover": {
-                borderColor: "#4a3f6b",
-                bgcolor: "rgba(74, 63, 107, 0.04)",
+                borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
               },
             }}
           >
@@ -326,12 +452,16 @@ export default function AppDataTable({
             <IconButton
               size="small"
               sx={{
-                color: "#4a3f6b",
+                color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
                 p: 0.6,
-                border: "1px solid rgba(74, 63, 107, 0.2)",
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid rgba(74, 63, 107, 0.2)",
                 borderRadius: "4px",
                 height: 32,
                 width: 32,
+                "&:hover": {
+                  borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
+                },
               }}
               onClick={toggleFullscreen}
             >
@@ -359,10 +489,11 @@ export default function AppDataTable({
                 width: { xs: "100%", sm: 200 },
                 fontSize: "0.78rem",
                 borderRadius: "4px",
-                bgcolor: "#ffffff",
-                "& fieldset": { borderColor: "rgba(74, 63, 107, 0.2)" },
-                "&:hover fieldset": { borderColor: "rgba(74, 63, 107, 0.4)" },
-                "&.Mui-focused fieldset": { borderColor: "#4a3f6b" },
+                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
+                color: "inherit",
+                "& fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(74, 63, 107, 0.2)" },
+                "&:hover fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25)" : "rgba(74, 63, 107, 0.4)" },
+                "&.Mui-focused fieldset": { borderColor: theme.palette.mode === "dark" ? theme.palette.primary.main : "#4a3f6b" },
               },
             }}
           />
@@ -386,7 +517,7 @@ export default function AppDataTable({
           sx: { p: 2, maxWidth: 240, maxHeight: 320, overflowY: "auto", borderRadius: "6px" }
         }}
       >
-        <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1, fontSize: "0.8rem", color: "#4a3f6b" }}>
+        <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1, fontSize: "0.8rem", color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
           Toggle Columns
         </Typography>
         <Stack spacing={0.5}>
@@ -412,16 +543,198 @@ export default function AppDataTable({
         </Stack>
       </Popover>
 
+      {/* Column Action Menu */}
+      <Menu
+        anchorEl={columnMenuAnchorEl}
+        open={isColumnMenuOpen}
+        onClose={handleColumnMenuClose}
+        PaperProps={{
+          sx: {
+            minWidth: 220,
+            maxWidth: 280,
+            borderRadius: "10px",
+            boxShadow: "0px 4px 20px rgba(0,0,0,0.08)",
+            border: `1px solid ${borderColor}`,
+          }
+        }}
+      >
+        {activeColumn && (
+          <Box>
+            {/* Header info */}
+            <Typography variant="caption" sx={{ px: 2, py: 1, display: "block", fontWeight: 800, color: textSecondary, textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em" }}>
+              Column Options: {activeColumn.label}
+            </Typography>
+            <Divider sx={{ my: 0.5 }} />
+
+            {/* Sorting Actions */}
+            {activeColumn.key && (
+              <>
+                <MenuItem
+                  onClick={() => {
+                    if (orderBy === activeColumn.key) {
+                      setOrderBy("");
+                    }
+                    handleColumnMenuClose();
+                  }}
+                  disabled={orderBy !== activeColumn.key}
+                  sx={{ py: 1, fontSize: "0.78rem", fontWeight: 500 }}
+                >
+                  <ClearIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: textSecondary }} />
+                  Clear sort
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setOrderBy(activeColumn.key);
+                    setOrder("asc");
+                    setPage(0);
+                    handleColumnMenuClose();
+                  }}
+                  sx={{ py: 1, fontSize: "0.78rem", fontWeight: orderBy === activeColumn.key && order === "asc" ? 700 : 500 }}
+                >
+                  <SortAscIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: primaryMain }} />
+                  Sort by {activeColumn.label} ascending
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setOrderBy(activeColumn.key);
+                    setOrder("desc");
+                    setPage(0);
+                    handleColumnMenuClose();
+                  }}
+                  sx={{ py: 1, fontSize: "0.78rem", fontWeight: orderBy === activeColumn.key && order === "desc" ? 700 : 500 }}
+                >
+                  <SortDescIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: primaryMain }} />
+                  Sort by {activeColumn.label} descending
+                </MenuItem>
+                <Divider sx={{ my: 0.5 }} />
+              </>
+            )}
+
+            {/* Filtering Actions */}
+            {activeColumn.key && (
+              <>
+                <MenuItem
+                  onClick={() => {
+                    setColumnFilters(prev => ({ ...prev, [activeColumn.key]: "" }));
+                    handleColumnMenuClose();
+                  }}
+                  disabled={!columnFilters[activeColumn.key]}
+                  sx={{ py: 1, fontSize: "0.78rem", fontWeight: 500 }}
+                >
+                  <ClearIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: textSecondary }} />
+                  Clear filter
+                </MenuItem>
+
+                {/* Filter Textbox directly inside menu */}
+                <Box sx={{ px: 2, py: 1 }} onClick={(e) => e.stopPropagation()}>
+                  <TextField
+                    size="small"
+                    placeholder={`Filter by ${activeColumn.label}...`}
+                    value={columnFilters[activeColumn.key] || ""}
+                    onChange={(e) => {
+                      setColumnFilters(prev => ({
+                        ...prev,
+                        [activeColumn.key]: e.target.value
+                      }));
+                      setPage(0);
+                    }}
+                    autoFocus
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <FilterIcon sx={{ fontSize: "1rem", color: textSecondary }} />
+                        </InputAdornment>
+                      ),
+                      sx: {
+                        height: 30,
+                        fontSize: "0.75rem",
+                        borderRadius: "6px",
+                      }
+                    }}
+                    variant="outlined"
+                    fullWidth
+                  />
+                </Box>
+                <Divider sx={{ my: 0.5 }} />
+              </>
+            )}
+
+            {/* Pinning Actions */}
+            <MenuItem
+              onClick={() => {
+                setPinnedColumns(prev => ({ ...prev, [activeColumn.label]: "left" }));
+                handleColumnMenuClose();
+              }}
+              disabled={pinnedColumns[activeColumn.label] === "left"}
+              sx={{ py: 1, fontSize: "0.78rem", fontWeight: 500 }}
+            >
+              <PinIcon sx={{ mr: 1.5, fontSize: "1.05rem", transform: "rotate(-45deg)", color: primaryMain }} />
+              Pin to left
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setPinnedColumns(prev => ({ ...prev, [activeColumn.label]: "right" }));
+                handleColumnMenuClose();
+              }}
+              disabled={pinnedColumns[activeColumn.label] === "right"}
+              sx={{ py: 1, fontSize: "0.78rem", fontWeight: 500 }}
+            >
+              <PinIcon sx={{ mr: 1.5, fontSize: "1.05rem", transform: "rotate(45deg)", color: primaryMain }} />
+              Pin to right
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setPinnedColumns(prev => ({ ...prev, [activeColumn.label]: null }));
+                handleColumnMenuClose();
+              }}
+              disabled={!pinnedColumns[activeColumn.label]}
+              sx={{ py: 1, fontSize: "0.78rem", fontWeight: 500 }}
+            >
+              <ClearIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: textSecondary }} />
+              Unpin
+            </MenuItem>
+            <Divider sx={{ my: 0.5 }} />
+
+            {/* Visibility Actions */}
+            <MenuItem
+              onClick={() => {
+                setVisibleColumns(prev => ({ ...prev, [activeColumn.label]: false }));
+                handleColumnMenuClose();
+              }}
+              sx={{ py: 1, fontSize: "0.78rem", fontWeight: 500 }}
+            >
+              <HideIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: textSecondary }} />
+              Hide {activeColumn.label} column
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setVisibleColumns(
+                  columns.reduce((acc, col) => {
+                    acc[col.label] = true;
+                    return acc;
+                  }, {})
+                );
+                handleColumnMenuClose();
+              }}
+              sx={{ py: 1, fontSize: "0.78rem", fontWeight: 500 }}
+            >
+              <ShowIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: primaryMain }} />
+              Show all columns
+            </MenuItem>
+          </Box>
+        )}
+      </Menu>
+
       {/* ── 3. Table ──────────────────────────────────────────────────────── */}
       <Box sx={{ overflowX: "auto", flexGrow: isFullscreen ? 1 : 0 }}>
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
-            <CircularProgress size={30} sx={{ color: "#4a3f6b" }} />
+            <CircularProgress size={30} sx={{ color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
           </Box>
         ) : (
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: "#eef4f8" }}>
+              <TableRow sx={{ bgcolor: theme.palette.mode === "dark" ? surfaceAlt : "#eef4f8" }}>
                 {orderedColumns.map((column, index) => (
                   <TableCell
                     key={index}
@@ -429,14 +742,19 @@ export default function AppDataTable({
                     sx={{
                       fontWeight: 800,
                       fontSize: "0.75rem",
-                      color: "#1e293b",
+                      color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
                       py: 1,
                       px: 2,
-                      borderRight: "1px solid rgba(224, 224, 224, 0.8)",
-                      borderBottom: "1px solid rgba(224, 224, 224, 1)",
+                      borderRight: theme.palette.mode === "dark"
+                        ? "1px solid rgba(255, 255, 255, 0.08)"
+                        : "1px solid rgba(224, 224, 224, 0.8)",
+                      borderBottom: theme.palette.mode === "dark"
+                        ? "1px solid rgba(255, 255, 255, 0.1)"
+                        : "1px solid rgba(224, 224, 224, 1)",
                       "&:last-child": { borderRight: "none" },
                       whiteSpace: "nowrap",
                       ...column.sx,
+                      ...getPinStyles(column, true),
                     }}
                   >
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: column.align === "right" ? "flex-end" : "space-between", width: "100%", gap: 1 }}>
@@ -460,7 +778,7 @@ export default function AppDataTable({
                       )}
                       <IconButton
                         size="small"
-                        onClick={handleColumnsClick}
+                        onClick={(e) => handleColumnMenuClick(e, column)}
                         sx={{ p: 0.1, color: "inherit", opacity: 0.5, "&:hover": { opacity: 1 } }}
                       >
                         <Typography variant="caption" sx={{ fontSize: "0.85rem", fontWeight: 700 }}>⋮</Typography>
@@ -478,11 +796,17 @@ export default function AppDataTable({
                     key={rowIndex}
                     hover
                     sx={{
-                      bgcolor: rowIndex % 2 === 1 ? "#fafafa" : "#ffffff",
-                      "&:hover": { bgcolor: "#f5f7fa" },
+                      bgcolor: rowIndex % 2 === 1
+                        ? (theme.palette.mode === "dark" ? "rgba(255,255,255,0.015)" : "#fafafa")
+                        : (theme.palette.mode === "dark" ? surface : "#ffffff"),
+                      "&:hover": { bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f5f7fa" },
                       "& td": {
-                        borderRight: "1px solid rgba(224, 224, 224, 0.8)",
-                        borderBottom: "1px solid rgba(224, 224, 224, 0.8)",
+                        borderRight: theme.palette.mode === "dark"
+                          ? "1px solid rgba(255, 255, 255, 0.08)"
+                          : "1px solid rgba(224, 224, 224, 0.8)",
+                        borderBottom: theme.palette.mode === "dark"
+                          ? "1px solid rgba(255, 255, 255, 0.08)"
+                          : "1px solid rgba(224, 224, 224, 0.8)",
                       },
                       "& td:last-child": { borderRight: "none" },
                     }}
@@ -495,8 +819,9 @@ export default function AppDataTable({
                           py: 0.8,
                           px: 2,
                           fontSize: "0.78rem",
-                          color: "#334155",
+                          color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
                           ...column.cellSx,
+                          ...getPinStyles(column, false),
                         }}
                       >
                         {column.render ? (
@@ -539,8 +864,8 @@ export default function AppDataTable({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          borderTop: "1px solid rgba(224, 224, 224, 1)",
-          bgcolor: "#ffffff",
+          borderTop: `1px solid ${borderColor}`,
+          bgcolor: surface,
           flexWrap: "wrap",
           gap: 2
         }}
@@ -548,7 +873,7 @@ export default function AppDataTable({
         {/* Left Pagination metrics */}
         <Stack direction="row" alignItems="center" spacing={2}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, color: "#64748b", fontSize: "0.75rem" }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, color: textSecondary, fontSize: "0.75rem" }}>
               Rows per page:
             </Typography>
             <Select
@@ -562,9 +887,9 @@ export default function AppDataTable({
                 height: 28,
                 fontSize: "0.75rem",
                 fontWeight: 600,
-                color: "#1e293b",
+                color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
                 "& .MuiSelect-select": { py: 0.5, px: 1 },
-                "& fieldset": { borderColor: "rgba(0,0,0,0.1)" },
+                "& fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(0,0,0,0.1)" },
               }}
             >
               {[5, 10, 15, 25, 50].map((val) => (
@@ -574,7 +899,7 @@ export default function AppDataTable({
               ))}
             </Select>
           </Box>
-          <Typography variant="caption" sx={{ fontWeight: 600, color: "#64748b", fontSize: "0.75rem" }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: textSecondary, fontSize: "0.75rem" }}>
             Rows {totalRows} • Page {page + 1} of {totalPages}
           </Typography>
         </Stack>
@@ -585,7 +910,12 @@ export default function AppDataTable({
             size="small"
             disabled={page === 0}
             onClick={() => setPage(0)}
-            sx={{ border: "1px solid rgba(224, 224, 224, 0.8)", borderRadius: "4px", p: 0.5 }}
+            sx={{
+              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
+              borderRadius: "4px",
+              p: 0.5,
+              color: "inherit"
+            }}
           >
             <FirstPageIcon sx={{ fontSize: "1.1rem" }} />
           </IconButton>
@@ -594,21 +924,21 @@ export default function AppDataTable({
             disabled={page === 0}
             onClick={() => setPage(prev => prev - 1)}
             sx={{
-              border: "1px solid rgba(224, 224, 224, 0.8)",
+              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
               borderRadius: "4px",
-              color: "#334155",
+              color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
               fontSize: "0.7rem",
               fontWeight: 700,
               textTransform: "none",
               px: 1.5,
               minWidth: "unset",
               height: 28,
-              "&:disabled": { color: "#cbd5e1" }
+              "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
             }}
           >
             Prev
           </Button>
-          <Typography variant="caption" sx={{ mx: 1.5, fontWeight: 700, fontSize: "0.75rem", color: "#1e293b" }}>
+          <Typography variant="caption" sx={{ mx: 1.5, fontWeight: 700, fontSize: "0.75rem", color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b" }}>
             {page + 1} / {totalPages}
           </Typography>
           <Button
@@ -616,16 +946,16 @@ export default function AppDataTable({
             disabled={page >= totalPages - 1}
             onClick={() => setPage(prev => prev + 1)}
             sx={{
-              border: "1px solid rgba(224, 224, 224, 0.8)",
+              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
               borderRadius: "4px",
-              color: "#334155",
+              color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
               fontSize: "0.7rem",
               fontWeight: 700,
               textTransform: "none",
               px: 1.5,
               minWidth: "unset",
               height: 28,
-              "&:disabled": { color: "#cbd5e1" }
+              "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
             }}
           >
             Next
@@ -634,7 +964,12 @@ export default function AppDataTable({
             size="small"
             disabled={page >= totalPages - 1}
             onClick={() => setPage(totalPages - 1)}
-            sx={{ border: "1px solid rgba(224, 224, 224, 0.8)", borderRadius: "4px", p: 0.5 }}
+            sx={{
+              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
+              borderRadius: "4px",
+              p: 0.5,
+              color: "inherit"
+            }}
           >
             <LastPageIcon sx={{ fontSize: "1.1rem" }} />
           </IconButton>

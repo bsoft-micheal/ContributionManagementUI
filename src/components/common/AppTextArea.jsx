@@ -21,8 +21,8 @@ export default function AppTextArea({
             display: "block",
             mb: 0.5,
             fontWeight: 700,
-            color: "#5b5280",
-            textTransform: "uppercase",
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.secondary",
+            textTransform: "none",
             letterSpacing: "0.04em",
             fontSize: "0.7rem",
           }}
@@ -46,7 +46,7 @@ export default function AppTextArea({
         sx={{
           "& .MuiOutlinedInput-root": {
             fontSize: "0.82rem",
-            bgcolor: "#ffffff",
+            bgcolor: "background.paper",
             borderRadius: "6px",
             height: "auto",
             "& .MuiOutlinedInput-input": {

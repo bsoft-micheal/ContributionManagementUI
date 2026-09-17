@@ -10,7 +10,7 @@ import {
 import { useAppToast } from "../../components/common/AppToast";
 import AppSelect from "../../components/common/AppSelect";
 import AppDataTable from "../../components/common/AppDataTable";
-import { GetRoles } from "../../services/roleService";
+import { GetUserRights, SaveUserRights } from "../../services/userRightsService";
 
 const defaultRows = [
   // Dashboard Module
@@ -30,10 +30,14 @@ const defaultRows = [
   // Support Data Module
   { id: 7, module: "Support Data", subModule: "Categories", page: "Event Types", access: "readWrite" },
   { id: 8, module: "Support Data", subModule: "Clearance", page: "Exit Process", access: "readWrite" },
-  { id: 9, module: "Support Data", subModule: "Admin", page: "User Rights", access: "readWrite" },
+  { id: 9,  module: "Support Data", subModule: "Admin", page: "User Rights", access: "readWrite" },
+  { id: 11, module: "Support Data", subModule: "Admin", page: "Users",       access: "readWrite" },
 
   // Reports Module
-  { id: 10, module: "Reports", subModule: "Analytics", page: "Reports", access: "readWrite" }
+  { id: 10, module: "Reports", subModule: "Analytics", page: "Event Audit", access: "readWrite" },
+  { id: 12, module: "Reports", subModule: "Analytics", page: "Member Velocity", access: "readWrite" },
+  { id: 13, module: "Reports", subModule: "Analytics", page: "Pending Dues", access: "readWrite" },
+  { id: 14, module: "Reports", subModule: "Analytics", page: "Member Category Paid", access: "readWrite" }
 ];
 
 export default function UserRightsPage() {
@@ -49,47 +53,60 @@ export default function UserRightsPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (selectedRoleName) {
+      fetchRightsForRole(selectedRoleName);
+    }
+  }, [selectedRoleName]);
+
   async function loadData() {
+    // Populate static User Roles
+    const rolesData = [
+      { roleName: "Admin" },
+      { roleName: "Manager" },
+      { roleName: "User" },
+      { roleName: "Member" }
+    ];
+    setRoles(rolesData);
+    if (rolesData.length > 0) {
+      setSelectedRoleName(rolesData[0].roleName);
+    }
+  }
+
+  async function fetchRightsForRole(roleName) {
     setLoading(true);
     try {
-      const rolesData = await GetRoles();
-      setRoles(rolesData);
-      
-      if (rolesData.length > 0) {
-        setSelectedRoleName(rolesData[0].roleName);
-      }
-
-      // Populate local storage rights and align with the current defaultRows schema
-      const savedRights = localStorage.getItem("projectRightsConfig");
-      let rightsMap = savedRights ? JSON.parse(savedRights) : {};
-      
-      rolesData.forEach(role => {
-        const existingRows = rightsMap[role.roleName] || [];
-        // Map current defaultRows. If a row exists by page/subModule/module name, preserve its access.
-        rightsMap[role.roleName] = defaultRows.map(defRow => {
-          const match = existingRows.find(
-            r => r.page === defRow.page || 
-                 (r.subModule === defRow.subModule && r.module === defRow.module) ||
-                 r.id === defRow.id
+      const serverRights = await GetUserRights(roleName);
+      // Align with defaultRows to handle any schema discrepancies
+      const alignedRights = defaultRows.map(defRow => {
+        let match = serverRights.find(r => r.page === defRow.page);
+        
+        // Fallback for transition from single 'Reports' to split reports
+        if (!match && defRow.module === "Reports") {
+          match = serverRights.find(r => r.page === "Reports");
+        }
+        
+        if (!match) {
+          match = serverRights.find(
+            r => r.subModule === defRow.subModule && r.module === defRow.module
           );
-          return {
-            ...defRow,
-            access: match ? match.access : defRow.access
-          };
-        });
-      });
+        }
 
-      localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
-      setRights(rightsMap);
-    } catch (error) {
-      toast.error("Failed to load operational directory");
+        return {
+          ...defRow,
+          access: match ? match.access : defRow.access
+        };
+      });
+      setRights(prev => ({ ...prev, [roleName]: alignedRights }));
+    } catch {
+      toast.error("Failed to load ");
     } finally {
       setLoading(false);
     }
   }
 
   // Update inline radio accessibility state instantly
-  const handleAccessChange = (rowId, newAccess) => {
+  const handleAccessChange = async (rowId, newAccess) => {
     if (!selectedRoleName) return;
 
     const updatedRights = { ...rights };
@@ -100,16 +117,36 @@ export default function UserRightsPage() {
       if (targetRow) {
         targetRow.access = newAccess;
         setRights(updatedRights);
-        localStorage.setItem("projectRightsConfig", JSON.stringify(updatedRights));
 
-        const activeRole = roles.find(r => r.roleName === selectedRoleName);
-        const resourceName = targetRow.subModule || targetRow.page || targetRow.module;
-        
-        let accessLabel = "Read Only";
-        if (newAccess === "readWrite") accessLabel = "Read/Write";
-        if (newAccess === "deny") accessLabel = "Deny";
+        try {
+          const payload = {
+            roleName: selectedRoleName,
+            rights: roleRows.map(r => ({
+              module: r.module,
+              subModule: r.subModule,
+              page: r.page,
+              access: r.access
+            }))
+          };
+          await SaveUserRights(payload);
 
-        toast.success(`Access updated: '${resourceName}' set to '${accessLabel}' for ${activeRole?.roleName}`);
+          // Update local storage so path authorization helper takes effect instantly
+          const savedRights = localStorage.getItem("projectRightsConfig");
+          let rightsMap = savedRights ? JSON.parse(savedRights) : {};
+          rightsMap[selectedRoleName] = roleRows;
+          localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
+
+          const activeRole = roles.find(r => r.roleName === selectedRoleName);
+          const resourceName = targetRow.subModule || targetRow.page || targetRow.module;
+          
+          let accessLabel = "Read Only";
+          if (newAccess === "readWrite") accessLabel = "Read/Write";
+          if (newAccess === "deny") accessLabel = "Deny";
+
+          toast.success("Saved successfully");
+        } catch {
+          toast.error("Failed to save");
+        }
       }
     }
   };
@@ -206,7 +243,7 @@ export default function UserRightsPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="User Rights Configuration"
+        title="User Rights"
         columns={columns}
         data={filteredRows}
         loading={loading}

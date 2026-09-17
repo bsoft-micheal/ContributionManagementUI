@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { FormControlLabel, Switch, Typography, Box, IconButton, Tooltip } from "@mui/material";
-import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon } from "@mui/icons-material";
+import { FormControlLabel, Checkbox, Typography, Box, IconButton, Tooltip } from "@mui/material";
+import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon, Delete as DeleteIcon, ToggleOn as ToggleOnIcon, ToggleOff as ToggleOffIcon } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -9,9 +9,19 @@ import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
-import { GetEventTypes, CreateEventType, UpdateEventType } from "../../services/eventTypeService";
+import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import AppSwitch from "../../components/common/AppSwitch";
+import { GetEventTypes, CreateEventType, UpdateEventType, DeleteEventType } from "../../services/eventTypeService";
+import { validateForm } from "../../utils/validation";
 
-const initialForm = { eventTypeName: "", isActive: true };
+const formatBaseAmount = (value) => {
+  if (value === undefined || value === null || value === "") return "";
+  const cleanVal = String(value).replace(/[^0-9]/g, "");
+  if (!cleanVal) return "";
+  return Number(cleanVal).toLocaleString("en-US");
+};
+
+const initialForm = { eventTypeName: "", isActive: true, baseAmount: 0 };
 
 export default function EventTypesPage() {
   const { authState } = useAuth();
@@ -21,6 +31,10 @@ export default function EventTypesPage() {
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [typeToDelete, setTypeToDelete] = useState(null);
+  const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
+  const [typeToToggle, setTypeToToggle] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
@@ -37,10 +51,12 @@ export default function EventTypesPage() {
   }
 
   async function handleSubmit() {
-    const newErrors = {};
-    if (!form.eventTypeName?.trim()) {
-      newErrors.eventTypeName = "This field is required";
-    }
+    const filed = "This field is required"
+    const schema = {
+      eventTypeName: { required: true, type: "letteronly", min: 2, max: 50, label: filed },
+      baseAmount: { required: true, type: "numberonly", min: 0, max: 1000000, label: filed }
+    };
+    const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -51,15 +67,72 @@ export default function EventTypesPage() {
     try {
       if (form.eventTypeId) {
         await UpdateEventType(form.eventTypeId, form);
-        toast.success("Strategic category updated");
+        toast.success("Saved successfully");
       } else {
         await CreateEventType(form);
-        toast.success("New operational category established");
+        toast.success("Saved successfully");
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error("Failed to synchronize category records");
+      toast.error("Failed to save");
+    }
+  }
+
+  function handleDeleteRequest(id) {
+    setTypeToDelete(id);
+    setDeleteConfirmOpen(true);
+  }
+
+  async function handleConfirmDelete() {
+    if (typeToDelete) {
+      try {
+        await DeleteEventType(typeToDelete);
+        toast.success("Deleted successfully");
+        loadData();
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Failed to delete");
+      } finally {
+        setDeleteConfirmOpen(false);
+        setTypeToDelete(null);
+      }
+    }
+  }
+
+  async function handleToggleStatus(row) {
+    try {
+      const payload = {
+        ...row,
+        isActive: !row.isActive,
+      };
+      await UpdateEventType(row.eventTypeId, payload);
+      toast.success("Status updated successfully");
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? "Failed to update status");
+    }
+  }
+
+  function handleToggleStatusRequest(row) {
+    setTypeToToggle(row);
+    setStatusConfirmOpen(true);
+  }
+
+  async function handleConfirmStatusToggle() {
+    if (!typeToToggle) return;
+    try {
+      const payload = {
+        ...typeToToggle,
+        isActive: !typeToToggle.isActive,
+      };
+      await UpdateEventType(typeToToggle.eventTypeId, payload);
+      toast.success("Category status updated successfully");
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? "Failed to update status");
+    } finally {
+      setStatusConfirmOpen(false);
+      setTypeToToggle(null);
     }
   }
 
@@ -67,16 +140,47 @@ export default function EventTypesPage() {
     {
       label: "Action",
       render: (row) => (
-        <Tooltip title={hasWriteAccess ? "Edit Category" : "Read Only Mode"}>
-          <span>
-            <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}>
-              <EditIcon sx={{ fontSize: "1.1rem", color: hasWriteAccess ? "#4a3f6b" : "#cbd5e1" }} />
-            </IconButton>
-          </span>
-        </Tooltip>
+        <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
+          <Tooltip title={hasWriteAccess ? "Edit Category" : ""}>
+            <span>
+              <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}>
+                <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={hasWriteAccess ? "Delete Category" : ""}>
+            <span>
+              <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => handleDeleteRequest(row.eventTypeId)}>
+                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={hasWriteAccess ? (row.isActive ? "Deactivate Category" : "Activate Category") : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => handleToggleStatusRequest(row)}
+              >
+                {row.isActive ? (
+                  <ToggleOnIcon sx={{ fontSize: "1.25rem", color: hasWriteAccess ? "#10b981" : "#cbd5e1" }} />
+                ) : (
+                  <ToggleOffIcon sx={{ fontSize: "1.25rem", color: hasWriteAccess ? "#ef4444" : "#cbd5e1" }} />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       )
     },
     { label: "Category Name", key: "eventTypeName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.eventTypeName}</Typography> },
+    {
+      label: "Base Amount",
+      key: "baseAmount",
+      align: "right",
+      render: (row) => <Typography variant="body2" fontWeight={700}>₹{(row.baseAmount ?? 0).toLocaleString()}</Typography>
+    },
     {
       label: "Status",
       key: "isActive",
@@ -89,12 +193,11 @@ export default function EventTypesPage() {
             bgcolor: row.isActive ? "rgba(22,163,74,0.08)" : "rgba(100,116,139,0.08)",
             px: 1.2, py: 0.3,
             borderRadius: "3px",
-            textTransform: "uppercase",
             fontSize: "0.7rem",
             letterSpacing: "0.04em"
           }}
         >
-          {row.isActive ? "Active" : "Archived"}
+          {row.isActive ? "Active" : "Inactive"}
         </Typography>
       )
     },
@@ -103,7 +206,7 @@ export default function EventTypesPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Event Classification Registry"
+        title="Manage Event Type"
         columns={columns}
         data={types}
         loading={loading}
@@ -112,6 +215,7 @@ export default function EventTypesPage() {
             size="small"
             variant="contained"
             disabled={!hasWriteAccess}
+            startIcon={<AddIcon />}
             onClick={() => { setForm(initialForm); setErrors({}); setDialogOpen(true); }}
           >
             Add
@@ -122,7 +226,7 @@ export default function EventTypesPage() {
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title={form.eventTypeId ? "Modify Category" : "Add Strategic Category"}
+        title={form.eventTypeId ? "Edit Event Type" : "Add Event Type"}
         actions={
           <>
             <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
@@ -131,31 +235,63 @@ export default function EventTypesPage() {
         }
       >
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <AppInput 
-            label="Event Type Name" 
-            fullWidth 
-            value={form.eventTypeName} 
+          <AppInput
+            label="Event Type"
+            fullWidth
+            value={form.eventTypeName}
             onChange={(e) => {
               setForm(f => ({ ...f, eventTypeName: e.target.value }));
               if (errors.eventTypeName) {
                 setErrors(prev => ({ ...prev, eventTypeName: "" }));
               }
-            }} 
+            }}
+            restrictType="letteronly"
+            maxLength={50}
             error={!!errors.eventTypeName}
             helperText={errors.eventTypeName}
             required
           />
-          <FormControlLabel
-            control={
-              <Switch 
-                checked={form.isActive} 
-                onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))} 
-              />
-            }
-            label={<Typography variant="body2" fontWeight={700}>Visible in Selection Menus</Typography>}
+          <AppInput
+            label="Base Amount"
+            fullWidth
+            value={formatBaseAmount(form.baseAmount)}
+            onChange={(e) => {
+              const rawVal = e.target.value.replace(/[^0-9]/g, "");
+              setForm(f => ({ ...f, baseAmount: rawVal ? Number(rawVal) : 0 }));
+              if (errors.baseAmount) {
+                setErrors(prev => ({ ...prev, baseAmount: "" }));
+              }
+            }}
+            maxLength={15}
+            error={!!errors.baseAmount}
+            helperText={errors.baseAmount}
+            required
           />
+          {form.eventTypeId && (
+            <AppSwitch
+              label="Active Or InActive types"
+              checked={form.isActive}
+              onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))}
+            />
+          )}
         </Box>
       </AppDialog>
+
+      <AppConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Confirm"
+        content="Are you sure you want to delete this record?"
+      />
+
+      <AppConfirmDialog
+        open={statusConfirmOpen}
+        onClose={() => setStatusConfirmOpen(false)}
+        onConfirm={handleConfirmStatusToggle}
+        title="Confirm"
+        content={`Are you sure you want to ${typeToToggle?.isActive ? "deactivate" : "activate"} this category?`}
+      />
     </div>
   );
 }

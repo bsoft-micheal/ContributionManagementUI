@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { Box, Grid, Typography, Card, CardContent, Divider, Chip } from "@mui/material";
+import { Box, Grid, Typography, Card, CardContent, Divider, Chip, Stack } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import { GetMembers } from "../../services/memberService";
 import { GetRoles } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
-import AppDialog from "../../components/common/AppDialog";
-import { GetContributionsByEvent, RecordPayment } from "../../services/contributionService";
-import { GetEvents } from "../../services/eventService";
+import { GetEvents, GetEventById } from "../../services/eventService";
 import { useAppToast } from "../../components/common/AppToast";
 
 export default function ContributionCalculationPage() {
+  const theme = useTheme();
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [events, setEvents] = useState([]);
@@ -19,6 +19,8 @@ export default function ContributionCalculationPage() {
   const [calculationData, setCalculationData] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState("");
   const [filterEventId, setFilterEventId] = useState("");
+  const [selectedEventDetails, setSelectedEventDetails] = useState(null);
+  const [fullShareAmount, setFullShareAmount] = useState(0);
   const toast = useAppToast();
 
   useEffect(() => {
@@ -41,39 +43,77 @@ export default function ContributionCalculationPage() {
         setFilterEventId(evts[0].eventId);
       }
     } catch (error) {
-      console.error("Error loading calculation data:", error);
+      console.error("Failed to load calculation data:", error);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (members.length && roles.length && selectedEventId) {
-      calculateContributions();
+    if (selectedEventId) {
+      loadEventDetails();
     }
-  }, [members, roles, selectedEventId]);
+  }, [selectedEventId]);
+
+  async function loadEventDetails() {
+    setLoading(true);
+    try {
+      const detailedEvent = await GetEventById(selectedEventId);
+      setSelectedEventDetails(detailedEvent);
+    } catch (error) {
+      console.error("Failed to load event details:", error);
+      toast.error("Failed to load event details");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (members.length && selectedEventDetails) {
+      calculateContributions();
+    } else {
+      setCalculationData([]);
+      setFullShareAmount(0);
+    }
+  }, [members, selectedEventDetails]);
 
   const calculateContributions = () => {
-    const selectedEvent = events.find(e => e.eventId === selectedEventId);
-    const eventDate = selectedEvent ? dayjs(selectedEvent.eventDate) : dayjs();
+    const eventDate = dayjs(selectedEventDetails.eventDate);
+    const eventParticipants = selectedEventDetails.participants || [];
 
-    const calculated = members.map(member => {
-      const role = roles.find(r => r.roleId === member.roleId);
-      const joiningDate = dayjs(member.joiningDate);
+    // 1. Identify which members are participants and find their tenure/joining date
+    const enrichedParticipants = eventParticipants.map(ep => {
+      const memberInfo = members.find(m => m.memberId === ep.memberId);
+      const joiningDate = memberInfo ? dayjs(memberInfo.joiningDate) : dayjs();
       const tenureYears = eventDate.diff(joiningDate, 'year', true);
       const isLessThanOneYear = tenureYears < 1;
-      
-      const baseAmount = role?.defaultContributionAmount || 0;
-      const percentage = isLessThanOneYear ? 0.5 : 1.0;
-      const calculatedAmount = baseAmount * percentage;
 
       return {
-        ...member,
-        tenure: tenureYears.toFixed(2),
-        percentage: (percentage * 100).toFixed(0) + "%",
-        baseAmount,
-        calculatedAmount,
-        isLessThanOneYear
+        memberId: ep.memberId,
+        name: ep.memberName || ep.name || (memberInfo ? memberInfo.name : ""),
+        joiningDate: memberInfo ? memberInfo.joiningDate : null,
+        tenure: tenureYears,
+        isLessThanOneYear,
+      };
+    });
+
+    // 2. Count full vs half shares
+    const halfShareCount = enrichedParticipants.filter(p => p.isLessThanOneYear).length;
+    const fullShareCount = enrichedParticipants.length - halfShareCount;
+
+    // 3. Split calculation
+    const totalAmount = selectedEventDetails.baseAmount || 0;
+    const divisor = fullShareCount + 0.5 * halfShareCount;
+    const fullShare = divisor > 0 ? (totalAmount / divisor) : 0;
+    setFullShareAmount(fullShare);
+
+    // 4. Calculate for each participant
+    const calculated = enrichedParticipants.map(p => {
+      const calculatedAmount = p.isLessThanOneYear ? (fullShare * 0.5) : fullShare;
+      return {
+        ...p,
+        tenureFormatted: p.tenure.toFixed(2),
+        calculatedAmount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimals
       };
     });
 
@@ -81,11 +121,31 @@ export default function ContributionCalculationPage() {
   };
 
   const columns = [
-    { label: "Member Name", key: "name", render: (row) => <Typography variant="body2" fontWeight={700}>{row.name}</Typography> },
-    { label: "Joining Date", key: "joiningDate", render: (row) => dayjs(row.joiningDate).format("DD/MM/YYYY") },
-    { label: "Tenure (Yrs)", key: "tenure", align: "right" },
+    { 
+      label: "Member Name", 
+      key: "name", 
+      sx: { minWidth: 160 },
+      cellSx: { minWidth: 160 },
+      render: (row) => <Typography variant="body2" fontWeight={700}>{row.name}</Typography> 
+    },
+    { 
+      label: "Joining Date", 
+      key: "joiningDate", 
+      sx: { minWidth: 120 },
+      cellSx: { minWidth: 120 },
+      render: (row) => row.joiningDate ? dayjs(row.joiningDate).format("DD/MM/YYYY") : "—" 
+    },
+    { 
+      label: "No of Years", 
+      key: "tenureFormatted", 
+      align: "right",
+      sx: { minWidth: 100 },
+      cellSx: { minWidth: 100 }
+    },
     { 
       label: "Rule Applied", 
+      sx: { minWidth: 150 },
+      cellSx: { minWidth: 150 },
       render: (row) => (
         <Chip 
           size="small" 
@@ -96,13 +156,14 @@ export default function ContributionCalculationPage() {
         />
       )
     },
-    { label: "Base Amount", key: "baseAmount", align: "right", render: (row) => `₹${row.baseAmount}` },
     { 
       label: "Final Payable", 
       key: "calculatedAmount", 
       align: "right", 
+      sx: { minWidth: 130 },
+      cellSx: { minWidth: 130 },
       render: (row) => (
-        <Typography variant="body2" fontWeight={900} color="primary.main">
+        <Typography variant="body2" fontWeight={900} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : theme.palette.primary.main }}>
           ₹{row.calculatedAmount}
         </Typography>
       ) 
@@ -112,16 +173,16 @@ export default function ContributionCalculationPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Contribution Calculation Matrix"
+        title="Contribution Calculation"
         columns={columns}
         data={calculationData}
         loading={loading}
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 220 }}>
+          <Grid container spacing={3} alignItems="stretch" justifyContent="space-between">
+            <Grid size={{ xs: 12, lg: 4 }} sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, flexWrap: "wrap", pt: 0.5 }}>
+              <Box sx={{ minWidth: 220, flexGrow: 1 }}>
                 <AppSelect
-                  label="Target Event"
+                  label="Planned Event"
                   value={filterEventId}
                   onChange={(e) => setFilterEventId(e.target.value)}
                   options={events.map(e => ({ label: e.eventName, value: e.eventId }))}
@@ -133,16 +194,15 @@ export default function ContributionCalculationPage() {
                 size="small"
                 onClick={() => {
                   setSelectedEventId(filterEventId);
-                  toast.success("Calculation target updated");
                 }}
                 sx={{
-                  bgcolor: "#4a3f6b !important",
+                  bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
                   color: "#ffffff",
                   height: 34,
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" }
+                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
                 }}
               >
                 Filter
@@ -156,7 +216,6 @@ export default function ContributionCalculationPage() {
                     setFilterEventId(firstEventId);
                     setSelectedEventId(firstEventId);
                   }
-                  toast.success("Filters reset to default");
                 }}
                 sx={{
                   color: "#ef4444",
@@ -171,18 +230,60 @@ export default function ContributionCalculationPage() {
                   }
                 }}
               >
-                × Clear Filter
+                Clear Filter
               </AppButton>
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Box sx={{ p: 1.5, bgcolor: "rgba(108, 92, 231, 0.05)", borderRadius: "8px", border: "1px solid rgba(108, 92, 231, 0.1)" }}>
-                <Typography variant="caption" fontWeight={800} color="primary.main" sx={{ textTransform: "uppercase" }}>
-                  Policy Summary
+            <Grid size={{ xs: 12, lg: 8 }} sx={{ display: "flex", justifyContent: "flex-end", alignItems: "stretch" }}>
+              <Card sx={{ border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === "dark" ? "#171b2d" : "#ffffff", p: 1.5, width: "100%", maxWidth: 840, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ display: "block", mb: 0.8, letterSpacing: "0.05em", fontSize: "0.68rem", textTransform: "uppercase" }}>
+                  Calculation Summary
                 </Typography>
-                <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-                  Members with tenure &lt; 1 year pay 50%. Tenure is calculated relative to the event date.
-                </Typography>
-              </Box>
+                <Grid container spacing={2}>
+                  {/* Column 1: Cost & Participants */}
+                  <Grid size={{ xs: 12, sm: 3.5 }}>
+                    <Stack spacing={0.5}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Event Cost:</Typography>
+                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>₹{selectedEventDetails?.baseAmount || 0}</Typography>
+                      </Box>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Participants:</Typography>
+                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.length}</Typography>
+                      </Box>
+                    </Stack>
+                  </Grid>
+
+                  {/* Column 2: Full/Half share counts */}
+                  <Grid size={{ xs: 12, sm: 4.5 }} sx={{ borderLeft: { xs: "none", sm: `1px solid ${theme.palette.divider}` }, pl: { xs: 0, sm: 2 } }}>
+                    <Stack spacing={0.5}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Full Share Members (100%):</Typography>
+                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => !x.isLessThanOneYear).length}</Typography>
+                      </Box>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Half Share Members (50%):</Typography>
+                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => x.isLessThanOneYear).length}</Typography>
+                      </Box>
+                    </Stack>
+                  </Grid>
+
+                  {/* Column 3: Full Share Amount */}
+                  <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Full Share</Typography>
+                    <Typography variant="body2" fontWeight={900} color="primary.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
+                      ₹{fullShareAmount.toFixed(2)}
+                    </Typography>
+                  </Grid>
+
+                  {/* Column 4: Half Share Amount */}
+                  <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Half Share (New Entrant)</Typography>
+                    <Typography variant="body2" fontWeight={900} color="warning.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
+                      ₹{(fullShareAmount * 0.5).toFixed(2)}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Card>
             </Grid>
           </Grid>
         }

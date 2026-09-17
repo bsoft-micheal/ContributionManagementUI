@@ -1,8 +1,8 @@
 body {
   margin: 0;
-  background: #f5f4fb;
+  background: var(--app-bg);
   min-height: 100vh;
-  color: #1e1a2e;
+  color: var(--app-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -29,35 +29,35 @@ body {
 .calendar-cell {
   min-height: 110px;
   padding: 12px;
-  border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid rgba(74, 63, 107, 0.1);
+  border-radius: 14px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
 }
 
 .calendar-cell:hover {
-  border-color: #4a3f6b;
+  border-color: rgba(124, 58, 237, 0.5);
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(74, 63, 107, 0.12);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
   z-index: 10;
 }
 
 /* ── Text selection ───────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(74, 63, 107, 0.15);
-  color: #4a3f6b;
+  background: rgba(124, 58, 237, 0.18);
+  color: inherit;
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(74, 63, 107, 0.25);
+  background: rgba(124, 58, 237, 0.25);
   border-radius: 20px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(74, 63, 107, 0.45); }
+::-webkit-scrollbar-thumb:hover { background: rgba(124, 58, 237, 0.45); }
 
 /* ── Print styles (for Export→Print) ─────────────────────────────────────── */
 @media print {
