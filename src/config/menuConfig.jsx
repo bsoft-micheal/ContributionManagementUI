@@ -10,6 +10,7 @@ import PersonRemoveRoundedIcon from "@mui/icons-material/PersonRemoveRounded";
 import SettingsSuggestRoundedIcon from "@mui/icons-material/SettingsSuggestRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
 import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
+import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
 import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 import PriorityHighRoundedIcon from "@mui/icons-material/PriorityHighRounded";
@@ -27,6 +28,7 @@ export const navigationItems = [
     id: "master",
     icon: <SettingsSuggestRoundedIcon fontSize="small" />,
     children: [
+      { label: "Roles",                   path: "/roles",        icon: <BadgeRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { label: "Event Types",             path: "/event-types",  icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { label: "Exit Process",            path: "/exit-process", icon: <PersonRemoveRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { label: "User Rights",             path: "/user-rights",  icon: <AdminPanelSettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },

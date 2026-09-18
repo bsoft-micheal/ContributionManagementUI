@@ -32,6 +32,7 @@ const defaultRows = [
   { id: 8, module: "Support Data", subModule: "Clearance", page: "Exit Process", access: "readWrite" },
   { id: 9,  module: "Support Data", subModule: "Admin", page: "User Rights", access: "readWrite" },
   { id: 11, module: "Support Data", subModule: "Admin", page: "Users",       access: "readWrite" },
+  { id: 15, module: "Support Data", subModule: "Admin", page: "Roles",       access: "readWrite" },
 
   // Reports Module
   { id: 10, module: "Reports", subModule: "Analytics", page: "Event Audit", access: "readWrite" },

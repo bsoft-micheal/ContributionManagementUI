@@ -21,7 +21,7 @@ const formatBaseAmount = (value) => {
   return Number(cleanVal).toLocaleString("en-US");
 };
 
-const initialForm = { eventTypeName: "", isActive: true, baseAmount: 0 };
+const initialForm = { eventTypeName: "", isActive: true, baseAmount: "" };
 
 export default function EventTypesPage() {
   const { authState } = useAuth();
@@ -51,10 +51,24 @@ export default function EventTypesPage() {
   }
 
   async function handleSubmit() {
-    const filed = "This field is required"
+    const filed = "This field is required";
     const schema = {
       eventTypeName: { required: true, type: "letteronly", min: 2, max: 50, label: filed },
-      baseAmount: { required: true, type: "numberonly", min: 0, max: 1000000, label: filed }
+      baseAmount: { 
+        required: true, 
+        type: "numberonly", 
+        label: filed,
+        customValidate: (val) => {
+          const num = Number(String(val).replace(/[^0-9]/g, ""));
+          if (val === "" || val === undefined || val === null || num <= 0) {
+            return filed;
+          }
+          if (num > 1000000) {
+            return "Base amount cannot exceed 1,000,000";
+          }
+          return "";
+        }
+      }
     };
     const newErrors = validateForm(form, schema);
 
@@ -65,17 +79,21 @@ export default function EventTypesPage() {
     }
 
     try {
+      const payload = {
+        ...form,
+        baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0)
+      };
       if (form.eventTypeId) {
-        await UpdateEventType(form.eventTypeId, form);
+        await UpdateEventType(form.eventTypeId, payload);
         toast.success("Saved successfully");
       } else {
-        await CreateEventType(form);
+        await CreateEventType(payload);
         toast.success("Saved successfully");
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error("Failed to save");
+      toast.error(error.response?.data?.message || "Failed to save");
     }
   }
 
@@ -230,7 +248,7 @@ export default function EventTypesPage() {
         actions={
           <>
             <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
-            <AppButton variant="text" color="inherit" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
+            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
           </>
         }
       >
@@ -257,7 +275,7 @@ export default function EventTypesPage() {
             value={formatBaseAmount(form.baseAmount)}
             onChange={(e) => {
               const rawVal = e.target.value.replace(/[^0-9]/g, "");
-              setForm(f => ({ ...f, baseAmount: rawVal ? Number(rawVal) : 0 }));
+              setForm(f => ({ ...f, baseAmount: rawVal === "" ? "" : Number(rawVal) }));
               if (errors.baseAmount) {
                 setErrors(prev => ({ ...prev, baseAmount: "" }));
               }
