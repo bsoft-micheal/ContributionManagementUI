@@ -25,7 +25,7 @@ const initialForm = {
   eventTypeId: "",
   eventDate: dayjs(),
   description: "",
-  baseAmount: 0,
+  baseAmount: "",
   participantIds: [],
 };
 
@@ -56,7 +56,7 @@ export default function EventFormDialog({
               eventTypeId: detailedEvent.eventTypeId || "",
               eventDate: detailedEvent.eventDate ? dayjs(detailedEvent.eventDate) : dayjs(),
               description: detailedEvent.description || "",
-              baseAmount: detailedEvent.baseAmount !== undefined && detailedEvent.baseAmount !== null ? String(detailedEvent.baseAmount) : "0",
+              baseAmount: detailedEvent.baseAmount !== undefined && detailedEvent.baseAmount !== null && Number(detailedEvent.baseAmount) > 0 ? String(detailedEvent.baseAmount) : "",
               participantIds: detailedEvent.participantIds || (detailedEvent.participants ? detailedEvent.participants.map(p => p.memberId) : []),
             });
           } catch (error) {
@@ -73,7 +73,7 @@ export default function EventFormDialog({
           eventTypeId: "",
           eventDate: event.eventDate ? dayjs(event.eventDate) : dayjs(),
           description: "",
-          baseAmount: 0,
+          baseAmount: "",
           participantIds: [],
         });
       } else {
@@ -84,27 +84,42 @@ export default function EventFormDialog({
   }, [open, event]);
 
   const calculateBaseAmount = (eventTypeId, eventDate) => {
-    if (!eventTypeId) return 0;
+    if (!eventTypeId) return "";
     const selectedType = eventTypes.find(t => t.eventTypeId === eventTypeId);
-    if (!selectedType) return 0;
+    if (!selectedType) return "";
 
-    const baseVal = selectedType.baseAmount || 0;
+    const typeBase = Number(selectedType.baseAmount) || 0;
 
     if (selectedType.eventTypeName.toLowerCase().includes("birthday")) {
-      if (!eventDate) return 0;
+      if (!eventDate) return "";
       const targetMonth = dayjs(eventDate).month(); // 0-11
       const count = members.filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === targetMonth).length;
-      return count * baseVal;
+      const rate = typeBase > 0 ? typeBase : 500;
+      return count > 0 ? (count * rate) : "";
     }
 
-    return baseVal;
+    return typeBase > 0 ? typeBase : "";
   };
 
   const handleSubmit = async () => {
     const filed = "This field is required";
     const schema = {
       eventName: { required: true, type: "letteronly", min: 3, max: 100, label: filed },
-      baseAmount: { required: true, type: "numberonly", min: 0, max: 1000000, label: filed },
+      baseAmount: { 
+        required: true, 
+        type: "numberonly", 
+        label: filed,
+        customValidate: (val) => {
+          const num = Number(String(val).replace(/[^0-9]/g, ""));
+          if (val === "" || val === undefined || val === null || num <= 0) {
+            return filed;
+          }
+          if (num > 1000000) {
+            return "Base amount cannot exceed 1,000,000";
+          }
+          return "";
+        }
+      },
       eventTypeId: { required: true, label: filed },
       eventDate: { required: true, label: filed },
       participantIds: { required: true, label: filed },
@@ -163,10 +178,14 @@ export default function EventFormDialog({
 
     const targetMonth = dayjs(form.eventDate).month();
     const celebrators = members.filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === targetMonth);
-    if (celebrators.length === 0) return "No birthdays this month";
+    const count = celebrators.length;
+    if (count === 0) return "No birthdays in this month";
     
+    const typeBase = Number(selectedType.baseAmount) || 0;
+    const rate = typeBase > 0 ? typeBase : 500;
+    const total = count * rate;
     const names = celebrators.map(c => c.name).join(", ");
-    return `${names} celebrating birthday`;
+    return `${names} celebrating birthday (${count} celebrant${count > 1 ? "s" : ""} × ₹${rate.toLocaleString()} = ₹${total.toLocaleString()})`;
   };
 
   return (
@@ -188,7 +207,7 @@ export default function EventFormDialog({
           >
             {saving ? "Saving..." : (loading ? "Loading..." : "Save")}
           </AppButton>
-          <AppButton variant="text" color="inherit" onClick={onClose} disabled={saving || loading}>
+          <AppButton variant="outlined" onClick={onClose} disabled={saving || loading}>
             Cancel
           </AppButton>
         </>
@@ -229,7 +248,7 @@ export default function EventFormDialog({
             error={!!errors.baseAmount}
             helperText={errors.baseAmount}
             required
-            disabled={!!form.eventTypeId}
+            disabled={!!form.eventTypeId && Boolean(calculateBaseAmount(form.eventTypeId, form.eventDate))}
           />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>

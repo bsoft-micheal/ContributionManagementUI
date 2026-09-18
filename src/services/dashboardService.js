@@ -2,10 +2,13 @@ import { getApi } from "./apiActions";
 
 export const GetDashboardSummary = async (params) => {
   try {
-    const apiParams = {
-      month: params.month === 0 ? null : params.month,
-      year: params.year === 0 ? null : params.year,
-    };
+    let apiParams = undefined;
+    if (params && (params.month !== undefined || params.year !== undefined)) {
+      apiParams = {
+        month: params.month === 0 ? null : params.month,
+        year: params.year === 0 ? null : params.year,
+      };
+    }
     const result = await getApi("/dashboard/summary", apiParams);
     return result;
   } catch (error) {

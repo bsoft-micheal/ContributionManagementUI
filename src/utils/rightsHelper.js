@@ -32,6 +32,7 @@ export function getRightsForPath(path, roleName) {
     else if (path === "/calendar") targetName = "Calendar";
     else if (path === "/events" || path.startsWith("/events/")) targetName = "Events";
     else if (path === "/event-types") targetName = "Event Types";
+    else if (path === "/roles")       targetName = "Roles";
     else if (path === "/contributions") targetName = "Contributions";
     else if (path === "/contribution-calculation") targetName = "Calculation";
     else if (path === "/reports/event-collection-audit" || path === "/reports") targetName = "Event Audit";

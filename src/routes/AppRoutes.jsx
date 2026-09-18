@@ -18,6 +18,7 @@ import ContributionCalculationPage from "../pages/contributions/ContributionCalc
 import ExitProcessPage from "../pages/members/ExitProcessPage";
 import UserRightsPage from "../pages/members/UserRightsPage";
 import UsersPage from "../pages/members/UsersPage";
+import RolesPage from "../pages/members/RolesPage";
 
 export default function AppRoutes() {
   return (
@@ -35,6 +36,7 @@ export default function AppRoutes() {
       >
         <Route path="/" element={<DashboardPage />} />
         <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
+        <Route path="/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
         <Route path="/event-types" element={<ProtectedRoute><EventTypesPage /></ProtectedRoute>} />
         <Route path="/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
         <Route path="/events/:id" element={<ProtectedRoute><EventDetailsPage /></ProtectedRoute>} />

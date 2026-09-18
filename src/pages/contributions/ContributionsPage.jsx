@@ -92,50 +92,33 @@ export default function ContributionsPage() {
     loadEvents();
   }, []);
 
-  const getContributionOutstanding = (c, member, role, event) => {
-    let expectedAmount = c.amount || 0;
-    if (member && role && event) {
-      const eventDate = dayjs(event.eventDate);
-      const joiningDate = dayjs(member.joiningDate);
-      const tenureYears = eventDate.diff(joiningDate, 'year', true);
-      const isLessThanOneYear = tenureYears < 1;
-
-      const baseAmount = role.defaultContributionAmount || 0;
-      const percentage = isLessThanOneYear ? 0.5 : 1.0;
-      expectedAmount = baseAmount * percentage;
-    }
-
-    const paidAmount = c.paymentStatus === "Paid" ? (c.amount || 0) : 0;
-    return Math.max(0, expectedAmount - paidAmount);
+  const getContributionOutstanding = (c) => {
+    if (!c) return 0;
+    if (c.paymentStatus === "Paid") return 0;
+    return c.amount || 0;
   };
 
   useEffect(() => {
     if (!selectedEventId) {
+      setContributions([]);
       return;
     }
 
     async function loadContributions() {
       try {
         const data = await GetContributionsByEvent(selectedEventId);
-        const selectedEvent = events.find(e => e.eventId === selectedEventId);
 
         const enrichedData = data.map(c => {
-          const member = members.find(m => m.memberId === c.memberId);
-          const role = member ? roles.find(r => r.roleId === member.roleId) : null;
-          const event = events.find(e => e.eventId === c.eventId) || selectedEvent;
-
-          // Calculate Arrears (Sum of unpaid contributions BEFORE this event's date or just other unpaid)
+          // Calculate Arrears: sum of unpaid contributions for this member in other events
           const previousUnpaid = allContributions
             .filter(prev =>
               prev.memberId === c.memberId &&
-              prev.eventId !== c.eventId
+              prev.eventId !== c.eventId &&
+              prev.paymentStatus !== "Paid"
             )
-            .reduce((sum, prev) => {
-              const prevEvent = events.find(e => e.eventId === prev.eventId);
-              return sum + getContributionOutstanding(prev, member, role, prevEvent);
-            }, 0);
+            .reduce((sum, prev) => sum + (prev.amount || 0), 0);
 
-          const currentOutstanding = getContributionOutstanding(c, member, role, event);
+          const currentOutstanding = getContributionOutstanding(c);
 
           return {
             ...c,
@@ -151,10 +134,10 @@ export default function ContributionsPage() {
     }
 
     loadContributions();
-  }, [selectedEventId, allContributions, members, roles, events]);
+  }, [selectedEventId, allContributions]);
 
   async function handlePay() {
-    const filed = "This field is required"
+    const filed = "This field is required";
     const schema = {
       amount: { required: true, type: "numberonly", min: 0, max: 1000000, label: filed },
       paymentMode: { required: true, label: filed },
@@ -174,34 +157,34 @@ export default function ContributionsPage() {
         paymentDate: payment.paymentDate?.toISOString(),
         amount: payment.amount === "" ? null : Number(payment.amount),
       });
-      toast.success("Saved successfully");
+      toast.success("Payment recorded successfully");
       setDialogOpen(false);
 
-      // Reload the lists which automatically triggers the dependency recalculation
-      try {
-        const allData = await GetContributions();
-        setAllContributions(allData);
-      } catch (err) {
-        console.warn("Could not load global contributions for arrears, falling back to local reload:", err);
-        // Fallback: reload this event's contributions directly
-        if (selectedEventId) {
-          const data = await GetContributionsByEvent(selectedEventId);
-          const selectedEvent = events.find(e => e.eventId === selectedEventId);
-          const enrichedData = data.map(c => {
-            const member = members.find(m => m.memberId === c.memberId);
-            const role = member ? roles.find(r => r.roleId === member.roleId) : null;
-            const event = events.find(e => e.eventId === c.eventId) || selectedEvent;
-            return {
-              ...c,
-              previousUnpaid: 0,
-              totalAccumulated: getContributionOutstanding(c, member, role, event)
-            };
-          });
-          setContributions(enrichedData);
-        }
-      }
+      // Reload global and event contributions to update all outstanding balances
+      const allData = await GetContributions();
+      setAllContributions(allData);
+
+      const eventData = await GetContributionsByEvent(selectedEventId);
+      const enriched = eventData.map(c => {
+        const previousUnpaid = allData
+          .filter(prev =>
+            prev.memberId === c.memberId &&
+            prev.eventId !== c.eventId &&
+            prev.paymentStatus !== "Paid"
+          )
+          .reduce((sum, prev) => sum + (prev.amount || 0), 0);
+
+        const currentOutstanding = getContributionOutstanding(c);
+
+        return {
+          ...c,
+          previousUnpaid,
+          totalAccumulated: currentOutstanding + previousUnpaid
+        };
+      });
+      setContributions(enriched);
     } catch (error) {
-      toast.error(error.response?.data?.message ?? "Unable to save.");
+      toast.error(error.response?.data?.message ?? "Unable to save payment.");
     }
   }
 
@@ -250,7 +233,7 @@ export default function ContributionsPage() {
         </Typography>
       )
     },
-    { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{row.amount}</Typography> },
+    { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{(row.amount || 0).toLocaleString()}</Typography> },
     {
       label: "Arrears",
       key: "previousUnpaid",
@@ -258,7 +241,7 @@ export default function ContributionsPage() {
       render: (row) => (
         <Tooltip title="Outstanding from previous cycles">
           <Typography variant="body2" color="error.main" fontWeight={row.previousUnpaid > 0 ? 800 : 400}>
-            ₹{row.previousUnpaid}
+            ₹{(row.previousUnpaid || 0).toLocaleString()}
           </Typography>
         </Tooltip>
       )
@@ -269,7 +252,7 @@ export default function ContributionsPage() {
       align: "right",
       render: (row) => (
         <Typography variant="body2" fontWeight={900} color={theme.palette.mode === "dark" ? "#ffffff" : "primary.main"}>
-          ₹{row.totalAccumulated}
+          ₹{(row.totalAccumulated || 0).toLocaleString()}
         </Typography>
       )
     },
@@ -288,8 +271,12 @@ export default function ContributionsPage() {
               <Box sx={{ minWidth: 220 }}>
                 <AppSelect
                   label="Selected Event"
+                  placeholder="Select an event"
                   value={filterEventId}
-                  onChange={(event) => setFilterEventId(event.target.value)}
+                  onChange={(event) => {
+                    setFilterEventId(event.target.value);
+                    setSelectedEventId(event.target.value);
+                  }}
                   options={eventOptions}
                   fullWidth
                 />
@@ -299,7 +286,6 @@ export default function ContributionsPage() {
                 size="small"
                 onClick={() => {
                   setSelectedEventId(filterEventId);
-
                 }}
                 sx={{
                   bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
@@ -322,7 +308,6 @@ export default function ContributionsPage() {
                     setFilterEventId(firstEventId);
                     setSelectedEventId(firstEventId);
                   }
-
                 }}
                 sx={{
                   color: "#ef4444",
@@ -347,7 +332,7 @@ export default function ContributionsPage() {
                     Total Income
                   </Typography>
                   <Typography variant="body1" fontWeight={900} color="success.main" sx={{ lineHeight: 1 }}>
-                    ₹{contributions.filter(c => c.paymentStatus === "Paid").reduce((sum, c) => sum + c.amount, 0)}
+                    ₹{contributions.filter(c => c.paymentStatus === "Paid").reduce((sum, c) => sum + (c.amount || 0), 0).toLocaleString()}
                   </Typography>
                 </Box>
                 <Box sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)", pl: 3 }}>
@@ -370,18 +355,18 @@ export default function ContributionsPage() {
         title="Record Payment"
         actions={
           <>
-              <AppButton
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={handlePay}
-                sx={{
-                  bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
-                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
-                }}
-              >
-                Save
-              </AppButton>
-            <AppButton variant="text" color="inherit" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
+            <AppButton
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handlePay}
+              sx={{
+                bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
+                "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
+              }}
+            >
+              Save
+            </AppButton>
+            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
           </>
         }
       >

@@ -440,7 +440,7 @@ export default function MembersPage() {
         actions={
           <>
             <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
-            <AppButton variant="text" color="inherit" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
+            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
           </>
         }
       >

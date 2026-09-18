@@ -1,21 +1,37 @@
 import React, { useEffect, useState } from "react";
-import { Grid, Typography, IconButton, Tooltip } from "@mui/material";
-import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon } from "@mui/icons-material";
+import { Grid, Typography, IconButton, Tooltip, Box } from "@mui/material";
+import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon, Delete as DeleteIcon } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
+import { useAuth } from "../../contexts/AuthContext";
+import { getRightsForPage } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
-import { GetRoles, CreateRole, UpdateRole } from "../../services/roleService";
+import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import { GetRoles, CreateRole, UpdateRole, DeleteRole } from "../../services/roleService";
 import { validateForm } from "../../utils/validation";
 
-const initialForm = { roleName: "", defaultContributionAmount: 0 };
+const initialForm = { roleName: "", defaultContributionAmount: "" };
+
+const formatAmount = (value) => {
+  if (value === undefined || value === null || value === "") return "";
+  const cleanVal = String(value).replace(/[^0-9]/g, "");
+  if (!cleanVal) return "";
+  return Number(cleanVal).toLocaleString("en-US");
+};
 
 export default function RolesPage() {
+  const { authState } = useAuth();
+  const rights = getRightsForPage("Roles", authState?.role);
+  const hasWriteAccess = rights.write;
+
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
@@ -28,19 +44,33 @@ export default function RolesPage() {
     setLoading(true);
     try {
       const data = await GetRoles();
-      setRoles(data);
+      setRoles(data || []);
     } catch (error) {
-      toast.error("Failed to load role catalog");
+      toast.error("Failed to load roles");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleSubmit() {
-    const filed = "This field is required"
+    const filed = "This field is required";
     const schema = {
       roleName: { required: true, type: "letteronly", min: 2, max: 50, label: filed },
-      defaultContributionAmount: { required: true, type: "numberonly", min: 0, max: 100000, label: filed }
+      defaultContributionAmount: { 
+        required: true, 
+        type: "numberonly", 
+        label: filed,
+        customValidate: (val) => {
+          const num = Number(String(val).replace(/[^0-9]/g, ""));
+          if (val === "" || val === undefined || val === null || num <= 0) {
+            return filed;
+          }
+          if (num > 1000000) {
+            return "Contribution amount cannot exceed 1,000,000";
+          }
+          return "";
+        }
+      }
     };
     const newErrors = validateForm(form, schema);
 
@@ -51,17 +81,42 @@ export default function RolesPage() {
     }
 
     try {
+      const payload = {
+        ...form,
+        defaultContributionAmount: Number(String(form.defaultContributionAmount).replace(/[^0-9]/g, "") || 0)
+      };
       if (form.roleId) {
-        await UpdateRole(form.roleId, form);
+        await UpdateRole(form.roleId, payload);
         toast.success("Saved successfully");
       } else {
-        await CreateRole(form);
+        await CreateRole(payload);
         toast.success("Saved successfully");
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error("Failed to save");
+      toast.error(error.response?.data?.message || "Failed to save");
+    }
+  }
+
+  function handleDeleteRequest(id) {
+    setRoleToDelete(id);
+    setDeleteConfirmOpen(true);
+  }
+
+  async function handleConfirmDelete() {
+    if (roleToDelete) {
+      try {
+        await DeleteRole(roleToDelete);
+        toast.success("Deleted successfully");
+        loadData();
+      } catch (error) {
+        const errorMsg = error.response?.data?.message || error.response?.data?.title || error.message || "Failed to delete role";
+        toast.error(errorMsg);
+      } finally {
+        setDeleteConfirmOpen(false);
+        setRoleToDelete(null);
+      }
     }
   }
 
@@ -69,21 +124,50 @@ export default function RolesPage() {
     {
       label: "Action",
       render: (row) => (
-        <Tooltip title="Edit Role">
-          <IconButton size="small" sx={{ p: 0.3 }} onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}>
-            <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
+          <Tooltip title={hasWriteAccess ? "Edit Role" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}
+              >
+                <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={hasWriteAccess ? "Delete Role" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => handleDeleteRequest(row.roleId ?? row.RoleId ?? row.id)}
+              >
+                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       )
     },
-    { label: "Role Name", key: "roleName" },
+    {
+      label: "Role Name",
+      key: "roleName",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={700}>
+          {row.roleName}
+        </Typography>
+      )
+    },
     {
       label: "Default Contribution",
       key: "defaultContributionAmount",
       align: "right",
       render: (row) => (
         <Typography variant="body2" fontWeight={700} color="primary.main">
-          ₹{row.defaultContributionAmount || 0}
+          ₹{(row.defaultContributionAmount || 0).toLocaleString()}
         </Typography>
       ),
     },
@@ -92,7 +176,7 @@ export default function RolesPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Manage Employer Role"
+        title="Manage Role"
         columns={columns}
         data={roles}
         loading={loading}
@@ -100,6 +184,7 @@ export default function RolesPage() {
           <AppButton
             size="small"
             variant="contained"
+            disabled={!hasWriteAccess}
             startIcon={<AddIcon />}
             onClick={() => { setForm(initialForm); setErrors({}); setDialogOpen(true); }}
           >
@@ -115,7 +200,7 @@ export default function RolesPage() {
         actions={
           <>
             <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
-            <AppButton variant="text" color="inherit" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
+            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
           </>
         }
       >
@@ -142,14 +227,14 @@ export default function RolesPage() {
             <AppInput 
               label="Contribution" 
               fullWidth 
-              value={form.defaultContributionAmount} 
+              value={formatAmount(form.defaultContributionAmount)} 
               onChange={(e) => {
-                setForm(f => ({ ...f, defaultContributionAmount: e.target.value }));
+                const rawVal = e.target.value.replace(/[^0-9]/g, "");
+                setForm(f => ({ ...f, defaultContributionAmount: rawVal === "" ? "" : Number(rawVal) }));
                 if (errors.defaultContributionAmount) {
                   setErrors(prev => ({ ...prev, defaultContributionAmount: "" }));
                 }
               }} 
-              restrictType="numberonly"
               maxLength={10}
               error={!!errors.defaultContributionAmount}
               helperText={errors.defaultContributionAmount}
@@ -158,6 +243,14 @@ export default function RolesPage() {
           </Grid>
         </Grid>
       </AppDialog>
+
+      <AppConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Confirm"
+        content="Are you sure you want to delete this role?"
+      />
     </div>
   );
 }

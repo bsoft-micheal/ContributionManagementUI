@@ -64,28 +64,36 @@ export default function AppConfirmDialog({
           variant="contained"
           onClick={onConfirm}
           sx={{
-            color: "#fff !important",
+            bgcolor: "#392f5a !important",
+            color: "#ffffff !important",
             textTransform: "none",
-            px: 3,
-            fontSize: "0.95rem"
+            px: 3.5,
+            fontSize: "0.95rem",
+            fontWeight: 700,
+            borderRadius: "8px",
+            "&:hover": {
+              bgcolor: "#2e244d !important",
+            }
           }}
         >
           {confirmText}
         </AppButton>
         <AppButton
-          variant="contained"
+          variant="outlined"
           onClick={onClose}
           sx={{
-            backgroundColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12) !important" : "#dce2e6 !important",
-            color: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#545454 !important",
-            border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+            bgcolor: "transparent !important",
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#334155 !important",
+            border: (theme) => theme.palette.mode === "dark" ? "1.5px solid rgba(255, 255, 255, 0.3) !important" : "1.5px solid #cbd5e1 !important",
             textTransform: "none",
-            px: 3,
+            px: 3.5,
             fontSize: "0.95rem",
+            fontWeight: 700,
+            borderRadius: "8px",
             boxShadow: "none",
             "&:hover": { 
-              backgroundColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2) !important" : "#caced1 !important", 
-              boxShadow: "none" 
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08) !important" : "rgba(0, 0, 0, 0.04) !important", 
+              border: (theme) => theme.palette.mode === "dark" ? "1.5px solid rgba(255, 255, 255, 0.5) !important" : "1.5px solid #94a3b8 !important", 
             },
           }}
         >

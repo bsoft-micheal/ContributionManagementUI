@@ -78,6 +78,12 @@ export default function ContributionCalculationPage() {
   }, [members, selectedEventDetails]);
 
   const calculateContributions = () => {
+    if (!selectedEventDetails) {
+      setCalculationData([]);
+      setFullShareAmount(0);
+      return;
+    }
+
     const eventDate = dayjs(selectedEventDetails.eventDate);
     const eventParticipants = selectedEventDetails.participants || [];
 
@@ -90,7 +96,7 @@ export default function ContributionCalculationPage() {
 
       return {
         memberId: ep.memberId,
-        name: ep.memberName || ep.name || (memberInfo ? memberInfo.name : ""),
+        name: ep.memberName || (memberInfo ? memberInfo.name : ""),
         joiningDate: memberInfo ? memberInfo.joiningDate : null,
         tenure: tenureYears,
         isLessThanOneYear,
@@ -107,12 +113,16 @@ export default function ContributionCalculationPage() {
     const fullShare = divisor > 0 ? (totalAmount / divisor) : 0;
     setFullShareAmount(fullShare);
 
-    // 4. Calculate for each participant
+    // 4. Calculate for each participant (respect existing contribution amounts or default split)
     const calculated = enrichedParticipants.map(p => {
-      const calculatedAmount = p.isLessThanOneYear ? (fullShare * 0.5) : fullShare;
+      const epContribution = selectedEventDetails.contributions?.find(c => c.memberId === p.memberId);
+      const calculatedAmount = (epContribution !== undefined && epContribution !== null)
+        ? epContribution.amount
+        : (p.isLessThanOneYear ? (fullShare * 0.5) : fullShare);
+
       return {
         ...p,
-        tenureFormatted: p.tenure.toFixed(2),
+        tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
         calculatedAmount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimals
       };
     });
@@ -164,7 +174,7 @@ export default function ContributionCalculationPage() {
       cellSx: { minWidth: 130 },
       render: (row) => (
         <Typography variant="body2" fontWeight={900} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : theme.palette.primary.main }}>
-          ₹{row.calculatedAmount}
+          ₹{(row.calculatedAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </Typography>
       ) 
     },
@@ -183,8 +193,12 @@ export default function ContributionCalculationPage() {
               <Box sx={{ minWidth: 220, flexGrow: 1 }}>
                 <AppSelect
                   label="Planned Event"
+                  placeholder="Select an event"
                   value={filterEventId}
-                  onChange={(e) => setFilterEventId(e.target.value)}
+                  onChange={(e) => {
+                    setFilterEventId(e.target.value);
+                    setSelectedEventId(e.target.value);
+                  }}
                   options={events.map(e => ({ label: e.eventName, value: e.eventId }))}
                   fullWidth
                 />
@@ -244,7 +258,7 @@ export default function ContributionCalculationPage() {
                     <Stack spacing={0.5}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Event Cost:</Typography>
-                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>₹{selectedEventDetails?.baseAmount || 0}</Typography>
+                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>₹{(selectedEventDetails?.baseAmount || 0).toLocaleString()}</Typography>
                       </Box>
                       <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Participants:</Typography>
@@ -271,7 +285,7 @@ export default function ContributionCalculationPage() {
                   <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Full Share</Typography>
                     <Typography variant="body2" fontWeight={900} color="primary.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
-                      ₹{fullShareAmount.toFixed(2)}
+                      ₹{fullShareAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Typography>
                   </Grid>
 
@@ -279,7 +293,7 @@ export default function ContributionCalculationPage() {
                   <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Half Share (New Entrant)</Typography>
                     <Typography variant="body2" fontWeight={900} color="warning.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
-                      ₹{(fullShareAmount * 0.5).toFixed(2)}
+                      ₹{(fullShareAmount * 0.5).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Typography>
                   </Grid>
                 </Grid>

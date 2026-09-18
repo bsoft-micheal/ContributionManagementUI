@@ -191,7 +191,7 @@ export default function ExcelImportDialog({
       actions={
         file ? (
           <>
-            <AppButton variant="text" onClick={handleClear} disabled={loading}>
+            <AppButton variant="outlined" onClick={handleClear} disabled={loading}>
               Upload Different File
             </AppButton>
             <AppButton
@@ -207,7 +207,7 @@ export default function ExcelImportDialog({
             </AppButton>
           </>
         ) : (
-          <AppButton variant="text" onClick={onClose}>
+          <AppButton variant="outlined" onClick={onClose}>
             Cancel
           </AppButton>
         )
