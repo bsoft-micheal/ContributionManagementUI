@@ -19,6 +19,7 @@ import ExitProcessPage from "../pages/members/ExitProcessPage";
 import UserRightsPage from "../pages/members/UserRightsPage";
 import UsersPage from "../pages/members/UsersPage";
 import RolesPage from "../pages/members/RolesPage";
+import SessionHistoryPage from "../pages/auth/SessionHistoryPage";
 
 export default function AppRoutes() {
   return (
@@ -49,6 +50,7 @@ export default function AppRoutes() {
         <Route path="/reports/member-category-paid" element={<ProtectedRoute><ReportsPage mode="member-category" /></ProtectedRoute>} />
         <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
         <Route path="/contribution-calculation" element={<ProtectedRoute><ContributionCalculationPage /></ProtectedRoute>} />
+        <Route path="/session-history" element={<ProtectedRoute><SessionHistoryPage /></ProtectedRoute>} />
         <Route path="/exit-process" element={<ProtectedRoute><ExitProcessPage /></ProtectedRoute>} />
         <Route path="/user-rights" element={<ProtectedRoute roles={["Admin", "Manager"]}><UserRightsPage /></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute roles={["Admin", "Manager"]}><UsersPage /></ProtectedRoute>} />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Box, Card, FormControlLabel, Link, Stack, Switch, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import AppInput from "../../components/common/AppInput";
@@ -17,15 +17,33 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: "admin@teamcontribution.local", password: "Admin@123" });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const { login } = useAuth();
+  const { login, verifyTwoFactor } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useAppToast();
   const [keepSignedIn, setKeepSignedIn] = useState(true);
 
+  // 2FA State
+  const [showOtpField, setShowOtpField] = useState(false);
+  const [otp, setOtp] = useState("");
+
+  // ── Show session-expired toast when redirected by idle timer ─────────────────
+  useEffect(() => {
+    if (location.state?.sessionExpired) {
+      toast.warning("You were logged out due to inactivity.");
+      // Clear the state so refreshing the page doesn't re-show the message
+      window.history.replaceState({}, document.title);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSubmit(event) {
     event.preventDefault();
     
+    if (showOtpField) {
+      return handleOtpSubmit();
+    }
+
     const newErrors = {};
     if (!form.email?.trim()) newErrors.email = "This field is required";
     if (!form.password?.trim()) newErrors.password = "This field is required";
@@ -38,10 +56,32 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(form);
-      navigate("/");
+      const data = await login(form);
+      if (data?.requiresTwoFactor) {
+        setShowOtpField(true);
+        toast.info("Please check your email for the OTP code.");
+      } else {
+        navigate("/");
+      }
     } catch (error) {
       toast.error(error.response?.data?.message ?? "Unable to login.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleOtpSubmit() {
+    if (!otp || otp.length !== 6) {
+      toast.error("Please enter a valid 6-digit OTP");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await verifyTwoFactor(form.email, otp);
+      navigate("/");
+    } catch (error) {
+      toast.error(error.response?.data?.message ?? "Invalid OTP code.");
     } finally {
       setLoading(false);
     }
@@ -241,78 +281,132 @@ export default function LoginPage() {
             {/* Form */}
             <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
               <Stack spacing={3.2}>
-                <AppInput
-                  label="Email Address"
-                  value={form.email}
-                  onChange={(e) => {
-                    setForm((c) => ({ ...c, email: e.target.value }));
-                    if (errors.email) setErrors((prev) => ({ ...prev, email: "" }));
-                  }}
-                  error={!!errors.email}
-                  helperText={errors.email}
-                  placeholder="Enter Email"
-                  required
-                />
-                
-                <AppInput
-                  label="Password"
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => {
-                    setForm((c) => ({ ...c, password: e.target.value }));
-                    if (errors.password) setErrors((prev) => ({ ...prev, password: "" }));
-                  }}
-                  error={!!errors.password}
-                  helperText={errors.password}
-                  placeholder="Enter Password"
-                  required
-                />
+                {!showOtpField ? (
+                  <>
+                    <AppInput
+                      label="Email Address"
+                      value={form.email}
+                      onChange={(e) => {
+                        setForm((c) => ({ ...c, email: e.target.value }));
+                        if (errors.email) setErrors((prev) => ({ ...prev, email: "" }));
+                      }}
+                      error={!!errors.email}
+                      helperText={errors.email}
+                      placeholder="Enter Email"
+                      required
+                    />
+                    
+                    <AppInput
+                      label="Password"
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => {
+                        setForm((c) => ({ ...c, password: e.target.value }));
+                        if (errors.password) setErrors((prev) => ({ ...prev, password: "" }));
+                      }}
+                      error={!!errors.password}
+                      helperText={errors.password}
+                      placeholder="Enter Password"
+                      required
+                    />
 
-                {/* Controls Row */}
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    width: "100%",
-                    mt: -1,
-                  }}
-                >
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        size="small"
-                        checked={keepSignedIn}
-                        onChange={(e) => setKeepSignedIn(e.target.checked)}
+                    {/* Controls Row */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        width: "100%",
+                        mt: -1,
+                      }}
+                    >
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            size="small"
+                            checked={keepSignedIn}
+                            onChange={(e) => setKeepSignedIn(e.target.checked)}
+                            sx={{
+                              "& .MuiSwitch-switchBase.Mui-checked": { color: "#7c3aed" },
+                              "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#7c3aed" },
+                            }}
+                          />
+                        }
+                        label="Remember Password ?"
                         sx={{
-                          "& .MuiSwitch-switchBase.Mui-checked": { color: "#7c3aed" },
-                          "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#7c3aed" },
+                          "& .MuiFormControlLabel-label": {
+                            fontSize: "0.78rem",
+                            fontWeight: 600,
+                            color: "text.secondary",
+                          },
                         }}
                       />
-                    }
-                    label="Remember Password ?"
-                    sx={{
-                      "& .MuiFormControlLabel-label": {
-                        fontSize: "0.78rem",
-                        fontWeight: 600,
-                        color: "text.secondary",
-                      },
-                    }}
-                  />
-                  <Link
-                    component={RouterLink}
-                    to="/forgot-password"
-                    sx={{
-                      fontSize: "0.78rem",
-                      fontWeight: 700,
-                      color: "#7c3aed",
-                      textDecoration: "none",
-                      "&:hover": { textDecoration: "underline" },
-                    }}
-                  >
-                    Forgot Password ?
-                  </Link>
-                </Box>
+                      <Link
+                        component={RouterLink}
+                        to="/forgot-password"
+                        sx={{
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          color: "#7c3aed",
+                          textDecoration: "none",
+                          "&:hover": { textDecoration: "underline" },
+                        }}
+                      >
+                        Forgot Password ?
+                      </Link>
+                    </Box>
+                  </>
+                ) : (
+                  <>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 600, mb: 1.5, textAlign: "left" }}>
+                        Enter the 6-digit code from your Authenticator App:
+                      </Typography>
+                      <Box sx={{ display: "flex", gap: { xs: 1, sm: 1.5 }, justifyContent: "space-between" }}>
+                        {Array(6).fill(0).map((_, i) => (
+                          <input
+                            key={i}
+                            id={`otp-input-${i}`}
+                            type="text"
+                            maxLength={1}
+                            value={otp[i] || ""}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, "");
+                              let newOtp = otp.split("");
+                              if (val) {
+                                newOtp[i] = val;
+                                setOtp(newOtp.join(""));
+                                if (i < 5) document.getElementById(`otp-input-${i + 1}`).focus();
+                              } else {
+                                newOtp[i] = "";
+                                setOtp(newOtp.join(""));
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Backspace" && !otp[i] && i > 0) {
+                                document.getElementById(`otp-input-${i - 1}`).focus();
+                              }
+                            }}
+                            style={{
+                              width: "100%",
+                              aspectRatio: "1",
+                              textAlign: "center",
+                              fontSize: "1.5rem",
+                              fontWeight: "bold",
+                              borderRadius: "12px",
+                              border: "2px solid rgba(124, 58, 237, 0.2)",
+                              outline: "none",
+                              backgroundColor: "transparent",
+                              color: "inherit"
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = "#7c3aed"}
+                            onBlur={(e) => e.target.style.borderColor = "rgba(124, 58, 237, 0.2)"}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  </>
+                )}
 
                 {/* Submit Button */}
                 <AppButton
@@ -342,8 +436,37 @@ export default function LoginPage() {
                     transition: "all 0.2s ease",
                   }}
                 >
-                  {loading ? "Signing in..." : "LOGIN"}
+                  {loading ? (showOtpField ? "Verifying..." : "Signing in...") : (showOtpField ? "VERIFY OTP" : "LOGIN")}
                 </AppButton>
+
+                {/* Back to Login Button for OTP step */}
+                {showOtpField && (
+                  <AppButton
+                    type="button"
+                    variant="outlined"
+                    size="large"
+                    disabled={loading}
+                    fullWidth
+                    onClick={() => {
+                      setShowOtpField(false);
+                      setOtp("");
+                    }}
+                    sx={{
+                      mt: 1.5,
+                      py: 1.1,
+                      fontSize: "0.82rem",
+                      borderRadius: "8px",
+                      borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(231, 235, 247, 0.2)" : "rgba(74, 63, 107, 0.2)",
+                      color: "text.primary",
+                      "&:hover": {
+                        borderColor: "#7c3aed",
+                        bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.08)" : "rgba(124, 58, 237, 0.04)",
+                      },
+                    }}
+                  >
+                    BACK TO LOGIN
+                  </AppButton>
+                )}
               </Stack>
             </Box>
 
