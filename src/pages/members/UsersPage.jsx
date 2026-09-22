@@ -123,7 +123,7 @@ export default function UsersPage() {
       const usersData = await GetUsersAsync();
       setUsers(usersData);
     } catch {
-      toast.error("Failed to load user directory");
+      toast.error("Failed to load users");
     } finally {
       setLoading(false);
     }
@@ -467,7 +467,7 @@ export default function UsersPage() {
     <div className="page-shell">
       {/* ── Data Table ────────────────────────────────────────────────────── */}
       <AppDataTable
-        title="User Directory"
+        title="User"
         columns={columns}
         data={filteredUsers}
         loading={loading}

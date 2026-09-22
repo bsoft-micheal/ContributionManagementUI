@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Card, FormControlLabel, Link, Stack, Switch, Typography } from "@mui/material";
+import { Alert, Box, Card, FormControlLabel, Link, Stack, Switch, Typography, IconButton, InputAdornment } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
@@ -8,6 +8,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import logo from "../../assets/logo.png";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
@@ -22,6 +23,7 @@ export default function LoginPage() {
   const location = useLocation();
   const toast = useAppToast();
   const [keepSignedIn, setKeepSignedIn] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   // 2FA State
   const [showOtpField, setShowOtpField] = useState(false);
@@ -59,7 +61,7 @@ export default function LoginPage() {
       const data = await login(form);
       if (data?.requiresTwoFactor) {
         setShowOtpField(true);
-        toast.info("Please check your email for the OTP code.");
+        toast.info("Please check OTP code in Autnenticator app.");
       } else {
         navigate("/");
       }
@@ -298,7 +300,7 @@ export default function LoginPage() {
                     
                     <AppInput
                       label="Password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={form.password}
                       onChange={(e) => {
                         setForm((c) => ({ ...c, password: e.target.value }));
@@ -308,6 +310,30 @@ export default function LoginPage() {
                       helperText={errors.password}
                       placeholder="Enter Password"
                       required
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              size="small"
+                              onClick={() => setShowPassword((prev) => !prev)}
+                              onMouseDown={(e) => e.preventDefault()}
+                              edge="end"
+                              sx={{
+                                color: (theme) =>
+                                  theme.palette.mode === "dark"
+                                    ? "rgba(255, 255, 255, 0.7)"
+                                    : "text.secondary",
+                              }}
+                            >
+                              {showPassword ? (
+                                <VisibilityOff sx={{ fontSize: "1.15rem" }} />
+                              ) : (
+                                <Visibility sx={{ fontSize: "1.15rem" }} />
+                              )}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
                     />
 
                     {/* Controls Row */}

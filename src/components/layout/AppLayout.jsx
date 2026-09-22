@@ -19,7 +19,6 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import SaveIcon from "@mui/icons-material/Save";
-import DevicesIcon from "@mui/icons-material/Devices";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../contexts/AuthContext";
@@ -410,24 +409,6 @@ export default function AppLayout() {
               }}
               >
               <LogoutRoundedIcon sx={{ fontSize: "1.1rem" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Session History">
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/session-history");
-              }}
-              sx={{
-                color: SIDEBAR.text,
-                p: 0.8,
-                borderRadius: "6px",
-                "&:hover": { bgcolor: SIDEBAR.hover, color: theme.palette.mode === "dark" ? "#e7ebf7" : "#ffffff" },
-                transition: "all 0.2s ease",
-              }}
-            >
-              <DevicesIcon sx={{ fontSize: "1.05rem" }} />
             </IconButton>
           </Tooltip>
           <Tooltip title={isDark ? "Switch to Day Theme" : "Switch to Night Theme"}>

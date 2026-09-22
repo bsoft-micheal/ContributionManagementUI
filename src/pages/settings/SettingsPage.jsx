@@ -81,6 +81,7 @@ import {
   getSystemSettingsAsync,
   updateSystemSettingsAsync,
   resetSystemSettingsAsync,
+  updateSystemSettings,
 } from "../../services/settingsService";
 
 const initialSettings = {
