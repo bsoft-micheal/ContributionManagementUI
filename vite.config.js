@@ -6,7 +6,8 @@ export default defineConfig({
   server: {
     port: 5173,
     watch: {
-      ignored: ["**/.vs/**", "**/.git/**"],
+      // Exclude Visual Studio lock files that cause EBUSY crash on Windows
+      ignored: ["**/.vs/**", "**/src/.vs/**"],
     },
   },
 });
