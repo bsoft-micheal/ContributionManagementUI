@@ -60,7 +60,8 @@ export function AuthProvider({ children }) {
       deviceInfo: getDeviceInfo()
     };
     
-    const { data } = await apiClient.post("/auth/login", payload);
+    const { data: resData } = await apiClient.post("/auth/loginAsync", payload);
+    const data = (resData && resData.data !== undefined) ? resData.data : resData;
     
     // Save fetched menu rights dynamically to local storage for immediate routing and access control enforcement
     if (data.rights && data.role) {
@@ -89,8 +90,9 @@ export function AuthProvider({ children }) {
       deviceInfo: getDeviceInfo()
     };
 
-    const response = await apiClient.post("/auth/verify-2fa", payload);
-    const data = response.data;
+    const response = await apiClient.post("/auth/verify-2faAsync", payload);
+    const resData = response.data;
+    const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
     if (data.rights && data.role) {
       const savedRights = localStorage.getItem("projectRightsConfig");
@@ -114,7 +116,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       if (authState?.token) {
-        await apiClient.post("/device-info/logout");
+        await apiClient.post("/device-info/logoutCurrentSessionAsync");
       }
     } catch (error) {
       console.error("Failed to logout from backend", error);
@@ -131,7 +133,8 @@ export function AuthProvider({ children }) {
       password: profileData.password,
     };
 
-    const { data } = await apiClient.put("/users/profile", payload);
+    const { data: resData } = await apiClient.put("/users/updateProfileAsync", payload);
+    const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
     setAuthState((current) => {
       if (!current) return current;

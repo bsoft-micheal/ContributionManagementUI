@@ -2,7 +2,7 @@ import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
 export const GetMembersAsync = async () => {
   try {
-    const result = await getApi("/members");
+    const result = await getApi("/members/getAllMemberAsync");
     return result;
   } catch (error) {
     console.error('Error fetching members:', error.response?.data || error.message);
@@ -12,7 +12,7 @@ export const GetMembersAsync = async () => {
 
 export const CreateMemberAsync = async (data) => {
   try {
-    const result = await postApi("/members", data);
+    const result = await postApi("/members/saveMemberAsync", data);
     return result;
   } catch (error) {
     console.error('Error creating member:', error.response?.data || error.message);
@@ -22,7 +22,7 @@ export const CreateMemberAsync = async (data) => {
 
 export const UpdateMemberAsync = async (id, data) => {
   try {
-    const result = await putApi(`/members/${id}`, data);
+    const result = await putApi(`/members/updateMemberAsyncById/${id}`, data);
     return result;
   } catch (error) {
     console.error('Error updating member:', error.response?.data || error.message);
@@ -32,7 +32,7 @@ export const UpdateMemberAsync = async (id, data) => {
 
 export const DeleteMemberAsync = async (id) => {
   try {
-    const result = await deleteApi(`/members/${id}`);
+    const result = await deleteApi(`/members/deleteMemberAsyncById/${id}`);
     return result;
   } catch (error) {
     console.error('Error deleting member:', error.response?.data || error.message);
@@ -42,7 +42,7 @@ export const DeleteMemberAsync = async (id) => {
 
 export const CreateMembersBulkAsync = async (data) => {
   try {
-    const result = await postApi("/members/bulk", data);
+    const result = await postApi("/members/saveBulkMemberAsync", data);
     return result;
   } catch (error) {
     console.error('Error creating members in bulk:', error.response?.data || error.message);

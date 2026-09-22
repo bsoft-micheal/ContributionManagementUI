@@ -205,7 +205,8 @@ export default function ReportsPage({ mode }) {
           month: filters.month === 0 ? null : filters.month,
           year: filters.year === 0 ? null : filters.year,
         };
-        const { data } = await apiClient.get("/reports/summary", { params: apiParams });
+        const { data: resData } = await apiClient.get("/reports/getSummaryReportAsync", { params: apiParams });
+        const data = (resData && resData.data !== undefined) ? resData.data : resData;
         setReport(data);
       } finally {
         setLoading(false);

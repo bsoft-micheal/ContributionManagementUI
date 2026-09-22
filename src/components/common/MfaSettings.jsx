@@ -28,8 +28,9 @@ export default function MfaSettings() {
   const fetchDevices = async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get("/mfa/devices");
-      setDevices(res.data);
+      const res = await apiClient.get("/mfa/getDevicesMfaAsync");
+      const data = res.data?.data !== undefined ? res.data.data : res.data;
+      setDevices(Array.isArray(data) ? data : []);
     } catch (err) {
       toast.error("Failed to load MFA devices");
     } finally {
@@ -44,8 +45,9 @@ export default function MfaSettings() {
   const handleStartSetup = async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get("/mfa/setup");
-      setSetupData(res.data);
+      const res = await apiClient.get("/mfa/setupMfaAsync");
+      const data = res.data?.data !== undefined ? res.data.data : res.data;
+      setSetupData(data);
     } catch (err) {
       toast.error("Failed to start MFA setup");
     } finally {
@@ -61,7 +63,7 @@ export default function MfaSettings() {
 
     try {
       setLoading(true);
-      await apiClient.post("/mfa/verify-setup", {
+      await apiClient.post("/mfa/verifySetupMfaAsync", {
         secretKey: setupData.secretKey,
         deviceLabel: verifyForm.deviceLabel || "Authenticator App",
         otp: verifyForm.otp,
@@ -81,7 +83,7 @@ export default function MfaSettings() {
   const handleRemoveDevice = async (id) => {
     try {
       setLoading(true);
-      await apiClient.delete(`/mfa/devices/${id}`);
+      await apiClient.delete(`/mfa/removeDeviceMfaAsync/${id}`);
       toast.success("Device removed");
       fetchDevices();
     } catch (err) {

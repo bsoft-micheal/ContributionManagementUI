@@ -9,7 +9,7 @@ export const GetDashboardSummaryAsync = async (params) => {
         year: params.year === 0 ? null : params.year,
       };
     }
-    const result = await getApi("/dashboard/summary", apiParams);
+    const result = await getApi("/dashboard/getSummaryDashboardAsync", apiParams);
     return result;
   } catch (error) {
     console.error('Error fetching dashboard summary:', error.response?.data || error.message);
