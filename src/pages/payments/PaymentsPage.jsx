@@ -429,7 +429,7 @@ export default function PaymentsPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Manage Payment Transactions"
+        title="Payment History"
         columns={columns}
         data={filteredTransactions}
         loading={loading}
@@ -447,6 +447,7 @@ export default function PaymentsPage() {
                   options={memberOptions}
                   size="small"
                   placeholder="Select Member"
+                  required
                   fullWidth
                 />
               </Box>
@@ -458,6 +459,7 @@ export default function PaymentsPage() {
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
+                  required
                   fullWidth
                 />
               </Box>
@@ -469,6 +471,7 @@ export default function PaymentsPage() {
                   options={modeOptions}
                   size="small"
                   placeholder="Payment Mode"
+                  required
                   fullWidth
                 />
               </Box>
@@ -480,6 +483,7 @@ export default function PaymentsPage() {
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
+                  required
                   fullWidth
                 />
               </Box>
@@ -489,6 +493,7 @@ export default function PaymentsPage() {
                   value={filterDate}
                   onChange={(newVal) => setFilterDate(newVal)}
                   size="small"
+                  required
                 />
               </Box>
               <AppButton

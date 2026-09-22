@@ -6,6 +6,7 @@ import {
   IconButton,
   Tooltip,
   Stack,
+  Chip,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -13,6 +14,8 @@ import {
   Visibility as ViewIcon,
   Add as AddIcon,
   CloudUploadOutlined as CloudUploadIcon,
+  DeleteOutline as DeleteOutlineIcon,
+  AddPhotoAlternate as AddPhotoAlternateIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -43,6 +46,7 @@ const initialForm = {
   category: "",
   takenDate: dayjs(),
   imageUrl: "",
+  imageUrls: [],
   description: "",
 };
 
@@ -174,10 +178,135 @@ export default function GalleryPage() {
       category: row.category || "",
       takenDate: row.takenDate ? dayjs(row.takenDate) : dayjs(),
       imageUrl: row.imageUrl || "",
+      imageUrls: row.imageUrl ? [row.imageUrl] : [],
       description: row.description || "",
     });
     setErrors({});
     setDialogOpen(true);
+  };
+
+  const handleMultipleImageUpload = (files) => {
+    if (!files || files.length === 0) return;
+
+    const currentImages = form.imageUrls || (form.imageUrl ? [form.imageUrl] : []);
+    const availableSlots = 5 - currentImages.length;
+
+    if (availableSlots <= 0) {
+      toast.error("Maximum 5 images allowed. Please remove an image before adding more.");
+      return;
+    }
+
+    const fileList = Array.from(files);
+
+    // Only allow up to available slots
+    let filesToProcess = fileList;
+    if (fileList.length > availableSlots) {
+      toast.warning(`Maximum limit is 5 images. Selecting first ${availableSlots} image(s).`);
+      filesToProcess = fileList.slice(0, availableSlots);
+    }
+
+    // Validate image format and total size (Max 10MB)
+    const MAX_BATCH_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+    let totalSize = 0;
+
+    for (const file of filesToProcess) {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`"${file.name}" is not a supported image file.`);
+        return;
+      }
+      if (file.size > MAX_BATCH_SIZE_BYTES) {
+        toast.error(`"${file.name}" exceeds the 10MB size limit (${(file.size / (1024 * 1024)).toFixed(1)}MB).`);
+        return;
+      }
+      totalSize += file.size;
+    }
+
+    if (totalSize > MAX_BATCH_SIZE_BYTES) {
+      toast.error(`Selected images total ${(totalSize / (1024 * 1024)).toFixed(1)}MB, which exceeds the 10MB limit.`);
+      return;
+    }
+
+    let processedCount = 0;
+    const optimizedUrls = [];
+
+    filesToProcess.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (uploadEvt) => {
+        const rawDataUrl = uploadEvt.target.result;
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          const optimizedUrl = canvas.toDataURL("image/jpeg", 0.82);
+          optimizedUrls.push(optimizedUrl);
+          processedCount++;
+          if (processedCount === filesToProcess.length) {
+            appendOptimizedImages(optimizedUrls);
+          }
+        };
+        img.onerror = () => {
+          optimizedUrls.push(rawDataUrl);
+          processedCount++;
+          if (processedCount === filesToProcess.length) {
+            appendOptimizedImages(optimizedUrls);
+          }
+        };
+        img.src = rawDataUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    const appendOptimizedImages = (newUrls) => {
+      setForm((prev) => {
+        const existing = prev.imageUrls || (prev.imageUrl ? [prev.imageUrl] : []);
+        const merged = [...existing, ...newUrls].slice(0, 5);
+        return {
+          ...prev,
+          imageUrls: merged,
+          imageUrl: merged[0] || "",
+        };
+      });
+      if (errors.imageUrl) setErrors((prev) => ({ ...prev, imageUrl: "" }));
+      toast.success(`${newUrls.length} image(s) attached successfully!`);
+    };
+  };
+
+  const handleRemoveImageIndex = (indexToRemove, e) => {
+    e.stopPropagation();
+    setForm((prev) => {
+      const updated = (prev.imageUrls || []).filter((_, idx) => idx !== indexToRemove);
+      return {
+        ...prev,
+        imageUrls: updated,
+        imageUrl: updated[0] || "",
+      };
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleClearAllImages = (e) => {
+    e.stopPropagation();
+    setForm((prev) => ({
+      ...prev,
+      imageUrls: [],
+      imageUrl: "",
+    }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleDeleteRequest = (row) => {
@@ -207,7 +336,14 @@ export default function GalleryPage() {
     if (!form.title || !form.title.trim()) newErrors.title = "Title is required";
     if (!form.eventName) newErrors.eventName = "Event is required";
     if (!form.category) newErrors.category = "Category is required";
-    if (!form.imageUrl || !form.imageUrl.trim()) newErrors.imageUrl = "Image URL or photo upload is required";
+    
+    const currentImages = (form.imageUrls && form.imageUrls.length > 0)
+      ? form.imageUrls
+      : (form.imageUrl ? [form.imageUrl] : []);
+
+    if (currentImages.length === 0) {
+      newErrors.imageUrl = "Please upload at least 1 image file (up to 5 images, max 10MB)";
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -216,17 +352,36 @@ export default function GalleryPage() {
     }
 
     try {
-      const payload = {
-        title: form.title,
-        eventName: form.eventName,
-        category: form.category,
-        imageUrl: form.imageUrl,
-        takenDate: form.takenDate ? form.takenDate.toISOString() : new Date().toISOString(),
-        description: form.description || "",
-      };
+      if (editingPhoto) {
+        const payload = {
+          title: form.title,
+          eventName: form.eventName,
+          category: form.category,
+          imageUrl: currentImages[0],
+          takenDate: form.takenDate ? form.takenDate.toISOString() : new Date().toISOString(),
+          description: form.description || "",
+        };
+        await createGalleryPhoto(payload);
+        toast.success("Photo updated successfully!");
+      } else {
+        for (let i = 0; i < currentImages.length; i++) {
+          const payload = {
+            title: currentImages.length > 1 ? `${form.title} (${i + 1})` : form.title,
+            eventName: form.eventName,
+            category: form.category,
+            imageUrl: currentImages[i],
+            takenDate: form.takenDate ? form.takenDate.toISOString() : new Date().toISOString(),
+            description: form.description || "",
+          };
+          await createGalleryPhoto(payload);
+        }
+        toast.success(
+          currentImages.length > 1
+            ? `${currentImages.length} photos added successfully!`
+            : "Photo added successfully!"
+        );
+      }
 
-      await createGalleryPhoto(payload);
-      toast.success(editingPhoto ? "Photo updated successfully!" : "Photo added successfully!");
       setDialogOpen(false);
       setEditingPhoto(null);
       setForm(initialForm);
@@ -277,8 +432,8 @@ export default function GalleryPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                          ? "rgba(255,255,255,0.3)"
+                          : "#cbd5e1",
                   }}
                 />
               </IconButton>
@@ -301,8 +456,8 @@ export default function GalleryPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                          ? "rgba(255,255,255,0.3)"
+                          : "#cbd5e1",
                   }}
                 />
               </IconButton>
@@ -393,7 +548,7 @@ export default function GalleryPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Manage Gallery Photos"
+        title="Gallery"
         columns={columns}
         data={filteredPhotos}
         loading={loading}
@@ -426,6 +581,7 @@ export default function GalleryPage() {
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
+                  required
                   fullWidth
                 />
               </Box>
@@ -437,6 +593,7 @@ export default function GalleryPage() {
                   options={categoryOptions}
                   size="small"
                   placeholder="Select Category"
+                  required
                   fullWidth
                 />
               </Box>
@@ -503,7 +660,7 @@ export default function GalleryPage() {
           setEditingPhoto(null);
           setErrors({});
         }}
-        title={editingPhoto ? "Edit Gallery Photo" : "Add Gallery Photo"}
+        title={editingPhoto ? "Edit Photo" : "Add Photos"}
         maxWidth="md"
         actions={
           <Stack direction="row" spacing={1.5}>
@@ -579,20 +736,6 @@ export default function GalleryPage() {
             />
           </Grid>
           <Grid size={{ xs: 12 }}>
-            <AppInput
-              label="Image URL"
-              placeholder="https://images.unsplash.com/..."
-              value={form.imageUrl}
-              onChange={(e) => {
-                setForm((c) => ({ ...c, imageUrl: e.target.value }));
-                if (errors.imageUrl) setErrors((p) => ({ ...p, imageUrl: "" }));
-              }}
-              error={!!errors.imageUrl}
-              helperText={errors.imageUrl}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12 }}>
             <AppTextArea
               label="Description"
               placeholder="Enter photo or moment description..."
@@ -602,83 +745,246 @@ export default function GalleryPage() {
             />
           </Grid>
           <Grid size={{ xs: 12 }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mb: 0.5, display: "block" }}>
-              Upload Image File
-            </Typography>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: errors.imageUrl ? "error.main" : "text.secondary" }}>
+                Upload Images (Max 5 images, up to 10MB) <Box component="span" sx={{ color: "error.main" }}>*</Box>
+              </Typography>
+              {form.imageUrls && form.imageUrls.length > 0 && (
+                <Chip
+                  label={`${form.imageUrls.length} of 5 uploaded`}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: "0.65rem",
+                    fontWeight: 800,
+                    bgcolor: form.imageUrls.length === 5 ? "rgba(22, 163, 74, 0.12)" : "rgba(74, 63, 107, 0.12)",
+                    color: form.imageUrls.length === 5 ? "#16a34a" : "#4a3f6b",
+                  }}
+                />
+              )}
+            </Box>
             <input
               type="file"
               ref={fileInputRef}
               accept="image/*"
+              multiple
               style={{ display: "none" }}
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (uploadEvt) => {
-                    const rawDataUrl = uploadEvt.target.result;
-                    const img = new Image();
-                    img.onload = () => {
-                      const maxDim = 1200;
-                      let width = img.width;
-                      let height = img.height;
-                      if (width > maxDim || height > maxDim) {
-                        if (width > height) {
-                          height = Math.round((height * maxDim) / width);
-                          width = maxDim;
-                        } else {
-                          width = Math.round((width * maxDim) / height);
-                          height = maxDim;
-                        }
-                      }
-                      const canvas = document.createElement("canvas");
-                      canvas.width = width;
-                      canvas.height = height;
-                      const ctx = canvas.getContext("2d");
-                      ctx.drawImage(img, 0, 0, width, height);
-                      const optimizedUrl = canvas.toDataURL("image/jpeg", 0.82);
-                      setForm((c) => ({ ...c, imageUrl: optimizedUrl }));
-                      if (errors.imageUrl) setErrors((prev) => ({ ...prev, imageUrl: "" }));
-                      toast.success(`Photo "${file.name}" attached successfully!`);
-                    };
-                    img.onerror = () => {
-                      setForm((c) => ({ ...c, imageUrl: rawDataUrl }));
-                      if (errors.imageUrl) setErrors((prev) => ({ ...prev, imageUrl: "" }));
-                      toast.success(`Photo "${file.name}" attached successfully!`);
-                    };
-                    img.src = rawDataUrl;
-                  };
-                  reader.readAsDataURL(file);
-                }
+                handleMultipleImageUpload(e.target.files);
+                e.target.value = "";
               }}
             />
             <Box
               sx={{
                 border: "1.5px dashed",
-                borderColor: (t) =>
-                  t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)",
+                borderColor: errors.imageUrl
+                  ? "error.main"
+                  : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)"),
                 borderRadius: "12px",
-                p: 2,
+                p: form.imageUrls && form.imageUrls.length > 0 ? 1.5 : 2.5,
                 textAlign: "center",
-                cursor: "pointer",
+                cursor: form.imageUrls && form.imageUrls.length > 0 ? "default" : "pointer",
                 transition: "all 0.2s ease",
-                bgcolor: (t) =>
-                  t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.02)",
+                bgcolor: errors.imageUrl
+                  ? "rgba(239, 68, 68, 0.04)"
+                  : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.02)"),
                 "&:hover": {
-                  borderColor: "#4a3f6b",
+                  borderColor: errors.imageUrl ? "error.main" : "#4a3f6b",
                   bgcolor: (t) =>
                     t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.05)",
                 },
               }}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (!form.imageUrls || form.imageUrls.length === 0) {
+                  fileInputRef.current?.click();
+                }
+              }}
             >
-              <CloudUploadIcon sx={{ fontSize: 28, color: "#4a3f6b", mb: 0.5 }} />
-              <Typography variant="caption" sx={{ display: "block", fontWeight: 700, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
-                Click to browse and upload image file from device
-              </Typography>
-              {form.imageUrl && (
-                <Typography variant="caption" sx={{ color: "#10b981", fontWeight: 700, mt: 0.5, display: "block" }}>
-                  ✓ Image loaded ready to save
-                </Typography>
+              {form.imageUrls && form.imageUrls.length > 0 ? (
+                <Box sx={{ width: "100%", position: "relative" }}>
+                  {/* Top Bar inside control */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      mb: 1.5,
+                      pb: 1,
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: "text.primary" }}>
+                      Preview Uploaded Images ({form.imageUrls.length}/5)
+                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {form.imageUrls.length < 5 && (
+                        <AppButton
+                          size="small"
+                          variant="outlined"
+                          startIcon={<AddPhotoAlternateIcon sx={{ fontSize: 16 }} />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fileInputRef.current?.click();
+                          }}
+                          sx={{ fontSize: "0.72rem", height: 26, py: 0, px: 1 }}
+                        >
+                          Add More ({5 - form.imageUrls.length} left)
+                        </AppButton>
+                      )}
+                      <AppButton
+                        size="small"
+                        variant="text"
+                        color="error"
+                        onClick={handleClearAllImages}
+                        sx={{ fontSize: "0.72rem", height: 26, minWidth: "auto", p: 0.5 }}
+                      >
+                        Clear All
+                      </AppButton>
+                    </Box>
+                  </Box>
+
+                  {/* Thumbnails Grid within control */}
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "repeat(2, 1fr)",
+                        sm: form.imageUrls.length === 1 ? "1fr" : "repeat(3, 1fr)",
+                        md: `repeat(${Math.min(form.imageUrls.length + (form.imageUrls.length < 5 ? 1 : 0), 4)}, 1fr)`,
+                      },
+                      gap: 1.5,
+                    }}
+                  >
+                    {form.imageUrls.map((url, idx) => (
+                      <Box
+                        key={idx}
+                        sx={{
+                          position: "relative",
+                          borderRadius: "10px",
+                          overflow: "hidden",
+                          border: "1px solid",
+                          borderColor: "divider",
+                          bgcolor: "background.paper",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                          aspectRatio: "4 / 3",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={url}
+                          alt={`Uploaded Photo ${idx + 1}`}
+                          sx={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+
+                        {/* Number Index Badge */}
+                        <Chip
+                          label={`#${idx + 1}`}
+                          size="small"
+                          sx={{
+                            position: "absolute",
+                            top: 6,
+                            left: 6,
+                            height: 18,
+                            fontSize: "0.62rem",
+                            fontWeight: 800,
+                            bgcolor: "rgba(0,0,0,0.7)",
+                            color: "#ffffff",
+                          }}
+                        />
+
+                        {/* Individual Delete Button */}
+                        <Tooltip title="Remove photo">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleRemoveImageIndex(idx, e)}
+                            sx={{
+                              position: "absolute",
+                              top: 5,
+                              right: 5,
+                              bgcolor: "rgba(239, 68, 68, 0.9)",
+                              color: "#ffffff",
+                              p: 0.4,
+                              "&:hover": {
+                                bgcolor: "#dc2626",
+                                transform: "scale(1.1)",
+                              },
+                              transition: "all 0.2s ease",
+                            }}
+                          >
+                            <DeleteOutlineIcon sx={{ fontSize: 15 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    ))}
+
+                    {/* Add More Tile if < 5 */}
+                    {form.imageUrls.length < 5 && (
+                      <Box
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          fileInputRef.current?.click();
+                        }}
+                        sx={{
+                          border: "1.5px dashed",
+                          borderColor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.25)" : "rgba(74,63,107,0.3)"),
+                          borderRadius: "10px",
+                          aspectRatio: "4 / 3",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          p: 1,
+                          bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.02)"),
+                          transition: "all 0.2s ease",
+                          "&:hover": {
+                            borderColor: "#4a3f6b",
+                            bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(74,63,107,0.06)"),
+                          },
+                        }}
+                      >
+                        <AddPhotoAlternateIcon sx={{ fontSize: 26, color: "#4a3f6b", mb: 0.5 }} />
+                        <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.7rem", color: "text.primary" }}>
+                          Add Photo
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.62rem" }}>
+                          {5 - form.imageUrls.length} slot(s) left
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "#10b981", fontWeight: 700, mt: 1.2, display: "block" }}
+                  >
+                    ✓ {form.imageUrls.length} photo(s) selected and ready to save (Max 5 images, up to 10MB)
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <CloudUploadIcon sx={{ fontSize: 36, color: errors.imageUrl ? "error.main" : "#4a3f6b", mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ display: "block", fontWeight: 700, fontSize: "0.8rem", color: errors.imageUrl ? "error.main" : (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
+                    Click to browse or drop images from device
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block", mt: 0.4 }}>
+                    Select up to 5 images • Maximum 10MB total • JPG, PNG, WebP
+                  </Typography>
+                  {errors.imageUrl && (
+                    <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, mt: 0.6, display: "block" }}>
+                      {errors.imageUrl}
+                    </Typography>
+                  )}
+                </>
               )}
             </Box>
           </Grid>

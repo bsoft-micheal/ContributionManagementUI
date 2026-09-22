@@ -56,9 +56,9 @@ export default function RolesPage() {
     const filed = "This field is required";
     const schema = {
       roleName: { required: true, type: "letteronly", min: 2, max: 50, label: filed },
-      defaultContributionAmount: { 
-        required: true, 
-        type: "numberonly", 
+      defaultContributionAmount: {
+        required: true,
+        type: "numberonly",
         label: filed,
         customValidate: (val) => {
           const num = Number(String(val).replace(/[^0-9]/g, ""));
@@ -176,7 +176,7 @@ export default function RolesPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Manage Role"
+        title="Roles "
         columns={columns}
         data={roles}
         loading={loading}
@@ -206,16 +206,17 @@ export default function RolesPage() {
       >
         <Grid container spacing={3}>
           <Grid size={{ xs: 12 }}>
-            <AppInput 
-              label="Role" 
-              fullWidth 
-              value={form.roleName} 
+            <AppInput
+              label="Role"
+              placeholder="Enter role name"
+              fullWidth
+              value={form.roleName}
               onChange={(e) => {
                 setForm(f => ({ ...f, roleName: e.target.value }));
                 if (errors.roleName) {
                   setErrors(prev => ({ ...prev, roleName: "" }));
                 }
-              }} 
+              }}
               restrictType="letteronly"
               maxLength={50}
               error={!!errors.roleName}
@@ -224,17 +225,18 @@ export default function RolesPage() {
             />
           </Grid>
           <Grid size={{ xs: 12 }}>
-            <AppInput 
-              label="Contribution" 
-              fullWidth 
-              value={formatAmount(form.defaultContributionAmount)} 
+            <AppInput
+              label="Contribution"
+              placeholder="Enter default contribution (₹)"
+              fullWidth
+              value={formatAmount(form.defaultContributionAmount)}
               onChange={(e) => {
                 const rawVal = e.target.value.replace(/[^0-9]/g, "");
                 setForm(f => ({ ...f, defaultContributionAmount: rawVal === "" ? "" : Number(rawVal) }));
                 if (errors.defaultContributionAmount) {
                   setErrors(prev => ({ ...prev, defaultContributionAmount: "" }));
                 }
-              }} 
+              }}
               maxLength={10}
               error={!!errors.defaultContributionAmount}
               helperText={errors.defaultContributionAmount}

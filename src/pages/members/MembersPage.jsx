@@ -219,7 +219,7 @@ export default function MembersPage() {
 
     if (!name) return { error: `Row ${rowNum}: Name is required` };
     if (!/^[a-zA-Z\s]+$/.test(name)) return { error: `Row ${rowNum}: Name must contain only letters` };
-    
+
     if (!email) return { error: `Row ${rowNum}: Email is required` };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: `Row ${rowNum}: Invalid email format` };
 
@@ -266,10 +266,10 @@ export default function MembersPage() {
       }
       const parsed = dayjs(String(val).trim(), ["DD/MM/YYYY", "YYYY-MM-DD", "MM/DD/YYYY", "DD-MM-YYYY"], true);
       if (parsed.isValid()) return parsed;
-      
+
       const looseParsed = dayjs(String(val).trim());
       if (looseParsed.isValid()) return looseParsed;
-      
+
       return null;
     };
 
@@ -363,12 +363,12 @@ export default function MembersPage() {
       key: "roleName",
       render: (row) => (
         <Typography variant="caption" fontWeight={700}
-          sx={{ 
-            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74,63,107,0.08)", 
-            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", 
-            px: 1.2, py: 0.3, 
-            borderRadius: "3px", 
-            fontSize: "0.75rem" 
+          sx={{
+            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74,63,107,0.08)",
+            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+            px: 1.2, py: 0.3,
+            borderRadius: "3px",
+            fontSize: "0.75rem"
           }}
         >
           {row.roleName}
@@ -407,7 +407,7 @@ export default function MembersPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Manage Members Details"
+        title="Members Details"
         columns={columns}
         data={filteredMembers}
         loading={loading}
@@ -456,6 +456,7 @@ export default function MembersPage() {
                   options={[...roleOptions]}
                   size="small"
                   placeholder="Select Role"
+                  required
                   fullWidth
                 />
               </Box>

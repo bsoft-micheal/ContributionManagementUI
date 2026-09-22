@@ -9,6 +9,11 @@ import {
   Divider,
   Stack,
   Switch,
+  Chip,
+  Tooltip,
+  IconButton,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
@@ -24,7 +29,17 @@ import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import dayjs from "dayjs";
+import {
+  validateUpiId,
+  buildUpiPaymentUri,
+  getQrCodeApiUrl,
+  generateQrPngDataUrl,
+} from "../../utils/upiQrHelper";
 
 const defaultPaymentQr = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
@@ -98,7 +113,9 @@ const initialSettings = {
   // Payment QR
   qrReceiverName: "Daniel A",
   qrUpiId: "danielrobertanto604@okicici",
-  qrImage: defaultPaymentQr,
+  qrMode: "generated", // "generated" | "uploaded"
+  qrPreviewAmount: "100",
+  qrImage: null,
 
   // Audit
   enableAuditLogs: true,
@@ -119,7 +136,29 @@ export default function SettingsPage() {
   });
 
   const [lastUpdated, setLastUpdated] = useState(() => dayjs().format("DD MMM YYYY, hh:mm A"));
+  const [qrRefreshKey, setQrRefreshKey] = useState(0);
   const fileInputRef = useRef(null);
+
+  const upiValidation = validateUpiId(settings.qrUpiId);
+  const upiError = !settings.qrUpiId ? "QR UPI ID is required" : (!upiValidation.isValid ? upiValidation.error : "");
+  const receiverError = !settings.qrReceiverName?.trim() ? "QR Receiver Name is required" : "";
+
+  const liveUpiUri = buildUpiPaymentUri({
+    upiId: settings.qrUpiId,
+    receiverName: settings.qrReceiverName,
+    amount: settings.qrPreviewAmount || 100,
+    note: "Contribution Payment",
+  });
+
+  const dynamicQrUrl = settings.qrUpiId
+    ? generateQrPngDataUrl(liveUpiUri, 300)
+    : defaultPaymentQr;
+
+  const copyToClipboard = (text, label) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard!`);
+  };
 
   const handleQrUpload = (e) => {
     const file = e.target.files?.[0];
@@ -131,7 +170,8 @@ export default function SettingsPage() {
     const reader = new FileReader();
     reader.onload = () => {
       handleChange("qrImage", reader.result);
-      toast.success("QR Code image updated successfully!");
+      handleChange("qrMode", "uploaded");
+      toast.success("QR Code image uploaded successfully!");
     };
     reader.readAsDataURL(file);
   };
@@ -142,11 +182,47 @@ export default function SettingsPage() {
       try {
         const data = await getSystemSettings();
         if (data && typeof data === "object") {
-          setSettings((prev) => ({ ...prev, ...data }));
+          const localSaved = localStorage.getItem("cm_system_settings");
+          let localMode = "generated";
+          try {
+            if (localSaved) {
+              const parsed = JSON.parse(localSaved);
+              if (parsed.qrMode) localMode = parsed.qrMode;
+            }
+          } catch (e) {}
+
+          // Filter out old placeholder 'unit1a@okaxis' so it cleanly defaults to danielrobertanto604@okicici
+          const isPlaceholderUpi =
+            !data.qrUpiId ||
+            data.qrUpiId.toLowerCase() === "unit1a@okaxis" ||
+            data.qrUpiId.toLowerCase() === "name@okaxis";
+
+          const isPlaceholderReceiver =
+            !data.qrReceiverName ||
+            data.qrReceiverName.toLowerCase().includes("unit 1a");
+
+          const cleanUpiId = isPlaceholderUpi ? "danielrobertanto604@okicici" : data.qrUpiId;
+          const cleanReceiver = isPlaceholderReceiver ? "Daniel A" : data.qrReceiverName;
+
+          const merged = {
+            ...initialSettings,
+            ...data,
+            qrUpiId: cleanUpiId,
+            qrReceiverName: cleanReceiver,
+            qrMode: localMode,
+          };
+
+          setSettings((prev) => ({
+            ...prev,
+            ...merged,
+          }));
           if (data.modifiedOn || data.createdOn) {
             setLastUpdated(dayjs(data.modifiedOn || data.createdOn).format("DD MMM YYYY, hh:mm A"));
           }
-          localStorage.setItem("cm_system_settings", JSON.stringify({ ...initialSettings, ...data }));
+          localStorage.setItem(
+            "cm_system_settings",
+            JSON.stringify(merged)
+          );
         }
       } catch (err) {
         console.warn("Could not fetch settings from backend, keeping cached settings:", err);
@@ -160,17 +236,58 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
+    if (!settings.qrReceiverName || !settings.qrReceiverName.trim()) {
+      toast.error("QR Receiver Name is required.");
+      return;
+    }
+    const upiCheck = validateUpiId(settings.qrUpiId);
+    if (!upiCheck.isValid) {
+      toast.error(upiCheck.error || "Please enter a valid UPI ID.");
+      return;
+    }
+    if (settings.qrPreviewAmount && (isNaN(Number(settings.qrPreviewAmount)) || Number(settings.qrPreviewAmount) <= 0)) {
+      toast.error("QR Preview Amount must be greater than 0.");
+      return;
+    }
+
+    // Generate scanner QR image URL compatible with backend database and Gmail
+    const scannerQrUrl = getQrCodeApiUrl(liveUpiUri, 300);
+    const isCustomUploaded = settings.qrMode === "uploaded" && settings.qrImage;
+    const effectiveQrImage = isCustomUploaded ? settings.qrImage : scannerQrUrl;
+
+    const payload = {
+      ...settings,
+      qrImage: effectiveQrImage,
+    };
+
     try {
-      const updated = await updateSystemSettings(settings);
-      setSettings(updated);
-      localStorage.setItem("cm_system_settings", JSON.stringify(updated));
+      const updated = await updateSystemSettings(payload);
+      setSettings((prev) => ({
+        ...prev,
+        ...updated,
+        qrImage: effectiveQrImage,
+      }));
+      localStorage.setItem(
+        "cm_system_settings",
+        JSON.stringify({
+          ...settings,
+          ...updated,
+          qrImage: effectiveQrImage,
+        })
+      );
     } catch (err) {
       console.warn("Backend settings update failed, saved locally:", err);
-      localStorage.setItem("cm_system_settings", JSON.stringify(settings));
+      localStorage.setItem(
+        "cm_system_settings",
+        JSON.stringify({
+          ...settings,
+          qrImage: effectiveQrImage,
+        })
+      );
     }
     const now = dayjs().format("DD MMM YYYY, hh:mm A");
     setLastUpdated(now);
-    toast.success("Settings saved successfully!");
+    toast.success("Settings saved! Dynamic UPI QR code updated for emails and Google Pay.");
   };
 
   const handleReset = async () => {
@@ -566,38 +683,84 @@ export default function SettingsPage() {
                   bgcolor: "background.paper",
                 }}
               >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
-                  <Box
-                    sx={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "10px",
-                      bgcolor: "rgba(2, 132, 199, 0.1)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#0284c7",
-                    }}
-                  >
-                    <QrCodeScannerOutlinedIcon fontSize="small" />
-                  </Box>
-                  <Box>
-                    <Typography variant="subtitle2" fontWeight={800}>
-                      Payment QR Settings
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
-                      Configure UPI/QR code for member contributions.
-                    </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box
+                      sx={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: "10px",
+                        bgcolor: "rgba(2, 132, 199, 0.1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#0284c7",
+                      }}
+                    >
+                      <QrCodeScannerOutlinedIcon fontSize="small" />
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle2" fontWeight={800}>
+                        Payment QR Settings
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
+                        Configure UPI/QR code for member contributions.
+                      </Typography>
+                    </Box>
                   </Box>
                 </Box>
 
                 <Stack spacing={2} sx={{ mt: 2 }}>
+                  {/* Mode Selector */}
+                  <Box>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mb: 0.6, display: "block" }}>
+                      QR Code Mode
+                    </Typography>
+                    <ToggleButtonGroup
+                      value={settings.qrMode || "generated"}
+                      exclusive
+                      onChange={(e, val) => {
+                        if (val) handleChange("qrMode", val);
+                      }}
+                      size="small"
+                      fullWidth
+                      sx={{
+                        "& .MuiToggleButton-root": {
+                          py: 0.5,
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          textTransform: "none",
+                          borderRadius: "8px",
+                          "&.Mui-selected": {
+                            bgcolor: "rgba(2, 132, 199, 0.12)",
+                            color: "#0284c7",
+                            borderColor: "#0284c7",
+                          },
+                        },
+                      }}
+                    >
+                      <ToggleButton value="generated">
+                        <AutoAwesomeOutlinedIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                        Dynamic UPI QR
+                      </ToggleButton>
+                      <ToggleButton value="uploaded">
+                        <CloudUploadOutlinedIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                        Uploaded QR
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+
+                  {/* Receiver Name and UPI ID */}
                   <Grid container spacing={1.5}>
                     <Grid size={{ xs: 6 }}>
                       <AppInput
                         label="QR Receiver Name"
                         value={settings.qrReceiverName}
                         onChange={(e) => handleChange("qrReceiverName", e.target.value)}
+                        placeholder="e.g. Daniel A"
+                        required
+                        error={Boolean(receiverError)}
+                        helperText={receiverError}
                       />
                     </Grid>
                     <Grid size={{ xs: 6 }}>
@@ -605,73 +768,291 @@ export default function SettingsPage() {
                         label="QR UPI ID"
                         value={settings.qrUpiId}
                         onChange={(e) => handleChange("qrUpiId", e.target.value)}
+                        placeholder="name@okaxis"
+                        required
+                        error={Boolean(upiError)}
+                        helperText={upiError}
                       />
                     </Grid>
                   </Grid>
 
+                  {/* When Dynamic Mode */}
+                  {(settings.qrMode || "generated") === "generated" ? (
+                    <Box
+                      sx={{
+                        p: 1.5,
+                        borderRadius: "12px",
+                        bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.06)" : "rgba(2, 132, 199, 0.03)"),
+                        border: "1px solid rgba(2, 132, 199, 0.2)",
+                      }}
+                    >
+                      <Grid container spacing={1.5} alignItems="center">
+                        <Grid size={{ xs: 7 }}>
+                          <AppInput
+                            label="Preview Amount (₹)"
+                            value={settings.qrPreviewAmount || "100"}
+                            onChange={(e) => handleChange("qrPreviewAmount", e.target.value)}
+                            restrictType="numberonly"
+                            placeholder="100"
+                          />
+                          <Box sx={{ mt: 1, display: "flex", gap: 0.8 }}>
+                            <AppButton
+                              variant="outlined"
+                              size="small"
+                              startIcon={<RefreshOutlinedIcon sx={{ fontSize: "0.9rem !important" }} />}
+                              onClick={() => {
+                                setQrRefreshKey((k) => k + 1);
+                                toast.info("QR Code regenerated with current amount!");
+                              }}
+                              sx={{ fontSize: "0.68rem", px: 1, py: 0.3 }}
+                            >
+                              Regenerate QR
+                            </AppButton>
+                            <Tooltip title="Copy UPI ID">
+                              <IconButton
+                                size="small"
+                                onClick={() => copyToClipboard(settings.qrUpiId, "UPI ID")}
+                                sx={{ border: "1px solid rgba(2, 132, 199, 0.3)", borderRadius: "8px", p: 0.4 }}
+                              >
+                                <ContentCopyOutlinedIcon sx={{ fontSize: 15, color: "#0284c7" }} />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.8, display: "block" }}>
+                            ⚡ Dynamic QR automatically opens <strong>Google Pay</strong> with receiver and exact contribution amount pre-filled.
+                          </Typography>
+                          <Box sx={{ mt: 1, display: "flex", gap: 0.8, flexWrap: "wrap" }}>
+                            <AppButton
+                              variant="contained"
+                              size="small"
+                              component="a"
+                              href={liveUpiUri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              sx={{
+                                fontSize: "0.7rem",
+                                py: 0.3,
+                                px: 1.2,
+                                bgcolor: "#0284c7",
+                                "&:hover": { bgcolor: "#0369a1" },
+                              }}
+                            >
+                              Test Open in Google Pay
+                            </AppButton>
+                            <AppButton
+                              variant="outlined"
+                              size="small"
+                              onClick={async () => {
+                                try {
+                                  const qrUrl = getQrCodeApiUrl(liveUpiUri, 300);
+                                  await updateSystemSettings({
+                                    ...settings,
+                                    qrImage: qrUrl,
+                                    qrMode: "generated",
+                                  });
+                                  handleChange("qrImage", null);
+                                  handleChange("qrMode", "generated");
+                                  toast.success("Scanner QR image synced to server database! Emails will now show the QR code.");
+                                } catch (e) {
+                                  toast.error("Failed to sync: " + (e.response?.data?.message || e.message));
+                                }
+                              }}
+                              sx={{
+                                fontSize: "0.7rem",
+                                py: 0.3,
+                                px: 1,
+                                borderColor: "#0284c7",
+                                color: "#0284c7",
+                                "&:hover": { bgcolor: "rgba(2, 132, 199, 0.08)" },
+                              }}
+                            >
+                              Sync Scanner Image to Email
+                            </AppButton>
+                          </Box>
+                        </Grid>
+                        <Grid size={{ xs: 5 }} sx={{ textAlign: "center" }}>
+                          <Box
+                            component="img"
+                            src={dynamicQrUrl}
+                            alt="Dynamic UPI QR"
+                            sx={{
+                              width: 96,
+                              height: 96,
+                              borderRadius: "10px",
+                              border: "2px solid #0284c7",
+                              p: 0.6,
+                              bgcolor: "#fff",
+                              display: "block",
+                              margin: "0 auto",
+                              objectFit: "contain",
+                              boxShadow: "0 4px 12px rgba(2, 132, 199, 0.2)",
+                            }}
+                          />
+                          <Chip
+                            label="Scannable with GPay"
+                            size="small"
+                            sx={{
+                              mt: 0.8,
+                              height: 20,
+                              fontSize: "0.62rem",
+                              fontWeight: 800,
+                              bgcolor: "#0284c7",
+                              color: "#ffffff",
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  ) : null}
+
+                  {/* Upload Section */}
                   <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mb: 0.5, display: "block" }}>
-                      QR Code Image
-                    </Typography>
-                    <Grid container spacing={1.5} alignItems="center">
-                      <Grid size={{ xs: 7 }}>
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={handleQrUpload}
-                          accept="image/*"
-                          style={{ display: "none" }}
-                        />
-                        <Box
-                          sx={{
-                            border: "1.5px dashed",
-                            borderColor: (t) => t.palette.divider,
-                            borderRadius: "12px",
-                            p: 1.5,
-                            textAlign: "center",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            "&:hover": { borderColor: "#0284c7", bgcolor: "rgba(2, 132, 199, 0.04)" },
-                          }}
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <CloudUploadOutlinedIcon sx={{ fontSize: 24, color: "#0284c7" }} />
-                          <Typography variant="caption" sx={{ display: "block", fontWeight: 700, fontSize: "0.7rem", mt: 0.3 }}>
-                            Click to upload QR code image
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.65rem" }}>
-                            PNG, JPG up to 2MB
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      <Grid size={{ xs: 5 }} sx={{ textAlign: "center" }}>
-                        <Box
-                          component="img"
-                          src={settings.qrImage || defaultPaymentQr}
-                          alt="QR Code"
-                          sx={{
-                            width: 72,
-                            height: 72,
-                            borderRadius: "8px",
-                            border: (t) => `1px solid ${t.palette.divider}`,
-                            p: 0.5,
-                            bgcolor: "#fff",
-                            display: "block",
-                            margin: "0 auto",
-                            objectFit: "contain",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                          }}
-                        />
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary" }}>
+                        {(settings.qrMode || "generated") === "uploaded"
+                          ? "Upload Custom QR Code Image"
+                          : "Static QR Image (Optional Fallback)"}
+                      </Typography>
+                      {settings.qrImage && (
+                        <Tooltip title="Remove Uploaded Image">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => {
+                              handleChange("qrImage", null);
+                              if (settings.qrMode === "uploaded") {
+                                handleChange("qrMode", "generated");
+                              }
+                              toast.info("Uploaded QR image removed.");
+                            }}
+                            sx={{ p: 0.3 }}
+                          >
+                            <DeleteOutlineOutlinedIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
+
+                    <Box sx={{ width: "100%", mt: 1 }}>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleQrUpload}
+                        accept="image/*"
+                        style={{ display: "none" }}
+                      />
+                      <Box
+                        sx={{
+                          border: "1.5px dashed",
+                          borderColor: (t) => t.palette.divider,
+                          borderRadius: "12px",
+                          p: settings.qrImage ? 2 : 2,
+                          textAlign: "center",
+                          cursor: settings.qrImage ? "default" : "pointer",
+                          transition: "all 0.2s ease",
+                          "&:hover": { borderColor: "#0284c7", bgcolor: "rgba(2, 132, 199, 0.04)" },
+                        }}
+                        onClick={() => {
+                          if (!settings.qrImage) fileInputRef.current?.click();
+                        }}
+                      >
+                        {settings.qrImage ? (
+                          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            <Box
+                              component="img"
+                              src={settings.qrImage}
+                              alt="Uploaded QR Code"
+                              sx={{
+                                width: 90,
+                                height: 90,
+                                borderRadius: "8px",
+                                border: (t) => `1.5px solid ${t.palette.divider}`,
+                                p: 0.6,
+                                bgcolor: "#fff",
+                                display: "block",
+                                margin: "0 auto",
+                                objectFit: "contain",
+                                boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+                              }}
+                            />
+                            <Chip
+                              label={settings.qrMode === "uploaded" ? "Uploaded QR Active" : "Uploaded Image (Fallback)"}
+                              size="small"
+                              sx={{
+                                mt: 1,
+                                height: 20,
+                                fontSize: "0.65rem",
+                                fontWeight: 700,
+                                bgcolor: settings.qrMode === "uploaded" ? "rgba(22, 163, 74, 0.12)" : "rgba(234, 88, 12, 0.12)",
+                                color: settings.qrMode === "uploaded" ? "#16a34a" : "#ea580c",
+                              }}
+                            />
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 1.2 }}>
+                              <AppButton
+                                size="small"
+                                variant="outlined"
+                                startIcon={<CloudUploadOutlinedIcon sx={{ fontSize: 16 }} />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fileInputRef.current?.click();
+                                }}
+                                sx={{ fontSize: "0.72rem", height: 28 }}
+                              >
+                                Change QR Image
+                              </AppButton>
+                              <AppButton
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                startIcon={<DeleteOutlineOutlinedIcon sx={{ fontSize: 16 }} />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleChange("qrImage", null);
+                                  if (settings.qrMode === "uploaded") {
+                                    handleChange("qrMode", "generated");
+                                  }
+                                  toast.info("Uploaded QR image removed.");
+                                  if (fileInputRef.current) fileInputRef.current.value = "";
+                                }}
+                                sx={{ fontSize: "0.72rem", height: 28 }}
+                              >
+                                Remove
+                              </AppButton>
+                            </Box>
+                          </Box>
+                        ) : (
+                          <>
+                            <CloudUploadOutlinedIcon sx={{ fontSize: 26, color: "#0284c7" }} />
+                            <Typography variant="caption" sx={{ display: "block", fontWeight: 700, fontSize: "0.72rem", mt: 0.3 }}>
+                              Click to upload QR code image
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.65rem" }}>
+                              PNG, JPG up to 2MB
+                            </Typography>
+                          </>
+                        )}
+                      </Box>
+                    </Box>
+
+                    {settings.qrImage && (settings.qrMode || "generated") === "generated" && (
+                      <Box sx={{ mt: 1.2, p: 1.2, borderRadius: "8px", bgcolor: "rgba(2, 132, 199, 0.06)", border: "1px dashed rgba(2, 132, 199, 0.3)" }}>
+                        <Typography variant="caption" sx={{ fontSize: "0.68rem", color: "#0369a1", display: "block" }}>
+                          💡 <strong>Dynamic UPI QR Mode Active:</strong> A live, scannable QR code encoding Daniel A ({settings.qrUpiId}) is active. Scanning will automatically redirect to Google Pay.
+                        </Typography>
                         <AppButton
-                          variant="outlined"
                           size="small"
-                          sx={{ mt: 0.8, fontSize: "0.68rem", px: 1, py: 0.2 }}
-                          onClick={() => fileInputRef.current?.click()}
+                          variant="text"
+                          color="error"
+                          onClick={() => {
+                            handleChange("qrImage", null);
+                            toast.info("Uploaded image cleared. Dynamic QR is now active for all emails!");
+                          }}
+                          sx={{ fontSize: "0.67rem", px: 0, py: 0.2, mt: 0.4, textTransform: "none", fontWeight: 700 }}
                         >
-                          Change Image
+                          Clear Uploaded Image & Use Dynamic QR Exclusively
                         </AppButton>
-                      </Grid>
-                    </Grid>
+                      </Box>
+                    )}
                   </Box>
                 </Stack>
               </Card>
@@ -820,10 +1201,10 @@ export default function SettingsPage() {
                   <CheckCircleRoundedIcon sx={{ color: "#16a34a", fontSize: 22, mt: 0.2 }} />
                   <Box>
                     <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }}>
-                      QR Uploaded
+                      Payment QR Configured
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
-                      UPI ID: {settings.qrUpiId}
+                      UPI: {settings.qrUpiId} ({(settings.qrMode || "generated") === "uploaded" && settings.qrImage ? "Uploaded QR" : "Dynamic UPI QR"})
                     </Typography>
                   </Box>
                 </Box>

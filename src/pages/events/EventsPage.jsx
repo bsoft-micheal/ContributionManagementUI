@@ -155,7 +155,7 @@ export default function EventsPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Manage Events"
+        title="Events Details"
         columns={columns}
         data={events}
         actions={
@@ -179,6 +179,8 @@ export default function EventsPage() {
                   value={filterMonth}
                   onChange={(event) => setFilterMonth(Number(event.target.value))}
                   options={monthOptions}
+                  placeholder="Select Month"
+                  required
                 />
               </Box>
               <Box sx={{ minWidth: 120 }}>
@@ -187,6 +189,8 @@ export default function EventsPage() {
                   value={filterYear}
                   onChange={(event) => setFilterYear(Number(event.target.value))}
                   options={yearOptions}
+                  placeholder="Select Year"
+                  required
                 />
               </Box>
               <AppButton

@@ -255,6 +255,7 @@ export default function EventTypesPage() {
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <AppInput
             label="Event Type"
+            placeholder="Enter event type name"
             fullWidth
             value={form.eventTypeName}
             onChange={(e) => {
@@ -271,6 +272,7 @@ export default function EventTypesPage() {
           />
           <AppInput
             label="Base Amount"
+            placeholder="Enter base amount (₹)"
             fullWidth
             value={formatBaseAmount(form.baseAmount)}
             onChange={(e) => {

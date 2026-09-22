@@ -266,15 +266,18 @@ export default function UserRightsPage() {
             <Grid size={{ xs: 12, md: 4 }}>
               <AppSelect
                 label="Role"
+                placeholder="Select Role"
                 value={selectedRoleName}
                 onChange={(e) => setSelectedRoleName(e.target.value)}
                 options={roles.map(r => ({ label: r.roleName, value: r.roleName }))}
+                required
                 fullWidth
               />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <AppSelect
                 label="Sub Module"
+                placeholder="Select Sub Module"
                 value={selectedSubModule}
                 onChange={(e) => setSelectedSubModule(e.target.value)}
                 options={[
@@ -285,6 +288,7 @@ export default function UserRightsPage() {
                   { label: "Support Data", value: "Support Data" },
                   { label: "Reports", value: "Reports" }
                 ]}
+                required
                 fullWidth
               />
             </Grid>

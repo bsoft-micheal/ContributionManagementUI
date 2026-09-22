@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   Avatar,
   Box,
-  Collapse,
   Divider,
   Drawer,
   IconButton,
@@ -10,6 +9,7 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Popover,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -17,8 +17,7 @@ import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
-import ExpandLess from "@mui/icons-material/ExpandLess";
-import ExpandMore from "@mui/icons-material/ExpandMore";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import SaveIcon from "@mui/icons-material/Save";
 import DevicesIcon from "@mui/icons-material/Devices";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -56,8 +55,8 @@ const SIDEBAR = {
 export default function AppLayout() {
   const theme = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [masterOpen, setMasterOpen] = useState(false);
-  const [reportsOpen, setReportsOpen] = useState(false);
+  const [flyoutAnchorEl, setFlyoutAnchorEl] = useState(null);
+  const [activeFlyoutItem, setActiveFlyoutItem] = useState(null);
   const { authState, logout, updateProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -104,15 +103,23 @@ export default function AppLayout() {
   });
   const [profileErrors, setProfileErrors] = useState({});
 
-  // Auto-expand menus based on current path
-  React.useEffect(() => {
-    if (location.pathname.startsWith("/reports") || location.pathname === "/my-contributions") {
-      setReportsOpen(true);
-    } else if (
-      ["/event-types", "/exit-process", "/user-rights", "/users"].includes(location.pathname)
-    ) {
-      setMasterOpen(true);
+  const handleCloseFlyout = () => {
+    setFlyoutAnchorEl(null);
+    setActiveFlyoutItem(null);
+  };
+
+  const handleParentClick = (item, event) => {
+    if (activeFlyoutItem?.id === item.id) {
+      handleCloseFlyout();
+    } else {
+      setFlyoutAnchorEl(event.currentTarget);
+      setActiveFlyoutItem(item);
     }
+  };
+
+  // Close flyout on path change
+  React.useEffect(() => {
+    handleCloseFlyout();
   }, [location.pathname]);
 
   // Sync profileForm with authState when dialog opens
@@ -173,10 +180,30 @@ export default function AppLayout() {
   };
 
   const isChildActive = (item) => {
-    return item.children?.some(child => location.pathname === child.path);
+    return item.children?.some(
+      (child) =>
+        location.pathname === child.path ||
+        (child.path !== "/" && location.pathname.startsWith(child.path + "/"))
+    );
   };
 
-  const renderNavItem = (item, isChild = false) => {
+  const isItemActive = (item) => {
+    if (item.children) {
+      return isChildActive(item);
+    }
+    if (item.path === "/") {
+      return location.pathname === "/";
+    }
+    if (item.path === "/reports") {
+      return location.pathname.startsWith("/reports");
+    }
+    return (
+      location.pathname === item.path ||
+      (item.path !== "/" && location.pathname.startsWith(item.path + "/"))
+    );
+  };
+
+  const renderNavItem = (item) => {
     if (item.adminOnly && authState?.role !== "Admin") return null;
 
     if (item.path) {
@@ -185,57 +212,79 @@ export default function AppLayout() {
     }
 
     if (item.children) {
-      const allChildrenDenied = item.children.every(child => {
+      const visibleChildren = item.children.filter((child) => {
+        if (child.adminOnly && authState?.role !== "Admin") return false;
         const rights = getRightsForPath(child.path, authState?.role);
-        return rights.deny;
+        return !rights.deny;
       });
-      if (allChildrenDenied) return null;
+      if (visibleChildren.length === 0) return null;
 
-      const open = item.id === "master" ? masterOpen : reportsOpen;
+      const isFlyoutOpen = Boolean(flyoutAnchorEl && activeFlyoutItem?.id === item.id);
       const active = isChildActive(item);
 
       return (
-        <React.Fragment key={item.id}>
-          <ListItemButton
-            onClick={() => item.id === "master" ? setMasterOpen(!open) : setReportsOpen(!open)}
+        <ListItemButton
+          key={item.id}
+          onClick={(e) => handleParentClick(item, e)}
+          selected={active || isFlyoutOpen}
+          sx={{
+            borderRadius: "8px",
+            mb: 0.5,
+            py: 0.9,
+            px: 1.5,
+            transition: "all 0.15s ease",
+            "&.Mui-selected": {
+              bgcolor: SIDEBAR.activeBg,
+              borderLeft: `3px solid ${SIDEBAR.active}`,
+              pl: "calc(12px - 3px)",
+              "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
+              "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 700 },
+              "&:hover": { bgcolor: SIDEBAR.activeBg },
+            },
+            "&:not(.Mui-selected)": {
+              borderLeft: "3px solid transparent",
+              color: SIDEBAR.text,
+              "& .MuiListItemIcon-root": { color: SIDEBAR.icon },
+              "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 600 },
+            },
+            "&:hover": { bgcolor: SIDEBAR.hover },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 36, color: active || isFlyoutOpen ? SIDEBAR.activeIcon : SIDEBAR.icon }}>
+            {item.icon}
+          </ListItemIcon>
+          <ListItemText
+            primary={item.label}
+            primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: active || isFlyoutOpen ? 700 : 600 }}
+          />
+          <ChevronRightRoundedIcon
             sx={{
-              borderRadius: "8px",
-              mb: 0.3,
-              py: 0.9,
-              px: 1.5,
-              color: active ? SIDEBAR.activeText : SIDEBAR.text,
-              bgcolor: active ? "rgba(255,255,255,0.02)" : "transparent",
-              "& .MuiListItemIcon-root": { color: active ? SIDEBAR.activeIcon : SIDEBAR.icon },
-              "&:hover": { bgcolor: SIDEBAR.hover },
+              fontSize: "1.15rem",
+              color: active || isFlyoutOpen ? SIDEBAR.activeIcon : SIDEBAR.icon,
+              transform: isFlyoutOpen ? "translateX(2px)" : "none",
+              transition: "transform 0.2s ease, color 0.2s ease",
             }}
-          >
-            <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
-            <ListItemText
-              primary={item.label}
-              primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: active ? 700 : 600 }}
-            />
-            {open ? <ExpandLess sx={{ fontSize: "1rem" }} /> : <ExpandMore sx={{ fontSize: "1rem" }} />}
-          </ListItemButton>
-          <Collapse in={open} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding sx={{ pl: 2.5 }}>
-              {item.children.map((child) => renderNavItem(child, true))}
-            </List>
-          </Collapse>
-        </React.Fragment>
+          />
+        </ListItemButton>
       );
     }
 
-    const active = location.pathname === item.path;
+    const active = isItemActive(item);
     return (
       <ListItemButton
         key={item.path}
-        onClick={() => { navigate(item.path); setMobileOpen(false); }}
+        onClick={() => {
+          handleCloseFlyout();
+          navigate(item.path);
+          setMobileOpen(false);
+        }}
         selected={active}
         sx={{
           borderRadius: "8px",
-          mb: 0.3,
-          py: isChild ? 0.6 : 0.9,
+          mb: 0.5,
+          py: 0.9,
           px: 1.5,
+          transition: "all 0.15s ease",
           "&.Mui-selected": {
             bgcolor: SIDEBAR.activeBg,
             borderLeft: `3px solid ${SIDEBAR.active}`,
@@ -252,12 +301,14 @@ export default function AppLayout() {
           "&:hover": { bgcolor: SIDEBAR.hover },
         }}
       >
-        <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+        <ListItemIcon sx={{ minWidth: 36, color: active ? SIDEBAR.activeIcon : SIDEBAR.icon }}>
+          {item.icon}
+        </ListItemIcon>
         <ListItemText
           primary={item.label}
           primaryTypographyProps={{
-            fontSize: isChild ? "0.82rem" : "0.85rem",
-            fontWeight: isChild ? 500 : 600
+            fontSize: "0.85rem",
+            fontWeight: active ? 700 : 600,
           }}
         />
       </ListItemButton>
@@ -582,6 +633,103 @@ export default function AppLayout() {
           <MfaSettings />
         </Box>
       </AppDialog >
+
+      {/* ── Submodule Flyout Popover (Right Side) ─────────────────────────── */}
+      <Popover
+        open={Boolean(flyoutAnchorEl && activeFlyoutItem)}
+        anchorEl={flyoutAnchorEl}
+        onClose={handleCloseFlyout}
+        anchorOrigin={{
+          vertical: "top",
+          horizontal: "right",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "left",
+        }}
+        slotProps={{
+          backdrop: {
+            invisible: true,
+          },
+          paper: {
+            sx: {
+              ml: 1,
+              bgcolor: SIDEBAR.bg,
+              color: SIDEBAR.text,
+              borderRadius: "12px",
+              boxShadow: theme.palette.mode === "dark"
+                ? "0 14px 40px rgba(0,0,0,0.7), 0 0 1px rgba(255,255,255,0.15)"
+                : "0 14px 40px rgba(18, 14, 34, 0.45), 0 0 1px rgba(255,255,255,0.1)",
+              border: `1px solid ${SIDEBAR.divider}`,
+              minWidth: 190,
+              p: 0.5,
+              backgroundImage: "none",
+            },
+          },
+        }}
+      >
+        {activeFlyoutItem && (
+          <List component="div" disablePadding>
+              {activeFlyoutItem.children
+                ?.filter((child) => {
+                  if (child.adminOnly && authState?.role !== "Admin") return false;
+                  const rights = getRightsForPath(child.path, authState?.role);
+                  return !rights.deny;
+                })
+                .map((child) => {
+                  const childActive = location.pathname === child.path;
+                  return (
+                    <ListItemButton
+                      key={child.path}
+                      onClick={() => {
+                        navigate(child.path);
+                        handleCloseFlyout();
+                        setMobileOpen(false);
+                      }}
+                      selected={childActive}
+                      sx={{
+                        borderRadius: "8px",
+                        mb: 0.3,
+                        py: 0.7,
+                        px: 1.4,
+                        transition: "all 0.15s ease",
+                        "&.Mui-selected": {
+                          bgcolor: SIDEBAR.activeBg,
+                          borderLeft: `3px solid ${SIDEBAR.active}`,
+                          pl: "calc(11.2px - 3px)",
+                          "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
+                          "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 700 },
+                          "&:hover": { bgcolor: SIDEBAR.activeBg },
+                        },
+                        "&:not(.Mui-selected)": {
+                          borderLeft: "3px solid transparent",
+                          color: SIDEBAR.text,
+                          "& .MuiListItemIcon-root": { color: SIDEBAR.icon },
+                          "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 500 },
+                        },
+                        "&:hover": {
+                          bgcolor: SIDEBAR.hover,
+                          "& .MuiListItemText-primary": { color: SIDEBAR.activeText },
+                          "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
+                        },
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32, color: childActive ? SIDEBAR.activeIcon : SIDEBAR.icon }}>
+                        {child.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={child.label}
+                        primaryTypographyProps={{
+                          fontSize: "0.83rem",
+                          fontWeight: childActive ? 700 : 500,
+                        }}
+                      />
+                    </ListItemButton>
+                  );
+                })}
+            </List>
+        )}
+      </Popover>
     </Box >
   );
 }

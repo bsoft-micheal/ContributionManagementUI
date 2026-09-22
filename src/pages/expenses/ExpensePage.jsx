@@ -15,6 +15,7 @@ import {
   Add as AddIcon,
   CloudUploadOutlined as CloudUploadIcon,
   AttachFile as AttachFileIcon,
+  DeleteOutline as DeleteOutlineIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -50,6 +51,7 @@ const initialForm = {
   submittedBy: "",
   status: "Pending",
   fileName: "",
+  filePreview: "",
 };
 
 const statusOptions = [
@@ -216,6 +218,7 @@ export default function ExpensePage() {
       submittedBy: row.submittedBy || "",
       status: row.status || "Pending",
       fileName: row.fileName || "",
+      filePreview: (row.fileName && (row.fileName.startsWith("data:image/") || row.fileName.startsWith("http"))) ? row.fileName : "",
     });
     setErrors({});
     setDialogOpen(true);
@@ -246,8 +249,21 @@ export default function ExpensePage() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      setForm((c) => ({ ...c, fileName: file.name }));
-      toast.info(`Selected bill: ${file.name}`);
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (uploadEvt) => {
+          setForm((c) => ({
+            ...c,
+            fileName: file.name,
+            filePreview: uploadEvt.target.result,
+          }));
+          toast.success(`Image "${file.name}" attached successfully!`);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setForm((c) => ({ ...c, fileName: file.name, filePreview: "" }));
+        toast.info(`Document "${file.name}" attached.`);
+      }
     }
   };
 
@@ -468,7 +484,7 @@ export default function ExpensePage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Manage Expense Details"
+        title="Expense Details"
         columns={columns}
         data={filteredExpenses}
         loading={loading}
@@ -501,6 +517,7 @@ export default function ExpensePage() {
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
+                  required
                   fullWidth
                 />
               </Box>
@@ -512,6 +529,7 @@ export default function ExpensePage() {
                   options={categoryOptions}
                   size="small"
                   placeholder="Select Category"
+                  required
                   fullWidth
                 />
               </Box>
@@ -523,6 +541,7 @@ export default function ExpensePage() {
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
+                  required
                   fullWidth
                 />
               </Box>
@@ -689,6 +708,7 @@ export default function ExpensePage() {
           <Grid size={{ xs: 12, md: 6 }}>
             <AppSelect
               label="Status"
+              placeholder="Select Status"
               value={form.status}
               onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}
               options={[
@@ -733,9 +753,9 @@ export default function ExpensePage() {
                 borderColor: (t) =>
                   t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)",
                 borderRadius: "12px",
-                p: 2,
+                p: form.filePreview ? 1.5 : 2,
                 textAlign: "center",
-                cursor: "pointer",
+                cursor: form.filePreview ? "default" : "pointer",
                 transition: "all 0.2s ease",
                 "&:hover": {
                   borderColor: "#4a3f6b",
@@ -743,18 +763,110 @@ export default function ExpensePage() {
                     t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.04)",
                 },
               }}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (!form.filePreview) fileInputRef.current?.click();
+              }}
             >
-              {form.fileName ? (
-                <>
+              {form.filePreview ? (
+                <Box sx={{ width: "100%", position: "relative" }}>
+                  <Box
+                    component="img"
+                    src={form.filePreview}
+                    alt="Receipt preview"
+                    sx={{
+                      maxHeight: 180,
+                      maxWidth: "100%",
+                      borderRadius: "8px",
+                      objectFit: "contain",
+                      display: "block",
+                      margin: "0 auto",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                      bgcolor: "#00000008",
+                    }}
+                  />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      fontWeight: 700,
+                      color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                      mt: 1,
+                    }}
+                  >
+                    {form.fileName}
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 1.5,
+                      mt: 1,
+                    }}
+                  >
+                    <AppButton
+                      size="small"
+                      variant="outlined"
+                      startIcon={<CloudUploadIcon sx={{ fontSize: 16 }} />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      sx={{ fontSize: "0.75rem", height: 28 }}
+                    >
+                      Change File
+                    </AppButton>
+                    <AppButton
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setForm((c) => ({ ...c, fileName: "", filePreview: "" }));
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      sx={{ fontSize: "0.75rem", height: 28 }}
+                    >
+                      Remove
+                    </AppButton>
+                  </Box>
+                </Box>
+              ) : form.fileName ? (
+                <Box sx={{ py: 0.5 }}>
                   <AttachFileIcon sx={{ fontSize: 28, color: "#4a3f6b", mb: 0.5 }} />
                   <Typography variant="caption" sx={{ display: "block", fontWeight: 700, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
                     Selected: {form.fileName}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
-                    Click to change attachment
-                  </Typography>
-                </>
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mt: 1 }}>
+                    <AppButton
+                      size="small"
+                      variant="outlined"
+                      startIcon={<CloudUploadIcon sx={{ fontSize: 16 }} />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      sx={{ fontSize: "0.75rem", height: 28 }}
+                    >
+                      Change File
+                    </AppButton>
+                    <AppButton
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setForm((c) => ({ ...c, fileName: "", filePreview: "" }));
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      sx={{ fontSize: "0.75rem", height: 28 }}
+                    >
+                      Remove
+                    </AppButton>
+                  </Box>
+                </Box>
               ) : (
                 <>
                   <CloudUploadIcon sx={{ fontSize: 28, color: "#4a3f6b", mb: 0.5 }} />
