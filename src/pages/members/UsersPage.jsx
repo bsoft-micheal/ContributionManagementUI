@@ -39,7 +39,7 @@ import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import { validateForm } from "../../utils/validation";
-import { GetUsers, CreateUser, UpdateUser, DeleteUser, CreateUsersBulk } from "../../services/userService";
+import { GetUsersAsync, CreateUserAsync, UpdateUserAsync, DeleteUserAsync, CreateUsersBulkAsync } from "../../services/userService";
 
 // ─── Role color map ───────────────────────────────────────────────────────────
 const ROLE_COLORS = {
@@ -120,7 +120,7 @@ export default function UsersPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const usersData = await GetUsers();
+      const usersData = await GetUsersAsync();
       setUsers(usersData);
     } catch {
       toast.error("Failed to load user directory");
@@ -205,10 +205,10 @@ export default function UsersPage() {
       };
 
       if (form.userId) {
-        await UpdateUser(form.userId, payload);
+        await UpdateUserAsync(form.userId, payload);
         toast.success("Saved successfully");
       } else {
-        await CreateUser(payload);
+        await CreateUserAsync(payload);
         toast.success("Saved successfully");
       }
       setDialogOpen(false);
@@ -229,7 +229,7 @@ export default function UsersPage() {
   async function handleConfirmDelete() {
     if (!userToDelete) return;
     try {
-      await DeleteUser(userToDelete);
+      await DeleteUserAsync(userToDelete);
       toast.success("Deleted successfully");
       loadData();
     } catch {
@@ -248,7 +248,7 @@ export default function UsersPage() {
         roleName: row.roleName,
         isActive: !row.isActive,
       };
-      await UpdateUser(row.userId, payload);
+      await UpdateUserAsync(row.userId, payload);
       toast.success(`User status updated successfully`);
       loadData();
     } catch (err) {
@@ -270,7 +270,7 @@ export default function UsersPage() {
         roleName: userToToggle.roleName,
         isActive: !userToToggle.isActive,
       };
-      await UpdateUser(userToToggle.userId, payload);
+      await UpdateUserAsync(userToToggle.userId, payload);
       toast.success("User status updated successfully");
       loadData();
     } catch (err) {
@@ -321,7 +321,7 @@ export default function UsersPage() {
     if (!validData || validData.length === 0) return;
     setLoading(true);
     try {
-      await CreateUsersBulk(validData);
+      await CreateUsersBulkAsync(validData);
       toast.success(`Successfully imported all ${validData.length} user(s)!`);
       loadData();
     } catch (err) {

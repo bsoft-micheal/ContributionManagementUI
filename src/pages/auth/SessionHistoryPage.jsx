@@ -34,11 +34,13 @@ export default function SessionHistoryPage() {
     try {
       setLoading(true);
       const [activeRes, historyRes] = await Promise.all([
-        apiClient.get("/device-info/active"),
-        apiClient.get("/device-info/history")
+        apiClient.get("/device-info/getActiveSessionAsync"),
+        apiClient.get("/device-info/getSessionHistoryAsync")
       ]);
-      setActiveSessions(activeRes.data);
-      setLoginHistory(historyRes.data);
+      const activeData = activeRes.data?.data !== undefined ? activeRes.data.data : activeRes.data;
+      const historyData = historyRes.data?.data !== undefined ? historyRes.data.data : historyRes.data;
+      setActiveSessions(Array.isArray(activeData) ? activeData : []);
+      setLoginHistory(Array.isArray(historyData) ? historyData : []);
     } catch (error) {
       console.error(error);
       toast.error("Failed to load session data.");
@@ -54,7 +56,7 @@ export default function SessionHistoryPage() {
 
   const handleLogoutSession = async (historyId) => {
     try {
-      await apiClient.delete(`/device-info/${historyId}`);
+      await apiClient.delete(`/device-info/logoutSessionAsync/${historyId}`);
       toast.success("Session logged out successfully.");
       fetchData(); // Refresh the lists
     } catch (error) {

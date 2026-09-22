@@ -17,9 +17,9 @@ import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
-import { GetEvents, DeleteEvent } from "../../services/eventService";
-import { GetEventTypes } from "../../services/eventTypeService";
-import { GetMembers } from "../../services/memberService";
+import { GetEventsAsync, DeleteEventAsync } from "../../services/eventService";
+import { GetEventTypesAsync } from "../../services/eventTypeService";
+import { GetMembersAsync } from "../../services/memberService";
 import AppDataTable from "../../components/common/AppDataTable";
 import EventFormDialog from "../../components/events/EventFormDialog";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
@@ -47,9 +47,9 @@ export default function EventsPage() {
 
   async function loadData() {
     const [events, types, members] = await Promise.all([
-      GetEvents(filters),
-      GetEventTypes(),
-      GetMembers(),
+      GetEventsAsync(filters),
+      GetEventTypesAsync(),
+      GetMembersAsync(),
     ]);
     setEvents(events);
     setEventTypes(types);
@@ -85,7 +85,7 @@ export default function EventsPage() {
   const handleConfirmDelete = async () => {
     if (eventToDelete) {
       try {
-        await DeleteEvent(eventToDelete.eventId);
+        await DeleteEventAsync(eventToDelete.eventId);
         toast.success("Event deleted successfully");
         loadData();
       } catch (error) {

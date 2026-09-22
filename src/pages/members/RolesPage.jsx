@@ -10,7 +10,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
-import { GetRoles, CreateRole, UpdateRole, DeleteRole } from "../../services/roleService";
+import { GetRolesAsync, CreateRoleAsync, UpdateRoleAsync, DeleteRoleAsync } from "../../services/roleService";
 import { validateForm } from "../../utils/validation";
 
 const initialForm = { roleName: "", defaultContributionAmount: "" };
@@ -43,7 +43,7 @@ export default function RolesPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await GetRoles();
+      const data = await GetRolesAsync();
       setRoles(data || []);
     } catch (error) {
       toast.error("Failed to load roles");
@@ -86,10 +86,10 @@ export default function RolesPage() {
         defaultContributionAmount: Number(String(form.defaultContributionAmount).replace(/[^0-9]/g, "") || 0)
       };
       if (form.roleId) {
-        await UpdateRole(form.roleId, payload);
+        await UpdateRoleAsync(form.roleId, payload);
         toast.success("Saved successfully");
       } else {
-        await CreateRole(payload);
+        await CreateRoleAsync(payload);
         toast.success("Saved successfully");
       }
       setDialogOpen(false);
@@ -107,7 +107,7 @@ export default function RolesPage() {
   async function handleConfirmDelete() {
     if (roleToDelete) {
       try {
-        await DeleteRole(roleToDelete);
+        await DeleteRoleAsync(roleToDelete);
         toast.success("Deleted successfully");
         loadData();
       } catch (error) {

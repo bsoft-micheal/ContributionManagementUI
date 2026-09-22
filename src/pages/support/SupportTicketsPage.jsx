@@ -31,14 +31,14 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import {
-  getSupportTickets,
-  createSupportTicket,
-  updateSupportTicket,
-  replySupportTicket,
-  deleteSupportTicket,
+  getSupportTicketsAsync,
+  createSupportTicketAsync,
+  updateSupportTicketAsync,
+  replySupportTicketAsync,
+  deleteSupportTicketAsync,
 } from "../../services/supportTicketService";
-import { GetMembers } from "../../services/memberService";
-import { GetEvents } from "../../services/eventService";
+import { GetMembersAsync } from "../../services/memberService";
+import { GetEventsAsync } from "../../services/eventService";
 
 const initialForm = {
   memberName: "",
@@ -103,7 +103,7 @@ export default function SupportTicketsPage() {
   const fetchTicketsFromDb = async () => {
     try {
       setLoading(true);
-      const data = await getSupportTickets();
+      const data = await getSupportTicketsAsync();
       if (Array.isArray(data)) {
         const mapped = data.map((item, idx) => ({
           id: item.ticketId
@@ -140,8 +140,8 @@ export default function SupportTicketsPage() {
   const fetchLookupData = async () => {
     try {
       const [membersRes, eventsRes] = await Promise.all([
-        GetMembers().catch(() => []),
-        GetEvents().catch(() => []),
+        GetMembersAsync().catch(() => []),
+        GetEventsAsync().catch(() => []),
       ]);
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
@@ -253,7 +253,7 @@ export default function SupportTicketsPage() {
     const ticketId = ticketToDelete.ticketId || ticketToDelete.id;
 
     try {
-      await deleteSupportTicket(ticketId);
+      await deleteSupportTicketAsync(ticketId);
       toast.success("Support ticket deleted successfully");
       await fetchTicketsFromDb();
     } catch (err) {
@@ -287,7 +287,7 @@ export default function SupportTicketsPage() {
 
       if (editingTicket) {
         const ticketId = editingTicket.ticketId || editingTicket.id;
-        await updateSupportTicket(ticketId, {
+        await updateSupportTicketAsync(ticketId, {
           ticketType: form.ticketType,
           subject: form.subject,
           description: form.description,
@@ -301,7 +301,7 @@ export default function SupportTicketsPage() {
         const nextIdx = tickets.length + 1;
         const newTicketNo = `TKT-2026-${String(nextIdx).padStart(3, "0")}`;
 
-        await createSupportTicket({
+        await createSupportTicketAsync({
           ticketNo: newTicketNo,
           memberName: form.memberName,
           memberId: resolvedMemberId || "",
@@ -336,7 +336,7 @@ export default function SupportTicketsPage() {
     if (selectedTicket) {
       const ticketId = selectedTicket.ticketId || selectedTicket.id;
       try {
-        await replySupportTicket(ticketId, {
+        await replySupportTicketAsync(ticketId, {
           replyMessage: replyText,
           status: replyStatus,
         });

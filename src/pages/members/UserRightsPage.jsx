@@ -10,8 +10,8 @@ import {
 import { useAppToast } from "../../components/common/AppToast";
 import AppSelect from "../../components/common/AppSelect";
 import AppDataTable from "../../components/common/AppDataTable";
-import { GetUserRights, SaveUserRights } from "../../services/userRightsService";
-import { GetRoles } from "../../services/roleService";
+import { GetUserRightsAsync, SaveUserRightsAsync } from "../../services/userRightsService";
+import { GetRolesAsync } from "../../services/roleService";
 
 const defaultRows = [
   // Dashboard Module
@@ -68,7 +68,7 @@ export default function UserRightsPage() {
 
   async function loadData() {
     try {
-      const dbRoles = await GetRoles();
+      const dbRoles = await GetRolesAsync();
       if (Array.isArray(dbRoles) && dbRoles.length > 0) {
         setRoles(dbRoles);
         setSelectedRoleName(dbRoles[0].roleName);
@@ -90,7 +90,7 @@ export default function UserRightsPage() {
   async function fetchRightsForRole(roleName) {
     setLoading(true);
     try {
-      const serverRights = await GetUserRights(roleName);
+      const serverRights = await GetUserRightsAsync(roleName);
       // Align with defaultRows to handle any schema discrepancies
       const alignedRights = defaultRows.map(defRow => {
         let match = serverRights.find(r => r.page === defRow.page);
@@ -142,7 +142,7 @@ export default function UserRightsPage() {
               access: r.access
             }))
           };
-          await SaveUserRights(payload);
+          await SaveUserRightsAsync(payload);
 
           // Update local storage so path authorization helper takes effect instantly
           const savedRights = localStorage.getItem("projectRightsConfig");

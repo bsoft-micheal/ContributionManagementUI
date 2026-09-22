@@ -18,7 +18,7 @@ import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
-import { RequestForgotPasswordOtp } from "../../services/userService";
+import { RequestForgotPasswordOtpAsync } from "../../services/userService";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
 
@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      await RequestForgotPasswordOtp(email.trim());
+      await RequestForgotPasswordOtpAsync(email.trim());
       toast.success("A password reset OTP has been sent to your email!");
       const sentTime = Date.now().toString();
       localStorage.setItem("otp_sent_time", sentTime);

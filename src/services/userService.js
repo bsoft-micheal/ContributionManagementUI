@@ -1,8 +1,8 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetUsers = async () => {
+export const GetUsersAsync = async () => {
   try {
-    const result = await getApi("/users");
+    const result = await getApi("/users/getAllUserAsync");
     return result;
   } catch (error) {
     console.error('Error fetching users:', error.response?.data || error.message);
@@ -10,9 +10,9 @@ export const GetUsers = async () => {
   }
 };
 
-export const CreateUser = async (data) => {
+export const CreateUserAsync = async (data) => {
   try {
-    const result = await postApi("/users", data);
+    const result = await postApi("/users/saveUserAsync", data);
     return result;
   } catch (error) {
     console.error('Error creating user:', error.response?.data || error.message);
@@ -20,9 +20,9 @@ export const CreateUser = async (data) => {
   }
 };
 
-export const UpdateUser = async (id, data) => {
+export const UpdateUserAsync = async (id, data) => {
   try {
-    const result = await putApi(`/users/${id}`, data);
+    const result = await putApi(`/users/updateUserAsyncById/${id}`, data);
     return result;
   } catch (error) {
     console.error('Error updating user:', error.response?.data || error.message);
@@ -30,9 +30,9 @@ export const UpdateUser = async (id, data) => {
   }
 };
 
-export const DeleteUser = async (id) => {
+export const DeleteUserAsync = async (id) => {
   try {
-    const result = await deleteApi(`/users/${id}`);
+    const result = await deleteApi(`/users/deleteUserAsyncById/${id}`);
     return result;
   } catch (error) {
     console.error('Error deleting user:', error.response?.data || error.message);
@@ -40,9 +40,9 @@ export const DeleteUser = async (id) => {
   }
 };
 
-export const CreateUsersBulk = async (data) => {
+export const CreateUsersBulkAsync = async (data) => {
   try {
-    const result = await postApi("/users/bulk", data);
+    const result = await postApi("/users/saveBulkUserAsync", data);
     return result;
   } catch (error) {
     console.error('Error creating users in bulk:', error.response?.data || error.message);
@@ -50,9 +50,9 @@ export const CreateUsersBulk = async (data) => {
   }
 };
 
-export const ResetUserPassword = async (id, data) => {
+export const ResetUserPasswordAsync = async (id, data) => {
   try {
-    const result = await putApi(`/users/${id}/reset-password`, data);
+    const result = await putApi(`/users/updateUserAsyncById/${id}`, data);
     return result;
   } catch (error) {
     console.error('Error resetting user password:', error.response?.data || error.message);
@@ -60,9 +60,9 @@ export const ResetUserPassword = async (id, data) => {
   }
 };
 
-export const RequestForgotPasswordOtp = async (email) => {
+export const RequestForgotPasswordOtpAsync = async (email) => {
   try {
-    const result = await postApi("/auth/forgot-password/request", { email });
+    const result = await postApi("/auth/forgot-password/requestAsync", { email });
     return result;
   } catch (error) {
     console.error('Error requesting forgot password OTP:', error.response?.data || error.message);
@@ -70,9 +70,9 @@ export const RequestForgotPasswordOtp = async (email) => {
   }
 };
 
-export const VerifyForgotPasswordOtp = async (email, otp) => {
+export const VerifyForgotPasswordOtpAsync = async (email, otp) => {
   try {
-    const result = await postApi("/auth/forgot-password/verify", { email, otp });
+    const result = await postApi("/auth/forgot-password/verifyAsync", { email, otp });
     return result;
   } catch (error) {
     console.error('Error verifying forgot password OTP:', error.response?.data || error.message);
@@ -80,9 +80,9 @@ export const VerifyForgotPasswordOtp = async (email, otp) => {
   }
 };
 
-export const ResetPasswordWithOtp = async (email, otp, newPassword) => {
+export const ResetPasswordWithOtpAsync = async (email, otp, newPassword) => {
   try {
-    const result = await postApi("/auth/forgot-password/reset", { email, otp, newPassword });
+    const result = await postApi("/auth/forgot-password/resetAsync", { email, otp, newPassword });
     return result;
   } catch (error) {
     console.error('Error resetting password with OTP:', error.response?.data || error.message);

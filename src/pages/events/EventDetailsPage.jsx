@@ -27,7 +27,8 @@ export default function EventDetailsPage() {
     async function loadData() {
       try {
         setLoading(true);
-        const { data } = await apiClient.get(`/events/${id}`);
+        const { data: resData } = await apiClient.get(`/events/getEventAsyncById/${id}`);
+        const data = (resData && resData.data !== undefined) ? resData.data : resData;
         setEventDetails(data);
       } catch (error) {
         console.error("Failed to load event details", error);

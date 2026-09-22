@@ -31,6 +31,7 @@ import {
   buildPaymentReminderEmailHtml,
 } from "../../utils/upiQrHelper";
 import { SendPaymentReminder } from "../../services/contributionService";
+import { CreateEventAsync, UpdateEventAsync, GetEventByIdAsync } from "../../services/eventService";
 
 // Hardcoded calculation rules as requested
 const RULES = {
@@ -154,7 +155,7 @@ export default function EventFormDialog({
         const fetchDetails = async () => {
           setLoading(true);
           try {
-            const detailedEvent = await GetEventById(event.eventId);
+            const detailedEvent = await GetEventByIdAsync(event.eventId);
             const pIds =
               detailedEvent.participantIds ||
               (detailedEvent.participants ? detailedEvent.participants.map((p) => p.memberId) : []);
@@ -358,7 +359,7 @@ export default function EventFormDialog({
       }
 
       if (form.eventId) {
-        await UpdateEvent(form.eventId, payload);
+        await UpdateEventAsync(form.eventId, payload);
         toast.success("Saved successfully");
       } else {
         // Sync dynamic QR code with per-member contribution amount to backend settings before event creation

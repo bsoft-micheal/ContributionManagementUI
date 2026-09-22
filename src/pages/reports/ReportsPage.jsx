@@ -22,8 +22,8 @@ import AppPieChart from "../../components/common/AppPieChart";
 import { PieChart as PieChartIcon, BarChart as BarChartIcon } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
-import { GetMembers } from "../../services/memberService";
-import { GetContributions } from "../../services/contributionService";
+import { GetMembersAsync } from "../../services/memberService";
+import { GetContributionsAsync } from "../../services/contributionService";
 
 function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
   const theme = useTheme();
@@ -184,12 +184,12 @@ export default function ReportsPage({ mode }) {
       async function loadMemberCategoryData() {
         setLoading(true);
         try {
-          const membersList = await GetMembers();
+          const membersList = await GetMembersAsync();
           setMembers(membersList);
           if (membersList.length > 0) {
             setSelectedMemberId(membersList[0].memberId);
           }
-          const contributionsList = await GetContributions();
+          const contributionsList = await GetContributionsAsync();
           setAllContributions(contributionsList);
         } finally {
           setLoading(false);
@@ -207,7 +207,8 @@ export default function ReportsPage({ mode }) {
           month: filters.month === 0 ? null : filters.month,
           year: filters.year === 0 ? null : filters.year,
         };
-        const { data } = await apiClient.get("/reports/summary", { params: apiParams });
+        const { data: resData } = await apiClient.get("/reports/getSummaryReportAsync", { params: apiParams });
+        const data = (resData && resData.data !== undefined) ? resData.data : resData;
         setReport(data);
       } finally {
         setLoading(false);

@@ -19,7 +19,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DialpadRoundedIcon from "@mui/icons-material/DialpadRounded";
 import TimerRoundedIcon from "@mui/icons-material/TimerRounded";
-import { RequestForgotPasswordOtp, VerifyForgotPasswordOtp } from "../../services/userService";
+import { RequestForgotPasswordOtpAsync, VerifyForgotPasswordOtpAsync } from "../../services/userService";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
 
@@ -130,7 +130,7 @@ export default function ForgotPasswordVerifyPage() {
 
     setLoading(true);
     try {
-      await VerifyForgotPasswordOtp(email, otp.trim());
+      await VerifyForgotPasswordOtpAsync(email, otp.trim());
       toast.success("OTP verified successfully! Please choose a new password.");
       setIsTimerActive(false);
       localStorage.setItem("recovery_otp", otp.trim());
@@ -146,7 +146,7 @@ export default function ForgotPasswordVerifyPage() {
   const handleResendOtp = async () => {
     setLoading(true);
     try {
-      await RequestForgotPasswordOtp(email);
+      await RequestForgotPasswordOtpAsync(email);
       toast.success("A new password reset OTP has been sent successfully.");
       localStorage.setItem("otp_sent_time", Date.now().toString());
       setTimer(900);

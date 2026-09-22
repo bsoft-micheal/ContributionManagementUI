@@ -1,6 +1,6 @@
 import { getApi } from "./apiActions";
 
-export const GetDashboardSummary = async (params) => {
+export const GetDashboardSummaryAsync = async (params) => {
   try {
     let apiParams = undefined;
     if (params && (params.month !== undefined || params.year !== undefined)) {
@@ -9,7 +9,7 @@ export const GetDashboardSummary = async (params) => {
         year: params.year === 0 ? null : params.year,
       };
     }
-    const result = await getApi("/dashboard/summary", apiParams);
+    const result = await getApi("/dashboard/getSummaryDashboardAsync", apiParams);
     return result;
   } catch (error) {
     console.error('Error fetching dashboard summary:', error.response?.data || error.message);
