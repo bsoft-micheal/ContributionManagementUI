@@ -29,7 +29,6 @@ import MetricCard from "../../components/MetricCard";
 import AppSelect from "../../components/common/AppSelect";
 import { GetDashboardSummaryAsync } from "../../services/dashboardService";
 import AppDataTable from "../../components/common/AppDataTable";
-import { GetDashboardSummary } from "../../services/dashboardService";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 const C = {
@@ -518,9 +517,11 @@ export default function DashboardPage() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const data = await GetDashboardSummaryAsync(filters);
-      setSummary(data);
-      setLoading(false);
+      const data = await GetDashboardSummaryAsync(appliedFilters);
+      if (!cancelled) {
+        setSummary(data);
+        setLoading(false);
+      }
     }
     load();
     return () => { cancelled = true; };
