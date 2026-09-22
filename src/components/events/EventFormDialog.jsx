@@ -19,6 +19,18 @@ import AppButton from "../common/AppButton";
 import AppDialog from "../common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../common/AppToast";
+import { CreateEvent, UpdateEvent, GetEventById } from "../../services/eventService";
+import { updateSystemSettings } from "../../services/settingsService";
+import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
+import {
+  getPaymentQrConfig,
+  generateDynamicPaymentQr,
+  buildUpiPaymentUri,
+  getQrCodeApiUrl,
+  generateQrPngDataUrl,
+  buildPaymentReminderEmailHtml,
+} from "../../utils/upiQrHelper";
+import { SendPaymentReminder } from "../../services/contributionService";
 import { CreateEventAsync, UpdateEventAsync, GetEventByIdAsync } from "../../services/eventService";
 
 // Hardcoded calculation rules as requested
@@ -79,6 +91,16 @@ export default function EventFormDialog({
   const [wfhBirthdays, setWfhBirthdays] = useState(0);
   const [totalMembers, setTotalMembers] = useState(47);
   const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
+  const [sendEmailWithQr, setSendEmailWithQr] = useState(() => {
+    try {
+      const saved = localStorage.getItem("cm_system_settings");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.enableEmailNotif !== undefined) return Boolean(parsed.enableEmailNotif);
+      }
+    } catch (e) { }
+    return true;
+  });
 
   const toast = useAppToast();
 
@@ -163,8 +185,8 @@ export default function EventFormDialog({
               description: detailedEvent.description || "",
               baseAmount:
                 detailedEvent.baseAmount !== undefined &&
-                detailedEvent.baseAmount !== null &&
-                Number(detailedEvent.baseAmount) > 0
+                  detailedEvent.baseAmount !== null &&
+                  Number(detailedEvent.baseAmount) > 0
                   ? String(detailedEvent.baseAmount)
                   : "",
               participantIds: pIds,
@@ -317,8 +339,7 @@ export default function EventFormDialog({
           eventDate: dayjs(form.eventDate).hour(12).toISOString(),
           description:
             form.description?.trim() ||
-            `Birthday celebration (${office} Office, ${wfh} WFH)${
-              celebrantsSummary ? ` for ${celebrantsSummary}` : ""
+            `Birthday celebration (${office} Office, ${wfh} WFH)${celebrantsSummary ? ` for ${celebrantsSummary}` : ""
             }. Planned Budget: ₹${plannedBudget.toLocaleString(
               "en-IN"
             )}, Contribution/member: ₹${contributionPerMember}`,
@@ -341,8 +362,120 @@ export default function EventFormDialog({
         await UpdateEventAsync(form.eventId, payload);
         toast.success("Saved successfully");
       } else {
-        await CreateEventAsync(payload);
+        // Sync dynamic QR code with per-member contribution amount to backend settings before event creation
+        // This guarantees that backend's email template sends the real, scannable UPI QR code (not a static logo)
+        try {
+          const qrConfig = getPaymentQrConfig();
+          const targetAmount = isBirthday
+            ? contributionPerMember
+            : (payload.participantIds?.length > 0
+              ? Math.round(Number(payload.baseAmount) / payload.participantIds.length)
+              : 0);
+
+          const eventUpiUri = buildUpiPaymentUri({
+            upiId: qrConfig.qrUpiId,
+            receiverName: qrConfig.qrReceiverName,
+            amount: targetAmount > 0 ? targetAmount : undefined,
+            note: `Contribution for ${payload.eventName}`,
+          });
+
+          // Generate the scanner QR image URL compatible with backend database and Gmail
+          const eventQrImage = getQrCodeApiUrl(eventUpiUri, 300);
+
+          if (eventQrImage) {
+            await updateSystemSettings({
+              ...qrConfig,
+              qrImage: eventQrImage,
+            });
+          }
+        } catch (syncErr) {
+          console.warn("Could not sync event dynamic QR to backend settings before creation:", syncErr);
+        }
+
+        const createdEvent = await CreateEvent(payload);
         toast.success("Saved successfully");
+
+        // Automatically dispatch payment reminder emails with dynamic QR to participants
+        if (sendEmailWithQr) {
+          try {
+            const qrConfig = getPaymentQrConfig();
+            const recipientList = [];
+
+            if (isBirthday) {
+              const celebrantIds = monthCelebrants.map((m) => m.memberId);
+              const allActive = activeMembers.length > 0 ? activeMembers : members;
+              allActive.forEach((m) => {
+                const isCelebrant = celebrantIds.includes(m.memberId);
+                const memAmount = exempt && isCelebrant ? 0 : contributionPerMember;
+                if (memAmount > 0) {
+                  recipientList.push({
+                    member: m,
+                    amount: memAmount,
+                  });
+                }
+              });
+            } else {
+              const pIds = payload.participantIds || [];
+              const perMemberAmount =
+                pIds.length > 0 ? Math.round(Number(payload.baseAmount) / pIds.length) : 0;
+              pIds.forEach((pId) => {
+                const m = members.find((x) => x.memberId === pId);
+                if (m && perMemberAmount > 0) {
+                  recipientList.push({
+                    member: m,
+                    amount: perMemberAmount,
+                  });
+                }
+              });
+            }
+
+            if (recipientList.length > 0) {
+              await Promise.allSettled(
+                recipientList.map(({ member: m, amount: memAmount }) => {
+                  const memberEmail =
+                    m.email || `${m.name?.toLowerCase().replace(/\s+/g, ".")}@example.com`;
+                  const { upiUri, qrImageUrl, receiverName, upiId } = generateDynamicPaymentQr({
+                    amount: memAmount,
+                    note: `Contribution for ${payload.eventName}`,
+                    customConfig: qrConfig,
+                  });
+
+                  const emailHtml = buildPaymentReminderEmailHtml({
+                    memberName: m.name,
+                    eventName: payload.eventName,
+                    amount: memAmount,
+                    dueDate: payload.eventDate
+                      ? new Date(payload.eventDate).toLocaleDateString()
+                      : undefined,
+                    upiId,
+                    receiverName,
+                    qrImageUrl,
+                  });
+
+                  return SendPaymentReminder({
+                    memberId: m.memberId,
+                    memberName: m.name,
+                    recipientEmail: memberEmail,
+                    eventId: createdEvent?.eventId,
+                    eventName: payload.eventName,
+                    amount: memAmount,
+                    upiId,
+                    receiverName,
+                    upiUri,
+                    qrImageUrl,
+                    emailHtml,
+                  });
+                })
+              );
+
+              toast.success(
+                `Dynamic UPI QR payment emails sent to ${recipientList.length} participants!`
+              );
+            }
+          } catch (emailErr) {
+            console.warn("Could not dispatch initial QR reminder emails:", emailErr);
+          }
+        }
       }
 
       if (onSaveSuccess) {
@@ -371,7 +504,7 @@ export default function EventFormDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title={form.eventId ? "Edit Event" : isBirthday ? "Birthday Event Setup" : "Add Event"}
+      title={form.eventId ? "Edit Event" : isBirthday ? "Event Details" : "Add Event"}
       maxWidth={isBirthday ? "lg" : "md"}
       actions={
         <>
@@ -412,7 +545,7 @@ export default function EventFormDialog({
         {isBirthday && (
           <Box sx={{ pt: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.82rem" }}>
-              Configure birthday members and automatically calculate the event budget.
+              
             </Typography>
           </Box>
         )}
@@ -454,6 +587,7 @@ export default function EventFormDialog({
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <AppInput
                       label="Event Name"
+                      placeholder="Enter event name"
                       required
                       value={form.eventName}
                       onChange={(e) => {
@@ -479,6 +613,7 @@ export default function EventFormDialog({
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <AppInput
                       label="Office Birthday Members"
+                      placeholder="Enter count"
                       type="number"
                       value={officeBirthdays}
                       onChange={(e) =>
@@ -490,6 +625,7 @@ export default function EventFormDialog({
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <AppInput
                       label="WFH Birthday Members"
+                      placeholder="Enter count"
                       type="number"
                       value={wfhBirthdays}
                       onChange={(e) =>
@@ -501,6 +637,7 @@ export default function EventFormDialog({
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <AppInput
                       label="Total Active Members"
+                      placeholder="Enter count"
                       type="number"
                       value={totalMembers}
                       onChange={(e) =>
@@ -560,6 +697,46 @@ export default function EventFormDialog({
                   </Grid>
                 </Grid>
 
+                {/* Send Payment Reminder Email with Dynamic QR toggle */}
+                {!form.eventId && (
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: "10px",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(2, 132, 199, 0.08)"
+                          : "rgba(2, 132, 199, 0.04)",
+                      border: "1px solid rgba(2, 132, 199, 0.2)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 1.5,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+                      <EmailOutlinedIcon sx={{ color: "#0284c7", fontSize: 20 }} />
+                      <Box>
+                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }}>
+                          Send Payment Reminder Email with Dynamic QR
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ fontSize: "0.7rem", display: "block" }}
+                        >
+                          Automatically email participants their exact share with pre-filled UPI QR.
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Switch
+                      checked={sendEmailWithQr}
+                      onChange={(e) => setSendEmailWithQr(e.target.checked)}
+                      color="primary"
+                    />
+                  </Box>
+                )}
+
                 {/* Celebrants detected for current month */}
                 {monthCelebrants.length > 0 && (
                   <Box
@@ -586,9 +763,8 @@ export default function EventFormDialog({
                       {monthCelebrants.map((m) => (
                         <Chip
                           key={m.memberId}
-                          label={`${m.name} (${m.memberType || "Office"}) - ${
-                            m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
-                          }`}
+                          label={`${m.name} (${m.memberType || "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
+                            }`}
                           size="small"
                           sx={{
                             fontWeight: 600,
@@ -852,6 +1028,7 @@ export default function EventFormDialog({
           <Grid size={{ xs: 12, md: 6 }}>
             <AppInput
               label="Event Name"
+              placeholder="Enter event name"
               value={form.eventName}
               onChange={(e) => {
                 setForm((current) => ({ ...current, eventName: e.target.value }));
@@ -867,6 +1044,7 @@ export default function EventFormDialog({
           <Grid size={{ xs: 12, md: 6 }}>
             <AppInput
               label="Base Amount"
+              placeholder="Enter base amount (₹)"
               value={formatBaseAmount(form.baseAmount)}
               onChange={(e) => {
                 const rawVal = e.target.value.replace(/[^0-9]/g, "");
@@ -910,12 +1088,54 @@ export default function EventFormDialog({
           <Grid size={{ xs: 12 }}>
             <AppTextArea
               label="Description"
+              placeholder="Enter event description..."
               minRows={3}
               maxRows={6}
               value={form.description}
               onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
             />
           </Grid>
+
+          {!form.eventId && (
+            <Grid size={{ xs: 12 }}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: "10px",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(2, 132, 199, 0.08)"
+                      : "rgba(2, 132, 199, 0.04)",
+                  border: "1px solid rgba(2, 132, 199, 0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1.5,
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+                  <EmailOutlinedIcon sx={{ color: "#0284c7", fontSize: 20 }} />
+                  <Box>
+                    <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }}>
+                      Send Payment Reminder Email with Dynamic QR
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ fontSize: "0.7rem", display: "block" }}
+                    >
+                      Automatically email participants their exact share with pre-filled UPI QR.
+                    </Typography>
+                  </Box>
+                </Box>
+                <Switch
+                  checked={sendEmailWithQr}
+                  onChange={(e) => setSendEmailWithQr(e.target.checked)}
+                  color="primary"
+                />
+              </Box>
+            </Grid>
+          )}
         </Grid>
       )}
     </AppDialog>

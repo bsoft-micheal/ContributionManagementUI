@@ -392,8 +392,8 @@ export default function SupportTicketsPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                          ? "rgba(255,255,255,0.3)"
+                          : "#cbd5e1",
                   }}
                 />
               </IconButton>
@@ -416,8 +416,8 @@ export default function SupportTicketsPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                          ? "rgba(255,255,255,0.3)"
+                          : "#cbd5e1",
                   }}
                 />
               </IconButton>
@@ -505,14 +505,14 @@ export default function SupportTicketsPage() {
               bgcolor: isHigh
                 ? "rgba(220, 38, 38, 0.1)"
                 : isMedium
-                ? "rgba(234, 179, 8, 0.12)"
-                : "rgba(59, 130, 246, 0.1)",
+                  ? "rgba(234, 179, 8, 0.12)"
+                  : "rgba(59, 130, 246, 0.1)",
               color: isHigh ? "#dc2626" : isMedium ? "#d97706" : "#2563eb",
               border: isHigh
                 ? "1px solid rgba(220, 38, 38, 0.25)"
                 : isMedium
-                ? "1px solid rgba(234, 179, 8, 0.25)"
-                : "1px solid rgba(59, 130, 246, 0.25)",
+                  ? "1px solid rgba(234, 179, 8, 0.25)"
+                  : "1px solid rgba(59, 130, 246, 0.25)",
               px: 1.2,
               py: 0.3,
               borderRadius: "12px",
@@ -540,24 +540,24 @@ export default function SupportTicketsPage() {
               bgcolor: isResolved
                 ? "rgba(22, 163, 74, 0.1)"
                 : isInProgress
-                ? "rgba(59, 130, 246, 0.1)"
-                : isOpen
-                ? "rgba(220, 38, 38, 0.1)"
-                : "rgba(100, 116, 139, 0.1)",
+                  ? "rgba(59, 130, 246, 0.1)"
+                  : isOpen
+                    ? "rgba(220, 38, 38, 0.1)"
+                    : "rgba(100, 116, 139, 0.1)",
               color: isResolved
                 ? "#16a34a"
                 : isInProgress
-                ? "#2563eb"
-                : isOpen
-                ? "#dc2626"
-                : "#64748b",
+                  ? "#2563eb"
+                  : isOpen
+                    ? "#dc2626"
+                    : "#64748b",
               border: isResolved
                 ? "1px solid rgba(22, 163, 74, 0.25)"
                 : isInProgress
-                ? "1px solid rgba(59, 130, 246, 0.25)"
-                : isOpen
-                ? "1px solid rgba(220, 38, 38, 0.25)"
-                : "1px solid rgba(100, 116, 139, 0.25)",
+                  ? "1px solid rgba(59, 130, 246, 0.25)"
+                  : isOpen
+                    ? "1px solid rgba(220, 38, 38, 0.25)"
+                    : "1px solid rgba(100, 116, 139, 0.25)",
               px: 1.2,
               py: 0.3,
               borderRadius: "12px",
@@ -585,7 +585,7 @@ export default function SupportTicketsPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Manage Support Tickets"
+        title="Support Tickets"
         columns={columns}
         data={filteredTickets}
         loading={loading}
@@ -618,6 +618,7 @@ export default function SupportTicketsPage() {
                   options={ticketTypeOptions}
                   size="small"
                   placeholder="Select Ticket Type"
+                  required
                   fullWidth
                 />
               </Box>
@@ -629,6 +630,7 @@ export default function SupportTicketsPage() {
                   options={priorityOptions}
                   size="small"
                   placeholder="Select Priority"
+                  required
                   fullWidth
                 />
               </Box>
@@ -640,6 +642,7 @@ export default function SupportTicketsPage() {
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
+                  required
                   fullWidth
                 />
               </Box>
@@ -776,6 +779,7 @@ export default function SupportTicketsPage() {
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
               label="Priority"
+              placeholder="Select Priority"
               value={form.priority}
               onChange={(e) => setForm((c) => ({ ...c, priority: e.target.value }))}
               options={priorityOptions.filter((o) => o.value !== "ALL")}
@@ -785,6 +789,7 @@ export default function SupportTicketsPage() {
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
               label="Status"
+              placeholder="Select Status"
               value={form.status}
               onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}
               options={statusOptions}
@@ -893,14 +898,14 @@ export default function SupportTicketsPage() {
                       selectedTicket.priority === "High"
                         ? "rgba(220, 38, 38, 0.12)"
                         : selectedTicket.priority === "Medium"
-                        ? "rgba(234, 179, 8, 0.12)"
-                        : "rgba(59, 130, 246, 0.12)",
+                          ? "rgba(234, 179, 8, 0.12)"
+                          : "rgba(59, 130, 246, 0.12)",
                     color:
                       selectedTicket.priority === "High"
                         ? "#dc2626"
                         : selectedTicket.priority === "Medium"
-                        ? "#d97706"
-                        : "#2563eb",
+                          ? "#d97706"
+                          : "#2563eb",
                   }}
                 />
                 <Chip
@@ -912,18 +917,18 @@ export default function SupportTicketsPage() {
                       selectedTicket.status === "Resolved"
                         ? "rgba(22, 163, 74, 0.12)"
                         : selectedTicket.status === "In Progress"
-                        ? "rgba(59, 130, 246, 0.12)"
-                        : selectedTicket.status === "Open"
-                        ? "rgba(220, 38, 38, 0.12)"
-                        : "rgba(100, 116, 139, 0.12)",
+                          ? "rgba(59, 130, 246, 0.12)"
+                          : selectedTicket.status === "Open"
+                            ? "rgba(220, 38, 38, 0.12)"
+                            : "rgba(100, 116, 139, 0.12)",
                     color:
                       selectedTicket.status === "Resolved"
                         ? "#16a34a"
                         : selectedTicket.status === "In Progress"
-                        ? "#2563eb"
-                        : selectedTicket.status === "Open"
-                        ? "#dc2626"
-                        : "#64748b",
+                          ? "#2563eb"
+                          : selectedTicket.status === "Open"
+                            ? "#dc2626"
+                            : "#64748b",
                   }}
                 />
               </Box>

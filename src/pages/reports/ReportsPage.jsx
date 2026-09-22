@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Card,
@@ -164,6 +165,7 @@ function SummaryChip({ label, value, color = "primary" }) {
 
 export default function ReportsPage({ mode }) {
   const theme = useTheme();
+  const navigate = useNavigate();
   const { authState } = useAuth();
   const hasWriteAccess = getRightsForPage("Reports", authState?.role).write;
 
@@ -381,15 +383,53 @@ export default function ReportsPage({ mode }) {
               </AppButton>
             </Box>
 
+            {/* Report Navigation Tabs */}
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", pt: 0.5 }}>
+              {[
+                { label: "Event Audit", path: "/reports/event-collection-audit", modeKey: "event" },
+                { label: "Member Velocity", path: "/reports/member-velocity", modeKey: "member" },
+                { label: "Pending Dues", path: "/reports/pending-dues", modeKey: "pending" },
+                { label: "Member Category Paid", path: "/reports/member-category-paid", modeKey: "member-category" },
+              ].map((tab) => {
+                const isActive = mode === tab.modeKey || (!mode && tab.modeKey === "event");
+                return (
+                  <Box
+                    key={tab.path}
+                    onClick={() => navigate(tab.path)}
+                    sx={{
+                      px: 1.8,
+                      py: 0.6,
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "0.82rem",
+                      fontWeight: isActive ? 700 : 600,
+                      bgcolor: isActive ? "primary.main" : theme.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.06)",
+                      color: isActive ? "#ffffff" : "text.secondary",
+                      border: isActive ? "1px solid transparent" : `1px solid ${theme.palette.divider}`,
+                      transition: "all 0.2s ease",
+                      "&:hover": {
+                        bgcolor: isActive ? "primary.dark" : theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(74,63,107,0.12)",
+                        color: isActive ? "#ffffff" : "text.primary",
+                      },
+                    }}
+                  >
+                    {tab.label}
+                  </Box>
+                );
+              })}
+            </Box>
+
             <Grid container spacing={2} alignItems="center">
               {mode === "member-category" ? (
                 <>
                   <Grid size={{ xs: 12, md: 4 }}>
                     <AppSelect
                       label="Select Member"
+                      placeholder="Select Member"
                       value={selectedMemberId}
                       onChange={(event) => setSelectedMemberId(event.target.value)}
                       options={members.map((member) => ({ label: member.name, value: member.memberId }))}
+                      required
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 8 }}>
@@ -403,17 +443,21 @@ export default function ReportsPage({ mode }) {
                   <Grid size={{ xs: 12, md: 3 }}>
                     <AppSelect
                       label="Month"
+                      placeholder="Select Month"
                       value={filters.month}
                       onChange={(event) => setFilters((current) => ({ ...current, month: Number(event.target.value) }))}
                       options={monthOptions}
+                      required
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 2 }}>
                     <AppSelect
                       label="Year"
+                      placeholder="Select Year"
                       value={filters.year}
                       onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
                       options={yearOptions}
+                      required
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 7 }}>

@@ -13,11 +13,13 @@ import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceW
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
 import CategoryRoundedIcon from "@mui/icons-material/CategoryRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import QrCodeScannerOutlinedIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import apiClient from "../../services/apiClient";
 import AppDataTable from "../../components/common/AppDataTable";
 import { exportSheets } from "../../utils/exportToExcel";
 import AppButton from "../../components/common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
+import PaymentQrReminderDialog from "../../components/contributions/PaymentQrReminderDialog";
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ icon, label, value, color, bg }) {
@@ -71,6 +73,7 @@ export default function MyContributionSummaryPage() {
   const { authState } = useAuth();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -259,21 +262,41 @@ export default function MyContributionSummaryPage() {
               All-time • {memberName}
             </Typography>
           </Box>
-          <AppButton
-            size="small"
-            variant="contained"
-            sx={{
-              bgcolor: "#2a1b4d",
-              borderRadius: "3px",
-              fontSize: "0.75rem",
-              py: 0.3,
-              px: 2,
-              "&:hover": { bgcolor: "#1a1033" },
-            }}
-            onClick={handleExport}
-          >
-            Export Excel
-          </AppButton>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            {totalPending > 0 && (
+              <AppButton
+                size="small"
+                variant="contained"
+                startIcon={<QrCodeScannerOutlinedIcon sx={{ fontSize: "1rem" }} />}
+                sx={{
+                  bgcolor: "#0284c7 !important",
+                  borderRadius: "3px",
+                  fontSize: "0.75rem",
+                  py: 0.3,
+                  px: 1.5,
+                  "&:hover": { bgcolor: "#0369a1 !important" },
+                }}
+                onClick={() => setQrDialogOpen(true)}
+              >
+                Pay Dues via UPI QR
+              </AppButton>
+            )}
+            <AppButton
+              size="small"
+              variant="contained"
+              sx={{
+                bgcolor: "#2a1b4d",
+                borderRadius: "3px",
+                fontSize: "0.75rem",
+                py: 0.3,
+                px: 2,
+                "&:hover": { bgcolor: "#1a1033" },
+              }}
+              onClick={handleExport}
+            >
+              Export Excel
+            </AppButton>
+          </Box>
         </Box>
 
         <CardContent sx={{ p: 0 }}>
@@ -343,6 +366,18 @@ export default function MyContributionSummaryPage() {
           </Box>
         </CardContent>
       </Card>
+      {/* ── Dynamic UPI QR Payment Dialog ── */}
+      <PaymentQrReminderDialog
+        open={qrDialogOpen}
+        onClose={() => setQrDialogOpen(false)}
+        contribution={{
+          memberName,
+          totalAccumulated: totalPending,
+          amount: totalPending,
+          eventName: "Pending Contributions",
+        }}
+        event={{ eventName: "Pending Contributions" }}
+      />
     </div>
   );
 }

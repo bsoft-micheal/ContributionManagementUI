@@ -16,7 +16,8 @@ import {
   Payments as PaymentsIcon,
   Visibility as ViewIcon,
   Add as AddIcon,
-  Save as SaveIcon
+  Save as SaveIcon,
+  QrCodeScanner as QrCodeIcon,
 } from "@mui/icons-material";
 
 import dayjs from "dayjs";
@@ -34,6 +35,13 @@ import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
+import PaymentQrReminderDialog from "../../components/contributions/PaymentQrReminderDialog";
+import {
+  getPaymentQrConfig,
+  buildUpiPaymentUri,
+  getQrCodeApiUrl,
+  generateQrPngDataUrl,
+} from "../../utils/upiQrHelper";
 
 const initialPayment = {
   eventId: "",
@@ -54,6 +62,8 @@ export default function ContributionsPage() {
   const [filterEventId, setFilterEventId] = useState("");
   const [contributions, setContributions] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [selectedContributionForQr, setSelectedContributionForQr] = useState(null);
   const [payment, setPayment] = useState(initialPayment);
   const [allContributions, setAllContributions] = useState([]);
   const [members, setMembers] = useState([]);
@@ -212,6 +222,19 @@ export default function ContributionsPage() {
               </IconButton>
             </span>
           </Tooltip>
+
+          <Tooltip title={row.paymentStatus === "Paid" ? "View Dynamic Payment QR" : "Scan Dynamic QR & Send Reminder"}>
+            <IconButton
+              size="small"
+              onClick={() => {
+                setSelectedContributionForQr(row);
+                setQrDialogOpen(true);
+              }}
+              sx={{ p: 0.3, color: actionIconColor }}
+            >
+              <QrCodeIcon sx={{ fontSize: "1.1rem" }} />
+            </IconButton>
+          </Tooltip>
         </Box>
       )
     },
@@ -278,6 +301,7 @@ export default function ContributionsPage() {
                     setSelectedEventId(event.target.value);
                   }}
                   options={eventOptions}
+                  required
                   fullWidth
                 />
               </Box>
@@ -352,7 +376,7 @@ export default function ContributionsPage() {
         onClose={() => setDialogOpen(false)}
         fullWidth
         maxWidth="xs"
-        title="Record Payment"
+        title="Contribution Collections "
         actions={
           <>
             <AppButton
@@ -373,6 +397,7 @@ export default function ContributionsPage() {
         <Stack spacing={3} sx={{ pt: 1 }}>
           <AppInput
             label="Amount"
+            placeholder="Enter payment amount (₹)"
             value={payment.amount}
             onChange={(event) => {
               setPayment((current) => ({ ...current, amount: event.target.value }));
@@ -386,6 +411,7 @@ export default function ContributionsPage() {
           />
           <AppSelect
             label="Payment Mode"
+            placeholder="Select payment mode"
             value={payment.paymentMode}
             onChange={(event) => {
               setPayment((current) => ({ ...current, paymentMode: event.target.value }));
@@ -407,8 +433,60 @@ export default function ContributionsPage() {
             helperText={errors.paymentDate}
             required
           />
+
+          {payment.paymentMode === "Upi" && Number(payment.amount) > 0 && (
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: "12px",
+                bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.08)" : "rgba(2, 132, 199, 0.04)"),
+                border: "1px solid rgba(2, 132, 199, 0.2)",
+                textAlign: "center",
+              }}
+            >
+              <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", display: "block", mb: 0.8 }}>
+                Dynamic UPI Payment QR (₹{Number(payment.amount).toLocaleString("en-IN")})
+              </Typography>
+              <Box
+                component="img"
+                src={generateQrPngDataUrl(
+                  buildUpiPaymentUri({
+                    upiId: getPaymentQrConfig().qrUpiId,
+                    receiverName: getPaymentQrConfig().qrReceiverName,
+                    amount: payment.amount,
+                    note: "Contribution Payment",
+                  }),
+                  200
+                )}
+                alt="UPI QR Code"
+                sx={{
+                  width: 120,
+                  height: 120,
+                  display: "block",
+                  margin: "0 auto",
+                  p: 0.6,
+                  bgcolor: "#ffffff",
+                  borderRadius: "10px",
+                  border: "1.5px solid #0284c7",
+                  boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)",
+                }}
+              />
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.6, display: "block" }}>
+                Scan with any UPI app to pay ₹{Number(payment.amount).toLocaleString("en-IN")} directly.
+              </Typography>
+            </Box>
+          )}
         </Stack>
       </AppDialog>
+
+      {/* Dynamic Payment QR & Email Reminder Dialog */}
+      <PaymentQrReminderDialog
+        open={qrDialogOpen}
+        onClose={() => setQrDialogOpen(false)}
+        contribution={selectedContributionForQr}
+        event={events.find((e) => e.eventId === selectedContributionForQr?.eventId)}
+        member={members.find((m) => m.memberId === selectedContributionForQr?.memberId)}
+      />
     </div>
   );
 }

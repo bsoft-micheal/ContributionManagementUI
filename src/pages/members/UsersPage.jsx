@@ -510,10 +510,12 @@ export default function UsersPage() {
               <Box sx={{ minWidth: 180 }}>
                 <AppSelect
                   label="Filter by Role"
+                  placeholder="Select Role"
                   value={filterRole}
                   onChange={(e) => setFilterRole(e.target.value)}
                   options={[{ label: "All Roles", value: "" }, ...USER_ROLES]}
                   size="small"
+                  required
                   fullWidth
                 />
               </Box>
@@ -522,6 +524,7 @@ export default function UsersPage() {
               <Box sx={{ minWidth: 160 }}>
                 <AppSelect
                   label="Filter by Status"
+                  placeholder="Select Status"
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                   options={[
@@ -530,6 +533,7 @@ export default function UsersPage() {
                     { label: "Inactive", value: "false" },
                   ]}
                   size="small"
+                  required
                   fullWidth
                 />
               </Box>

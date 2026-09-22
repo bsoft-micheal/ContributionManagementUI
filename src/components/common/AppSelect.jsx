@@ -1,6 +1,5 @@
-import { MenuItem, TextField, Box, Typography, IconButton } from "@mui/material";
+import { MenuItem, TextField, Box, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import CloseIcon from "@mui/icons-material/Close";
 
 export default function AppSelect({
   label,
@@ -16,6 +15,13 @@ export default function AppSelect({
   ...props
 }) {
   const theme = useTheme();
+
+  const effectivePlaceholder =
+    placeholder !== undefined && placeholder !== ""
+      ? placeholder
+      : label
+      ? `Select ${label.replace(/[*:]/g, "").trim()}...`
+      : "Select an option...";
 
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
@@ -42,33 +48,29 @@ export default function AppSelect({
       )}
       <TextField
         select
-        value={value}
+        value={value ?? ""}
         onChange={onChange}
         fullWidth={fullWidth}
         variant="outlined"
         size={size}
         SelectProps={{
-          endAdornment: value && onChange && !props.disabled ? (
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange({ target: { value: "" } });
-              }}
-              sx={{
-                position: "absolute",
-                right: 28,
-                top: "50%",
-                transform: "translateY(-50%)",
-                padding: "2px",
-                color: theme.palette.text.secondary,
-                "&:hover": { color: "#ef4444" },
-                zIndex: 2,
-              }}
-            >
-              <CloseIcon sx={{ fontSize: "0.95rem" }} />
-            </IconButton>
-          ) : null
+          displayEmpty: true,
+          renderValue: (selected) => {
+            if (selected === "" || selected === undefined || selected === null) {
+              return (
+                <span
+                  style={{
+                    color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.45)" : "#94a3b8",
+                    fontSize: "0.82rem",
+                  }}
+                >
+                  {effectivePlaceholder}
+                </span>
+              );
+            }
+            const found = options.find((o) => o.value === selected);
+            return found ? found.label : selected;
+          },
         }}
         sx={{
           "& .MuiOutlinedInput-root": {
@@ -79,7 +81,7 @@ export default function AppSelect({
             color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             "& .MuiSelect-select": {
               py: size === "small" ? 0.7 : 1,
-              pr: value && onChange && !props.disabled ? "40px !important" : "24px !important",
+              pr: "28px !important",
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             },
             "& fieldset": {
@@ -99,11 +101,9 @@ export default function AppSelect({
         helperText={helperText}
         {...props}
       >
-        {placeholder && (
-          <MenuItem value="" disabled>
-            <em style={{ color: theme.palette.text.secondary, fontSize: "0.85rem" }}>{placeholder}</em>
-          </MenuItem>
-        )}
+        <MenuItem value="" disabled sx={{ fontSize: "0.85rem", fontStyle: "italic", color: "text.secondary" }}>
+          {effectivePlaceholder}
+        </MenuItem>
         {options.map((option) => (
           <MenuItem
             key={option.value}

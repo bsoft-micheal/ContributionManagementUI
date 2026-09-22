@@ -237,6 +237,7 @@ export default function ContributionCalculationPage() {
                     setSelectedEventId(e.target.value);
                   }}
                   options={events.map(e => ({ label: e.eventName, value: e.eventId }))}
+                  required
                   fullWidth
                 />
               </Box>

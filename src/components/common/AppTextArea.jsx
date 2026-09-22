@@ -12,6 +12,13 @@ export default function AppTextArea({
   required = false,
   ...props
 }) {
+  const effectivePlaceholder =
+    placeholder !== undefined && placeholder !== ""
+      ? placeholder
+      : label
+      ? `Enter ${label.replace(/[*:]/g, "").trim().toLowerCase()}...`
+      : "Enter description...";
+
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
       {label && (
@@ -41,7 +48,7 @@ export default function AppTextArea({
         multiline
         minRows={minRows}
         fullWidth={fullWidth}
-        placeholder={placeholder || `Enter ${label?.toLowerCase() || "value"}...`}
+        placeholder={effectivePlaceholder}
         variant="outlined"
         sx={{
           "& .MuiOutlinedInput-root": {

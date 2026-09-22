@@ -33,6 +33,13 @@ export default function AppInput({
     }
   };
 
+  const effectivePlaceholder =
+    placeholder !== undefined && placeholder !== ""
+      ? placeholder
+      : label
+      ? `Enter ${label.replace(/[*:]/g, "").trim().toLowerCase()}...`
+      : "Enter value...";
+
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
       {label && (
@@ -61,7 +68,7 @@ export default function AppInput({
         onChange={handleInputChange}
         type={type}
         fullWidth={fullWidth}
-        placeholder={placeholder || `Enter ${label?.toLowerCase() || "value"}...`}
+        placeholder={effectivePlaceholder}
         variant="outlined"
         size={size}
         sx={{
