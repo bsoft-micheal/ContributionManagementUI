@@ -1,6 +1,6 @@
 import { getApi, postApi } from "./apiActions";
 
-export const GetContributions = async (params) => {
+export const GetContributionsAsync = async (params) => {
   try {
     const result = await getApi("/contributions", params);
     return result;
@@ -10,7 +10,7 @@ export const GetContributions = async (params) => {
   }
 };
 
-export const GetContributionsByEvent = async (eventId) => {
+export const GetContributionsByEventAsync = async (eventId) => {
   try {
     const result = await getApi(`/contributions/event/${eventId}`);
     return result;
@@ -20,7 +20,7 @@ export const GetContributionsByEvent = async (eventId) => {
   }
 };
 
-export const RecordPayment = async (data) => {
+export const RecordPaymentAsync = async (data) => {
   try {
     const result = await postApi("/contributions/pay", data);
     return result;

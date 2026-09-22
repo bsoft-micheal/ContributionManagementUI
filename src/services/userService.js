@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetUsers = async () => {
+export const GetUsersAsync = async () => {
   try {
     const result = await getApi("/users");
     return result;
@@ -10,7 +10,7 @@ export const GetUsers = async () => {
   }
 };
 
-export const CreateUser = async (data) => {
+export const CreateUserAsync = async (data) => {
   try {
     const result = await postApi("/users", data);
     return result;
@@ -20,7 +20,7 @@ export const CreateUser = async (data) => {
   }
 };
 
-export const UpdateUser = async (id, data) => {
+export const UpdateUserAsync = async (id, data) => {
   try {
     const result = await putApi(`/users/${id}`, data);
     return result;
@@ -30,7 +30,7 @@ export const UpdateUser = async (id, data) => {
   }
 };
 
-export const DeleteUser = async (id) => {
+export const DeleteUserAsync = async (id) => {
   try {
     const result = await deleteApi(`/users/${id}`);
     return result;
@@ -40,7 +40,7 @@ export const DeleteUser = async (id) => {
   }
 };
 
-export const CreateUsersBulk = async (data) => {
+export const CreateUsersBulkAsync = async (data) => {
   try {
     const result = await postApi("/users/bulk", data);
     return result;
@@ -50,7 +50,7 @@ export const CreateUsersBulk = async (data) => {
   }
 };
 
-export const ResetUserPassword = async (id, data) => {
+export const ResetUserPasswordAsync = async (id, data) => {
   try {
     const result = await putApi(`/users/${id}/reset-password`, data);
     return result;
@@ -60,7 +60,7 @@ export const ResetUserPassword = async (id, data) => {
   }
 };
 
-export const RequestForgotPasswordOtp = async (email) => {
+export const RequestForgotPasswordOtpAsync = async (email) => {
   try {
     const result = await postApi("/auth/forgot-password/request", { email });
     return result;
@@ -70,7 +70,7 @@ export const RequestForgotPasswordOtp = async (email) => {
   }
 };
 
-export const VerifyForgotPasswordOtp = async (email, otp) => {
+export const VerifyForgotPasswordOtpAsync = async (email, otp) => {
   try {
     const result = await postApi("/auth/forgot-password/verify", { email, otp });
     return result;
@@ -80,7 +80,7 @@ export const VerifyForgotPasswordOtp = async (email, otp) => {
   }
 };
 
-export const ResetPasswordWithOtp = async (email, otp, newPassword) => {
+export const ResetPasswordWithOtpAsync = async (email, otp, newPassword) => {
   try {
     const result = await postApi("/auth/forgot-password/reset", { email, otp, newPassword });
     return result;

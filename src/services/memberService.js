@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetMembers = async () => {
+export const GetMembersAsync = async () => {
   try {
     const result = await getApi("/members");
     return result;
@@ -10,7 +10,7 @@ export const GetMembers = async () => {
   }
 };
 
-export const CreateMember = async (data) => {
+export const CreateMemberAsync = async (data) => {
   try {
     const result = await postApi("/members", data);
     return result;
@@ -20,7 +20,7 @@ export const CreateMember = async (data) => {
   }
 };
 
-export const UpdateMember = async (id, data) => {
+export const UpdateMemberAsync = async (id, data) => {
   try {
     const result = await putApi(`/members/${id}`, data);
     return result;
@@ -30,7 +30,7 @@ export const UpdateMember = async (id, data) => {
   }
 };
 
-export const DeleteMember = async (id) => {
+export const DeleteMemberAsync = async (id) => {
   try {
     const result = await deleteApi(`/members/${id}`);
     return result;
@@ -40,7 +40,7 @@ export const DeleteMember = async (id) => {
   }
 };
 
-export const CreateMembersBulk = async (data) => {
+export const CreateMembersBulkAsync = async (data) => {
   try {
     const result = await postApi("/members/bulk", data);
     return result;

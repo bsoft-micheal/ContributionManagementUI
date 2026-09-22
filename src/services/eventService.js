@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetEvents = async (params) => {
+export const GetEventsAsync = async (params) => {
   try {
     let apiParams = undefined;
     if (params && (params.month !== undefined || params.year !== undefined)) {
@@ -17,7 +17,7 @@ export const GetEvents = async (params) => {
   }
 };
 
-export const CreateEvent = async (data) => {
+export const CreateEventAsync = async (data) => {
   try {
     const result = await postApi("/events", data);
     return result;
@@ -27,7 +27,7 @@ export const CreateEvent = async (data) => {
   }
 };
 
-export const UpdateEvent = async (id, data) => {
+export const UpdateEventAsync = async (id, data) => {
   try {
     const result = await putApi(`/events/${id}`, data);
     return result;
@@ -37,7 +37,7 @@ export const UpdateEvent = async (id, data) => {
   }
 };
 
-export const DeleteEvent = async (id) => {
+export const DeleteEventAsync = async (id) => {
   try {
     const result = await deleteApi(`/events/${id}`);
     return result;
@@ -47,7 +47,7 @@ export const DeleteEvent = async (id) => {
   }
 };
 
-export const GetEventById = async (id) => {
+export const GetEventByIdAsync = async (id) => {
   try {
     const result = await getApi(`/events/${id}`);
     return result;

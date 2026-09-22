@@ -1,6 +1,6 @@
 import { getApi, postApi } from "./apiActions";
 
-export const GetUserRights = async (roleName) => {
+export const GetUserRightsAsync = async (roleName) => {
   try {
     const result = await getApi(`/user-rights/${roleName}`);
     return result;
@@ -10,7 +10,7 @@ export const GetUserRights = async (roleName) => {
   }
 };
 
-export const SaveUserRights = async (data) => {
+export const SaveUserRightsAsync = async (data) => {
   try {
     const result = await postApi("/user-rights", data);
     return result;

@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetEventTypes = async () => {
+export const GetEventTypesAsync = async () => {
   try {
     const result = await getApi("/event-types");
     return result;
@@ -10,7 +10,7 @@ export const GetEventTypes = async () => {
   }
 };
 
-export const CreateEventType = async (data) => {
+export const CreateEventTypeAsync = async (data) => {
   try {
     const result = await postApi("/event-types", data);
     return result;
@@ -20,7 +20,7 @@ export const CreateEventType = async (data) => {
   }
 };
 
-export const UpdateEventType = async (id, data) => {
+export const UpdateEventTypeAsync = async (id, data) => {
   try {
     const result = await putApi(`/event-types/${id}`, data);
     return result;
@@ -30,7 +30,7 @@ export const UpdateEventType = async (id, data) => {
   }
 };
 
-export const DeleteEventType = async (id) => {
+export const DeleteEventTypeAsync = async (id) => {
   try {
     const result = await deleteApi(`/event-types/${id}`);
     return result;

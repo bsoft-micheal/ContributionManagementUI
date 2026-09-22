@@ -1,6 +1,6 @@
 import { getApi, postApi } from "./apiActions";
 
-export const getSystemSettings = async () => {
+export const getSystemSettingsAsync = async () => {
   try {
     return await getApi("/settings");
   } catch (error) {
@@ -9,7 +9,7 @@ export const getSystemSettings = async () => {
   }
 };
 
-export const updateSystemSettings = async (data) => {
+export const updateSystemSettingsAsync = async (data) => {
   try {
     return await postApi("/settings", data);
   } catch (error) {
@@ -18,7 +18,7 @@ export const updateSystemSettings = async (data) => {
   }
 };
 
-export const resetSystemSettings = async () => {
+export const resetSystemSettingsAsync = async () => {
   try {
     return await postApi("/settings/reset", {});
   } catch (error) {

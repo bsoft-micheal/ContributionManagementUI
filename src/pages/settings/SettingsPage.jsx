@@ -63,9 +63,9 @@ import AppSwitch from "../../components/common/AppSwitch";
 import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
 import {
-  getSystemSettings,
-  updateSystemSettings,
-  resetSystemSettings,
+  getSystemSettingsAsync,
+  updateSystemSettingsAsync,
+  resetSystemSettingsAsync,
 } from "../../services/settingsService";
 
 const initialSettings = {
@@ -140,7 +140,7 @@ export default function SettingsPage() {
   React.useEffect(() => {
     const loadBackendSettings = async () => {
       try {
-        const data = await getSystemSettings();
+        const data = await getSystemSettingsAsync();
         if (data && typeof data === "object") {
           setSettings((prev) => ({ ...prev, ...data }));
           if (data.modifiedOn || data.createdOn) {
@@ -161,7 +161,7 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     try {
-      const updated = await updateSystemSettings(settings);
+      const updated = await updateSystemSettingsAsync(settings);
       setSettings(updated);
       localStorage.setItem("cm_system_settings", JSON.stringify(updated));
     } catch (err) {
@@ -175,7 +175,7 @@ export default function SettingsPage() {
 
   const handleReset = async () => {
     try {
-      const defaults = await resetSystemSettings();
+      const defaults = await resetSystemSettingsAsync();
       setSettings(defaults);
       localStorage.setItem("cm_system_settings", JSON.stringify(defaults));
     } catch (err) {

@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const getSupportTickets = async (params) => {
+export const getSupportTicketsAsync = async (params) => {
   try {
     return await getApi("/support-tickets", params);
   } catch (error) {
@@ -9,7 +9,7 @@ export const getSupportTickets = async (params) => {
   }
 };
 
-export const getSupportTicketById = async (id) => {
+export const getSupportTicketByIdAsync = async (id) => {
   try {
     return await getApi(`/support-tickets/${id}`);
   } catch (error) {
@@ -18,7 +18,7 @@ export const getSupportTicketById = async (id) => {
   }
 };
 
-export const createSupportTicket = async (data) => {
+export const createSupportTicketAsync = async (data) => {
   try {
     return await postApi("/support-tickets", data);
   } catch (error) {
@@ -27,7 +27,7 @@ export const createSupportTicket = async (data) => {
   }
 };
 
-export const updateSupportTicket = async (id, data) => {
+export const updateSupportTicketAsync = async (id, data) => {
   try {
     return await putApi(`/support-tickets/${id}`, data);
   } catch (error) {
@@ -36,7 +36,7 @@ export const updateSupportTicket = async (id, data) => {
   }
 };
 
-export const replySupportTicket = async (id, data) => {
+export const replySupportTicketAsync = async (id, data) => {
   try {
     return await postApi(`/support-tickets/${id}/reply`, data);
   } catch (error) {
@@ -45,7 +45,7 @@ export const replySupportTicket = async (id, data) => {
   }
 };
 
-export const deleteSupportTicket = async (id) => {
+export const deleteSupportTicketAsync = async (id) => {
   try {
     return await deleteApi(`/support-tickets/${id}`);
   } catch (error) {

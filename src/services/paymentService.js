@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const getPaymentTransactions = async (params) => {
+export const getPaymentTransactionsAsync = async (params) => {
   try {
     return await getApi("/payments", params);
   } catch (error) {
@@ -9,7 +9,7 @@ export const getPaymentTransactions = async (params) => {
   }
 };
 
-export const getPaymentById = async (id) => {
+export const getPaymentByIdAsync = async (id) => {
   try {
     return await getApi(`/payments/${id}`);
   } catch (error) {
@@ -18,7 +18,7 @@ export const getPaymentById = async (id) => {
   }
 };
 
-export const createPaymentTransaction = async (data) => {
+export const createPaymentTransactionAsync = async (data) => {
   try {
     return await postApi("/payments", data);
   } catch (error) {
@@ -27,7 +27,7 @@ export const createPaymentTransaction = async (data) => {
   }
 };
 
-export const verifyPaymentTransaction = async (id, data) => {
+export const verifyPaymentTransactionAsync = async (id, data) => {
   try {
     return await putApi(`/payments/${id}/verify`, data);
   } catch (error) {
@@ -36,7 +36,7 @@ export const verifyPaymentTransaction = async (id, data) => {
   }
 };
 
-export const deletePaymentTransaction = async (id) => {
+export const deletePaymentTransactionAsync = async (id) => {
   try {
     return await deleteApi(`/payments/${id}`);
   } catch (error) {

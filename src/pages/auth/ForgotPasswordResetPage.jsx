@@ -22,7 +22,7 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { ResetPasswordWithOtp } from "../../services/userService";
+import { ResetPasswordWithOtpAsync } from "../../services/userService";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
 
@@ -70,7 +70,7 @@ export default function ForgotPasswordResetPage() {
 
     setLoading(true);
     try {
-      await ResetPasswordWithOtp(email, otp, newPassword.trim());
+      await ResetPasswordWithOtpAsync(email, otp, newPassword.trim());
       toast.success("Password updated successfully! Redirecting you to Login...");
       
       // Clear recovery session storage items

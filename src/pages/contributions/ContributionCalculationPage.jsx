@@ -2,12 +2,12 @@ import React, { useEffect, useState } from "react";
 import { Box, Grid, Typography, Card, CardContent, Divider, Chip, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
-import { GetMembers } from "../../services/memberService";
-import { GetRoles } from "../../services/roleService";
+import { GetMembersAsync } from "../../services/memberService";
+import { GetRolesAsync } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
-import { GetEvents, GetEventById } from "../../services/eventService";
+import { GetEventsAsync, GetEventByIdAsync } from "../../services/eventService";
 import { useAppToast } from "../../components/common/AppToast";
 
 export default function ContributionCalculationPage() {
@@ -31,9 +31,9 @@ export default function ContributionCalculationPage() {
     setLoading(true);
     try {
       const [mems, rls, evts] = await Promise.all([
-        GetMembers(),
-        GetRoles(),
-        GetEvents()
+        GetMembersAsync(),
+        GetRolesAsync(),
+        GetEventsAsync()
       ]);
       setMembers(mems);
       setRoles(rls);
@@ -58,7 +58,7 @@ export default function ContributionCalculationPage() {
   async function loadEventDetails() {
     setLoading(true);
     try {
-      const detailedEvent = await GetEventById(selectedEventId);
+      const detailedEvent = await GetEventByIdAsync(selectedEventId);
       setSelectedEventDetails(detailedEvent);
     } catch (error) {
       console.error("Failed to load event details:", error);

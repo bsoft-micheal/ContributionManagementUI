@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetRoles = async () => {
+export const GetRolesAsync = async () => {
   try {
     const result = await getApi("/roles");
     return result;
@@ -10,7 +10,7 @@ export const GetRoles = async () => {
   }
 };
 
-export const CreateRole = async (data) => {
+export const CreateRoleAsync = async (data) => {
   try {
     const result = await postApi("/roles", data);
     return result;
@@ -20,7 +20,7 @@ export const CreateRole = async (data) => {
   }
 };
 
-export const UpdateRole = async (id, data) => {
+export const UpdateRoleAsync = async (id, data) => {
   try {
     const result = await putApi(`/roles/${id}`, data);
     return result;
@@ -30,7 +30,7 @@ export const UpdateRole = async (id, data) => {
   }
 };
 
-export const DeleteRole = async (id) => {
+export const DeleteRoleAsync = async (id) => {
   try {
     const result = await deleteApi(`/roles/${id}`);
     return result;

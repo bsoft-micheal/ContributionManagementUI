@@ -17,8 +17,37 @@ export function AuthProvider({ children }) {
     }
   }, [authState]);
 
+  function getDeviceInfo() {
+    let deviceId = localStorage.getItem("teamContributionDeviceId");
+    if (!deviceId) {
+      deviceId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      localStorage.setItem("teamContributionDeviceId", deviceId);
+    }
+    
+    return {
+      deviceId: deviceId,
+      deviceName: "Web Browser",
+      brand: "Unknown",
+      model: "Unknown",
+      os: navigator.platform || "Unknown",
+      osVersion: "Unknown",
+      systemName: navigator.userAgent.includes("Windows") ? "Windows" : navigator.userAgent.includes("Mac") ? "MacOS" : "Unknown",
+      systemVersion: "Unknown",
+      deviceType: 1, // 1 = Web Browser
+      appVersion: "1.0.0",
+      totalMemory: navigator.deviceMemory ? Math.round(navigator.deviceMemory * 1024 * 1024 * 1024) : 0,
+      browser: navigator.userAgent.includes("Chrome") ? "Chrome" : navigator.userAgent.includes("Firefox") ? "Firefox" : "Unknown",
+      browserVersion: "Unknown"
+    };
+  }
+
   async function login(credentials) {
-    const { data } = await apiClient.post("/auth/login", credentials);
+    const payload = {
+      ...credentials,
+      deviceInfo: getDeviceInfo()
+    };
+    
+    const { data } = await apiClient.post("/auth/login", payload);
     
     // Save fetched menu rights dynamically to local storage for immediate routing and access control enforcement
     if (data.rights && data.role) {

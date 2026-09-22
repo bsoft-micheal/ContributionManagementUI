@@ -30,12 +30,12 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import {
-  getGalleryPhotos,
-  createGalleryPhoto,
-  deleteGalleryPhoto,
+  getGalleryPhotosAsync,
+  createGalleryPhotoAsync,
+  deleteGalleryPhotoAsync,
 } from "../../services/galleryService";
-import { GetEvents } from "../../services/eventService";
-import { GetEventTypes } from "../../services/eventTypeService";
+import { GetEventsAsync } from "../../services/eventService";
+import { GetEventTypesAsync } from "../../services/eventTypeService";
 
 const initialForm = {
   title: "",
@@ -77,7 +77,7 @@ export default function GalleryPage() {
   const fetchPhotosFromDb = async () => {
     try {
       setLoading(true);
-      const data = await getGalleryPhotos();
+      const data = await getGalleryPhotosAsync();
       if (Array.isArray(data)) {
         const mapped = data.map((item, idx) => ({
           id: item.photoId
@@ -106,8 +106,8 @@ export default function GalleryPage() {
   const fetchLookupData = async () => {
     try {
       const [eventsRes, eventTypesRes] = await Promise.all([
-        GetEvents().catch(() => []),
-        GetEventTypes().catch(() => []),
+        GetEventsAsync().catch(() => []),
+        GetEventTypesAsync().catch(() => []),
       ]);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
@@ -190,7 +190,7 @@ export default function GalleryPage() {
     const photoId = photoToDelete.photoId || photoToDelete.id;
 
     try {
-      await deleteGalleryPhoto(photoId);
+      await deleteGalleryPhotoAsync(photoId);
       toast.success("Photo deleted successfully");
       await fetchPhotosFromDb();
     } catch (err) {
@@ -225,7 +225,7 @@ export default function GalleryPage() {
         description: form.description || "",
       };
 
-      await createGalleryPhoto(payload);
+      await createGalleryPhotoAsync(payload);
       toast.success(editingPhoto ? "Photo updated successfully!" : "Photo added successfully!");
       setDialogOpen(false);
       setEditingPhoto(null);

@@ -7,8 +7,8 @@ import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
 import apiClient from "../../services/apiClient";
-import { GetMembers } from "../../services/memberService";
-import { GetEventTypes } from "../../services/eventTypeService";
+import { GetMembersAsync } from "../../services/memberService";
+import { GetEventTypesAsync } from "../../services/eventTypeService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import EventFormDialog from "../../components/events/EventFormDialog";
@@ -85,8 +85,8 @@ export default function CalendarPage() {
     async function loadEventTypesAndMembers() {
       try {
         const [types, mems] = await Promise.all([
-          GetEventTypes(),
-          GetMembers(),
+          GetEventTypesAsync(),
+          GetMembersAsync(),
         ]);
         setEventTypes(types);
         setMembers(mems);

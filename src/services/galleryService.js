@@ -1,6 +1,6 @@
 import { getApi, postApi, deleteApi } from "./apiActions";
 
-export const getGalleryPhotos = async (params) => {
+export const getGalleryPhotosAsync = async (params) => {
   try {
     return await getApi("/gallery", params);
   } catch (error) {
@@ -9,7 +9,7 @@ export const getGalleryPhotos = async (params) => {
   }
 };
 
-export const createGalleryPhoto = async (data) => {
+export const createGalleryPhotoAsync = async (data) => {
   try {
     return await postApi("/gallery", data);
   } catch (error) {
@@ -18,7 +18,7 @@ export const createGalleryPhoto = async (data) => {
   }
 };
 
-export const deleteGalleryPhoto = async (id) => {
+export const deleteGalleryPhotoAsync = async (id) => {
   try {
     return await deleteApi(`/gallery/${id}`);
   } catch (error) {

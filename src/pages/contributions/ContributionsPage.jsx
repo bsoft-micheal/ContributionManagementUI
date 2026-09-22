@@ -24,10 +24,10 @@ import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
-import { GetContributions, GetContributionsByEvent, RecordPayment } from "../../services/contributionService";
-import { GetEvents } from "../../services/eventService";
-import { GetMembers } from "../../services/memberService";
-import { GetRoles } from "../../services/roleService";
+import { GetContributionsAsync, GetContributionsByEventAsync, RecordPaymentAsync } from "../../services/contributionService";
+import { GetEventsAsync } from "../../services/eventService";
+import { GetMembersAsync } from "../../services/memberService";
+import { GetRolesAsync } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { validateForm } from "../../utils/validation";
@@ -66,9 +66,9 @@ export default function ContributionsPage() {
     async function loadEvents() {
       try {
         const [mems, rls, data] = await Promise.all([
-          GetMembers(),
-          GetRoles(),
-          GetEvents()
+          GetMembersAsync(),
+          GetRolesAsync(),
+          GetEventsAsync()
         ]);
         setMembers(mems);
         setRoles(rls);
@@ -78,7 +78,7 @@ export default function ContributionsPage() {
           setFilterEventId(data[0].eventId);
         }
         try {
-          const allData = await GetContributions();
+          const allData = await GetContributionsAsync();
           setAllContributions(allData);
         } catch (allDataErr) {
           console.warn("Global contributions endpoint not available yet:", allDataErr);
@@ -106,7 +106,7 @@ export default function ContributionsPage() {
 
     async function loadContributions() {
       try {
-        const data = await GetContributionsByEvent(selectedEventId);
+        const data = await GetContributionsByEventAsync(selectedEventId);
 
         const enrichedData = data.map(c => {
           // Calculate Arrears: sum of unpaid contributions for this member in other events
@@ -152,7 +152,7 @@ export default function ContributionsPage() {
     }
 
     try {
-      await RecordPayment({
+      await RecordPaymentAsync({
         ...payment,
         paymentDate: payment.paymentDate?.toISOString(),
         amount: payment.amount === "" ? null : Number(payment.amount),
@@ -161,10 +161,10 @@ export default function ContributionsPage() {
       setDialogOpen(false);
 
       // Reload global and event contributions to update all outstanding balances
-      const allData = await GetContributions();
+      const allData = await GetContributionsAsync();
       setAllContributions(allData);
 
-      const eventData = await GetContributionsByEvent(selectedEventId);
+      const eventData = await GetContributionsByEventAsync(selectedEventId);
       const enriched = eventData.map(c => {
         const previousUnpaid = allData
           .filter(prev =>

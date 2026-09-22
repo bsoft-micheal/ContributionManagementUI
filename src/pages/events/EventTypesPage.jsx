@@ -11,7 +11,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
-import { GetEventTypes, CreateEventType, UpdateEventType, DeleteEventType } from "../../services/eventTypeService";
+import { GetEventTypesAsync, CreateEventTypeAsync, UpdateEventTypeAsync, DeleteEventTypeAsync } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
 
 const formatBaseAmount = (value) => {
@@ -45,7 +45,7 @@ export default function EventTypesPage() {
 
   async function loadData() {
     setLoading(true);
-    const data = await GetEventTypes();
+    const data = await GetEventTypesAsync();
     setTypes(data);
     setLoading(false);
   }
@@ -84,10 +84,10 @@ export default function EventTypesPage() {
         baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0)
       };
       if (form.eventTypeId) {
-        await UpdateEventType(form.eventTypeId, payload);
+        await UpdateEventTypeAsync(form.eventTypeId, payload);
         toast.success("Saved successfully");
       } else {
-        await CreateEventType(payload);
+        await CreateEventTypeAsync(payload);
         toast.success("Saved successfully");
       }
       setDialogOpen(false);
@@ -105,7 +105,7 @@ export default function EventTypesPage() {
   async function handleConfirmDelete() {
     if (typeToDelete) {
       try {
-        await DeleteEventType(typeToDelete);
+        await DeleteEventTypeAsync(typeToDelete);
         toast.success("Deleted successfully");
         loadData();
       } catch (error) {
@@ -123,7 +123,7 @@ export default function EventTypesPage() {
         ...row,
         isActive: !row.isActive,
       };
-      await UpdateEventType(row.eventTypeId, payload);
+      await UpdateEventTypeAsync(row.eventTypeId, payload);
       toast.success("Status updated successfully");
       loadData();
     } catch (err) {
@@ -143,7 +143,7 @@ export default function EventTypesPage() {
         ...typeToToggle,
         isActive: !typeToToggle.isActive,
       };
-      await UpdateEventType(typeToToggle.eventTypeId, payload);
+      await UpdateEventTypeAsync(typeToToggle.eventTypeId, payload);
       toast.success("Category status updated successfully");
       loadData();
     } catch (err) {

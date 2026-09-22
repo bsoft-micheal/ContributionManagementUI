@@ -14,7 +14,7 @@ import dayjs from "dayjs";
 import MetricCard from "../../components/MetricCard";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
-import { GetDashboardSummary } from "../../services/dashboardService";
+import { GetDashboardSummaryAsync } from "../../services/dashboardService";
 import AppDataTable from "../../components/common/AppDataTable";
 
 function EventContributionChart({ items }) {
@@ -168,7 +168,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await GetDashboardSummary(filters);
+      const data = await GetDashboardSummaryAsync(filters);
       setSummary(data);
       setLoading(false);
     }

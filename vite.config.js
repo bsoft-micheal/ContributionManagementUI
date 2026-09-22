@@ -6,7 +6,12 @@ export default defineConfig({
   server: {
     port: 5173,
     watch: {
-      ignored: ["**/.vs/**", "**/.git/**"],
+      ignored: [
+        "**/.vs/**", 
+        "**/.git/**", 
+        "**/src/.vs/**", 
+        "**/*.vsidx"
+      ],
     },
   },
 });

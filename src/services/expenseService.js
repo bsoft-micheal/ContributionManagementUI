@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const getExpenses = async (params) => {
+export const getExpensesAsync = async (params) => {
   try {
     return await getApi("/expenses", params);
   } catch (error) {
@@ -9,7 +9,7 @@ export const getExpenses = async (params) => {
   }
 };
 
-export const getExpenseById = async (id) => {
+export const getExpenseByIdAsync = async (id) => {
   try {
     return await getApi(`/expenses/${id}`);
   } catch (error) {
@@ -18,7 +18,7 @@ export const getExpenseById = async (id) => {
   }
 };
 
-export const createExpense = async (data) => {
+export const createExpenseAsync = async (data) => {
   try {
     return await postApi("/expenses", data);
   } catch (error) {
@@ -27,7 +27,7 @@ export const createExpense = async (data) => {
   }
 };
 
-export const updateExpense = async (id, data) => {
+export const updateExpenseAsync = async (id, data) => {
   try {
     return await putApi(`/expenses/${id}`, data);
   } catch (error) {
@@ -36,7 +36,7 @@ export const updateExpense = async (id, data) => {
   }
 };
 
-export const deleteExpense = async (id) => {
+export const deleteExpenseAsync = async (id) => {
   try {
     return await deleteApi(`/expenses/${id}`);
   } catch (error) {
