@@ -33,68 +33,60 @@ import AppDataTable from "../../components/common/AppDataTable";
 // ─── Color Palette ────────────────────────────────────────────────────────────
 const C = {
   collected: "#10b981", // emerald green
-  pending:   "#f59e0b", // amber
-  paid:      "#3b82f6", // blue
-  unpaid:    "#ef4444", // red
+  pending: "#f59e0b", // amber
+  paid: "#3b82f6", // blue
+  unpaid: "#ef4444", // red
 };
 
 // ─── Format Helpers ───────────────────────────────────────────────────────────
 function fmtAmt(v) {
   const n = Number(v) || 0;
   if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000)   return `₹${(n / 1000).toFixed(1)}k`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}k`;
   return `₹${Math.round(n)}`;
 }
 
-// ─── Multi-Ring Donut (SVG stroke-dasharray technique) ────────────────────────
+// ─── Premium Multi-Ring Donut Chart ─────────────────────────────────────────
 //
-//  Ring layout (300×300 SVG):
-//   Outer ring  →  mid-radius 120, thickness 30  (inner edge at 105)
-//   Inner ring  →  mid-radius  80, thickness 30  (outer edge at  95)
-//   Decorative gap = 10 px between rings
-//   Center area  →  radius ≈ 63 px  (diameter ≈ 126 px for text)
+//  Ring layout (320×320 SVG):
+//   Outer ring  →  mid-radius 118, thickness 22 (Amount: Collected vs Pending)
+//   Inner ring  →  mid-radius  84, thickness 18 (Payments: Paid vs Pending)
+//   Center area →  radius ≈ 64 px (diameter ≈ 128 px for glass stats hub)
 
-const MR_SIZE        = 300;
-const MR_THICKNESS   = 30;
-const MR_MID_RADII   = [120, 80]; // outer → inner
-const MR_SEGMENT_GAP = 3;         // px gap between adjacent segments
-
-function buildRingArcs(segments, midR) {
-  const circ  = 2 * Math.PI * midR;
-  const total = segments.reduce((s, d) => s + Math.max(Number(d.value) || 0, 0), 0);
-  let cum = 0;
-  return {
-    circ,
-    total,
-    arcs: segments.map((seg) => {
-      const val  = Math.max(Number(seg.value) || 0, 0);
-      const frac = total > 0 ? val / total : 0;
-      const len  = frac * circ;
-      const dash = Math.max(0, len - MR_SEGMENT_GAP);
-      const offset = circ - cum;
-      cum += len;
-      return { ...seg, frac, dash, offset };
-    }),
-  };
-}
+const MR_SIZE = 320;
+const MR_MID_RADII = [118, 84];
+const MR_WIDTHS = [22, 18];
 
 function MultiRingDonut({ rings, centerPct, centerLabel, centerSub }) {
-  const theme  = useTheme();
+  const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-  const cx     = MR_SIZE / 2;
-  const cy     = MR_SIZE / 2;
+  const cx = MR_SIZE / 2;
+  const cy = MR_SIZE / 2;
 
-  const trackColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.07)";
-  const rimColor   = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const trackColor = isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.07)";
+  const rimColor = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.10)";
 
-  const processed = rings.map((ring, ri) => ({
-    ...ring,
-    midR: MR_MID_RADII[ri],
-    ...buildRingArcs(ring.segments, MR_MID_RADII[ri]),
-  }));
+  const processedRings = rings.map((ring, ri) => {
+    const midR = MR_MID_RADII[ri];
+    const strokeWidth = MR_WIDTHS[ri];
+    const circ = 2 * Math.PI * midR;
+    const total = ring.segments.reduce((s, d) => s + Math.max(Number(d.value) || 0, 0), 0);
+    let cum = 0;
 
-  const outerR = MR_MID_RADII[0] + MR_THICKNESS / 2 + 5;
-  const innerR = MR_MID_RADII[MR_MID_RADII.length - 1] - MR_THICKNESS / 2 - 5;
+    const nonZeroCount = ring.segments.filter((s) => Number(s.value) > 0).length;
+    const arcs = ring.segments.map((seg) => {
+      const val = Math.max(Number(seg.value) || 0, 0);
+      const frac = total > 0 ? val / total : 0;
+      const len = frac * circ;
+      // Gap between segments only if multiple segments have value
+      const dash = nonZeroCount > 1 ? Math.max(0, len - 3.5) : len;
+      const offset = circ - cum;
+      cum += len;
+      return { ...seg, frac, dash, offset, len };
+    });
+
+    return { ...ring, midR, strokeWidth, circ, total, arcs };
+  });
 
   return (
     <Box sx={{ position: "relative", width: MR_SIZE, height: MR_SIZE, flexShrink: 0 }}>
@@ -105,112 +97,164 @@ function MultiRingDonut({ rings, centerPct, centerLabel, centerSub }) {
         style={{ transform: "rotate(-90deg)", overflow: "visible" }}
       >
         <defs>
-          {/* Subtle drop-shadow for segments */}
-          <filter id="mrShadow" x="-15%" y="-15%" width="130%" height="130%">
-            <feDropShadow dx="0" dy="1.5" stdDeviation="2.5" floodOpacity="0.2" />
+          {/* Subtle drop shadow */}
+          <filter id="mrGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3.5" floodOpacity="0.22" />
           </filter>
 
-          {/* Glow filters per colour */}
-          {Object.entries(C).map(([key, hex]) => (
-            <filter key={key} id={`glow-${key}`} x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          ))}
+          {/* Linear Gradients */}
+          <linearGradient id="grad-collected" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#059669" />
+          </linearGradient>
+          <linearGradient id="grad-pending" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#d97706" />
+          </linearGradient>
+          <linearGradient id="grad-paid" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#2563eb" />
+          </linearGradient>
+          <linearGradient id="grad-unpaid" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ef4444" />
+            <stop offset="100%" stopColor="#dc2626" />
+          </linearGradient>
         </defs>
 
-        {/* ── Outer decorative border ── */}
-        <circle cx={cx} cy={cy} r={outerR}
-          fill="none" stroke={rimColor} strokeWidth={1} />
+        {/* Outer decorative dashed orbit track */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={136}
+          fill="none"
+          stroke={rimColor}
+          strokeWidth={1}
+          strokeDasharray="4 6"
+        />
 
-        {/* ── Inner decorative border (center circle outline) ── */}
-        <circle cx={cx} cy={cy} r={innerR}
-          fill="none" stroke={rimColor} strokeWidth={1} />
+        {/* Inner decorative orbit track */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={68}
+          fill="none"
+          stroke={rimColor}
+          strokeWidth={1}
+        />
 
-        {/* ── Background tracks ── */}
-        {processed.map((ring, ri) => (
-          <circle key={`track-${ri}`}
-            cx={cx} cy={cy} r={ring.midR}
+        {/* Background tracks */}
+        {processedRings.map((ring, ri) => (
+          <circle
+            key={`bg-track-${ri}`}
+            cx={cx}
+            cy={cy}
+            r={ring.midR}
             fill="none"
             stroke={trackColor}
-            strokeWidth={MR_THICKNESS}
+            strokeWidth={ring.strokeWidth}
           />
         ))}
 
-        {/* ── Coloured segments ── */}
-        {processed.map((ring, ri) =>
-          ring.arcs.map((arc, ai) => (
-            <circle key={`seg-${ri}-${ai}`}
-              cx={cx} cy={cy} r={ring.midR}
-              fill="none"
-              stroke={arc.color}
-              strokeWidth={MR_THICKNESS - 5}
-              strokeLinecap="butt"
-              strokeDasharray={`${arc.dash} ${ring.circ}`}
-              strokeDashoffset={arc.offset}
-              filter="url(#mrShadow)"
-            />
-          ))
-        )}
+        {/* Active Colored Arcs */}
+        {processedRings.map((ring, ri) =>
+          ring.arcs.map((arc, ai) => {
+            if (arc.dash <= 0) return null;
+            const gradId =
+              arc.color === C.collected ? "url(#grad-collected)" :
+              arc.color === C.pending ? "url(#grad-pending)" :
+              arc.color === C.paid ? "url(#grad-paid)" :
+              arc.color === C.unpaid ? "url(#grad-unpaid)" : arc.color;
 
-        {/* ── Ring-index dots at 12 o'clock (shows which ring is which) ── */}
-        {processed.map((ring, ri) => {
-          // 12 o'clock in the rotated SVG = (cx, cy - midR) in SVG coords
-          const dotX = cx;
-          const dotY = cy - ring.midR;
-          return (
-            <circle key={`dot-${ri}`}
-              cx={dotX} cy={dotY} r={6}
-              fill={theme.palette.background.paper}
-              stroke={ring.arcs[0]?.color ?? rimColor}
-              strokeWidth={2.5}
-            />
-          );
-        })}
+            return (
+              <circle
+                key={`arc-${ri}-${ai}`}
+                cx={cx}
+                cy={cy}
+                r={ring.midR}
+                fill="none"
+                stroke={gradId}
+                strokeWidth={ring.strokeWidth}
+                strokeDasharray={`${arc.dash} ${ring.circ}`}
+                strokeDashoffset={arc.offset}
+                strokeLinecap="round"
+                filter="url(#mrGlow)"
+              />
+            );
+          })
+        )}
       </svg>
 
-      {/* ── Center overlay (counters SVG rotation) ── */}
-      <Box sx={{
-        position: "absolute", inset: 0,
-        display: "grid", placeItems: "center",
-        textAlign: "center", pointerEvents: "none",
-      }}>
-        <Box>
-          <Typography
-            sx={{
-              fontSize: "2rem",
-              fontWeight: 900,
-              lineHeight: 1,
-              background: `linear-gradient(135deg, ${C.collected} 0%, #059669 100%)`,
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            {centerPct}%
-          </Typography>
-          <Typography
-            variant="caption"
-            fontWeight={800}
-            color="text.secondary"
-            display="block"
-            sx={{ mt: 0.4, fontSize: "0.72rem", letterSpacing: "0.04em" }}
-          >
-            {centerLabel}
-          </Typography>
-          {centerSub && (
+      {/* Center overlay */}
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          display: "grid",
+          placeItems: "center",
+          textAlign: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <Box
+          sx={{
+            width: 120,
+            height: 120,
+            borderRadius: "50%",
+            display: "grid",
+            placeItems: "center",
+            background: isDark
+              ? "radial-gradient(circle, rgba(124, 58, 237, 0.16) 0%, rgba(30, 26, 46, 0.85) 100%)"
+              : "radial-gradient(circle, rgba(124, 58, 237, 0.08) 0%, rgba(255, 255, 255, 0.95) 100%)",
+            boxShadow: isDark
+              ? "0 4px 20px rgba(0,0,0,0.4), inset 0 0 16px rgba(124, 58, 237, 0.1)"
+              : "0 4px 16px rgba(0,0,0,0.06), inset 0 0 12px rgba(124, 58, 237, 0.05)",
+            border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.1)"}`,
+          }}
+        >
+          <Box>
+            <Typography
+              sx={{
+                fontSize: "2.1rem",
+                fontWeight: 900,
+                lineHeight: 1,
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              {centerPct}%
+            </Typography>
             <Typography
               variant="caption"
-              color="text.disabled"
-              display="block"
-              sx={{ fontSize: "0.6rem", mt: 0.3 }}
+              sx={{
+                fontWeight: 800,
+                color: "text.secondary",
+                display: "block",
+                mt: 0.5,
+                fontSize: "0.68rem",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
             >
-              {centerSub}
+              {centerLabel}
             </Typography>
-          )}
+            {centerSub && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "text.disabled",
+                  display: "block",
+                  fontSize: "0.62rem",
+                  fontWeight: 600,
+                  mt: 0.2,
+                }}
+              >
+                {centerSub}
+              </Typography>
+            )}
+          </Box>
         </Box>
       </Box>
     </Box>
@@ -220,76 +264,96 @@ function MultiRingDonut({ rings, centerPct, centerLabel, centerSub }) {
 // ─── Ring Legend Group ────────────────────────────────────────────────────────
 
 function RingLegendGroup({ index, label, color, segments, total }) {
-  const theme  = useTheme();
+  const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
   return (
     <Box>
-      {/* Group header with coloured accent bar */}
+      {/* Group header */}
       <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1.5 }}>
-        <Box sx={{
-          width: 28, height: 28, borderRadius: "50%",
-          display: "grid", placeItems: "center", flexShrink: 0,
-          background: `linear-gradient(135deg, ${alpha(color, 0.25)} 0%, ${alpha(color, 0.12)} 100%)`,
-          border: `2px solid ${alpha(color, 0.4)}`,
-        }}>
+        <Box
+          sx={{
+            width: 26,
+            height: 26,
+            borderRadius: "50%",
+            display: "grid",
+            placeItems: "center",
+            flexShrink: 0,
+            background: `linear-gradient(135deg, ${alpha(color, 0.25)} 0%, ${alpha(color, 0.12)} 100%)`,
+            border: `1.5px solid ${alpha(color, 0.45)}`,
+          }}
+        >
           <Typography sx={{ fontSize: "0.65rem", fontWeight: 900, color }}>
             {index}
           </Typography>
         </Box>
-        <Box>
-          <Typography variant="body2" fontWeight={800}
-            sx={{ textTransform: "uppercase", letterSpacing: "0.07em", fontSize: "0.72rem", color }}>
-            {label}
-          </Typography>
-        </Box>
+        <Typography
+          variant="body2"
+          fontWeight={800}
+          sx={{ textTransform: "uppercase", letterSpacing: "0.08em", fontSize: "0.74rem", color }}
+        >
+          {label}
+        </Typography>
       </Stack>
 
-      <Stack spacing={1.25}>
+      <Stack spacing={1.5}>
         {segments.map((seg, i) => {
           const frac = total > 0 ? Math.max(Number(seg.value) || 0, 0) / total : 0;
-          const pct  = Math.round(frac * 100);
+          const pct = Math.round(frac * 100);
           return (
             <Box key={i}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                <Stack direction="row" alignItems="center" spacing={0.75}>
-                  <Box sx={{
-                    width: 10, height: 10, borderRadius: 0.5,
-                    bgcolor: seg.color, flexShrink: 0,
-                    boxShadow: `0 0 6px ${alpha(seg.color, 0.55)}`,
-                  }} />
-                  <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.82rem" }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.6 }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      bgcolor: seg.color,
+                      flexShrink: 0,
+                      boxShadow: `0 0 6px ${alpha(seg.color, 0.55)}`,
+                    }}
+                  />
+                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.84rem" }}>
                     {seg.label}
                   </Typography>
                 </Stack>
-                <Stack direction="row" alignItems="center" spacing={0.75}>
-                  <Typography variant="body2" fontWeight={800} sx={{ fontSize: "0.82rem" }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography variant="body2" fontWeight={800} sx={{ fontSize: "0.85rem" }}>
                     {seg.displayValue ?? seg.value}
                   </Typography>
-                  <Box sx={{
-                    px: 0.7, py: 0.05, borderRadius: 99,
-                    bgcolor: alpha(seg.color, 0.14),
-                    border: `1px solid ${alpha(seg.color, 0.3)}`,
-                  }}>
-                    <Typography variant="caption" fontWeight={900}
-                      sx={{ color: seg.color, fontSize: "0.66rem" }}>
-                      {pct}%
-                    </Typography>
-                  </Box>
+                  <Chip
+                    label={`${pct}%`}
+                    size="small"
+                    sx={{
+                      height: 18,
+                      fontSize: "0.65rem",
+                      fontWeight: 900,
+                      bgcolor: alpha(seg.color, 0.12),
+                      color: seg.color,
+                      border: `1px solid ${alpha(seg.color, 0.3)}`,
+                    }}
+                  />
                 </Stack>
               </Stack>
-              {/* Coloured progress bar */}
-              <Box sx={{
-                height: 5, borderRadius: 99,
-                bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
-                overflow: "hidden",
-              }}>
-                <Box sx={{
-                  height: "100%", width: `${pct}%`,
-                  background: `linear-gradient(90deg, ${seg.color} 0%, ${alpha(seg.color, 0.7)} 100%)`,
-                  borderRadius: 99,
-                  transition: "width 0.8s cubic-bezier(.16,1,.3,1)",
-                }} />
+              {/* Progress bar */}
+              <Box
+                sx={{
+                  height: 6,
+                  borderRadius: 3,
+                  bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  sx={{
+                    height: "100%",
+                    width: `${pct}%`,
+                    background: `linear-gradient(90deg, ${seg.color} 0%, ${alpha(seg.color, 0.7)} 100%)`,
+                    borderRadius: 3,
+                    transition: "width 0.8s cubic-bezier(.16,1,.3,1)",
+                  }}
+                />
               </Box>
             </Box>
           );
@@ -302,67 +366,89 @@ function RingLegendGroup({ index, label, color, segments, total }) {
 // ─── Per-Event Mini Card ──────────────────────────────────────────────────────
 
 function EventMiniCard({ event, index }) {
-  const theme  = useTheme();
+  const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-  const expected  = Number(event.expectedAmount)  || 0;
+  const expected = Number(event.expectedAmount) || 0;
   const collected = Number(event.collectedAmount) || 0;
   const pct = expected > 0 ? Math.round((collected / expected) * 100) : 0;
   const allPaid = event.pendingContributionsCount === 0 && (event.totalContributionsCount ?? 0) > 0;
 
   return (
-    <Box sx={{
-      p: 1.5, borderRadius: 1.5,
-      border: `1px solid ${theme.palette.divider}`,
-      bgcolor: isDark ? alpha("#fff", 0.02) : alpha("#000", 0.01),
-      transition: "border-color 0.2s",
-      "&:hover": { borderColor: alpha(C.collected, 0.4) },
-    }}>
+    <Box
+      sx={{
+        p: 1.75,
+        borderRadius: 2,
+        border: `1px solid ${theme.palette.divider}`,
+        bgcolor: isDark ? alpha("#fff", 0.02) : alpha("#000", 0.01),
+        transition: "all 0.2s ease",
+        "&:hover": {
+          borderColor: alpha(C.collected, 0.4),
+          transform: "translateY(-2px)",
+          boxShadow: isDark ? "0 6px 16px rgba(0,0,0,0.3)" : "0 4px 12px rgba(0,0,0,0.05)",
+        },
+      }}
+    >
       <Stack direction="row" alignItems="flex-start" spacing={1.5}>
-        <Box sx={{
-          width: 28, height: 28, borderRadius: 1,
-          bgcolor: alpha(C.paid, 0.12),
-          border: `1px solid ${alpha(C.paid, 0.2)}`,
-          display: "grid", placeItems: "center", flexShrink: 0,
-        }}>
-          <Typography sx={{ fontSize: "0.65rem", fontWeight: 900, color: C.paid }}>
+        <Box
+          sx={{
+            width: 30,
+            height: 30,
+            borderRadius: 1.5,
+            bgcolor: alpha(C.paid, 0.12),
+            border: `1px solid ${alpha(C.paid, 0.25)}`,
+            display: "grid",
+            placeItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Typography sx={{ fontSize: "0.7rem", fontWeight: 900, color: C.paid }}>
             {String(index + 1).padStart(2, "0")}
           </Typography>
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="caption" fontWeight={700} noWrap
-              sx={{ maxWidth: 160, fontSize: "0.78rem" }}>
+            <Typography variant="body2" fontWeight={800} noWrap sx={{ maxWidth: 170, fontSize: "0.82rem" }}>
               {event.eventName}
             </Typography>
             <Chip
               label={allPaid ? "✓ Settled" : `${event.pendingContributionsCount} pending`}
               size="small"
               sx={{
-                height: 18, fontSize: "0.65rem", fontWeight: 800, ml: 1,
+                height: 20,
+                fontSize: "0.66rem",
+                fontWeight: 800,
+                ml: 1,
                 bgcolor: allPaid ? alpha(C.collected, 0.14) : alpha(C.unpaid, 0.12),
                 color: allPaid ? "#059669" : "#dc2626",
                 border: `1px solid ${allPaid ? alpha(C.collected, 0.28) : alpha(C.unpaid, 0.28)}`,
               }}
             />
           </Stack>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 0.6 }}>
-            <Box sx={{
-              flex: 1, mr: 1, height: 5, borderRadius: 99,
-              bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
-              overflow: "hidden",
-            }}>
-              <Box sx={{
-                height: "100%", width: `${pct}%`,
-                background: `linear-gradient(90deg, ${C.collected} 0%, ${alpha(C.collected, 0.7)} 100%)`,
-                borderRadius: 99,
-                transition: "width 0.7s cubic-bezier(.16,1,.3,1)",
-              }} />
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 0.8 }}>
+            <Box
+              sx={{
+                flex: 1,
+                mr: 1.5,
+                height: 6,
+                borderRadius: 3,
+                bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+                overflow: "hidden",
+              }}
+            >
+              <Box
+                sx={{
+                  height: "100%",
+                  width: `${pct}%`,
+                  background: `linear-gradient(90deg, ${C.collected} 0%, ${alpha(C.collected, 0.7)} 100%)`,
+                  borderRadius: 3,
+                  transition: "width 0.7s cubic-bezier(.16,1,.3,1)",
+                }}
+              />
             </Box>
-            <Typography variant="caption" fontWeight={700}
-              sx={{ whiteSpace: "nowrap", fontSize: "0.7rem", color: C.collected }}>
+            <Typography variant="caption" fontWeight={800} sx={{ whiteSpace: "nowrap", fontSize: "0.74rem", color: C.collected }}>
               {fmtAmt(collected)}
-              <Typography component="span" color="text.disabled" sx={{ fontSize: "0.65rem" }}>
-                {" /"} {fmtAmt(expected)}
+              <Typography component="span" color="text.disabled" sx={{ fontSize: "0.68rem", fontWeight: 600 }}>
+                {" / "} {fmtAmt(expected)}
               </Typography>
             </Typography>
           </Stack>
@@ -479,16 +565,21 @@ function FilterBar({ pending, onChange, onGo, loading }) {
 function StatPill({ label, value, color }) {
   return (
     <Box sx={{
-      px: 2, py: 1.25, borderRadius: 2,
-      border: `1px solid ${alpha(color, 0.25)}`,
+      px: 2, py: 1.5, borderRadius: 2.5,
+      border: `1px solid ${alpha(color, 0.28)}`,
       bgcolor: alpha(color, 0.08),
       flex: 1, textAlign: "center",
+      transition: "all 0.2s ease",
+      "&:hover": {
+        bgcolor: alpha(color, 0.13),
+        transform: "translateY(-1px)",
+      },
     }}>
-      <Typography sx={{ fontSize: "1.15rem", fontWeight: 900, color, lineHeight: 1 }}>
+      <Typography sx={{ fontSize: "1.25rem", fontWeight: 900, color, lineHeight: 1.1 }}>
         {value}
       </Typography>
-      <Typography variant="caption" color="text.secondary" fontWeight={600}
-        sx={{ fontSize: "0.67rem", letterSpacing: "0.04em", mt: 0.25, display: "block" }}>
+      <Typography variant="caption" color="text.secondary" fontWeight={700}
+        sx={{ fontSize: "0.68rem", letterSpacing: "0.04em", mt: 0.4, display: "block" }}>
         {label}
       </Typography>
     </Box>
@@ -498,13 +589,13 @@ function StatPill({ label, value, color }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const theme  = useTheme();
+  const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
   const [activeTab, setActiveTab] = useState(0);
-  const [summary,   setSummary]   = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [search,    setSearch]    = useState("");
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const [pendingFilters, setPendingFilters] = useState({
     month: dayjs().month() + 1, year: dayjs().year(),
@@ -536,19 +627,19 @@ export default function DashboardPage() {
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const events       = summary?.upcomingEvents ?? [];
-  const chartEvents  = events.slice(0, 6);
+  const events = summary?.upcomingEvents ?? [];
+  const chartEvents = events.slice(0, 6);
 
-  const totalCollected = Number(summary?.totalContributions  ?? 0);
-  const totalPending   = Number(summary?.totalPendingAmount  ?? 0);
-  const pendingCount   = Number(summary?.pendingPayments     ?? 0);
-  const paidCount      = events.reduce(
+  const totalCollected = Number(summary?.totalContributions ?? 0);
+  const totalPending = Number(summary?.totalPendingAmount ?? 0);
+  const pendingCount = Number(summary?.pendingPayments ?? 0);
+  const paidCount = events.reduce(
     (s, e) => s + ((e.totalContributionsCount ?? 0) - (e.pendingContributionsCount ?? 0)), 0
   );
-  const totalExpected  = totalCollected + totalPending;
+  const totalExpected = totalCollected + totalPending;
   const collectionRate = totalExpected > 0
     ? Math.round((totalCollected / totalExpected) * 100) : 0;
-  const paymentRate    = (paidCount + pendingCount) > 0
+  const paymentRate = (paidCount + pendingCount) > 0
     ? Math.round((paidCount / (paidCount + pendingCount)) * 100) : 0;
 
   // Multi-ring chart ring definitions
@@ -556,13 +647,13 @@ export default function DashboardPage() {
     label: "Amount",
     segments: [
       { label: "Collected", value: totalCollected, color: C.collected, displayValue: fmtAmt(totalCollected) },
-      { label: "Pending",   value: totalPending,   color: C.pending,   displayValue: fmtAmt(totalPending)   },
+      { label: "Pending", value: totalPending, color: C.pending, displayValue: fmtAmt(totalPending) },
     ],
   };
   const paymentsRing = {
     label: "Payments",
     segments: [
-      { label: "Paid",    value: paidCount,    color: C.paid,   displayValue: String(paidCount)   },
+      { label: "Paid", value: paidCount, color: C.paid, displayValue: String(paidCount) },
       { label: "Pending", value: pendingCount, color: C.unpaid, displayValue: String(pendingCount) },
     ],
   };
@@ -572,9 +663,9 @@ export default function DashboardPage() {
     const q = search.trim().toLowerCase();
     return q
       ? events.filter((e) =>
-          e.eventName.toLowerCase().includes(q) ||
-          e.eventTypeName.toLowerCase().includes(q)
-        )
+        e.eventName.toLowerCase().includes(q) ||
+        e.eventTypeName.toLowerCase().includes(q)
+      )
       : events;
   }, [events, search]);
 
@@ -622,7 +713,7 @@ export default function DashboardPage() {
     {
       label: "Paid / Total", key: "totalContributionsCount", align: "center",
       render: (row) => {
-        const paid  = (row.totalContributionsCount ?? 0) - (row.pendingContributionsCount ?? 0);
+        const paid = (row.totalContributionsCount ?? 0) - (row.pendingContributionsCount ?? 0);
         const total = row.totalContributionsCount ?? 0;
         return (
           <Chip label={`${paid} / ${total}`} size="small"
@@ -659,12 +750,16 @@ export default function DashboardPage() {
           >
             <Tab id="tab-charts" icon={<DonutLargeIcon sx={{ fontSize: 18 }} />}
               iconPosition="start" label="Charts"
-              sx={{ fontWeight: 700, minHeight: 48, textTransform: "none", fontSize: "0.88rem",
-                "&.Mui-selected": { color: "primary.main" } }} />
+              sx={{
+                fontWeight: 700, minHeight: 48, textTransform: "none", fontSize: "0.88rem",
+                "&.Mui-selected": { color: "primary.main" }
+              }} />
             <Tab id="tab-dashboard" icon={<GridViewIcon sx={{ fontSize: 18 }} />}
               iconPosition="start" label="Dashboard"
-              sx={{ fontWeight: 700, minHeight: 48, textTransform: "none", fontSize: "0.88rem",
-                "&.Mui-selected": { color: "primary.main" } }} />
+              sx={{
+                fontWeight: 700, minHeight: 48, textTransform: "none", fontSize: "0.88rem",
+                "&.Mui-selected": { color: "primary.main" }
+              }} />
           </Tabs>
         </Box>
 
@@ -765,8 +860,8 @@ export default function DashboardPage() {
                                 {/* Ring-type legend pills below donut */}
                                 <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap">
                                   {[
-                                    { label: "① Amount Ring",   color: C.collected },
-                                    { label: "② Payments Ring", color: C.paid      },
+                                    { label: "① Amount Ring", color: C.collected },
+                                    { label: "② Payments Ring", color: C.paid },
                                   ].map((item) => (
                                     <Box key={item.label} sx={{
                                       display: "flex", alignItems: "center", gap: 0.6,
@@ -794,9 +889,9 @@ export default function DashboardPage() {
                               <Stack spacing={3}>
                                 {/* Quick stat pills */}
                                 <Stack direction="row" spacing={1.5}>
-                                  <StatPill label="Collection Rate" value={`${collectionRate}%`}  color={C.collected} />
-                                  <StatPill label="Payment Rate"    value={`${paymentRate}%`}     color={C.paid}      />
-                                  <StatPill label="Events"          value={summary?.monthlyEventsCount ?? 0} color="#7c3aed" />
+                                  <StatPill label="Collection Rate" value={`${collectionRate}%`} color={C.collected} />
+                                  <StatPill label="Payment Rate" value={`${paymentRate}%`} color={C.paid} />
+                                  <StatPill label="Events" value={summary?.monthlyEventsCount ?? 0} color="#7c3aed" />
                                 </Stack>
 
                                 {/* Ring legends */}

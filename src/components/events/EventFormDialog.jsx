@@ -19,7 +19,7 @@ import AppButton from "../common/AppButton";
 import AppDialog from "../common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../common/AppToast";
-import { CreateEvent, UpdateEvent, GetEventById } from "../../services/eventService";
+import { CreateEventAsync, UpdateEventAsync, GetEventByIdAsync } from "../../services/eventService";
 import { updateSystemSettings } from "../../services/settingsService";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import {
@@ -31,7 +31,6 @@ import {
   buildPaymentReminderEmailHtml,
 } from "../../utils/upiQrHelper";
 import { SendPaymentReminder } from "../../services/contributionService";
-import { CreateEventAsync, UpdateEventAsync, GetEventByIdAsync } from "../../services/eventService";
 
 // Hardcoded calculation rules as requested
 const RULES = {

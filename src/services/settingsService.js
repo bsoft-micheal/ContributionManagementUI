@@ -26,3 +26,9 @@ export const resetSystemSettingsAsync = async () => {
     throw error;
   }
 };
+
+// Aliases for compatibility
+export const getSystemSettings = getSystemSettingsAsync;
+export const updateSystemSettings = updateSystemSettingsAsync;
+export const resetSystemSettings = resetSystemSettingsAsync;
+
