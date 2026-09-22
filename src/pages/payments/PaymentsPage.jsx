@@ -25,11 +25,11 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { useAppToast } from "../../components/common/AppToast";
 import {
-  getPaymentTransactions,
-  verifyPaymentTransaction,
+  getPaymentTransactionsAsync,
+  verifyPaymentTransactionAsync,
 } from "../../services/paymentService";
-import { GetMembers } from "../../services/memberService";
-import { GetEvents } from "../../services/eventService";
+import { GetMembersAsync } from "../../services/memberService";
+import { GetEventsAsync } from "../../services/eventService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 
@@ -106,9 +106,9 @@ export default function PaymentsPage() {
     try {
       setLoading(true);
       const [txnRes, memsRes, eventsRes] = await Promise.all([
-        getPaymentTransactions().catch(() => []),
-        GetMembers().catch(() => []),
-        GetEvents().catch(() => []),
+        getPaymentTransactionsAsync().catch(() => []),
+        GetMembersAsync().catch(() => []),
+        GetEventsAsync().catch(() => []),
       ]);
 
       if (Array.isArray(memsRes)) setMembersList(memsRes);
@@ -162,7 +162,7 @@ export default function PaymentsPage() {
     const verifier = authState?.fullName || authState?.username || "Admin";
     if (target.transactionId) {
       try {
-        await verifyPaymentTransaction(target.transactionId, {
+        await verifyPaymentTransactionAsync(target.transactionId, {
           status: "Verified",
           verifiedBy: verifier,
           notes: `Payment verified by ${verifier}.`,
@@ -192,7 +192,7 @@ export default function PaymentsPage() {
 
     if (target.transactionId) {
       try {
-        await verifyPaymentTransaction(target.transactionId, {
+        await verifyPaymentTransactionAsync(target.transactionId, {
           status: "Pending",
           verifiedBy: "-",
           notes: "Marked as pending.",

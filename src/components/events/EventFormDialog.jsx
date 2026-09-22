@@ -19,7 +19,7 @@ import AppButton from "../common/AppButton";
 import AppDialog from "../common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../common/AppToast";
-import { CreateEvent, UpdateEvent, GetEventById } from "../../services/eventService";
+import { CreateEventAsync, UpdateEventAsync, GetEventByIdAsync } from "../../services/eventService";
 
 // Hardcoded calculation rules as requested
 const RULES = {
@@ -133,7 +133,7 @@ export default function EventFormDialog({
         const fetchDetails = async () => {
           setLoading(true);
           try {
-            const detailedEvent = await GetEventById(event.eventId);
+            const detailedEvent = await GetEventByIdAsync(event.eventId);
             const pIds =
               detailedEvent.participantIds ||
               (detailedEvent.participants ? detailedEvent.participants.map((p) => p.memberId) : []);
@@ -338,10 +338,10 @@ export default function EventFormDialog({
       }
 
       if (form.eventId) {
-        await UpdateEvent(form.eventId, payload);
+        await UpdateEventAsync(form.eventId, payload);
         toast.success("Saved successfully");
       } else {
-        await CreateEvent(payload);
+        await CreateEventAsync(payload);
         toast.success("Saved successfully");
       }
 

@@ -1,44 +1,44 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const getExpenses = async (params) => {
+export const getExpensesAsync = async (params) => {
   try {
-    return await getApi("/expenses", params);
+    return await getApi("/expenses/getAllExpenseAsync", params);
   } catch (error) {
     console.error("Error fetching expenses:", error.response?.data || error.message);
     throw error;
   }
 };
 
-export const getExpenseById = async (id) => {
+export const getExpenseByIdAsync = async (id) => {
   try {
-    return await getApi(`/expenses/${id}`);
+    return await getApi(`/expenses/getExpenseAsyncById/${id}`);
   } catch (error) {
     console.error("Error fetching expense:", error.response?.data || error.message);
     throw error;
   }
 };
 
-export const createExpense = async (data) => {
+export const createExpenseAsync = async (data) => {
   try {
-    return await postApi("/expenses", data);
+    return await postApi("/expenses/saveExpenseAsync", data);
   } catch (error) {
     console.error("Error creating expense:", error.response?.data || error.message);
     throw error;
   }
 };
 
-export const updateExpense = async (id, data) => {
+export const updateExpenseAsync = async (id, data) => {
   try {
-    return await putApi(`/expenses/${id}`, data);
+    return await putApi(`/expenses/updateExpenseAsyncById/${id}`, data);
   } catch (error) {
     console.error("Error updating expense:", error.response?.data || error.message);
     throw error;
   }
 };
 
-export const deleteExpense = async (id) => {
+export const deleteExpenseAsync = async (id) => {
   try {
-    return await deleteApi(`/expenses/${id}`);
+    return await deleteApi(`/expenses/deleteExpenseAsyncById/${id}`);
   } catch (error) {
     console.error("Error deleting expense:", error.response?.data || error.message);
     throw error;

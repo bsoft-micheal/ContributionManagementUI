@@ -76,7 +76,8 @@ export default function MyContributionSummaryPage() {
     async function load() {
       setLoading(true);
       try {
-        const { data } = await apiClient.get("/contributions/my-summary");
+        const { data: resData } = await apiClient.get("/contributions/getMySummaryAsync");
+        const data = (resData && resData.data !== undefined) ? resData.data : resData;
         setSummary(data);
       } catch (err) {
         console.error("Failed to load contribution summary:", err);

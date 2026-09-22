@@ -27,8 +27,8 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import dayjs from "dayjs";
 import MetricCard from "../../components/MetricCard";
 import AppSelect from "../../components/common/AppSelect";
+import { GetDashboardSummaryAsync } from "../../services/dashboardService";
 import AppDataTable from "../../components/common/AppDataTable";
-import { GetDashboardSummary } from "../../services/dashboardService";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 const C = {
@@ -517,11 +517,11 @@ export default function DashboardPage() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      try {
-        const data = await GetDashboardSummary(appliedFilters);
-        if (!cancelled) setSummary(data);
-      } catch { /* handled by apiClient */ }
-      finally { if (!cancelled) setLoading(false); }
+      const data = await GetDashboardSummaryAsync(appliedFilters);
+      if (!cancelled) {
+        setSummary(data);
+        setLoading(false);
+      }
     }
     load();
     return () => { cancelled = true; };

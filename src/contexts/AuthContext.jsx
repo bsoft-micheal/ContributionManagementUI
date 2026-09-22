@@ -30,53 +30,39 @@ export function AuthProvider({ children }) {
     }
   }, [authState]);
 
-  // ── Check token expiry on app load ───────────────────────────────────────────
-  // If the stored token has already expired (e.g. user left the tab overnight),
-  // clear the session immediately so they land on the login page.
-  useEffect(() => {
-    if (authState?.expiresAtUtc) {
-      const expiresAt = new Date(authState.expiresAtUtc);
-      if (expiresAt <= new Date()) {
-        // Token expired — silently clear without redirect toast
-        setAuthState(null);
-      }
+  function getDeviceInfo() {
+    let deviceId = localStorage.getItem("teamContributionDeviceId");
+    if (!deviceId) {
+      deviceId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      localStorage.setItem("teamContributionDeviceId", deviceId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once on mount only
+    
+    return {
+      deviceId: deviceId,
+      deviceName: "Web Browser",
+      brand: "Unknown",
+      model: "Unknown",
+      os: navigator.platform || "Unknown",
+      osVersion: "Unknown",
+      systemName: navigator.userAgent.includes("Windows") ? "Windows" : navigator.userAgent.includes("Mac") ? "MacOS" : "Unknown",
+      systemVersion: "Unknown",
+      deviceType: 1, // 1 = Web Browser
+      appVersion: "1.0.0",
+      totalMemory: navigator.deviceMemory ? Math.round(navigator.deviceMemory * 1024 * 1024 * 1024) : 0,
+      browser: navigator.userAgent.includes("Chrome") ? "Chrome" : navigator.userAgent.includes("Firefox") ? "Firefox" : "Unknown",
+      browserVersion: "Unknown"
+    };
+  }
 
-  // ── Idle-timer logout ────────────────────────────────────────────────────────
-  // Keep a stable ref so the hook callback never causes re-renders
-  const handleIdleRef = useRef(null);
-  handleIdleRef.current = () => {
-    logout();
-    // Navigate to login and pass a flag so LoginPage can show a toast
-    navigate("/login", {
-      replace: true,
-      state: { sessionExpired: true },
-    });
-  };
-
-  useIdleTimer({
-    onIdle:  () => handleIdleRef.current?.(),
-    timeout: IDLE_TIMEOUT_MS,
-    enabled: Boolean(authState?.token),   // only runs when user is logged in
-  });
-
-  // ── Login ────────────────────────────────────────────────────────────────────
-  const login = async (credentials) => {
-    // Append the device payload for tracking
+  async function login(credentials) {
     const payload = {
       ...credentials,
       deviceInfo: getDeviceInfo()
     };
-
-    const response = await apiClient.post("/auth/login", payload);
-    const data = response.data;
-
-    if (data.requiresTwoFactor) {
-      return data; // Return early, do not set authState yet
-    }
-
+    
+    const { data: resData } = await apiClient.post("/auth/loginAsync", payload);
+    const data = (resData && resData.data !== undefined) ? resData.data : resData;
+    
     // Save fetched menu rights dynamically to local storage for immediate routing and access control enforcement
     if (data.rights && data.role) {
       const savedRights = localStorage.getItem("projectRightsConfig");
@@ -104,8 +90,9 @@ export function AuthProvider({ children }) {
       deviceInfo: getDeviceInfo()
     };
 
-    const response = await apiClient.post("/auth/verify-2fa", payload);
-    const data = response.data;
+    const response = await apiClient.post("/auth/verify-2faAsync", payload);
+    const resData = response.data;
+    const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
     if (data.rights && data.role) {
       const savedRights = localStorage.getItem("projectRightsConfig");
@@ -129,7 +116,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       if (authState?.token) {
-        await apiClient.post("/device-info/logout");
+        await apiClient.post("/device-info/logoutCurrentSessionAsync");
       }
     } catch (error) {
       console.error("Failed to logout from backend", error);
@@ -146,7 +133,8 @@ export function AuthProvider({ children }) {
       password: profileData.password,
     };
 
-    const { data } = await apiClient.put("/users/profile", payload);
+    const { data: resData } = await apiClient.put("/users/updateProfileAsync", payload);
+    const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
     setAuthState((current) => {
       if (!current) return current;

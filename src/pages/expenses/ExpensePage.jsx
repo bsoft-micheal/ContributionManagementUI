@@ -32,14 +32,14 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import {
-  getExpenses,
-  createExpense,
-  updateExpense,
-  deleteExpense,
+  getExpensesAsync,
+  createExpenseAsync,
+  updateExpenseAsync,
+  deleteExpenseAsync,
 } from "../../services/expenseService";
-import { GetEvents } from "../../services/eventService";
-import { GetMembers } from "../../services/memberService";
-import { GetEventTypes } from "../../services/eventTypeService";
+import { GetEventsAsync } from "../../services/eventService";
+import { GetMembersAsync } from "../../services/memberService";
+import { GetEventTypesAsync } from "../../services/eventTypeService";
 
 const initialForm = {
   eventName: "",
@@ -93,7 +93,7 @@ export default function ExpensePage() {
   const fetchExpensesFromDb = async () => {
     try {
       setLoading(true);
-      const data = await getExpenses();
+      const data = await getExpensesAsync();
       if (Array.isArray(data)) {
         const mapped = data.map((item, idx) => ({
           id: item.expenseId
@@ -125,9 +125,9 @@ export default function ExpensePage() {
   const fetchLookupData = async () => {
     try {
       const [eventsRes, membersRes, eventTypesRes] = await Promise.all([
-        GetEvents().catch(() => []),
-        GetMembers().catch(() => []),
-        GetEventTypes().catch(() => []),
+        GetEventsAsync().catch(() => []),
+        GetMembersAsync().catch(() => []),
+        GetEventTypesAsync().catch(() => []),
       ]);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(membersRes)) setMembersList(membersRes);
@@ -231,7 +231,7 @@ export default function ExpensePage() {
     const expenseId = expenseToDelete.expenseId || expenseToDelete.id;
 
     try {
-      await deleteExpense(expenseId);
+      await deleteExpenseAsync(expenseId);
       toast.success("Expense deleted successfully");
       await fetchExpensesFromDb();
     } catch (err) {
@@ -270,7 +270,7 @@ export default function ExpensePage() {
     try {
       if (editingExpense) {
         const expenseId = editingExpense.expenseId || editingExpense.id;
-        await updateExpense(expenseId, {
+        await updateExpenseAsync(expenseId, {
           eventName: form.eventName,
           category: form.category,
           amount: Number(form.amount),
@@ -283,7 +283,7 @@ export default function ExpensePage() {
         });
         toast.success("Expense updated successfully!");
       } else {
-        await createExpense({
+        await createExpenseAsync({
           eventName: form.eventName,
           category: form.category,
           amount: Number(form.amount),

@@ -3,7 +3,7 @@ import { Box, Grid, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
-import { GetContributionsByEvent } from "../../services/contributionService";
+import { GetContributionsByEventAsync } from "../../services/contributionService";
 
 export default function EventDetailsDialog({ open, onClose, event, members = [] }) {
   const [contributions, setContributions] = useState([]);
@@ -14,7 +14,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
       const fetchContributions = async () => {
         setLoading(true);
         try {
-          const data = await GetContributionsByEvent(event.eventId);
+          const data = await GetContributionsByEventAsync(event.eventId);
           setContributions(data || []);
         } catch (error) {
           console.error("Failed to load contributions:", error);

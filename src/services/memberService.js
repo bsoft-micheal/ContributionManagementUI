@@ -1,8 +1,8 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetMembers = async () => {
+export const GetMembersAsync = async () => {
   try {
-    const result = await getApi("/members");
+    const result = await getApi("/members/getAllMemberAsync");
     return result;
   } catch (error) {
     console.error('Error fetching members:', error.response?.data || error.message);
@@ -10,9 +10,9 @@ export const GetMembers = async () => {
   }
 };
 
-export const CreateMember = async (data) => {
+export const CreateMemberAsync = async (data) => {
   try {
-    const result = await postApi("/members", data);
+    const result = await postApi("/members/saveMemberAsync", data);
     return result;
   } catch (error) {
     console.error('Error creating member:', error.response?.data || error.message);
@@ -20,9 +20,9 @@ export const CreateMember = async (data) => {
   }
 };
 
-export const UpdateMember = async (id, data) => {
+export const UpdateMemberAsync = async (id, data) => {
   try {
-    const result = await putApi(`/members/${id}`, data);
+    const result = await putApi(`/members/updateMemberAsyncById/${id}`, data);
     return result;
   } catch (error) {
     console.error('Error updating member:', error.response?.data || error.message);
@@ -30,9 +30,9 @@ export const UpdateMember = async (id, data) => {
   }
 };
 
-export const DeleteMember = async (id) => {
+export const DeleteMemberAsync = async (id) => {
   try {
-    const result = await deleteApi(`/members/${id}`);
+    const result = await deleteApi(`/members/deleteMemberAsyncById/${id}`);
     return result;
   } catch (error) {
     console.error('Error deleting member:', error.response?.data || error.message);
@@ -40,9 +40,9 @@ export const DeleteMember = async (id) => {
   }
 };
 
-export const CreateMembersBulk = async (data) => {
+export const CreateMembersBulkAsync = async (data) => {
   try {
-    const result = await postApi("/members/bulk", data);
+    const result = await postApi("/members/saveBulkMemberAsync", data);
     return result;
   } catch (error) {
     console.error('Error creating members in bulk:', error.response?.data || error.message);
