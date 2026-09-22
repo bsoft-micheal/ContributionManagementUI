@@ -32,7 +32,7 @@ export function getRightsForPath(path, roleName) {
     else if (path === "/calendar") targetName = "Calendar";
     else if (path === "/events" || path.startsWith("/events/")) targetName = "Events";
     else if (path === "/event-types") targetName = "Event Types";
-    else if (path === "/roles")       targetName = "Roles";
+    else if (path === "/roles") targetName = "Roles";
     else if (path === "/contributions") targetName = "Contributions";
     else if (path === "/contribution-calculation") targetName = "Calculation";
     else if (path === "/reports/event-collection-audit" || path === "/reports") targetName = "Event Audit";
@@ -40,8 +40,13 @@ export function getRightsForPath(path, roleName) {
     else if (path === "/reports/pending-dues") targetName = "Pending Dues";
     else if (path === "/reports/member-category-paid") targetName = "Member Category Paid";
     else if (path === "/my-contributions") targetName = "My Contributions";
+    else if (path === "/payments") targetName = "Payments";
+    else if (path === "/expense") targetName = "Expense";
+    else if (path === "/gallery") targetName = "Gallery";
+    else if (path === "/support-tickets") targetName = "Support Tickets";
+    else if (path === "/settings") targetName = "Settings";
     else if (path === "/user-rights") targetName = "User Rights"; // Admin-only
-    else if (path === "/users")       targetName = "Users";        // Admin & Manager only
+    else if (path === "/users") targetName = "Users";        // Admin & Manager only
 
     if (targetName === "User Rights" || targetName === "Users") {
       if (roleName === "Admin" || roleName === "Manager") {
@@ -98,8 +103,8 @@ export function getRightsForPage(pageName, roleName) {
 
     const pageRight = roleRights.find(
       r => r.page.toLowerCase() === pageName.toLowerCase() ||
-           r.subModule.toLowerCase() === pageName.toLowerCase() ||
-           r.module.toLowerCase() === pageName.toLowerCase()
+        r.subModule.toLowerCase() === pageName.toLowerCase() ||
+        r.module.toLowerCase() === pageName.toLowerCase()
     );
     if (!pageRight) {
       return { read: true, write: false, deny: false };

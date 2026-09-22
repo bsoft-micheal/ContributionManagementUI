@@ -1,7 +1,14 @@
-
-import React, { useState, useEffect } from "react";
-import { Grid, Box, Typography, Stack } from "@mui/material";
-import { Save as SaveIcon } from "@mui/icons-material";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  Grid,
+  Box,
+  Typography,
+  Chip,
+  Switch,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
+import { Save as SaveIcon, CakeRounded as CakeIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
@@ -13,6 +20,15 @@ import AppDialog from "../common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../common/AppToast";
 import { CreateEvent, UpdateEvent, GetEventById } from "../../services/eventService";
+
+// Hardcoded calculation rules as requested
+const RULES = {
+  cakeRate: 300,        // ₹300 per office birthday member
+  puffsRate: 20,        // ₹20 per person / puff
+  giftRate: 1000,       // ₹1,000 per birthday celebrant (Office + WFH)
+  rounding: 1,          // Round up to ₹1
+  puffsBasis: "office", // Per office birthday member
+};
 
 const formatBaseAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -30,6 +46,21 @@ const initialForm = {
   participantIds: [],
 };
 
+const getDefaultBirthdayExempt = () => {
+  try {
+    const saved = localStorage.getItem("cm_system_settings");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.birthdayMembersExempt !== undefined) {
+        return Boolean(parsed.birthdayMembersExempt);
+      }
+    }
+  } catch (e) {
+    console.warn("Could not read birthdayMembersExempt setting:", e);
+  }
+  return true;
+};
+
 export default function EventFormDialog({
   open,
   onClose,
@@ -42,58 +73,100 @@ export default function EventFormDialog({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Birthday-specific configuration states
+  const [officeBirthdays, setOfficeBirthdays] = useState(1);
+  const [wfhBirthdays, setWfhBirthdays] = useState(0);
+  const [totalMembers, setTotalMembers] = useState(47);
+  const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
+
   const toast = useAppToast();
 
-  const selectedType = eventTypes.find(t => t.eventTypeId === form.eventTypeId);
-  const isBirthday = Boolean(selectedType && selectedType.eventTypeName?.toLowerCase().includes("birthday"));
+  const selectedType = eventTypes.find((t) => t.eventTypeId === form.eventTypeId);
+  const isBirthday = Boolean(
+    selectedType && selectedType.eventTypeName?.toLowerCase().includes("birthday")
+  );
 
-  const calculateBaseAmount = (eventTypeId, eventDate, participantIds = form.participantIds) => {
-    if (!eventTypeId) return "";
-    const typeObj = eventTypes.find(t => t.eventTypeId === eventTypeId);
-    if (!typeObj) return "";
+  // Active members count
+  const activeMembers = useMemo(
+    () => members.filter((m) => m.isActive && !m.isExited),
+    [members]
+  );
 
-    const typeBase = Number(typeObj.baseAmount) || 0;
+  // Detect month celebrants from active members
+  const monthCelebrants = useMemo(() => {
+    if (!form.eventDate) return [];
+    const targetMonth = dayjs(form.eventDate).month();
+    return activeMembers.filter(
+      (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+    );
+  }, [form.eventDate, activeMembers]);
 
-    if (typeObj.eventTypeName?.toLowerCase().includes("birthday")) {
-      const rate = typeBase > 0 ? typeBase : 500;
-      if (participantIds && participantIds.length > 0) {
-        return participantIds.length * rate;
-      }
-      if (!eventDate) return "";
-      const targetMonth = dayjs(eventDate).month(); // 0-11
-      const count = members.filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === targetMonth).length;
-      return count > 0 ? (count * rate) : "";
-    }
+  // Birthday calculation math
+  const office = Math.max(0, Number(officeBirthdays) || 0);
+  const wfh = Math.max(0, Number(wfhBirthdays) || 0);
+  const total = Math.max(0, Number(totalMembers) || 0);
+  const bdays = office + wfh;
+  const eligible = Math.max(0, total - (exempt ? bdays : 0));
 
-    return typeBase > 0 ? typeBase : "";
-  };
+  const cake = office * RULES.cakeRate;
+  const puffsFactor = office > 0 ? office : 0;
+  const puffs = total * RULES.puffsRate * puffsFactor;
+  const gift = bdays * RULES.giftRate;
+  const plannedBudget = cake + puffs + gift;
 
+  const rawPerMember = eligible > 0 ? plannedBudget / eligible : 0;
+  const contributionPerMember =
+    eligible > 0 ? Math.ceil(rawPerMember / RULES.rounding) * RULES.rounding : 0;
+  const expectedCollection = contributionPerMember * eligible;
+  const roundingSurplus = Math.max(0, expectedCollection - plannedBudget);
+
+  // Dialog open & initialization
   useEffect(() => {
     if (open) {
+      const bdayType = eventTypes.find((t) =>
+        t.eventTypeName?.toLowerCase().includes("birthday")
+      );
+      const defaultTypeId = bdayType ? bdayType.eventTypeId : eventTypes[0]?.eventTypeId || "";
+
       if (event && event.eventId) {
         const fetchDetails = async () => {
           setLoading(true);
           try {
             const detailedEvent = await GetEventById(event.eventId);
-            let pIds = detailedEvent.participantIds || (detailedEvent.participants ? detailedEvent.participants.map(p => p.memberId) : []);
-            
-            const eventTypeObj = eventTypes.find(t => t.eventTypeId === detailedEvent.eventTypeId);
-            const isBdayEvent = Boolean(eventTypeObj && eventTypeObj.eventTypeName?.toLowerCase().includes("birthday"));
-            
-            if (isBdayEvent && (!pIds || pIds.length === 0)) {
-              const targetMonth = detailedEvent.eventDate ? dayjs(detailedEvent.eventDate).month() : dayjs().month();
-              pIds = members
-                .filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === targetMonth)
-                .map(m => m.memberId);
-            }
+            const pIds =
+              detailedEvent.participantIds ||
+              (detailedEvent.participants ? detailedEvent.participants.map((p) => p.memberId) : []);
+
+            const currentEventDate = detailedEvent.eventDate ? dayjs(detailedEvent.eventDate) : dayjs();
+            const targetMonth = currentEventDate.month();
+            const celebrantsInMonth = activeMembers.filter(
+              (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+            );
+            const offCount = celebrantsInMonth.filter(
+              (m) => (m.memberType || "Office").toLowerCase() === "office"
+            ).length;
+            const wfhCount = celebrantsInMonth.filter(
+              (m) => (m.memberType || "Office").toLowerCase() === "wfh"
+            ).length;
+
+            setOfficeBirthdays(offCount > 0 ? offCount : 1);
+            setWfhBirthdays(wfhCount);
+            setTotalMembers(activeMembers.length > 0 ? activeMembers.length : 47);
+            setExempt(true);
 
             setForm({
               eventId: detailedEvent.eventId || null,
               eventName: detailedEvent.eventName || "",
-              eventTypeId: detailedEvent.eventTypeId || "",
-              eventDate: detailedEvent.eventDate ? dayjs(detailedEvent.eventDate) : dayjs(),
+              eventTypeId: detailedEvent.eventTypeId || defaultTypeId,
+              eventDate: currentEventDate,
               description: detailedEvent.description || "",
-              baseAmount: detailedEvent.baseAmount !== undefined && detailedEvent.baseAmount !== null && Number(detailedEvent.baseAmount) > 0 ? String(detailedEvent.baseAmount) : "",
+              baseAmount:
+                detailedEvent.baseAmount !== undefined &&
+                detailedEvent.baseAmount !== null &&
+                Number(detailedEvent.baseAmount) > 0
+                  ? String(detailedEvent.baseAmount)
+                  : "",
               participantIds: pIds,
             });
           } catch (error) {
@@ -104,27 +177,84 @@ export default function EventFormDialog({
           }
         };
         fetchDetails();
-      } else if (event) {
+      } else {
+        // Adding new event
+        const defaultDate = dayjs().date() > 25 ? dayjs().add(1, "month").date(25) : dayjs().date(25);
+        const targetMonth = defaultDate.month();
+        const celebrantsInMonth = activeMembers.filter(
+          (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+        );
+        const offCount = celebrantsInMonth.filter(
+          (m) => (m.memberType || "Office").toLowerCase() === "office"
+        ).length;
+        const wfhCount = celebrantsInMonth.filter(
+          (m) => (m.memberType || "Office").toLowerCase() === "wfh"
+        ).length;
+
+        setOfficeBirthdays(offCount > 0 ? offCount : 1);
+        setWfhBirthdays(wfhCount);
+        setTotalMembers(activeMembers.length > 0 ? activeMembers.length : 47);
+        setExempt(getDefaultBirthdayExempt());
+
         setForm({
-          eventName: "",
-          eventTypeId: "",
-          eventDate: event.eventDate ? dayjs(event.eventDate) : dayjs(),
+          eventName: `${defaultDate.format("MMMM")} Birthday Celebration`,
+          eventTypeId: defaultTypeId,
+          eventDate: defaultDate,
           description: "",
           baseAmount: "",
-          participantIds: [],
+          participantIds: activeMembers.map((m) => m.memberId),
         });
-      } else {
-        setForm(initialForm);
       }
       setErrors({});
     }
-  }, [open, event]);
+  }, [open, event, eventTypes, activeMembers]);
+
+  // Handle date change
+  const handleDateChange = (newDate) => {
+    if (!newDate) return;
+    const oldMonth = dayjs(form.eventDate).month();
+    const newMonth = dayjs(newDate).month();
+
+    let newEventName = form.eventName;
+    if (
+      !form.eventId &&
+      (form.eventName.includes("Birthday Celebration") || !form.eventName.trim())
+    ) {
+      newEventName = `${dayjs(newDate).format("MMMM")} Birthday Celebration`;
+    }
+
+    if (oldMonth !== newMonth) {
+      const celebrantsInNewMonth = activeMembers.filter(
+        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === newMonth
+      );
+      const offCount = celebrantsInNewMonth.filter(
+        (m) => (m.memberType || "Office").toLowerCase() === "office"
+      ).length;
+      const wfhCount = celebrantsInNewMonth.filter(
+        (m) => (m.memberType || "Office").toLowerCase() === "wfh"
+      ).length;
+      setOfficeBirthdays(offCount > 0 ? offCount : 1);
+      setWfhBirthdays(wfhCount);
+    }
+
+    setForm((c) => ({
+      ...c,
+      eventDate: newDate,
+      eventName: newEventName,
+    }));
+    if (errors.eventDate) setErrors((p) => ({ ...p, eventDate: "" }));
+  };
 
   const handleSubmit = async () => {
     const filed = "This field is required";
     const schema = {
-      eventName: { required: true, type: "letteronly", min: 3, max: 100, label: filed },
-      baseAmount: {
+      eventName: { required: true, min: 3, max: 100, label: filed },
+      eventTypeId: { required: true, label: filed },
+      eventDate: { required: true, label: filed },
+    };
+
+    if (!isBirthday) {
+      schema.baseAmount = {
         required: true,
         type: "numberonly",
         label: filed,
@@ -133,16 +263,11 @@ export default function EventFormDialog({
           if (val === "" || val === undefined || val === null || num <= 0) {
             return filed;
           }
-          if (num > 1000000) {
-            return "Base amount cannot exceed 1,000,000";
-          }
           return "";
-        }
-      },
-      eventTypeId: { required: true, label: filed },
-      eventDate: { required: true, label: filed },
-      participantIds: { required: true, label: filed },
-    };
+        },
+      };
+      schema.participantIds = { required: true, label: filed };
+    }
 
     const newErrors = validateForm(form, schema);
 
@@ -154,11 +279,63 @@ export default function EventFormDialog({
 
     setSaving(true);
     try {
-      const payload = {
-        ...form,
-        baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
-        eventDate: dayjs(form.eventDate).hour(12).toISOString(),
-      };
+      let payload;
+
+      if (isBirthday) {
+        const celebrantIds = monthCelebrants.map((m) => m.memberId);
+        const allActiveParticipantIds = activeMembers.map((m) => m.memberId);
+
+        const contributionOverrides = [];
+        if (exempt) {
+          celebrantIds.forEach((id) => {
+            contributionOverrides.push({ memberId: id, amount: 0 });
+          });
+          allActiveParticipantIds.forEach((id) => {
+            if (!celebrantIds.includes(id)) {
+              contributionOverrides.push({
+                memberId: id,
+                amount: contributionPerMember,
+              });
+            }
+          });
+        } else {
+          allActiveParticipantIds.forEach((id) => {
+            contributionOverrides.push({
+              memberId: id,
+              amount: contributionPerMember,
+            });
+          });
+        }
+
+        const celebrantsSummary = monthCelebrants
+          .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
+          .join(", ");
+
+        payload = {
+          eventName: form.eventName.trim(),
+          eventTypeId: form.eventTypeId,
+          eventDate: dayjs(form.eventDate).hour(12).toISOString(),
+          description:
+            form.description?.trim() ||
+            `Birthday celebration (${office} Office, ${wfh} WFH)${
+              celebrantsSummary ? ` for ${celebrantsSummary}` : ""
+            }. Planned Budget: ₹${plannedBudget.toLocaleString(
+              "en-IN"
+            )}, Contribution/member: ₹${contributionPerMember}`,
+          baseAmount: plannedBudget,
+          participantIds:
+            allActiveParticipantIds.length > 0
+              ? allActiveParticipantIds
+              : form.participantIds,
+          contributionOverrides: contributionOverrides,
+        };
+      } else {
+        payload = {
+          ...form,
+          baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
+          eventDate: dayjs(form.eventDate).hour(12).toISOString(),
+        };
+      }
 
       if (form.eventId) {
         await UpdateEvent(form.eventId, payload);
@@ -173,7 +350,7 @@ export default function EventFormDialog({
       }
       onClose();
     } catch (error) {
-      toast.error("Failed to save");
+      toast.error("Failed to save event");
       console.error("Error saving event:", error);
     } finally {
       setSaving(false);
@@ -190,54 +367,12 @@ export default function EventFormDialog({
     value: m.memberId,
   }));
 
-  const getBirthdayCelebrators = () => {
-    if (!form.eventTypeId) return "";
-    const typeObj = eventTypes.find(t => t.eventTypeId === form.eventTypeId);
-    if (!typeObj || !typeObj.eventTypeName?.toLowerCase().includes("birthday")) return "";
-
-    let celebrators = [];
-    if (form.participantIds && form.participantIds.length > 0) {
-      celebrators = members.filter(m => form.participantIds.includes(m.memberId));
-    } else {
-      const targetMonth = dayjs(form.eventDate).month();
-      celebrators = members.filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === targetMonth);
-    }
-
-    const count = celebrators.length;
-    if (count === 0) return "No birthdays in this month";
-
-    const typeBase = Number(typeObj.baseAmount) || 0;
-    const rate = typeBase > 0 ? typeBase : 500;
-    const total = count * rate;
-    const names = celebrators.map(c => c.name).join(", ");
-    return `${names} celebrating birthday (${count} celebrant${count > 1 ? "s" : ""} × ₹${rate.toLocaleString()} = ₹${total.toLocaleString()})`;
-  };
-
-  const getBirthdayMembersList = () => {
-    if (!isBirthday) return [];
-
-    let celebrants = [];
-    if (form.participantIds && form.participantIds.length > 0) {
-      celebrants = members.filter(m => form.participantIds.includes(m.memberId));
-    } else {
-      const targetMonth = dayjs(form.eventDate).month();
-      celebrants = members.filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === targetMonth);
-    }
-
-    return [...celebrants].sort((a, b) => {
-      const dayA = a.dateOfBirth ? dayjs(a.dateOfBirth).date() : 0;
-      const dayB = b.dateOfBirth ? dayjs(b.dateOfBirth).date() : 0;
-      return dayA - dayB;
-    });
-  };
-
-  const birthdayMembersList = getBirthdayMembersList();
-
   return (
     <AppDialog
       open={open}
       onClose={onClose}
-      title={form.eventId ? "Edit Event" : "Add Event"}
+      title={form.eventId ? "Edit Event" : isBirthday ? "Birthday Event Setup" : "Add Event"}
+      maxWidth={isBirthday ? "lg" : "md"}
       actions={
         <>
           <AppButton
@@ -250,7 +385,7 @@ export default function EventFormDialog({
               "&:hover": { bgcolor: "#3b325c !important" },
             }}
           >
-            {saving ? "Saving..." : (loading ? "Loading..." : "Save")}
+            {saving ? "Saving..." : loading ? "Loading..." : "Save"}
           </AppButton>
           <AppButton variant="outlined" onClick={onClose} disabled={saving || loading}>
             Cancel
@@ -258,262 +393,560 @@ export default function EventFormDialog({
         </>
       }
     >
-      <Grid container spacing={4}>
-        <Grid size={{ xs: 12, md: 6 }}>
+      {/* Category selector row */}
+      <Box sx={{ mb: 2.5, display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+        <Box sx={{ minWidth: 220 }}>
           <AppSelect
-            label="Category"
+            label="Event Category"
             value={form.eventTypeId}
             onChange={(e) => {
-              const newTypeId = e.target.value;
-              const typeObj = eventTypes.find(t => t.eventTypeId === newTypeId);
-              const isBday = Boolean(typeObj && typeObj.eventTypeName?.toLowerCase().includes("birthday"));
-              let updatedParticipantIds = form.participantIds;
-              
-              if (isBday && (!updatedParticipantIds || updatedParticipantIds.length === 0)) {
-                const targetMonth = dayjs(form.eventDate).month();
-                const monthCelebrants = members
-                  .filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === targetMonth)
-                  .map(m => m.memberId);
-                if (monthCelebrants.length > 0) {
-                  updatedParticipantIds = monthCelebrants;
-                }
-              }
-
-              const computedAmount = calculateBaseAmount(newTypeId, form.eventDate, updatedParticipantIds);
-              setForm((current) => ({
-                ...current,
-                eventTypeId: newTypeId,
-                participantIds: updatedParticipantIds,
-                baseAmount: computedAmount
-              }));
-              if (errors.eventTypeId) setErrors((prev) => ({ ...prev, eventTypeId: "" }));
-              if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
-              if (errors.participantIds && updatedParticipantIds.length > 0) setErrors((prev) => ({ ...prev, participantIds: "" }));
+              setForm((c) => ({ ...c, eventTypeId: e.target.value }));
+              if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
             }}
             options={typeOptions}
             error={!!errors.eventTypeId}
             helperText={errors.eventTypeId}
             required
           />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <AppInput
-            label="Base Amount"
-            value={formatBaseAmount(form.baseAmount)}
-            onChange={(e) => {
-              const rawVal = e.target.value.replace(/[^0-9]/g, "");
-              setForm((current) => ({ ...current, baseAmount: rawVal }));
-              if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
-            }}
-            maxLength={15}
-            error={!!errors.baseAmount}
-            helperText={errors.baseAmount}
-            required
-            disabled={!!form.eventTypeId && Boolean(calculateBaseAmount(form.eventTypeId, form.eventDate))}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <AppInput
-            label="Event Name"
-            value={form.eventName}
-            onChange={(e) => {
-              setForm((current) => ({ ...current, eventName: e.target.value }));
-              if (errors.eventName) setErrors((prev) => ({ ...prev, eventName: "" }));
-            }}
-            restrictType="letteronly"
-            maxLength={100}
-            error={!!errors.eventName}
-            helperText={errors.eventName}
-            required
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <AppDateInput
-            label="Event Date"
-            value={form.eventDate}
-            onChange={(newValue) => {
-              const typeObj = eventTypes.find(t => t.eventTypeId === form.eventTypeId);
-              const isBday = Boolean(typeObj && typeObj.eventTypeName?.toLowerCase().includes("birthday"));
-              
-              let updatedParticipantIds = form.participantIds;
-              if (isBday && newValue && dayjs(newValue).month() !== dayjs(form.eventDate).month()) {
-                const newMonth = dayjs(newValue).month();
-                const newMonthCelebrants = members
-                  .filter(m => m.isActive && !m.isExited && dayjs(m.dateOfBirth).month() === newMonth)
-                  .map(m => m.memberId);
-                if (newMonthCelebrants.length > 0) {
-                  updatedParticipantIds = newMonthCelebrants;
-                }
-              }
+        </Box>
+        {isBirthday && (
+          <Box sx={{ pt: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.82rem" }}>
+              Configure birthday members and automatically calculate the event budget.
+            </Typography>
+          </Box>
+        )}
+      </Box>
 
-              const computedAmount = calculateBaseAmount(form.eventTypeId, newValue, updatedParticipantIds);
-              setForm((current) => ({
-                ...current,
-                eventDate: newValue,
-                participantIds: updatedParticipantIds,
-                baseAmount: form.eventTypeId ? computedAmount : current.baseAmount
-              }));
-              if (errors.eventDate) setErrors((prev) => ({ ...prev, eventDate: "" }));
-              if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
-            }}
-            error={!!errors.eventDate}
-            helperText={errors.eventDate}
-            required
-          />
-        </Grid>
-        {getBirthdayCelebrators() && (
-          <Grid size={{ xs: 12 }}>
+      {/* Birthday Event Setup (Prototype Implementation) */}
+      {isBirthday ? (
+        <Grid container spacing={3}>
+          {/* Left Column: Event Configuration Card */}
+          <Grid size={{ xs: 12, md: 7 }}>
             <Box
               sx={{
-                p: 1.5,
-                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.12)" : "rgba(34, 197, 94, 0.08)",
                 border: "1px solid",
-                borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.3)" : "rgba(34, 197, 94, 0.2)",
-                borderRadius: "6px",
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
+                borderColor: "divider",
+                borderRadius: "14px",
+                overflow: "hidden",
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
+                boxShadow: "0 3px 12px rgba(20,60,90,0.06)",
               }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#4ade80" : "#15803d" }}>
-                🎂 {getBirthdayCelebrators()}
-              </Typography>
+              <Box
+                sx={{
+                  px: 2.5,
+                  py: 1.6,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Event Configuration
+                </Typography>
+              </Box>
+
+              <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label="Event Name"
+                      required
+                      value={form.eventName}
+                      onChange={(e) => {
+                        setForm((c) => ({ ...c, eventName: e.target.value }));
+                        if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
+                      }}
+                      error={!!errors.eventName}
+                      helperText={errors.eventName}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppDateInput
+                      label="Event Date"
+                      required
+                      value={form.eventDate}
+                      onChange={handleDateChange}
+                      error={!!errors.eventDate}
+                      helperText={errors.eventDate}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label="Office Birthday Members"
+                      type="number"
+                      value={officeBirthdays}
+                      onChange={(e) =>
+                        setOfficeBirthdays(Math.max(0, parseInt(e.target.value, 10) || 0))
+                      }
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label="WFH Birthday Members"
+                      type="number"
+                      value={wfhBirthdays}
+                      onChange={(e) =>
+                        setWfhBirthdays(Math.max(0, parseInt(e.target.value, 10) || 0))
+                      }
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label="Total Active Members"
+                      type="number"
+                      value={totalMembers}
+                      onChange={(e) =>
+                        setTotalMembers(Math.max(1, parseInt(e.target.value, 10) || 1))
+                      }
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, pt: 0.2 }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
+                        Birthday Members Exempt?
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.4 }}>
+                        <Switch
+                          checked={exempt}
+                          onChange={(e) => setExempt(e.target.checked)}
+                          sx={{
+                            width: 44,
+                            height: 24,
+                            padding: 0,
+                            "& .MuiSwitch-switchBase": {
+                              padding: 0,
+                              margin: "2px",
+                              transitionDuration: "200ms",
+                              "&.Mui-checked": {
+                                transform: "translateX(20px)",
+                                color: "#fff",
+                                "& + .MuiSwitch-track": {
+                                  backgroundColor: "#1677c8",
+                                  opacity: 1,
+                                  border: 0,
+                                },
+                              },
+                            },
+                            "& .MuiSwitch-thumb": {
+                              boxSizing: "border-box",
+                              width: 20,
+                              height: 20,
+                            },
+                            "& .MuiSwitch-track": {
+                              borderRadius: 24 / 2,
+                              backgroundColor: "#b8c7d5",
+                              opacity: 1,
+                            },
+                          }}
+                        />
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          sx={{ color: exempt ? "#1677c8" : "text.secondary" }}
+                        >
+                          {exempt ? "Enabled" : "Disabled"}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                {/* Celebrants detected for current month */}
+                {monthCelebrants.length > 0 && (
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: "8px",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(255,255,255,0.03)"
+                          : "rgba(22, 119, 200, 0.04)",
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      fontWeight={700}
+                      color="text.secondary"
+                      sx={{ display: "block", mb: 0.8 }}
+                    >
+                      Identified Celebrants in {dayjs(form.eventDate).format("MMMM")} ({monthCelebrants.length}):
+                    </Typography>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                      {monthCelebrants.map((m) => (
+                        <Chip
+                          key={m.memberId}
+                          label={`${m.name} (${m.memberType || "Office"}) - ${
+                            m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
+                          }`}
+                          size="small"
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: "0.75rem",
+                            bgcolor:
+                              (m.memberType || "Office").toLowerCase() === "wfh"
+                                ? "rgba(121, 87, 213, 0.1)"
+                                : "rgba(22, 119, 200, 0.1)",
+                            color:
+                              (m.memberType || "Office").toLowerCase() === "wfh"
+                                ? "#7957d5"
+                                : "#1677c8",
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
             </Box>
           </Grid>
-        )}
-        <Grid size={{ xs: 12 }}>
-          <AppTextArea
-            label="Description"
-            minRows={3}
-            maxRows={6}
-            value={form.description}
-            onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <AppMultiSelect
-            label="Members"
-            placeholder="Select members..."
-            value={form.participantIds}
-            onChange={(e) => {
-              const newParticipantIds = e.target.value;
-              const computedAmount = isBirthday 
-                ? calculateBaseAmount(form.eventTypeId, form.eventDate, newParticipantIds)
-                : form.baseAmount;
-              setForm((current) => ({
-                ...current,
-                participantIds: newParticipantIds,
-                baseAmount: isBirthday && computedAmount ? computedAmount : current.baseAmount
-              }));
-              if (errors.participantIds) setErrors((prev) => ({ ...prev, participantIds: "" }));
-              if (errors.baseAmount && computedAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
-            }}
-            options={memberOptions}
-            error={!!errors.participantIds}
-            helperText={errors.participantIds}
-            required
-          />
-        </Grid>
 
-        {isBirthday && (
-          <Grid size={{ xs: 12 }}>
+          {/* Right Column: Calculated Event Summary Card */}
+          <Grid size={{ xs: 12, md: 5 }}>
             <Box
               sx={{
-                p: 2,
-                borderRadius: "10px",
                 border: "1px solid",
-                borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(192, 38, 211, 0.3)" : "rgba(192, 38, 211, 0.2)",
-                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(192, 38, 211, 0.08)" : "rgba(192, 38, 211, 0.03)",
+                borderColor: "divider",
+                borderRadius: "14px",
+                overflow: "hidden",
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
+                boxShadow: "0 3px 12px rgba(20,60,90,0.06)",
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{
-                    fontWeight: 800,
-                    color: (theme) => theme.palette.mode === "dark" ? "#f0abfc" : "#86198f",
-                    fontSize: "0.95rem",
-                    letterSpacing: "0.01em",
-                  }}
-                >
-                  Birthday Members
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 700,
-                    color: "text.secondary",
-                    fontSize: "0.75rem",
-                  }}
-                >
-                  {birthdayMembersList.length} celebrant{birthdayMembersList.length !== 1 ? "s" : ""}
+              <Box
+                sx={{
+                  px: 2.5,
+                  py: 1.6,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Calculated Event Summary
                 </Typography>
               </Box>
 
               <Box
                 sx={{
-                  borderBottom: "1px solid",
-                  borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(192, 38, 211, 0.25)" : "rgba(192, 38, 211, 0.15)",
-                  mb: 1.5,
+                  p: 2.5,
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
                 }}
-              />
-
-              {birthdayMembersList.length === 0 ? (
-                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic", textAlign: "center", py: 1 }}>
-                  No birthday members selected
-                </Typography>
-              ) : (
-                <Stack spacing={1}>
-                  {birthdayMembersList.map((m) => (
-                    <Box
-                      key={m.memberId}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        py: 0.8,
-                        px: 1.5,
-                        borderRadius: "6px",
-                        bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.7)",
-                        border: "1px solid",
-                        borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.04)",
-                        transition: "all 0.15s ease",
-                        "&:hover": {
-                          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(192, 38, 211, 0.15)" : "rgba(192, 38, 211, 0.08)",
-                          transform: "translateX(2px)",
-                        },
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                        <Typography sx={{ fontSize: "1.1rem", lineHeight: 1 }}>🎂</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary" }}>
-                          {m.name}
-                        </Typography>
-                      </Box>
-
-                      <Box
-                        sx={{
-                          px: 1.5,
-                          py: 0.35,
-                          borderRadius: "12px",
-                          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(192, 38, 211, 0.25)" : "rgba(192, 38, 211, 0.1)",
-                          color: (theme) => theme.palette.mode === "dark" ? "#f5d0fe" : "#a21caf",
-                          fontWeight: 800,
-                          fontSize: "0.82rem",
-                          fontFamily: "monospace, 'Outfit', sans-serif",
-                          letterSpacing: "0.02em",
-                        }}
-                      >
-                        {m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : "N/A"}
-                      </Box>
-                    </Box>
-                  ))}
-                </Stack>
-              )}
+              >
+                <MetricLine label="Birthday Members" value={bdays} />
+                <MetricLine label="Office / WFH" value={`${office} / ${wfh}`} />
+                <MetricLine label="Eligible Contributors" value={eligible} />
+                <MetricLine
+                  label="Planned Budget"
+                  value={`₹${plannedBudget.toLocaleString("en-IN")}`}
+                />
+                <MetricLine
+                  label="Contribution / Member"
+                  value={`₹${contributionPerMember.toLocaleString("en-IN")}`}
+                  highlight
+                />
+                <MetricLine
+                  label="Expected Collection"
+                  value={`₹${expectedCollection.toLocaleString("en-IN")}`}
+                />
+                <MetricLine
+                  label="Rounding Surplus"
+                  value={`₹${roundingSurplus.toLocaleString("en-IN")}`}
+                  isLast
+                />
+              </Box>
             </Box>
           </Grid>
-        )}
-      </Grid>
+
+          {/* Bottom Card: Budget Breakdown */}
+          <Grid size={{ xs: 12 }}>
+            <Box
+              sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: "14px",
+                overflow: "hidden",
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
+                boxShadow: "0 3px 12px rgba(20,60,90,0.06)",
+              }}
+            >
+              <Box
+                sx={{
+                  px: 2.5,
+                  py: 1.6,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Budget Breakdown
+                </Typography>
+              </Box>
+
+              <Box sx={{ p: 2.5 }}>
+                {/* Header row */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1.2fr 1fr 1fr", sm: "1.6fr 1.2fr 1fr 1fr auto" },
+                    gap: 2,
+                    pb: 1,
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
+                    fontWeight: 700,
+                    fontSize: "0.8rem",
+                    color: "text.secondary",
+                  }}
+                >
+                  <div>Expense Item</div>
+                  <div>Calculation</div>
+                  <div>Rate</div>
+                  <div>Amount</div>
+                  <Box sx={{ display: { xs: "none", sm: "block" } }}></Box>
+                </Box>
+
+                {/* Row 1: ½ kg Cake */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1.2fr 1fr 1fr", sm: "1.6fr 1.2fr 1fr 1fr auto" },
+                    gap: 2,
+                    py: 1.4,
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={600}>
+                    ½ kg Cake
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {office} × ₹300
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ₹300
+                  </Typography>
+                  <Typography variant="body2" fontWeight={800} color="text.primary">
+                    ₹{cake.toLocaleString("en-IN")}
+                  </Typography>
+                  <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                    <Chip
+                      label="Auto"
+                      size="small"
+                      sx={{
+                        bgcolor: "rgba(22, 163, 74, 0.1)",
+                        color: "#16a34a",
+                        fontWeight: 700,
+                        fontSize: "0.7rem",
+                        height: 22,
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                {/* Row 2: Chicken Roll / Puffs */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1.2fr 1fr 1fr", sm: "1.6fr 1.2fr 1fr 1fr auto" },
+                    gap: 2,
+                    py: 1.4,
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={600}>
+                    Chicken Roll / Puffs
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {puffsFactor > 0
+                      ? `${total} × ₹20${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`
+                      : "WFH only → Not provided"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ₹20
+                  </Typography>
+                  <Typography variant="body2" fontWeight={800} color="text.primary">
+                    ₹{puffs.toLocaleString("en-IN")}
+                  </Typography>
+                  <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                    <Chip
+                      label="Auto"
+                      size="small"
+                      sx={{
+                        bgcolor: "rgba(22, 163, 74, 0.1)",
+                        color: "#16a34a",
+                        fontWeight: 700,
+                        fontSize: "0.7rem",
+                        height: 22,
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                {/* Row 3: Birthday Gift */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1.2fr 1fr 1fr", sm: "1.6fr 1.2fr 1fr 1fr auto" },
+                    gap: 2,
+                    py: 1.4,
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={600}>
+                    Birthday Gift
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {bdays} × ₹1,000
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ₹1,000
+                  </Typography>
+                  <Typography variant="body2" fontWeight={800} color="text.primary">
+                    ₹{gift.toLocaleString("en-IN")}
+                  </Typography>
+                  <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                    <Chip
+                      label="Auto"
+                      size="small"
+                      sx={{
+                        bgcolor: "rgba(22, 163, 74, 0.1)",
+                        color: "#16a34a",
+                        fontWeight: 700,
+                        fontSize: "0.7rem",
+                        height: 22,
+                      }}
+                    />
+                  </Box>
+                </Box>
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
+      ) : (
+        /* Non-Birthday Event Standard Form */
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AppInput
+              label="Event Name"
+              value={form.eventName}
+              onChange={(e) => {
+                setForm((current) => ({ ...current, eventName: e.target.value }));
+                if (errors.eventName) setErrors((prev) => ({ ...prev, eventName: "" }));
+              }}
+              restrictType="letteronly"
+              maxLength={100}
+              error={!!errors.eventName}
+              helperText={errors.eventName}
+              required
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AppInput
+              label="Base Amount"
+              value={formatBaseAmount(form.baseAmount)}
+              onChange={(e) => {
+                const rawVal = e.target.value.replace(/[^0-9]/g, "");
+                setForm((current) => ({ ...current, baseAmount: rawVal }));
+                if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
+              }}
+              maxLength={15}
+              error={!!errors.baseAmount}
+              helperText={errors.baseAmount}
+              required
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AppDateInput
+              label="Event Date"
+              value={form.eventDate}
+              onChange={(newValue) => {
+                setForm((current) => ({ ...current, eventDate: newValue }));
+                if (errors.eventDate) setErrors((prev) => ({ ...prev, eventDate: "" }));
+              }}
+              error={!!errors.eventDate}
+              helperText={errors.eventDate}
+              required
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AppMultiSelect
+              label="Participants"
+              placeholder="Select members..."
+              value={form.participantIds}
+              onChange={(e) => {
+                setForm((current) => ({ ...current, participantIds: e.target.value }));
+                if (errors.participantIds) setErrors((prev) => ({ ...prev, participantIds: "" }));
+              }}
+              options={memberOptions}
+              error={!!errors.participantIds}
+              helperText={errors.participantIds}
+              required
+            />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <AppTextArea
+              label="Description"
+              minRows={3}
+              maxRows={6}
+              value={form.description}
+              onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
+            />
+          </Grid>
+        </Grid>
+      )}
     </AppDialog>
+  );
+}
+
+function MetricLine({ label, value, highlight, isLast }) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        py: 1.1,
+        borderBottom: isLast ? "none" : "1px solid",
+        borderColor: "divider",
+      }}
+    >
+      <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.88rem" }}>
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: highlight ? 900 : 700,
+          fontSize: highlight ? "1.05rem" : "0.95rem",
+          color: highlight ? "#1677c8" : "text.primary",
+        }}
+      >
+        {value}
+      </Typography>
+    </Box>
   );
 }

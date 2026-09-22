@@ -157,6 +157,38 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
                 fontSize: "0.65rem",
               }}
             >
+              Type
+            </Typography>
+            <Box sx={{ mt: 0.5 }}>
+              <Typography
+                variant="caption"
+                fontWeight={700}
+                sx={{
+                  bgcolor: ((member.type || member.memberType || "")).toUpperCase() === "WFH" ? "rgba(147, 51, 234, 0.1)" : "rgba(37, 99, 235, 0.1)",
+                  color: ((member.type || member.memberType || "")).toUpperCase() === "WFH" ? "#9333ea" : "#2563eb",
+                  border: ((member.type || member.memberType || "")).toUpperCase() === "WFH" ? "1px solid rgba(147, 51, 234, 0.25)" : "1px solid rgba(37, 99, 235, 0.25)",
+                  px: 1.2,
+                  py: 0.3,
+                  borderRadius: "12px",
+                  fontSize: "0.75rem",
+                  display: "inline-block"
+                }}
+              >
+                {member.type || member.memberType || "Office"}
+              </Typography>
+            </Box>
+          </Box>
+        </Grid>
+        <Grid size={{ xs: 6, md: 6 }}>
+          <Box>
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 800,
+                color: "text.secondary",
+                fontSize: "0.65rem",
+              }}
+            >
               Date of Birth
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>

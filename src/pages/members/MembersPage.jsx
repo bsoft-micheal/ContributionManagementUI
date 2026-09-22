@@ -42,6 +42,7 @@ const initialForm = {
   phone: "",
   roleId: "",
   gender: "",
+  type: "Office",
   dateOfBirth: dayjs().subtract(18, "year"),
   joiningDate: dayjs(),
 };
@@ -78,6 +79,11 @@ export default function MembersPage() {
     { label: "Other", value: "Other" },
   ];
 
+  const typeOptions = [
+    { label: "Office", value: "Office" },
+    { label: "WFH", value: "WFH" },
+  ];
+
   const templateValidations = useMemo(() => {
     const roleNamesList = roles.map((r) => r.roleName).join(",");
     return {
@@ -85,6 +91,11 @@ export default function MembersPage() {
         type: "list",
         formulae: [`"Male,Female,Other"`],
         error: "Please select a gender from the list."
+      },
+      "Type": {
+        type: "list",
+        formulae: [`"Office,WFH"`],
+        error: "Please select a type from the list."
       },
       "Role": {
         type: "list",
@@ -112,12 +123,21 @@ export default function MembersPage() {
 
   async function loadData() {
     setLoading(true);
-    const [members, roles] = await Promise.all([
+    const [membersData, rolesData] = await Promise.all([
       GetMembers(),
       GetRoles(),
     ]);
-    setMembers(members);
-    setRoles(roles);
+    const localOverrides = JSON.parse(localStorage.getItem("cm_member_overrides") || "{}");
+    const normalizedMembers = (membersData || []).map((m) => {
+      const override = localOverrides[m.memberId] || {};
+      const type = override.type || m.type || "Office";
+      return {
+        ...m,
+        type,
+      };
+    });
+    setMembers(normalizedMembers);
+    setRoles(rolesData);
     setLoading(false);
   }
 
@@ -129,6 +149,7 @@ export default function MembersPage() {
       phone: { required: true, type: "numberonly", min: 10, max: 10, label: filed },
       roleId: { required: true, label: filed },
       gender: { required: true, label: filed },
+      type: { required: true, label: filed },
       dateOfBirth: { required: true, label: filed },
       joiningDate: { required: true, label: filed },
     };
@@ -141,13 +162,24 @@ export default function MembersPage() {
     }
 
     try {
+      let res;
       if (form.memberId) {
-        await UpdateMember(form.memberId, form);
+        res = await UpdateMember(form.memberId, form);
         toast.success("Saved successfully");
       } else {
-        await CreateMember(form);
+        res = await CreateMember(form);
         toast.success("Saved successfully");
       }
+
+      const savedId = form.memberId || res?.memberId || res?.data?.memberId;
+      if (savedId) {
+        const localOverrides = JSON.parse(localStorage.getItem("cm_member_overrides") || "{}");
+        localOverrides[savedId] = {
+          type: form.type || "Office",
+        };
+        localStorage.setItem("cm_member_overrides", JSON.stringify(localOverrides));
+      }
+
       setDialogOpen(false);
       loadData();
     } catch (error) {
@@ -181,6 +213,7 @@ export default function MembersPage() {
     const phone = row["phone"] !== undefined && row["phone"] !== null ? String(row["phone"]).trim() : "";
     const gender = row["gender"] !== undefined && row["gender"] !== null ? String(row["gender"]).trim() : "";
     const roleName = row["role"] !== undefined && row["role"] !== null ? String(row["role"]).trim() : "";
+    const rawType = row["type"] !== undefined && row["type"] !== null ? String(row["type"]).trim() : "";
     const dobStr = row["date of birth"] !== undefined && row["date of birth"] !== null ? row["date of birth"] : (row["dob"] || "");
     const joiningStr = row["joining date"] !== undefined && row["joining date"] !== null ? row["joining date"] : (row["joiningdate"] || "");
 
@@ -203,6 +236,19 @@ export default function MembersPage() {
     const matchedRole = roles.find(r => r.roleName.toLowerCase() === roleName.toLowerCase());
     if (!matchedRole) {
       return { error: `Row ${rowNum}: Role '${roleName}' not found in system` };
+    }
+
+    // Match Type
+    let normalizedType = "Office";
+    if (rawType) {
+      const upperType = rawType.toUpperCase();
+      if (upperType === "WFH") {
+        normalizedType = "WFH";
+      } else if (upperType === "OFFICE") {
+        normalizedType = "Office";
+      } else {
+        return { error: `Row ${rowNum}: Type must be Office or WFH` };
+      }
     }
 
     // Helper to parse dates from Excel (supporting Date objects, serial numbers, and string values)
@@ -242,6 +288,7 @@ export default function MembersPage() {
         email,
         phone,
         gender: normalizedGender,
+        type: normalizedType,
         roleId: matchedRole.roleId,
         dateOfBirth: dob.toISOString(),
         joiningDate: joiningDate.toISOString(),
@@ -287,6 +334,7 @@ export default function MembersPage() {
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => {
                 setForm({
                   ...row,
+                  type: row.type || "Office",
                   dateOfBirth: row.dateOfBirth ? dayjs(row.dateOfBirth) : null,
                   joiningDate: row.joiningDate ? dayjs(row.joiningDate) : null
                 });
@@ -326,6 +374,31 @@ export default function MembersPage() {
           {row.roleName}
         </Typography>
       ),
+    },
+    {
+      label: "Type",
+      key: "type",
+      render: (row) => {
+        const isWfh = (row.type || "").toUpperCase() === "WFH";
+        return (
+          <Typography
+            variant="caption"
+            fontWeight={700}
+            sx={{
+              bgcolor: isWfh ? "rgba(147, 51, 234, 0.1)" : "rgba(37, 99, 235, 0.1)",
+              color: isWfh ? "#9333ea" : "#2563eb",
+              border: isWfh ? "1px solid rgba(147, 51, 234, 0.25)" : "1px solid rgba(37, 99, 235, 0.25)",
+              px: 1.2,
+              py: 0.3,
+              borderRadius: "12px",
+              fontSize: "0.75rem",
+              display: "inline-block"
+            }}
+          >
+            {row.type || "Office"}
+          </Typography>
+        );
+      },
     },
     { label: "Date of Birth", key: "dateOfBirth", render: (row) => row.dateOfBirth ? dayjs(row.dateOfBirth).format("DD/MM/YYYY") : "--" },
     { label: "Joining Date", key: "joiningDate", render: (row) => row.joiningDate ? dayjs(row.joiningDate).format("DD/MM/YYYY") : "--" },
@@ -529,6 +602,21 @@ export default function MembersPage() {
               required
             />
           </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AppSelect
+              label="Type"
+              placeholder="Select type..."
+              value={form.type || "Office"}
+              onChange={(e) => {
+                setForm((c) => ({ ...c, type: e.target.value }));
+                if (errors.type) setErrors(prev => ({ ...prev, type: "" }));
+              }}
+              options={typeOptions}
+              error={!!errors.type}
+              helperText={errors.type}
+              required
+            />
+          </Grid>
         </Grid>
       </AppDialog>
 
@@ -551,7 +639,7 @@ export default function MembersPage() {
         onClose={() => setImportDialogOpen(false)}
         onImport={handleBulkImport}
         title="Import Members"
-        templateHeaders={["Name", "Email", "Phone", "Role", "Gender", "Date of Birth", "Joining Date"]}
+        templateHeaders={["Name", "Email", "Phone", "Role", "Gender", "Type", "Date of Birth", "Joining Date"]}
         templateValidations={templateValidations}
         validateRow={validateRow}
       />

@@ -11,6 +11,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import AppSelect from "../../components/common/AppSelect";
 import AppDataTable from "../../components/common/AppDataTable";
 import { GetUserRights, SaveUserRights } from "../../services/userRightsService";
+import { GetRoles } from "../../services/roleService";
 
 const defaultRows = [
   // Dashboard Module
@@ -22,17 +23,22 @@ const defaultRows = [
   // Events Module
   { id: 3, module: "Events", subModule: "Registry", page: "Events", access: "readWrite" },
   { id: 4, module: "Events", subModule: "Calendar", page: "Calendar", access: "readWrite" },
+  { id: 16, module: "Events", subModule: "Media", page: "Gallery", access: "readWrite" },
 
   // Contributions Module
   { id: 5, module: "Contributions", subModule: "Ledger", page: "Contributions", access: "readWrite" },
   { id: 6, module: "Contributions", subModule: "Calculation", page: "Calculation", access: "readWrite" },
+  { id: 17, module: "Contributions", subModule: "Expenses", page: "Expense", access: "readWrite" },
+  { id: 18, module: "Contributions", subModule: "Payments", page: "Payments", access: "readWrite" },
 
   // Support Data Module
   { id: 7, module: "Support Data", subModule: "Categories", page: "Event Types", access: "readWrite" },
   { id: 8, module: "Support Data", subModule: "Clearance", page: "Exit Process", access: "readWrite" },
-  { id: 9,  module: "Support Data", subModule: "Admin", page: "User Rights", access: "readWrite" },
-  { id: 11, module: "Support Data", subModule: "Admin", page: "Users",       access: "readWrite" },
-  { id: 15, module: "Support Data", subModule: "Admin", page: "Roles",       access: "readWrite" },
+  { id: 9, module: "Support Data", subModule: "Admin", page: "User Rights", access: "readWrite" },
+  { id: 11, module: "Support Data", subModule: "Admin", page: "Users", access: "readWrite" },
+  { id: 15, module: "Support Data", subModule: "Admin", page: "Roles", access: "readWrite" },
+  { id: 19, module: "Support Data", subModule: "Helpdesk", page: "Support Tickets", access: "readWrite" },
+  { id: 20, module: "Support Data", subModule: "Configuration", page: "Settings", access: "readWrite" },
 
   // Reports Module
   { id: 10, module: "Reports", subModule: "Analytics", page: "Event Audit", access: "readWrite" },
@@ -61,16 +67,23 @@ export default function UserRightsPage() {
   }, [selectedRoleName]);
 
   async function loadData() {
-    // Populate static User Roles
-    const rolesData = [
-      { roleName: "Admin" },
-      { roleName: "Manager" },
-      { roleName: "User" },
-      { roleName: "Member" }
-    ];
-    setRoles(rolesData);
-    if (rolesData.length > 0) {
-      setSelectedRoleName(rolesData[0].roleName);
+    try {
+      const dbRoles = await GetRoles();
+      if (Array.isArray(dbRoles) && dbRoles.length > 0) {
+        setRoles(dbRoles);
+        setSelectedRoleName(dbRoles[0].roleName);
+      } else {
+        const fallback = [
+          { roleName: "Admin" },
+          { roleName: "Manager" },
+          { roleName: "User" },
+          { roleName: "Member" },
+        ];
+        setRoles(fallback);
+        setSelectedRoleName(fallback[0].roleName);
+      }
+    } catch (err) {
+      console.warn("Could not load roles from database:", err);
     }
   }
 
@@ -81,12 +94,12 @@ export default function UserRightsPage() {
       // Align with defaultRows to handle any schema discrepancies
       const alignedRights = defaultRows.map(defRow => {
         let match = serverRights.find(r => r.page === defRow.page);
-        
+
         // Fallback for transition from single 'Reports' to split reports
         if (!match && defRow.module === "Reports") {
           match = serverRights.find(r => r.page === "Reports");
         }
-        
+
         if (!match) {
           match = serverRights.find(
             r => r.subModule === defRow.subModule && r.module === defRow.module
@@ -112,7 +125,7 @@ export default function UserRightsPage() {
 
     const updatedRights = { ...rights };
     const roleRows = updatedRights[selectedRoleName];
-    
+
     if (roleRows) {
       const targetRow = roleRows.find(r => r.id === rowId);
       if (targetRow) {
@@ -139,7 +152,7 @@ export default function UserRightsPage() {
 
           const activeRole = roles.find(r => r.roleName === selectedRoleName);
           const resourceName = targetRow.subModule || targetRow.page || targetRow.module;
-          
+
           let accessLabel = "Read Only";
           if (newAccess === "readWrite") accessLabel = "Read/Write";
           if (newAccess === "deny") accessLabel = "Deny";
@@ -155,7 +168,7 @@ export default function UserRightsPage() {
   // Filter rows by Selected Sub Module
   const filteredRows = useMemo(() => {
     const currentRows = rights[selectedRoleName] || [];
-    
+
     return currentRows.filter(row => {
       // If the page is "User Rights" and selectedRoleName is not Admin or Manager, hide it
       if (row.page === "User Rights" && selectedRoleName !== "Admin" && selectedRoleName !== "Manager") {
