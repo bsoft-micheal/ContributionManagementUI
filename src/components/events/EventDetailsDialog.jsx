@@ -5,7 +5,7 @@ import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import { GetContributionsByEvent } from "../../services/contributionService";
 
-export default function EventDetailsDialog({ open, onClose, event }) {
+export default function EventDetailsDialog({ open, onClose, event, members = [] }) {
   const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -36,6 +36,51 @@ export default function EventDetailsDialog({ open, onClose, event }) {
     .reduce((sum, c) => sum + (c.amount || 0), 0);
   const totalUnpaid = totalExpected - totalPaid;
   const unpaidList = contributions.filter((c) => c.paymentStatus !== "Paid");
+
+  const isBirthday = Boolean(
+    event?.eventTypeName?.toLowerCase().includes("birthday") ||
+    event?.eventName?.toLowerCase().includes("birthday")
+  );
+
+  const getBirthdayCelebrants = () => {
+    if (!isBirthday || !event) return [];
+    const eventMonth = dayjs(event.eventDate).month();
+    const participantIds = (event.participants || []).map((p) => p.memberId || p.id);
+    let matched = [];
+
+    if (participantIds.length > 0) {
+      const pMembers = members.filter((m) => participantIds.includes(m.memberId) && m.dateOfBirth);
+      const monthMatches = pMembers.filter((m) => dayjs(m.dateOfBirth).month() === eventMonth);
+      matched = monthMatches.length > 0 ? monthMatches : pMembers;
+    }
+
+    const textToSearch = `${event.eventName || ""} ${event.description || ""}`.toLowerCase();
+    const nameMatches = members.filter((m) => {
+      if (!m.name || !m.dateOfBirth) return false;
+      const lowerName = m.name.toLowerCase().trim();
+      if (textToSearch.includes(lowerName)) return true;
+      const parts = lowerName.split(/\s+/).filter((p) => p.length >= 3);
+      return parts.length > 0 && parts.some((p) => textToSearch.includes(p));
+    });
+
+    const map = new Map();
+    matched.forEach((c) => map.set(c.memberId, c));
+    nameMatches.forEach((c) => map.set(c.memberId, c));
+
+    if (map.size === 0) {
+      members
+        .filter((m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === eventMonth)
+        .forEach((c) => map.set(c.memberId, c));
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      const dayA = a.dateOfBirth ? dayjs(a.dateOfBirth).date() : 0;
+      const dayB = b.dateOfBirth ? dayjs(b.dateOfBirth).date() : 0;
+      return dayA - dayB;
+    });
+  };
+
+  const celebrantsList = getBirthdayCelebrants();
 
   return (
     <AppDialog
@@ -139,6 +184,70 @@ export default function EventDetailsDialog({ open, onClose, event }) {
             </Typography>
           </Box>
         </Grid>
+
+        {isBirthday && celebrantsList.length > 0 && (
+          <Grid size={{ xs: 12 }}>
+            <Box
+              sx={{
+                p: 1.5,
+                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(192, 38, 211, 0.12)" : "rgba(192, 38, 211, 0.05)",
+                borderRadius: "8px",
+                border: "1px solid",
+                borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(192, 38, 211, 0.25)" : "rgba(192, 38, 211, 0.15)",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 800,
+                    color: (theme) => theme.palette.mode === "dark" ? "#f0abfc" : "#86198f",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  🎂 Birthday Celebrants
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary" }}>
+                  {celebrantsList.length} celebrant{celebrantsList.length !== 1 ? "s" : ""}
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                {celebrantsList.map((c) => (
+                  <Box
+                    key={c.memberId}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: "14px",
+                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "#ffffff",
+                      border: "1px solid",
+                      borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(192, 38, 211, 0.3)" : "rgba(192, 38, 211, 0.2)",
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.8rem" }}>
+                      🎂 {c.name}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: 800,
+                        color: (theme) => theme.palette.mode === "dark" ? "#f5d0fe" : "#a21caf",
+                        fontFamily: "monospace, 'Outfit', sans-serif",
+                        fontSize: "0.78rem",
+                      }}
+                    >
+                      {c.dateOfBirth ? dayjs(c.dateOfBirth).format("D MMM") : ""}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          </Grid>
+        )}
+
         <Grid size={{ xs: 12 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 4 }}>

@@ -17,6 +17,8 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
 import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
+import AppPieChart from "../../components/common/AppPieChart";
+import { PieChart as PieChartIcon, BarChart as BarChartIcon } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import { GetMembers } from "../../services/memberService";
@@ -172,6 +174,8 @@ export default function ReportsPage({ mode }) {
   const [members, setMembers] = useState([]);
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [allContributions, setAllContributions] = useState([]);
+  const [chartType, setChartType] = useState("pie");
+  const [eventMetric, setEventMetric] = useState("expected");
 
   useEffect(() => {
     if (mode === "member-category") {
@@ -274,19 +278,40 @@ export default function ReportsPage({ mode }) {
 
   const chartData = useMemo(() => {
     if (mode === "member-category") {
-      return memberCategoryData.map((item) => ({ label: item.categoryName, value: item.totalPaidAmount }));
+      return memberCategoryData
+        .filter((item) => Number(item.totalPaidAmount) > 0)
+        .map((item) => ({ label: item.categoryName, value: Number(item.totalPaidAmount) }));
     }
 
     if (mode === "member") {
-      return (report?.memberContributionHistory ?? []).slice(0, 6).map((item) => ({ label: item.memberName, value: item.totalPaidAmount }));
+      return (report?.memberContributionHistory ?? [])
+        .filter((item) => Number(item.totalPaidAmount) > 0)
+        .map((item) => ({ label: item.memberName, value: Number(item.totalPaidAmount) }));
     }
 
     if (mode === "pending") {
-      return (report?.pendingDues ?? []).slice(0, 6).map((item) => ({ label: item.memberName, value: item.amount }));
+      const grouped = {};
+      (report?.pendingDues ?? []).forEach((item) => {
+        const name = item.memberName || "Unknown";
+        grouped[name] = (grouped[name] || 0) + (Number(item.amount) || 0);
+      });
+      return Object.entries(grouped)
+        .filter(([, val]) => val > 0)
+        .map(([memberName, amount]) => ({ label: memberName, value: amount }));
     }
 
-    return (report?.eventCollections ?? []).slice(0, 6).map((item) => ({ label: item.eventName, value: item.expectedAmount }));
-  }, [mode, memberCategoryData, report]);
+    return (report?.eventCollections ?? [])
+      .map((item) => {
+        const val =
+          eventMetric === "paid"
+            ? Number(item.paidAmount) || 0
+            : eventMetric === "pending"
+            ? Number(item.pendingAmount) || 0
+            : Number(item.expectedAmount) || 0;
+        return { label: item.eventName, value: val };
+      })
+      .filter((item) => item.value > 0);
+  }, [mode, memberCategoryData, report, eventMetric]);
 
   const pageTitle =
     mode === "event" ? "Event Audit" :
@@ -411,7 +436,7 @@ export default function ReportsPage({ mode }) {
           ) : (
             <Stack spacing={3}>
               <Grid container spacing={2.5}>
-                <Grid size={{ xs: 12, lg: 7 }}>
+                <Grid size={{ xs: 12, lg: 8 }}>
                   <Card
                     sx={{
                       height: "100%",
@@ -420,18 +445,107 @@ export default function ReportsPage({ mode }) {
                     }}
                   >
                     <CardContent>
-                      <Stack spacing={2}>
-                        <Box>
-                          <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1.05rem", color: "text.primary" }}>
-                            Visualization
-                          </Typography>
+                      <Stack spacing={2.5}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                            <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1.05rem", color: "text.primary" }}>
+                              Visualization
+                            </Typography>
+                            {(!mode || mode === "event") && (
+                              <Stack direction="row" spacing={0.5} sx={{ ml: { xs: 0, sm: 1 } }}>
+                                {[
+                                  { label: "Expected", key: "expected" },
+                                  { label: "Paid", key: "paid" },
+                                  { label: "Pending", key: "pending" },
+                                ].map((m) => (
+                                  <Chip
+                                    key={m.key}
+                                    size="small"
+                                    label={m.label}
+                                    onClick={() => setEventMetric(m.key)}
+                                    color={eventMetric === m.key ? "primary" : "default"}
+                                    variant={eventMetric === m.key ? "filled" : "outlined"}
+                                    sx={{
+                                      height: 24,
+                                      fontSize: "0.72rem",
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                    }}
+                                  />
+                                ))}
+                              </Stack>
+                            )}
+                          </Box>
+
+                          {/* View Toggle: Pie Chart vs Bar Chart */}
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            sx={{
+                              bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.06)",
+                              p: 0.5,
+                              borderRadius: "8px",
+                            }}
+                          >
+                            <Box
+                              onClick={() => setChartType("pie")}
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                                px: 1.2,
+                                py: 0.4,
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                fontSize: "0.75rem",
+                                fontWeight: 700,
+                                bgcolor: chartType === "pie" ? "primary.main" : "transparent",
+                                color: chartType === "pie" ? "#ffffff" : "text.secondary",
+                                transition: "all 0.2s ease",
+                                "&:hover": {
+                                  color: chartType === "pie" ? "#ffffff" : "text.primary",
+                                },
+                              }}
+                            >
+                              <PieChartIcon sx={{ fontSize: 16 }} />
+                              Pie Chart
+                            </Box>
+                            <Box
+                              onClick={() => setChartType("bar")}
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                                px: 1.2,
+                                py: 0.4,
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                fontSize: "0.75rem",
+                                fontWeight: 700,
+                                bgcolor: chartType === "bar" ? "primary.main" : "transparent",
+                                color: chartType === "bar" ? "#ffffff" : "text.secondary",
+                                transition: "all 0.2s ease",
+                                "&:hover": {
+                                  color: chartType === "bar" ? "#ffffff" : "text.primary",
+                                },
+                              }}
+                            >
+                              <BarChartIcon sx={{ fontSize: 16 }} />
+                              Bar Chart
+                            </Box>
+                          </Stack>
                         </Box>
-                        <SimpleBarChart items={chartData} />
+
+                        {chartType === "pie" ? (
+                          <AppPieChart items={chartData} />
+                        ) : (
+                          <SimpleBarChart items={chartData} />
+                        )}
                       </Stack>
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid size={{ xs: 12, lg: 5 }}>
+                <Grid size={{ xs: 12, lg: 4 }}>
                   <Card
                     sx={{
                       height: "100%",
