@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Card, CardContent, Grid, Stack, Typography, Paper } from "@mui/material";
+import { Box, Card, CardContent, Grid, Stack, Typography, Paper, Tooltip } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import AppInput from "../../components/common/AppInput";
@@ -135,6 +135,121 @@ export default function CalendarPage() {
     setViewDialogOpen(true);
   };
 
+  const getCelebrantsForEvent = (eventItem) => {
+    const isBirthday = 
+      eventItem.eventTypeName?.toLowerCase().includes("birthday") ||
+      eventItem.eventName?.toLowerCase().includes("birthday");
+
+    if (!isBirthday) return [];
+
+    const eventMonth = dayjs(eventItem.eventDate).month();
+    const activeMembersInMonth = members.filter(
+      (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === eventMonth
+    );
+
+    // 1. Check if participants are explicitly attached to eventItem
+    const participantIds = (eventItem.participants || []).map((p) => p.memberId || p.id);
+    let matchedCelebrants = [];
+
+    if (participantIds.length > 0) {
+      const pMembers = members.filter((m) => participantIds.includes(m.memberId) && m.dateOfBirth);
+      const monthMatches = pMembers.filter((m) => dayjs(m.dateOfBirth).month() === eventMonth);
+      if (monthMatches.length > 0) {
+        matchedCelebrants = monthMatches;
+      } else {
+        matchedCelebrants = pMembers;
+      }
+    }
+
+    // 2. Also check if member names appear in eventName or description
+    const textToSearch = `${eventItem.eventName || ""} ${eventItem.description || ""}`.toLowerCase();
+    const nameMatches = members.filter((m) => {
+      if (!m.name || !m.dateOfBirth) return false;
+      const lowerName = m.name.toLowerCase().trim();
+      if (textToSearch.includes(lowerName)) return true;
+      const parts = lowerName.split(/\s+/).filter((p) => p.length >= 3);
+      return parts.length > 0 && parts.some((p) => textToSearch.includes(p));
+    });
+
+    const map = new Map();
+    matchedCelebrants.forEach((c) => map.set(c.memberId, c));
+    nameMatches.forEach((c) => map.set(c.memberId, c));
+
+    // 3. Fallback: if still empty, but this is a birthday event for this month, map to active celebrants of the month
+    if (map.size === 0 && activeMembersInMonth.length > 0) {
+      activeMembersInMonth.forEach((c) => map.set(c.memberId, c));
+    }
+
+    return Array.from(map.values());
+  };
+
+  const getDayItems = (day) => {
+    const dayStr = day.format("YYYY-MM-DD");
+    const dayMonth = day.month();
+    const dayDate = day.date();
+
+    const items = [];
+    const handledCelebrantIds = new Set();
+
+    for (const eventItem of events) {
+      const isBirthday = 
+        eventItem.eventTypeName?.toLowerCase().includes("birthday") ||
+        eventItem.eventName?.toLowerCase().includes("birthday");
+
+      if (!isBirthday) {
+        if (dayjs(eventItem.eventDate).format("YYYY-MM-DD") === dayStr) {
+          items.push({
+            key: `event-${eventItem.eventId}`,
+            eventItem,
+            title: eventItem.eventName || eventItem.eventTypeName || "Scheduled Event",
+            subtitle: `${eventItem.eventName || eventItem.eventTypeName} (${dayjs(eventItem.eventDate).format("DD MMM YYYY")})`,
+            colorType: eventItem.eventTypeName,
+            isBirthdayCelebrant: false,
+          });
+        }
+        continue;
+      }
+
+      // Birthday event: map each celebrant using their DOB from the member table
+      const celebrants = getCelebrantsForEvent(eventItem);
+
+      if (celebrants.length > 0) {
+        for (const celebrant of celebrants) {
+          if (!celebrant.dateOfBirth) continue;
+          const dob = dayjs(celebrant.dateOfBirth);
+          if (dob.month() === dayMonth && dob.date() === dayDate) {
+            if (!handledCelebrantIds.has(celebrant.memberId)) {
+              handledCelebrantIds.add(celebrant.memberId);
+              items.push({
+                key: `bday-${celebrant.memberId}-${eventItem.eventId}`,
+                eventItem,
+                celebrant,
+                title: `🎂 ${celebrant.name}`,
+                subtitle: `${celebrant.name}'s Birthday (${dob.format("D MMM")}) • ${eventItem.eventName}`,
+                colorType: "Birthday",
+                isBirthdayCelebrant: true,
+              });
+            }
+          }
+        }
+      } else {
+        // Fallback: If no celebrants could be extracted, show on eventDate
+        if (dayjs(eventItem.eventDate).format("YYYY-MM-DD") === dayStr) {
+          items.push({
+            key: `event-${eventItem.eventId}`,
+            eventItem,
+            title: eventItem.eventName || "Birthday",
+            subtitle: `${eventItem.eventName} (${dayjs(eventItem.eventDate).format("DD MMM YYYY")})`,
+            colorType: "Birthday",
+            isBirthdayCelebrant: false,
+          });
+        }
+      }
+    }
+
+    return items;
+  };
+
   return (
     <div className="page-shell">
       <Card sx={{ overflow: "hidden" }}>
@@ -259,9 +374,7 @@ export default function CalendarPage() {
                 ))}
 
                 {calendarDays.map((day) => {
-                  const dayEvents = events.filter((eventItem) =>
-                    dayjs(eventItem.eventDate).format("YYYY-MM-DD") === day.format("YYYY-MM-DD")
-                  );
+                  const dayItems = getDayItems(day);
                   const isDifferentMonth = day.month() + 1 !== filters.month;
 
                   return (
@@ -306,34 +419,40 @@ export default function CalendarPage() {
                       </Box>
                       
                       <Stack spacing={0.4}>
-                        {dayEvents.map((eventItem) => {
-                          const palette = getEventColor(eventItem.eventTypeName);
+                        {dayItems.map((item) => {
+                          const palette = getEventColor(item.colorType);
                           return (
-                            <Box
-                              key={eventItem.eventId}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEventClick(eventItem);
-                              }}
-                              sx={{
-                                px: 0.8,
-                                py: 0.4,
-                                borderRadius: 0.8,
-                                bgcolor: palette.main,
-                                color: theme.palette.getContrastText(palette.main),
-                                lineHeight: 1,
-                                cursor: "pointer",
-                                boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
-                                transition: "transform 0.1s ease",
-                                "&:hover": {
-                                  transform: "scale(1.03)"
-                                }
-                              }}
+                            <Tooltip
+                              key={item.key}
+                              title={item.subtitle || item.title}
+                              arrow
+                              placement="top"
                             >
-                              <Typography sx={{ fontSize: "0.55rem", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                {eventItem.eventName || eventItem.eventTypeName || eventItem.description || "Scheduled Event"}
-                              </Typography>
-                            </Box>
+                              <Box
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEventClick(item.eventItem);
+                                }}
+                                sx={{
+                                  px: 0.8,
+                                  py: 0.4,
+                                  borderRadius: 0.8,
+                                  bgcolor: palette.main,
+                                  color: theme.palette.getContrastText(palette.main),
+                                  lineHeight: 1,
+                                  cursor: "pointer",
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                                  transition: "transform 0.1s ease",
+                                  "&:hover": {
+                                    transform: "scale(1.03)"
+                                  }
+                                }}
+                              >
+                                <Typography sx={{ fontSize: "0.55rem", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {item.title}
+                                </Typography>
+                              </Box>
+                            </Tooltip>
                           );
                         })}
                       </Stack>
@@ -359,6 +478,7 @@ export default function CalendarPage() {
         open={viewDialogOpen}
         onClose={() => setViewDialogOpen(false)}
         event={selectedEvent}
+        members={members}
       />
     </div>
   );

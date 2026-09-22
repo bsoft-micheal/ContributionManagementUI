@@ -87,6 +87,10 @@ export default function ContributionCalculationPage() {
     const eventDate = dayjs(selectedEventDetails.eventDate);
     const eventParticipants = selectedEventDetails.participants || [];
 
+    const eventTypeName = selectedEventDetails.eventTypeName || 
+      events.find(e => e.eventId === selectedEventDetails.eventId)?.eventTypeName || "";
+    const isBirthdayEvent = eventTypeName.toLowerCase().includes("birthday");
+
     // 1. Identify which members are participants and find their tenure/joining date
     const enrichedParticipants = eventParticipants.map(ep => {
       const memberInfo = members.find(m => m.memberId === ep.memberId);
@@ -103,25 +107,41 @@ export default function ContributionCalculationPage() {
       };
     });
 
-    // 2. Count full vs half shares
-    const halfShareCount = enrichedParticipants.filter(p => p.isLessThanOneYear).length;
-    const fullShareCount = enrichedParticipants.length - halfShareCount;
-
-    // 3. Split calculation
     const totalAmount = selectedEventDetails.baseAmount || 0;
-    const divisor = fullShareCount + 0.5 * halfShareCount;
-    const fullShare = divisor > 0 ? (totalAmount / divisor) : 0;
-    setFullShareAmount(fullShare);
+    let fullShare = 0;
+    let equalShare = 0;
+
+    if (isBirthdayEvent) {
+      // 2. Count full vs half shares (Only for Birthday events)
+      const halfShareCount = enrichedParticipants.filter(p => p.isLessThanOneYear).length;
+      const fullShareCount = enrichedParticipants.length - halfShareCount;
+
+      // 3. Split calculation
+      const divisor = fullShareCount + 0.5 * halfShareCount;
+      fullShare = divisor > 0 ? (totalAmount / divisor) : 0;
+      setFullShareAmount(fullShare);
+    } else {
+      // For other events (Except Birthday), everyone pays an equal share amount
+      const divisor = enrichedParticipants.length;
+      equalShare = divisor > 0 ? (totalAmount / divisor) : 0;
+      setFullShareAmount(equalShare);
+    }
 
     // 4. Calculate for each participant (respect existing contribution amounts or default split)
     const calculated = enrichedParticipants.map(p => {
       const epContribution = selectedEventDetails.contributions?.find(c => c.memberId === p.memberId);
-      const calculatedAmount = (epContribution !== undefined && epContribution !== null)
-        ? epContribution.amount
-        : (p.isLessThanOneYear ? (fullShare * 0.5) : fullShare);
+      let calculatedAmount;
+      if (epContribution !== undefined && epContribution !== null) {
+        calculatedAmount = epContribution.amount;
+      } else if (isBirthdayEvent) {
+        calculatedAmount = p.isLessThanOneYear ? (fullShare * 0.5) : fullShare;
+      } else {
+        calculatedAmount = equalShare;
+      }
 
       return {
         ...p,
+        isBirthdayEvent,
         tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
         calculatedAmount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimals
       };
@@ -130,53 +150,70 @@ export default function ContributionCalculationPage() {
     setCalculationData(calculated);
   };
 
+  const currentEventTypeName = selectedEventDetails?.eventTypeName || 
+    events.find(e => e.eventId === selectedEventDetails?.eventId)?.eventTypeName || "";
+  const isCurrentEventBirthday = currentEventTypeName.toLowerCase().includes("birthday");
+
   const columns = [
-    { 
-      label: "Member Name", 
-      key: "name", 
+    {
+      label: "Member Name",
+      key: "name",
       sx: { minWidth: 160 },
       cellSx: { minWidth: 160 },
-      render: (row) => <Typography variant="body2" fontWeight={700}>{row.name}</Typography> 
+      render: (row) => <Typography variant="body2" fontWeight={700}>{row.name}</Typography>
     },
-    { 
-      label: "Joining Date", 
-      key: "joiningDate", 
+    {
+      label: "Joining Date",
+      key: "joiningDate",
       sx: { minWidth: 120 },
       cellSx: { minWidth: 120 },
-      render: (row) => row.joiningDate ? dayjs(row.joiningDate).format("DD/MM/YYYY") : "—" 
+      render: (row) => row.joiningDate ? dayjs(row.joiningDate).format("DD/MM/YYYY") : "—"
     },
-    { 
-      label: "No of Years", 
-      key: "tenureFormatted", 
+    {
+      label: "No of Years",
+      key: "tenureFormatted",
       align: "right",
       sx: { minWidth: 100 },
       cellSx: { minWidth: 100 }
     },
-    { 
-      label: "Rule Applied", 
+    {
+      label: "Rule Applied",
       sx: { minWidth: 150 },
       cellSx: { minWidth: 150 },
-      render: (row) => (
-        <Chip 
-          size="small" 
-          label={row.isLessThanOneYear ? "50% (New Entrant)" : "100% (Standard)"}
-          color={row.isLessThanOneYear ? "warning" : "success"}
-          variant="outlined"
-          sx={{ fontWeight: 800, fontSize: "0.65rem" }}
-        />
-      )
+      render: (row) => {
+        if (!row.isBirthdayEvent) {
+          return (
+            <Chip
+              size="small"
+              label="Equal Share"
+              color="primary"
+              variant="outlined"
+              sx={{ fontWeight: 800, fontSize: "0.65rem" }}
+            />
+          );
+        }
+        return (
+          <Chip
+            size="small"
+            label={row.isLessThanOneYear ? "50% (New Entrant)" : "100% (Standard)"}
+            color={row.isLessThanOneYear ? "warning" : "success"}
+            variant="outlined"
+            sx={{ fontWeight: 800, fontSize: "0.65rem" }}
+          />
+        );
+      }
     },
-    { 
-      label: "Final Payable", 
-      key: "calculatedAmount", 
-      align: "right", 
+    {
+      label: "Final Payable",
+      key: "calculatedAmount",
+      align: "right",
       sx: { minWidth: 130 },
       cellSx: { minWidth: 130 },
       render: (row) => (
         <Typography variant="body2" fontWeight={900} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : theme.palette.primary.main }}>
           ₹{(row.calculatedAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </Typography>
-      ) 
+      )
     },
   ];
 
@@ -254,7 +291,7 @@ export default function ContributionCalculationPage() {
                 </Typography>
                 <Grid container spacing={2}>
                   {/* Column 1: Cost & Participants */}
-                  <Grid size={{ xs: 12, sm: 3.5 }}>
+                  <Grid size={{ xs: 12, sm: isCurrentEventBirthday ? 3.5 : 4 }}>
                     <Stack spacing={0.5}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Event Cost:</Typography>
@@ -267,35 +304,63 @@ export default function ContributionCalculationPage() {
                     </Stack>
                   </Grid>
 
-                  {/* Column 2: Full/Half share counts */}
-                  <Grid size={{ xs: 12, sm: 4.5 }} sx={{ borderLeft: { xs: "none", sm: `1px solid ${theme.palette.divider}` }, pl: { xs: 0, sm: 2 } }}>
-                    <Stack spacing={0.5}>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Full Share Members (100%):</Typography>
-                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => !x.isLessThanOneYear).length}</Typography>
-                      </Box>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Half Share Members (50%):</Typography>
-                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => x.isLessThanOneYear).length}</Typography>
-                      </Box>
-                    </Stack>
-                  </Grid>
+                  {isCurrentEventBirthday ? (
+                    <>
+                      {/* Column 2: Full/Half share counts for Birthday */}
+                      <Grid size={{ xs: 12, sm: 4.5 }} sx={{ borderLeft: { xs: "none", sm: `1px solid ${theme.palette.divider}` }, pl: { xs: 0, sm: 2 } }}>
+                        <Stack spacing={0.5}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Full Share Members (100%):</Typography>
+                            <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => !x.isLessThanOneYear).length}</Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Half Share Members (50%):</Typography>
+                            <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => x.isLessThanOneYear).length}</Typography>
+                          </Box>
+                        </Stack>
+                      </Grid>
 
-                  {/* Column 3: Full Share Amount */}
-                  <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Full Share</Typography>
-                    <Typography variant="body2" fontWeight={900} color="primary.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
-                      ₹{fullShareAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </Typography>
-                  </Grid>
+                      {/* Column 3: Full Share Amount */}
+                      <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Full Share</Typography>
+                        <Typography variant="body2" fontWeight={900} color="primary.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
+                          ₹{fullShareAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Typography>
+                      </Grid>
 
-                  {/* Column 4: Half Share Amount */}
-                  <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Half Share (New Entrant)</Typography>
-                    <Typography variant="body2" fontWeight={900} color="warning.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
-                      ₹{(fullShareAmount * 0.5).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </Typography>
-                  </Grid>
+                      {/* Column 4: Half Share Amount */}
+                      <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Half Share (50%)</Typography>
+                        <Typography variant="body2" fontWeight={900} color="warning.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
+                          ₹{(fullShareAmount * 0.5).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Typography>
+                      </Grid>
+                    </>
+                  ) : (
+                    <>
+                      {/* Column 2: Equal Distribution info for Other Events */}
+                      <Grid size={{ xs: 12, sm: 4 }} sx={{ borderLeft: { xs: "none", sm: `1px solid ${theme.palette.divider}` }, pl: { xs: 0, sm: 2 } }}>
+                        <Stack spacing={0.5}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Rule:</Typography>
+                            <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>Equal Share Split</Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Eligible Members:</Typography>
+                            <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>All {calculationData.length} Members (100%)</Typography>
+                          </Box>
+                        </Stack>
+                      </Grid>
+
+                      {/* Column 3: Equal Share Amount */}
+                      <Grid size={{ xs: 12, sm: 4 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Equal Share per Member</Typography>
+                        <Typography variant="body2" fontWeight={900} color="primary.main" sx={{ fontSize: "0.95rem", mt: 0.2 }}>
+                          ₹{fullShareAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Typography>
+                      </Grid>
+                    </>
+                  )}
                 </Grid>
               </Card>
             </Grid>

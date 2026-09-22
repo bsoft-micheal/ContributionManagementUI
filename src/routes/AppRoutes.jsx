@@ -19,6 +19,11 @@ import ExitProcessPage from "../pages/members/ExitProcessPage";
 import UserRightsPage from "../pages/members/UserRightsPage";
 import UsersPage from "../pages/members/UsersPage";
 import RolesPage from "../pages/members/RolesPage";
+import ExpensePage from "../pages/expenses/ExpensePage";
+import SupportTicketsPage from "../pages/support/SupportTicketsPage";
+import SettingsPage from "../pages/settings/SettingsPage";
+import PaymentsPage from "../pages/payments/PaymentsPage";
+import GalleryPage from "../pages/gallery/GalleryPage";
 import SessionHistoryPage from "../pages/auth/SessionHistoryPage";
 
 export default function AppRoutes() {
@@ -42,6 +47,11 @@ export default function AppRoutes() {
         <Route path="/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
         <Route path="/events/:id" element={<ProtectedRoute><EventDetailsPage /></ProtectedRoute>} />
         <Route path="/contributions" element={<ProtectedRoute><ContributionsPage /></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
+        <Route path="/expense" element={<ProtectedRoute><ExpensePage /></ProtectedRoute>} />
+        <Route path="/gallery" element={<ProtectedRoute><GalleryPage /></ProtectedRoute>} />
+        <Route path="/support-tickets" element={<ProtectedRoute><SupportTicketsPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/my-contributions" element={<ProtectedRoute><MyContributionSummaryPage /></ProtectedRoute>} />
         <Route path="/reports" element={<Navigate to="/reports/event-collection-audit" replace />} />
         <Route path="/reports/event-collection-audit" element={<ProtectedRoute><ReportsPage mode="event" /></ProtectedRoute>} />

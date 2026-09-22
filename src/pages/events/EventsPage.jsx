@@ -62,9 +62,9 @@ export default function EventsPage() {
 
   const monthOptions = [
     { label: "All", value: 0 },
-    ...Array.from({ length: 12 }, (_, i) => ({ 
-      label: dayjs().month(i).format("MMMM"), 
-      value: i + 1 
+    ...Array.from({ length: 12 }, (_, i) => ({
+      label: dayjs().month(i).format("MMMM"),
+      value: i + 1
     }))
   ];
 
@@ -101,46 +101,48 @@ export default function EventsPage() {
     {
       label: "Action",
       render: (row) => (
-          <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-            <Tooltip title="View Details">
-              <IconButton size="small" sx={{ p: 0.3 }} 
-                onClick={() => { 
-                  setSelectedEvent(row); 
-                  setViewDialogOpen(true); 
-                }}
-              >
-                <ViewIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-              </IconButton>
-            </Tooltip>
-            {hasWriteAccess && (
-              <>
-                <Tooltip title="Edit Event">
-                  <IconButton size="small" sx={{ p: 0.3 }} 
-                    onClick={() => { 
-                      setSelectedEvent(row); 
-                      setDialogOpen(true); 
-                    }}
-                  >
-                    <EditIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete Event">
-                  <IconButton size="small" sx={{ p: 0.3 }} 
-                    onClick={() => handleDeleteRequest(row)}
-                  >
-                    <DeleteIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-                  </IconButton>
-                </Tooltip>
-              </>
-            )}
-          </Box>
+        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+          <Tooltip title="View Details">
+            <IconButton size="small" sx={{ p: 0.3 }}
+              onClick={() => {
+                setSelectedEvent(row);
+                setViewDialogOpen(true);
+              }}
+            >
+              <ViewIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+            </IconButton>
+          </Tooltip>
+          {hasWriteAccess && (
+            <>
+              <Tooltip title="Edit Event">
+                <IconButton size="small" sx={{ p: 0.3 }}
+                  onClick={() => {
+                    setSelectedEvent(row);
+                    setDialogOpen(true);
+                  }}
+                >
+                  <EditIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Delete Event">
+                <IconButton size="small" sx={{ p: 0.3 }}
+                  onClick={() => handleDeleteRequest(row)}
+                >
+                  <DeleteIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
+        </Box>
       )
     },
-    { label: "Event Name", key: "eventName", render: (row) => (
+    {
+      label: "Event Name", key: "eventName", render: (row) => (
         <Typography variant="body2" fontWeight={700} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }}>{row.eventName}</Typography>
-    )},
+      )
+    },
     { label: "Category", key: "eventTypeName", render: (row) => <Typography variant="body2">{row.eventTypeName}</Typography> },
-    { label: "Date", key: "eventDate", render: (row) => dayjs(row.eventDate).format("DD/MM/YYYY") },
+    { label: "Event Date", key: "eventDate", render: (row) => dayjs(row.eventDate).format("DD/MM/YYYY") },
 
     {
       label: "Valuation",
@@ -192,7 +194,7 @@ export default function EventsPage() {
                 size="small"
                 onClick={() => {
                   setFilters({ month: filterMonth, year: filterYear });
-                 
+
                 }}
                 sx={{
                   bgcolor: "#4a3f6b !important",
