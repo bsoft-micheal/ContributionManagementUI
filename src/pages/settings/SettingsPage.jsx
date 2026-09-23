@@ -77,6 +77,7 @@ import AppSelect from "../../components/common/AppSelect";
 import AppSwitch from "../../components/common/AppSwitch";
 import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
+import MfaSettings from "../../components/common/MfaSettings";
 import {
   getSystemSettingsAsync,
   updateSystemSettingsAsync,
@@ -603,6 +604,11 @@ export default function SettingsPage() {
                       onChange={(e) => handleChange("enable2faAdmin", e.target.checked)}
                     />
                   </Box>
+
+                  <Divider sx={{ my: 1.5, borderColor: "divider" }} />
+
+                  {/* Personal MFA Device Configuration */}
+                  <MfaSettings embedded title="Two-Factor Authentication (MFA)" />
                 </Stack>
               </Card>
             </Grid>

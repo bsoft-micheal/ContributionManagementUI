@@ -14,6 +14,7 @@ import {
   Tab,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -38,6 +39,22 @@ const C = {
   unpaid: "#ef4444", // red
 };
 
+// ─── Curated Vibrant Donut Palette (Matches Reference Mockup) ─────────────────
+const DONUT_COLORS = [
+  "#8B5CF6", // Purple (Image 1 top right)
+  "#A78BFA", // Lavender
+  "#38BDF8", // Cyan / Sky Blue
+  "#F43F5E", // Rose / Coral
+  "#F59E0B", // Amber / Warm Orange
+  "#10B981", // Mint / Emerald
+  "#3B82F6", // Royal Blue
+  "#EC4899", // Pink
+  "#06B6D4", // Teal Cyan
+  "#6366F1", // Indigo
+  "#E11D48", // Crimson
+  "#84CC16", // Lime
+];
+
 // ─── Format Helpers ───────────────────────────────────────────────────────────
 function fmtAmt(v) {
   const n = Number(v) || 0;
@@ -46,215 +63,234 @@ function fmtAmt(v) {
   return `₹${Math.round(n)}`;
 }
 
-// ─── Premium Multi-Ring Donut Chart ─────────────────────────────────────────
-//
-//  Ring layout (320×320 SVG):
-//   Outer ring  →  mid-radius 118, thickness 22 (Amount: Collected vs Pending)
-//   Inner ring  →  mid-radius  84, thickness 18 (Payments: Paid vs Pending)
-//   Center area →  radius ≈ 64 px (diameter ≈ 128 px for glass stats hub)
+// ─── SVG Arc Path Generator ───────────────────────────────────────────────────
+function getDonutArcPath(cx, cy, rInner, rOuter, startAngle, endAngle) {
+  // If full circle (or 99.9%+)
+  if (endAngle - startAngle >= 2 * Math.PI - 0.001) {
+    const midAngle = startAngle + Math.PI;
+    return `
+      M ${cx + rOuter * Math.cos(startAngle)} ${cy + rOuter * Math.sin(startAngle)}
+      A ${rOuter} ${rOuter} 0 0 1 ${cx + rOuter * Math.cos(midAngle)} ${cy + rOuter * Math.sin(midAngle)}
+      A ${rOuter} ${rOuter} 0 0 1 ${cx + rOuter * Math.cos(endAngle)} ${cy + rOuter * Math.sin(endAngle)}
+      L ${cx + rInner * Math.cos(endAngle)} ${cy + rInner * Math.sin(endAngle)}
+      A ${rInner} ${rInner} 0 0 0 ${cx + rInner * Math.cos(midAngle)} ${cy + rInner * Math.sin(midAngle)}
+      A ${rInner} ${rInner} 0 0 0 ${cx + rInner * Math.cos(startAngle)} ${cy + rInner * Math.sin(startAngle)}
+      Z
+    `;
+  }
+  const x1 = cx + rOuter * Math.cos(startAngle);
+  const y1 = cy + rOuter * Math.sin(startAngle);
+  const x2 = cx + rOuter * Math.cos(endAngle);
+  const y2 = cy + rOuter * Math.sin(endAngle);
+  const x3 = cx + rInner * Math.cos(endAngle);
+  const y3 = cy + rInner * Math.sin(endAngle);
+  const x4 = cx + rInner * Math.cos(startAngle);
+  const y4 = cy + rInner * Math.sin(startAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
 
-const MR_SIZE = 320;
-const MR_MID_RADII = [118, 84];
-const MR_WIDTHS = [22, 18];
+  return `
+    M ${x1} ${y1}
+    A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${x2} ${y2}
+    L ${x3} ${y3}
+    A ${rInner} ${rInner} 0 ${largeArc} 0 ${x4} ${y4}
+    Z
+  `;
+}
 
-function MultiRingDonut({ rings, centerPct, centerLabel, centerSub }) {
+// ─── Interactive Segmented Donut Chart Component ──────────────────────────────
+function InteractiveDonutChart({
+  items = [],
+  activeItem = null,
+  onHoverItem = () => {},
+  defaultSummary = {},
+  size = 300,
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-  const cx = MR_SIZE / 2;
-  const cy = MR_SIZE / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const rInner = 86;
+  const rOuter = 136;
+  const rInnerHover = 84;
+  const rOuterHover = 144;
 
-  const trackColor = isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.07)";
-  const rimColor = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.10)";
+  const validItems = items.filter((d) => (Number(d.value) || 0) > 0);
+  const total = validItems.reduce((acc, d) => acc + (Number(d.value) || 0), 0);
 
-  const processedRings = rings.map((ring, ri) => {
-    const midR = MR_MID_RADII[ri];
-    const strokeWidth = MR_WIDTHS[ri];
-    const circ = 2 * Math.PI * midR;
-    const total = ring.segments.reduce((s, d) => s + Math.max(Number(d.value) || 0, 0), 0);
-    let cum = 0;
+  // Compute angles
+  let currentAngle = -Math.PI / 2; // Start at 12 o'clock
+  const slices = (validItems.length > 0 ? validItems : items).map((item, idx) => {
+    const val = Number(item.value) || 0;
+    const fraction = total > 0 ? val / total : items.length > 0 ? 1 / items.length : 1;
+    const angleDelta = fraction * 2 * Math.PI;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + angleDelta;
+    currentAngle = endAngle;
 
-    const nonZeroCount = ring.segments.filter((s) => Number(s.value) > 0).length;
-    const arcs = ring.segments.map((seg) => {
-      const val = Math.max(Number(seg.value) || 0, 0);
-      const frac = total > 0 ? val / total : 0;
-      const len = frac * circ;
-      // Gap between segments only if multiple segments have value
-      const dash = nonZeroCount > 1 ? Math.max(0, len - 3.5) : len;
-      const offset = circ - cum;
-      cum += len;
-      return { ...seg, frac, dash, offset, len };
-    });
+    const pctNum = fraction * 100;
+    const pct = pctNum % 1 === 0 ? pctNum.toFixed(0) : pctNum.toFixed(1);
 
-    return { ...ring, midR, strokeWidth, circ, total, arcs };
+    return {
+      ...item,
+      fraction,
+      startAngle,
+      endAngle,
+      percent: item.percent ?? pct,
+      color: item.color || DONUT_COLORS[idx % DONUT_COLORS.length],
+    };
   });
 
+  // Current display in center
+  const display = activeItem || defaultSummary;
+
   return (
-    <Box sx={{ position: "relative", width: MR_SIZE, height: MR_SIZE, flexShrink: 0 }}>
+    <Box
+      sx={{
+        position: "relative",
+        width: size,
+        height: size,
+        flexShrink: 0,
+        userSelect: "none",
+      }}
+    >
       <svg
-        width={MR_SIZE}
-        height={MR_SIZE}
-        viewBox={`0 0 ${MR_SIZE} ${MR_SIZE}`}
-        style={{ transform: "rotate(-90deg)", overflow: "visible" }}
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        style={{ overflow: "visible" }}
       >
         <defs>
-          {/* Subtle drop shadow */}
-          <filter id="mrGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="2" stdDeviation="3.5" floodOpacity="0.22" />
+          <filter id="donutHoverShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity={isDark ? "0.6" : "0.22"} />
           </filter>
-
-          {/* Linear Gradients */}
-          <linearGradient id="grad-collected" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#10b981" />
-            <stop offset="100%" stopColor="#059669" />
-          </linearGradient>
-          <linearGradient id="grad-pending" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#d97706" />
-          </linearGradient>
-          <linearGradient id="grad-paid" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#3b82f6" />
-            <stop offset="100%" stopColor="#2563eb" />
-          </linearGradient>
-          <linearGradient id="grad-unpaid" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#ef4444" />
-            <stop offset="100%" stopColor="#dc2626" />
-          </linearGradient>
         </defs>
 
-        {/* Outer decorative dashed orbit track */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={136}
-          fill="none"
-          stroke={rimColor}
-          strokeWidth={1}
-          strokeDasharray="4 6"
-        />
-
-        {/* Inner decorative orbit track */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={68}
-          fill="none"
-          stroke={rimColor}
-          strokeWidth={1}
-        />
-
-        {/* Background tracks */}
-        {processedRings.map((ring, ri) => (
+        {/* Empty state ring if total is 0 */}
+        {slices.length === 0 && (
           <circle
-            key={`bg-track-${ri}`}
             cx={cx}
             cy={cy}
-            r={ring.midR}
+            r={(rOuter + rInner) / 2}
             fill="none"
-            stroke={trackColor}
-            strokeWidth={ring.strokeWidth}
+            stroke={isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}
+            strokeWidth={rOuter - rInner}
           />
-        ))}
-
-        {/* Active Colored Arcs */}
-        {processedRings.map((ring, ri) =>
-          ring.arcs.map((arc, ai) => {
-            if (arc.dash <= 0) return null;
-            const gradId =
-              arc.color === C.collected ? "url(#grad-collected)" :
-              arc.color === C.pending ? "url(#grad-pending)" :
-              arc.color === C.paid ? "url(#grad-paid)" :
-              arc.color === C.unpaid ? "url(#grad-unpaid)" : arc.color;
-
-            return (
-              <circle
-                key={`arc-${ri}-${ai}`}
-                cx={cx}
-                cy={cy}
-                r={ring.midR}
-                fill="none"
-                stroke={gradId}
-                strokeWidth={ring.strokeWidth}
-                strokeDasharray={`${arc.dash} ${ring.circ}`}
-                strokeDashoffset={arc.offset}
-                strokeLinecap="round"
-                filter="url(#mrGlow)"
-              />
-            );
-          })
         )}
+
+        {/* Slices */}
+        {slices.map((slice, idx) => {
+          const isHovered =
+            activeItem && (activeItem.id === slice.id || activeItem.label === slice.label);
+          const currentRInner = isHovered ? rInnerHover : rInner;
+          const currentROuter = isHovered ? rOuterHover : rOuter;
+          const pathD = getDonutArcPath(
+            cx,
+            cy,
+            currentRInner,
+            currentROuter,
+            slice.startAngle,
+            slice.endAngle
+          );
+
+          return (
+            <path
+              key={slice.id || idx}
+              d={pathD}
+              fill={slice.color}
+              stroke={isDark ? "#171a2e" : "#ffffff"}
+              strokeWidth={slices.length > 1 ? 3 : 0}
+              strokeLinejoin="round"
+              filter={isHovered ? "url(#donutHoverShadow)" : "none"}
+              style={{
+                cursor: "pointer",
+                transition: "all 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
+                opacity: activeItem && !isHovered ? 0.75 : 1,
+              }}
+              onMouseEnter={() => onHoverItem(slice)}
+              onMouseLeave={() => onHoverItem(null)}
+            />
+          );
+        })}
       </svg>
 
-      {/* Center overlay */}
+      {/* Center Details Hub (Exact Match to Reference Mockup) */}
       <Box
         sx={{
           position: "absolute",
-          inset: 0,
-          display: "grid",
-          placeItems: "center",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 138,
+          height: 138,
+          borderRadius: "50%",
+          bgcolor: isDark ? "#171a2f" : "#ffffff",
+          boxShadow: isDark
+            ? "0 4px 24px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.08)"
+            : "0 6px 24px rgba(30, 26, 46, 0.08), 0 1px 3px rgba(0,0,0,0.04)",
+          border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)"}`,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          px: 1.5,
           textAlign: "center",
           pointerEvents: "none",
+          transition: "all 0.22s ease",
         }}
       >
-        <Box
+        {/* Item Title */}
+        <Tooltip title={display?.label || display?.title || ""}>
+          <Typography
+            noWrap
+            sx={{
+              maxWidth: 114,
+              fontSize: "0.78rem",
+              fontWeight: 700,
+              color: "#2563eb",
+              lineHeight: 1.2,
+              letterSpacing: "0.01em",
+            }}
+          >
+            {display?.label || display?.title || "Details"}
+          </Typography>
+        </Tooltip>
+
+        {/* Amount */}
+        <Typography
           sx={{
-            width: 120,
-            height: 120,
-            borderRadius: "50%",
-            display: "grid",
-            placeItems: "center",
-            background: isDark
-              ? "radial-gradient(circle, rgba(124, 58, 237, 0.16) 0%, rgba(30, 26, 46, 0.85) 100%)"
-              : "radial-gradient(circle, rgba(124, 58, 237, 0.08) 0%, rgba(255, 255, 255, 0.95) 100%)",
-            boxShadow: isDark
-              ? "0 4px 20px rgba(0,0,0,0.4), inset 0 0 16px rgba(124, 58, 237, 0.1)"
-              : "0 4px 16px rgba(0,0,0,0.06), inset 0 0 12px rgba(124, 58, 237, 0.05)",
-            border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.1)"}`,
+            fontSize: "1.32rem",
+            fontWeight: 900,
+            color: isDark ? "#ffffff" : "#0f172a",
+            lineHeight: 1.15,
+            my: 0.35,
+            letterSpacing: "-0.02em",
           }}
         >
-          <Box>
-            <Typography
-              sx={{
-                fontSize: "2.1rem",
-                fontWeight: 900,
-                lineHeight: 1,
-                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                letterSpacing: "-0.03em",
-              }}
-            >
-              {centerPct}%
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                fontWeight: 800,
-                color: "text.secondary",
-                display: "block",
-                mt: 0.5,
-                fontSize: "0.68rem",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              {centerLabel}
-            </Typography>
-            {centerSub && (
-              <Typography
-                variant="caption"
-                sx={{
-                  color: "text.disabled",
-                  display: "block",
-                  fontSize: "0.62rem",
-                  fontWeight: 600,
-                  mt: 0.2,
-                }}
-              >
-                {centerSub}
-              </Typography>
-            )}
-          </Box>
+          ₹{Number(display?.value ?? display?.amount ?? 0).toLocaleString()}
+        </Typography>
+
+        {/* Percentage Badge */}
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            px: 1.2,
+            py: 0.2,
+            borderRadius: 99,
+            bgcolor: isDark ? alpha("#3b82f6", 0.2) : "#eff6ff",
+            border: `1px solid ${alpha("#3b82f6", 0.28)}`,
+          }}
+        >
+          <Typography
+            sx={{
+              color: "#2563eb",
+              fontWeight: 800,
+              fontSize: "0.72rem",
+              lineHeight: 1.3,
+            }}
+          >
+            {display?.percent != null ? `${display.percent}%` : `${display?.badge || "0%"}`}
+          </Typography>
         </Box>
       </Box>
     </Box>
@@ -642,6 +678,69 @@ export default function DashboardPage() {
   const paymentRate = (paidCount + pendingCount) > 0
     ? Math.round((paidCount / (paidCount + pendingCount)) * 100) : 0;
 
+  // ── Donut Chart View & Hover State ───────────────────────────────────────
+  const [donutView, setDonutView] = useState("events"); // "events" | "status"
+  const [hoveredSlice, setHoveredSlice] = useState(null);
+
+  // Slices for By Event mode (matches reference mockup)
+  const eventSlices = useMemo(() => {
+    return events.map((e, idx) => {
+      const exp = Number(e.expectedAmount) || 0;
+      const col = Number(e.collectedAmount) || 0;
+      const pctNum =
+        totalExpected > 0
+          ? (exp / totalExpected) * 100
+          : events.length > 0
+          ? 100 / events.length
+          : 0;
+      const pctStr = pctNum % 1 === 0 ? pctNum.toFixed(0) : pctNum.toFixed(1);
+      const colPct = exp > 0 ? Math.min(100, Math.round((col / exp) * 100)) : 0;
+
+      return {
+        id: e.eventId || `event-${idx}`,
+        label: e.eventName,
+        value: exp,
+        collected: col,
+        collectedPct: colPct,
+        percent: pctStr,
+        color: DONUT_COLORS[idx % DONUT_COLORS.length],
+        eventTypeName: e.eventTypeName,
+        date: e.eventDate,
+      };
+    });
+  }, [events, totalExpected]);
+
+  // Slices for Status mode (Collected vs Pending)
+  const statusSlices = useMemo(() => {
+    const colPct = totalExpected > 0 ? (totalCollected / totalExpected) * 100 : 0;
+    const penPct = totalExpected > 0 ? (totalPending / totalExpected) * 100 : 0;
+    return [
+      {
+        id: "status-collected",
+        label: "Collected",
+        value: totalCollected,
+        percent: colPct % 1 === 0 ? colPct.toFixed(0) : colPct.toFixed(1),
+        color: C.collected,
+      },
+      {
+        id: "status-pending",
+        label: "Pending",
+        value: totalPending,
+        percent: penPct % 1 === 0 ? penPct.toFixed(0) : penPct.toFixed(1),
+        color: C.pending,
+      },
+    ];
+  }, [totalCollected, totalPending, totalExpected]);
+
+  const defaultSummary = useMemo(() => {
+    return {
+      title: donutView === "events" ? "All Events" : "Total Expected",
+      amount: totalExpected,
+      percent: collectionRate,
+      badge: `${collectionRate}%`,
+    };
+  }, [donutView, totalExpected, collectionRate]);
+
   // Multi-ring chart ring definitions
   const amountRing = {
     label: "Amount",
@@ -810,7 +909,7 @@ export default function DashboardPage() {
                     </Grid>
                   </Grid>
 
-                  {/* ② Multi-ring Donut Hero */}
+                  {/* ② Segmented Interactive Donut Hero */}
                   {events.length > 0 ? (
                     <Card sx={{
                       border: `1px solid ${theme.palette.divider}`,
@@ -822,26 +921,74 @@ export default function DashboardPage() {
                         : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
                     }}>
                       <CardContent sx={{ p: { xs: 2, md: 3.5 } }}>
-                        <Stack spacing={3.5}>
+                        <Stack spacing={3}>
 
-                          {/* Card title */}
-                          <Stack direction="row" alignItems="center" spacing={1.25}>
-                            <Box sx={{
-                              width: 36, height: 36, borderRadius: 1.5,
-                              display: "grid", placeItems: "center",
-                              background: "linear-gradient(135deg, rgba(124,58,237,0.2) 0%, rgba(79,70,229,0.12) 100%)",
-                              border: "1px solid rgba(124,58,237,0.2)",
+                          {/* Card title & View Switcher */}
+                          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5}>
+                            <Stack direction="row" alignItems="center" spacing={1.25}>
+                              <Box sx={{
+                                width: 36, height: 36, borderRadius: 1.5,
+                                display: "grid", placeItems: "center",
+                                background: "linear-gradient(135deg, rgba(124,58,237,0.2) 0%, rgba(79,70,229,0.12) 100%)",
+                                border: "1px solid rgba(124,58,237,0.2)",
+                              }}>
+                                <DonutLargeIcon sx={{ fontSize: 20, color: "primary.main" }} />
+                              </Box>
+                              <Box>
+                                <Typography variant="h6" fontWeight={900}>
+                                  Financial Overview
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {donutView === "events" ? "Event contribution breakdown" : "Multi-ring contribution analysis"}
+                                </Typography>
+                              </Box>
+                            </Stack>
+
+                            {/* View Switcher: By Event / Financial Status */}
+                            <Stack direction="row" spacing={0.5} sx={{
+                              bgcolor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+                              p: 0.5, borderRadius: 2,
+                              border: `1px solid ${theme.palette.divider}`,
                             }}>
-                              <DonutLargeIcon sx={{ fontSize: 20, color: "primary.main" }} />
-                            </Box>
-                            <Box>
-                              <Typography variant="h6" fontWeight={900}>
-                                Financial Overview
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                Multi-ring contribution analysis
-                              </Typography>
-                            </Box>
+                              <Button
+                                size="small"
+                                onClick={() => { setDonutView("events"); setHoveredSlice(null); }}
+                                sx={{
+                                  borderRadius: 1.5,
+                                  px: 1.5, py: 0.4,
+                                  fontSize: "0.75rem",
+                                  fontWeight: 800,
+                                  textTransform: "none",
+                                  bgcolor: donutView === "events" ? "primary.main" : "transparent",
+                                  color: donutView === "events" ? "#ffffff" : "text.secondary",
+                                  boxShadow: donutView === "events" ? "0 2px 8px rgba(124, 58, 237, 0.3)" : "none",
+                                  "&:hover": {
+                                    bgcolor: donutView === "events" ? "primary.dark" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                                  },
+                                }}
+                              >
+                                By Event
+                              </Button>
+                              <Button
+                                size="small"
+                                onClick={() => { setDonutView("status"); setHoveredSlice(null); }}
+                                sx={{
+                                  borderRadius: 1.5,
+                                  px: 1.5, py: 0.4,
+                                  fontSize: "0.75rem",
+                                  fontWeight: 800,
+                                  textTransform: "none",
+                                  bgcolor: donutView === "status" ? "primary.main" : "transparent",
+                                  color: donutView === "status" ? "#ffffff" : "text.secondary",
+                                  boxShadow: donutView === "status" ? "0 2px 8px rgba(124, 58, 237, 0.3)" : "none",
+                                  "&:hover": {
+                                    bgcolor: donutView === "status" ? "primary.dark" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                                  },
+                                }}
+                              >
+                                Financial Status
+                              </Button>
+                            </Stack>
                           </Stack>
 
                           {/* Donut + Stats side-by-side */}
@@ -849,67 +996,172 @@ export default function DashboardPage() {
 
                             {/* Donut chart */}
                             <Grid size={{ xs: 12, md: 5 }}>
-                              <Stack alignItems="center" spacing={2}>
-                                <MultiRingDonut
-                                  rings={[amountRing, paymentsRing]}
-                                  centerPct={collectionRate}
-                                  centerLabel="Collected"
-                                  centerSub={`${fmtAmt(totalCollected)} of ${fmtAmt(totalExpected)}`}
+                              <Stack alignItems="center" spacing={1.5}>
+                                <InteractiveDonutChart
+                                  items={donutView === "events" ? eventSlices : statusSlices}
+                                  activeItem={hoveredSlice}
+                                  onHoverItem={setHoveredSlice}
+                                  defaultSummary={defaultSummary}
+                                  size={300}
                                 />
 
-                                {/* Ring-type legend pills below donut */}
-                                <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap">
-                                  {[
-                                    { label: "① Amount Ring", color: C.collected },
-                                    { label: "② Payments Ring", color: C.paid },
-                                  ].map((item) => (
-                                    <Box key={item.label} sx={{
-                                      display: "flex", alignItems: "center", gap: 0.6,
-                                      px: 1.25, py: 0.5, borderRadius: 99,
-                                      border: `1px solid ${alpha(item.color, 0.3)}`,
-                                      bgcolor: alpha(item.color, 0.08),
-                                    }}>
-                                      <Box sx={{
-                                        width: 8, height: 8, borderRadius: "50%",
-                                        bgcolor: item.color,
-                                        boxShadow: `0 0 5px ${alpha(item.color, 0.5)}`,
-                                      }} />
-                                      <Typography variant="caption" fontWeight={700}
-                                        sx={{ color: item.color, fontSize: "0.67rem" }}>
-                                        {item.label}
-                                      </Typography>
-                                    </Box>
-                                  ))}
-                                </Stack>
+                                {/* Interactive hint below donut */}
+                                <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.72rem" }}>
+                                  Hover any slice to view details in center
+                                </Typography>
                               </Stack>
                             </Grid>
 
                             {/* Stats panel */}
                             <Grid size={{ xs: 12, md: 7 }}>
-                              <Stack spacing={3}>
+                              <Stack spacing={2.5}>
                                 {/* Quick stat pills */}
                                 <Stack direction="row" spacing={1.5}>
                                   <StatPill label="Collection Rate" value={`${collectionRate}%`} color={C.collected} />
                                   <StatPill label="Payment Rate" value={`${paymentRate}%`} color={C.paid} />
-                                  <StatPill label="Events" value={summary?.monthlyEventsCount ?? 0} color="#7c3aed" />
+                                  <StatPill label="Events" value={summary?.monthlyEventsCount ?? events.length} color="#7c3aed" />
                                 </Stack>
 
-                                {/* Ring legends */}
-                                <RingLegendGroup
-                                  index="①"
-                                  label="Amount Ring"
-                                  color={C.collected}
-                                  segments={amountRing.segments}
-                                  total={totalExpected}
-                                />
-                                <Divider />
-                                <RingLegendGroup
-                                  index="②"
-                                  label="Payments Ring"
-                                  color={C.paid}
-                                  segments={paymentsRing.segments}
-                                  total={paidCount + pendingCount}
-                                />
+                                {donutView === "events" ? (
+                                  <>
+                                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                      <Typography
+                                        variant="caption"
+                                        fontWeight={800}
+                                        sx={{
+                                          textTransform: "uppercase",
+                                          letterSpacing: "0.08em",
+                                          fontSize: "0.72rem",
+                                          color: "text.secondary",
+                                        }}
+                                      >
+                                        Event Contribution Share
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.7rem" }}>
+                                        Hover event to inspect
+                                      </Typography>
+                                    </Stack>
+
+                                    {/* Scrollable Event List */}
+                                    <Box
+                                      sx={{
+                                        maxHeight: 230,
+                                        overflowY: "auto",
+                                        pr: 0.5,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 1.2,
+                                        "&::-webkit-scrollbar": { width: 5 },
+                                        "&::-webkit-scrollbar-thumb": {
+                                          backgroundColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
+                                          borderRadius: 4,
+                                        },
+                                      }}
+                                    >
+                                      {eventSlices.map((item) => {
+                                        const isSelected = hoveredSlice?.id === item.id;
+                                        return (
+                                          <Box
+                                            key={item.id}
+                                            onMouseEnter={() => setHoveredSlice(item)}
+                                            onMouseLeave={() => setHoveredSlice(null)}
+                                            sx={{
+                                              p: 1.2,
+                                              borderRadius: 2,
+                                              border: `1px solid ${isSelected ? item.color : isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"}`,
+                                              bgcolor: isSelected
+                                                ? alpha(item.color, isDark ? 0.16 : 0.08)
+                                                : isDark
+                                                ? "rgba(255,255,255,0.02)"
+                                                : "rgba(0,0,0,0.015)",
+                                              cursor: "pointer",
+                                              transition: "all 0.2s ease",
+                                              "&:hover": {
+                                                borderColor: item.color,
+                                                transform: "translateX(2px)",
+                                              },
+                                            }}
+                                          >
+                                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.6 }}>
+                                              <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+                                                <Box
+                                                  sx={{
+                                                    width: 10,
+                                                    height: 10,
+                                                    borderRadius: "50%",
+                                                    bgcolor: item.color,
+                                                    flexShrink: 0,
+                                                    boxShadow: `0 0 6px ${alpha(item.color, 0.55)}`,
+                                                  }}
+                                                />
+                                                <Typography variant="body2" fontWeight={800} noWrap sx={{ fontSize: "0.82rem", maxWidth: 180 }}>
+                                                  {item.label}
+                                                </Typography>
+                                              </Stack>
+
+                                              <Stack direction="row" alignItems="center" spacing={1}>
+                                                <Typography variant="body2" fontWeight={900} sx={{ fontSize: "0.84rem" }}>
+                                                  ₹{Number(item.value).toLocaleString()}
+                                                </Typography>
+                                                <Chip
+                                                  label={`${item.percent}%`}
+                                                  size="small"
+                                                  sx={{
+                                                    height: 20,
+                                                    fontSize: "0.68rem",
+                                                    fontWeight: 900,
+                                                    bgcolor: alpha(item.color, 0.12),
+                                                    color: item.color,
+                                                    border: `1px solid ${alpha(item.color, 0.3)}`,
+                                                  }}
+                                                />
+                                              </Stack>
+                                            </Stack>
+
+                                            {/* Mini collection progress for this event */}
+                                            <Box
+                                              sx={{
+                                                height: 5,
+                                                borderRadius: 3,
+                                                bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+                                                overflow: "hidden",
+                                              }}
+                                            >
+                                              <Box
+                                                sx={{
+                                                  height: "100%",
+                                                  width: `${item.collectedPct}%`,
+                                                  background: `linear-gradient(90deg, ${item.color} 0%, ${alpha(item.color, 0.7)} 100%)`,
+                                                  borderRadius: 3,
+                                                  transition: "width 0.6s ease",
+                                                }}
+                                              />
+                                            </Box>
+                                          </Box>
+                                        );
+                                      })}
+                                    </Box>
+                                  </>
+                                ) : (
+                                  <>
+                                    {/* Ring legends for Financial Status */}
+                                    <RingLegendGroup
+                                      index="①"
+                                      label="Amount Ring"
+                                      color={C.collected}
+                                      segments={amountRing.segments}
+                                      total={totalExpected}
+                                    />
+                                    <Divider />
+                                    <RingLegendGroup
+                                      index="②"
+                                      label="Payments Ring"
+                                      color={C.paid}
+                                      segments={paymentsRing.segments}
+                                      total={paidCount + pendingCount}
+                                    />
+                                  </>
+                                )}
                               </Stack>
                             </Grid>
                           </Grid>
