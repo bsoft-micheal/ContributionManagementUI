@@ -4,7 +4,6 @@ import {
   Box,
   Typography,
   Chip,
-  Switch,
   IconButton,
   Tooltip,
 } from "@mui/material";
@@ -21,16 +20,11 @@ import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../common/AppToast";
 import { CreateEventAsync, UpdateEventAsync, GetEventByIdAsync } from "../../services/eventService";
 import { updateSystemSettings } from "../../services/settingsService";
-import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import {
   getPaymentQrConfig,
-  generateDynamicPaymentQr,
   buildUpiPaymentUri,
   getQrCodeApiUrl,
-  generateQrPngDataUrl,
-  buildPaymentReminderEmailHtml,
 } from "../../utils/upiQrHelper";
-import { SendPaymentReminder } from "../../services/contributionService";
 
 // Hardcoded calculation rules as requested
 const RULES = {
@@ -90,16 +84,6 @@ export default function EventFormDialog({
   const [wfhBirthdays, setWfhBirthdays] = useState(0);
   const [totalMembers, setTotalMembers] = useState(47);
   const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
-  const [sendEmailWithQr, setSendEmailWithQr] = useState(() => {
-    try {
-      const saved = localStorage.getItem("cm_system_settings");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.enableEmailNotif !== undefined) return Boolean(parsed.enableEmailNotif);
-      }
-    } catch (e) { }
-    return true;
-  });
 
   const toast = useAppToast();
 
@@ -393,88 +377,6 @@ export default function EventFormDialog({
 
         const createdEvent = await CreateEventAsync(payload);
         toast.success("Saved successfully");
-
-        // Automatically dispatch payment reminder emails with dynamic QR to participants
-        if (sendEmailWithQr) {
-          try {
-            const qrConfig = getPaymentQrConfig();
-            const recipientList = [];
-
-            if (isBirthday) {
-              const celebrantIds = monthCelebrants.map((m) => m.memberId);
-              const allActive = activeMembers.length > 0 ? activeMembers : members;
-              allActive.forEach((m) => {
-                const isCelebrant = celebrantIds.includes(m.memberId);
-                const memAmount = exempt && isCelebrant ? 0 : contributionPerMember;
-                if (memAmount > 0) {
-                  recipientList.push({
-                    member: m,
-                    amount: memAmount,
-                  });
-                }
-              });
-            } else {
-              const pIds = payload.participantIds || [];
-              const perMemberAmount =
-                pIds.length > 0 ? Math.round(Number(payload.baseAmount) / pIds.length) : 0;
-              pIds.forEach((pId) => {
-                const m = members.find((x) => x.memberId === pId);
-                if (m && perMemberAmount > 0) {
-                  recipientList.push({
-                    member: m,
-                    amount: perMemberAmount,
-                  });
-                }
-              });
-            }
-
-            if (recipientList.length > 0) {
-              await Promise.allSettled(
-                recipientList.map(({ member: m, amount: memAmount }) => {
-                  const memberEmail =
-                    m.email || `${m.name?.toLowerCase().replace(/\s+/g, ".")}@example.com`;
-                  const { upiUri, qrImageUrl, receiverName, upiId } = generateDynamicPaymentQr({
-                    amount: memAmount,
-                    note: `Contribution for ${payload.eventName}`,
-                    customConfig: qrConfig,
-                  });
-
-                  const emailHtml = buildPaymentReminderEmailHtml({
-                    memberName: m.name,
-                    eventName: payload.eventName,
-                    amount: memAmount,
-                    dueDate: payload.eventDate
-                      ? new Date(payload.eventDate).toLocaleDateString()
-                      : undefined,
-                    upiId,
-                    receiverName,
-                    qrImageUrl,
-                  });
-
-                  return SendPaymentReminder({
-                    memberId: m.memberId,
-                    memberName: m.name,
-                    recipientEmail: memberEmail,
-                    eventId: createdEvent?.eventId,
-                    eventName: payload.eventName,
-                    amount: memAmount,
-                    upiId,
-                    receiverName,
-                    upiUri,
-                    qrImageUrl,
-                    emailHtml,
-                  });
-                })
-              );
-
-              toast.success(
-                `Dynamic UPI QR payment emails sent to ${recipientList.length} participants!`
-              );
-            }
-          } catch (emailErr) {
-            console.warn("Could not dispatch initial QR reminder emails:", emailErr);
-          }
-        }
       }
 
       if (onSaveSuccess) {
@@ -603,7 +505,7 @@ export default function EventFormDialog({
                     <AppInput
                       label="Total Active Members"
                       placeholder="Enter count"
-                      type="number"
+                      type="Text"
                       value={totalMembers}
                       onChange={(e) =>
                         setTotalMembers(Math.max(1, parseInt(e.target.value, 10) || 1))
@@ -615,7 +517,7 @@ export default function EventFormDialog({
                     <AppInput
                       label="Office Birthday Members"
                       placeholder="Enter count"
-                      type="number"
+                      type="Text"
                       value={officeBirthdays}
                       onChange={(e) =>
                         setOfficeBirthdays(Math.max(0, parseInt(e.target.value, 10) || 0))
@@ -627,7 +529,7 @@ export default function EventFormDialog({
                     <AppInput
                       label="WFH Birthday Members"
                       placeholder="Enter count"
-                      type="number"
+                      type="Text"
                       value={wfhBirthdays}
                       onChange={(e) =>
                         setWfhBirthdays(Math.max(0, parseInt(e.target.value, 10) || 0))
@@ -636,45 +538,7 @@ export default function EventFormDialog({
                   </Grid>
                 </Grid>
 
-                {/* Send Payment Reminder Email with Dynamic QR toggle */}
-                {!form.eventId && (
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      borderRadius: "10px",
-                      bgcolor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(2, 132, 199, 0.08)"
-                          : "rgba(2, 132, 199, 0.04)",
-                      border: "1px solid rgba(2, 132, 199, 0.2)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 1.5,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                      <EmailOutlinedIcon sx={{ color: "#0284c7", fontSize: 20 }} />
-                      <Box>
-                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }}>
-                          Send Payment Reminder Email with Dynamic QR
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ fontSize: "0.7rem", display: "block" }}
-                        >
-                          Automatically email participants their exact share with pre-filled UPI QR.
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Switch
-                      checked={sendEmailWithQr}
-                      onChange={(e) => setSendEmailWithQr(e.target.checked)}
-                      color="primary"
-                    />
-                  </Box>
-                )}
+
 
                 {/* Celebrants detected for current month */}
                 {monthCelebrants.length > 0 && (
@@ -1090,46 +954,7 @@ export default function EventFormDialog({
             />
           </Grid>
 
-          {!form.eventId && (
-            <Grid size={{ xs: 12 }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: "10px",
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(2, 132, 199, 0.08)"
-                      : "rgba(2, 132, 199, 0.04)",
-                  border: "1px solid rgba(2, 132, 199, 0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 1.5,
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                  <EmailOutlinedIcon sx={{ color: "#0284c7", fontSize: 20 }} />
-                  <Box>
-                    <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }}>
-                      Send Payment Reminder Email with Dynamic QR
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ fontSize: "0.7rem", display: "block" }}
-                    >
-                      Automatically email participants their exact share with pre-filled UPI QR.
-                    </Typography>
-                  </Box>
-                </Box>
-                <Switch
-                  checked={sendEmailWithQr}
-                  onChange={(e) => setSendEmailWithQr(e.target.checked)}
-                  color="primary"
-                />
-              </Box>
-            </Grid>
-          )}
+
         </Grid>
       )}
     </AppDialog>
