@@ -354,37 +354,16 @@ export default function LoginPage() {
                       }}
                     />
 
-                    {/* Controls Row */}
+                    {/* Forgot Password Link Row */}
                     <Box
                       sx={{
                         display: "flex",
-                        justifyContent: "space-between",
+                        justifyContent: "flex-end",
                         alignItems: "center",
                         width: "100%",
                         mt: -1,
                       }}
                     >
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            size="small"
-                            checked={keepSignedIn}
-                            onChange={(e) => setKeepSignedIn(e.target.checked)}
-                            sx={{
-                              "& .MuiSwitch-switchBase.Mui-checked": { color: "#7c3aed" },
-                              "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#7c3aed" },
-                            }}
-                          />
-                        }
-                        label="Remember Password ?"
-                        sx={{
-                          "& .MuiFormControlLabel-label": {
-                            fontSize: "0.78rem",
-                            fontWeight: 600,
-                            color: "text.secondary",
-                          },
-                        }}
-                      />
                       <Link
                         component={RouterLink}
                         to="/forgot-password"
@@ -537,34 +516,6 @@ export default function LoginPage() {
               </Stack>
             </Box>
 
-            {/* Quick Demo Credentials Badge */}
-            <Box sx={{ mt: 5, width: "100%" }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  gap: 1.5,
-                  p: 2,
-                  borderRadius: "12px",
-                  border: "1px solid",
-                  borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(231, 235, 247, 0.12)" : "rgba(74, 63, 107, 0.12)",
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(231, 235, 247, 0.02)" : "rgba(74, 63, 107, 0.02)",
-                  alignItems: "flex-start",
-                }}
-              >
-                <InfoOutlinedIcon sx={{ color: "#7c3aed", fontSize: "1.1rem", mt: 0.2 }} />
-                <Box>
-                  <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.primary", mb: 0.4 }}>
-                    Quick Demo Login:
-                  </Typography>
-                  <Typography sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
-                    Email: <strong style={{ color: "#7c3aed" }}>admin@teamcontribution.local</strong>
-                  </Typography>
-                  <Typography sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
-                    Password: <strong style={{ color: "#7c3aed" }}>Admin@123</strong>
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
           </Card>
         </Box>
       </Card>

@@ -20,6 +20,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DialpadRoundedIcon from "@mui/icons-material/DialpadRounded";
 import TimerRoundedIcon from "@mui/icons-material/TimerRounded";
 import { RequestForgotPasswordOtpAsync, VerifyForgotPasswordOtpAsync } from "../../services/userService";
+import { getSystemSettingsAsync } from "../../services/settingsService";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
 
@@ -34,24 +35,19 @@ export default function ForgotPasswordVerifyPage() {
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [attemptsMsg, setAttemptsMsg] = useState("");
+  const [isLocked, setIsLocked] = useState(false);
+  const [expiryDuration, setExpiryDuration] = useState(600);
   
   const [timer, setTimer] = useState(() => {
     const sentTimeStr = localStorage.getItem("otp_sent_time");
-    console.log("[ForgotPasswordVerifyPage] Mount - sentTimeStr from localStorage:", sentTimeStr);
     if (sentTimeStr) {
       const sentTime = parseInt(sentTimeStr, 10);
       const elapsed = Math.floor((Date.now() - sentTime) / 1000);
-      const remaining = 900 - elapsed;
-      console.log("[ForgotPasswordVerifyPage] Mount - Timer calculation details:", {
-        sentTime,
-        now: Date.now(),
-        elapsed,
-        remaining
-      });
+      const remaining = 600 - elapsed;
       return remaining > 0 ? remaining : 0;
     }
-    console.log("[ForgotPasswordVerifyPage] Mount - No sentTimeStr found. Defaulting to 900s.");
-    return 900;
+    return 600;
   });
   
   const [isTimerActive, setIsTimerActive] = useState(() => {
@@ -59,15 +55,37 @@ export default function ForgotPasswordVerifyPage() {
     if (sentTimeStr) {
       const sentTime = parseInt(sentTimeStr, 10);
       const elapsed = Math.floor((Date.now() - sentTime) / 1000);
-      const isActive = elapsed < 900;
-      console.log("[ForgotPasswordVerifyPage] Mount - isTimerActive details:", {
-        elapsed,
-        isActive
-      });
-      return isActive;
+      return elapsed < 600;
     }
     return true;
   });
+
+  // Fetch dynamic OTP expiry from system settings
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const sys = await getSystemSettingsAsync();
+        const mins = parseInt(sys?.otpExpiry, 10);
+        if (mins > 0) {
+          const secs = mins * 60;
+          setExpiryDuration(secs);
+          const sentTimeStr = localStorage.getItem("otp_sent_time");
+          if (sentTimeStr) {
+            const sentTime = parseInt(sentTimeStr, 10);
+            const elapsed = Math.floor((Date.now() - sentTime) / 1000);
+            const remaining = secs - elapsed;
+            setTimer(remaining > 0 ? remaining : 0);
+            setIsTimerActive(remaining > 0);
+          } else {
+            setTimer(secs);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load dynamic OTP settings:", err);
+      }
+    }
+    loadConfig();
+  }, []);
 
   // Security Redirect: if page is accessed directly, send back to step 1
   useEffect(() => {
@@ -86,16 +104,14 @@ export default function ForgotPasswordVerifyPage() {
       if (sentTimeStr) {
         const sentTime = parseInt(sentTimeStr, 10);
         const elapsed = Math.floor((Date.now() - sentTime) / 1000);
-        const remaining = 900 - elapsed;
+        const remaining = expiryDuration - elapsed;
         if (remaining <= 0) {
-          console.log("[ForgotPasswordVerifyPage] Tick - Timer expired!");
           setTimer(0);
           setIsTimerActive(false);
         } else {
           setTimer(remaining);
         }
       } else {
-        console.log("[ForgotPasswordVerifyPage] Tick - sentTimeStr is missing from localStorage. Decrementing state.");
         setTimer((prev) => {
           if (prev <= 1) {
             setIsTimerActive(false);
@@ -107,7 +123,7 @@ export default function ForgotPasswordVerifyPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isTimerActive]);
+  }, [isTimerActive, expiryDuration]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -117,6 +133,10 @@ export default function ForgotPasswordVerifyPage() {
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
+    if (isLocked) {
+      toast.error("Maximum OTP attempts exceeded. Please request a new OTP.");
+      return;
+    }
     if (!otp.trim()) {
       setOtpError("OTP code is required.");
       toast.error("Please enter the 6-digit OTP code.");
@@ -137,7 +157,15 @@ export default function ForgotPasswordVerifyPage() {
       localStorage.removeItem("otp_sent_time");
       navigate("/forgot-password/reset", { state: { email, otp: otp.trim() } });
     } catch (error) {
-      toast.error(error.response?.data?.message ?? "Invalid or expired OTP. Please try again.");
+      const msg = error.response?.data?.message || "Invalid or expired OTP. Please try again.";
+      toast.error(msg);
+      setAttemptsMsg(msg);
+      if (msg.toLowerCase().includes("maximum otp attempts exceeded") || msg.toLowerCase().includes("maximum attempts")) {
+        setIsLocked(true);
+        setOtpError("Maximum attempts reached.");
+      } else {
+        setOtpError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -149,10 +177,12 @@ export default function ForgotPasswordVerifyPage() {
       await RequestForgotPasswordOtpAsync(email);
       toast.success("A new password reset OTP has been sent successfully.");
       localStorage.setItem("otp_sent_time", Date.now().toString());
-      setTimer(900);
+      setTimer(expiryDuration);
       setIsTimerActive(true);
       setOtp("");
       setOtpError("");
+      setAttemptsMsg("");
+      setIsLocked(false);
     } catch (error) {
       toast.error(error.response?.data?.message ?? "Failed to resend OTP. Please try again.");
     } finally {
@@ -306,6 +336,25 @@ export default function ForgotPasswordVerifyPage() {
                 Please enter the 6-digit OTP code sent to <strong style={{ color: theme.palette.text.primary }}>{email}</strong>.
               </Typography>
 
+              {/* Attempts feedback banner */}
+              {attemptsMsg && (
+                <Box
+                  sx={{
+                    mb: 2.5,
+                    p: 1.5,
+                    borderRadius: "8px",
+                    bgcolor: isLocked ? "rgba(239, 68, 68, 0.12)" : "rgba(245, 158, 11, 0.12)",
+                    border: `1px solid ${isLocked ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`,
+                    color: isLocked ? "#dc2626" : "#d97706",
+                    fontSize: "0.82rem",
+                    fontWeight: 700,
+                    textAlign: "center",
+                  }}
+                >
+                  {attemptsMsg}
+                </Box>
+              )}
+
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1.5, borderRadius: "8px", bgcolor: theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.12)" : "rgba(124, 58, 237, 0.05)", border: "1px dashed rgba(124, 58, 237, 0.2)", mb: 4 }}>
                 <TimerRoundedIcon sx={{ color: "#7c3aed", fontSize: "1.2rem" }} />
                 <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "#7c3aed" }}>
@@ -317,6 +366,7 @@ export default function ForgotPasswordVerifyPage() {
                 <AppInput
                   label="Enter 6-Digit OTP"
                   value={otp}
+                  disabled={loading || isLocked}
                   onChange={(e) => {
                     setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6));
                     if (otpError) setOtpError("");
@@ -338,7 +388,7 @@ export default function ForgotPasswordVerifyPage() {
                 <AppButton
                   type="submit"
                   size="large"
-                  disabled={loading || timer === 0}
+                  disabled={loading || timer === 0 || isLocked}
                   fullWidth
                   sx={{
                     py: 1.1,
@@ -362,7 +412,7 @@ export default function ForgotPasswordVerifyPage() {
                     transition: "all 0.2s ease",
                   }}
                 >
-                  {loading ? <CircularProgress size={24} sx={{ color: "#ffffff" }} /> : "VERIFY OTP CODE"}
+                  {loading ? <CircularProgress size={24} sx={{ color: "#ffffff" }} /> : isLocked ? "ATTEMPTS EXCEEDED" : "VERIFY OTP CODE"}
                 </AppButton>
 
                 <Box sx={{ textAlign: "center", mt: 1 }}>
@@ -372,19 +422,19 @@ export default function ForgotPasswordVerifyPage() {
                       component="button"
                       type="button"
                       onClick={handleResendOtp}
-                      disabled={timer > 0 || loading}
+                      disabled={(!isLocked && timer > 0) || loading}
                       sx={{
                         fontSize: "0.78rem",
                         fontWeight: 700,
-                        color: timer > 0 
+                        color: (!isLocked && timer > 0)
                           ? (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.3)" : "#9d96bd") 
                           : "#7c3aed",
                         textDecoration: "none",
-                        cursor: timer > 0 ? "not-allowed" : "pointer",
-                        "&:hover": { textDecoration: timer > 0 ? "none" : "underline" },
+                        cursor: (!isLocked && timer > 0) ? "not-allowed" : "pointer",
+                        "&:hover": { textDecoration: (!isLocked && timer > 0) ? "none" : "underline" },
                       }}
                     >
-                      Resend OTP {timer > 0 && `(Wait ${timer}s)`}
+                      Resend OTP {!isLocked && timer > 0 && `(Wait ${timer}s)`}
                     </Link>
                   </Typography>
                 </Box>
