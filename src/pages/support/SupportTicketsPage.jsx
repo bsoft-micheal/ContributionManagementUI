@@ -19,6 +19,7 @@ import {
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
+import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -578,7 +579,7 @@ export default function SupportTicketsPage() {
     {
       label: "Created Date",
       key: "createdDate",
-      render: (row) => (row.createdDate ? dayjs(row.createdDate).format("DD/MM/YYYY") : "--"),
+      render: (row) => formatGridDate(row.createdDate),
     },
   ];
 
@@ -962,9 +963,7 @@ export default function SupportTicketsPage() {
                   Created Date
                 </Typography>
                 <Typography variant="body2">
-                  {selectedTicket.createdDate
-                    ? dayjs(selectedTicket.createdDate).format("DD MMMM YYYY, hh:mm A")
-                    : "--"}
+                  {formatViewDateTime(selectedTicket.createdDate)}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 12 }}>

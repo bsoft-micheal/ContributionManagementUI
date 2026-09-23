@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import { formatViewDate } from "../../utils/dateHelper";
 import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
 import MetricCard from "../../components/MetricCard";
 import apiClient from "../../services/apiClient";
@@ -84,7 +85,7 @@ export default function EventDetailsPage() {
       <PageHeader
         eyebrow={eventDetails.eventTypeName}
         title={eventDetails.eventName}
-        description={`${eventDetails.description} Scheduled for ${dayjs(eventDetails.eventDate).format("DD MMM YYYY")}.`}
+        description={`${eventDetails.description} Scheduled for ${formatViewDate(eventDetails.eventDate)}.`}
         actions={
           <AppButton
             variant="text"

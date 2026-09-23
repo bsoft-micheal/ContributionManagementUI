@@ -20,6 +20,7 @@ import {
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
+import { formatGridDate, formatViewDate } from "../../utils/dateHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -430,7 +431,7 @@ export default function ExpensePage() {
     {
       label: "Expense Date",
       key: "expenseDate",
-      render: (row) => (row.expenseDate ? dayjs(row.expenseDate).format("DD/MM/YYYY") : "--"),
+      render: (row) => formatGridDate(row.expenseDate),
     },
     {
       label: "Status",
@@ -988,9 +989,7 @@ export default function ExpensePage() {
                   Expense Date
                 </Typography>
                 <Typography variant="body2">
-                  {selectedExpense.expenseDate
-                    ? dayjs(selectedExpense.expenseDate).format("DD/MM/YYYY")
-                    : "--"}
+                  {formatViewDate(selectedExpense.expenseDate)}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 6 }}>

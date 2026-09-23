@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Grid, Typography } from "@mui/material";
 import dayjs from "dayjs";
+import { formatViewDate } from "../../utils/dateHelper";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 
@@ -192,7 +193,7 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               Date of Birth
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {member.dateOfBirth ? dayjs(member.dateOfBirth).format("DD MMMM YYYY") : "--"}
+              {formatViewDate(member.dateOfBirth)}
             </Typography>
           </Box>
         </Grid>
@@ -209,7 +210,7 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               Joining Date
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {member.joiningDate ? dayjs(member.joiningDate).format("DD MMMM YYYY") : "--"}
+              {formatViewDate(member.joiningDate)}
             </Typography>
           </Box>
         </Grid>

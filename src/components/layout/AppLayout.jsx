@@ -26,12 +26,16 @@ import { navigationItems } from "../../config/menuConfig";
 import { getRightsForPath } from "../../utils/rightsHelper";
 import AppDialog from "../common/AppDialog";
 import AppInput from "../common/AppInput";
+import AppSelect from "../common/AppSelect";
+import AppDateInput from "../common/AppDateInput";
 import AppButton from "../common/AppButton";
 import AppImageUpload from "../common/AppImageUpload";
 import { useAppToast } from "../common/AppToast";
 import { validateForm } from "../../utils/validation";
 import { getImageUrl } from "../../services/apiClient";
+import { GetProfileAsync } from "../../services/userService";
 import { useThemeMode } from "../../contexts/ThemeModeContext";
+import dayjs from "dayjs";
 import logo from "../../assets/logo.png";
 
 const drawerWidth = 240;
@@ -91,11 +95,28 @@ export default function AppLayout() {
     };
   }, [theme.palette.mode]);
 
+  const genderOptions = [
+    { label: "Male", value: "Male" },
+    { label: "Female", value: "Female" },
+    { label: "Other", value: "Other" },
+  ];
+
+  const memberTypeOptions = [
+    { label: "Office", value: "Office" },
+    { label: "WFH", value: "WFH" },
+  ];
+
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({
     fullName: "",
     email: "",
     profileImage: "",
+    phone: "",
+    gender: "",
+    memberType: "Office",
+    dateOfBirth: null,
+    joiningDate: null,
+    roleName: "",
     password: "",
     confirmPassword: "",
   });
@@ -120,27 +141,81 @@ export default function AppLayout() {
     handleCloseFlyout();
   }, [location.pathname]);
 
-  // Sync profileForm with authState when dialog opens
+  // Sync profileForm with backend profile (or authState fallback) when dialog opens
   React.useEffect(() => {
-    if (profileDialogOpen && authState) {
-      setProfileForm({
-        fullName: authState.fullName || "",
-        email: authState.email || "",
-        profileImage: authState.profileImage || "",
-        password: "",
-        confirmPassword: "",
-      });
-      setProfileErrors({});
+    if (profileDialogOpen) {
+      let isMounted = true;
+      const loadProfile = async () => {
+        try {
+          const res = await GetProfileAsync();
+          const profile = res?.data || res;
+          if (profile && isMounted) {
+            setProfileForm({
+              fullName: profile.fullName || authState?.fullName || "",
+              email: profile.email || authState?.email || "",
+              profileImage: profile.profileImage || authState?.profileImage || "",
+              phone: profile.phone || "",
+              gender: profile.gender || "",
+              memberType: profile.memberType || "Office",
+              dateOfBirth: profile.dateOfBirth ? dayjs(profile.dateOfBirth) : null,
+              joiningDate: profile.joiningDate ? dayjs(profile.joiningDate) : null,
+              roleName: profile.roleName || authState?.role || "Member",
+              password: "",
+              confirmPassword: "",
+            });
+            setProfileErrors({});
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to load latest profile:", e);
+        }
+
+        if (isMounted && authState) {
+          setProfileForm({
+            fullName: authState.fullName || "",
+            email: authState.email || "",
+            profileImage: authState.profileImage || "",
+            phone: authState.phone || "",
+            gender: authState.gender || "",
+            memberType: authState.memberType || "Office",
+            dateOfBirth: authState.dateOfBirth ? dayjs(authState.dateOfBirth) : null,
+            joiningDate: authState.joiningDate ? dayjs(authState.joiningDate) : null,
+            roleName: authState.role || "Member",
+            password: "",
+            confirmPassword: "",
+          });
+          setProfileErrors({});
+        }
+      };
+
+      loadProfile();
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [profileDialogOpen, authState]);
+  }, [profileDialogOpen]);
 
   const handleSaveProfile = async () => {
-    const filed = "This field is required"
+    const requiredMsg = "This field is required";
     const schema = {
-      fullName: { required: true, type: "letteronly", min: 2, max: 100, label: filed },
-      email: { required: true, email: true, label: filed }
+      fullName: { required: true, type: "letteronly", min: 2, max: 100, label: requiredMsg },
+      email: { required: true, email: true, label: requiredMsg },
+      phone: { required: true, type: "numberonly", min: 10, max: 10, label: requiredMsg },
+      gender: { required: true, label: requiredMsg },
     };
     const errors = validateForm(profileForm, schema);
+
+    if (profileForm.phone && profileForm.phone.length !== 10) {
+      errors.phone = "Phone number must be 10 digits";
+    }
+
+    if (!profileForm.dateOfBirth || !dayjs(profileForm.dateOfBirth).isValid()) {
+      errors.dateOfBirth = requiredMsg;
+    }
+
+    if (!profileForm.joiningDate || !dayjs(profileForm.joiningDate).isValid()) {
+      errors.joiningDate = requiredMsg;
+    }
 
     if (profileForm.password) {
       if (profileForm.password.length < 6) {
@@ -153,7 +228,7 @@ export default function AppLayout() {
 
     if (Object.keys(errors).length > 0) {
       setProfileErrors(errors);
-      toast.error("Please fill all the required fields");
+      toast.error("Please fill all the required fields correctly");
       return;
     }
 
@@ -162,6 +237,12 @@ export default function AppLayout() {
         fullName: profileForm.fullName.trim(),
         email: profileForm.email.trim(),
         profileImage: profileForm.profileImage,
+        phone: profileForm.phone.trim(),
+        gender: profileForm.gender,
+        memberType: profileForm.memberType,
+        dateOfBirth: profileForm.dateOfBirth ? dayjs(profileForm.dateOfBirth).toISOString() : undefined,
+        joiningDate: profileForm.joiningDate ? dayjs(profileForm.joiningDate).toISOString() : undefined,
+        roleName: profileForm.roleName,
         password: profileForm.password || undefined,
       });
 
@@ -521,7 +602,7 @@ export default function AppLayout() {
           </>
         }
       >
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 1, pb: 1 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: 1, pb: 1 }}>
           <AppImageUpload
             value={getImageUrl(profileForm.profileImage)}
             onChange={(base64) => setProfileForm((prev) => ({ ...prev, profileImage: base64 }))}
@@ -530,7 +611,8 @@ export default function AppLayout() {
             helperText="Click or hover to change profile picture"
           />
 
-          <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", sm: "row" } }}>
+          {/* Row 1: Name & Email */}
+          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
             <Box sx={{ flex: 1 }}>
               <AppInput
                 label="Name"
@@ -548,7 +630,7 @@ export default function AppLayout() {
             </Box>
             <Box sx={{ flex: 1 }}>
               <AppInput
-                label="Email "
+                label="Email"
                 type="email"
                 value={profileForm.email}
                 onChange={(e) => {
@@ -561,26 +643,106 @@ export default function AppLayout() {
                 required
               />
             </Box>
-
           </Box>
 
-          <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", sm: "row" } }}>
-            <Box sx={{ flex: 1, maxWidth: { xs: "100%", sm: "calc(50% - 10px)" } }}>
+          {/* Row 2: Phone & Gender */}
+          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
+            <Box sx={{ flex: 1 }}>
+              <AppInput
+                label="Phone Number"
+                value={profileForm.phone}
+                onChange={(e) => {
+                  setProfileForm((prev) => ({ ...prev, phone: e.target.value }));
+                  if (profileErrors.phone) setProfileErrors((prev) => ({ ...prev, phone: "" }));
+                }}
+                restrictType="numberonly"
+                maxLength={10}
+                placeholder="10-digit number"
+                error={!!profileErrors.phone}
+                helperText={profileErrors.phone}
+                required
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <AppSelect
+                label="Gender"
+                value={profileForm.gender}
+                onChange={(e) => {
+                  setProfileForm((prev) => ({ ...prev, gender: e.target.value }));
+                  if (profileErrors.gender) setProfileErrors((prev) => ({ ...prev, gender: "" }));
+                }}
+                options={genderOptions}
+                placeholder="Select gender"
+                error={!!profileErrors.gender}
+                helperText={profileErrors.gender}
+                required
+              />
+            </Box>
+          </Box>
+
+          {/* Row 3: Date of Birth & Joining Date */}
+          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
+            <Box sx={{ flex: 1 }}>
+              <AppDateInput
+                label="Date of Birth"
+                value={profileForm.dateOfBirth}
+                onChange={(newValue) => {
+                  setProfileForm((prev) => ({ ...prev, dateOfBirth: newValue }));
+                  if (profileErrors.dateOfBirth) setProfileErrors((prev) => ({ ...prev, dateOfBirth: "" }));
+                }}
+                error={!!profileErrors.dateOfBirth}
+                helperText={profileErrors.dateOfBirth}
+                required
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <AppDateInput
+                label="Joining Date"
+                value={profileForm.joiningDate}
+                onChange={(newValue) => {
+                  setProfileForm((prev) => ({ ...prev, joiningDate: newValue }));
+                  if (profileErrors.joiningDate) setProfileErrors((prev) => ({ ...prev, joiningDate: "" }));
+                }}
+                error={!!profileErrors.joiningDate}
+                helperText={profileErrors.joiningDate}
+                required
+              />
+            </Box>
+          </Box>
+
+          {/* Row 4: Role & Member Type */}
+          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
+            <Box sx={{ flex: 1 }}>
               <AppInput
                 label="Role"
-                value={authState?.role || "Member"}
+                value={profileForm.roleName || authState?.role || "Member"}
                 disabled
                 helperText="System role is managed by administrator"
               />
             </Box>
+            <Box sx={{ flex: 1 }}>
+              <AppSelect
+                label="Member Type"
+                value={profileForm.memberType || "Office"}
+                onChange={(e) => {
+                  setProfileForm((prev) => ({ ...prev, memberType: e.target.value }));
+                  if (profileErrors.memberType) setProfileErrors((prev) => ({ ...prev, memberType: "" }));
+                }}
+                options={memberTypeOptions}
+                placeholder="Select member type"
+                error={!!profileErrors.memberType}
+                helperText={profileErrors.memberType}
+              />
+            </Box>
           </Box>
+
           <Divider sx={{ my: 0.5, borderColor: "rgba(74, 63, 107, 0.08)" }} />
 
           <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", mt: -1 }}>
             Change Password (Optional)
           </Typography>
 
-          <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", sm: "row" } }}>
+          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
             <Box sx={{ flex: 1 }}>
               <AppInput
                 label="New Password"
@@ -611,7 +773,7 @@ export default function AppLayout() {
             </Box>
           </Box>
         </Box>
-      </AppDialog >
+      </AppDialog>
 
       {/* ── Submodule Flyout Popover (Right Side) ─────────────────────────── */}
       <Popover

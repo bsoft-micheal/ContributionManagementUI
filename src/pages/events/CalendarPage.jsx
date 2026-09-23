@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Box, Card, CardContent, Grid, Stack, Typography, Paper, Tooltip } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
+import { formatViewDate } from "../../utils/dateHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
@@ -203,7 +204,7 @@ export default function CalendarPage() {
             key: `event-${eventItem.eventId}`,
             eventItem,
             title: eventItem.eventName || eventItem.eventTypeName || "Scheduled Event",
-            subtitle: `${eventItem.eventName || eventItem.eventTypeName} (${dayjs(eventItem.eventDate).format("DD MMM YYYY")})`,
+            subtitle: `${eventItem.eventName || eventItem.eventTypeName} (${formatViewDate(eventItem.eventDate)})`,
             colorType: eventItem.eventTypeName,
             isBirthdayCelebrant: false,
           });
@@ -240,7 +241,7 @@ export default function CalendarPage() {
             key: `event-${eventItem.eventId}`,
             eventItem,
             title: eventItem.eventName || "Birthday",
-            subtitle: `${eventItem.eventName} (${dayjs(eventItem.eventDate).format("DD MMM YYYY")})`,
+            subtitle: `${eventItem.eventName} (${formatViewDate(eventItem.eventDate)})`,
             colorType: "Birthday",
             isBirthdayCelebrant: false,
           });
@@ -346,7 +347,7 @@ export default function CalendarPage() {
                         <Box>
                           <Typography variant="subtitle2" fontWeight={800}>{eventItem.eventName}</Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {dayjs(eventItem.eventDate).format("DD MMM YYYY")} | {eventItem.eventTypeName}
+                            {formatViewDate(eventItem.eventDate)} | {eventItem.eventTypeName}
                           </Typography>
                         </Box>
                         <Typography variant="subtitle2" fontWeight={800} color="primary.main">

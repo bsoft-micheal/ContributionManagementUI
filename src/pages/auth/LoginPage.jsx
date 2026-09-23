@@ -28,6 +28,8 @@ export default function LoginPage() {
   // 2FA State
   const [showOtpField, setShowOtpField] = useState(false);
   const [otp, setOtp] = useState("");
+  const [mfaStatusMessage, setMfaStatusMessage] = useState("");
+  const [isLockedOut, setIsLockedOut] = useState(false);
 
   // ── Show session-expired toast when redirected by idle timer ─────────────────
   useEffect(() => {
@@ -61,7 +63,9 @@ export default function LoginPage() {
       const data = await login(form);
       if (data?.requiresTwoFactor) {
         setShowOtpField(true);
-        toast.info("Please check OTP code in Autnenticator app.");
+        setMfaStatusMessage("");
+        setIsLockedOut(false);
+        toast.info("Please check OTP code in Authenticator app.");
       } else {
         navigate("/");
       }
@@ -73,6 +77,11 @@ export default function LoginPage() {
   }
 
   async function handleOtpSubmit() {
+    if (isLockedOut) {
+      toast.error(mfaStatusMessage || "MFA verification is temporarily locked.");
+      return;
+    }
+
     if (!otp || otp.length !== 6) {
       toast.error("Please enter a valid 6-digit OTP");
       return;
@@ -81,9 +90,18 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await verifyTwoFactor(form.email, otp);
+      setMfaStatusMessage("");
+      setIsLockedOut(false);
       navigate("/");
     } catch (error) {
-      toast.error(error.response?.data?.message ?? "Invalid OTP code.");
+      const msg = error.response?.data?.message ?? "Invalid OTP code.";
+      setMfaStatusMessage(msg);
+      if (msg.toLowerCase().includes("locked") || msg.toLowerCase().includes("exceeded")) {
+        setIsLockedOut(true);
+      }
+      setOtp("");
+      document.getElementById("otp-input-0")?.focus();
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -385,6 +403,20 @@ export default function LoginPage() {
                 ) : (
                   <>
                     <Box sx={{ mb: 3 }}>
+                      {mfaStatusMessage && (
+                        <Alert
+                          severity={isLockedOut ? "error" : "warning"}
+                          sx={{
+                            mb: 2,
+                            fontSize: "0.82rem",
+                            borderRadius: "8px",
+                            textAlign: "left",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {mfaStatusMessage}
+                        </Alert>
+                      )}
                       <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 600, mb: 1.5, textAlign: "left" }}>
                         Enter the 6-digit code from your Authenticator App:
                       </Typography>
@@ -395,6 +427,7 @@ export default function LoginPage() {
                             id={`otp-input-${i}`}
                             type="text"
                             maxLength={1}
+                            disabled={loading || isLockedOut}
                             value={otp[i] || ""}
                             onChange={(e) => {
                               const val = e.target.value.replace(/\D/g, "");
@@ -420,13 +453,19 @@ export default function LoginPage() {
                               fontSize: "1.5rem",
                               fontWeight: "bold",
                               borderRadius: "12px",
-                              border: "2px solid rgba(124, 58, 237, 0.2)",
+                              border: isLockedOut
+                                ? "2px solid rgba(239, 68, 68, 0.4)"
+                                : "2px solid rgba(124, 58, 237, 0.2)",
                               outline: "none",
-                              backgroundColor: "transparent",
-                              color: "inherit"
+                              backgroundColor: isLockedOut
+                                ? "rgba(239, 68, 68, 0.05)"
+                                : "transparent",
+                              color: "inherit",
+                              cursor: isLockedOut ? "not-allowed" : "text",
+                              opacity: isLockedOut ? 0.7 : 1,
                             }}
-                            onFocus={(e) => e.target.style.borderColor = "#7c3aed"}
-                            onBlur={(e) => e.target.style.borderColor = "rgba(124, 58, 237, 0.2)"}
+                            onFocus={(e) => { if (!isLockedOut) e.target.style.borderColor = "#7c3aed"; }}
+                            onBlur={(e) => { if (!isLockedOut) e.target.style.borderColor = isLockedOut ? "rgba(239, 68, 68, 0.4)" : "rgba(124, 58, 237, 0.2)"; }}
                           />
                         ))}
                       </Box>
@@ -438,7 +477,7 @@ export default function LoginPage() {
                 <AppButton
                   type="submit"
                   size="large"
-                  disabled={loading}
+                  disabled={loading || (showOtpField && isLockedOut)}
                   fullWidth
                   sx={{
                     py: 1.1,
@@ -462,7 +501,7 @@ export default function LoginPage() {
                     transition: "all 0.2s ease",
                   }}
                 >
-                  {loading ? (showOtpField ? "Verifying..." : "Signing in...") : (showOtpField ? "VERIFY OTP" : "LOGIN")}
+                  {loading ? (showOtpField ? "Verifying..." : "Signing in...") : (showOtpField ? (isLockedOut ? "LOCKED OUT" : "VERIFY OTP") : "LOGIN")}
                 </AppButton>
 
                 {/* Back to Login Button for OTP step */}
@@ -476,6 +515,8 @@ export default function LoginPage() {
                     onClick={() => {
                       setShowOtpField(false);
                       setOtp("");
+                      setMfaStatusMessage("");
+                      setIsLockedOut(false);
                     }}
                     sx={{
                       mt: 1.5,

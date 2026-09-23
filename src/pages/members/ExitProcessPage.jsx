@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Grid, Typography, Chip, Tooltip, IconButton, Avatar } from "@mui/material";
 import { ExitToApp as ExitIcon, CheckCircle as CheckCircleIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
+import { formatGridDate } from "../../utils/dateHelper";
 import { GetMembersAsync, UpdateMemberAsync } from "../../services/memberService";
 import { GetContributionsAsync } from "../../services/contributionService";
 import { GetEventsAsync } from "../../services/eventService";
@@ -103,7 +104,7 @@ export default function ExitProcessPage() {
         </Box>
       )
     },
-    { label: "Joining Date", key: "joiningDate", render: (row) => dayjs(row.joiningDate).format("DD/MM/YYYY") },
+    { label: "Joining Date", key: "joiningDate", render: (row) => formatGridDate(row.joiningDate) },
     { 
       label: "Outstanding Dues", 
       key: "pendingAmount", 

@@ -28,6 +28,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import dayjs from "dayjs";
+import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 
@@ -457,8 +458,7 @@ export default function UsersPage() {
     {
       label: "Created On",
       key: "createdOn",
-      render: (row) =>
-        row.createdOn ? dayjs(row.createdOn).format("DD/MM/YYYY") : "—",
+      render: (row) => formatGridDate(row.createdOn),
     },
   ];
 
@@ -749,7 +749,7 @@ export default function UsersPage() {
                   Created On:
                 </Typography>
                 <Typography variant="caption" sx={{ color: "#1e1a2e", fontWeight: 700 }}>
-                  {form.createdOn ? dayjs(form.createdOn).format("DD/MM/YYYY hh:mm A") : "—"}
+                  {formatViewDateTime(form.createdOn, "—")}
                 </Typography>
               </Box>
             </Grid>

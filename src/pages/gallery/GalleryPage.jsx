@@ -20,6 +20,7 @@ import {
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
+import { formatGridDate, formatViewDate } from "../../utils/dateHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -541,7 +542,7 @@ export default function GalleryPage() {
     {
       label: "Date",
       key: "takenDate",
-      render: (row) => (row.takenDate ? dayjs(row.takenDate).format("DD/MM/YYYY") : "--"),
+      render: (row) => formatGridDate(row.takenDate),
     },
   ];
 
@@ -1074,7 +1075,7 @@ export default function GalleryPage() {
                   Date
                 </Typography>
                 <Typography variant="body2">
-                  {selectedPhoto.takenDate ? dayjs(selectedPhoto.takenDate).format("DD MMMM YYYY") : "--"}
+                  {formatViewDate(selectedPhoto.takenDate)}
                 </Typography>
               </Grid>
               {selectedPhoto.description && (

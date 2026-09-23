@@ -26,6 +26,7 @@ import AppButton from "./AppButton";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import dayjs from "dayjs";
+import { formatGridDate } from "../../utils/dateHelper";
 
 export default function ExcelImportDialog({
   open,
@@ -470,13 +471,13 @@ export default function ExcelImportDialog({
                           if (isDateColumn && value !== "") {
                             if (value instanceof Date) {
                               const localDate = new Date(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
-                              displayValue = dayjs(localDate).format("DD/MM/YYYY");
+                              displayValue = formatGridDate(localDate);
                             } else {
                               const num = Number(value);
                               if (!isNaN(num) && num > 10000 && num < 60000) {
                                 const utcDate = new Date((num - 25568) * 86400 * 1000);
                                 const localDate = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate());
-                                displayValue = dayjs(localDate).format("DD/MM/YYYY");
+                                displayValue = formatGridDate(localDate);
                               }
                             }
                           }

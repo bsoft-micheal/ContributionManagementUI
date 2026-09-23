@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Grid, Typography, Card, CardContent, Divider, Chip, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
+import { formatGridDate } from "../../utils/dateHelper";
 import { GetMembersAsync } from "../../services/memberService";
 import { GetRolesAsync } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
@@ -167,7 +168,7 @@ export default function ContributionCalculationPage() {
       key: "joiningDate",
       sx: { minWidth: 120 },
       cellSx: { minWidth: 120 },
-      render: (row) => row.joiningDate ? dayjs(row.joiningDate).format("DD/MM/YYYY") : "—"
+      render: (row) => formatGridDate(row.joiningDate),
     },
     {
       label: "No of Years",

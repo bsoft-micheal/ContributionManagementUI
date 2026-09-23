@@ -125,12 +125,44 @@ export function AuthProvider({ children }) {
     }
   };
 
+  async function fetchProfile() {
+    try {
+      const { data: resData } = await apiClient.get("/users/getProfileAsync");
+      const data = (resData && resData.data !== undefined) ? resData.data : resData;
+      setAuthState((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          fullName: data.fullName || current.fullName,
+          email: data.email || current.email,
+          profileImage: data.profileImage,
+          phone: data.phone,
+          gender: data.gender,
+          memberType: data.memberType,
+          dateOfBirth: data.dateOfBirth,
+          joiningDate: data.joiningDate,
+          role: data.roleName || current.role,
+        };
+      });
+      return data;
+    } catch (err) {
+      console.error("Failed to fetch profile", err);
+      throw err;
+    }
+  }
+
   async function updateProfile(profileData) {
     const payload = {
       fullName: profileData.fullName,
       email: profileData.email,
       profileImage: profileData.profileImage,
       password: profileData.password,
+      phone: profileData.phone,
+      gender: profileData.gender,
+      memberType: profileData.memberType,
+      dateOfBirth: profileData.dateOfBirth,
+      joiningDate: profileData.joiningDate,
+      roleName: profileData.roleName,
     };
 
     const { data: resData } = await apiClient.put("/users/updateProfileAsync", payload);
@@ -143,8 +175,15 @@ export function AuthProvider({ children }) {
         fullName: data.fullName || current.fullName,
         email: data.email || current.email,
         profileImage: data.profileImage,
+        phone: data.phone !== undefined ? data.phone : current.phone,
+        gender: data.gender !== undefined ? data.gender : current.gender,
+        memberType: data.memberType !== undefined ? data.memberType : current.memberType,
+        dateOfBirth: data.dateOfBirth !== undefined ? data.dateOfBirth : current.dateOfBirth,
+        joiningDate: data.joiningDate !== undefined ? data.joiningDate : current.joiningDate,
+        role: data.roleName || current.role,
       };
     });
+    return data;
   }
 
   return (
@@ -155,6 +194,7 @@ export function AuthProvider({ children }) {
         verifyTwoFactor,
         logout,
         updateProfile,
+        fetchProfile,
         isAuthenticated: Boolean(authState?.token),
       }}
     >
