@@ -194,6 +194,33 @@ export default function UsersPage() {
       return;
     }
 
+    // Check duplicate email and username
+    const emailLower = form.email.trim().toLowerCase();
+    const usernameLower = form.username.trim().toLowerCase();
+    if (!form.userId) {
+      if (users.some((u) => u.email && u.email.trim().toLowerCase() === emailLower)) {
+        setErrors((prev) => ({ ...prev, email: "This email is already registered" }));
+        toast.error("This email is already registered");
+        return;
+      }
+      if (users.some((u) => u.username && u.username.trim().toLowerCase() === usernameLower)) {
+        setErrors((prev) => ({ ...prev, username: "This username is already taken" }));
+        toast.error("This username is already taken");
+        return;
+      }
+    } else {
+      if (users.some((u) => u.userId !== form.userId && u.email && u.email.trim().toLowerCase() === emailLower)) {
+        setErrors((prev) => ({ ...prev, email: "This email is already registered" }));
+        toast.error("This email is already registered");
+        return;
+      }
+      if (users.some((u) => u.userId !== form.userId && u.username && u.username.trim().toLowerCase() === usernameLower)) {
+        setErrors((prev) => ({ ...prev, username: "This username is already taken" }));
+        toast.error("This username is already taken");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -214,7 +241,12 @@ export default function UsersPage() {
       setDialogOpen(false);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? "Failed to save");
+      const rawMsg = err.response?.data?.message || (typeof err.response?.data === "string" ? err.response?.data : "") || err.message || "";
+      if (rawMsg.toLowerCase().includes("inner exception") || rawMsg.toLowerCase().includes("unique") || rawMsg.toLowerCase().includes("duplicate")) {
+        toast.error("A user with this username or email already exists.");
+      } else {
+        toast.error(err.response?.data?.message ?? "Failed to save");
+      }
     } finally {
       setSaving(false);
     }
@@ -281,7 +313,7 @@ export default function UsersPage() {
     }
   }
 
-  const validateRow = (row, rowNum) => {
+  const validateRow = (row, rowNum, allRows) => {
     const username = row["username"] !== undefined && row["username"] !== null ? String(row["username"]).trim() : "";
     const email = row["email"] !== undefined && row["email"] !== null ? String(row["email"]).trim() : "";
     const roleName = row["role"] !== undefined && row["role"] !== null ? String(row["role"]).trim() : (row["rolename"] !== undefined && row["rolename"] !== null ? String(row["rolename"]).trim() : "");
@@ -292,8 +324,40 @@ export default function UsersPage() {
       return { error: `Row ${rowNum}: Username must be alphanumeric (3-30 characters)` };
     }
 
+    const usernameLower = username.toLowerCase();
+    const existingUser = users.find((u) => u.username && u.username.trim().toLowerCase() === usernameLower);
+    if (existingUser) {
+      return { error: `Row ${rowNum}: Username '${username}' already exists in system` };
+    }
+
+    if (allRows && Array.isArray(allRows)) {
+      const firstUserIndex = allRows.findIndex((r) => {
+        const rUser = r["username"] !== undefined && r["username"] !== null ? String(r["username"]).trim().toLowerCase() : "";
+        return rUser === usernameLower;
+      });
+      if (firstUserIndex !== -1 && firstUserIndex < (rowNum - 2)) {
+        return { error: `Row ${rowNum}: Duplicate username '${username}' in Excel (Row ${firstUserIndex + 2})` };
+      }
+    }
+
     if (!email) return { error: `Row ${rowNum}: Email is required` };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: `Row ${rowNum}: Invalid email format` };
+
+    const emailLower = email.toLowerCase();
+    const existingEmail = users.find((u) => u.email && u.email.trim().toLowerCase() === emailLower);
+    if (existingEmail) {
+      return { error: `Row ${rowNum}: Email '${email}' already exists in system` };
+    }
+
+    if (allRows && Array.isArray(allRows)) {
+      const firstEmailIndex = allRows.findIndex((r) => {
+        const rEmail = r["email"] !== undefined && r["email"] !== null ? String(r["email"]).trim().toLowerCase() : "";
+        return rEmail === emailLower;
+      });
+      if (firstEmailIndex !== -1 && firstEmailIndex < (rowNum - 2)) {
+        return { error: `Row ${rowNum}: Duplicate email '${email}' in Excel (Row ${firstEmailIndex + 2})` };
+      }
+    }
 
     // Match role case-insensitively
     const matchedRole = USER_ROLES.find(r => r.value.toLowerCase() === roleName.toLowerCase());
@@ -325,7 +389,12 @@ export default function UsersPage() {
       toast.success(`Successfully imported all ${validData.length} user(s)!`);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || "Failed to import users");
+      const rawMsg = err.response?.data?.message || (typeof err.response?.data === "string" ? err.response?.data : "") || err.message || "";
+      if (rawMsg.toLowerCase().includes("inner exception") || rawMsg.toLowerCase().includes("unique") || rawMsg.toLowerCase().includes("duplicate")) {
+        toast.error("One or more records contain a username or email that already exists in the database.");
+      } else {
+        toast.error(rawMsg || "Failed to import users");
+      }
     } finally {
       setLoading(false);
     }
@@ -512,7 +581,11 @@ export default function UsersPage() {
                   label="Filter by Role"
                   placeholder="Select Role"
                   value={filterRole}
-                  onChange={(e) => setFilterRole(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterRole(val);
+                    setAppliedRole(val);
+                  }}
                   options={[{ label: "All Roles", value: "" }, ...USER_ROLES]}
                   size="small"
                   required
@@ -526,7 +599,11 @@ export default function UsersPage() {
                   label="Filter by Status"
                   placeholder="Select Status"
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterStatus(val);
+                    setAppliedStatus(val);
+                  }}
                   options={[
                     { label: "All Statuses", value: "" },
                     { label: "Active", value: "true" },
@@ -537,28 +614,6 @@ export default function UsersPage() {
                   fullWidth
                 />
               </Box>
-
-              {/* Apply button */}
-              <AppButton
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setAppliedRole(filterRole);
-                  setAppliedStatus(filterStatus);
-
-                }}
-                sx={{
-                  bgcolor: "#4a3f6b !important",
-                  color: "#ffffff",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" },
-                }}
-              >
-                Filter
-              </AppButton>
 
               {/* Clear button */}
               <AppButton

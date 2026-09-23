@@ -443,7 +443,11 @@ export default function PaymentsPage() {
                 <AppSelect
                   label="Select Member"
                   value={filterMember}
-                  onChange={(e) => setFilterMember(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterMember(val);
+                    setAppliedMember(val);
+                  }}
                   options={memberOptions}
                   size="small"
                   placeholder="Select Member"
@@ -455,7 +459,11 @@ export default function PaymentsPage() {
                 <AppSelect
                   label="Select Event"
                   value={filterEvent}
-                  onChange={(e) => setFilterEvent(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterEvent(val);
+                    setAppliedEvent(val);
+                  }}
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
@@ -467,7 +475,11 @@ export default function PaymentsPage() {
                 <AppSelect
                   label="Payment Mode"
                   value={filterMode}
-                  onChange={(e) => setFilterMode(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterMode(val);
+                    setAppliedMode(val);
+                  }}
                   options={modeOptions}
                   size="small"
                   placeholder="Payment Mode"
@@ -475,11 +487,15 @@ export default function PaymentsPage() {
                   fullWidth
                 />
               </Box>
-              <Box sx={{ minWidth: 160 }}>
+              <Box sx={{ width: 160, minWidth: 160 }}>
                 <AppSelect
                   label="Select Status"
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterStatus(val);
+                    setAppliedStatus(val);
+                  }}
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
@@ -487,37 +503,18 @@ export default function PaymentsPage() {
                   fullWidth
                 />
               </Box>
-              <Box sx={{ minWidth: 160 }}>
+              <Box sx={{ width: 160, minWidth: 160 }}>
                 <AppDateInput
                   label="Payment Date"
                   value={filterDate}
-                  onChange={(newVal) => setFilterDate(newVal)}
+                  onChange={(newVal) => {
+                    setFilterDate(newVal);
+                    setAppliedDate(newVal);
+                  }}
                   size="small"
-                  required
+                  fullWidth
                 />
               </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setAppliedMember(filterMember);
-                  setAppliedEvent(filterEvent);
-                  setAppliedMode(filterMode);
-                  setAppliedStatus(filterStatus);
-                  setAppliedDate(filterDate);
-                }}
-                sx={{
-                  bgcolor: "#4a3f6b !important",
-                  color: "#ffffff",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" },
-                }}
-              >
-                Filter
-              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"

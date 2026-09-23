@@ -306,24 +306,6 @@ export default function ContributionsPage() {
                 />
               </Box>
               <AppButton
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setSelectedEventId(filterEventId);
-                }}
-                sx={{
-                  bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
-                  color: "#ffffff",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
-                }}
-              >
-                Filter
-              </AppButton>
-              <AppButton
                 variant="outlined"
                 size="small"
                 onClick={() => {

@@ -391,7 +391,7 @@ export default function EventFormDialog({
           console.warn("Could not sync event dynamic QR to backend settings before creation:", syncErr);
         }
 
-        const createdEvent = await CreateEvent(payload);
+        const createdEvent = await CreateEventAsync(payload);
         toast.success("Saved successfully");
 
         // Automatically dispatch payment reminder emails with dynamic QR to participants
@@ -525,31 +525,6 @@ export default function EventFormDialog({
         </>
       }
     >
-      {/* Category selector row */}
-      <Box sx={{ mb: 2.5, display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Box sx={{ minWidth: 220 }}>
-          <AppSelect
-            label="Event Category"
-            value={form.eventTypeId}
-            onChange={(e) => {
-              setForm((c) => ({ ...c, eventTypeId: e.target.value }));
-              if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
-            }}
-            options={typeOptions}
-            error={!!errors.eventTypeId}
-            helperText={errors.eventTypeId}
-            required
-          />
-        </Box>
-        {isBirthday && (
-          <Box sx={{ pt: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.82rem" }}>
-              
-            </Typography>
-          </Box>
-        )}
-      </Box>
-
       {/* Birthday Event Setup (Prototype Implementation) */}
       {isBirthday ? (
         <Grid container spacing={3}>
@@ -584,6 +559,21 @@ export default function EventFormDialog({
               <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppSelect
+                      label="Event Category"
+                      value={form.eventTypeId}
+                      onChange={(e) => {
+                        setForm((c) => ({ ...c, eventTypeId: e.target.value }));
+                        if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+                      }}
+                      options={typeOptions}
+                      error={!!errors.eventTypeId}
+                      helperText={errors.eventTypeId}
+                      required
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <AppInput
                       label="Event Name"
                       placeholder="Enter event name"
@@ -611,6 +601,18 @@ export default function EventFormDialog({
 
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <AppInput
+                      label="Total Active Members"
+                      placeholder="Enter count"
+                      type="number"
+                      value={totalMembers}
+                      onChange={(e) =>
+                        setTotalMembers(Math.max(1, parseInt(e.target.value, 10) || 1))
+                      }
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
                       label="Office Birthday Members"
                       placeholder="Enter count"
                       type="number"
@@ -631,68 +633,6 @@ export default function EventFormDialog({
                         setWfhBirthdays(Math.max(0, parseInt(e.target.value, 10) || 0))
                       }
                     />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label="Total Active Members"
-                      placeholder="Enter count"
-                      type="number"
-                      value={totalMembers}
-                      onChange={(e) =>
-                        setTotalMembers(Math.max(1, parseInt(e.target.value, 10) || 1))
-                      }
-                    />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, pt: 0.2 }}>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary">
-                        Birthday Members Exempt?
-                      </Typography>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.4 }}>
-                        <Switch
-                          checked={exempt}
-                          onChange={(e) => setExempt(e.target.checked)}
-                          sx={{
-                            width: 44,
-                            height: 24,
-                            padding: 0,
-                            "& .MuiSwitch-switchBase": {
-                              padding: 0,
-                              margin: "2px",
-                              transitionDuration: "200ms",
-                              "&.Mui-checked": {
-                                transform: "translateX(20px)",
-                                color: "#fff",
-                                "& + .MuiSwitch-track": {
-                                  backgroundColor: "#1677c8",
-                                  opacity: 1,
-                                  border: 0,
-                                },
-                              },
-                            },
-                            "& .MuiSwitch-thumb": {
-                              boxSizing: "border-box",
-                              width: 20,
-                              height: 20,
-                            },
-                            "& .MuiSwitch-track": {
-                              borderRadius: 24 / 2,
-                              backgroundColor: "#b8c7d5",
-                              opacity: 1,
-                            },
-                          }}
-                        />
-                        <Typography
-                          variant="body2"
-                          fontWeight={600}
-                          sx={{ color: exempt ? "#1677c8" : "text.secondary" }}
-                        >
-                          {exempt ? "Enabled" : "Disabled"}
-                        </Typography>
-                      </Box>
-                    </Box>
                   </Grid>
                 </Grid>
 
@@ -872,10 +812,51 @@ export default function EventFormDialog({
                   borderColor: "divider",
                   bgcolor: (theme) =>
                     theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 0.5,
                 }}
               >
-                <Typography variant="subtitle1" fontWeight={700}>
-                  Budget Breakdown
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 1,
+                  }}
+                >
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    Budget Breakdown
+                  </Typography>
+                  <Chip
+                    label={`₹${plannedBudget.toLocaleString("en-IN")} Total Budget ÷ ${eligible} Members = ₹${contributionPerMember}/person`}
+                    size="small"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(124, 58, 237, 0.15)"
+                          : "rgba(74, 63, 107, 0.08)",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
+                    }}
+                  />
+                </Box>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontSize: "0.78rem",
+                    lineHeight: 1.5,
+                    color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#1e293b"),
+                    fontWeight: 600,
+                    "& strong": {
+                      fontWeight: 800,
+                      color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
+                    },
+                  }}
+                >
+                  Calculation: <strong>Cake</strong> (Office Celebrants × ₹300) + <strong>Snacks / Puffs</strong> (Total Active Members × ₹20) + <strong>Gift</strong> (Total Birthday Celebrants × ₹1,000). Total planned budget is divided equally among eligible contributing members.
                 </Typography>
               </Box>
 
@@ -1024,6 +1005,20 @@ export default function EventFormDialog({
       ) : (
         /* Non-Birthday Event Standard Form */
         <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AppSelect
+              label="Event Category"
+              value={form.eventTypeId}
+              onChange={(e) => {
+                setForm((c) => ({ ...c, eventTypeId: e.target.value }));
+                if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+              }}
+              options={typeOptions}
+              error={!!errors.eventTypeId}
+              helperText={errors.eventTypeId}
+              required
+            />
+          </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <AppInput
               label="Event Name"

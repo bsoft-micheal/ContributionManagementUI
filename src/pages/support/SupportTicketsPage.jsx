@@ -610,11 +610,15 @@ export default function SupportTicketsPage() {
         filterPanel={
           <Grid container spacing={2} alignItems="center">
             <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 200 }}>
+              <Box sx={{ minWidth: 180 }}>
                 <AppSelect
                   label="Select Ticket Type"
                   value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterType(val);
+                    setAppliedType(val);
+                  }}
                   options={ticketTypeOptions}
                   size="small"
                   placeholder="Select Ticket Type"
@@ -626,7 +630,11 @@ export default function SupportTicketsPage() {
                 <AppSelect
                   label="Select Priority"
                   value={filterPriority}
-                  onChange={(e) => setFilterPriority(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterPriority(val);
+                    setAppliedPriority(val);
+                  }}
                   options={priorityOptions}
                   size="small"
                   placeholder="Select Priority"
@@ -638,7 +646,11 @@ export default function SupportTicketsPage() {
                 <AppSelect
                   label="Select Status"
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterStatus(val);
+                    setAppliedStatus(val);
+                  }}
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
@@ -646,26 +658,6 @@ export default function SupportTicketsPage() {
                   fullWidth
                 />
               </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setAppliedType(filterType);
-                  setAppliedPriority(filterPriority);
-                  setAppliedStatus(filterStatus);
-                }}
-                sx={{
-                  bgcolor: "#4a3f6b !important",
-                  color: "#ffffff",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" },
-                }}
-              >
-                Filter
-              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"

@@ -16,6 +16,9 @@ import {
   CloudUploadOutlined as CloudUploadIcon,
   DeleteOutline as DeleteOutlineIcon,
   AddPhotoAlternate as AddPhotoAlternateIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  PhotoLibrary as PhotoLibraryIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -39,6 +42,28 @@ import {
 } from "../../services/galleryService";
 import { GetEventsAsync } from "../../services/eventService";
 import { GetEventTypesAsync } from "../../services/eventTypeService";
+
+// Helper to safely extract an array of image URLs/data from any format
+export const extractImages = (rawImageUrl) => {
+  if (!rawImageUrl) return [];
+  if (Array.isArray(rawImageUrl)) return rawImageUrl.filter(Boolean);
+  if (typeof rawImageUrl === "string") {
+    const trimmed = rawImageUrl.trim();
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch (e) {
+        // fallback
+      }
+    }
+    if (trimmed.includes("|||")) {
+      return trimmed.split("|||").map((s) => s.trim()).filter(Boolean);
+    }
+    return [trimmed];
+  }
+  return [];
+};
 
 const initialForm = {
   title: "",
@@ -68,6 +93,7 @@ export default function GalleryPage() {
   const [photoToDelete, setPhotoToDelete] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [activeViewImageIndex, setActiveViewImageIndex] = useState(0);
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
@@ -83,18 +109,59 @@ export default function GalleryPage() {
       setLoading(true);
       const data = await getGalleryPhotosAsync();
       if (Array.isArray(data)) {
-        const mapped = data.map((item, idx) => ({
-          id: item.photoId
-            ? `PHT-${String(idx + 1).padStart(3, "0")}`
-            : item.id || `PHT-${String(idx + 1).padStart(3, "0")}`,
-          photoId: item.photoId || item.id,
-          title: item.title || "",
-          eventName: item.eventName || "",
-          category: item.category || "",
-          takenDate: item.takenDate ? dayjs(item.takenDate).format("YYYY-MM-DD") : "",
-          imageUrl: item.imageUrl || "",
-          description: item.description || "",
+        // Group items if they were saved with Title (1), Title (2) under same event/date
+        const groupedMap = new Map();
+
+        data.forEach((item, idx) => {
+          const rawTitle = (item.title || "").trim();
+          // Check if title ends with (1), (2), etc.
+          const match = rawTitle.match(/^(.*?)\s*\(\d+\)$/);
+          const baseTitle = match ? match[1].trim() : rawTitle;
+
+          const eventName = (item.eventName || "").trim();
+          const category = (item.category || "").trim();
+          const dateStr = item.takenDate ? dayjs(item.takenDate).format("YYYY-MM-DD") : "";
+
+          // Key to group legacy multiple entries of the same upload
+          const groupKey = `${baseTitle.toLowerCase()}___${eventName.toLowerCase()}___${category.toLowerCase()}___${dateStr}`;
+
+          const itemImages = extractImages(item.imageUrl);
+          const pid = item.photoId || item.id;
+
+          if (groupedMap.has(groupKey)) {
+            const existing = groupedMap.get(groupKey);
+            if (pid && !existing.allPhotoIds.includes(pid)) {
+              existing.allPhotoIds.push(pid);
+            }
+            itemImages.forEach((img) => {
+              if (img && !existing.images.includes(img)) {
+                existing.images.push(img);
+              }
+            });
+            if (!existing.description && item.description) {
+              existing.description = item.description;
+            }
+          } else {
+            groupedMap.set(groupKey, {
+              id: pid ? `PHT-${String(idx + 1).padStart(3, "0")}` : `PHT-${String(idx + 1).padStart(3, "0")}`,
+              photoId: pid,
+              allPhotoIds: pid ? [pid] : [],
+              title: baseTitle || rawTitle || "Untitled Moment",
+              eventName: item.eventName || "",
+              category: item.category || "",
+              takenDate: dateStr,
+              description: item.description || "",
+              images: itemImages,
+              imageUrl: itemImages[0] || item.imageUrl || "",
+            });
+          }
+        });
+
+        const mapped = Array.from(groupedMap.values()).map((entry, idx) => ({
+          ...entry,
+          id: `PHT-${String(idx + 1).padStart(3, "0")}`,
         }));
+
         setPhotos(mapped);
       } else {
         setPhotos([]);
@@ -172,13 +239,14 @@ export default function GalleryPage() {
 
   const handleEditPhoto = (row) => {
     setEditingPhoto(row);
+    const rowImages = row.images?.length > 0 ? row.images : (row.imageUrl ? [row.imageUrl] : []);
     setForm({
       title: row.title || "",
       eventName: row.eventName || "",
       category: row.category || "",
       takenDate: row.takenDate ? dayjs(row.takenDate) : dayjs(),
-      imageUrl: row.imageUrl || "",
-      imageUrls: row.imageUrl ? [row.imageUrl] : [],
+      imageUrl: rowImages[0] || "",
+      imageUrls: rowImages,
       description: row.description || "",
     });
     setErrors({});
@@ -235,7 +303,7 @@ export default function GalleryPage() {
         const rawDataUrl = uploadEvt.target.result;
         const img = new Image();
         img.onload = () => {
-          const maxDim = 1200;
+          const maxDim = 1000;
           let width = img.width;
           let height = img.height;
           if (width > maxDim || height > maxDim) {
@@ -252,7 +320,7 @@ export default function GalleryPage() {
           canvas.height = height;
           const ctx = canvas.getContext("2d");
           ctx.drawImage(img, 0, 0, width, height);
-          const optimizedUrl = canvas.toDataURL("image/jpeg", 0.82);
+          const optimizedUrl = canvas.toDataURL("image/jpeg", 0.78);
           optimizedUrls.push(optimizedUrl);
           processedCount++;
           if (processedCount === filesToProcess.length) {
@@ -316,11 +384,17 @@ export default function GalleryPage() {
 
   const handleConfirmDelete = async () => {
     if (!photoToDelete) return;
-    const photoId = photoToDelete.photoId || photoToDelete.id;
+    const idsToDelete = photoToDelete.allPhotoIds?.length
+      ? photoToDelete.allPhotoIds
+      : [photoToDelete.photoId || photoToDelete.id];
 
     try {
-      await deleteGalleryPhotoAsync(photoId);
-      toast.success("Photo deleted successfully");
+      for (const pid of idsToDelete) {
+        if (pid) {
+          await deleteGalleryPhotoAsync(pid);
+        }
+      }
+      toast.success("Gallery entry deleted successfully");
       await fetchPhotosFromDb();
     } catch (err) {
       console.error("Backend delete photo call failed:", err);
@@ -352,32 +426,37 @@ export default function GalleryPage() {
     }
 
     try {
+      const payload = {
+        title: form.title.trim(),
+        eventName: form.eventName,
+        category: form.category,
+        imageUrl: currentImages.length > 1 ? JSON.stringify(currentImages) : (currentImages[0] || ""),
+        takenDate: form.takenDate ? form.takenDate.toISOString() : new Date().toISOString(),
+        description: form.description || "",
+      };
+
       if (editingPhoto) {
-        const payload = {
-          title: form.title,
-          eventName: form.eventName,
-          category: form.category,
-          imageUrl: currentImages[0],
-          takenDate: form.takenDate ? form.takenDate.toISOString() : new Date().toISOString(),
-          description: form.description || "",
-        };
-        await createGalleryPhoto(payload);
-        toast.success("Photo updated successfully!");
-      } else {
-        for (let i = 0; i < currentImages.length; i++) {
-          const payload = {
-            title: currentImages.length > 1 ? `${form.title} (${i + 1})` : form.title,
-            eventName: form.eventName,
-            category: form.category,
-            imageUrl: currentImages[i],
-            takenDate: form.takenDate ? form.takenDate.toISOString() : new Date().toISOString(),
-            description: form.description || "",
-          };
-          await createGalleryPhoto(payload);
+        const idsToDelete = editingPhoto.allPhotoIds?.length
+          ? editingPhoto.allPhotoIds
+          : [editingPhoto.photoId || editingPhoto.id];
+
+        for (const pid of idsToDelete) {
+          if (pid) {
+            try {
+              await deleteGalleryPhotoAsync(pid);
+            } catch (delErr) {
+              console.warn("Failed to delete old record during update:", pid, delErr);
+            }
+          }
         }
+
+        await createGalleryPhotoAsync(payload);
+        toast.success("Gallery entry updated successfully!");
+      } else {
+        await createGalleryPhotoAsync(payload);
         toast.success(
           currentImages.length > 1
-            ? `${currentImages.length} photos added successfully!`
+            ? `Gallery entry with ${currentImages.length} photos added successfully!`
             : "Photo added successfully!"
         );
       }
@@ -404,6 +483,7 @@ export default function GalleryPage() {
               sx={{ p: 0.3 }}
               onClick={() => {
                 setSelectedPhoto(row);
+                setActiveViewImageIndex(0);
                 setViewDialogOpen(true);
               }}
             >
@@ -467,45 +547,27 @@ export default function GalleryPage() {
       ),
     },
     {
-      label: "Photo",
-      render: (row) => (
-        <Box
-          sx={{
-            width: 44,
-            height: 44,
-            borderRadius: "8px",
-            overflow: "hidden",
-            bgcolor: "#f1f5f9",
-            border: (t) => `1px solid ${t.palette.divider}`,
-            cursor: "pointer",
-          }}
-          onClick={() => {
-            setSelectedPhoto(row);
-            setViewDialogOpen(true);
-          }}
-        >
-          <Box
-            component="img"
-            src={row.imageUrl}
-            alt={row.title}
-            sx={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              transition: "transform 0.2s ease",
-              "&:hover": { transform: "scale(1.1)" },
-            }}
-          />
-        </Box>
-      ),
-    },
-    {
       label: "Title",
       key: "title",
       render: (row) => (
-        <Typography variant="body2" fontWeight={700} sx={{ color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") }}>
-          {row.title}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="body2" fontWeight={700} sx={{ color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") }}>
+            {row.title}
+          </Typography>
+          {row.images && row.images.length > 1 && (
+            <Chip
+              label={`${row.images.length} photos`}
+              size="small"
+              sx={{
+                height: 18,
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74,63,107,0.08)",
+                color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+              }}
+            />
+          )}
+        </Box>
       ),
     },
     {
@@ -577,7 +639,11 @@ export default function GalleryPage() {
                 <AppSelect
                   label="Select Event"
                   value={filterEvent}
-                  onChange={(e) => setFilterEvent(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterEvent(val);
+                    setAppliedEvent(val);
+                  }}
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
@@ -589,7 +655,11 @@ export default function GalleryPage() {
                 <AppSelect
                   label="Select Category"
                   value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterCategory(val);
+                    setAppliedCategory(val);
+                  }}
                   options={categoryOptions}
                   size="small"
                   placeholder="Select Category"
@@ -597,25 +667,6 @@ export default function GalleryPage() {
                   fullWidth
                 />
               </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setAppliedEvent(filterEvent);
-                  setAppliedCategory(filterCategory);
-                }}
-                sx={{
-                  bgcolor: "#4a3f6b !important",
-                  color: "#ffffff",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" },
-                }}
-              >
-                Filter
-              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"
@@ -663,7 +714,7 @@ export default function GalleryPage() {
         title={editingPhoto ? "Edit Photo" : "Add Photos"}
         maxWidth="md"
         actions={
-          <Stack direction="row" spacing={1.5}>
+          <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ width: "100%" }}>
             <AppButton
               variant="outlined"
               onClick={() => {
@@ -684,7 +735,7 @@ export default function GalleryPage() {
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
               label="Photo Title"
-              placeholder="e.g. Birthday Cake Cutting"
+              placeholder="Enter the Title"
               value={form.title}
               onChange={(e) => {
                 setForm((c) => ({ ...c, title: e.target.value }));
@@ -1000,7 +1051,7 @@ export default function GalleryPage() {
         }}
         onConfirm={handleConfirmDelete}
         title="Confirm"
-        content="Are you sure you want to delete this photo?"
+        content="Are you sure you want to delete this gallery entry and all attached photos?"
       />
 
       {/* View Photo Details Dialog */}
@@ -1009,96 +1060,307 @@ export default function GalleryPage() {
         onClose={() => {
           setViewDialogOpen(false);
           setSelectedPhoto(null);
+          setActiveViewImageIndex(0);
         }}
-        title="Photo Details"
-        maxWidth="sm"
+        title="Gallery Details"
+        maxWidth="md"
         actions={
-          <AppButton variant="contained" onClick={() => setViewDialogOpen(false)}>
-            Close
-          </AppButton>
-        }
-      >
-        {selectedPhoto && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Box
-              sx={{
-                width: "100%",
-                height: 240,
-                borderRadius: "10px",
-                overflow: "hidden",
-                bgcolor: "#000000",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+          <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ width: "100%" }}>
+            <AppButton
+              variant="contained"
+              onClick={() => {
+                setViewDialogOpen(false);
+                setSelectedPhoto(null);
+                setActiveViewImageIndex(0);
               }}
             >
-              <Box
-                component="img"
-                src={selectedPhoto.imageUrl}
-                alt={selectedPhoto.title}
-                sx={{
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                  objectFit: "contain",
-                }}
-              />
-            </Box>
+              Close
+            </AppButton>
+          </Stack>
+        }
+      >
+        {selectedPhoto && (() => {
+          const currentImages = selectedPhoto.images && selectedPhoto.images.length > 0
+            ? selectedPhoto.images
+            : (selectedPhoto.imageUrl ? [selectedPhoto.imageUrl] : []);
+          const activeImg = currentImages[activeViewImageIndex] || currentImages[0];
 
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Title
-                </Typography>
-                <Typography variant="subtitle2" fontWeight={800} color={(t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")}>
-                  {selectedPhoto.title}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Category
-                </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {selectedPhoto.category}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Event Name
-                </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {selectedPhoto.eventName}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Date
-                </Typography>
-                <Typography variant="body2">
-                  {selectedPhoto.takenDate ? dayjs(selectedPhoto.takenDate).format("DD MMMM YYYY") : "--"}
-                </Typography>
-              </Grid>
-              {selectedPhoto.description && (
-                <Grid size={{ xs: 12 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Description
-                  </Typography>
-                  <Typography
-                    variant="body2"
+          return (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+              {/* Image Showcase Area */}
+              {currentImages.length > 0 ? (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  {/* Main Large Display */}
+                  <Box
                     sx={{
-                      bgcolor: (t) =>
-                        t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
-                      p: 1.5,
-                      borderRadius: "8px",
-                      border: (t) => `1px solid ${t.palette.divider}`,
+                      position: "relative",
+                      width: "100%",
+                      height: { xs: 260, sm: 340, md: 380 },
+                      borderRadius: "12px",
+                      overflow: "hidden",
+                      bgcolor: "#090d16",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
                     }}
                   >
-                    {selectedPhoto.description}
-                  </Typography>
+                    <Box
+                      component="img"
+                      src={activeImg}
+                      alt={`${selectedPhoto.title} preview`}
+                      sx={{
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        objectFit: "contain",
+                        display: "block",
+                        userSelect: "none",
+                        transition: "opacity 0.2s ease",
+                      }}
+                    />
+
+                    {/* Counter Badge */}
+                    <Chip
+                      icon={<PhotoLibraryIcon sx={{ fontSize: "14px !important", color: "#ffffff !important" }} />}
+                      label={`${activeViewImageIndex + 1} of ${currentImages.length}`}
+                      size="small"
+                      sx={{
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                        bgcolor: "rgba(0, 0, 0, 0.75)",
+                        backdropFilter: "blur(4px)",
+                        color: "#ffffff",
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                      }}
+                    />
+
+                    {/* Navigation Arrows for multi-images */}
+                    {currentImages.length > 1 && (
+                      <>
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            setActiveViewImageIndex((prev) =>
+                              prev > 0 ? prev - 1 : currentImages.length - 1
+                            )
+                          }
+                          sx={{
+                            position: "absolute",
+                            left: 12,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            bgcolor: "rgba(0,0,0,0.6)",
+                            color: "#ffffff",
+                            "&:hover": {
+                              bgcolor: "rgba(0,0,0,0.85)",
+                              transform: "translateY(-50%) scale(1.1)",
+                            },
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          <ChevronLeftIcon sx={{ fontSize: 28 }} />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            setActiveViewImageIndex((prev) =>
+                              prev < currentImages.length - 1 ? prev + 1 : 0
+                            )
+                          }
+                          sx={{
+                            position: "absolute",
+                            right: 12,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            bgcolor: "rgba(0,0,0,0.6)",
+                            color: "#ffffff",
+                            "&:hover": {
+                              bgcolor: "rgba(0,0,0,0.85)",
+                              transform: "translateY(-50%) scale(1.1)",
+                            },
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          <ChevronRightIcon sx={{ fontSize: 28 }} />
+                        </IconButton>
+                      </>
+                    )}
+                  </Box>
+
+                  {/* Thumbnail Filmstrip */}
+                  {currentImages.length > 1 && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.5,
+                        overflowX: "auto",
+                        py: 0.5,
+                        px: 0.5,
+                        "&::-webkit-scrollbar": { height: 6 },
+                        "&::-webkit-scrollbar-thumb": {
+                          bgcolor: "rgba(0,0,0,0.2)",
+                          borderRadius: 3,
+                        },
+                      }}
+                    >
+                      {currentImages.map((imgUrl, idx) => {
+                        const isActive = idx === activeViewImageIndex;
+                        return (
+                          <Box
+                            key={idx}
+                            onClick={() => setActiveViewImageIndex(idx)}
+                            sx={{
+                              flexShrink: 0,
+                              width: 68,
+                              height: 52,
+                              borderRadius: "8px",
+                              overflow: "hidden",
+                              cursor: "pointer",
+                              border: "2px solid",
+                              borderColor: isActive
+                                ? (t) => (t.palette.mode === "dark" ? "#818cf8" : "#4a3f6b")
+                                : "transparent",
+                              opacity: isActive ? 1 : 0.6,
+                              transform: isActive ? "scale(1.05)" : "scale(1)",
+                              transition: "all 0.2s ease",
+                              boxShadow: isActive ? "0 2px 8px rgba(74,63,107,0.3)" : "none",
+                              "&:hover": {
+                                opacity: 1,
+                                transform: "scale(1.05)",
+                              },
+                            }}
+                          >
+                            <Box
+                              component="img"
+                              src={imgUrl}
+                              alt={`Thumbnail ${idx + 1}`}
+                              sx={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                display: "block",
+                              }}
+                            />
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
+                </Box>
+              ) : null}
+
+              {/* Details Info Grid */}
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: "10px",
+                  bgcolor: (t) =>
+                    t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                  border: (t) => `1px solid ${t.palette.divider}`,
+                }}
+              >
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
+                      Title
+                    </Typography>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={700}
+                      sx={{ color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") }}
+                    >
+                      {selectedPhoto.title}
+                    </Typography>
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
+                      Event Name
+                    </Typography>
+                    <Typography variant="body1" fontWeight={600}>
+                      {selectedPhoto.eventName || "--"}
+                    </Typography>
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 4 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
+                      Category
+                    </Typography>
+                    <Chip
+                      label={selectedPhoto.category || "General"}
+                      size="small"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.08)"
+                            : "rgba(74,63,107,0.08)",
+                        color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 4 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
+                      Date
+                    </Typography>
+                    <Typography variant="body2" fontWeight={600}>
+                      {selectedPhoto.takenDate
+                        ? dayjs(selectedPhoto.takenDate).format("DD MMMM YYYY")
+                        : "--"}
+                    </Typography>
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
+                      Total Photos
+                    </Typography>
+                    <Chip
+                      icon={<PhotoLibraryIcon sx={{ fontSize: "14px !important" }} />}
+                      label={`${currentImages.length} Photo${currentImages.length === 1 ? "" : "s"} Attached`}
+                      size="small"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark"
+                            ? "rgba(16, 185, 129, 0.15)"
+                            : "rgba(16, 185, 129, 0.12)",
+                        color: "#10b981",
+                      }}
+                    />
+                  </Grid>
+
+                  {selectedPhoto.description && (
+                    <Grid size={{ xs: 12 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
+                        Description
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          bgcolor: (t) =>
+                            t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
+                          p: 1.5,
+                          borderRadius: "8px",
+                          border: (t) => `1px solid ${t.palette.divider}`,
+                          whiteSpace: "pre-line",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {selectedPhoto.description}
+                      </Typography>
+                    </Grid>
+                  )}
                 </Grid>
-              )}
-            </Grid>
-          </Box>
-        )}
+              </Box>
+            </Box>
+          );
+        })()}
       </AppDialog>
     </div>
   );
