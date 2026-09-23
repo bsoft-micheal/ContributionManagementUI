@@ -1362,61 +1362,6 @@ export default function GalleryPage() {
             </Box>
           );
         })()}
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Title
-                </Typography>
-                <Typography variant="subtitle2" fontWeight={800} color={(t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")}>
-                  {selectedPhoto.title}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Category
-                </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {selectedPhoto.category}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Event Name
-                </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {selectedPhoto.eventName}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Date
-                </Typography>
-                <Typography variant="body2">
-                  {formatViewDate(selectedPhoto.takenDate)}
-                </Typography>
-              </Grid>
-              {selectedPhoto.description && (
-                <Grid size={{ xs: 12 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Description
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      bgcolor: (t) =>
-                        t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
-                      p: 1.5,
-                      borderRadius: "8px",
-                      border: (t) => `1px solid ${t.palette.divider}`,
-                    }}
-                  >
-                    {selectedPhoto.description}
-                  </Typography>
-                </Grid>
-              )}
-            </Grid>
-          </Box>
-        )}
       </AppDialog>
     </div>
   );

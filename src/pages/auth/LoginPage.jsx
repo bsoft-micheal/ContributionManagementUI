@@ -15,14 +15,14 @@ import rightLoginBg from "../../assets/right_login_bg.png";
 
 export default function LoginPage() {
   const theme = useTheme();
-  const [form, setForm] = useState({ email: "admin@teamcontribution.local", password: "Admin@123" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const { login, verifyTwoFactor } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useAppToast();
-  const [keepSignedIn, setKeepSignedIn] = useState(true);
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // 2FA State
@@ -60,7 +60,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const data = await login(form);
+      const data = await login(form, keepSignedIn);
       if (data?.requiresTwoFactor) {
         setShowOtpField(true);
         setMfaStatusMessage("");
@@ -89,7 +89,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await verifyTwoFactor(form.email, otp);
+      await verifyTwoFactor(form.email, otp, keepSignedIn);
       setMfaStatusMessage("");
       setIsLockedOut(false);
       navigate("/");

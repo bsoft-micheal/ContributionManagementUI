@@ -17,16 +17,41 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
 
   const [authState, setAuthState] = useState(() => {
-    const cached = localStorage.getItem("teamContributionAuth");
-    return cached ? JSON.parse(cached) : null;
+    // 1. Check current browser tab session
+    const sessionAuth = sessionStorage.getItem("teamContributionAuth");
+    if (sessionAuth) {
+      try {
+        return JSON.parse(sessionAuth);
+      } catch {
+        sessionStorage.removeItem("teamContributionAuth");
+      }
+    }
+
+    // 2. Check if user explicitly selected "Remember Password" in localStorage
+    const rememberMe = localStorage.getItem("teamContributionRememberMe");
+    if (rememberMe === "true") {
+      const localAuth = localStorage.getItem("teamContributionAuth");
+      if (localAuth) {
+        try {
+          const parsed = JSON.parse(localAuth);
+          sessionStorage.setItem("teamContributionAuth", localAuth);
+          return parsed;
+        } catch {
+          localStorage.removeItem("teamContributionAuth");
+          localStorage.removeItem("teamContributionRememberMe");
+        }
+      }
+    }
+
+    return null;
   });
 
-  // ── Persist auth state to localStorage ──────────────────────────────────────
+  // ── Sync auth state cleanup when logged out ──────────────────────────────────
   useEffect(() => {
-    if (authState) {
-      localStorage.setItem("teamContributionAuth", JSON.stringify(authState));
-    } else {
+    if (!authState) {
+      sessionStorage.removeItem("teamContributionAuth");
       localStorage.removeItem("teamContributionAuth");
+      localStorage.removeItem("teamContributionRememberMe");
     }
   }, [authState]);
 
@@ -54,7 +79,7 @@ export function AuthProvider({ children }) {
     };
   }
 
-  async function login(credentials) {
+  async function login(credentials, remember = false) {
     const payload = {
       ...credentials,
       deviceInfo: getDeviceInfo()
@@ -79,11 +104,22 @@ export function AuthProvider({ children }) {
       localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
     }
 
+    if (data.token) {
+      sessionStorage.setItem("teamContributionAuth", JSON.stringify(data));
+      if (remember) {
+        localStorage.setItem("teamContributionAuth", JSON.stringify(data));
+        localStorage.setItem("teamContributionRememberMe", "true");
+      } else {
+        localStorage.removeItem("teamContributionAuth");
+        localStorage.removeItem("teamContributionRememberMe");
+      }
+    }
+
     setAuthState(data);
     return data;
   }
 
-  const verifyTwoFactor = async (email, otp) => {
+  const verifyTwoFactor = async (email, otp, remember = false) => {
     const payload = {
       email,
       otp,
@@ -109,9 +145,20 @@ export function AuthProvider({ children }) {
       localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
     }
 
+    if (data.token) {
+      sessionStorage.setItem("teamContributionAuth", JSON.stringify(data));
+      if (remember) {
+        localStorage.setItem("teamContributionAuth", JSON.stringify(data));
+        localStorage.setItem("teamContributionRememberMe", "true");
+      } else {
+        localStorage.removeItem("teamContributionAuth");
+        localStorage.removeItem("teamContributionRememberMe");
+      }
+    }
+
     setAuthState(data);
     return data;
-  }
+  };
 
   const logout = async () => {
     try {
@@ -121,6 +168,9 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error("Failed to logout from backend", error);
     } finally {
+      sessionStorage.removeItem("teamContributionAuth");
+      localStorage.removeItem("teamContributionAuth");
+      localStorage.removeItem("teamContributionRememberMe");
       setAuthState(null);
     }
   };

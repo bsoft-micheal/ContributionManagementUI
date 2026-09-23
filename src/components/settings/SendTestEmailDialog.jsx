@@ -47,7 +47,7 @@ export default function SendTestEmailDialog({
       setCategoryId(initialCategoryId || "all");
       // Auto-fill from logged-in user if available
       try {
-        const auth = localStorage.getItem("teamContributionAuth");
+        const auth = sessionStorage.getItem("teamContributionAuth") || localStorage.getItem("teamContributionAuth");
         if (auth) {
           const parsed = JSON.parse(auth);
           if (parsed.email) setRecipientEmail(parsed.email);
