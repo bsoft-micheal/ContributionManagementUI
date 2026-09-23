@@ -15,7 +15,7 @@ import AppInput from "./AppInput";
 import apiClient from "../../services/apiClient";
 import { useAppToast } from "./AppToast";
 
-export default function MfaSettings() {
+export default function MfaSettings({ embedded = false, title = "Two-Factor Authentication (MFA)" }) {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [setupData, setSetupData] = useState(null);
@@ -94,11 +94,18 @@ export default function MfaSettings() {
   };
 
   return (
-    <Box sx={{ mt: 3 }}>
-      <Divider sx={{ my: 2, borderColor: "rgba(74, 63, 107, 0.08)" }} />
-      <Typography variant="subtitle1" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", mb: 2 }}>
-        Two-Factor Authentication (MFA)
-      </Typography>
+    <Box sx={{ mt: embedded ? 1 : 3 }}>
+      {!embedded && <Divider sx={{ my: 2, borderColor: "rgba(74, 63, 107, 0.08)" }} />}
+      {title && (
+        <Typography
+          variant="subtitle1"
+          fontWeight={800}
+          color="text.primary"
+          sx={{ letterSpacing: "0.02em", mb: 2, fontSize: "0.95rem" }}
+        >
+          {title}
+        </Typography>
+      )}
 
       {loading && devices.length === 0 && !setupData && (
         <CircularProgress size={24} />
@@ -107,44 +114,71 @@ export default function MfaSettings() {
       {/* List of existing devices */}
       {devices.length > 0 && !setupData && (
         <Box sx={{ mb: 2 }}>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.85rem", color: "text.primary" }}>
               Configured Device
             </Typography>
             <Typography
               variant="caption"
               sx={{
-                bgcolor: "rgba(16, 185, 129, 0.1)",
+                bgcolor: "rgba(16, 185, 129, 0.12)",
                 color: "#059669",
                 fontWeight: 700,
-                px: 1,
-                py: 0.25,
+                px: 1.25,
+                py: 0.35,
                 borderRadius: "12px",
-                fontSize: "0.7rem",
+                fontSize: "0.72rem",
               }}
             >
               Active (1 Device Only)
             </Typography>
           </Box>
-          <List sx={{ bgcolor: "background.paper", borderRadius: 1, border: "1px solid rgba(0,0,0,0.1)" }}>
-            {devices.map((device) => (
-              <ListItem
-                key={device.id}
-                secondaryAction={
-                  <IconButton edge="end" onClick={() => handleRemoveDevice(device.id)} color="error" title="Delete Device">
-                    <DeleteOutlineIcon />
-                  </IconButton>
-                }
+
+          {devices.map((device) => (
+            <Box
+              key={device.id}
+              sx={{
+                p: 2.2,
+                borderRadius: "16px",
+                border: (t) => `1px solid ${t.palette.divider}`,
+                bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#fafafa"),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <Box>
+                <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "text.primary" }}>
+                  {device.deviceLabel}
+                </Typography>
+                <Typography sx={{ fontSize: "0.85rem", color: "text.secondary", mt: 0.3 }}>
+                  Added: {new Date(device.dateAdded || device.createdAt).toLocaleDateString()}
+                </Typography>
+              </Box>
+
+              <IconButton
+                onClick={() => handleRemoveDevice(device.id)}
+                sx={{
+                  color: "#d32f2f",
+                  "&:hover": { bgcolor: "rgba(211, 47, 47, 0.08)" },
+                }}
+                title="Delete Device"
               >
-                <ListItemText
-                  primary={device.deviceLabel}
-                  secondary={`Added: ${new Date(device.dateAdded).toLocaleDateString()}`}
-                  primaryTypographyProps={{ fontWeight: 600 }}
-                />
-              </ListItem>
-            ))}
-          </List>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, fontSize: "0.75rem" }}>
+                <DeleteOutlineIcon sx={{ fontSize: 24 }} />
+              </IconButton>
+            </Box>
+          ))}
+
+          <Typography
+            variant="caption"
+            sx={{
+              display: "block",
+              mt: 1.5,
+              fontSize: "0.76rem",
+              color: "text.secondary",
+            }}
+          >
             * Only one MFA device is allowed per account. To use a different device, delete the current device first.
           </Typography>
         </Box>
@@ -153,13 +187,19 @@ export default function MfaSettings() {
       {/* Start Setup Button - Only allowed when NO device is currently configured */}
       {!setupData && devices.length === 0 && (
         <Button
-          variant="outlined"
-          color="primary"
+          variant="contained"
           onClick={handleStartSetup}
           disabled={loading}
-          sx={{ borderRadius: "8px", fontWeight: 700 }}
+          sx={{
+            borderRadius: "10px",
+            fontWeight: 700,
+            textTransform: "none",
+            bgcolor: "primary.main",
+            boxShadow: "none",
+            "&:hover": { bgcolor: "primary.dark", boxShadow: "none" },
+          }}
         >
-          Set Up Authenticator App
+          + Set Up Authenticator App
         </Button>
       )}
 
