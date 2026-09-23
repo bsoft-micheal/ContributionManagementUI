@@ -14,6 +14,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import EventFormDialog from "../../components/events/EventFormDialog";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
+import { FilterList as FilterListIcon } from "@mui/icons-material";
 
 const eventColors = {
   Birthday: { main: "#c026d3", bg: "rgba(192, 38, 211, 0.08)", border: "rgba(192, 38, 211, 0.2)", text: "#c026d3" },
@@ -53,6 +54,8 @@ export default function CalendarPage() {
     return getRightsForPage("Calendar", authState?.role).write;
   }, [authState?.role]);
 
+  const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
+  const [filterYear, setFilterYear] = useState(dayjs().year());
   const [filters, setFilters] = useState({ month: dayjs().month() + 1, year: dayjs().year() });
   const [events, setEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
@@ -226,7 +229,7 @@ export default function CalendarPage() {
                 key: `bday-${celebrant.memberId}-${eventItem.eventId}`,
                 eventItem,
                 celebrant,
-                title: `🎂 ${celebrant.name}`,
+                title: `${celebrant.name}`,
                 subtitle: `${celebrant.name}'s Birthday (${dob.format("D MMM")}) • ${eventItem.eventName}`,
                 colorType: "Birthday",
                 isBirthdayCelebrant: true,
@@ -272,28 +275,73 @@ export default function CalendarPage() {
 
         <CardContent sx={{ p: 0 }}>
           <Box sx={{ bgcolor: theme.palette.mode === "dark" ? "#171b2d" : "#faf9fd", px: 2.5, py: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
-            <Grid container spacing={4} alignItems="center">
-              <Grid size={{ xs: 12, md: 3 }}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
                 <AppSelect
                   size="small"
                   label="Month"
-                  value={filters.month}
-                  onChange={(event) => setFilters((current) => ({ ...current, month: Number(event.target.value) }))}
+                  value={filterMonth}
+                  onChange={(event) => setFilterMonth(Number(event.target.value))}
                   options={monthOptions}
                   fullWidth
                 />
               </Grid>
-              <Grid size={{ xs: 12, md: 2 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                 <AppSelect
                   size="small"
                   label="Year"
-                  value={filters.year}
-                  onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
+                  value={filterYear}
+                  onChange={(event) => setFilterYear(Number(event.target.value))}
                   options={yearOptions}
                   fullWidth
                 />
               </Grid>
-              <Grid size={{ xs: 12, md: 7 }}>
+              <Grid size={{ xs: 12, md: 3 }} sx={{ display: "flex", gap: 1.5, alignItems: "center", mt: { xs: 0, md: 2.2 } }}>
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<FilterListIcon />}
+                  onClick={() => {
+                    setFilters({ month: filterMonth, year: filterYear });
+                    toast.success("Filters applied");
+                  }}
+                  sx={{
+                    height: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                  }}
+                >
+                  Filter
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const defaultMonth = dayjs().month() + 1;
+                    const defaultYear = dayjs().year();
+                    setFilterMonth(defaultMonth);
+                    setFilterYear(defaultYear);
+                    setFilters({ month: defaultMonth, year: defaultYear });
+                    toast.success("Filters cleared");
+                  }}
+                  sx={{
+                    color: "#ef4444",
+                    borderColor: "rgba(239, 68, 68, 0.4)",
+                    height: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    "&:hover": {
+                      borderColor: "#ef4444",
+                      bgcolor: "rgba(239, 68, 68, 0.05)"
+                    }
+                  }}
+                >
+                  Clear Filter
+                </AppButton>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4.5 }}>
                  <Stack direction="column" justifyContent="center" sx={{ height: "100%", ml: { md: 2 } }}>
                    <Typography variant="subtitle2" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.02em", mb: 0.5, fontSize: "0.95rem" }}>
                     Current Month's Event Status

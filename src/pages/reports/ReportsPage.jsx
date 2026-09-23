@@ -19,7 +19,8 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppPieChart from "../../components/common/AppPieChart";
-import { PieChart as PieChartIcon, BarChart as BarChartIcon } from "@mui/icons-material";
+import { useAppToast } from "../../components/common/AppToast";
+import { PieChart as PieChartIcon, BarChart as BarChartIcon, FilterList as FilterListIcon } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 
@@ -159,8 +160,11 @@ export default function ReportsPage({ mode = "event" }) {
   const { authState } = useAuth();
   const hasWriteAccess = getRightsForPage("Reports", authState?.role).write;
 
+  const toast = useAppToast();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
+  const [filterYear, setFilterYear] = useState(dayjs().year());
   const [filters, setFilters] = useState({ month: dayjs().month() + 1, year: dayjs().year() });
   const [chartType, setChartType] = useState("pie");
   const [metric, setMetric] = useState("paid");
@@ -413,27 +417,72 @@ export default function ReportsPage({ mode = "event" }) {
 
             {/* Filter Bar and Summary KPIs */}
             <Grid container spacing={2} alignItems="center">
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 2.2 }}>
                 <AppSelect
                   label="Month"
                   placeholder="Select Month"
-                  value={filters.month}
-                  onChange={(event) => setFilters((current) => ({ ...current, month: Number(event.target.value) }))}
+                  value={filterMonth}
+                  onChange={(event) => setFilterMonth(Number(event.target.value))}
                   options={monthOptions}
                   required
                 />
               </Grid>
-              <Grid size={{ xs: 12, md: 2 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 1.8 }}>
                 <AppSelect
                   label="Year"
                   placeholder="Select Year"
-                  value={filters.year}
-                  onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
+                  value={filterYear}
+                  onChange={(event) => setFilterYear(Number(event.target.value))}
                   options={yearOptions}
                   required
                 />
               </Grid>
-              <Grid size={{ xs: 12, md: 7 }}>
+              <Grid size={{ xs: 12, md: 3 }} sx={{ display: "flex", gap: 1.5, alignItems: "center", mt: { xs: 0, md: 2.2 } }}>
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<FilterListIcon />}
+                  onClick={() => {
+                    setFilters({ month: filterMonth, year: filterYear });
+                    toast.success("Filters applied");
+                  }}
+                  sx={{
+                    height: 38,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                  }}
+                >
+                  Filter
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const defaultMonth = dayjs().month() + 1;
+                    const defaultYear = dayjs().year();
+                    setFilterMonth(defaultMonth);
+                    setFilterYear(defaultYear);
+                    setFilters({ month: defaultMonth, year: defaultYear });
+                    toast.success("Filters cleared");
+                  }}
+                  sx={{
+                    color: "#ef4444",
+                    borderColor: "rgba(239, 68, 68, 0.4)",
+                    height: 38,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    "&:hover": {
+                      borderColor: "#ef4444",
+                      bgcolor: "rgba(239, 68, 68, 0.05)"
+                    }
+                  }}
+                >
+                  Clear Filter
+                </AppButton>
+              </Grid>
+              <Grid size={{ xs: 12, md: 5 }}>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent={{ xs: "flex-start", md: "flex-end" }} sx={{ mt: { xs: 1, md: 2.5 } }}>
                   {mode === "event" && (
                     <>

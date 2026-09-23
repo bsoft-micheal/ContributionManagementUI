@@ -18,6 +18,7 @@ import {
   Add as AddIcon,
   Save as SaveIcon,
   QrCodeScanner as QrCodeIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 
 import dayjs from "dayjs";
@@ -298,13 +299,30 @@ export default function ContributionsPage() {
                   value={filterEventId}
                   onChange={(event) => {
                     setFilterEventId(event.target.value);
-                    setSelectedEventId(event.target.value);
                   }}
                   options={eventOptions}
                   required
                   fullWidth
                 />
               </Box>
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => {
+                  setSelectedEventId(filterEventId);
+                  toast.success("Filter applied");
+                }}
+                sx={{
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"
@@ -313,6 +331,7 @@ export default function ContributionsPage() {
                     const firstEventId = events[0].eventId;
                     setFilterEventId(firstEventId);
                     setSelectedEventId(firstEventId);
+                    toast.success("Filter cleared");
                   }
                 }}
                 sx={{
@@ -322,6 +341,7 @@ export default function ContributionsPage() {
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
+                  px: 2,
                   "&:hover": {
                     borderColor: "#ef4444",
                     bgcolor: "rgba(239, 68, 68, 0.05)"

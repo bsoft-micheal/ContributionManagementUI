@@ -7,7 +7,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from "@mui/icons-material";
+import { Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, FilterList as FilterListIcon } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -174,9 +174,7 @@ export default function EventsPage() {
                   label="Month"
                   value={filterMonth}
                   onChange={(event) => {
-                    const val = Number(event.target.value);
-                    setFilterMonth(val);
-                    setFilters((prev) => ({ ...prev, month: val }));
+                    setFilterMonth(Number(event.target.value));
                   }}
                   options={monthOptions}
                   placeholder="Select Month"
@@ -188,15 +186,31 @@ export default function EventsPage() {
                   label="Year"
                   value={filterYear}
                   onChange={(event) => {
-                    const val = Number(event.target.value);
-                    setFilterYear(val);
-                    setFilters((prev) => ({ ...prev, year: val }));
+                    setFilterYear(Number(event.target.value));
                   }}
                   options={yearOptions}
                   placeholder="Select Year"
                   required
                 />
               </Box>
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => {
+                  setFilters({ month: filterMonth, year: filterYear });
+                  toast.success("Filters applied");
+                }}
+                sx={{
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"
@@ -215,6 +229,7 @@ export default function EventsPage() {
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
+                  px: 2,
                   "&:hover": {
                     borderColor: "#ef4444",
                     bgcolor: "rgba(239, 68, 68, 0.05)"

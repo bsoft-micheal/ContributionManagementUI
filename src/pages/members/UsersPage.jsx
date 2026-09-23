@@ -22,6 +22,7 @@ import {
   ToggleOn as ToggleOnIcon,
   ToggleOff as ToggleOffIcon,
   Description as ExcelIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
@@ -582,9 +583,7 @@ export default function UsersPage() {
                   placeholder="Select Role"
                   value={filterRole}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterRole(val);
-                    setAppliedRole(val);
+                    setFilterRole(e.target.value);
                   }}
                   options={[{ label: "All Roles", value: "" }, ...USER_ROLES]}
                   size="small"
@@ -600,9 +599,7 @@ export default function UsersPage() {
                   placeholder="Select Status"
                   value={filterStatus}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterStatus(val);
-                    setAppliedStatus(val);
+                    setFilterStatus(e.target.value);
                   }}
                   options={[
                     { label: "All Statuses", value: "" },
@@ -615,6 +612,27 @@ export default function UsersPage() {
                 />
               </Box>
 
+              {/* Filter button */}
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => {
+                  setAppliedRole(filterRole);
+                  setAppliedStatus(filterStatus);
+                  toast.success("Filters applied");
+                }}
+                sx={{
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
+
               {/* Clear button */}
               <AppButton
                 variant="outlined"
@@ -624,7 +642,7 @@ export default function UsersPage() {
                   setFilterStatus("");
                   setAppliedRole("");
                   setAppliedStatus("");
-
+                  toast.success("Filters cleared");
                 }}
                 sx={{
                   color: "#ef4444",
@@ -633,6 +651,7 @@ export default function UsersPage() {
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
+                  px: 2,
                   "&:hover": {
                     borderColor: "#ef4444",
                     bgcolor: "rgba(239,68,68,0.05)",

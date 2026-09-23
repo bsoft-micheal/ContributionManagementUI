@@ -362,8 +362,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
                           {index + 1}
                         </TableCell>
                         <TableCell sx={{ fontSize: "0.78rem", py: 0.8, fontWeight: 700 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
-                            <Typography component="span" sx={{ fontSize: "0.85rem" }}>🎂</Typography>
+                          <Box sx={{ display: "flex", alignItems: "center" }}>
                             <Typography component="span" sx={{ fontWeight: 700, fontSize: "0.78rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.primary" }}>
                               {celebrant.name}
                             </Typography>

@@ -240,7 +240,7 @@ export default function PaymentQrReminderDialog({
                     {eventName}
                   </Typography>
                   <Typography variant="caption" sx={{ color: "#0284c7", display: "block", mt: 0.3 }}>
-                    ✉ {memberEmail}
+                    {memberEmail}
                   </Typography>
                 </Grid>
 
