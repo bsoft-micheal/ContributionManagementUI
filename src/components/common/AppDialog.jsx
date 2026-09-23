@@ -96,7 +96,13 @@ export default function AppDialog({
             py: 2,
             bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#faf9fd",
             borderTop: `1px solid ${theme.palette.divider}`,
-            gap: 1,
+            gap: 1.5,
+            justifyContent: "center !important",
+            display: "flex",
+            alignItems: "center",
+            "& > *": {
+              justifyContent: "center",
+            },
           }}
         >
           {actions}

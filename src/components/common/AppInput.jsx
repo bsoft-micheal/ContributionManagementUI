@@ -78,11 +78,11 @@ export default function AppInput({
             borderRadius: "12px",
             height: size === "small" ? 34 : 40,
             color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
-            "& input": {
+            "& input, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
               py: size === "small" ? 0.8 : 1.2,
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
               "&::placeholder": {
-                color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.5)" : "inherit",
+                color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.45)" : "#94a3b8",
                 opacity: 1,
               }
             },

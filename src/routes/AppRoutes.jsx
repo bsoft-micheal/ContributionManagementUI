@@ -5,6 +5,7 @@ import CalendarPage from "../pages/events/CalendarPage";
 import ContributionsPage from "../pages/contributions/ContributionsPage";
 import DashboardPage from "../pages/dashboard/DashboardPage";
 import EventDetailsPage from "../pages/events/EventDetailsPage";
+import EventFormPage from "../pages/events/EventFormPage";
 import EventTypesPage from "../pages/events/EventTypesPage";
 import EventsPage from "../pages/events/EventsPage";
 import LoginPage from "../pages/auth/LoginPage";
@@ -44,6 +45,8 @@ export default function AppRoutes() {
         <Route path="/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
         <Route path="/event-types" element={<ProtectedRoute><EventTypesPage /></ProtectedRoute>} />
         <Route path="/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
+        <Route path="/events/add" element={<ProtectedRoute><EventFormPage /></ProtectedRoute>} />
+        <Route path="/events/edit/:id" element={<ProtectedRoute><EventFormPage /></ProtectedRoute>} />
         <Route path="/events/:id" element={<ProtectedRoute><EventDetailsPage /></ProtectedRoute>} />
         <Route path="/contributions" element={<ProtectedRoute><ContributionsPage /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />

@@ -27,6 +27,11 @@ import {
   buildPaymentReminderEmailHtml,
 } from "../../utils/upiQrHelper";
 import { SendPaymentReminder } from "../../services/contributionService";
+import {
+  resolveCategoryTemplate,
+  interpolatePlaceholders,
+  logEmailReminder,
+} from "../../services/emailReminderScheduler";
 
 export default function PaymentQrReminderDialog({
   open,
@@ -49,14 +54,32 @@ export default function PaymentQrReminderDialog({
   const memberName = contribution.memberName || member?.name || "Member";
   const memberEmail = member?.email || contribution.memberEmail || `${memberName.toLowerCase().replace(/\s+/g, ".")}@example.com`;
   const eventName = event?.eventName || contribution.eventName || "Contribution Event";
+  const categoryName = contribution.categoryName || event?.eventTypeName || "Contribution";
+  const categoryId = event?.eventTypeId || contribution.eventTypeId;
   const amount = Number(contribution.totalAccumulated || contribution.amount || 0);
 
   // Generate dynamic QR code specific to this member's contribution amount
   const { upiUri, qrImageUrl, receiverName, upiId, mode } = generateDynamicPaymentQr({
     amount,
-    note: `Contribution for ${eventName}`,
+    note: `Contribution for ${categoryName}`,
     customConfig: config,
   });
+
+  const formattedDueDate = event?.eventDate ? new Date(event.eventDate).toLocaleDateString() : undefined;
+  const template = resolveCategoryTemplate(categoryId, categoryName, "reminder");
+
+  const placeholderData = {
+    memberName,
+    categoryName,
+    amount,
+    dueDate: formattedDueDate,
+    orgName: "Unit 1A Residents Association",
+    paymentLink: upiUri,
+    qrImageUrl,
+  };
+
+  const previewSubject = interpolatePlaceholders(template.subject, placeholderData);
+  const previewDescription = interpolatePlaceholders(template.description, placeholderData);
 
   const copyToClipboard = (text, label) => {
     if (!text) return;
@@ -69,18 +92,23 @@ export default function PaymentQrReminderDialog({
     try {
       const emailHtml = buildPaymentReminderEmailHtml({
         memberName,
+        categoryName,
         eventName,
         amount,
-        dueDate: event?.eventDate ? new Date(event.eventDate).toLocaleDateString() : undefined,
+        dueDate: formattedDueDate,
         upiId,
         receiverName,
         qrImageUrl,
+        customSubject: previewSubject,
+        customBody: previewDescription,
       });
 
       await SendPaymentReminder({
         memberId: contribution.memberId,
         memberName,
         recipientEmail: memberEmail,
+        categoryId,
+        categoryName,
         eventId: contribution.eventId || event?.eventId,
         eventName,
         amount,
@@ -89,10 +117,27 @@ export default function PaymentQrReminderDialog({
         upiUri,
         qrImageUrl,
         emailHtml,
+        stage: "Manual Reminder",
+      });
+
+      logEmailReminder({
+        contributionId: contribution.contributionId,
+        memberId: contribution.memberId,
+        memberName,
+        recipientEmail: memberEmail,
+        categoryId,
+        categoryName,
+        eventName,
+        amount,
+        stage: "Manual Reminder",
+        templateType: "reminder",
+        subject: previewSubject,
+        status: "Sent",
+        cycleMonthYear: new Date().toISOString().substring(0, 7),
       });
 
       setSentSuccess(true);
-      toast.success(`Payment reminder email with dynamic QR sent to ${memberName}!`);
+      toast.success(`Payment reminder email for "${categoryName}" sent to ${memberName}!`);
     } catch (err) {
       console.error("Failed to send reminder:", err);
       toast.error("Failed to send reminder email. Please try again.");
@@ -325,15 +370,15 @@ export default function PaymentQrReminderDialog({
                 To: <strong>{memberEmail}</strong>
               </Typography>
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                Subject: <strong>Payment Reminder - {eventName} (₹{amount.toLocaleString("en-IN")})</strong>
+                Category: <strong>{categoryName}</strong>
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                Subject: <strong>{previewSubject}</strong>
               </Typography>
             </Box>
 
-            <Typography variant="body2" sx={{ mb: 1.5 }}>
-              Dear <strong>{memberName}</strong>,
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-              This is a friendly reminder regarding your pending contribution for <strong>{eventName}</strong>.
+            <Typography variant="body2" sx={{ color: isDark ? "#cbd5e1" : "#334155", mb: 2, whiteSpace: "pre-line", lineHeight: 1.6 }}>
+              {previewDescription}
             </Typography>
 
             <Box

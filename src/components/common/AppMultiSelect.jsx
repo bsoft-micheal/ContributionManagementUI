@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MenuItem, TextField, Box, Typography, Checkbox, ListItemText } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 
 export default function AppMultiSelect({
   label,
@@ -14,6 +15,7 @@ export default function AppMultiSelect({
   required = false,
   ...props
 }) {
+  const theme = useTheme();
   const [open, setOpen] = useState(false);
   const allSelected = options.length > 0 && value.length === options.length;
 
@@ -80,7 +82,17 @@ export default function AppMultiSelect({
           onClose: () => setOpen(false),
           renderValue: (selected) => {
             if (!selected || selected.length === 0) {
-              return <em style={{ color: "#9ca3af", fontSize: "0.85rem", fontStyle: "normal" }}>{placeholder}</em>;
+              return (
+                <em
+                  style={{
+                    color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.45)" : "#94a3b8",
+                    fontSize: "0.85rem",
+                    fontStyle: "normal",
+                  }}
+                >
+                  {placeholder}
+                </em>
+              );
             }
             return (
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>

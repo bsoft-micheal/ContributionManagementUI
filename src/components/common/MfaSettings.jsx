@@ -15,7 +15,7 @@ import AppInput from "./AppInput";
 import apiClient from "../../services/apiClient";
 import { useAppToast } from "./AppToast";
 
-export default function MfaSettings({ embedded = false, title = "Two-Factor Authentication (MFA)" }) {
+export default function MfaSettings({ embedded = false, title = "Two-Factor Authentication (MFA)", onDevicesChange }) {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [setupData, setSetupData] = useState(null);
@@ -30,7 +30,11 @@ export default function MfaSettings({ embedded = false, title = "Two-Factor Auth
       setLoading(true);
       const res = await apiClient.get("/mfa/getDevicesMfaAsync");
       const data = res.data?.data !== undefined ? res.data.data : res.data;
-      setDevices(Array.isArray(data) ? data : []);
+      const devList = Array.isArray(data) ? data : [];
+      setDevices(devList);
+      if (typeof onDevicesChange === "function") {
+        onDevicesChange(devList);
+      }
     } catch (err) {
       toast.error("Failed to load MFA devices");
     } finally {
@@ -245,7 +249,7 @@ export default function MfaSettings({ embedded = false, title = "Two-Factor Auth
             </Box>
           </Box>
 
-          <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
+          <Box sx={{ display: "flex", gap: 2, justifyContent: "center" }}>
             <Button onClick={() => setSetupData(null)} color="inherit" disabled={loading}>
               Cancel
             </Button>
