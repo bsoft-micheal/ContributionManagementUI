@@ -497,7 +497,7 @@ export default function PaymentsPage() {
                   fullWidth
                 />
               </Box>
-              <Box sx={{ width: 160, minWidth: 160 }}>
+              <Box sx={{ width: 170, minWidth: 165 }}>
                 <AppDateInput
                   label="Payment Date"
                   value={filterDate}
