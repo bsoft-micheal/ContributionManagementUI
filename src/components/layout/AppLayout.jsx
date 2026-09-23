@@ -33,7 +33,6 @@ import { validateForm } from "../../utils/validation";
 import { getImageUrl } from "../../services/apiClient";
 import { useThemeMode } from "../../contexts/ThemeModeContext";
 import logo from "../../assets/logo.png";
-import MfaSettings from "../common/MfaSettings";
 
 const drawerWidth = 240;
 
@@ -611,7 +610,6 @@ export default function AppLayout() {
               />
             </Box>
           </Box>
-          <MfaSettings />
         </Box>
       </AppDialog >
 

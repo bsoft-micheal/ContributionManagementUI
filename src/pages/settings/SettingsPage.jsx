@@ -79,6 +79,19 @@ const defaultPaymentQr = `data:image/svg+xml;utf8,${encodeURIComponent(`
 </svg>
 `)}`;
 
+import AppInput from "../../components/common/AppInput";
+import AppSelect from "../../components/common/AppSelect";
+import AppSwitch from "../../components/common/AppSwitch";
+import AppButton from "../../components/common/AppButton";
+import { useAppToast } from "../../components/common/AppToast";
+import MfaSettings from "../../components/common/MfaSettings";
+import {
+  getSystemSettingsAsync,
+  updateSystemSettingsAsync,
+  resetSystemSettingsAsync,
+  updateSystemSettings,
+} from "../../services/settingsService";
+
 const initialSettings = {
   // General
   orgName: "Unit 1A Residents Association",
@@ -783,22 +796,28 @@ export default function SettingsPage() {
                   </Grid>
                 </Grid>
 
-                <Box sx={{ pt: 1 }}>
-                  <AppSwitch
-                    label="Enable OTP for Member Login"
-                    checked={settings.enableOtpLogin}
-                    onChange={(e) => handleChange("enableOtpLogin", e.target.checked)}
-                  />
-                </Box>
-                <Box>
-                  <AppSwitch
-                    label="Enable 2FA for Admin Users"
-                    checked={settings.enable2faAdmin}
-                    onChange={(e) => handleChange("enable2faAdmin", e.target.checked)}
-                  />
-                </Box>
-              </Stack>
-            </Box>
+                  <Box sx={{ pt: 1 }}>
+                    <AppSwitch
+                      label="Enable OTP for Member Login"
+                      checked={settings.enableOtpLogin}
+                      onChange={(e) => handleChange("enableOtpLogin", e.target.checked)}
+                    />
+                  </Box>
+                  <Box>
+                    <AppSwitch
+                      label="Enable 2FA for Admin Users"
+                      checked={settings.enable2faAdmin}
+                      onChange={(e) => handleChange("enable2faAdmin", e.target.checked)}
+                    />
+                  </Box>
+
+                  <Divider sx={{ my: 1.5, borderColor: "divider" }} />
+
+                  {/* Personal MFA Device Configuration */}
+                  <MfaSettings embedded title="Two-Factor Authentication (MFA)" />
+                </Stack>
+              </Card>
+            </Grid>
 
             {/* Save Button for OTP / 2FA Settings */}
             <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "flex-end" }}>
