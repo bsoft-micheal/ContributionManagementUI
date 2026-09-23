@@ -181,11 +181,14 @@ export function generateDynamicPaymentQr({ amount, note, customConfig }) {
 export function buildPaymentReminderEmailHtml({
   memberName,
   eventName,
+  eventId,
   amount,
   dueDate,
   upiId,
   receiverName,
   qrImageUrl,
+  customSubject,
+  customDescription,
 }) {
   const formattedAmount = `₹${Number(amount || 0).toLocaleString("en-IN")}`;
   const upiUri = buildUpiPaymentUri({
@@ -195,27 +198,58 @@ export function buildPaymentReminderEmailHtml({
     note: `Contribution for ${eventName}`,
   });
 
+  let subjectText = customSubject;
+  let descText = customDescription;
+
+  if (!subjectText || !descText) {
+    try {
+      const savedSettings = JSON.parse(localStorage.getItem("cm_system_settings") || "{}");
+      const eventTemplate = eventId && savedSettings.eventTemplates?.[eventId];
+      if (!subjectText) {
+        subjectText = eventTemplate?.subject || savedSettings.emailSubject || `Payment Reminder - ${eventName}`;
+      }
+      if (!descText) {
+        descText = eventTemplate?.description || savedSettings.emailDescription || "";
+      }
+    } catch (e) {}
+  }
+
+  const replaceTokens = (str) => {
+    if (!str) return "";
+    return str
+      .replace(/\{memberName\}/g, memberName || "Member")
+      .replace(/\{eventName\}/g, eventName || "Event")
+      .replace(/\{amount\}/g, formattedAmount)
+      .replace(/\{dueDate\}/g, dueDate || "N/A")
+      .replace(/\{orgName\}/g, "Unit 1A Residents Association");
+  };
+
+  const finalSubject = replaceTokens(subjectText || `Payment Reminder - ${eventName}`);
+  const finalDesc = descText
+    ? replaceTokens(descText).replace(/\n/g, "<br/>")
+    : `This is a friendly reminder regarding your pending contribution for <strong>${eventName}</strong>.`;
+
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Payment Reminder - ${eventName}</title>
+  <title>${finalSubject}</title>
 </head>
 <body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 24px; color: #1e293b;">
   <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%); padding: 24px; text-align: center; color: #ffffff;">
-      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em;">Contribution Payment Reminder</h2>
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em;">${finalSubject}</h2>
       <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">Unit 1A Residents Association</p>
     </div>
 
     <!-- Body Content -->
     <div style="padding: 28px 24px;">
       <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.5;">Dear <strong>${memberName || "Member"}</strong>,</p>
-      <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.6;">
-        This is a friendly reminder regarding your pending contribution for <strong>${eventName}</strong>.
-      </p>
+      <div style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.6;">
+        ${finalDesc}
+      </div>
 
       <!-- Amount Highlight Box -->
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 24px;">

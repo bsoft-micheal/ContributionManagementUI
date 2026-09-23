@@ -101,7 +101,7 @@ export default function AppSelect({
         helperText={helperText}
         {...props}
       >
-        <MenuItem value="" disabled sx={{ fontSize: "0.85rem", fontStyle: "italic", color: "text.secondary" }}>
+        <MenuItem value="" sx={{ display: "none" }}>
           {effectivePlaceholder}
         </MenuItem>
         {options.map((option) => (

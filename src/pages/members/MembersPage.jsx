@@ -70,7 +70,7 @@ export default function MembersPage() {
 
   const filteredMembers = useMemo(() => {
     if (!appliedRoleId) return members;
-    return members.filter((m) => m.roleId === appliedRoleId);
+    return members.filter((m) => String(m.roleId) === String(appliedRoleId));
   }, [members, appliedRoleId]);
 
   const genderOptions = [
@@ -137,7 +137,18 @@ export default function MembersPage() {
       };
     });
     setMembers(normalizedMembers);
-    setRoles(rolesData);
+    const safeRoles = rolesData || [];
+    setRoles(safeRoles);
+    if (safeRoles.length > 0) {
+      setFilterRoleId((prev) => {
+        if (prev && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
+        return safeRoles[0].roleId;
+      });
+      setAppliedRoleId((prev) => {
+        if (prev && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
+        return safeRoles[0].roleId;
+      });
+    }
     setLoading(false);
   }
 
@@ -450,12 +461,11 @@ export default function MembersPage() {
             <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
               <Box sx={{ minWidth: 200 }}>
                 <AppSelect
-                  label="Select Role"
+                  label="Role"
                   value={filterRoleId}
                   onChange={(e) => setFilterRoleId(e.target.value)}
-                  options={[...roleOptions]}
+                  options={roleOptions}
                   size="small"
-                  placeholder="Select Role"
                   required
                   fullWidth
                 />
@@ -464,8 +474,11 @@ export default function MembersPage() {
                 variant="contained"
                 size="small"
                 onClick={() => {
+                  if (!filterRoleId) {
+                    toast.error("Please select a role");
+                    return;
+                  }
                   setAppliedRoleId(filterRoleId);
-
                 }}
                 sx={{
                   bgcolor: "#4a3f6b !important",
@@ -483,9 +496,10 @@ export default function MembersPage() {
                 variant="outlined"
                 size="small"
                 onClick={() => {
-                  setFilterRoleId("");
-                  setAppliedRoleId("");
-                  toast.success("Filter cleared");
+                  const defaultId = roles[0]?.roleId || "";
+                  setFilterRoleId(defaultId);
+                  setAppliedRoleId(defaultId);
+                  toast.success("Filter reset to default role");
                 }}
                 sx={{
                   color: "#ef4444",
