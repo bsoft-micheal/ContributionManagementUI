@@ -46,6 +46,7 @@ import {
   Visibility as ShowIcon,
   Sort as SortIcon,
 } from "@mui/icons-material";
+import { formatGridDate, formatGridDateTime } from "../../utils/dateHelper";
 
 // ─── CSV Export Helper ──────────────────────────────────────────────────────
 function exportToCSV(columns, data, filename = "export.csv") {
@@ -831,7 +832,11 @@ export default function AppDataTable({
                             variant="body2"
                             sx={{ fontSize: "inherit", color: "inherit" }}
                           >
-                            {row[column.key] ?? "--"}
+                            {column.type === "date"
+                              ? formatGridDate(row[column.key])
+                              : column.type === "datetime"
+                              ? formatGridDateTime(row[column.key])
+                              : (row[column.key] ?? "--")}
                           </Typography>
                         )}
                       </TableCell>

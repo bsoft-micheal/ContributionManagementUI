@@ -22,6 +22,7 @@ import { getRightsForPage } from "../../utils/rightsHelper";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
+import { formatGridDate } from "../../utils/dateHelper";
 
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -493,8 +494,8 @@ export default function MembersPage() {
         );
       },
     },
-    { label: "Date of Birth", key: "dateOfBirth", render: (row) => row.dateOfBirth ? dayjs(row.dateOfBirth).format("DD/MM/YYYY") : "--" },
-    { label: "Joining Date", key: "joiningDate", render: (row) => row.joiningDate ? dayjs(row.joiningDate).format("DD/MM/YYYY") : "--" },
+    { label: "Date of Birth", key: "dateOfBirth", render: (row) => formatGridDate(row.dateOfBirth) },
+    { label: "Joining Date", key: "joiningDate", render: (row) => formatGridDate(row.joiningDate) },
   ];
 
   return (

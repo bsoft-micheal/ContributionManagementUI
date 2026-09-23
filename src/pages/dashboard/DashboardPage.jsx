@@ -26,6 +26,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import SearchIcon from "@mui/icons-material/Search";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import dayjs from "dayjs";
+import { formatGridDate } from "../../utils/dateHelper";
 import MetricCard from "../../components/MetricCard";
 import AppSelect from "../../components/common/AppSelect";
 import { GetDashboardSummaryAsync } from "../../services/dashboardService";
@@ -785,7 +786,7 @@ export default function DashboardPage() {
         }} />
       ),
     },
-    { label: "Date", key: "eventDate", render: (row) => dayjs(row.eventDate).format("DD MMM YYYY") },
+    { label: "Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
     {
       label: "Expected", key: "expectedAmount", align: "right",
       render: (row) => (

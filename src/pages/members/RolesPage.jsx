@@ -13,14 +13,7 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { GetRolesAsync, CreateRoleAsync, UpdateRoleAsync, DeleteRoleAsync } from "../../services/roleService";
 import { validateForm } from "../../utils/validation";
 
-const initialForm = { roleName: "", defaultContributionAmount: "" };
-
-const formatAmount = (value) => {
-  if (value === undefined || value === null || value === "") return "";
-  const cleanVal = String(value).replace(/[^0-9]/g, "");
-  if (!cleanVal) return "";
-  return Number(cleanVal).toLocaleString("en-US");
-};
+const initialForm = { roleName: "" };
 
 export default function RolesPage() {
   const { authState } = useAuth();
@@ -56,21 +49,6 @@ export default function RolesPage() {
     const filed = "This field is required";
     const schema = {
       roleName: { required: true, type: "letteronly", min: 2, max: 50, label: filed },
-      defaultContributionAmount: {
-        required: true,
-        type: "numberonly",
-        label: filed,
-        customValidate: (val) => {
-          const num = Number(String(val).replace(/[^0-9]/g, ""));
-          if (val === "" || val === undefined || val === null || num <= 0) {
-            return filed;
-          }
-          if (num > 1000000) {
-            return "Contribution amount cannot exceed 1,000,000";
-          }
-          return "";
-        }
-      }
     };
     const newErrors = validateForm(form, schema);
 
@@ -83,7 +61,8 @@ export default function RolesPage() {
     try {
       const payload = {
         ...form,
-        defaultContributionAmount: Number(String(form.defaultContributionAmount).replace(/[^0-9]/g, "") || 0)
+        roleName: form.roleName.trim(),
+        defaultContributionAmount: form.defaultContributionAmount ? Number(form.defaultContributionAmount) : 0
       };
       if (form.roleId) {
         await UpdateRoleAsync(form.roleId, payload);
@@ -161,16 +140,6 @@ export default function RolesPage() {
         </Typography>
       )
     },
-    {
-      label: "Default Contribution",
-      key: "defaultContributionAmount",
-      align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={700} color="primary.main">
-          ₹{(row.defaultContributionAmount || 0).toLocaleString()}
-        </Typography>
-      ),
-    },
   ];
 
   return (
@@ -221,25 +190,6 @@ export default function RolesPage() {
               maxLength={50}
               error={!!errors.roleName}
               helperText={errors.roleName}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12 }}>
-            <AppInput
-              label="Contribution"
-              placeholder="Enter default contribution (₹)"
-              fullWidth
-              value={formatAmount(form.defaultContributionAmount)}
-              onChange={(e) => {
-                const rawVal = e.target.value.replace(/[^0-9]/g, "");
-                setForm(f => ({ ...f, defaultContributionAmount: rawVal === "" ? "" : Number(rawVal) }));
-                if (errors.defaultContributionAmount) {
-                  setErrors(prev => ({ ...prev, defaultContributionAmount: "" }));
-                }
-              }}
-              maxLength={10}
-              error={!!errors.defaultContributionAmount}
-              helperText={errors.defaultContributionAmount}
               required
             />
           </Grid>

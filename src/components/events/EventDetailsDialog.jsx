@@ -11,6 +11,7 @@ import {
   Chip,
 } from "@mui/material";
 import dayjs from "dayjs";
+import { formatViewDate } from "../../utils/dateHelper";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import { GetContributionsByEventAsync } from "../../services/contributionService";
@@ -256,7 +257,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
               Date
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
-              {dayjs(event.eventDate).format("DD MMMM YYYY")}
+              {formatViewDate(event.eventDate)}
             </Typography>
           </Box>
         </Grid>

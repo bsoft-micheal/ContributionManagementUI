@@ -90,3 +90,24 @@ export const ResetPasswordWithOtpAsync = async (email, otp, newPassword) => {
   }
 };
 
+export const GetProfileAsync = async () => {
+  try {
+    const result = await getApi("/users/getProfileAsync");
+    return result;
+  } catch (error) {
+    console.error('Error fetching profile:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const UpdateProfileAsync = async (data) => {
+  try {
+    const result = await putApi("/users/updateProfileAsync", data);
+    return result;
+  } catch (error) {
+    console.error('Error updating profile:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+

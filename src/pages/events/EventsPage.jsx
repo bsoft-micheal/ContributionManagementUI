@@ -11,6 +11,7 @@ import { Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Add as 
 
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import { formatGridDate } from "../../utils/dateHelper";
 import { useAppToast } from "../../components/common/AppToast";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -137,7 +138,7 @@ export default function EventsPage() {
       )
     },
     { label: "Category", key: "eventTypeName", render: (row) => <Typography variant="body2">{row.eventTypeName}</Typography> },
-    { label: "Event Date", key: "eventDate", render: (row) => dayjs(row.eventDate).format("DD/MM/YYYY") },
+    { label: "Event Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
 
     {
       label: "Valuation",

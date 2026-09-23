@@ -22,6 +22,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import apiClient from "../../services/apiClient";
 import { useAppToast } from "../../components/common/AppToast";
 import dayjs from "dayjs";
+import { formatGridDateTime } from "../../utils/dateHelper";
 
 export default function SessionHistoryPage() {
   const [activeSessions, setActiveSessions] = useState([]);
@@ -141,7 +142,7 @@ export default function SessionHistoryPage() {
                           <Typography variant="body2">{session.browser}</Typography>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">{dayjs(session.lastSeenAt).format("MMM DD, YYYY HH:mm")}</Typography>
+                          <Typography variant="body2">{formatGridDateTime(session.lastSeenAt)}</Typography>
                         </TableCell>
                         <TableCell align="right">
                           {!isCurrentDevice && activeHistoryRecord && (
@@ -203,11 +204,11 @@ export default function SessionHistoryPage() {
                         </Stack>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2">{dayjs(history.loginTime).format("MMM DD, YYYY HH:mm")}</Typography>
+                        <Typography variant="body2">{formatGridDateTime(history.loginTime)}</Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {history.logoutTime ? dayjs(history.logoutTime).format("MMM DD, YYYY HH:mm") : "-"}
+                          {formatGridDateTime(history.logoutTime, "-")}
                         </Typography>
                       </TableCell>
                       <TableCell>

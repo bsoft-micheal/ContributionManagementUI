@@ -5,11 +5,15 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const authState = localStorage.getItem("teamContributionAuth");
+  const authState = sessionStorage.getItem("teamContributionAuth") || localStorage.getItem("teamContributionAuth");
   if (authState) {
-    const { token } = JSON.parse(authState);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const { token } = JSON.parse(authState);
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch {
+      // ignore parse error
     }
   }
 
@@ -20,7 +24,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      sessionStorage.removeItem("teamContributionAuth");
       localStorage.removeItem("teamContributionAuth");
+      localStorage.removeItem("teamContributionRememberMe");
       window.location.href = "/login";
     }
     return Promise.reject(error);

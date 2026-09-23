@@ -16,6 +16,7 @@ import {
   ReceiptLongOutlined as ReceiptIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
+import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
 
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -392,7 +393,7 @@ export default function PaymentsPage() {
       key: "paymentDate",
       render: (row) => (
         <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.76rem" }}>
-          {row.paymentDate ? dayjs(row.paymentDate).format("DD MMM YYYY") : "--"}
+          {formatGridDate(row.paymentDate)}
         </Typography>
       ),
     },
@@ -669,9 +670,7 @@ export default function PaymentsPage() {
                   Payment Date
                 </Typography>
                 <Typography variant="body2">
-                  {selectedTxn.paymentDate
-                    ? dayjs(selectedTxn.paymentDate).format("DD MMM YYYY, hh:mm A")
-                    : "--"}
+                  {formatViewDateTime(selectedTxn.paymentDate)}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 6 }}>
@@ -688,7 +687,7 @@ export default function PaymentsPage() {
                 </Typography>
                 <Typography variant="body2">
                   {selectedTxn.verifiedOn && selectedTxn.verifiedOn !== "-"
-                    ? dayjs(selectedTxn.verifiedOn).format("DD MMM YYYY, hh:mm A")
+                    ? formatViewDateTime(selectedTxn.verifiedOn)
                     : "--"}
                 </Typography>
               </Grid>

@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
+import { formatGridDate } from "../../utils/dateHelper";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
 import CategoryRoundedIcon from "@mui/icons-material/CategoryRounded";
@@ -186,10 +187,7 @@ export default function MyContributionSummaryPage() {
     {
       label: "Payment Date",
       key: "paymentDate",
-      render: (row) =>
-        row.paymentDate
-          ? dayjs(row.paymentDate).format("DD MMM YYYY")
-          : <Typography variant="body2" color="text.secondary">—</Typography>,
+      render: (row) => formatGridDate(row.paymentDate),
     },
   ];
 
@@ -213,7 +211,7 @@ export default function MyContributionSummaryPage() {
           "Category": d.categoryName,
           "Amount (₹)": d.amount,
           "Status": d.paymentStatus,
-          "Payment Date": d.paymentDate ? dayjs(d.paymentDate).format("DD MMM YYYY") : "",
+          "Payment Date": formatGridDate(d.paymentDate, ""),
         })),
       },
     ]);

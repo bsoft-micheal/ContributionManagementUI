@@ -12,18 +12,16 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
+import { formatGridDate } from "../../utils/dateHelper";
 import apiClient from "../../services/apiClient";
 import { exportSheets } from "../../utils/exportToExcel";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
-import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
 import AppPieChart from "../../components/common/AppPieChart";
 import { PieChart as PieChartIcon, BarChart as BarChartIcon } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
-import { GetMembersAsync } from "../../services/memberService";
-import { GetContributionsAsync } from "../../services/contributionService";
 
 function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
   const theme = useTheme();
@@ -40,16 +38,12 @@ function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
             key={item[labelKey]}
             sx={{
               display: "grid",
-              gridTemplateColumns: "130px 1fr 90px",
+              gridTemplateColumns: "140px 1fr 100px",
               alignItems: "center",
               gap: 2,
               "&:hover": {
-                "& .bar-fill": {
-                  filter: "brightness(1.15)",
-                },
-                "& .bar-label": {
-                  color: "primary.main",
-                }
+                "& .bar-fill": { filter: "brightness(1.15)" },
+                "& .bar-label": { color: "primary.main" }
               }
             }}
           >
@@ -57,11 +51,7 @@ function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
               className="bar-label"
               variant="body2"
               fontWeight={700}
-              sx={{
-                fontSize: "0.82rem",
-                transition: "color 0.2s ease",
-                color: "text.primary"
-              }}
+              sx={{ fontSize: "0.82rem", transition: "color 0.2s ease", color: "text.primary" }}
               noWrap
             >
               {item[labelKey]}
@@ -92,12 +82,7 @@ function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
               variant="subtitle2"
               fontWeight={800}
               color="text.primary"
-              sx={{
-                minWidth: 84,
-                textAlign: "right",
-                fontFamily: '"Outfit", sans-serif',
-                fontSize: "0.85rem"
-              }}
+              sx={{ minWidth: 84, textAlign: "right", fontFamily: '"Outfit", sans-serif', fontSize: "0.85rem" }}
             >
               {"\u20B9"}{value.toLocaleString()}
             </Typography>
@@ -134,6 +119,11 @@ function SummaryChip({ label, value, color = "primary" }) {
       bg: theme.palette.mode === "dark" ? "rgba(220, 38, 38, 0.12)" : "rgba(220, 38, 38, 0.06)",
       border: theme.palette.mode === "dark" ? "rgba(220, 38, 38, 0.25)" : "rgba(220, 38, 38, 0.15)",
       text: theme.palette.mode === "dark" ? "#f87171" : "#b91c1c",
+    },
+    warning: {
+      bg: theme.palette.mode === "dark" ? "rgba(217, 119, 6, 0.12)" : "rgba(217, 119, 6, 0.06)",
+      border: theme.palette.mode === "dark" ? "rgba(217, 119, 6, 0.25)" : "rgba(217, 119, 6, 0.15)",
+      text: theme.palette.mode === "dark" ? "#fbbf24" : "#d97706",
     }
   };
 
@@ -163,7 +153,7 @@ function SummaryChip({ label, value, color = "primary" }) {
   );
 }
 
-export default function ReportsPage({ mode }) {
+export default function ReportsPage({ mode = "event" }) {
   const theme = useTheme();
   const navigate = useNavigate();
   const { authState } = useAuth();
@@ -172,34 +162,10 @@ export default function ReportsPage({ mode }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ month: dayjs().month() + 1, year: dayjs().year() });
-
-  const [members, setMembers] = useState([]);
-  const [selectedMemberId, setSelectedMemberId] = useState("");
-  const [allContributions, setAllContributions] = useState([]);
   const [chartType, setChartType] = useState("pie");
-  const [eventMetric, setEventMetric] = useState("expected");
+  const [metric, setMetric] = useState("paid");
 
   useEffect(() => {
-    if (mode === "member-category") {
-      async function loadMemberCategoryData() {
-        setLoading(true);
-        try {
-          const membersList = await GetMembersAsync();
-          setMembers(membersList);
-          if (membersList.length > 0) {
-            setSelectedMemberId(membersList[0].memberId);
-          }
-          const contributionsList = await GetContributionsAsync();
-          setAllContributions(contributionsList);
-        } finally {
-          setLoading(false);
-        }
-      }
-
-      loadMemberCategoryData();
-      return;
-    }
-
     async function loadReports() {
       setLoading(true);
       try {
@@ -216,10 +182,10 @@ export default function ReportsPage({ mode }) {
     }
 
     loadReports();
-  }, [filters, mode]);
+  }, [filters]);
 
   const monthOptions = [
-    { label: "All", value: 0 },
+    { label: "All Months", value: 0 },
     ...Array.from({ length: 12 }, (_, i) => ({
       label: dayjs().month(i).format("MMMM"),
       value: i + 1,
@@ -228,130 +194,161 @@ export default function ReportsPage({ mode }) {
 
   const currentYear = dayjs().year();
   const yearOptions = [
-    { label: "All", value: 0 },
+    { label: "All Years", value: 0 },
     ...Array.from({ length: 11 }, (_, i) => {
       const y = currentYear - 5 + i;
       return { label: String(y), value: y };
     })
   ];
 
+  // 1. Event Collections Columns
   const eventColumns = [
     { label: "Event", key: "eventName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.eventName}</Typography> },
-    { label: "Date", key: "eventDate", render: (row) => dayjs(row.eventDate).format("DD MMM YYYY") },
+    { label: "Type", key: "eventTypeName", render: (row) => <Typography variant="body2" color="text.secondary">{row.eventTypeName || "General"}</Typography> },
+    { label: "Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
     { label: "Expected", key: "expectedAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800}>{"\u20B9"}{Number(row.expectedAmount).toLocaleString()}</Typography> },
     { label: "Paid", key: "paidAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="success.main">{"\u20B9"}{Number(row.paidAmount).toLocaleString()}</Typography> },
     { label: "Pending", key: "pendingAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="error.main">{"\u20B9"}{Number(row.pendingAmount).toLocaleString()}</Typography> },
+    {
+      label: "Rate",
+      key: "collectionRate",
+      align: "center",
+      render: (row) => {
+        const rate = row.collectionRate ?? (row.expectedAmount > 0 ? Math.round((row.paidAmount / row.expectedAmount) * 100) : 0);
+        return (
+          <Chip
+            size="small"
+            label={`${rate}%`}
+            color={rate >= 100 ? "success" : rate >= 50 ? "primary" : "warning"}
+            sx={{ fontWeight: 700, fontSize: "0.72rem", height: 22 }}
+          />
+        );
+      }
+    }
   ];
 
+  // 2. Member Contributions Columns
   const memberColumns = [
     { label: "Member", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
     { label: "Expected", key: "totalExpectedAmount", align: "right", render: (row) => `\u20B9${Number(row.totalExpectedAmount).toLocaleString()}` },
     { label: "Paid", key: "totalPaidAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="success.main">{"\u20B9"}{Number(row.totalPaidAmount).toLocaleString()}</Typography> },
     { label: "Pending", key: "totalPendingAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="error.main">{"\u20B9"}{(row.totalExpectedAmount - row.totalPaidAmount).toLocaleString()}</Typography> },
-  ];
-
-  const pendingColumns = [
-    { label: "Member", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
-    { label: "Event", key: "eventName" },
-    { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="error.main">{"\u20B9"}{Number(row.amount).toLocaleString()}</Typography> },
-  ];
-
-  const memberCategoryData = useMemo(() => {
-    if (!selectedMemberId || allContributions.length === 0) return [];
-
-    const memberPaidContribs = allContributions.filter(
-      (contribution) => contribution.memberId === selectedMemberId && contribution.paymentStatus === "Paid"
-    );
-
-    const groups = {};
-    memberPaidContribs.forEach((contribution) => {
-      const category = contribution.categoryName || "Uncategorized";
-      groups[category] = (groups[category] || 0) + contribution.amount;
-    });
-
-    return Object.entries(groups)
-      .map(([categoryName, totalPaidAmount]) => ({ categoryName, totalPaidAmount }))
-      .sort((a, b) => b.totalPaidAmount - a.totalPaidAmount);
-  }, [selectedMemberId, allContributions]);
-
-  const memberCategoryColumns = [
-    { label: "Category", key: "categoryName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.categoryName}</Typography> },
-    { label: "Total Paid", key: "totalPaidAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="success.main">₹{Number(row.totalPaidAmount).toLocaleString()}</Typography> },
-  ];
-
-  const chartData = useMemo(() => {
-    if (mode === "member-category") {
-      return memberCategoryData
-        .filter((item) => Number(item.totalPaidAmount) > 0)
-        .map((item) => ({ label: item.categoryName, value: Number(item.totalPaidAmount) }));
+    { label: "Paid Events", key: "paidEventsCount", align: "center", render: (row) => <Typography variant="body2" fontWeight={600}>{row.paidEventsCount}</Typography> },
+    { label: "Pending Events", key: "pendingEventsCount", align: "center", render: (row) => <Typography variant="body2" fontWeight={600} color={row.pendingEventsCount > 0 ? "error.main" : "text.secondary"}>{row.pendingEventsCount}</Typography> },
+    {
+      label: "Status",
+      key: "completionRate",
+      align: "center",
+      render: (row) => {
+        const rate = row.totalExpectedAmount > 0 ? Math.round((row.totalPaidAmount / row.totalExpectedAmount) * 100) : 0;
+        return (
+          <Chip
+            size="small"
+            label={rate >= 100 ? "All Paid" : `${rate}% Paid`}
+            color={rate >= 100 ? "success" : "warning"}
+            variant={rate >= 100 ? "filled" : "outlined"}
+            sx={{ fontWeight: 700, fontSize: "0.72rem", height: 22 }}
+          />
+        );
+      }
     }
+  ];
 
+  // 3. Pending Dues Columns
+  const pendingColumns = [
+    { label: "Member Name", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
+    { label: "Phone", key: "phone", render: (row) => <Typography variant="body2" color="text.secondary">{row.phone || "—"}</Typography> },
+    { label: "Event Name", key: "eventName", render: (row) => <Typography variant="body2" fontWeight={600}>{row.eventName}</Typography> },
+    { label: "Event Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
+    { label: "Pending Due", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="error.main">{"\u20B9"}{Number(row.amount).toLocaleString()}</Typography> },
+    {
+      label: "Aging Category",
+      key: "agingCategory",
+      align: "center",
+      render: (row) => {
+        const category = row.agingCategory || (row.daysOverdue > 30 ? "Critical (> 30d)" : row.daysOverdue >= 15 ? "Moderate (15-30d)" : "Recent (< 15d)");
+        const isCritical = category.includes("Critical");
+        const isModerate = category.includes("Moderate");
+        return (
+          <Chip
+            size="small"
+            label={category}
+            color={isCritical ? "error" : isModerate ? "warning" : "info"}
+            sx={{ fontWeight: 700, fontSize: "0.72rem", height: 22 }}
+          />
+        );
+      }
+    }
+  ];
+
+  // Chart Data calculation per mode
+  const chartData = useMemo(() => {
     if (mode === "member") {
       return (report?.memberContributionHistory ?? [])
-        .filter((item) => Number(item.totalPaidAmount) > 0)
-        .map((item) => ({ label: item.memberName, value: Number(item.totalPaidAmount) }));
+        .map((item) => {
+          const val =
+            metric === "paid"
+              ? Number(item.totalPaidAmount) || 0
+              : metric === "pending"
+              ? Math.max(0, (Number(item.totalExpectedAmount) || 0) - (Number(item.totalPaidAmount) || 0))
+              : Number(item.totalExpectedAmount) || 0;
+          return { label: item.memberName, value: val };
+        })
+        .filter((item) => item.value > 0);
     }
 
     if (mode === "pending") {
-      const grouped = {};
-      (report?.pendingDues ?? []).forEach((item) => {
-        const name = item.memberName || "Unknown";
-        grouped[name] = (grouped[name] || 0) + (Number(item.amount) || 0);
+      if (metric === "member") {
+        // Group pending dues by member
+        const map = {};
+        (report?.pendingDues ?? []).forEach(d => {
+          map[d.memberName] = (map[d.memberName] || 0) + Number(d.amount);
+        });
+        return Object.entries(map).map(([k, v]) => ({ label: k, value: v }));
+      }
+      // Group pending dues by event
+      const map = {};
+      (report?.pendingDues ?? []).forEach(d => {
+        map[d.eventName] = (map[d.eventName] || 0) + Number(d.amount);
       });
-      return Object.entries(grouped)
-        .filter(([, val]) => val > 0)
-        .map(([memberName, amount]) => ({ label: memberName, value: amount }));
+      return Object.entries(map).map(([k, v]) => ({ label: k, value: v }));
     }
 
+    // Default: Event Collections
     return (report?.eventCollections ?? [])
       .map((item) => {
         const val =
-          eventMetric === "paid"
+          metric === "paid"
             ? Number(item.paidAmount) || 0
-            : eventMetric === "pending"
+            : metric === "pending"
             ? Number(item.pendingAmount) || 0
             : Number(item.expectedAmount) || 0;
         return { label: item.eventName, value: val };
       })
       .filter((item) => item.value > 0);
-  }, [mode, memberCategoryData, report, eventMetric]);
+  }, [mode, report, metric]);
 
-  const pageTitle =
-    mode === "event" ? "Event Audit" :
-    mode === "member" ? "Member Velocity" :
-    mode === "pending" ? "Pending Dues" :
-    mode === "member-category" ? "Member Category Paid" :
-    "Financial Analytics";
-
-  const totalMemberPaid = useMemo(() => {
-    return memberCategoryData.reduce((sum, row) => sum + row.totalPaidAmount, 0);
-  }, [memberCategoryData]);
+  const pageTitle = {
+    event: "Event Collections",
+    member: "Member Contributions",
+    pending: "Pending Dues & Defaulters",
+  }[mode] || "Event Collections";
 
   const exportCurrentView = () => {
     if (!hasWriteAccess) return;
 
-    if (mode === "member-category") {
-      const activeMember = members.find((member) => member.memberId === selectedMemberId);
-      const memberName = activeMember ? activeMember.name : "Member";
-      exportSheets(`${memberName}-category-payments.xlsx`, [
-        {
-          name: "Category Payments",
-          data: memberCategoryData.map((item, index) => ({
-            "S.No": index + 1,
-            Category: item.categoryName,
-            "Total Paid (\u20B9)": item.totalPaidAmount,
-          })),
-        },
-      ]);
-      return;
-    }
-
     exportSheets("team-contribution-reports.xlsx", [
       { name: "Event Collections", data: report?.eventCollections ?? [] },
-      { name: "Member History", data: report?.memberContributionHistory ?? [] },
+      { name: "Member Contributions", data: report?.memberContributionHistory ?? [] },
       { name: "Pending Dues", data: report?.pendingDues ?? [] },
     ]);
   };
+
+  const navTabs = [
+    { label: "Event Collections", path: "/reports/event-collection-audit", modeKey: "event" },
+    { label: "Member Contributions", path: "/reports/member-velocity", modeKey: "member" },
+    { label: "Pending Dues", path: "/reports/pending-dues", modeKey: "pending" },
+  ];
 
   return (
     <div className="page-shell">
@@ -383,14 +380,9 @@ export default function ReportsPage({ mode }) {
               </AppButton>
             </Box>
 
-            {/* Report Navigation Tabs */}
+            {/* 5-Tab Pill Navigation */}
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", pt: 0.5 }}>
-              {[
-                { label: "Event Audit", path: "/reports/event-collection-audit", modeKey: "event" },
-                { label: "Member Velocity", path: "/reports/member-velocity", modeKey: "member" },
-                { label: "Pending Dues", path: "/reports/pending-dues", modeKey: "pending" },
-                { label: "Member Category Paid", path: "/reports/member-category-paid", modeKey: "member-category" },
-              ].map((tab) => {
+              {navTabs.map((tab) => {
                 const isActive = mode === tab.modeKey || (!mode && tab.modeKey === "event");
                 return (
                   <Box
@@ -419,56 +411,53 @@ export default function ReportsPage({ mode }) {
               })}
             </Box>
 
+            {/* Filter Bar and Summary KPIs */}
             <Grid container spacing={2} alignItems="center">
-              {mode === "member-category" ? (
-                <>
-                  <Grid size={{ xs: 12, md: 4 }}>
-                    <AppSelect
-                      label="Select Member"
-                      placeholder="Select Member"
-                      value={selectedMemberId}
-                      onChange={(event) => setSelectedMemberId(event.target.value)}
-                      options={members.map((member) => ({ label: member.name, value: member.memberId }))}
-                      required
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 8 }}>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent={{ xs: "flex-start", md: "flex-end" }} sx={{ mt: { xs: 1, md: 2.5 } }}>
-                      <SummaryChip label="Total Contributed" value={`\u20B9${Number(totalMemberPaid).toLocaleString()}`} color="success" />
-                    </Stack>
-                  </Grid>
-                </>
-              ) : (
-                <>
-                  <Grid size={{ xs: 12, md: 3 }}>
-                    <AppSelect
-                      label="Month"
-                      placeholder="Select Month"
-                      value={filters.month}
-                      onChange={(event) => setFilters((current) => ({ ...current, month: Number(event.target.value) }))}
-                      options={monthOptions}
-                      required
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 2 }}>
-                    <AppSelect
-                      label="Year"
-                      placeholder="Select Year"
-                      value={filters.year}
-                      onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
-                      options={yearOptions}
-                      required
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 7 }}>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent={{ xs: "flex-start", md: "flex-end" }} sx={{ mt: { xs: 1, md: 2.5 } }}>
-                      <SummaryChip label="Expected" value={`\u20B9${Number(report?.eventCollections?.reduce((sum, row) => sum + row.expectedAmount, 0) ?? 0).toLocaleString()}`} />
-                      <SummaryChip label="Paid" value={`\u20B9${Number(report?.eventCollections?.reduce((sum, row) => sum + row.paidAmount, 0) ?? 0).toLocaleString()}`} color="success" />
-                      <SummaryChip label="Pending" value={`\u20B9${Number(report?.eventCollections?.reduce((sum, row) => sum + row.pendingAmount, 0) ?? 0).toLocaleString()}`} color="error" />
-                    </Stack>
-                  </Grid>
-                </>
-              )}
+              <Grid size={{ xs: 12, md: 3 }}>
+                <AppSelect
+                  label="Month"
+                  placeholder="Select Month"
+                  value={filters.month}
+                  onChange={(event) => setFilters((current) => ({ ...current, month: Number(event.target.value) }))}
+                  options={monthOptions}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 2 }}>
+                <AppSelect
+                  label="Year"
+                  placeholder="Select Year"
+                  value={filters.year}
+                  onChange={(event) => setFilters((current) => ({ ...current, year: Number(event.target.value) }))}
+                  options={yearOptions}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 7 }}>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent={{ xs: "flex-start", md: "flex-end" }} sx={{ mt: { xs: 1, md: 2.5 } }}>
+                  {mode === "event" && (
+                    <>
+                      <SummaryChip label="Expected" value={`₹${Number(report?.eventCollections?.reduce((sum, row) => sum + row.expectedAmount, 0) ?? 0).toLocaleString()}`} />
+                      <SummaryChip label="Paid" value={`₹${Number(report?.eventCollections?.reduce((sum, row) => sum + row.paidAmount, 0) ?? 0).toLocaleString()}`} color="success" />
+                      <SummaryChip label="Pending" value={`₹${Number(report?.eventCollections?.reduce((sum, row) => sum + row.pendingAmount, 0) ?? 0).toLocaleString()}`} color="error" />
+                    </>
+                  )}
+                  {mode === "member" && (
+                    <>
+                      <SummaryChip label="Members" value={report?.memberContributionHistory?.length ?? 0} />
+                      <SummaryChip label="Total Expected" value={`₹${Number(report?.memberContributionHistory?.reduce((sum, row) => sum + row.totalExpectedAmount, 0) ?? 0).toLocaleString()}`} />
+                      <SummaryChip label="Total Paid" value={`₹${Number(report?.memberContributionHistory?.reduce((sum, row) => sum + row.totalPaidAmount, 0) ?? 0).toLocaleString()}`} color="success" />
+                    </>
+                  )}
+                  {mode === "pending" && (
+                    <>
+                      <SummaryChip label="Total Outstanding Dues" value={`₹${Number(report?.pendingDues?.reduce((sum, row) => sum + row.amount, 0) ?? 0).toLocaleString()}`} color="error" />
+                      <SummaryChip label="Pending Records" value={report?.pendingDues?.length ?? 0} color="warning" />
+                      <SummaryChip label="Defaulters" value={new Set(report?.pendingDues?.map(p => p.memberId)).size} color="error" />
+                    </>
+                  )}
+                </Stack>
+              </Grid>
             </Grid>
           </Stack>
         </Box>
@@ -496,30 +485,44 @@ export default function ReportsPage({ mode }) {
                             <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1.05rem", color: "text.primary" }}>
                               Visualization
                             </Typography>
-                            {(!mode || mode === "event") && (
-                              <Stack direction="row" spacing={0.5} sx={{ ml: { xs: 0, sm: 1 } }}>
-                                {[
-                                  { label: "Expected", key: "expected" },
+
+                            {/* Metric Selector based on active report mode */}
+                            <Stack direction="row" spacing={0.5} sx={{ ml: { xs: 0, sm: 1 } }}>
+                              {(mode === "event" || mode === "member") && (
+                                [
                                   { label: "Paid", key: "paid" },
+                                  { label: "Expected", key: "expected" },
                                   { label: "Pending", key: "pending" },
                                 ].map((m) => (
                                   <Chip
                                     key={m.key}
                                     size="small"
                                     label={m.label}
-                                    onClick={() => setEventMetric(m.key)}
-                                    color={eventMetric === m.key ? "primary" : "default"}
-                                    variant={eventMetric === m.key ? "filled" : "outlined"}
-                                    sx={{
-                                      height: 24,
-                                      fontSize: "0.72rem",
-                                      fontWeight: 700,
-                                      cursor: "pointer",
-                                    }}
+                                    onClick={() => setMetric(m.key)}
+                                    color={metric === m.key ? "primary" : "default"}
+                                    variant={metric === m.key ? "filled" : "outlined"}
+                                    sx={{ height: 24, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}
                                   />
-                                ))}
-                              </Stack>
-                            )}
+                                ))
+                              )}
+
+                              {mode === "pending" && (
+                                [
+                                  { label: "By Event", key: "event" },
+                                  { label: "By Member", key: "member" },
+                                ].map((m) => (
+                                  <Chip
+                                    key={m.key}
+                                    size="small"
+                                    label={m.label}
+                                    onClick={() => setMetric(m.key)}
+                                    color={(metric === m.key || (metric !== "event" && metric !== "member" && m.key === "event")) ? "primary" : "default"}
+                                    variant={(metric === m.key || (metric !== "event" && metric !== "member" && m.key === "event")) ? "filled" : "outlined"}
+                                    sx={{ height: 24, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}
+                                  />
+                                ))
+                              )}
+                            </Stack>
                           </Box>
 
                           {/* View Toggle: Pie Chart vs Bar Chart */}
@@ -547,9 +550,7 @@ export default function ReportsPage({ mode }) {
                                 bgcolor: chartType === "pie" ? "primary.main" : "transparent",
                                 color: chartType === "pie" ? "#ffffff" : "text.secondary",
                                 transition: "all 0.2s ease",
-                                "&:hover": {
-                                  color: chartType === "pie" ? "#ffffff" : "text.primary",
-                                },
+                                "&:hover": { color: chartType === "pie" ? "#ffffff" : "text.primary" },
                               }}
                             >
                               <PieChartIcon sx={{ fontSize: 16 }} />
@@ -570,9 +571,7 @@ export default function ReportsPage({ mode }) {
                                 bgcolor: chartType === "bar" ? "primary.main" : "transparent",
                                 color: chartType === "bar" ? "#ffffff" : "text.secondary",
                                 transition: "all 0.2s ease",
-                                "&:hover": {
-                                  color: chartType === "bar" ? "#ffffff" : "text.primary",
-                                },
+                                "&:hover": { color: chartType === "bar" ? "#ffffff" : "text.primary" },
                               }}
                             >
                               <BarChartIcon sx={{ fontSize: 16 }} />
@@ -581,7 +580,13 @@ export default function ReportsPage({ mode }) {
                           </Stack>
                         </Box>
 
-                        {chartType === "pie" ? (
+                        {chartData.length === 0 ? (
+                          <Box sx={{ py: 6, textAlign: "center" }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
+                              No chart data to visualize for this selection.
+                            </Typography>
+                          </Box>
+                        ) : chartType === "pie" ? (
                           <AppPieChart items={chartData} />
                         ) : (
                           <SimpleBarChart items={chartData} />
@@ -590,6 +595,8 @@ export default function ReportsPage({ mode }) {
                     </CardContent>
                   </Card>
                 </Grid>
+
+                {/* At a Glance KPI Card */}
                 <Grid size={{ xs: 12, lg: 4 }}>
                   <Card
                     sx={{
@@ -606,61 +613,118 @@ export default function ReportsPage({ mode }) {
                           </Typography>
                         </Box>
                         <Box sx={{ width: "100%" }}>
-                          {mode === "member-category" ? (
-                            <Stack spacing={1.5}>
-                              <Chip
-                                label={`Selected member: ${members.find((member) => member.memberId === selectedMemberId)?.name || "None"}`}
-                                variant="outlined"
+                          <Stack spacing={1.5} sx={{ mt: 1 }}>
+                            {mode === "event" && [
+                              { label: "Event Collections", value: report?.eventCollections?.length ?? 0 },
+                              { label: "Fully Collected Events", value: report?.eventCollections?.filter(e => e.pendingAmount === 0).length ?? 0 },
+                              { label: "Events with Pending Dues", value: report?.eventCollections?.filter(e => e.pendingAmount > 0).length ?? 0 },
+                              { label: "Average Collection Rate", value: `${report?.eventCollections?.length ? Math.round(report.eventCollections.reduce((s, e) => s + (e.collectionRate || 0), 0) / report.eventCollections.length) : 0}%` },
+                            ].map((row) => (
+                              <Box
+                                key={row.label}
                                 sx={{
-                                  alignSelf: "flex-start",
-                                  fontWeight: 700,
-                                  borderColor: "secondary.main",
-                                  color: "secondary.main"
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  py: 1,
+                                  borderBottom: "1px solid",
+                                  borderColor: "divider",
+                                  "&:last-child": { borderBottom: "none" }
                                 }}
-                              />
-                              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-                                Paid category distribution helps identify where a member contributes most frequently.
-                              </Typography>
-                            </Stack>
-                          ) : (
-                            <Stack spacing={1.5} sx={{ mt: 1 }}>
-                              {[
-                                { label: "Event collections", value: report?.eventCollections?.length ?? 0 },
-                                { label: "Member records", value: report?.memberContributionHistory?.length ?? 0 },
-                                { label: "Pending dues", value: report?.pendingDues?.length ?? 0 }
-                              ].map((row) => (
-                                <Box
-                                  key={row.label}
+                              >
+                                <Typography variant="body2" fontWeight={600} color="text.secondary">
+                                  {row.label}
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={800}
                                   sx={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    py: 1,
-                                    borderBottom: "1px solid",
-                                    borderColor: "divider",
-                                    "&:last-child": { borderBottom: "none" }
+                                    bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.05)",
+                                    px: 1.5,
+                                    py: 0.25,
+                                    borderRadius: "6px",
+                                    fontFamily: '"Outfit", sans-serif'
                                   }}
                                 >
-                                  <Typography variant="body2" fontWeight={600} color="text.secondary">
-                                    {row.label}
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    fontWeight={800}
-                                    sx={{
-                                      bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.05)",
-                                      px: 1.5,
-                                      py: 0.25,
-                                      borderRadius: "6px",
-                                      fontFamily: '"Outfit", sans-serif'
-                                    }}
-                                  >
-                                    {row.value}
-                                  </Typography>
-                                </Box>
-                              ))}
-                            </Stack>
-                          )}
+                                  {row.value}
+                                </Typography>
+                              </Box>
+                            ))}
+
+                            {mode === "member" && [
+                              { label: "Active Contributors", value: report?.memberContributionHistory?.length ?? 0 },
+                              { label: "100% Cleared Members", value: report?.memberContributionHistory?.filter(m => m.pendingEventsCount === 0).length ?? 0 },
+                              { label: "Members with Pending Dues", value: report?.memberContributionHistory?.filter(m => m.pendingEventsCount > 0).length ?? 0 },
+                              { label: "Collection Efficiency", value: `${report?.financialSummary?.collectionEfficiencyPercent ?? 0}%` },
+                            ].map((row) => (
+                              <Box
+                                key={row.label}
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  py: 1,
+                                  borderBottom: "1px solid",
+                                  borderColor: "divider",
+                                  "&:last-child": { borderBottom: "none" }
+                                }}
+                              >
+                                <Typography variant="body2" fontWeight={600} color="text.secondary">
+                                  {row.label}
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={800}
+                                  sx={{
+                                    bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.05)",
+                                    px: 1.5,
+                                    py: 0.25,
+                                    borderRadius: "6px",
+                                    fontFamily: '"Outfit", sans-serif'
+                                  }}
+                                >
+                                  {row.value}
+                                </Typography>
+                              </Box>
+                            ))}
+
+                            {mode === "pending" && [
+                              { label: "Total Overdue Amount", value: `₹${Number(report?.financialSummary?.totalPendingDues ?? 0).toLocaleString()}` },
+                              { label: "Unique Defaulters", value: report?.financialSummary?.defaultersCount ?? 0 },
+                              { label: "Critical Dues (> 30 Days)", value: report?.pendingDues?.filter(p => p.daysOverdue > 30).length ?? 0 },
+                              { label: "Moderate Dues (15-30 Days)", value: report?.pendingDues?.filter(p => p.daysOverdue >= 15 && p.daysOverdue <= 30).length ?? 0 },
+                            ].map((row) => (
+                              <Box
+                                key={row.label}
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  py: 1,
+                                  borderBottom: "1px solid",
+                                  borderColor: "divider",
+                                  "&:last-child": { borderBottom: "none" }
+                                }}
+                              >
+                                <Typography variant="body2" fontWeight={600} color="text.secondary">
+                                  {row.label}
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={800}
+                                  sx={{
+                                    bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.05)",
+                                    px: 1.5,
+                                    py: 0.25,
+                                    borderRadius: "6px",
+                                    fontFamily: '"Outfit", sans-serif'
+                                  }}
+                                >
+                                  {row.value}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Stack>
                         </Box>
                       </Stack>
                     </CardContent>
@@ -668,20 +732,17 @@ export default function ReportsPage({ mode }) {
                 </Grid>
               </Grid>
 
+              {/* Data Table per active report mode */}
               {(mode === "event" || !mode) && (
-                <AppDataTable title="Event Collection Audit" columns={eventColumns} data={report?.eventCollections ?? []} loading={false} />
+                <AppDataTable title="Event Collections" columns={eventColumns} data={report?.eventCollections ?? []} loading={false} />
               )}
 
-              {(mode === "member" || !mode) && (
-                <AppDataTable title="Member Contribution Details" columns={memberColumns} data={report?.memberContributionHistory ?? []} loading={false} />
+              {mode === "member" && (
+                <AppDataTable title="Member Contributions" columns={memberColumns} data={report?.memberContributionHistory ?? []} loading={false} />
               )}
 
-              {(mode === "pending" || !mode) && (
-                <AppDataTable title="Pending Dues Details" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
-              )}
-
-              {mode === "member-category" && (
-                <AppDataTable title="Category-wise Paid Summary" columns={memberCategoryColumns} data={memberCategoryData} loading={false} />
+              {mode === "pending" && (
+                <AppDataTable title="Pending Dues & Defaulters" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
               )}
             </Stack>
           )}
