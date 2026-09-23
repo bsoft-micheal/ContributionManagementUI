@@ -29,7 +29,10 @@ import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
 import MetricCard from "../../components/MetricCard";
 import AppSelect from "../../components/common/AppSelect";
+import AppButton from "../../components/common/AppButton";
 import { GetDashboardSummaryAsync } from "../../services/dashboardService";
+import { GetEventTypesAsync } from "../../services/eventTypeService";
+import { useAppToast } from "../../components/common/AppToast";
 import AppDataTable from "../../components/common/AppDataTable";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
@@ -554,7 +557,7 @@ const YEAR_OPTIONS = [
   }),
 ];
 
-function FilterBar({ pending, onChange, onGo, loading }) {
+function FilterBar({ pending, onChange, onGo, onClear, eventTypeOptions, loading }) {
   const theme = useTheme();
   return (
     <Box sx={{
@@ -575,24 +578,44 @@ function FilterBar({ pending, onChange, onGo, loading }) {
           onChange={(e) => onChange("year", Number(e.target.value))}
           options={YEAR_OPTIONS} />
       </Box>
-      <Button
-        variant="contained" onClick={onGo} disabled={loading}
+      <Box sx={{ minWidth: 190 }}>
+        <AppSelect label="Event Type" value={pending.eventType || "ALL"}
+          onChange={(e) => onChange("eventType", e.target.value)}
+          options={eventTypeOptions} />
+      </Box>
+      <AppButton
+        variant="contained"
+        onClick={onGo}
+        disabled={loading}
         startIcon={<PlayArrowIcon />}
         sx={{
-          height: 40, px: 3.5, fontWeight: 800, letterSpacing: "0.03em",
-          background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
-          boxShadow: "0 4px 14px rgba(124,58,237,0.35)",
-          transition: "all 0.25s ease",
-          "&:hover": {
-            background: "linear-gradient(135deg, #6d28d9 0%, #4338ca 100%)",
-            boxShadow: "0 6px 20px rgba(124,58,237,0.45)",
-            transform: "translateY(-1px)",
-          },
-          "&:active": { transform: "translateY(0)" },
+          height: 40,
+          px: 3.5,
+          fontWeight: 800,
+          letterSpacing: "0.03em",
         }}
       >
         Go
-      </Button>
+      </AppButton>
+      <AppButton
+        variant="outlined"
+        onClick={onClear}
+        disabled={loading}
+        sx={{
+          color: "#ef4444",
+          borderColor: "rgba(239, 68, 68, 0.4)",
+          height: 40,
+          px: 2.5,
+          fontWeight: 700,
+          fontSize: "0.75rem",
+          "&:hover": {
+            borderColor: "#ef4444",
+            bgcolor: "rgba(239, 68, 68, 0.05)",
+          },
+        }}
+      >
+        Clear Filter
+      </AppButton>
     </Box>
   );
 }
@@ -628,24 +651,48 @@ function StatPill({ label, value, color }) {
 export default function DashboardPage() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const toast = useAppToast();
 
   const [activeTab, setActiveTab] = useState(0);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [eventTypes, setEventTypes] = useState([]);
 
   const [pendingFilters, setPendingFilters] = useState({
-    month: dayjs().month() + 1, year: dayjs().year(),
+    month: dayjs().month() + 1,
+    year: dayjs().year(),
+    eventType: "ALL",
   });
   const [appliedFilters, setAppliedFilters] = useState({
-    month: dayjs().month() + 1, year: dayjs().year(),
+    month: dayjs().month() + 1,
+    year: dayjs().year(),
+    eventType: "ALL",
   });
+
+  // Fetch event types for filter dropdown
+  useEffect(() => {
+    async function fetchEventTypes() {
+      try {
+        const types = await GetEventTypesAsync();
+        if (Array.isArray(types)) {
+          setEventTypes(types);
+        }
+      } catch (err) {
+        console.error("Failed to load event types:", err);
+      }
+    }
+    fetchEventTypes();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const data = await GetDashboardSummaryAsync(appliedFilters);
+      const data = await GetDashboardSummaryAsync({
+        month: appliedFilters.month,
+        year: appliedFilters.year,
+      });
       if (!cancelled) {
         setSummary(data);
         setLoading(false);
@@ -653,7 +700,27 @@ export default function DashboardPage() {
     }
     load();
     return () => { cancelled = true; };
-  }, [appliedFilters]);
+  }, [appliedFilters.month, appliedFilters.year]);
+
+  // Build Event Type options combining API categories and any upcoming events
+  const eventTypeOptions = useMemo(() => {
+    const options = [{ label: "All Event Types", value: "ALL" }];
+    const set = new Set();
+    eventTypes.forEach((t) => {
+      const name = t.eventTypeName || t.name;
+      if (name && !set.has(name.toLowerCase())) {
+        set.add(name.toLowerCase());
+        options.push({ label: name, value: name });
+      }
+    });
+    (summary?.upcomingEvents ?? []).forEach((e) => {
+      if (e.eventTypeName && !set.has(e.eventTypeName.toLowerCase())) {
+        set.add(e.eventTypeName.toLowerCase());
+        options.push({ label: e.eventTypeName, value: e.eventTypeName });
+      }
+    });
+    return options;
+  }, [eventTypes, summary?.upcomingEvents]);
 
   function handleFilterChange(key, value) {
     setPendingFilters((p) => ({ ...p, [key]: value }));
@@ -662,14 +729,42 @@ export default function DashboardPage() {
     setAppliedFilters({ ...pendingFilters });
     setSearch("");
   }
+  function handleClear() {
+    const resetValues = {
+      month: dayjs().month() + 1,
+      year: dayjs().year(),
+      eventType: "ALL",
+    };
+    setPendingFilters(resetValues);
+    setAppliedFilters(resetValues);
+    setSearch("");
+    toast.info("Dashboard filters reset to defaults");
+  }
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const events = summary?.upcomingEvents ?? [];
+  const isFilteredByType = Boolean(appliedFilters.eventType && appliedFilters.eventType !== "ALL");
+  const allEvents = summary?.upcomingEvents ?? [];
+  const events = useMemo(() => {
+    if (!isFilteredByType) return allEvents;
+    return allEvents.filter(
+      (e) => e.eventTypeName?.toLowerCase() === appliedFilters.eventType.toLowerCase()
+    );
+  }, [allEvents, isFilteredByType, appliedFilters.eventType]);
+
   const chartEvents = events.slice(0, 6);
 
-  const totalCollected = Number(summary?.totalContributions ?? 0);
-  const totalPending = Number(summary?.totalPendingAmount ?? 0);
-  const pendingCount = Number(summary?.pendingPayments ?? 0);
+  const totalCollected = isFilteredByType
+    ? events.reduce((sum, e) => sum + (Number(e.collectedAmount) || 0), 0)
+    : Number(summary?.totalContributions ?? 0);
+
+  const totalPending = isFilteredByType
+    ? events.reduce((sum, e) => sum + (Number(e.pendingAmount) || 0), 0)
+    : Number(summary?.totalPendingAmount ?? 0);
+
+  const pendingCount = isFilteredByType
+    ? events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0)
+    : Number(summary?.pendingPayments ?? 0);
+
   const paidCount = events.reduce(
     (s, e) => s + ((e.totalContributionsCount ?? 0) - (e.pendingContributionsCount ?? 0)), 0
   );
@@ -734,13 +829,16 @@ export default function DashboardPage() {
   }, [totalCollected, totalPending, totalExpected]);
 
   const defaultSummary = useMemo(() => {
+    const title = donutView === "events"
+      ? (isFilteredByType ? appliedFilters.eventType : "All Events")
+      : "Total Expected";
     return {
-      title: donutView === "events" ? "All Events" : "Total Expected",
+      title,
       amount: totalExpected,
       percent: collectionRate,
       badge: `${collectionRate}%`,
     };
-  }, [donutView, totalExpected, collectionRate]);
+  }, [donutView, isFilteredByType, appliedFilters.eventType, totalExpected, collectionRate]);
 
   // Multi-ring chart ring definitions
   const amountRing = {
@@ -842,7 +940,9 @@ export default function DashboardPage() {
             onChange={(_, v) => setActiveTab(v)}
             TabIndicatorProps={{
               style: {
-                background: "linear-gradient(90deg, #7c3aed 0%, #4f46e5 100%)",
+                background: theme.palette.mode === "dark"
+                  ? "linear-gradient(90deg, #7b6faa 0%, #a78bfa 100%)"
+                  : "linear-gradient(90deg, #4a3f6b 0%, #2d2550 100%)",
                 height: 3, borderRadius: "3px 3px 0 0",
               },
             }}
@@ -868,6 +968,8 @@ export default function DashboardPage() {
           pending={pendingFilters}
           onChange={handleFilterChange}
           onGo={handleGo}
+          onClear={handleClear}
+          eventTypeOptions={eventTypeOptions}
           loading={loading}
         />
 
@@ -890,8 +992,8 @@ export default function DashboardPage() {
                   <Grid container spacing={2.5}>
                     <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                       <MetricCard label="TOTAL EVENTS"
-                        value={summary?.monthlyEventsCount ?? 0}
-                        helper="Scheduled for the selected period" />
+                        value={events.length}
+                        helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for the selected period"} />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                       <MetricCard label="TOTAL COLLECTIONS"
@@ -1020,7 +1122,7 @@ export default function DashboardPage() {
                                 <Stack direction="row" spacing={1.5}>
                                   <StatPill label="Collection Rate" value={`${collectionRate}%`} color={C.collected} />
                                   <StatPill label="Payment Rate" value={`${paymentRate}%`} color={C.paid} />
-                                  <StatPill label="Events" value={summary?.monthlyEventsCount ?? events.length} color="#7c3aed" />
+                                  <StatPill label="Events" value={events.length} color="#7c3aed" />
                                 </Stack>
 
                                 {donutView === "events" ? (
@@ -1174,7 +1276,11 @@ export default function DashboardPage() {
                       py: 10, display: "grid", placeItems: "center", color: "text.secondary",
                       border: `1px dashed ${theme.palette.divider}`, borderRadius: 2,
                     }}>
-                      <Typography variant="body2">No events found for the selected period.</Typography>
+                      <Typography variant="body2">
+                        {isFilteredByType
+                          ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
+                          : "No events found for the selected period."}
+                      </Typography>
                     </Box>
                   )}
 

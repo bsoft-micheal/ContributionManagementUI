@@ -9,7 +9,9 @@ import {
 
 import { useAppToast } from "../../components/common/AppToast";
 import AppSelect from "../../components/common/AppSelect";
+import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
+import { FilterList as FilterListIcon } from "@mui/icons-material";
 import { GetUserRightsAsync, SaveUserRightsAsync } from "../../services/userRightsService";
 import { GetRolesAsync } from "../../services/roleService";
 
@@ -51,6 +53,8 @@ export default function UserRightsPage() {
   const [roles, setRoles] = useState([]);
   const [selectedRoleName, setSelectedRoleName] = useState("");
   const [selectedSubModule, setSelectedSubModule] = useState("Dashboard");
+  const [filterRoleName, setFilterRoleName] = useState("");
+  const [filterSubModule, setFilterSubModule] = useState("Dashboard");
   const [rights, setRights] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -72,6 +76,7 @@ export default function UserRightsPage() {
       if (Array.isArray(dbRoles) && dbRoles.length > 0) {
         setRoles(dbRoles);
         setSelectedRoleName(dbRoles[0].roleName);
+        setFilterRoleName(dbRoles[0].roleName);
       } else {
         const fallback = [
           { roleName: "Admin" },
@@ -81,6 +86,7 @@ export default function UserRightsPage() {
         ];
         setRoles(fallback);
         setSelectedRoleName(fallback[0].roleName);
+        setFilterRoleName(fallback[0].roleName);
       }
     } catch (err) {
       console.warn("Could not load roles from database:", err);
@@ -263,23 +269,23 @@ export default function UserRightsPage() {
         loading={loading}
         filterPanel={
           <Grid container spacing={3} alignItems="center">
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 3.5 }}>
               <AppSelect
                 label="Role"
                 placeholder="Select Role"
-                value={selectedRoleName}
-                onChange={(e) => setSelectedRoleName(e.target.value)}
+                value={filterRoleName}
+                onChange={(e) => setFilterRoleName(e.target.value)}
                 options={roles.map(r => ({ label: r.roleName, value: r.roleName }))}
                 required
                 fullWidth
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 3.5 }}>
               <AppSelect
                 label="Sub Module"
                 placeholder="Select Sub Module"
-                value={selectedSubModule}
-                onChange={(e) => setSelectedSubModule(e.target.value)}
+                value={filterSubModule}
+                onChange={(e) => setFilterSubModule(e.target.value)}
                 options={[
                   { label: "Dashboard", value: "Dashboard" },
                   { label: "Members", value: "Members" },
@@ -291,6 +297,52 @@ export default function UserRightsPage() {
                 required
                 fullWidth
               />
+            </Grid>
+            <Grid size={{ xs: 12, md: 5 }} sx={{ display: "flex", gap: 1.5, alignItems: "center", mt: { xs: 0, md: 2.2 } }}>
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => {
+                  setSelectedRoleName(filterRoleName);
+                  setSelectedSubModule(filterSubModule);
+                  toast.success("Filters applied");
+                }}
+                sx={{
+                  height: 34,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  const defaultRole = roles.length > 0 ? roles[0].roleName : "Admin";
+                  setFilterRoleName(defaultRole);
+                  setFilterSubModule("Dashboard");
+                  setSelectedRoleName(defaultRole);
+                  setSelectedSubModule("Dashboard");
+                  toast.success("Filters cleared");
+                }}
+                sx={{
+                  color: "#ef4444",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
+                  height: 34,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                  "&:hover": {
+                    borderColor: "#ef4444",
+                    bgcolor: "rgba(239, 68, 68, 0.05)"
+                  }
+                }}
+              >
+                Clear Filter
+              </AppButton>
             </Grid>
           </Grid>
         }

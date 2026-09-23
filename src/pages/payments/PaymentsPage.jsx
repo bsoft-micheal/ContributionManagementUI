@@ -14,6 +14,7 @@ import {
   PaymentRounded as PaymentRoundedIcon,
   FileDownloadOutlined as FileDownloadIcon,
   ReceiptLongOutlined as ReceiptIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
@@ -445,9 +446,7 @@ export default function PaymentsPage() {
                   label="Select Member"
                   value={filterMember}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterMember(val);
-                    setAppliedMember(val);
+                    setFilterMember(e.target.value);
                   }}
                   options={memberOptions}
                   size="small"
@@ -461,9 +460,7 @@ export default function PaymentsPage() {
                   label="Select Event"
                   value={filterEvent}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterEvent(val);
-                    setAppliedEvent(val);
+                    setFilterEvent(e.target.value);
                   }}
                   options={eventOptions}
                   size="small"
@@ -477,9 +474,7 @@ export default function PaymentsPage() {
                   label="Payment Mode"
                   value={filterMode}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterMode(val);
-                    setAppliedMode(val);
+                    setFilterMode(e.target.value);
                   }}
                   options={modeOptions}
                   size="small"
@@ -493,9 +488,7 @@ export default function PaymentsPage() {
                   label="Select Status"
                   value={filterStatus}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterStatus(val);
-                    setAppliedStatus(val);
+                    setFilterStatus(e.target.value);
                   }}
                   options={statusOptions}
                   size="small"
@@ -510,12 +503,33 @@ export default function PaymentsPage() {
                   value={filterDate}
                   onChange={(newVal) => {
                     setFilterDate(newVal);
-                    setAppliedDate(newVal);
                   }}
                   size="small"
                   fullWidth
                 />
               </Box>
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => {
+                  setAppliedMember(filterMember);
+                  setAppliedEvent(filterEvent);
+                  setAppliedMode(filterMode);
+                  setAppliedStatus(filterStatus);
+                  setAppliedDate(filterDate);
+                  toast.success("Filters applied");
+                }}
+                sx={{
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"
@@ -530,24 +544,19 @@ export default function PaymentsPage() {
                   setAppliedMode("ALL");
                   setAppliedStatus("ALL");
                   setAppliedDate(null);
+                  toast.success("Filters cleared");
                 }}
                 sx={{
+                  color: "#ef4444",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
                   height: 34,
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
-                  borderColor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.2)"
-                      : "rgba(74, 63, 107, 0.3)",
-                  color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                  px: 2,
                   "&:hover": {
-                    borderColor: (theme) =>
-                      theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255, 255, 255, 0.05)"
-                        : "rgba(74, 63, 107, 0.04)",
+                    borderColor: "#ef4444",
+                    bgcolor: "rgba(239, 68, 68, 0.05)",
                   },
                 }}
               >

@@ -14,6 +14,7 @@ import {
   Visibility as ViewIcon,
   PersonAdd as PersonAddIcon,
   Description as ExcelIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
@@ -546,17 +547,31 @@ export default function MembersPage() {
                 <AppSelect
                   label="Role"
                   value={filterRoleId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterRoleId(val);
-                    setAppliedRoleId(val);
-                  }}
+                  onChange={(e) => setFilterRoleId(e.target.value)}
                   options={roleOptions}
                   size="small"
                   required
                   fullWidth
                 />
               </Box>
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => {
+                  setAppliedRoleId(filterRoleId);
+                  toast.success("Filter applied");
+                }}
+                sx={{
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"
@@ -572,6 +587,7 @@ export default function MembersPage() {
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
+                  px: 2,
                   "&:hover": {
                     borderColor: "#ef4444",
                     bgcolor: "rgba(239, 68, 68, 0.05)"

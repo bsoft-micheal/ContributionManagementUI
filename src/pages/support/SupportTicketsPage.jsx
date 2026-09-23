@@ -15,6 +15,7 @@ import {
   Visibility as ViewIcon,
   Add as AddIcon,
   Send as SendIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -616,9 +617,7 @@ export default function SupportTicketsPage() {
                   label="Select Ticket Type"
                   value={filterType}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterType(val);
-                    setAppliedType(val);
+                    setFilterType(e.target.value);
                   }}
                   options={ticketTypeOptions}
                   size="small"
@@ -632,9 +631,7 @@ export default function SupportTicketsPage() {
                   label="Select Priority"
                   value={filterPriority}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterPriority(val);
-                    setAppliedPriority(val);
+                    setFilterPriority(e.target.value);
                   }}
                   options={priorityOptions}
                   size="small"
@@ -648,9 +645,7 @@ export default function SupportTicketsPage() {
                   label="Select Status"
                   value={filterStatus}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterStatus(val);
-                    setAppliedStatus(val);
+                    setFilterStatus(e.target.value);
                   }}
                   options={statusOptions}
                   size="small"
@@ -659,6 +654,26 @@ export default function SupportTicketsPage() {
                   fullWidth
                 />
               </Box>
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => {
+                  setAppliedType(filterType);
+                  setAppliedPriority(filterPriority);
+                  setAppliedStatus(filterStatus);
+                  toast.success("Filters applied");
+                }}
+                sx={{
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"
@@ -669,24 +684,19 @@ export default function SupportTicketsPage() {
                   setAppliedType("ALL");
                   setAppliedPriority("ALL");
                   setAppliedStatus("ALL");
+                  toast.success("Filters cleared");
                 }}
                 sx={{
+                  color: "#ef4444",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
                   height: 34,
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
-                  borderColor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.2)"
-                      : "rgba(74, 63, 107, 0.3)",
-                  color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                  px: 2,
                   "&:hover": {
-                    borderColor: (theme) =>
-                      theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255, 255, 255, 0.05)"
-                        : "rgba(74, 63, 107, 0.04)",
+                    borderColor: "#ef4444",
+                    bgcolor: "rgba(239, 68, 68, 0.05)",
                   },
                 }}
               >
@@ -990,7 +1000,7 @@ export default function SupportTicketsPage() {
                     Attachment
                   </Typography>
                   <Typography variant="body2" sx={{ color: "#4a3f6b", fontWeight: 600, mt: 0.5 }}>
-                    📎 {selectedTicket.attachment}
+                    {selectedTicket.attachment}
                   </Typography>
                 </Grid>
               )}

@@ -1057,7 +1057,7 @@ export default function SettingsPage() {
                       >
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
                           <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary" }}>
-                            💡 Click to Insert Dynamic Placeholders:
+                            Click to Insert Dynamic Placeholders:
                           </Typography>
                           <Typography variant="caption" sx={{ color: "text.disabled", fontSize: "0.68rem" }}>
                             Values auto-populate when dispatched
@@ -1155,7 +1155,7 @@ export default function SettingsPage() {
                         {/* Visual Schedule Roadmap */}
                         <Box sx={{ mt: 2, p: 1.5, borderRadius: "8px", bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#ffffff", border: `1px solid ${theme.palette.divider}` }}>
                           <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", display: "block", mb: 0.6 }}>
-                            📅 Scheduled Dispatch Cycle:
+                            Scheduled Dispatch Cycle:
                           </Typography>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap", fontSize: "0.72rem" }}>
                             <Chip label="Day 1: Initial Email" size="small" color="info" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
@@ -1645,7 +1645,7 @@ export default function SettingsPage() {
                     }}
                   >
                     <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", lineHeight: 1.4, display: "block" }}>
-                      🔒 Time-based one-time password and multi-factor authentication are actively enforced on login.
+                      Time-based one-time password and multi-factor authentication are actively enforced on login.
                     </Typography>
                   </Box>
                 </Stack>

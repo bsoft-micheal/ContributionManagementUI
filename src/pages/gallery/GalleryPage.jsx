@@ -19,6 +19,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   PhotoLibrary as PhotoLibraryIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -641,9 +642,7 @@ export default function GalleryPage() {
                   label="Select Event"
                   value={filterEvent}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterEvent(val);
-                    setAppliedEvent(val);
+                    setFilterEvent(e.target.value);
                   }}
                   options={eventOptions}
                   size="small"
@@ -657,9 +656,7 @@ export default function GalleryPage() {
                   label="Select Category"
                   value={filterCategory}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setFilterCategory(val);
-                    setAppliedCategory(val);
+                    setFilterCategory(e.target.value);
                   }}
                   options={categoryOptions}
                   size="small"
@@ -669,6 +666,25 @@ export default function GalleryPage() {
                 />
               </Box>
               <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => {
+                  setAppliedEvent(filterEvent);
+                  setAppliedCategory(filterCategory);
+                  toast.success("Filters applied");
+                }}
+                sx={{
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
+              <AppButton
                 variant="outlined"
                 size="small"
                 onClick={() => {
@@ -676,24 +692,19 @@ export default function GalleryPage() {
                   setFilterCategory("ALL");
                   setAppliedEvent("ALL");
                   setAppliedCategory("ALL");
+                  toast.success("Filters cleared");
                 }}
                 sx={{
+                  color: "#ef4444",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
                   height: 34,
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
-                  borderColor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.2)"
-                      : "rgba(74, 63, 107, 0.3)",
-                  color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                  px: 2,
                   "&:hover": {
-                    borderColor: (theme) =>
-                      theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255, 255, 255, 0.05)"
-                        : "rgba(74, 63, 107, 0.04)",
+                    borderColor: "#ef4444",
+                    bgcolor: "rgba(239, 68, 68, 0.05)",
                   },
                 }}
               >

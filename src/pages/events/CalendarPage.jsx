@@ -29,6 +29,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import EventFormDialog from "../../components/events/EventFormDialog";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
+import { FilterList as FilterListIcon } from "@mui/icons-material";
 
 /**
  * Returns icon, display label, and color palette tailored for event categories

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Grid, Typography, Card, CardContent, Divider, Chip, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { FilterList as FilterListIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
 import { GetMembersAsync } from "../../services/memberService";
@@ -243,13 +244,30 @@ export default function ContributionCalculationPage() {
                   value={filterEventId}
                   onChange={(e) => {
                     setFilterEventId(e.target.value);
-                    setSelectedEventId(e.target.value);
                   }}
                   options={events.map(e => ({ label: e.eventName, value: e.eventId }))}
                   required
                   fullWidth
                 />
               </Box>
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => {
+                  setSelectedEventId(filterEventId);
+                  toast.success("Filter applied");
+                }}
+                sx={{
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"
@@ -258,6 +276,7 @@ export default function ContributionCalculationPage() {
                     const firstEventId = events[0].eventId;
                     setFilterEventId(firstEventId);
                     setSelectedEventId(firstEventId);
+                    toast.success("Filter cleared");
                   }
                 }}
                 sx={{
@@ -267,6 +286,7 @@ export default function ContributionCalculationPage() {
                   mt: 2.2,
                   fontWeight: 700,
                   fontSize: "0.75rem",
+                  px: 2,
                   "&:hover": {
                     borderColor: "#ef4444",
                     bgcolor: "rgba(239, 68, 68, 0.05)"
