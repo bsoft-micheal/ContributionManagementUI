@@ -20,6 +20,7 @@ import { useTheme } from "@mui/material/styles";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
+import LockResetOutlinedIcon from "@mui/icons-material/LockResetOutlined";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import QrCodeScannerOutlinedIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
@@ -142,7 +143,15 @@ export default function SettingsPage() {
     const saved = localStorage.getItem("cm_system_settings");
     if (saved) {
       try {
-        return { ...initialSettings, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        return {
+          ...initialSettings,
+          ...parsed,
+          birthdayMembersExempt:
+            parsed.birthdayMembersExempt !== undefined
+              ? parsed.birthdayMembersExempt
+              : true,
+        };
       } catch (e) {
         return initialSettings;
       }
@@ -256,6 +265,7 @@ export default function SettingsPage() {
           let localEnableReminderEmail = true;
           let localReminderIntervalDays = "10";
           let localMaxReminders = "3";
+          let localBirthdayMembersExempt = undefined;
           try {
             if (localSaved) {
               const parsed = JSON.parse(localSaved);
@@ -266,8 +276,16 @@ export default function SettingsPage() {
               if (parsed.enableReminderEmail !== undefined) localEnableReminderEmail = parsed.enableReminderEmail;
               if (parsed.reminderIntervalDays) localReminderIntervalDays = String(parsed.reminderIntervalDays);
               if (parsed.maxReminders) localMaxReminders = String(parsed.maxReminders);
+              if (parsed.birthdayMembersExempt !== undefined) localBirthdayMembersExempt = parsed.birthdayMembersExempt;
             }
           } catch (e) {}
+
+          const resolvedBirthdayMembersExempt =
+            data.birthdayMembersExempt !== undefined
+              ? data.birthdayMembersExempt
+              : localBirthdayMembersExempt !== undefined
+              ? localBirthdayMembersExempt
+              : true;
 
           const isPlaceholderUpi =
             !data.qrUpiId ||
@@ -284,6 +302,7 @@ export default function SettingsPage() {
           const merged = {
             ...initialSettings,
             ...data,
+            birthdayMembersExempt: resolvedBirthdayMembersExempt,
             qrUpiId: cleanUpiId,
             qrReceiverName: cleanReceiver,
             qrMode: localMode,
@@ -311,6 +330,24 @@ export default function SettingsPage() {
     setSettings((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Immediate toggle and persistence for Birthday Exemption setting
+  const handleBirthdayExemptToggle = async (checked) => {
+    const updated = { ...settings, birthdayMembersExempt: checked };
+    setSettings(updated);
+
+    try {
+      const saved = localStorage.getItem("cm_system_settings");
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem("cm_system_settings", JSON.stringify({ ...parsed, ...updated, birthdayMembersExempt: checked }));
+    } catch (e) {}
+
+    try {
+      await updateSystemSettings(updated);
+    } catch (err) {
+      console.warn("Could not sync birthdayMembersExempt to backend:", err);
+    }
+  };
+
   const persistSettings = async (updated) => {
     try {
       const savedRes = await updateSystemSettings(updated);
@@ -328,14 +365,22 @@ export default function SettingsPage() {
     }
   };
 
-  // 1. Save General Settings (Org info + Notifications)
+  // 1. Save General Settings (Org info + OTP / 2FA)
   const handleSaveGeneral = async () => {
     if (!settings.orgName || !settings.orgName.trim()) {
       toast.error("Organization Name is required.");
       return;
     }
+    if (!settings.otpExpiry || Number(settings.otpExpiry) <= 0) {
+      toast.error("Please enter a valid OTP Expiry in minutes.");
+      return;
+    }
+    if (!settings.maxRetry || Number(settings.maxRetry) <= 0) {
+      toast.error("Please enter a valid Max Retry Attempt.");
+      return;
+    }
     await persistSettings(settings);
-    toast.success("General settings saved successfully!");
+    toast.success("General & Security settings saved successfully!");
   };
 
   // 2. Handle Category Selection Change in Email Template Settings
@@ -526,7 +571,6 @@ export default function SettingsPage() {
             {[
               { key: "general", label: "General Settings" },
               { key: "emailTemplate", label: "Email Template Settings" },
-              { key: "otp2fa", label: "OTP / 2FA Settings" },
               { key: "paymentQr", label: "Payment QR Settings" },
             ].map((tab) => {
               const isActive = activeTab === tab.key;
@@ -567,185 +611,118 @@ export default function SettingsPage() {
             })}
           </Box>
 
-        {/* ── 1. General Settings (including Notification Settings) ───────────── */}
+        {/* ── 1. General Settings (including OTP / 2FA & MFA) ───────────────── */}
         {activeTab === "general" && (
-          <Grid container spacing={2.5} alignItems="flex-start">
-            {/* Left: General Settings Form (65-70% on desktop) */}
-            <Grid size={{ xs: 12, lg: 8 }}>
-              <Card
-                sx={{
-                  borderRadius: "16px",
-                  border: (t) => `1px solid ${t.palette.divider}`,
-                  p: 2.5,
-                  bgcolor: "background.paper",
-                }}
-              >
+          <Box sx={{ width: "100%" }}>
+            <Card
+              sx={{
+                borderRadius: "16px",
+                border: (t) => `1px solid ${t.palette.divider}`,
+                p: { xs: 2, md: 3 },
+                bgcolor: "background.paper",
+                boxShadow: isDark
+                  ? "0 4px 20px rgba(0,0,0,0.3)"
+                  : "0 4px 20px rgba(74, 63, 107, 0.05)",
+              }}
+            >
+              {/* General Settings Section Header */}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+                <Box
+                  sx={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: "10px",
+                    bgcolor: "rgba(2, 132, 199, 0.1)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#0284c7",
+                  }}
+                >
+                  <SettingsOutlinedIcon fontSize="small" />
+                </Box>
                 <Box>
-                  {/* Card Header */}
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
-                    <Box
+                  <Typography variant="subtitle1" fontWeight={800}>
+                    General Settings
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
+                    Basic organization information and preferences.
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Stack spacing={2.2} sx={{ mt: 2 }}>
+                {/* Organization Name */}
+                <AppInput
+                  label="Organization Name"
+                  value={settings.orgName}
+                  onChange={(e) => handleChange("orgName", e.target.value)}
+                  placeholder="e.g. Unit 1A Residents Association"
+                />
+
+                {/* Birthday Exemption */}
+                <Box sx={{ pt: 0.5 }}>
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">
+                    Birthday Members Exempt?
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
+                    <Switch
+                      checked={
+                        settings.birthdayMembersExempt !== undefined
+                          ? settings.birthdayMembersExempt
+                          : true
+                      }
+                      onChange={(e) => handleBirthdayExemptToggle(e.target.checked)}
                       sx={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: "10px",
-                        bgcolor: "rgba(2, 132, 199, 0.1)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#0284c7",
-                      }}
-                    >
-                      <SettingsOutlinedIcon fontSize="small" />
-                    </Box>
-                    <Box>
-                      <Typography variant="subtitle1" fontWeight={800}>
-                        General Settings
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                        Basic information and notification preferences.
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Stack spacing={2.2} sx={{ mt: 2 }}>
-                    {/* Organization Name */}
-                    <AppInput
-                      label="Organization Name"
-                      value={settings.orgName}
-                      onChange={(e) => handleChange("orgName", e.target.value)}
-                      placeholder="e.g. Unit 1A Residents Association"
-                    />
-
-                    {/* Birthday Exemption */}
-                    <Box sx={{ pt: 0.5 }}>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary">
-                        Birthday Members Exempt?
-                      </Typography>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
-                        <Switch
-                          checked={
-                            settings.birthdayMembersExempt !== undefined
-                              ? settings.birthdayMembersExempt
-                              : true
-                          }
-                          onChange={(e) => handleChange("birthdayMembersExempt", e.target.checked)}
-                          sx={{
-                            width: 44,
-                            height: 24,
-                            padding: 0,
-                            "& .MuiSwitch-switchBase": {
-                              padding: 0,
-                              margin: "2px",
-                              transitionDuration: "200ms",
-                              "&.Mui-checked": {
-                                transform: "translateX(20px)",
-                                color: "#fff",
-                                "& + .MuiSwitch-track": {
-                                  backgroundColor: "#1677c8",
-                                  opacity: 1,
-                                  border: 0,
-                                },
-                              },
-                            },
-                            "& .MuiSwitch-thumb": {
-                              width: 20,
-                              height: 20,
-                              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                            },
-                            "& .MuiSwitch-track": {
-                              borderRadius: 24 / 2,
-                              backgroundColor: (t) =>
-                                t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
+                        width: 44,
+                        height: 24,
+                        padding: 0,
+                        "& .MuiSwitch-switchBase": {
+                          padding: 0,
+                          margin: "2px",
+                          transitionDuration: "200ms",
+                          "&.Mui-checked": {
+                            transform: "translateX(20px)",
+                            color: "#fff",
+                            "& + .MuiSwitch-track": {
+                              backgroundColor: "#1677c8",
                               opacity: 1,
+                              border: 0,
                             },
-                          }}
-                        />
-                        <Typography
-                          variant="body2"
-                          fontWeight={700}
-                          color={
-                            settings.birthdayMembersExempt !== false ? "#1677c8" : "text.secondary"
-                          }
-                        >
-                          {settings.birthdayMembersExempt !== false ? "Enabled" : "Disabled"}
-                        </Typography>
-                      </Box>
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.4, display: "block" }}>
-                        Exempt celebrants from contributing towards their birthday event by default.
-                      </Typography>
-                    </Box>
-
-                    <Divider sx={{ my: 1 }} />
-
-                    {/* Notification Settings Embedded Section */}
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                      <NotificationsNoneOutlinedIcon sx={{ fontSize: 18, color: "#0284c7" }} />
-                      <Typography variant="subtitle2" fontWeight={750} sx={{ fontSize: "0.83rem" }}>
-                        Notification Alerts
-                      </Typography>
-                    </Box>
-
-                    <Stack spacing={1.6}>
-                      <AppSwitch
-                        label="Enable Email Notifications"
-                        checked={settings.enableEmailNotif}
-                        onChange={(e) => handleChange("enableEmailNotif", e.target.checked)}
-                      />
-                      <AppSwitch
-                        label="Notify for New Member Registrations"
-                        checked={settings.notifNewMember}
-                        onChange={(e) => handleChange("notifNewMember", e.target.checked)}
-                      />
-                      <AppSwitch
-                        label="Notify for Payment Confirmations"
-                        checked={settings.notifPaymentConfirm}
-                        onChange={(e) => handleChange("notifPaymentConfirm", e.target.checked)}
-                      />
-                      <AppSwitch
-                        label="Notify for Event Reminders"
-                        checked={settings.notifEventReminder}
-                        onChange={(e) => handleChange("notifEventReminder", e.target.checked)}
-                      />
-                      <AppSwitch
-                        label="Notify for Support Tickets"
-                        checked={settings.notifSupportTicket}
-                        onChange={(e) => handleChange("notifSupportTicket", e.target.checked)}
-                      />
-                    </Stack>
-                  </Stack>
+                          },
+                        },
+                        "& .MuiSwitch-thumb": {
+                          width: 20,
+                          height: 20,
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                        },
+                        "& .MuiSwitch-track": {
+                          borderRadius: 24 / 2,
+                          backgroundColor: (t) =>
+                            t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
+                          opacity: 1,
+                        },
+                      }}
+                    />
+                    <Typography
+                      variant="body2"
+                      fontWeight={700}
+                      color={
+                        settings.birthdayMembersExempt !== false ? "#1677c8" : "text.secondary"
+                      }
+                    >
+                      {settings.birthdayMembersExempt !== false ? "Enabled" : "Disabled"}
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.4, display: "block" }}>
+                    Exempt celebrants from contributing towards their birthday event by default.
+                  </Typography>
                 </Box>
 
-                {/* Save Button for General Settings */}
-                <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center" }}>
-                  <AppButton
-                    variant="contained"
-                    startIcon={<SaveOutlinedIcon />}
-                    onClick={handleSaveGeneral}
-                    sx={{
-                      bgcolor: "#0284c7 !important",
-                      "&:hover": { bgcolor: "#0369a1 !important" },
-                      px: 2.5,
-                      fontWeight: 700,
-                    }}
-                  >
-                    Save General Settings
-                  </AppButton>
-                </Box>
-              </Card>
-            </Grid>
+                <Divider sx={{ my: 1.5 }} />
 
-            {/* Right: Settings Summary Panel (30-35% on desktop) */}
-            <Grid size={{ xs: 12, lg: 4 }}>
-              <Card
-                sx={{
-                  borderRadius: "16px",
-                  border: (t) => `1px solid ${t.palette.divider}`,
-                  p: 2.5,
-                  bgcolor: "background.paper",
-                }}
-              >
-                {/* Header */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+                {/* 2. Forgot Password OTP Settings Section Header */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, pt: 0.5 }}>
                   <Box
                     sx={{
                       width: 38,
@@ -758,119 +735,102 @@ export default function SettingsPage() {
                       color: "#0284c7",
                     }}
                   >
-                    <InfoOutlinedIcon fontSize="small" />
+                    <LockResetOutlinedIcon fontSize="small" />
                   </Box>
                   <Box>
                     <Typography variant="subtitle1" fontWeight={800}>
-                      Settings Summary
+                      Forgot Password OTP Settings
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                      Quick overview of active preferences.
+                      Configure email OTP expiry time and maximum retry limits for password reset requests.
                     </Typography>
                   </Box>
                 </Box>
 
-                <Divider sx={{ mb: 2.5 }} />
+                <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label="Forgot Password OTP Expiry (minutes)"
+                      value={settings.otpExpiry}
+                      onChange={(e) => handleChange("otpExpiry", e.target.value)}
+                      restrictType="numberonly"
+                      placeholder="e.g. 10"
+                      required
+                    />
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
+                      Validity window for the 6-digit OTP code emailed to users during password reset.
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label="Max Retry Attempts"
+                      value={settings.maxRetry}
+                      onChange={(e) => handleChange("maxRetry", e.target.value)}
+                      restrictType="numberonly"
+                      placeholder="e.g. 3"
+                      required
+                    />
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
+                      Number of incorrect attempts allowed before the OTP is invalidated and locked.
+                    </Typography>
+                  </Grid>
+                </Grid>
 
-                <Stack spacing={2.2}>
-                  {/* Organization */}
+                <Divider sx={{ my: 1.5 }} />
+
+                {/* 3. Two-Factor Authentication (2FA) Section Header */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, pt: 0.5 }}>
+                  <Box
+                    sx={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: "10px",
+                      bgcolor: "rgba(16, 185, 129, 0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#059669",
+                    }}
+                  >
+                    <SecurityOutlinedIcon fontSize="small" />
+                  </Box>
                   <Box>
-                    <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em" }}>
-                      Organization
+                    <Typography variant="subtitle1" fontWeight={800}>
+                      Two-Factor Authentication (2FA)
                     </Typography>
-                    <Typography variant="body2" fontWeight={700} sx={{ mt: 0.4, color: "text.primary", wordBreak: "break-word" }}>
-                      {settings.orgName || "Not configured"}
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
+                      Secure account logins with an Authenticator app (Google Authenticator, Microsoft Authenticator).
                     </Typography>
                   </Box>
+                </Box>
 
-                  {/* Birthday Exemption */}
-                  <Box>
-                    <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em" }}>
-                      Birthday Exemption
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mt: 0.4 }}>
-                      {settings.birthdayMembersExempt !== false ? (
-                        <>
-                          <CheckCircleRoundedIcon sx={{ fontSize: 18, color: "#10b981" }} />
-                          <Typography variant="body2" fontWeight={700} sx={{ color: "#10b981" }}>
-                            Enabled
-                          </Typography>
-                        </>
-                      ) : (
-                        <>
-                          <CancelOutlinedIcon sx={{ fontSize: 18, color: "text.disabled" }} />
-                          <Typography variant="body2" fontWeight={700} sx={{ color: "text.secondary" }}>
-                            Disabled
-                          </Typography>
-                        </>
-                      )}
-                    </Box>
-                  </Box>
+                {/* Personal 2FA Device Configuration at UI level */}
+                <MfaSettings
+                  embedded
+                  title=""
+                  onDevicesChange={(devs) => setMfaDevicesCount(devs.length)}
+                />
+              </Stack>
 
-                  {/* Notifications */}
-                  <Box>
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.6 }}>
-                      <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em" }}>
-                        Notifications
-                      </Typography>
-                      <Chip
-                        label={`${[
-                          settings.enableEmailNotif,
-                          settings.notifNewMember,
-                          settings.notifPaymentConfirm,
-                          settings.notifEventReminder,
-                          settings.notifSupportTicket,
-                        ].filter(Boolean).length} of 5 Enabled`}
-                        size="small"
-                        sx={{
-                          height: 20,
-                          fontSize: "0.65rem",
-                          fontWeight: 750,
-                          bgcolor: isDark ? "rgba(2,132,199,0.2)" : "#e0f2fe",
-                          color: "#0284c7",
-                        }}
-                      />
-                    </Box>
-                    <Stack spacing={0.6} sx={{ mt: 1, pl: 0.5 }}>
-                      {[
-                        { label: "Email Notifications", active: settings.enableEmailNotif },
-                        { label: "Member Registration", active: settings.notifNewMember },
-                        { label: "Payment Confirmation", active: settings.notifPaymentConfirm },
-                        { label: "Event Reminder", active: settings.notifEventReminder },
-                        { label: "Support Ticket", active: settings.notifSupportTicket },
-                      ].map((item, idx) => (
-                        <Box key={idx} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 0.2 }}>
-                          <Typography variant="caption" sx={{ color: item.active ? "text.primary" : "text.disabled", fontSize: "0.74rem" }}>
-                            {item.label}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            fontWeight={800}
-                            sx={{
-                              fontSize: "0.68rem",
-                              color: item.active ? "#10b981" : "text.disabled",
-                            }}
-                          >
-                            {item.active ? "ON" : "OFF"}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Stack>
-                  </Box>
-
-                  {/* Last Updated */}
-                  <Box sx={{ pt: 1, borderTop: (t) => `1px dashed ${t.palette.divider}` }}>
-                    <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em" }}>
-                      Last Updated
-                    </Typography>
-                    <Typography variant="body2" fontWeight={700} sx={{ mt: 0.4, color: "text.secondary", fontSize: "0.78rem" }}>
-                      {lastUpdated || dayjs().format("DD MMM YYYY")}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Card>
-            </Grid>
-          </Grid>
+              {/* Save Button for General Settings */}
+              <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center" }}>
+                <AppButton
+                  variant="contained"
+                  startIcon={<SaveOutlinedIcon />}
+                  onClick={handleSaveGeneral}
+                  sx={{
+                    bgcolor: "#0284c7 !important",
+                    "&:hover": { bgcolor: "#0369a1 !important" },
+                    px: 3,
+                    py: 1,
+                    fontWeight: 700,
+                  }}
+                >
+                  Save General Settings
+                </AppButton>
+              </Box>
+            </Card>
+          </Box>
         )}
 
         {/* ── 2. Email Template Settings (Subject & Description against Category) ── */}
@@ -977,7 +937,7 @@ export default function SettingsPage() {
                       {/* 1. Category Selector Dropdown */}
                       <Box>
                         <AppSelect
-                          label="Category"
+                          label="Event Type"
                           value={selectedCategoryId}
                           onChange={(e) => handleTemplateCategoryChange(e.target.value)}
                           options={categorySelectOptions}
@@ -1045,54 +1005,6 @@ export default function SettingsPage() {
                         minRows={6}
                         required
                       />
-
-                      {/* 5. Dynamic Variables Legend Chips (All 7 Placeholders) */}
-                      <Box
-                        sx={{
-                          p: 1.6,
-                          borderRadius: "10px",
-                          bgcolor: isDark ? "rgba(255,255,255,0.03)" : "rgba(2,132,199,0.04)",
-                          border: (t) => `1px dashed ${t.palette.divider}`,
-                        }}
-                      >
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
-                          <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary" }}>
-                            Click to Insert Dynamic Placeholders:
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: "text.disabled", fontSize: "0.68rem" }}>
-                            Values auto-populate when dispatched
-                          </Typography>
-                        </Box>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                          {[
-                            { tag: "{memberName}", desc: "Member Name" },
-                            { tag: "{categoryName}", desc: "Category Name" },
-                            { tag: "{amount}", desc: "Due Amount" },
-                            { tag: "{dueDate}", desc: "Due Date" },
-                            { tag: "{orgName}", desc: "Organization" },
-                            { tag: "{paymentLink}", desc: "UPI Link" },
-                            { tag: "{qrCode}", desc: "QR Code Tag" },
-                          ].map((item) => (
-                            <Chip
-                              key={item.tag}
-                              label={`${item.tag}`}
-                              size="small"
-                              onClick={() => {
-                                setTemplateDescription((prev) => `${prev} ${item.tag}`);
-                                toast.info(`Inserted ${item.tag}`);
-                              }}
-                              sx={{
-                                fontSize: "0.72rem",
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                bgcolor: isDark ? "rgba(255,255,255,0.08)" : "#e0f2fe",
-                                color: "#0284c7",
-                                "&:hover": { bgcolor: "#bae6fd" },
-                              }}
-                            />
-                          ))}
-                        </Stack>
-                      </Box>
 
                       <Divider sx={{ my: 0.5 }} />
 
@@ -1357,23 +1269,6 @@ export default function SettingsPage() {
                       </Typography>
                     </Box>
 
-                    {/* Simulated Pay Contribution Button */}
-                    <Box sx={{ my: 1.5, textAlign: "center" }}>
-                      <AppButton
-                        variant="contained"
-                        fullWidth
-                        sx={{
-                          bgcolor: "#0284c7 !important",
-                          "&:hover": { bgcolor: "#0369a1 !important" },
-                          py: 0.8,
-                          fontSize: "0.8rem",
-                          fontWeight: 700,
-                          borderRadius: "8px",
-                        }}
-                      >
-                        Pay Contribution
-                      </AppButton>
-                    </Box>
 
                     {/* Email Footer */}
                     <Box sx={{ mt: 2, pt: 1, borderTop: (t) => `1px dashed ${t.palette.divider}` }}>
@@ -1389,270 +1284,7 @@ export default function SettingsPage() {
           );
         })()}
 
-        {/* ── 3. OTP / 2FA Settings ───────────────────────────────────────────── */}
-        {activeTab === "otp2fa" && (
-          <Grid container spacing={2.5} alignItems="flex-start">
-            {/* Left: OTP / 2FA Settings Form (65-70% on desktop) */}
-            <Grid size={{ xs: 12, lg: 8 }}>
-              <Card
-                sx={{
-                  borderRadius: "16px",
-                  border: (t) => `1px solid ${t.palette.divider}`,
-                  p: 2.5,
-                  bgcolor: "background.paper",
-                }}
-              >
-                <Box>
-                  {/* Card Header */}
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
-                    <Box
-                      sx={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: "10px",
-                        bgcolor: "rgba(2, 132, 199, 0.1)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#0284c7",
-                      }}
-                    >
-                      <SecurityOutlinedIcon fontSize="small" />
-                    </Box>
-                    <Box>
-                      <Typography variant="subtitle1" fontWeight={800}>
-                        OTP / 2FA Settings
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                        Configure one-time password and two-factor authentication.
-                      </Typography>
-                    </Box>
-                  </Box>
 
-                  <Stack spacing={2.5} sx={{ mt: 2 }}>
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 6 }}>
-                        <AppInput
-                          label="OTP Expiry (minutes)"
-                          value={settings.otpExpiry}
-                          onChange={(e) => handleChange("otpExpiry", e.target.value)}
-                          restrictType="numberonly"
-                          required
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <AppInput
-                          label="Max Retry Attempt"
-                          value={settings.maxRetry}
-                          onChange={(e) => handleChange("maxRetry", e.target.value)}
-                          restrictType="numberonly"
-                          required
-                        />
-                      </Grid>
-                    </Grid>
-
-                    <Box sx={{ pt: 1 }}>
-                      <AppSwitch
-                        label="Enable OTP for Member Login"
-                        checked={settings.enableOtpLogin}
-                        onChange={(e) => handleChange("enableOtpLogin", e.target.checked)}
-                      />
-                    </Box>
-                    <Box>
-                      <AppSwitch
-                        label="Enable 2FA for Admin Users"
-                        checked={settings.enable2faAdmin}
-                        onChange={(e) => handleChange("enable2faAdmin", e.target.checked)}
-                      />
-                    </Box>
-
-                    <Divider sx={{ my: 1.5, borderColor: "divider" }} />
-
-                    {/* Personal MFA Device Configuration */}
-                    <MfaSettings
-                      embedded
-                      title="Two-Factor Authentication (MFA)"
-                      onDevicesChange={(devs) => setMfaDevicesCount(devs.length)}
-                    />
-                  </Stack>
-                </Box>
-
-                {/* Save Button for OTP / 2FA Settings */}
-                <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center" }}>
-                  <AppButton
-                    variant="contained"
-                    startIcon={<SaveOutlinedIcon />}
-                    onClick={handleSaveOtp}
-                    sx={{
-                      bgcolor: "#0284c7 !important",
-                      "&:hover": { bgcolor: "#0369a1 !important" },
-                      px: 2.5,
-                      fontWeight: 700,
-                    }}
-                  >
-                    Save OTP / 2FA Settings
-                  </AppButton>
-                </Box>
-              </Card>
-            </Grid>
-
-            {/* Right: Security Status Panel (30-35% on desktop) */}
-            <Grid size={{ xs: 12, lg: 4 }}>
-              <Card
-                sx={{
-                  borderRadius: "16px",
-                  border: (t) => `1px solid ${t.palette.divider}`,
-                  p: 2.5,
-                  bgcolor: "background.paper",
-                }}
-              >
-                {/* Header */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
-                  <Box
-                    sx={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: "10px",
-                      bgcolor: "rgba(2, 132, 199, 0.1)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#0284c7",
-                    }}
-                  >
-                    <ShieldOutlinedIcon fontSize="small" />
-                  </Box>
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight={800}>
-                      Security Status
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                      Authentication & protection policies.
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Divider sx={{ mb: 2.5 }} />
-
-                <Stack spacing={2.2}>
-                  {/* Member OTP */}
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          bgcolor: settings.enableOtpLogin ? "#10b981" : "text.disabled",
-                        }}
-                      />
-                      <Typography variant="body2" fontWeight={700} sx={{ color: "text.primary" }}>
-                        Member OTP
-                      </Typography>
-                    </Box>
-                    <Typography
-                      variant="body2"
-                      fontWeight={800}
-                      sx={{
-                        color: settings.enableOtpLogin ? "#10b981" : "text.secondary",
-                        fontSize: "0.82rem",
-                      }}
-                    >
-                      {settings.enableOtpLogin ? "Enabled" : "Disabled"}
-                    </Typography>
-                  </Box>
-
-                  {/* Admin 2FA */}
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          bgcolor: settings.enable2faAdmin ? "#10b981" : "text.disabled",
-                        }}
-                      />
-                      <Typography variant="body2" fontWeight={700} sx={{ color: "text.primary" }}>
-                        Admin 2FA
-                      </Typography>
-                    </Box>
-                    <Typography
-                      variant="body2"
-                      fontWeight={800}
-                      sx={{
-                        color: settings.enable2faAdmin ? "#10b981" : "text.secondary",
-                        fontSize: "0.82rem",
-                      }}
-                    >
-                      {settings.enable2faAdmin ? "Enabled" : "Disabled"}
-                    </Typography>
-                  </Box>
-
-                  <Divider sx={{ my: 0.5 }} />
-
-                  {/* OTP Expiry */}
-                  <Box>
-                    <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em" }}>
-                      OTP Expiry
-                    </Typography>
-                    <Typography variant="body2" fontWeight={700} sx={{ mt: 0.4, color: "text.primary" }}>
-                      {settings.otpExpiry || "10"} Minutes
-                    </Typography>
-                  </Box>
-
-                  {/* Maximum Attempts */}
-                  <Box>
-                    <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em" }}>
-                      Maximum Attempts
-                    </Typography>
-                    <Typography variant="body2" fontWeight={700} sx={{ mt: 0.4, color: "text.primary" }}>
-                      {settings.maxRetry || "3"} Attempts
-                    </Typography>
-                  </Box>
-
-                  {/* Registered MFA Devices */}
-                  <Box>
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em" }}>
-                        Registered MFA Devices
-                      </Typography>
-                      <Chip
-                        label="Active"
-                        size="small"
-                        sx={{
-                          height: 18,
-                          fontSize: "0.62rem",
-                          fontWeight: 750,
-                          bgcolor: "rgba(16, 185, 129, 0.12)",
-                          color: "#059669",
-                        }}
-                      />
-                    </Box>
-                    <Typography variant="body2" fontWeight={700} sx={{ mt: 0.4, color: "text.primary" }}>
-                      {mfaDevicesCount || 1} Device{(mfaDevicesCount || 1) === 1 ? "" : "s"} Configured
-                    </Typography>
-                  </Box>
-
-                  {/* Protection Info Pill */}
-                  <Box
-                    sx={{
-                      mt: 1,
-                      p: 1.5,
-                      borderRadius: "10px",
-                      bgcolor: isDark ? "rgba(255,255,255,0.03)" : "rgba(2,132,199,0.05)",
-                      border: (t) => `1px dashed ${t.palette.divider}`,
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", lineHeight: 1.4, display: "block" }}>
-                      Time-based one-time password and multi-factor authentication are actively enforced on login.
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Card>
-            </Grid>
-          </Grid>
-        )}
 
         {/* ── 4. Payment QR Settings ──────────────────────────────────────────── */}
         {activeTab === "paymentQr" && (
