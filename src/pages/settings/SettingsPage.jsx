@@ -79,19 +79,6 @@ const defaultPaymentQr = `data:image/svg+xml;utf8,${encodeURIComponent(`
 </svg>
 `)}`;
 
-import AppInput from "../../components/common/AppInput";
-import AppSelect from "../../components/common/AppSelect";
-import AppSwitch from "../../components/common/AppSwitch";
-import AppButton from "../../components/common/AppButton";
-import { useAppToast } from "../../components/common/AppToast";
-import MfaSettings from "../../components/common/MfaSettings";
-import {
-  getSystemSettingsAsync,
-  updateSystemSettingsAsync,
-  resetSystemSettingsAsync,
-  updateSystemSettings,
-} from "../../services/settingsService";
-
 const initialSettings = {
   // General
   orgName: "Unit 1A Residents Association",
@@ -810,33 +797,27 @@ export default function SettingsPage() {
                       onChange={(e) => handleChange("enable2faAdmin", e.target.checked)}
                     />
                   </Box>
-
-                  <Divider sx={{ my: 1.5, borderColor: "divider" }} />
-
-                  {/* Personal MFA Device Configuration */}
-                  <MfaSettings embedded title="Two-Factor Authentication (MFA)" />
                 </Stack>
-              </Card>
-            </Grid>
+              </Box>
 
-            {/* Save Button for OTP / 2FA Settings */}
-            <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "flex-end" }}>
-              <AppButton
-                variant="contained"
-                startIcon={<SaveOutlinedIcon />}
-                onClick={handleSaveOtp}
-                sx={{
-                  bgcolor: "#0284c7 !important",
-                  "&:hover": { bgcolor: "#0369a1 !important" },
-                  px: 2.5,
-                  fontWeight: 700,
-                }}
-              >
-                Save OTP / 2FA Settings
-              </AppButton>
-            </Box>
-          </Card>
-        </Grid>
+              {/* Save Button for OTP / 2FA Settings */}
+              <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "flex-end" }}>
+                <AppButton
+                  variant="contained"
+                  startIcon={<SaveOutlinedIcon />}
+                  onClick={handleSaveOtp}
+                  sx={{
+                    bgcolor: "#0284c7 !important",
+                    "&:hover": { bgcolor: "#0369a1 !important" },
+                    px: 2.5,
+                    fontWeight: 700,
+                  }}
+                >
+                  Save OTP / 2FA Settings
+                </AppButton>
+              </Box>
+            </Card>
+          </Grid>
 
         {/* ── 4. Payment QR Settings ──────────────────────────────────────────── */}
         <Grid size={{ xs: 12, md: 6 }}>
