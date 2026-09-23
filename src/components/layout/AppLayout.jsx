@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Avatar,
   Box,
+  ClickAwayListener,
   Divider,
   Drawer,
   IconButton,
@@ -9,7 +10,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Popover,
+  Paper,
+  Popper,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -122,23 +124,76 @@ export default function AppLayout() {
   });
   const [profileErrors, setProfileErrors] = useState({});
 
+  const hoverTimeoutRef = useRef(null);
+
   const handleCloseFlyout = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
     setFlyoutAnchorEl(null);
     setActiveFlyoutItem(null);
+  };
+
+  const handleParentMouseEnter = (item, event) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setFlyoutAnchorEl(event.currentTarget);
+    setActiveFlyoutItem(item);
+  };
+
+  const handleParentMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      handleCloseFlyout();
+    }, 250);
+  };
+
+  const handleFlyoutMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  const handleFlyoutMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      handleCloseFlyout();
+    }, 250);
+  };
+
+  const handleItemMouseEnter = () => {
+    handleCloseFlyout();
   };
 
   const handleParentClick = (item, event) => {
     if (activeFlyoutItem?.id === item.id) {
       handleCloseFlyout();
     } else {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
       setFlyoutAnchorEl(event.currentTarget);
       setActiveFlyoutItem(item);
     }
   };
 
-  // Close flyout on path change
+  // Close flyout on path change or component unmount
   React.useEffect(() => {
     handleCloseFlyout();
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
   }, [location.pathname]);
 
   // Sync profileForm with backend profile (or authState fallback) when dialog opens
@@ -305,6 +360,8 @@ export default function AppLayout() {
         <ListItemButton
           key={item.id}
           onClick={(e) => handleParentClick(item, e)}
+          onMouseEnter={(e) => handleParentMouseEnter(item, e)}
+          onMouseLeave={handleParentMouseLeave}
           selected={active || isFlyoutOpen}
           sx={{
             borderRadius: "8px",
@@ -352,6 +409,7 @@ export default function AppLayout() {
     return (
       <ListItemButton
         key={item.path}
+        onMouseEnter={handleItemMouseEnter}
         onClick={() => {
           handleCloseFlyout();
           navigate(item.path);
@@ -398,7 +456,7 @@ export default function AppLayout() {
     <Box sx={{ minHeight: "100%", display: "flex", flexDirection: "column", bgcolor: SIDEBAR.bg }}>
 
       {/* ── Brand ─────────────────────────────────────────────────────────── */}
-      <Box sx={{ px: 2.5, py: 3, display: "flex", alignItems: "center", gap: { xs: 1.2, md: 1.8 } }}>
+      <Box onMouseEnter={handleItemMouseEnter} sx={{ px: 2.5, py: 3, display: "flex", alignItems: "center", gap: { xs: 1.2, md: 1.8 } }}>
         {/* Mobile menu toggle close button */}
         <Box sx={{ display: { xs: "block", md: "none" }, mr: 0.5 }}>
           <IconButton
@@ -448,6 +506,7 @@ export default function AppLayout() {
       <Box sx={{ px: 1.5, py: 1.5 }}>
         {/* User info row */}
         <Box
+          onMouseEnter={handleItemMouseEnter}
           onClick={() => setProfileDialogOpen(true)}
           sx={{
             display: "flex",
@@ -487,7 +546,7 @@ export default function AppLayout() {
                 "&:hover": { bgcolor: SIDEBAR.logoutHover, color: "#f87171" },
                 transition: "all 0.2s ease",
               }}
-              >
+            >
               <LogoutRoundedIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
           </Tooltip>
@@ -775,26 +834,27 @@ export default function AppLayout() {
         </Box>
       </AppDialog>
 
-      {/* ── Submodule Flyout Popover (Right Side) ─────────────────────────── */}
-      <Popover
+      {/* ── Submodule Flyout Popper (Right Side) ─────────────────────────── */}
+      <Popper
         open={Boolean(flyoutAnchorEl && activeFlyoutItem)}
         anchorEl={flyoutAnchorEl}
-        onClose={handleCloseFlyout}
-        anchorOrigin={{
-          vertical: "top",
-          horizontal: "right",
-        }}
-        transformOrigin={{
-          vertical: "top",
-          horizontal: "left",
-        }}
-        slotProps={{
-          backdrop: {
-            invisible: true,
+        placement="right-start"
+        style={{ zIndex: 1400 }}
+        modifiers={[
+          {
+            name: "offset",
+            options: {
+              offset: [0, 8],
+            },
           },
-          paper: {
-            sx: {
-              ml: 1,
+        ]}
+      >
+        <ClickAwayListener onClickAway={handleCloseFlyout}>
+          <Paper
+            onMouseEnter={handleFlyoutMouseEnter}
+            onMouseLeave={handleFlyoutMouseLeave}
+            elevation={8}
+            sx={{
               bgcolor: SIDEBAR.bg,
               color: SIDEBAR.text,
               borderRadius: "12px",
@@ -805,72 +865,81 @@ export default function AppLayout() {
               minWidth: 190,
               p: 0.5,
               backgroundImage: "none",
-            },
-          },
-        }}
-      >
-        {activeFlyoutItem && (
-          <List component="div" disablePadding>
-              {activeFlyoutItem.children
-                ?.filter((child) => {
-                  if (child.adminOnly && authState?.role !== "Admin") return false;
-                  const rights = getRightsForPath(child.path, authState?.role);
-                  return !rights.deny;
-                })
-                .map((child) => {
-                  const childActive = location.pathname === child.path;
-                  return (
-                    <ListItemButton
-                      key={child.path}
-                      onClick={() => {
-                        navigate(child.path);
-                        handleCloseFlyout();
-                        setMobileOpen(false);
-                      }}
-                      selected={childActive}
-                      sx={{
-                        borderRadius: "8px",
-                        mb: 0.3,
-                        py: 0.7,
-                        px: 1.4,
-                        transition: "all 0.15s ease",
-                        "&.Mui-selected": {
-                          bgcolor: SIDEBAR.activeBg,
-                          borderLeft: `3px solid ${SIDEBAR.active}`,
-                          pl: "calc(11.2px - 3px)",
-                          "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
-                          "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 700 },
-                          "&:hover": { bgcolor: SIDEBAR.activeBg },
-                        },
-                        "&:not(.Mui-selected)": {
-                          borderLeft: "3px solid transparent",
-                          color: SIDEBAR.text,
-                          "& .MuiListItemIcon-root": { color: SIDEBAR.icon },
-                          "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 500 },
-                        },
-                        "&:hover": {
-                          bgcolor: SIDEBAR.hover,
-                          "& .MuiListItemText-primary": { color: SIDEBAR.activeText },
-                          "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
-                        },
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 32, color: childActive ? SIDEBAR.activeIcon : SIDEBAR.icon }}>
-                        {child.icon}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={child.label}
-                        primaryTypographyProps={{
-                          fontSize: "0.83rem",
-                          fontWeight: childActive ? 700 : 500,
+              position: "relative",
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                top: -8,
+                bottom: -8,
+                left: -14,
+                width: 16,
+              },
+            }}
+          >
+            {activeFlyoutItem && (
+              <List component="div" disablePadding>
+                {activeFlyoutItem.children
+                  ?.filter((child) => {
+                    if (child.adminOnly && authState?.role !== "Admin") return false;
+                    const rights = getRightsForPath(child.path, authState?.role);
+                    return !rights.deny;
+                  })
+                  .map((child) => {
+                    const childActive = location.pathname === child.path;
+                    return (
+                      <ListItemButton
+                        key={child.path}
+                        onClick={() => {
+                          navigate(child.path);
+                          handleCloseFlyout();
+                          setMobileOpen(false);
                         }}
-                      />
-                    </ListItemButton>
-                  );
-                })}
-            </List>
-        )}
-      </Popover>
+                        selected={childActive}
+                        sx={{
+                          borderRadius: "8px",
+                          mb: 0.3,
+                          py: 0.7,
+                          px: 1.4,
+                          transition: "all 0.15s ease",
+                          "&.Mui-selected": {
+                            bgcolor: SIDEBAR.activeBg,
+                            borderLeft: `3px solid ${SIDEBAR.active}`,
+                            pl: "calc(11.2px - 3px)",
+                            "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
+                            "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 700 },
+                            "&:hover": { bgcolor: SIDEBAR.activeBg },
+                          },
+                          "&:not(.Mui-selected)": {
+                            borderLeft: "3px solid transparent",
+                            color: SIDEBAR.text,
+                            "& .MuiListItemIcon-root": { color: SIDEBAR.icon },
+                            "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 500 },
+                          },
+                          "&:hover": {
+                            bgcolor: SIDEBAR.hover,
+                            "& .MuiListItemText-primary": { color: SIDEBAR.activeText },
+                            "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ minWidth: 32, color: childActive ? SIDEBAR.activeIcon : SIDEBAR.icon }}>
+                          {child.icon}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={child.label}
+                          primaryTypographyProps={{
+                            fontSize: "0.83rem",
+                            fontWeight: childActive ? 700 : 500,
+                          }}
+                        />
+                      </ListItemButton>
+                    );
+                  })}
+              </List>
+            )}
+          </Paper>
+        </ClickAwayListener>
+      </Popper>
     </Box >
   );
 }
