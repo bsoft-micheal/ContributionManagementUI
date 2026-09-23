@@ -22,7 +22,6 @@ import { GetEventsAsync, DeleteEventAsync } from "../../services/eventService";
 import { GetEventTypesAsync } from "../../services/eventTypeService";
 import { GetMembersAsync } from "../../services/memberService";
 import AppDataTable from "../../components/common/AppDataTable";
-import EventFormDialog from "../../components/events/EventFormDialog";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 
@@ -31,7 +30,6 @@ export default function EventsPage() {
   const [events, setEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
   const [filterYear, setFilterYear] = useState(dayjs().year());
   const [filters, setFilters] = useState({ month: filterMonth, year: filterYear });
@@ -117,10 +115,7 @@ export default function EventsPage() {
             <>
               <Tooltip title="Edit Event">
                 <IconButton size="small" sx={{ p: 0.3 }}
-                  onClick={() => {
-                    setSelectedEvent(row);
-                    setDialogOpen(true);
-                  }}
+                  onClick={() => navigate(`/events/edit/${row.eventId}`)}
                 >
                   <EditIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
                 </IconButton>
@@ -165,7 +160,7 @@ export default function EventsPage() {
               size="small"
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => { setSelectedEvent(null); setDialogOpen(true); }}
+              onClick={() => navigate("/events/add")}
             >
               Add
             </AppButton>
@@ -178,7 +173,11 @@ export default function EventsPage() {
                 <AppSelect
                   label="Month"
                   value={filterMonth}
-                  onChange={(event) => setFilterMonth(Number(event.target.value))}
+                  onChange={(event) => {
+                    const val = Number(event.target.value);
+                    setFilterMonth(val);
+                    setFilters((prev) => ({ ...prev, month: val }));
+                  }}
                   options={monthOptions}
                   placeholder="Select Month"
                   required
@@ -188,31 +187,16 @@ export default function EventsPage() {
                 <AppSelect
                   label="Year"
                   value={filterYear}
-                  onChange={(event) => setFilterYear(Number(event.target.value))}
+                  onChange={(event) => {
+                    const val = Number(event.target.value);
+                    setFilterYear(val);
+                    setFilters((prev) => ({ ...prev, year: val }));
+                  }}
                   options={yearOptions}
                   placeholder="Select Year"
                   required
                 />
               </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setFilters({ month: filterMonth, year: filterYear });
-
-                }}
-                sx={{
-                  bgcolor: "#4a3f6b !important",
-                  color: "#ffffff",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" }
-                }}
-              >
-                Filter
-              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"
@@ -252,19 +236,12 @@ export default function EventsPage() {
         }
       />
 
-      <EventFormDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        event={selectedEvent}
-        eventTypes={eventTypes}
-        members={members}
-        onSaveSuccess={loadData}
-      />
 
       <EventDetailsDialog
         open={viewDialogOpen}
         onClose={() => setViewDialogOpen(false)}
         event={selectedEvent}
+        members={members}
       />
 
       <AppConfirmDialog

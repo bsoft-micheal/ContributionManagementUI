@@ -180,42 +180,54 @@ export function generateDynamicPaymentQr({ amount, note, customConfig }) {
  */
 export function buildPaymentReminderEmailHtml({
   memberName,
+  categoryName,
   eventName,
   amount,
   dueDate,
   upiId,
   receiverName,
   qrImageUrl,
+  customSubject,
+  customBody,
+  orgName = "Unit 1A Residents Association",
 }) {
+  const effectiveCategory = categoryName || eventName || "Contribution";
   const formattedAmount = `₹${Number(amount || 0).toLocaleString("en-IN")}`;
   const upiUri = buildUpiPaymentUri({
     upiId,
     receiverName,
     amount,
-    note: `Contribution for ${eventName}`,
+    note: `Contribution for ${effectiveCategory}`,
   });
+
+  const title = customSubject || `Contribution Payment Reminder - ${effectiveCategory}`;
 
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Payment Reminder - ${eventName}</title>
+  <title>${title}</title>
 </head>
 <body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 24px; color: #1e293b;">
   <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%); padding: 24px; text-align: center; color: #ffffff;">
-      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em;">Contribution Payment Reminder</h2>
-      <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">Unit 1A Residents Association</p>
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em;">${title}</h2>
+      <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">${orgName}</p>
     </div>
 
     <!-- Body Content -->
     <div style="padding: 28px 24px;">
+      ${
+        customBody
+          ? `<div style="font-size: 14px; line-height: 1.7; color: #334155; white-space: pre-line; margin-bottom: 20px;">${customBody}</div>`
+          : `
       <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.5;">Dear <strong>${memberName || "Member"}</strong>,</p>
       <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.6;">
-        This is a friendly reminder regarding your pending contribution for <strong>${eventName}</strong>.
-      </p>
+        This is a friendly reminder regarding your pending contribution for <strong>${effectiveCategory}</strong>.
+      </p>`
+      }
 
       <!-- Amount Highlight Box -->
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 24px;">

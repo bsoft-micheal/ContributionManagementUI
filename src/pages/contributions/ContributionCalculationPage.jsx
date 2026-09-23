@@ -90,7 +90,11 @@ export default function ContributionCalculationPage() {
 
     const eventTypeName = selectedEventDetails.eventTypeName || 
       events.find(e => e.eventId === selectedEventDetails.eventId)?.eventTypeName || "";
-    const isBirthdayEvent = eventTypeName.toLowerCase().includes("birthday");
+    const eventName = selectedEventDetails.eventName || 
+      events.find(e => e.eventId === selectedEventDetails.eventId)?.eventName || "";
+    const isBirthdayEvent = 
+      eventTypeName.toLowerCase().includes("birthday") || 
+      eventName.toLowerCase().includes("birthday");
 
     // 1. Identify which members are participants and find their tenure/joining date
     const enrichedParticipants = eventParticipants.map(ep => {
@@ -117,7 +121,7 @@ export default function ContributionCalculationPage() {
       const halfShareCount = enrichedParticipants.filter(p => p.isLessThanOneYear).length;
       const fullShareCount = enrichedParticipants.length - halfShareCount;
 
-      // 3. Split calculation
+      // 3. Split calculation: Full share = total / (fullShareCount + 0.5 * halfShareCount)
       const divisor = fullShareCount + 0.5 * halfShareCount;
       fullShare = divisor > 0 ? (totalAmount / divisor) : 0;
       setFullShareAmount(fullShare);
@@ -128,14 +132,14 @@ export default function ContributionCalculationPage() {
       setFullShareAmount(equalShare);
     }
 
-    // 4. Calculate for each participant (respect existing contribution amounts or default split)
+    // 4. Calculate for each participant (Birthday category applies 50% half share for new entrants)
     const calculated = enrichedParticipants.map(p => {
       const epContribution = selectedEventDetails.contributions?.find(c => c.memberId === p.memberId);
       let calculatedAmount;
-      if (epContribution !== undefined && epContribution !== null) {
-        calculatedAmount = epContribution.amount;
-      } else if (isBirthdayEvent) {
+      if (isBirthdayEvent) {
         calculatedAmount = p.isLessThanOneYear ? (fullShare * 0.5) : fullShare;
+      } else if (epContribution !== undefined && epContribution !== null && epContribution.amount !== undefined) {
+        calculatedAmount = epContribution.amount;
       } else {
         calculatedAmount = equalShare;
       }
@@ -153,7 +157,11 @@ export default function ContributionCalculationPage() {
 
   const currentEventTypeName = selectedEventDetails?.eventTypeName || 
     events.find(e => e.eventId === selectedEventDetails?.eventId)?.eventTypeName || "";
-  const isCurrentEventBirthday = currentEventTypeName.toLowerCase().includes("birthday");
+  const currentEventName = selectedEventDetails?.eventName || 
+    events.find(e => e.eventId === selectedEventDetails?.eventId)?.eventName || "";
+  const isCurrentEventBirthday = 
+    currentEventTypeName.toLowerCase().includes("birthday") ||
+    currentEventName.toLowerCase().includes("birthday");
 
   const columns = [
     {
@@ -242,24 +250,6 @@ export default function ContributionCalculationPage() {
                   fullWidth
                 />
               </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setSelectedEventId(filterEventId);
-                }}
-                sx={{
-                  bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
-                  color: "#ffffff",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
-                }}
-              >
-                Filter
-              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"

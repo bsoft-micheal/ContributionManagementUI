@@ -62,20 +62,29 @@ export default function ExcelImportDialog({
         // Parse rows as an array of objects
         const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-        // Map and validate each row
-        const processed = rawJson.map((row, idx) => {
-          // Normalize keys (case-insensitive, trim/preserve types)
+        // Filter out completely empty rows
+        const nonEmptyRawJson = rawJson.filter((row) =>
+          Object.values(row).some(
+            (v) => v !== "" && v !== null && v !== undefined && String(v).trim() !== ""
+          )
+        );
+
+        // Normalize keys (case-insensitive, trim/preserve types)
+        const allNormalized = nonEmptyRawJson.map((row) => {
           const normalizedRow = {};
           Object.keys(row).forEach((key) => {
             const val = row[key];
             normalizedRow[key.trim().toLowerCase()] = typeof val === "string" ? val.trim() : val;
           });
+          return normalizedRow;
+        });
 
-          // Run validation passed from parent
-          const validationResult = validateRow(normalizedRow, idx + 1);
+        // Map and validate each row with full dataset context for duplicate detection
+        const processed = allNormalized.map((normalizedRow, idx) => {
+          const validationResult = validateRow(normalizedRow, idx + 1, allNormalized);
           return {
             rowNumber: idx + 2, // Excel rows are 1-indexed, first row is header
-            raw: row,
+            raw: nonEmptyRawJson[idx],
             error: validationResult.error,
             parsed: validationResult.parsed,
           };

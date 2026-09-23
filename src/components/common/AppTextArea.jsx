@@ -59,6 +59,10 @@ export default function AppTextArea({
             "& .MuiOutlinedInput-input": {
               py: 1.2,
               overflowY: "auto !important",
+              "&::placeholder": {
+                color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.45)" : "#94a3b8",
+                opacity: 1,
+              },
               "&::-webkit-scrollbar": {
                 width: "5px",
               },

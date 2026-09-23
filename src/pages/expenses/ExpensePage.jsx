@@ -514,7 +514,11 @@ export default function ExpensePage() {
                 <AppSelect
                   label="Select Event"
                   value={filterEvent}
-                  onChange={(e) => setFilterEvent(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterEvent(val);
+                    setAppliedEvent(val);
+                  }}
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
@@ -526,7 +530,11 @@ export default function ExpensePage() {
                 <AppSelect
                   label="Select Category"
                   value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterCategory(val);
+                    setAppliedCategory(val);
+                  }}
                   options={categoryOptions}
                   size="small"
                   placeholder="Select Category"
@@ -538,7 +546,11 @@ export default function ExpensePage() {
                 <AppSelect
                   label="Select Status"
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterStatus(val);
+                    setAppliedStatus(val);
+                  }}
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
@@ -546,26 +558,6 @@ export default function ExpensePage() {
                   fullWidth
                 />
               </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setAppliedEvent(filterEvent);
-                  setAppliedCategory(filterCategory);
-                  setAppliedStatus(filterStatus);
-                }}
-                sx={{
-                  bgcolor: "#4a3f6b !important",
-                  color: "#ffffff",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" },
-                }}
-              >
-                Filter
-              </AppButton>
               <AppButton
                 variant="outlined"
                 size="small"

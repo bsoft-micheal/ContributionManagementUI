@@ -66,12 +66,12 @@ export default function MembersPage() {
   const [selectedMember, setSelectedMember] = useState(null);
   const toast = useAppToast();
 
-  const [filterRoleId, setFilterRoleId] = useState("");
-  const [appliedRoleId, setAppliedRoleId] = useState("");
+  const [filterRoleId, setFilterRoleId] = useState("ALL");
+  const [appliedRoleId, setAppliedRoleId] = useState("ALL");
 
   const filteredMembers = useMemo(() => {
-    if (!appliedRoleId) return members;
-    return members.filter((m) => m.roleId === appliedRoleId);
+    if (!appliedRoleId || appliedRoleId === "ALL") return members;
+    return members.filter((m) => String(m.roleId) === String(appliedRoleId));
   }, [members, appliedRoleId]);
 
   const genderOptions = [
@@ -138,7 +138,20 @@ export default function MembersPage() {
       };
     });
     setMembers(normalizedMembers);
-    setRoles(rolesData);
+    const safeRoles = rolesData || [];
+    setRoles(safeRoles);
+    if (safeRoles.length > 0) {
+      setFilterRoleId((prev) => {
+        if (prev === "ALL") return "ALL";
+        if (prev && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
+        return "ALL";
+      });
+      setAppliedRoleId((prev) => {
+        if (prev === "ALL") return "ALL";
+        if (prev && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
+        return "ALL";
+      });
+    }
     setLoading(false);
   }
 
@@ -160,6 +173,33 @@ export default function MembersPage() {
       setErrors(newErrors);
       toast.error("Please fill all the required fields");
       return;
+    }
+
+    // Check uniqueness for email and phone
+    const emailLower = form.email.trim().toLowerCase();
+    const phoneClean = form.phone.trim();
+    if (!form.memberId) {
+      if (members.some((m) => m.email && m.email.trim().toLowerCase() === emailLower)) {
+        setErrors((prev) => ({ ...prev, email: "This email is already registered" }));
+        toast.error("This email is already registered with another member");
+        return;
+      }
+      if (members.some((m) => m.phone && String(m.phone).trim() === phoneClean)) {
+        setErrors((prev) => ({ ...prev, phone: "This phone number is already registered" }));
+        toast.error("This phone number is already registered with another member");
+        return;
+      }
+    } else {
+      if (members.some((m) => m.memberId !== form.memberId && m.email && m.email.trim().toLowerCase() === emailLower)) {
+        setErrors((prev) => ({ ...prev, email: "This email is already registered" }));
+        toast.error("This email is already registered with another member");
+        return;
+      }
+      if (members.some((m) => m.memberId !== form.memberId && m.phone && String(m.phone).trim() === phoneClean)) {
+        setErrors((prev) => ({ ...prev, phone: "This phone number is already registered" }));
+        toast.error("This phone number is already registered with another member");
+        return;
+      }
     }
 
     try {
@@ -184,7 +224,12 @@ export default function MembersPage() {
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error("Failed to save");
+      const rawMsg = error.response?.data?.message || (typeof error.response?.data === "string" ? error.response?.data : "") || error.message || "";
+      if (rawMsg.toLowerCase().includes("inner exception") || rawMsg.toLowerCase().includes("unique") || rawMsg.toLowerCase().includes("duplicate")) {
+        toast.error("A member with this email or phone number already exists.");
+      } else {
+        toast.error("Failed to save");
+      }
     }
   }
 
@@ -208,7 +253,7 @@ export default function MembersPage() {
     }
   }
 
-  const validateRow = (row, rowNum) => {
+  const validateRow = (row, rowNum, allRows) => {
     const name = row["name"] !== undefined && row["name"] !== null ? String(row["name"]).trim() : "";
     const email = row["email"] !== undefined && row["email"] !== null ? String(row["email"]).trim() : "";
     const phone = row["phone"] !== undefined && row["phone"] !== null ? String(row["phone"]).trim() : "";
@@ -224,8 +269,48 @@ export default function MembersPage() {
     if (!email) return { error: `Row ${rowNum}: Email is required` };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: `Row ${rowNum}: Invalid email format` };
 
+    // 1. Check if email already exists in system database
+    const emailLower = email.toLowerCase();
+    const existingMemberWithEmail = members.find(
+      (m) => m.email && m.email.trim().toLowerCase() === emailLower
+    );
+    if (existingMemberWithEmail) {
+      return { error: `Row ${rowNum}: Email '${email}' already exists in system` };
+    }
+
+    // 2. Check if email is duplicated within the Excel spreadsheet itself
+    if (allRows && Array.isArray(allRows)) {
+      const firstEmailIndex = allRows.findIndex((r) => {
+        const rEmail = r["email"] !== undefined && r["email"] !== null ? String(r["email"]).trim().toLowerCase() : "";
+        return rEmail === emailLower;
+      });
+      if (firstEmailIndex !== -1 && firstEmailIndex < (rowNum - 2)) {
+        return { error: `Row ${rowNum}: Duplicate email '${email}' in Excel (Row ${firstEmailIndex + 2})` };
+      }
+    }
+
     if (!phone) return { error: `Row ${rowNum}: Phone number is required` };
     if (!/^\d{10}$/.test(phone)) return { error: `Row ${rowNum}: Phone number must be exactly 10 digits` };
+
+    // 3. Check if phone already exists in system database
+    const cleanPhone = phone.trim();
+    const existingMemberWithPhone = members.find(
+      (m) => m.phone && String(m.phone).trim() === cleanPhone
+    );
+    if (existingMemberWithPhone) {
+      return { error: `Row ${rowNum}: Phone '${phone}' already exists in system` };
+    }
+
+    // 4. Check if phone is duplicated within the Excel spreadsheet itself
+    if (allRows && Array.isArray(allRows)) {
+      const firstPhoneIndex = allRows.findIndex((r) => {
+        const rPhone = r["phone"] !== undefined && r["phone"] !== null ? String(r["phone"]).trim() : "";
+        return rPhone === cleanPhone;
+      });
+      if (firstPhoneIndex !== -1 && firstPhoneIndex < (rowNum - 2)) {
+        return { error: `Row ${rowNum}: Duplicate phone '${phone}' in Excel (Row ${firstPhoneIndex + 2})` };
+      }
+    }
 
     // Match gender
     const normalizedGender = gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
@@ -305,16 +390,24 @@ export default function MembersPage() {
       toast.success(`Successfully imported all ${validData.length} member(s)!`);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || "Failed to import members");
+      const rawMsg = err.response?.data?.message || (typeof err.response?.data === "string" ? err.response?.data : "") || err.message || "";
+      if (rawMsg.toLowerCase().includes("inner exception") || rawMsg.toLowerCase().includes("unique") || rawMsg.toLowerCase().includes("duplicate")) {
+        toast.error("One or more records contain an email or phone that already exists in the database.");
+      } else {
+        toast.error(rawMsg || "Failed to import members");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const roleOptions = roles.map((r) => ({
-    label: r.roleName,
-    value: r.roleId,
-  }));
+  const roleOptions = [
+    { label: "All", value: "ALL" },
+    ...roles.map((r) => ({
+      label: r.roleName,
+      value: r.roleId,
+    })),
+  ];
 
   const columns = [
     {
@@ -451,42 +544,26 @@ export default function MembersPage() {
             <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
               <Box sx={{ minWidth: 200 }}>
                 <AppSelect
-                  label="Select Role"
+                  label="Role"
                   value={filterRoleId}
-                  onChange={(e) => setFilterRoleId(e.target.value)}
-                  options={[...roleOptions]}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterRoleId(val);
+                    setAppliedRoleId(val);
+                  }}
+                  options={roleOptions}
                   size="small"
-                  placeholder="Select Role"
                   required
                   fullWidth
                 />
               </Box>
               <AppButton
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setAppliedRoleId(filterRoleId);
-
-                }}
-                sx={{
-                  bgcolor: "#4a3f6b !important",
-                  color: "#ffffff",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "#3b325c !important" }
-                }}
-              >
-                Filter
-              </AppButton>
-              <AppButton
                 variant="outlined"
                 size="small"
                 onClick={() => {
-                  setFilterRoleId("");
-                  setAppliedRoleId("");
-                  toast.success("Filter cleared");
+                  setFilterRoleId("ALL");
+                  setAppliedRoleId("ALL");
+                  toast.success("Filter reset to All");
                 }}
                 sx={{
                   color: "#ef4444",
