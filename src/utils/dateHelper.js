@@ -62,3 +62,24 @@ export function formatViewDateTime(date, placeholder = "--") {
   const d = dayjs(date);
   return d.isValid() ? d.format(DATE_FORMATS.VIEW_DATETIME) : placeholder;
 }
+
+/**
+ * Safely parse a date of birth (supports DD/MM/YYYY, ISO, and Dayjs)
+ * @param {string | Date | dayjs.Dayjs} val
+ * @returns {dayjs.Dayjs | null}
+ */
+export function parseMemberDob(val) {
+  if (!val) return null;
+  if (dayjs.isDayjs(val)) return val.isValid() ? val : null;
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
+      const [d, m, y] = trimmed.split("/").map(Number);
+      const parsed = dayjs(new Date(y, m - 1, d));
+      if (parsed.isValid()) return parsed;
+    }
+    const parsed = dayjs(trimmed);
+    if (parsed.isValid()) return parsed;
+  }
+  return null;
+}

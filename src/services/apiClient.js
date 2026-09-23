@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5111/api/v1",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "https://localhost:5111/api/v1",
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -37,7 +37,7 @@ export const getImageUrl = (path) => {
   if (!path) return "";
   if (path.startsWith("data:") || path.startsWith("http:") || path.startsWith("https:")) return path;
   
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5111/api/v1";
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://localhost:5111/api/v1";
   const backendBaseUrl = baseUrl.replace(/\/api\/v\d+$/i, "").replace(/\/api$/i, "");
   
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
