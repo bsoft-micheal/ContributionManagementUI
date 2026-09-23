@@ -220,13 +220,25 @@ export default function EventFormPage() {
     selectedType && selectedType.eventTypeName?.toLowerCase().includes("birthday")
   );
 
-  // Detect month celebrants from active members
+  // Detect month celebrants from active members (deduplicated by name + DOB or ID)
   const monthCelebrants = useMemo(() => {
     if (!form.eventDate) return [];
     const targetMonth = dayjs(form.eventDate).month();
-    return activeMembers.filter(
-      (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
-    );
+    const seen = new Set();
+    const list = [];
+    for (const m of activeMembers) {
+      if (!m.dateOfBirth) continue;
+      const dob = dayjs(m.dateOfBirth);
+      if (dob.month() !== targetMonth) continue;
+      const normName = (m.name || "").toLowerCase().trim();
+      const dobStr = dob.format("YYYY-MM-DD");
+      const key = normName && dobStr ? `${normName}|${dobStr}` : `id:${m.memberId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push(m);
+      }
+    }
+    return list;
   }, [form.eventDate, activeMembers]);
 
   // Birthday calculation math

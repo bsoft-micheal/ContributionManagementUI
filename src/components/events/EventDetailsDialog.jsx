@@ -79,17 +79,18 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
     const items = celebrantsText.split(/,\s*/);
     const result = [];
     items.forEach((item, idx) => {
-      const m = item.match(/^(.*?)\s*\((.*?)\)$/);
+      const cleanItem = item.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+      const m = cleanItem.match(/^(.*?)\s*\((.*?)\)$/);
       if (m) {
         result.push({
           id: `parsed-${idx}`,
           name: m[1].trim(),
           dobText: m[2].trim(),
         });
-      } else if (item.trim()) {
+      } else if (cleanItem) {
         result.push({
           id: `parsed-${idx}`,
-          name: item.trim(),
+          name: cleanItem,
           dobText: "--",
         });
       }
@@ -97,7 +98,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
     return result;
   };
 
-  // Compile birthday members & DOB table data
+  // Compile birthday members & DOB table data (strictly deduplicated)
   const getTableCelebrants = () => {
     if (!isBirthday) return [];
 
@@ -105,27 +106,53 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
     const eventMonth = dayjs(event.eventDate).month();
     const map = new Map();
 
+    const getDedupeKey = (id, name, dob) => {
+      const cleanName = (name || "").toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+      const cleanDob = dob ? dayjs(dob).format("YYYY-MM-DD") : "";
+      if (cleanName && cleanDob) {
+        return `${cleanName}|${cleanDob}`;
+      }
+      if (id && !String(id).startsWith("parsed-")) {
+        return `id:${id}`;
+      }
+      return cleanName || `id:${id}`;
+    };
+
     // 1. Process parsed items from description (maintains exact list from description)
     parsedList.forEach((item) => {
-      const match = allMembers.find((m) => {
+      const cleanItemName = item.name.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+      let match = allMembers.find((m) => {
         if (!m.name) return false;
-        const a = m.name.toLowerCase().trim();
-        const b = item.name.toLowerCase().trim();
-        return a === b || a.includes(b) || b.includes(a);
+        const cleanMName = m.name.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+        return cleanMName === cleanItemName;
       });
 
-      map.set(item.name.toLowerCase(), {
-        id: match?.memberId || item.id,
-        name: match?.name || item.name,
-        dateOfBirth: match?.dateOfBirth || null,
-        dobFormatted: match?.dateOfBirth
-          ? dayjs(match.dateOfBirth).format("DD/MM/YYYY")
-          : item.dobText,
-        dobDayMonth: match?.dateOfBirth
-          ? dayjs(match.dateOfBirth).format("D MMMM")
-          : item.dobText,
-        memberType: match?.memberType || "Office",
-      });
+      if (!match) {
+        match = allMembers.find((m) => {
+          if (!m.name) return false;
+          const cleanMName = m.name.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+          return cleanMName.includes(cleanItemName) || cleanItemName.includes(cleanMName);
+        });
+      }
+
+      const resolvedName = match?.name || item.name;
+      const resolvedDob = match?.dateOfBirth || null;
+      const dedupeKey = getDedupeKey(match?.memberId || item.id, resolvedName, resolvedDob);
+
+      if (!map.has(dedupeKey)) {
+        map.set(dedupeKey, {
+          id: match?.memberId || item.id,
+          name: resolvedName,
+          dateOfBirth: resolvedDob,
+          dobFormatted: resolvedDob
+            ? dayjs(resolvedDob).format("DD/MM/YYYY")
+            : item.dobText,
+          dobDayMonth: resolvedDob
+            ? dayjs(resolvedDob).format("D MMMM")
+            : item.dobText,
+          memberType: match?.memberType || "Office",
+        });
+      }
     });
 
     // 2. Supplement from event.participants or allMembers matching event month
@@ -144,9 +171,9 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
     }
 
     matchedMembers.forEach((m) => {
-      const key = (m.name || "").toLowerCase().trim();
-      if (!map.has(key)) {
-        map.set(key, {
+      const dedupeKey = getDedupeKey(m.memberId, m.name, m.dateOfBirth);
+      if (!map.has(dedupeKey)) {
+        map.set(dedupeKey, {
           id: m.memberId,
           name: m.name,
           dateOfBirth: m.dateOfBirth,
@@ -154,6 +181,16 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
           dobDayMonth: m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMMM") : "--",
           memberType: m.memberType || "Office",
         });
+      } else {
+        // If already present, enrich missing birth date or ID if parsed item didn't have it
+        const existing = map.get(dedupeKey);
+        if (!existing.dateOfBirth && m.dateOfBirth) {
+          existing.id = m.memberId;
+          existing.dateOfBirth = m.dateOfBirth;
+          existing.dobFormatted = dayjs(m.dateOfBirth).format("DD/MM/YYYY");
+          existing.dobDayMonth = dayjs(m.dateOfBirth).format("D MMMM");
+          existing.memberType = m.memberType || existing.memberType || "Office";
+        }
       }
     });
 

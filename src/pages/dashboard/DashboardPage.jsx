@@ -26,14 +26,16 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import SearchIcon from "@mui/icons-material/Search";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import dayjs from "dayjs";
-import { formatGridDate } from "../../utils/dateHelper";
+import { formatGridDate, parseMemberDob } from "../../utils/dateHelper";
 import MetricCard from "../../components/MetricCard";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import { GetDashboardSummaryAsync } from "../../services/dashboardService";
 import { GetEventTypesAsync } from "../../services/eventTypeService";
+import { GetMembersAsync } from "../../services/memberService";
 import { useAppToast } from "../../components/common/AppToast";
 import AppDataTable from "../../components/common/AppDataTable";
+import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 const C = {
@@ -659,6 +661,11 @@ export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [eventTypes, setEventTypes] = useState([]);
 
+  // Birthday Celebration Modal States
+  const [todayCelebrants, setTodayCelebrants] = useState([]);
+  const [bdayModalOpen, setBdayModalOpen] = useState(false);
+  const [hasCelebrated, setHasCelebrated] = useState(false);
+
   const [pendingFilters, setPendingFilters] = useState({
     month: dayjs().month() + 1,
     year: dayjs().year(),
@@ -701,6 +708,75 @@ export default function DashboardPage() {
     load();
     return () => { cancelled = true; };
   }, [appliedFilters.month, appliedFilters.year]);
+
+  // Detect today's birthdays on Dashboard open & trigger celebratory pop up message with paper blast
+  useEffect(() => {
+    let cancelled = false;
+    async function checkTodayBirthdays() {
+      try {
+        const membersData = await GetMembersAsync().catch(() => []);
+        if (cancelled || !Array.isArray(membersData)) return;
+
+        const today = dayjs();
+        const todayMonth = today.month();
+        const todayDate = today.date();
+
+        const celebrants = [];
+        const seen = new Set();
+
+        for (const m of membersData) {
+          const dob = parseMemberDob(m.dateOfBirth);
+          if (dob && dob.month() === todayMonth && dob.date() === todayDate) {
+            const name = m.name || m.memberName || "Unknown";
+            const key = `${name.toLowerCase()}|${dob.format("MM-DD")}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              celebrants.push({
+                memberId: m.memberId,
+                name,
+                type: m.type || m.memberType || "Member",
+                dateOfBirth: m.dateOfBirth,
+              });
+            }
+          }
+        }
+
+        // Also check if any upcoming event or event in summary is a Birthday today
+        if (summary?.upcomingEvents && Array.isArray(summary.upcomingEvents)) {
+          for (const ev of summary.upcomingEvents) {
+            const isBday =
+              (ev.eventTypeName || "").toLowerCase().includes("birthday") ||
+              (ev.eventName || "").toLowerCase().includes("birthday");
+            if (isBday && ev.eventDate && dayjs(ev.eventDate).isSame(today, "day")) {
+              const name = ev.eventName || "Birthday Celebrant";
+              const key = `event|${name.toLowerCase()}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                celebrants.push({
+                  memberId: ev.eventId,
+                  name,
+                  type: "Birthday Event",
+                });
+              }
+            }
+          }
+        }
+
+        if (celebrants.length > 0 && !hasCelebrated) {
+          setTodayCelebrants(celebrants);
+          setBdayModalOpen(true);
+          setHasCelebrated(true);
+        }
+      } catch (err) {
+        console.error("Error checking birthdays in Dashboard:", err);
+      }
+    }
+
+    checkTodayBirthdays();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasCelebrated, summary]);
 
   // Build Event Type options combining API categories and any upcoming events
   const eventTypeOptions = useMemo(() => {
@@ -1346,6 +1422,14 @@ export default function DashboardPage() {
           </>
         )}
       </Card>
+
+      {/* Big Celebratory Birthday Pop-up Modal with Paper Blast Confetti & Auto-Hide */}
+      <BirthdayCelebrationModal
+        open={bdayModalOpen}
+        onClose={() => setBdayModalOpen(false)}
+        celebrants={todayCelebrants}
+        autoCloseSeconds={5}
+      />
     </div>
   );
 }
