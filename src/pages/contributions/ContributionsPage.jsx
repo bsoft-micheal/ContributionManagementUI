@@ -441,48 +441,74 @@ export default function ContributionsPage() {
             required
           />
 
-          {payment.paymentMode === "Upi" && Number(payment.amount) > 0 && (
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: "12px",
-                bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.08)" : "rgba(2, 132, 199, 0.04)"),
-                border: "1px solid rgba(2, 132, 199, 0.2)",
-                textAlign: "center",
-              }}
-            >
-              <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", display: "block", mb: 0.8 }}>
-                Dynamic UPI Payment QR (₹{Number(payment.amount).toLocaleString("en-IN")})
-              </Typography>
+          {payment.paymentMode === "Upi" && Number(payment.amount) > 0 && (() => {
+            const targetEvent = events.find((e) => e.eventId === payment?.eventId);
+            const eventType = targetEvent?.eventTypeName || targetEvent?.eventType || targetEvent?.name;
+            const eventQrConfig = getPaymentQrConfig(eventType);
+
+            return (
               <Box
-                component="img"
-                src={generateQrPngDataUrl(
-                  buildUpiPaymentUri({
-                    upiId: getPaymentQrConfig().qrUpiId,
-                    receiverName: getPaymentQrConfig().qrReceiverName,
-                    amount: payment.amount,
-                    note: "Contribution Payment",
-                  }),
-                  200
-                )}
-                alt="UPI QR Code"
                 sx={{
-                  width: 120,
-                  height: 120,
-                  display: "block",
-                  margin: "0 auto",
-                  p: 0.6,
-                  bgcolor: "#ffffff",
-                  borderRadius: "10px",
-                  border: "1.5px solid #0284c7",
-                  boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)",
+                  p: 1.5,
+                  borderRadius: "12px",
+                  bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.08)" : "rgba(2, 132, 199, 0.04)"),
+                  border: "1px solid rgba(2, 132, 199, 0.2)",
+                  textAlign: "center",
                 }}
-              />
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.6, display: "block" }}>
-                Scan with any UPI app to pay ₹{Number(payment.amount).toLocaleString("en-IN")} directly.
-              </Typography>
-            </Box>
-          )}
+              >
+                <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", display: "block", mb: 0.8 }}>
+                  Dynamic UPI Payment QR (₹{Number(payment.amount).toLocaleString("en-IN")}) - {eventType || "Event"}
+                </Typography>
+                {eventQrConfig.isConfigured ? (
+                  <>
+                    <Box
+                      component="img"
+                      src={
+                        eventQrConfig.qrMode === "uploaded" && eventQrConfig.qrImage
+                          ? eventQrConfig.qrImage
+                          : generateQrPngDataUrl(
+                              buildUpiPaymentUri({
+                                upiId: eventQrConfig.qrUpiId,
+                                receiverName: eventQrConfig.qrReceiverName,
+                                amount: payment.amount,
+                                note: `Contribution Payment for ${eventType || "Event"}`,
+                              }),
+                              200
+                            )
+                      }
+                      alt="UPI QR Code"
+                      sx={{
+                        width: 120,
+                        height: 120,
+                        display: "block",
+                        margin: "0 auto",
+                        p: 0.6,
+                        bgcolor: "#ffffff",
+                        borderRadius: "10px",
+                        border: "1.5px solid #0284c7",
+                        boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)",
+                      }}
+                    />
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.6, display: "block" }}>
+                      Payee: <strong>{eventQrConfig.qrReceiverName}</strong> ({eventQrConfig.qrUpiId})
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.2, display: "block" }}>
+                      Scan with any UPI app to pay ₹{Number(payment.amount).toLocaleString("en-IN")} directly.
+                    </Typography>
+                  </>
+                ) : (
+                  <Box sx={{ py: 1 }}>
+                    <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 700, display: "block" }}>
+                      Payment QR is not configured for this event type ({eventType || "Event"}).
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.66rem", mt: 0.3, display: "block" }}>
+                      Configure UPI ID in Settings &gt; Payment QR Settings.
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            );
+          })()}
         </Stack>
       </AppDialog>
 

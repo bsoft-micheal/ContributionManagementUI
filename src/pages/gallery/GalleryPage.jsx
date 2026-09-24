@@ -20,6 +20,7 @@ import {
   ChevronRight as ChevronRightIcon,
   PhotoLibrary as PhotoLibraryIcon,
   FilterList as FilterListIcon,
+  Download as DownloadIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -66,6 +67,25 @@ export const extractImages = (rawImageUrl) => {
   }
   return [];
 };
+
+// Helper to convert base64 data URL to Blob for reliable downloading
+export function dataURLtoBlob(dataurl) {
+  try {
+    const arr = dataurl.split(",");
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch (e) {
+    console.error("Failed to parse data URL to blob:", e);
+    return null;
+  }
+}
 
 const initialForm = {
   title: "",
@@ -253,6 +273,68 @@ export default function GalleryPage() {
     });
     setErrors({});
     setDialogOpen(true);
+  };
+
+  const handleDownloadImage = async (imgUrl, suggestedName = "gallery-photo") => {
+    if (!imgUrl) return;
+    try {
+      let blob;
+      let ext = "jpg";
+
+      if (imgUrl.startsWith("data:")) {
+        const mimeMatch = imgUrl.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+)/);
+        if (mimeMatch) {
+          ext = mimeMatch[1].split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+        }
+        blob = dataURLtoBlob(imgUrl);
+      } else {
+        const response = await fetch(imgUrl);
+        blob = await response.blob();
+        if (blob.type) {
+          ext = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+        } else if (imgUrl.includes(".")) {
+          const urlExt = imgUrl.split(".").pop().split(/[?#]/)[0];
+          if (urlExt && urlExt.length <= 4) ext = urlExt;
+        }
+      }
+
+      const cleanName = suggestedName.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+      if (blob) {
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = `${cleanName}.${ext}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+        toast.success("Image downloaded successfully");
+      } else {
+        const link = document.createElement("a");
+        link.href = imgUrl;
+        link.download = `${cleanName}.${ext}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Image downloaded successfully");
+      }
+    } catch (error) {
+      console.error("Download failed:", error);
+      try {
+        const cleanName = suggestedName.replace(/[^a-zA-Z0-9_-]/g, "_");
+        const link = document.createElement("a");
+        link.href = imgUrl;
+        link.download = `${cleanName}.jpg`;
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Image download initiated");
+      } catch {
+        toast.error("Failed to download image");
+      }
+    }
   };
 
   const handleMultipleImageUpload = (files) => {
@@ -1082,7 +1164,49 @@ export default function GalleryPage() {
         title="Gallery Details"
         maxWidth="md"
         actions={
-          <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ width: "100%" }}>
+          <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ width: "100%", flexWrap: "wrap", gap: 1 }}>
+            {selectedPhoto && (() => {
+              const currentImages = selectedPhoto.images && selectedPhoto.images.length > 0
+                ? selectedPhoto.images
+                : (selectedPhoto.imageUrl ? [selectedPhoto.imageUrl] : []);
+              const activeImg = currentImages[activeViewImageIndex] || currentImages[0];
+              if (!activeImg) return null;
+
+              return (
+                <>
+                  <AppButton
+                    variant="outlined"
+                    startIcon={<DownloadIcon />}
+                    onClick={() => {
+                      handleDownloadImage(
+                        activeImg,
+                        `${selectedPhoto.title || "gallery-photo"}-${activeViewImageIndex + 1}`
+                      );
+                    }}
+                  >
+                    Download Current Photo
+                  </AppButton>
+                  {currentImages.length > 1 && (
+                    <AppButton
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => {
+                        currentImages.forEach((img, i) => {
+                          setTimeout(() => {
+                            handleDownloadImage(
+                              img,
+                              `${selectedPhoto.title || "gallery-photo"}-${i + 1}`
+                            );
+                          }, i * 350);
+                        });
+                      }}
+                    >
+                      Download All ({currentImages.length})
+                    </AppButton>
+                  )}
+                </>
+              );
+            })()}
             <AppButton
               variant="contained"
               onClick={() => {
@@ -1136,22 +1260,65 @@ export default function GalleryPage() {
                       }}
                     />
 
-                    {/* Counter Badge */}
-                    <Chip
-                      icon={<PhotoLibraryIcon sx={{ fontSize: "14px !important", color: "#ffffff !important" }} />}
-                      label={`${activeViewImageIndex + 1} of ${currentImages.length}`}
-                      size="small"
+                    {/* Top Right Controls: Download Button + Counter Badge */}
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
                       sx={{
                         position: "absolute",
                         top: 12,
                         right: 12,
-                        bgcolor: "rgba(0, 0, 0, 0.75)",
-                        backdropFilter: "blur(4px)",
-                        color: "#ffffff",
-                        fontWeight: 700,
-                        fontSize: "0.75rem",
+                        zIndex: 3,
                       }}
-                    />
+                    >
+                      <Tooltip title="Download this image">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadImage(
+                              activeImg,
+                              `${selectedPhoto.title || "gallery-photo"}-${activeViewImageIndex + 1}`
+                            );
+                          }}
+                          sx={{
+                            bgcolor: "rgba(0, 0, 0, 0.75)",
+                            backdropFilter: "blur(4px)",
+                            color: "#ffffff",
+                            width: 32,
+                            height: 32,
+                            borderRadius: "16px",
+                            border: "1px solid rgba(255, 255, 255, 0.15)",
+                            "&:hover": {
+                              bgcolor: (t) => t.palette.mode === "dark" ? "#6366f1" : "#4a3f6b",
+                              transform: "scale(1.08)",
+                              color: "#ffffff",
+                            },
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          <DownloadIcon sx={{ fontSize: "1.1rem" }} />
+                        </IconButton>
+                      </Tooltip>
+
+                      {/* Counter Badge */}
+                      <Chip
+                        icon={<PhotoLibraryIcon sx={{ fontSize: "14px !important", color: "#ffffff !important" }} />}
+                        label={`${activeViewImageIndex + 1} of ${currentImages.length}`}
+                        size="small"
+                        sx={{
+                          bgcolor: "rgba(0, 0, 0, 0.75)",
+                          backdropFilter: "blur(4px)",
+                          color: "#ffffff",
+                          fontWeight: 700,
+                          fontSize: "0.75rem",
+                          height: 32,
+                          borderRadius: "16px",
+                          border: "1px solid rgba(255, 255, 255, 0.15)",
+                        }}
+                      />
+                    </Stack>
 
                     {/* Navigation Arrows for multi-images */}
                     {currentImages.length > 1 && (
@@ -1228,39 +1395,80 @@ export default function GalleryPage() {
                         return (
                           <Box
                             key={idx}
-                            onClick={() => setActiveViewImageIndex(idx)}
                             sx={{
+                              position: "relative",
                               flexShrink: 0,
-                              width: 68,
-                              height: 52,
-                              borderRadius: "8px",
-                              overflow: "hidden",
-                              cursor: "pointer",
-                              border: "2px solid",
-                              borderColor: isActive
-                                ? (t) => (t.palette.mode === "dark" ? "#818cf8" : "#4a3f6b")
-                                : "transparent",
-                              opacity: isActive ? 1 : 0.6,
-                              transform: isActive ? "scale(1.05)" : "scale(1)",
-                              transition: "all 0.2s ease",
-                              boxShadow: isActive ? "0 2px 8px rgba(74,63,107,0.3)" : "none",
-                              "&:hover": {
+                              "&:hover .thumb-download-btn": {
                                 opacity: 1,
-                                transform: "scale(1.05)",
                               },
                             }}
                           >
                             <Box
-                              component="img"
-                              src={imgUrl}
-                              alt={`Thumbnail ${idx + 1}`}
+                              onClick={() => setActiveViewImageIndex(idx)}
                               sx={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                display: "block",
+                                width: 68,
+                                height: 52,
+                                borderRadius: "8px",
+                                overflow: "hidden",
+                                cursor: "pointer",
+                                border: "2px solid",
+                                borderColor: isActive
+                                  ? (t) => (t.palette.mode === "dark" ? "#818cf8" : "#4a3f6b")
+                                  : "transparent",
+                                opacity: isActive ? 1 : 0.6,
+                                transform: isActive ? "scale(1.05)" : "scale(1)",
+                                transition: "all 0.2s ease",
+                                boxShadow: isActive ? "0 2px 8px rgba(74,63,107,0.3)" : "none",
+                                "&:hover": {
+                                  opacity: 1,
+                                  transform: "scale(1.05)",
+                                },
                               }}
-                            />
+                            >
+                              <Box
+                                component="img"
+                                src={imgUrl}
+                                alt={`Thumbnail ${idx + 1}`}
+                                sx={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                  display: "block",
+                                }}
+                              />
+                            </Box>
+                            <Tooltip title={`Download image ${idx + 1}`}>
+                              <IconButton
+                                className="thumb-download-btn"
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadImage(
+                                    imgUrl,
+                                    `${selectedPhoto.title || "gallery-photo"}-${idx + 1}`
+                                  );
+                                }}
+                                sx={{
+                                  position: "absolute",
+                                  top: 3,
+                                  right: 3,
+                                  width: 22,
+                                  height: 22,
+                                  p: 0,
+                                  bgcolor: "rgba(0, 0, 0, 0.8)",
+                                  backdropFilter: "blur(2px)",
+                                  color: "#ffffff",
+                                  opacity: 0,
+                                  transition: "opacity 0.2s ease, transform 0.2s ease",
+                                  "&:hover": {
+                                    bgcolor: "#4a3f6b",
+                                    transform: "scale(1.15)",
+                                  },
+                                }}
+                              >
+                                <DownloadIcon sx={{ fontSize: "0.85rem" }} />
+                              </IconButton>
+                            </Tooltip>
                           </Box>
                         );
                       })}

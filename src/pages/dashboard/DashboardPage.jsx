@@ -1428,12 +1428,12 @@ export default function DashboardPage() {
         )}
       </Card>
 
-      {/* Big Celebratory Birthday Pop-up Modal with Paper Blast Confetti & Auto-Hide */}
+      {/* Big Celebratory Birthday Pop-up Modal with Paper Blast Confetti (Static) */}
       <BirthdayCelebrationModal
         open={bdayModalOpen}
         onClose={() => setBdayModalOpen(false)}
         celebrants={todayCelebrants}
-        autoCloseSeconds={5}
+        autoCloseSeconds={0}
       />
     </div>
   );

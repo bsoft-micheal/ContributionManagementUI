@@ -45,7 +45,7 @@ export function buildUpiPaymentUri({ upiId, receiverName, amount, note }) {
   if (!upiId) return "";
   const cleanUpi = upiId.trim();
   const cleanName = (receiverName || "Contribution Management").trim();
-  
+
   const params = new URLSearchParams();
   params.set("pa", cleanUpi);
   params.set("pn", cleanName);
@@ -87,69 +87,182 @@ export function getQrCodeSvgDataUri(text, size = 200) {
   return getQrCodeApiUrl(text, size);
 }
 
+export const EVENT_QR_STORAGE_KEY = "cm_event_payment_qr_configs";
+
 /**
- * Fetches the current Payment QR configuration from localStorage or default settings.
- * @returns {Object} Configured QR settings
+ * Normalizes an event type string for key matching.
+ * E.g., "teamouting" -> "Teamouting", "team outing" -> "Team Outing"
  */
-export function getPaymentQrConfig() {
-  const defaults = {
-    qrReceiverName: "Daniel A",
-    qrUpiId: "danielrobertanto604@okicici",
-    qrMode: "generated", // "generated" | "uploaded"
-    qrImage: null,
-    qrPreviewAmount: "100",
-  };
-
-  try {
-    const saved = localStorage.getItem("cm_system_settings");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // If cached value is the old system placeholder (unit1a@okaxis), cleanly replace with user's desired danielrobertanto604@okicici
-      const isPlaceholderUpi =
-        !parsed.qrUpiId ||
-        parsed.qrUpiId.toLowerCase() === "unit1a@okaxis" ||
-        parsed.qrUpiId.toLowerCase() === "name@okaxis";
-
-      const isPlaceholderReceiver =
-        !parsed.qrReceiverName ||
-        parsed.qrReceiverName.toLowerCase().includes("unit 1a");
-
-      return {
-        qrReceiverName: isPlaceholderReceiver ? defaults.qrReceiverName : parsed.qrReceiverName,
-        qrUpiId: isPlaceholderUpi ? defaults.qrUpiId : parsed.qrUpiId,
-        qrMode: parsed.qrMode || defaults.qrMode,
-        qrImage: parsed.qrImage || null,
-        qrPreviewAmount: parsed.qrPreviewAmount || defaults.qrPreviewAmount,
-      };
-    }
-  } catch (err) {
-    console.warn("Could not read Payment QR config from localStorage:", err);
-  }
-
-  return defaults;
+export function normalizeEventTypeName(name) {
+  if (!name || typeof name !== "string") return "";
+  const trimmed = name.trim();
+  if (!trimmed) return "";
+  return trimmed;
 }
 
 /**
- * Generates a dynamic QR Code image URL tailored for a specific member's contribution amount.
+ * Retrieves all stored per-event-type payment QR configurations.
+ * Does not hardcode values; returns dynamically saved records.
+ * @returns {Record<string, { receiverName: string, upiId: string, qrMode: string, qrImage: string | null, previewAmount: string, isActive: boolean }>}
+ */
+export function getAllPaymentQrConfigs() {
+  try {
+    const raw = localStorage.getItem(EVENT_QR_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not read event payment QR configs from localStorage:", err);
+  }
+  return {};
+}
+
+/**
+ * Saves a payment QR configuration strictly for a single event type.
+ * Guarantees that saving one event type will not overwrite others.
+ * 
+ * @param {string} eventType 
+ * @param {Object} config 
+ * @returns {Record<string, Object>} All updated configurations
+ */
+export function savePaymentQrConfigForEventType(eventType, config) {
+  const norm = normalizeEventTypeName(eventType);
+  if (!norm) return getAllPaymentQrConfigs();
+
+  const all = getAllPaymentQrConfigs();
+  const existing = all[norm] || {};
+
+  all[norm] = {
+    ...existing,
+    ...config,
+    receiverName: (config.receiverName || "").trim(),
+    upiId: (config.upiId || "").trim(),
+    qrMode: config.qrMode || "generated",
+    qrImage: config.qrImage || null,
+    previewAmount: config.previewAmount || "100",
+    isActive: config.isActive !== undefined ? config.isActive : true,
+  };
+
+  try {
+    localStorage.setItem(EVENT_QR_STORAGE_KEY, JSON.stringify(all));
+  } catch (err) {
+    console.warn("Could not save event payment QR configs to localStorage:", err);
+  }
+
+  return all;
+}
+
+/**
+ * Fetches the Payment QR configuration for a specific event type.
+ * If not configured, returns an unconfigured object with isConfigured: false.
+ * 
+ * @param {string|Object} [eventTypeOrEvent] - Event Type name or event object
+ * @returns {Object} Configured QR settings with isConfigured boolean flag
+ */
+export function getPaymentQrConfig(eventTypeOrEvent) {
+  let eventType = "";
+  if (typeof eventTypeOrEvent === "string") {
+    eventType = eventTypeOrEvent;
+  } else if (eventTypeOrEvent && typeof eventTypeOrEvent === "object") {
+    eventType =
+      eventTypeOrEvent.eventTypeName ||
+      eventTypeOrEvent.eventType ||
+      eventTypeOrEvent.categoryName ||
+      eventTypeOrEvent.name ||
+      "";
+  }
+
+  const norm = normalizeEventTypeName(eventType);
+  const all = getAllPaymentQrConfigs();
+
+  // Try direct match or case-insensitive match
+  let matchedConfig = null;
+  if (norm && all[norm]) {
+    matchedConfig = all[norm];
+  } else if (norm) {
+    const key = Object.keys(all).find((k) => k.toLowerCase() === norm.toLowerCase());
+    if (key) matchedConfig = all[key];
+  }
+
+  // If found and has a valid UPI ID
+  if (matchedConfig && matchedConfig.upiId && matchedConfig.upiId.trim()) {
+    const receiverName = matchedConfig.receiverName || "";
+    const upiId = matchedConfig.upiId.trim();
+    const qrMode = matchedConfig.qrMode || "generated";
+    const qrImage = matchedConfig.qrImage || null;
+
+    return {
+      eventType: norm,
+      receiverName,
+      upiId,
+      qrReceiverName: receiverName,
+      qrUpiId: upiId,
+      qrMode,
+      qrImage,
+      previewAmount: matchedConfig.previewAmount || "100",
+      isActive: matchedConfig.isActive !== false,
+      isConfigured: true,
+      message: "",
+    };
+  }
+
+  // If no per-event-type config exists, return clean unconfigured state (no hardcoded credentials)
+  return {
+    eventType: norm || "Event",
+    receiverName: "",
+    upiId: "",
+    qrReceiverName: "",
+    qrUpiId: "",
+    qrMode: "generated",
+    qrImage: null,
+    previewAmount: "100",
+    isActive: false,
+    isConfigured: false,
+    message: "Payment QR is not configured for this event type.",
+  };
+}
+
+/**
+ * Generates a dynamic QR Code image URL tailored for a specific member's contribution amount
+ * and specific event type.
  * 
  * @param {Object} params
- * @param {number} params.amount - Member's exact outstanding amount
+ * @param {number} params.amount - Member's outstanding amount
  * @param {string} [params.note] - Event / Contribution note
  * @param {Object} [params.customConfig] - Optional custom QR config override
- * @returns {{ upiUri: string, qrImageUrl: string, receiverName: string, upiId: string, amount: number, mode: string }}
+ * @param {string|Object} [params.eventType] - Event type to resolve config for
+ * @returns {{ upiUri: string, qrImageUrl: string, receiverName: string, upiId: string, amount: number, mode: string, isConfigured: boolean, message: string }}
  */
-export function generateDynamicPaymentQr({ amount, note, customConfig }) {
-  const config = customConfig || getPaymentQrConfig();
+export function generateDynamicPaymentQr({ amount, note, customConfig, eventType }) {
+  const config = customConfig || getPaymentQrConfig(eventType);
   const numAmount = Number(amount) || 0;
-  
+  const isConfigured = Boolean(config.isConfigured || (config.upiId && config.upiId.trim()) || (config.qrUpiId && config.qrUpiId.trim()));
+  const effectiveUpiId = config.upiId || config.qrUpiId || "";
+  const effectiveReceiver = config.receiverName || config.qrReceiverName || "";
+
+  if (!isConfigured || !effectiveUpiId) {
+    return {
+      upiUri: "",
+      qrImageUrl: "",
+      receiverName: effectiveReceiver,
+      upiId: effectiveUpiId,
+      amount: numAmount,
+      mode: config.qrMode || "generated",
+      isConfigured: false,
+      message: "Payment QR is not configured for this event type.",
+    };
+  }
+
   const upiUri = buildUpiPaymentUri({
-    upiId: config.qrUpiId,
-    receiverName: config.qrReceiverName,
+    upiId: effectiveUpiId,
+    receiverName: effectiveReceiver,
     amount: numAmount,
     note: note || "Contribution Due",
   });
 
-  // If mode is uploaded and an image exists, return the uploaded image, else generated QR scanner image URL
   const isUploadedMode = config.qrMode === "uploaded" && config.qrImage;
   const qrImageUrl = isUploadedMode
     ? config.qrImage
@@ -158,10 +271,12 @@ export function generateDynamicPaymentQr({ amount, note, customConfig }) {
   return {
     upiUri,
     qrImageUrl,
-    receiverName: config.qrReceiverName,
-    upiId: config.qrUpiId,
+    receiverName: effectiveReceiver,
+    upiId: effectiveUpiId,
     amount: numAmount,
     mode: isUploadedMode ? "uploaded" : "generated",
+    isConfigured: true,
+    message: "",
   };
 }
 
@@ -219,15 +334,14 @@ export function buildPaymentReminderEmailHtml({
 
     <!-- Body Content -->
     <div style="padding: 28px 24px;">
-      ${
-        customBody
-          ? `<div style="font-size: 14px; line-height: 1.7; color: #334155; white-space: pre-line; margin-bottom: 20px;">${customBody}</div>`
-          : `
+      ${customBody
+      ? `<div style="font-size: 14px; line-height: 1.7; color: #334155; white-space: pre-line; margin-bottom: 20px;">${customBody}</div>`
+      : `
       <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.5;">Dear <strong>${memberName || "Member"}</strong>,</p>
       <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.6;">
         This is a friendly reminder regarding your pending contribution for <strong>${effectiveCategory}</strong>.
       </p>`
-      }
+    }
 
       <!-- Amount Highlight Box -->
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 24px;">

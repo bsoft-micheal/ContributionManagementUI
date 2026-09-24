@@ -188,7 +188,7 @@ export function logEmailReminder(entry) {
 export function clearEmailReminderLogs() {
   try {
     localStorage.removeItem(EMAIL_LOGS_STORAGE_KEY);
-  } catch (e) {}
+  } catch (e) { }
 }
 
 /**
@@ -222,7 +222,7 @@ export async function sendTestEmail({
       const parsed = JSON.parse(rawSettings);
       if (parsed.orgName) orgName = parsed.orgName;
     }
-  } catch (e) {}
+  } catch (e) { }
 
   const config = getPaymentQrConfig();
   const testAmount = 500;
@@ -344,7 +344,7 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
     if (rawSettings) {
       settings = { ...settings, ...JSON.parse(rawSettings) };
     }
-  } catch (e) {}
+  } catch (e) { }
 
   const today = dayjs();
   const currentDay = forcedDay !== null ? Number(forcedDay) : today.date();
