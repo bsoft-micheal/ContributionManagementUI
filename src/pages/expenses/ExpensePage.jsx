@@ -163,6 +163,9 @@ export default function ExpensePage() {
           description: item.description || "",
           fileName: item.fileName || "",
           fileUrl: item.fileUrl || item.fileName || "",
+          createdBy: item.createdBy || item.CreatedBy || "--",
+          createdOn: item.createdOn || item.CreatedOn || item.createdAt || item.CreatedAt || null,
+          createdAt: item.createdAt || item.CreatedAt || item.createdOn || item.CreatedOn || null,
         }));
         setExpenses(mapped);
       } else {
@@ -403,7 +406,7 @@ export default function ExpensePage() {
       return;
     }
 
-    const currentUserName = authState?.user?.name || authState?.name || "Admin";
+    const currentUserName = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || authState?.name || "";
 
     try {
       if (editingExpense) {
@@ -611,6 +614,11 @@ export default function ExpensePage() {
           {row.createdBy || row.CreatedBy || "--"}
         </Typography>
       ),
+    },
+    {
+      label: "Created On",
+      key: "createdOn",
+      render: (row) => formatGridDate(row.createdOn || row.CreatedOn || row.createdAt || row.CreatedAt),
     },
   ];
 

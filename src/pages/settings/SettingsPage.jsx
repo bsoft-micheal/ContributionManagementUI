@@ -60,6 +60,7 @@ import AppSwitch from "../../components/common/AppSwitch";
 import AppButton from "../../components/common/AppButton";
 import AppTextArea from "../../components/common/AppTextArea";
 import AppDataTable from "../../components/common/AppDataTable";
+import { formatGridDate } from "../../utils/dateHelper";
 import MfaSettings from "../../components/common/MfaSettings";
 import { useAppToast } from "../../components/common/AppToast";
 import {
@@ -277,17 +278,17 @@ export default function SettingsPage() {
 
   const liveUpiUri = isCurrentConfigured
     ? buildUpiPaymentUri({
-        upiId: currentQrConfig.upiId,
-        receiverName: currentQrConfig.receiverName,
-        amount: currentQrConfig.previewAmount || 100,
-        note: `Contribution for ${selectedQrEventType}`,
-      })
+      upiId: currentQrConfig.upiId,
+      receiverName: currentQrConfig.receiverName,
+      amount: currentQrConfig.previewAmount || 100,
+      note: `Contribution for ${selectedQrEventType}`,
+    })
     : "";
 
   const dynamicQrUrl = isCurrentConfigured
     ? (currentQrConfig.qrMode === "uploaded" && currentQrConfig.qrImage
-        ? currentQrConfig.qrImage
-        : generateQrPngDataUrl(liveUpiUri, 300))
+      ? currentQrConfig.qrImage
+      : generateQrPngDataUrl(liveUpiUri, 300))
     : "";
 
   const copyToClipboard = (text, label) => {
@@ -318,6 +319,8 @@ export default function SettingsPage() {
             qrImage: config.qrImage || null,
             isConfigured: Boolean(config.isConfigured && hasUpi),
             isActive: config.isActive !== false,
+            createdBy: config.createdBy || c.createdBy || c.CreatedBy || "--",
+            createdOn: config.createdOn || config.createdAt || c.createdAt || c.createdOn || null,
           });
         }
       });
@@ -337,6 +340,8 @@ export default function SettingsPage() {
           qrImage: config.qrImage || null,
           isConfigured: Boolean(config.isConfigured && hasUpi),
           isActive: config.isActive !== false,
+          createdBy: config.createdBy || "--",
+          createdOn: config.createdOn || config.createdAt || null,
         });
       }
     });
@@ -354,6 +359,8 @@ export default function SettingsPage() {
           qrImage: config.qrImage || null,
           isConfigured: Boolean(config.isConfigured && hasUpi),
           isActive: config.isActive !== false,
+          createdBy: config.createdBy || "--",
+          createdOn: config.createdOn || config.createdAt || null,
         });
       });
     }
@@ -513,6 +520,20 @@ export default function SettingsPage() {
           />
         ),
       },
+      {
+        label: "Created By",
+        key: "createdBy",
+        render: (row) => (
+          <Typography variant="body2" color="text.secondary">
+            {row.createdBy || row.CreatedBy || "--"}
+          </Typography>
+        ),
+      },
+      {
+        label: "Created On",
+        key: "createdOn",
+        render: (row) => formatGridDate(row.createdOn || row.CreatedOn || row.createdAt || row.CreatedAt),
+      },
     ],
     [selectedQrEventType]
   );
@@ -648,7 +669,7 @@ export default function SettingsPage() {
                 const updated = { ...prev, ...loadedMap };
                 try {
                   localStorage.setItem("cm_event_payment_qr_configs", JSON.stringify(updated));
-                } catch (e) {}
+                } catch (e) { }
                 return updated;
               });
             }
@@ -1204,7 +1225,7 @@ export default function SettingsPage() {
                       fontWeight: 700,
                     }}
                   >
-                    Save General Settings
+                    Save
                   </AppButton>
                 </Box>
               </Card>
@@ -2006,7 +2027,7 @@ export default function SettingsPage() {
                           fontSize: "0.8rem",
                         }}
                       >
-                        Save 
+                        Save
                       </AppButton>
                     </Box>
                   </Card>

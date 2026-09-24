@@ -121,8 +121,9 @@ export default function SupportTicketsPage() {
           description: item.description || "",
           status: item.status || "Open",
           priority: item.priority || "Medium",
-          assignedTo: item.assignedTo || "Admin",
-          createdDate: item.createdOn || new Date().toISOString(),
+          assignedTo: item.assignedTo || "--",
+          createdDate: item.createdOn || item.createdAt || new Date().toISOString(),
+          createdBy: item.createdBy || item.CreatedBy || "--",
           refNo: item.refNo || "-",
           utr: item.utr || "-",
           attachment: item.attachment || null,
@@ -575,12 +576,12 @@ export default function SupportTicketsPage() {
     {
       label: "Assigned To",
       key: "assignedTo",
-      render: (row) => row.assignedTo || "Admin",
+      render: (row) => row.assignedTo || "--",
     },
     {
-      label: "Created Date",
+      label: "Created On",
       key: "createdDate",
-      render: (row) => formatGridDate(row.createdDate),
+      render: (row) => formatGridDate(row.createdDate || row.createdOn || row.createdAt),
     },
     {
       label: "Created By",

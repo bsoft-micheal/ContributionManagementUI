@@ -110,6 +110,8 @@ export default function ContributionCalculationPage() {
         joiningDate: memberInfo ? memberInfo.joiningDate : null,
         tenure: tenureYears,
         isLessThanOneYear,
+        createdBy: memberInfo?.createdBy || memberInfo?.CreatedBy || ep.createdBy || ep.CreatedBy || "--",
+        createdAt: memberInfo?.createdAt || memberInfo?.CreatedAt || memberInfo?.createdOn || memberInfo?.CreatedOn || ep.createdAt || ep.createdOn || null,
       };
     });
 
@@ -229,6 +231,11 @@ export default function ContributionCalculationPage() {
       label: "Created By",
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
   ];
 

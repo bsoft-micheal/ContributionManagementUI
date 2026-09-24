@@ -42,7 +42,10 @@ export default function ExitProcessPage() {
         // Assume active members only
         if (member.isExited) return false;
 
-        const hasFarewell = farewellEvents.some(e => e.participantIds?.includes(member.memberId));
+        const hasFarewell = farewellEvents.some(
+          e => e.participantIds?.includes(member.memberId) ||
+               e.participants?.some(p => p.memberId === member.memberId || p.id === member.memberId)
+        );
         return hasFarewell;
       }).map(member => {
         // Calculate pending dues
@@ -132,6 +135,11 @@ export default function ExitProcessPage() {
       label: "Created By",
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
     {
       label: "Final Action",

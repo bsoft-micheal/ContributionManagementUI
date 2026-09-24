@@ -131,6 +131,9 @@ export default function PaymentsPage() {
           verifiedOn: t.verifiedOn || "-",
           notes: t.notes || "",
           screenshot: t.screenshot || "",
+          createdBy: t.createdBy || t.CreatedBy || "--",
+          createdOn: t.createdOn || t.CreatedOn || t.createdAt || t.CreatedAt || null,
+          createdAt: t.createdAt || t.CreatedAt || t.createdOn || t.CreatedOn || null,
         }));
         setTransactions(mapped);
       }
@@ -161,13 +164,13 @@ export default function PaymentsPage() {
     const target = txn || selectedTxn;
     if (!target) return;
 
-    const verifier = authState?.fullName || authState?.username || "Admin";
+    const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "";
     if (target.transactionId) {
       try {
         await verifyPaymentTransactionAsync(target.transactionId, {
           status: "Verified",
           verifiedBy: verifier,
-          notes: `Payment verified by ${verifier}.`,
+          notes: verifier ? `Payment verified by ${verifier}.` : "Payment verified.",
         });
         toast.success(`Transaction ${target.id} marked as Verified!`);
         await loadBackendData();
@@ -434,6 +437,11 @@ export default function PaymentsPage() {
           {row.createdBy || row.CreatedBy || "--"}
         </Typography>
       ),
+    },
+    {
+      label: "Created On",
+      key: "createdOn",
+      render: (row) => formatGridDate(row.createdOn || row.CreatedOn || row.createdAt || row.CreatedAt),
     },
   ];
 

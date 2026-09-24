@@ -175,6 +175,8 @@ export default function GalleryPage() {
               description: item.description || "",
               images: itemImages,
               imageUrl: itemImages[0] || item.imageUrl || "",
+              createdBy: item.createdBy || item.CreatedBy || "--",
+              createdOn: item.createdOn || item.createdAt || item.CreatedOn || item.CreatedAt,
             });
           }
         });
@@ -693,6 +695,11 @@ export default function GalleryPage() {
       label: "Created By",
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdOn",
+      render: (row) => formatGridDate(row.createdOn || row.CreatedOn || row.createdAt || row.CreatedAt),
     },
   ];
 

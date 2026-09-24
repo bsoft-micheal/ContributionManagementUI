@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-import { formatViewDate } from "../../utils/dateHelper";
+import { formatViewDate, formatGridDate } from "../../utils/dateHelper";
 import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
 import MetricCard from "../../components/MetricCard";
 import apiClient from "../../services/apiClient";
@@ -82,6 +82,11 @@ export default function EventDetailsPage() {
       label: "Created By",
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
   ];
 

@@ -106,6 +106,7 @@ export function AuthProvider({ children }) {
 
     if (data.token) {
       sessionStorage.setItem("teamContributionAuth", JSON.stringify(data));
+      sessionStorage.removeItem("birthdayModalShownSession");
       if (remember) {
         localStorage.setItem("teamContributionAuth", JSON.stringify(data));
         localStorage.setItem("teamContributionRememberMe", "true");
@@ -147,6 +148,7 @@ export function AuthProvider({ children }) {
 
     if (data.token) {
       sessionStorage.setItem("teamContributionAuth", JSON.stringify(data));
+      sessionStorage.removeItem("birthdayModalShownSession");
       if (remember) {
         localStorage.setItem("teamContributionAuth", JSON.stringify(data));
         localStorage.setItem("teamContributionRememberMe", "true");
@@ -169,6 +171,7 @@ export function AuthProvider({ children }) {
       console.error("Failed to logout from backend", error);
     } finally {
       sessionStorage.removeItem("teamContributionAuth");
+      sessionStorage.removeItem("birthdayModalShownSession");
       localStorage.removeItem("teamContributionAuth");
       localStorage.removeItem("teamContributionRememberMe");
       setAuthState(null);

@@ -44,6 +44,7 @@ export function getRightsForPath(path, roleName) {
     else if (path === "/expense") targetName = "Expense";
     else if (path === "/gallery") targetName = "Gallery";
     else if (path === "/support-tickets") targetName = "Support Tickets";
+    else if (path === "/budget-calculations") targetName = "Budget Calculations";
     else if (path === "/settings") targetName = "Settings";
     else if (path === "/user-rights") targetName = "User Rights"; // Admin-only
     else if (path === "/users") targetName = "Users";        // Admin & Manager only

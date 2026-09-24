@@ -497,6 +497,11 @@ export default function MembersPage() {
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--"
     },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn)
+    },
   ];
 
   return (
