@@ -12,6 +12,18 @@ export const VALIDATION_PATTERNS = {
     message: "Only numbers are allowed",
     sanitize: (val) => val.replace(/[^0-9]/g, "")
   },
+  decimalonly: {
+    pattern: /^[0-9]*\.?[0-9]*$/,
+    message: "Only numbers and decimal point are allowed",
+    sanitize: (val) => {
+      const clean = String(val).replace(/[^0-9.]/g, "");
+      const parts = clean.split(".");
+      if (parts.length > 2) {
+        return parts[0] + "." + parts.slice(1).join("");
+      }
+      return clean;
+    }
+  },
   letterandnumber: {
     pattern: /^[A-Za-z0-9\s]*$/,
     message: "Only letters, numbers, and spaces are allowed",
@@ -85,7 +97,7 @@ export function validateField(value, config = {}) {
 
   // 4. Min/Max bounds check
   // Smart heuristic: check if this is an explicit numeric value (amount, price, etc.) vs a numeric string (phone number, OTP)
-  const isNumericValCheck = (type === "numberonly") && (
+  const isNumericValCheck = (type === "numberonly" || type === "decimalonly") && (
     min === 0 || 
     (max !== undefined && max > 100) || 
     /amount|price|fee|cost|contribution|value/i.test(label || "") ||
