@@ -815,28 +815,28 @@ export default function EventFormPage() {
                     <Box
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: { xs: "1.2fr 1fr 1fr", sm: "1.6fr 1.2fr 1fr 1fr auto" },
+                        gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
                         gap: 2,
-                        pb: 1,
+                        pb: 1.2,
                         borderBottom: "1px solid",
                         borderColor: "divider",
                         fontWeight: 700,
-                        fontSize: "0.8rem",
+                        fontSize: "0.82rem",
                         color: "text.secondary",
+                        alignItems: "center",
                       }}
                     >
-                      <div>Expense Item</div>
-                      <div>Calculation</div>
-                      <div>Rate</div>
-                      <div>Amount</div>
-                      <Box sx={{ display: { xs: "none", sm: "block" } }}></Box>
+                      <Box sx={{ textAlign: "left" }}>Expense Item</Box>
+                      <Box sx={{ textAlign: "left" }}>Calculation</Box>
+                      <Box sx={{ textAlign: "right" }}>Rate</Box>
+                      <Box sx={{ textAlign: "right" }}>Amount</Box>
                     </Box>
 
                     {/* Row 1: ½ kg Cake */}
                     <Box
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: { xs: "1.2fr 1fr 1fr", sm: "1.6fr 1.2fr 1fr 1fr auto" },
+                        gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
                         gap: 2,
                         py: 1.4,
                         borderBottom: "1px solid",
@@ -844,38 +844,25 @@ export default function EventFormPage() {
                         alignItems: "center",
                       }}
                     >
-                      <Typography variant="body2" fontWeight={600}>
+                      <Typography variant="body2" fontWeight={600} sx={{ textAlign: "left" }}>
                         ½ kg Cake
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>
                         {office} × ₹300
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
                         ₹300
                       </Typography>
-                      <Typography variant="body2" fontWeight={800} color="text.primary">
+                      <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ textAlign: "right" }}>
                         ₹{cake.toLocaleString("en-IN")}
                       </Typography>
-                      <Box sx={{ display: { xs: "none", sm: "block" } }}>
-                        <Chip
-                          label="Auto"
-                          size="small"
-                          sx={{
-                            bgcolor: "rgba(22, 163, 74, 0.1)",
-                            color: "#16a34a",
-                            fontWeight: 700,
-                            fontSize: "0.7rem",
-                            height: 22,
-                          }}
-                        />
-                      </Box>
                     </Box>
 
                     {/* Row 2: Chicken Roll / Puffs */}
                     <Box
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: { xs: "1.2fr 1fr 1fr", sm: "1.6fr 1.2fr 1fr 1fr auto" },
+                        gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
                         gap: 2,
                         py: 1.4,
                         borderBottom: "1px solid",
@@ -883,70 +870,82 @@ export default function EventFormPage() {
                         alignItems: "center",
                       }}
                     >
-                      <Typography variant="body2" fontWeight={600}>
+                      <Typography variant="body2" fontWeight={600} sx={{ textAlign: "left" }}>
                         Chicken Roll / Puffs
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>
                         {puffsFactor > 0
                           ? `${total} × ₹20${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`
                           : "WFH only → Not provided"}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
                         ₹20
                       </Typography>
-                      <Typography variant="body2" fontWeight={800} color="text.primary">
+                      <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ textAlign: "right" }}>
                         ₹{puffs.toLocaleString("en-IN")}
                       </Typography>
-                      <Box sx={{ display: { xs: "none", sm: "block" } }}>
-                        <Chip
-                          label="Auto"
-                          size="small"
-                          sx={{
-                            bgcolor: "rgba(22, 163, 74, 0.1)",
-                            color: "#16a34a",
-                            fontWeight: 700,
-                            fontSize: "0.7rem",
-                            height: 22,
-                          }}
-                        />
-                      </Box>
                     </Box>
 
                     {/* Row 3: Birthday Gift */}
                     <Box
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: { xs: "1.2fr 1fr 1fr", sm: "1.6fr 1.2fr 1fr 1fr auto" },
+                        gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
                         gap: 2,
                         py: 1.4,
+                        borderBottom: "2px solid",
+                        borderColor: "divider",
                         alignItems: "center",
                       }}
                     >
-                      <Typography variant="body2" fontWeight={600}>
+                      <Typography variant="body2" fontWeight={600} sx={{ textAlign: "left" }}>
                         Birthday Gift
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>
                         {bdays} × ₹1,000
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
                         ₹1,000
                       </Typography>
-                      <Typography variant="body2" fontWeight={800} color="text.primary">
+                      <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ textAlign: "right" }}>
                         ₹{gift.toLocaleString("en-IN")}
                       </Typography>
-                      <Box sx={{ display: { xs: "none", sm: "block" } }}>
-                        <Chip
-                          label="Auto"
-                          size="small"
-                          sx={{
-                            bgcolor: "rgba(22, 163, 74, 0.1)",
-                            color: "#16a34a",
-                            fontWeight: 700,
-                            fontSize: "0.7rem",
-                            height: 22,
-                          }}
-                        />
-                      </Box>
+                    </Box>
+
+                    {/* Total Summary Row under Amount */}
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
+                        gap: 2,
+                        pt: 1.6,
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle2"
+                        fontWeight={800}
+                        sx={{
+                          gridColumn: "span 3",
+                          textAlign: "right",
+                          pr: 1,
+                          color: "text.primary",
+                          fontSize: "0.9rem",
+                        }}
+                      >
+                        Total Amount:
+                      </Typography>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight={900}
+                        sx={{
+                          textAlign: "right",
+                          color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
+                          fontSize: "1.1rem",
+                        }}
+                      >
+                        ₹{plannedBudget.toLocaleString("en-IN")}
+                      </Typography>
                     </Box>
                   </Box>
                 </Box>

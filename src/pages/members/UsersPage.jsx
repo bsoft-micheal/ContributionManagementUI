@@ -672,6 +672,9 @@ export default function UsersPage() {
         title={form.userId ? "Edit User" : "Add User"}
         actions={
           <>
+            <AppButton variant="outlined" onClick={() => setDialogOpen(false)} disabled={saving}>
+              Cancel
+            </AppButton>
             <AppButton
               variant="contained"
               startIcon={<SaveIcon />}
@@ -680,9 +683,6 @@ export default function UsersPage() {
               sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}
             >
               {saving ? "Saving…" : "Save"}
-            </AppButton>
-            <AppButton variant="text" color="inherit" onClick={() => setDialogOpen(false)}>
-              Cancel
             </AppButton>
           </>
         }

@@ -50,6 +50,8 @@ const initialPayment = {
   amount: "",
   paymentMode: "Upi",
   paymentDate: dayjs(),
+  cashAmount: "",
+  upiAmount: "",
 };
 
 export default function ContributionsPage() {
@@ -147,6 +149,71 @@ export default function ContributionsPage() {
     loadContributions();
   }, [selectedEventId, allContributions]);
 
+  const handleAmountChange = (val) => {
+    setPayment((prev) => {
+      const next = { ...prev, amount: val };
+      if (prev.paymentMode === "Split" && val !== "") {
+        const total = Number(val) || 0;
+        const currentCash = Number(prev.cashAmount);
+        if (!isNaN(currentCash) && currentCash > 0 && currentCash <= total) {
+          next.upiAmount = String(Math.round((total - currentCash) * 100) / 100);
+        } else if (total > 0) {
+          const half = Math.round((total / 2) * 100) / 100;
+          next.cashAmount = String(half);
+          next.upiAmount = String(Math.round((total - half) * 100) / 100);
+        }
+      }
+      return next;
+    });
+    if (errors.amount || errors.split) setErrors(prev => ({ ...prev, amount: "", split: "" }));
+  };
+
+  const handlePaymentModeChange = (newMode) => {
+    setPayment((current) => {
+      const next = { ...current, paymentMode: newMode };
+      if (newMode === "Split") {
+        const total = Number(current.amount) || 0;
+        if (total > 0 && (!current.cashAmount || !current.upiAmount)) {
+          const half = Math.round((total / 2) * 100) / 100;
+          next.cashAmount = String(half);
+          next.upiAmount = String(Math.round((total - half) * 100) / 100);
+        }
+      }
+      return next;
+    });
+    if (errors.paymentMode || errors.split || errors.cashAmount || errors.upiAmount) {
+      setErrors(prev => ({ ...prev, paymentMode: "", split: "", cashAmount: "", upiAmount: "" }));
+    }
+  };
+
+  const handleCashAmountChange = (val) => {
+    setPayment((prev) => {
+      const parsedCash = val === "" ? 0 : (Number(val) || 0);
+      const parsedUpi = prev.upiAmount === "" ? 0 : (Number(prev.upiAmount) || 0);
+      const newTotal = Math.round((parsedCash + parsedUpi) * 100) / 100;
+      return {
+        ...prev,
+        cashAmount: val,
+        amount: (val !== "" || prev.upiAmount !== "") ? String(newTotal) : prev.amount
+      };
+    });
+    if (errors.cashAmount || errors.split) setErrors(prev => ({ ...prev, cashAmount: "", split: "" }));
+  };
+
+  const handleUpiAmountChange = (val) => {
+    setPayment((prev) => {
+      const parsedCash = prev.cashAmount === "" ? 0 : (Number(prev.cashAmount) || 0);
+      const parsedUpi = val === "" ? 0 : (Number(val) || 0);
+      const newTotal = Math.round((parsedCash + parsedUpi) * 100) / 100;
+      return {
+        ...prev,
+        upiAmount: val,
+        amount: (prev.cashAmount !== "" || val !== "") ? String(newTotal) : prev.amount
+      };
+    });
+    if (errors.upiAmount || errors.split) setErrors(prev => ({ ...prev, upiAmount: "", split: "" }));
+  };
+
   async function handlePay() {
     const filed = "This field is required";
     const schema = {
@@ -156,9 +223,32 @@ export default function ContributionsPage() {
     };
     const newErrors = validateForm(payment, schema);
 
+    if (payment.paymentMode === "Split") {
+      const total = Number(payment.amount) || 0;
+      const cash = Number(payment.cashAmount);
+      const upi = Number(payment.upiAmount);
+
+      if (payment.cashAmount === "" || isNaN(cash) || cash < 0) {
+        newErrors.cashAmount = "Please enter valid cash amount";
+      }
+      if (payment.upiAmount === "" || isNaN(upi) || upi < 0) {
+        newErrors.upiAmount = "Please enter valid UPI amount";
+      }
+      if (!newErrors.cashAmount && !newErrors.upiAmount) {
+        const splitSum = Math.round((cash + upi) * 100) / 100;
+        if (splitSum !== total) {
+          newErrors.split = `Cash (₹${cash}) + UPI (₹${upi}) = ₹${splitSum} must equal Total (₹${total}).`;
+        }
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      if (newErrors.split) {
+        toast.error(newErrors.split);
+      } else {
+        toast.error("Please fill all the required fields correctly");
+      }
       return;
     }
 
@@ -167,6 +257,8 @@ export default function ContributionsPage() {
         ...payment,
         paymentDate: payment.paymentDate?.toISOString(),
         amount: payment.amount === "" ? null : Number(payment.amount),
+        cashAmount: payment.paymentMode === "Split" ? (payment.cashAmount === "" ? null : Number(payment.cashAmount)) : null,
+        upiAmount: payment.paymentMode === "Split" ? (payment.upiAmount === "" ? null : Number(payment.upiAmount)) : null,
       });
       toast.success("Payment recorded successfully");
       setDialogOpen(false);
@@ -195,12 +287,23 @@ export default function ContributionsPage() {
       });
       setContributions(enriched);
     } catch (error) {
-      toast.error(error.response?.data?.message ?? "Unable to save payment.");
+      const apiErrorMsg =
+        error.response?.data?.message ||
+        (error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(" ") : null) ||
+        error.response?.data?.title ||
+        "Unable to save payment.";
+      toast.error(apiErrorMsg);
     }
   }
 
   const eventOptions = events.map(e => ({ label: e.eventName, value: e.eventId }));
-  const modeOptions = ["Cash", "Upi", "BankTransfer", "Card"].map(m => ({ label: m, value: m }));
+  const modeOptions = [
+    { label: "Cash", value: "Cash" },
+    { label: "UPI", value: "Upi" },
+    { label: "Split Payment (Cash + UPI)", value: "Split" },
+    { label: "Bank Transfer", value: "BankTransfer" },
+    { label: "Card", value: "Card" },
+  ];
 
   const columns = [
     {
@@ -213,7 +316,16 @@ export default function ContributionsPage() {
                 size="small"
                 disabled={row.paymentStatus === "Paid" || !hasWriteAccess}
                 onClick={() => {
-                  setPayment({ eventId: row.eventId, memberId: row.memberId, amount: row.amount, paymentMode: "Upi", paymentDate: dayjs() });
+                  const initialAmt = row.amount || "";
+                  setPayment({
+                    eventId: row.eventId,
+                    memberId: row.memberId,
+                    amount: initialAmt,
+                    paymentMode: "Upi",
+                    paymentDate: dayjs(),
+                    cashAmount: "",
+                    upiAmount: "",
+                  });
                   setErrors({});
                   setDialogOpen(true);
                 }}
@@ -280,7 +392,40 @@ export default function ContributionsPage() {
         </Typography>
       )
     },
-    { label: "Mode", key: "paymentMode" },
+    {
+      label: "Mode",
+      key: "paymentMode",
+      render: (row) => {
+        if (row.paymentMode === "Split") {
+          const cashInfo = row.cashAmount ? `₹${Number(row.cashAmount).toLocaleString()} Cash` : "";
+          const upiInfo = row.upiAmount ? `₹${Number(row.upiAmount).toLocaleString()} UPI` : "";
+          const splitLabel = cashInfo && upiInfo ? `Split (${cashInfo} + ${upiInfo})` : "Split (Cash + UPI)";
+          const tooltipText = cashInfo && upiInfo ? `Split Payment: ${cashInfo} and ${upiInfo}` : "Split Payment (Partial Cash + Partial UPI)";
+
+          return (
+            <Tooltip title={tooltipText}>
+              <Box
+                component="span"
+                sx={{
+                  display: "inline-block",
+                  px: 1,
+                  py: 0.3,
+                  borderRadius: "4px",
+                  fontSize: "0.72rem",
+                  fontWeight: 800,
+                  color: "#4f46e5",
+                  bgcolor: "rgba(79, 70, 229, 0.08)",
+                  border: "1px solid rgba(79, 70, 229, 0.25)",
+                }}
+              >
+                {splitLabel}
+              </Box>
+            </Tooltip>
+          );
+        }
+        return row.paymentMode || "-";
+      },
+    },
   ];
 
   return (
@@ -381,10 +526,20 @@ export default function ContributionsPage() {
         title="Contribution Collections "
         actions={
           <>
+            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
             <AppButton
               variant="contained"
               startIcon={<SaveIcon />}
               onClick={handlePay}
+              disabled={
+                payment.paymentMode === "Split" && (
+                  !payment.amount ||
+                  Number(payment.amount) <= 0 ||
+                  payment.cashAmount === "" ||
+                  payment.upiAmount === "" ||
+                  Math.round(((Number(payment.cashAmount) || 0) + (Number(payment.upiAmount) || 0)) * 100) / 100 !== Number(payment.amount)
+                )
+              }
               sx={{
                 bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
                 "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
@@ -392,19 +547,15 @@ export default function ContributionsPage() {
             >
               Save
             </AppButton>
-            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
           </>
         }
       >
-        <Stack spacing={3} sx={{ pt: 1 }}>
+        <Stack spacing={2.5} sx={{ pt: 1 }}>
           <AppInput
             label="Amount"
             placeholder="Enter payment amount (₹)"
             value={payment.amount}
-            onChange={(event) => {
-              setPayment((current) => ({ ...current, amount: event.target.value }));
-              if (errors.amount) setErrors(prev => ({ ...prev, amount: "" }));
-            }}
+            onChange={(event) => handleAmountChange(event.target.value)}
             restrictType="numberonly"
             maxLength={10}
             error={!!errors.amount}
@@ -415,15 +566,138 @@ export default function ContributionsPage() {
             label="Payment Mode"
             placeholder="Select payment mode"
             value={payment.paymentMode}
-            onChange={(event) => {
-              setPayment((current) => ({ ...current, paymentMode: event.target.value }));
-              if (errors.paymentMode) setErrors(prev => ({ ...prev, paymentMode: "" }));
-            }}
+            onChange={(event) => handlePaymentModeChange(event.target.value)}
             options={modeOptions}
             error={!!errors.paymentMode}
             helperText={errors.paymentMode}
             required
           />
+
+          {payment.paymentMode === "Split" && (
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: "12px",
+                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "rgba(74, 63, 107, 0.03)",
+                border: "1px dashed",
+                borderColor: (t) => t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(74, 63, 107, 0.25)",
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                <Typography variant="caption" fontWeight={800} sx={{ color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.7rem" }}>
+                  Split Payment Breakdown
+                </Typography>
+                <AppButton
+                  size="small"
+                  variant="outlined"
+                  onClick={() => {
+                    const tot = Number(payment.amount) || 0;
+                    const half = Math.round((tot / 2) * 100) / 100;
+                    setPayment((prev) => ({
+                      ...prev,
+                      cashAmount: String(half),
+                      upiAmount: String(Math.round((tot - half) * 100) / 100),
+                    }));
+                    setErrors((prev) => ({ ...prev, cashAmount: "", upiAmount: "", split: "" }));
+                  }}
+                  sx={{
+                    fontSize: "0.68rem",
+                    py: 0.2,
+                    px: 1,
+                    height: 24,
+                    minHeight: 24,
+                    fontWeight: 700,
+                  }}
+                >
+                  50 / 50 Split
+                </AppButton>
+              </Box>
+
+              <Grid container spacing={1.5}>
+                <Grid size={{ xs: 6 }}>
+                  <AppInput
+                    label="Cash Amount *"
+                    placeholder="₹ Cash"
+                    value={payment.cashAmount}
+                    onChange={(e) => handleCashAmountChange(e.target.value)}
+                    restrictType="numberonly"
+                    maxLength={10}
+                    error={!!errors.cashAmount}
+                    helperText={errors.cashAmount}
+                    required
+                  />
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <AppInput
+                    label="UPI Amount *"
+                    placeholder="₹ UPI"
+                    value={payment.upiAmount}
+                    onChange={(e) => handleUpiAmountChange(e.target.value)}
+                    restrictType="numberonly"
+                    maxLength={10}
+                    error={!!errors.upiAmount}
+                    helperText={errors.upiAmount}
+                    required
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Real-time Balance Status Indicator */}
+              {(() => {
+                const tot = Number(payment.amount) || 0;
+                const c = Number(payment.cashAmount) || 0;
+                const u = Number(payment.upiAmount) || 0;
+                const sum = Math.round((c + u) * 100) / 100;
+                const isBalanced = tot > 0 && sum === tot && payment.cashAmount !== "" && payment.upiAmount !== "";
+                const diff = Math.round((tot - sum) * 100) / 100;
+
+                if (isBalanced) {
+                  return (
+                    <Box
+                      sx={{
+                        mt: 1.5,
+                        p: 1,
+                        borderRadius: "8px",
+                        bgcolor: "rgba(22, 163, 74, 0.08)",
+                        border: "1px solid rgba(22, 163, 74, 0.25)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 800, fontSize: "0.75rem" }}>
+                        ✓ Balanced: ₹{c.toLocaleString()} (Cash) + ₹{u.toLocaleString()} (UPI) = ₹{tot.toLocaleString()}
+                      </Typography>
+                    </Box>
+                  );
+                }
+
+                if (tot > 0 && (payment.cashAmount !== "" || payment.upiAmount !== "")) {
+                  return (
+                    <Box
+                      sx={{
+                        mt: 1.5,
+                        p: 1,
+                        borderRadius: "8px",
+                        bgcolor: "rgba(220, 38, 38, 0.08)",
+                        border: "1px solid rgba(220, 38, 38, 0.25)",
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: "#dc2626", fontWeight: 800, fontSize: "0.72rem", display: "block" }}>
+                        ⚠️ Split total is ₹{sum.toLocaleString()} (Diff: {diff > 0 ? `₹${diff.toLocaleString()} remaining` : `₹${Math.abs(diff).toLocaleString()} over`}).
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem" }}>
+                        The sum of Cash + UPI must equal the Total Amount (₹{tot.toLocaleString()}).
+                      </Typography>
+                    </Box>
+                  );
+                }
+
+                return null;
+              })()}
+            </Box>
+          )}
+
           <AppDateInput
             label="Payment Date"
             value={payment.paymentDate}
@@ -436,7 +710,8 @@ export default function ContributionsPage() {
             required
           />
 
-          {payment.paymentMode === "Upi" && Number(payment.amount) > 0 && (
+          {((payment.paymentMode === "Upi" && Number(payment.amount) > 0) ||
+            (payment.paymentMode === "Split" && Number(payment.upiAmount) > 0)) && (
             <Box
               sx={{
                 p: 1.5,
@@ -447,7 +722,9 @@ export default function ContributionsPage() {
               }}
             >
               <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", display: "block", mb: 0.8 }}>
-                Dynamic UPI Payment QR (₹{Number(payment.amount).toLocaleString("en-IN")})
+                {payment.paymentMode === "Split"
+                  ? `Dynamic UPI QR (Split UPI Portion: ₹${Number(payment.upiAmount).toLocaleString("en-IN")})`
+                  : `Dynamic UPI Payment QR (₹${Number(payment.amount).toLocaleString("en-IN")})`}
               </Typography>
               <Box
                 component="img"
@@ -455,7 +732,7 @@ export default function ContributionsPage() {
                   buildUpiPaymentUri({
                     upiId: getPaymentQrConfig().qrUpiId,
                     receiverName: getPaymentQrConfig().qrReceiverName,
-                    amount: payment.amount,
+                    amount: payment.paymentMode === "Split" ? payment.upiAmount : payment.amount,
                     note: "Contribution Payment",
                   }),
                   200
@@ -474,7 +751,9 @@ export default function ContributionsPage() {
                 }}
               />
               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.6, display: "block" }}>
-                Scan with any UPI app to pay ₹{Number(payment.amount).toLocaleString("en-IN")} directly.
+                {payment.paymentMode === "Split"
+                  ? `Scan with any UPI app to pay ₹${Number(payment.upiAmount).toLocaleString("en-IN")} online. Collect ₹${Number(payment.cashAmount || 0).toLocaleString("en-IN")} in cash.`
+                  : `Scan with any UPI app to pay ₹${Number(payment.amount).toLocaleString("en-IN")} directly.`}
               </Typography>
             </Box>
           )}

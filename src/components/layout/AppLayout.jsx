@@ -647,6 +647,9 @@ export default function AppLayout() {
         showCloseIcon={false}
         actions={
           <>
+            <AppButton variant="outlined" onClick={() => setProfileDialogOpen(false)}>
+              Cancel
+            </AppButton>
             <AppButton
               variant="contained"
               startIcon={<SaveIcon />}
@@ -654,9 +657,6 @@ export default function AppLayout() {
               sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}
             >
               Save
-            </AppButton>
-            <AppButton variant="text" color="inherit" onClick={() => setProfileDialogOpen(false)}>
-              Cancel
             </AppButton>
           </>
         }

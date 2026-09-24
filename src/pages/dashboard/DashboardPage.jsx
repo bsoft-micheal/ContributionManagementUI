@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -22,7 +22,7 @@ import DonutLargeIcon from "@mui/icons-material/DonutLarge";
 import GridViewIcon from "@mui/icons-material/GridView";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import FilterListIcon from "@mui/icons-material/FilterList";
 import SearchIcon from "@mui/icons-material/Search";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import dayjs from "dayjs";
@@ -559,65 +559,102 @@ const YEAR_OPTIONS = [
   }),
 ];
 
-function FilterBar({ pending, onChange, onGo, onClear, eventTypeOptions, loading }) {
+function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, loading }) {
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   return (
     <Box sx={{
       px: { xs: 2, md: 3 }, py: 2,
       display: "flex", flexWrap: "wrap", gap: 2, alignItems: "flex-end",
       borderBottom: `1px solid ${theme.palette.divider}`,
-      background: theme.palette.mode === "dark"
+      background: isDark
         ? alpha(theme.palette.primary.main, 0.04)
         : alpha(theme.palette.primary.main, 0.025),
     }}>
       <Box sx={{ minWidth: 170 }}>
-        <AppSelect label="Month" value={pending.month}
+        <AppSelect
+          label="Month"
+          value={pending.month}
           onChange={(e) => onChange("month", Number(e.target.value))}
-          options={MONTH_OPTIONS} />
+          options={MONTH_OPTIONS}
+        />
       </Box>
       <Box sx={{ minWidth: 145 }}>
-        <AppSelect label="Year" value={pending.year}
+        <AppSelect
+          label="Year"
+          value={pending.year}
           onChange={(e) => onChange("year", Number(e.target.value))}
-          options={YEAR_OPTIONS} />
+          options={YEAR_OPTIONS}
+        />
       </Box>
       <Box sx={{ minWidth: 190 }}>
-        <AppSelect label="Event Type" value={pending.eventType || "ALL"}
+        <AppSelect
+          label="Event Type"
+          value={pending.eventType || "ALL"}
           onChange={(e) => onChange("eventType", e.target.value)}
-          options={eventTypeOptions} />
+          options={eventTypeOptions}
+        />
       </Box>
-      <AppButton
+
+      {/* Filter Button (Pill button with FilterList icon - matching reference image) */}
+      <Button
         variant="contained"
-        onClick={onGo}
+        onClick={onFilter}
         disabled={loading}
-        startIcon={<PlayArrowIcon />}
+        startIcon={<FilterListIcon sx={{ fontSize: 19 }} />}
         sx={{
           height: 40,
-          px: 3.5,
+          px: 3,
+          borderRadius: "20px",
+          bgcolor: isDark ? "#483b7a" : "#302657",
+          color: "#ffffff",
           fontWeight: 800,
-          letterSpacing: "0.03em",
+          fontSize: "0.85rem",
+          textTransform: "none",
+          boxShadow: isDark
+            ? "0 3px 12px rgba(0,0,0,0.4)"
+            : "0 2px 10px rgba(48, 38, 87, 0.28)",
+          "&:hover": {
+            bgcolor: isDark ? "#594996" : "#241d45",
+            boxShadow: "0 4px 14px rgba(48, 38, 87, 0.4)",
+          },
+          "&:active": {
+            transform: "scale(0.98)",
+          },
         }}
       >
-        Go
-      </AppButton>
-      <AppButton
+        Filter
+      </Button>
+
+      {/* Clear Filter Button (Pill button with Red/Coral border - clearly visible as in reference image) */}
+      <Button
         variant="outlined"
         onClick={onClear}
         disabled={loading}
         sx={{
-          color: "#ef4444",
-          borderColor: "rgba(239, 68, 68, 0.4)",
           height: 40,
           px: 2.5,
-          fontWeight: 700,
-          fontSize: "0.75rem",
+          borderRadius: "20px",
+          color: "#ef4444",
+          bgcolor: isDark ? "rgba(239, 68, 68, 0.08)" : "#ffffff",
+          border: "1.5px solid #f87171",
+          fontWeight: 800,
+          fontSize: "0.82rem",
+          textTransform: "none",
+          boxShadow: isDark ? "none" : "0 1px 4px rgba(239, 68, 68, 0.08)",
           "&:hover": {
-            borderColor: "#ef4444",
-            bgcolor: "rgba(239, 68, 68, 0.05)",
+            border: "1.5px solid #ef4444",
+            bgcolor: isDark ? "rgba(239, 68, 68, 0.16)" : "rgba(239, 68, 68, 0.06)",
+            color: "#dc2626",
+          },
+          "&:active": {
+            transform: "scale(0.98)",
           },
         }}
       >
         Clear Filter
-      </AppButton>
+      </Button>
     </Box>
   );
 }
@@ -692,22 +729,23 @@ export default function DashboardPage() {
     fetchEventTypes();
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      const data = await GetDashboardSummaryAsync({
-        month: appliedFilters.month,
-        year: appliedFilters.year,
-      });
-      if (!cancelled) {
-        setSummary(data);
-        setLoading(false);
-      }
+  const loadDashboard = useCallback(async (month, year) => {
+    setLoading(true);
+    try {
+      const data = await GetDashboardSummaryAsync({ month, year });
+      setSummary(data);
+    } catch (err) {
+      console.error("Failed to fetch dashboard summary:", err);
+      toast.error("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
     }
-    load();
-    return () => { cancelled = true; };
-  }, [appliedFilters.month, appliedFilters.year]);
+  }, [toast]);
+
+  // Initial load
+  useEffect(() => {
+    loadDashboard(appliedFilters.month, appliedFilters.year);
+  }, []);
 
   // Detect today's birthdays on Dashboard open & trigger celebratory pop up message with paper blast
   useEffect(() => {
@@ -799,20 +837,24 @@ export default function DashboardPage() {
   }, [eventTypes, summary?.upcomingEvents]);
 
   function handleFilterChange(key, value) {
-    setPendingFilters((p) => ({ ...p, [key]: value }));
+    setPendingFilters((prev) => ({ ...prev, [key]: value }));
   }
-  function handleGo() {
+
+  function handleFilter() {
     setAppliedFilters({ ...pendingFilters });
-    setSearch("");
+    loadDashboard(pendingFilters.month, pendingFilters.year);
+    toast.success("Filters applied");
   }
+
   function handleClear() {
-    const resetValues = {
+    const defaultValues = {
       month: dayjs().month() + 1,
       year: dayjs().year(),
       eventType: "ALL",
     };
-    setPendingFilters(resetValues);
-    setAppliedFilters(resetValues);
+    setPendingFilters(defaultValues);
+    setAppliedFilters(defaultValues);
+    loadDashboard(defaultValues.month, defaultValues.year);
     setSearch("");
     toast.info("Dashboard filters reset to defaults");
   }
@@ -823,7 +865,7 @@ export default function DashboardPage() {
   const events = useMemo(() => {
     if (!isFilteredByType) return allEvents;
     return allEvents.filter(
-      (e) => e.eventTypeName?.toLowerCase() === appliedFilters.eventType.toLowerCase()
+      (e) => (e.eventTypeName || "").toLowerCase() === appliedFilters.eventType.toLowerCase()
     );
   }, [allEvents, isFilteredByType, appliedFilters.eventType]);
 
@@ -1043,7 +1085,7 @@ export default function DashboardPage() {
         <FilterBar
           pending={pendingFilters}
           onChange={handleFilterChange}
-          onGo={handleGo}
+          onFilter={handleFilter}
           onClear={handleClear}
           eventTypeOptions={eventTypeOptions}
           loading={loading}
