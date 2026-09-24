@@ -130,6 +130,11 @@ export default function MyContributionSummaryPage() {
         </Typography>
       ),
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   const eventColumns = [
@@ -189,6 +194,11 @@ export default function MyContributionSummaryPage() {
       key: "paymentDate",
       render: (row) => formatGridDate(row.paymentDate),
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   const handleExport = () => {
@@ -201,6 +211,7 @@ export default function MyContributionSummaryPage() {
           "Category": d.categoryName,
           "Events Paid": d.eventCount,
           "Total Paid (₹)": d.totalPaid,
+          "Created By": d.createdBy || d.CreatedBy || "--",
         })),
       },
       {
@@ -212,6 +223,7 @@ export default function MyContributionSummaryPage() {
           "Amount (₹)": d.amount,
           "Status": d.paymentStatus,
           "Payment Date": formatGridDate(d.paymentDate, ""),
+          "Created By": d.createdBy || d.CreatedBy || "--",
         })),
       },
     ]);

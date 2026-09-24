@@ -530,6 +530,11 @@ export default function UsersPage() {
       key: "createdOn",
       render: (row) => formatGridDate(row.createdOn),
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   // ─── Render ────────────────────────────────────────────────────────────────

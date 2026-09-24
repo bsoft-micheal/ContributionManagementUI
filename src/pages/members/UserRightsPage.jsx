@@ -114,7 +114,8 @@ export default function UserRightsPage() {
 
         return {
           ...defRow,
-          access: match ? match.access : defRow.access
+          access: match ? match.access : defRow.access,
+          createdBy: match ? (match.createdBy || match.CreatedBy) : null,
         };
       });
       setRights(prev => ({ ...prev, [roleName]: alignedRights }));
@@ -257,7 +258,12 @@ export default function UserRightsPage() {
           />
         </RadioGroup>
       )
-    }
+    },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   return (
