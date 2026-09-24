@@ -587,6 +587,9 @@ export default function PaymentsPage() {
         maxWidth="sm"
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
+            <AppButton variant="outlined" onClick={() => setViewDialogOpen(false)}>
+              Close
+            </AppButton>
             {hasWriteAccess && selectedTxn && selectedTxn.status !== "Verified" && (
               <AppButton
                 variant="contained"
@@ -605,9 +608,6 @@ export default function PaymentsPage() {
                 Mark Pending
               </AppButton>
             )}
-            <AppButton variant="outlined" onClick={() => setViewDialogOpen(false)}>
-              Close
-            </AppButton>
           </Stack>
         }
       >

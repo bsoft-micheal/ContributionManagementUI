@@ -252,8 +252,8 @@ export default function EventTypesPage() {
         title={form.eventTypeId ? "Edit Event Type" : "Add Event Type"}
         actions={
           <>
-            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
             <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
+            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
           </>
         }
       >

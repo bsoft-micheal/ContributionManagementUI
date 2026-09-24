@@ -36,10 +36,10 @@ apiClient.interceptors.response.use(
 export const getImageUrl = (path) => {
   if (!path) return "";
   if (path.startsWith("data:") || path.startsWith("http:") || path.startsWith("https:")) return path;
-  
+
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://localhost:5111/api/v1";
   const backendBaseUrl = baseUrl.replace(/\/api\/v\d+$/i, "").replace(/\/api$/i, "");
-  
+
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${backendBaseUrl}${cleanPath}`;
 };
