@@ -323,8 +323,6 @@ export default function ContributionsPage() {
     { label: "Cash", value: "Cash" },
     { label: "UPI", value: "Upi" },
     { label: "Split Payment (Cash + UPI)", value: "Split" },
-    { label: "Bank Transfer", value: "BankTransfer" },
-    { label: "Card", value: "Card" },
   ];
 
   const columns = [

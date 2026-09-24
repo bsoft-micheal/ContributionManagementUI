@@ -1111,27 +1111,46 @@ export default function DashboardPage() {
               <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Stack spacing={3}>
 
-                  {/* ① 4 Metric Cards */}
-                  <Grid container spacing={2.5}>
-                    <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                      <MetricCard label="TOTAL EVENTS"
-                        value={events.length}
-                        helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for the selected period"} />
+                  {/* ① Top Summary Metric Cards (5 Cards Grid) */}
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                      <MetricCard
+                        label="TOTAL EXPECTED"
+                        value={`₹${totalExpected.toLocaleString()}`}
+                        helper="Projected target amount"
+                        accent="#7c3aed"
+                      />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                      <MetricCard label="TOTAL COLLECTIONS"
+                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                      <MetricCard
+                        label="TOTAL COLLECTIONS"
                         value={`₹${totalCollected.toLocaleString()}`}
-                        helper="Amount collected (paid)" accent="success.main" />
+                        helper="Amount collected (paid)"
+                        accent="success.main"
+                      />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                      <MetricCard label="TOTAL PENDING"
+                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                      <MetricCard
+                        label="TOTAL PENDING"
                         value={`₹${totalPending.toLocaleString()}`}
-                        helper="Outstanding amount" accent="error.main" />
+                        helper="Outstanding amount"
+                        accent="error.main"
+                      />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                      <MetricCard label="PENDING PAYMENTS"
+                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                      <MetricCard
+                        label="TOTAL EVENTS"
+                        value={events.length}
+                        helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                      <MetricCard
+                        label="PENDING PAYMENTS"
                         value={pendingCount}
-                        helper="Unpaid contributions" accent="warning.main" />
+                        helper="Unpaid contributions"
+                        accent="warning.main"
+                      />
                     </Grid>
                   </Grid>
 
@@ -1326,15 +1345,17 @@ export default function DashboardPage() {
                                               </Stack>
 
                                               <Stack direction="row" alignItems="center" spacing={1}>
-                                                <Typography variant="body2" fontWeight={900} sx={{ fontSize: "0.84rem" }}>
-                                                  ₹{Number(item.value).toLocaleString()}
-                                                </Typography>
+                                                <Box sx={{ textAlign: "right" }}>
+                                                  <Typography variant="body2" fontWeight={900} sx={{ fontSize: "0.84rem", display: "block", lineHeight: 1.1 }}>
+                                                    ₹{Number(item.collected).toLocaleString()} <Typography component="span" sx={{ fontSize: "0.7rem", color: "text.secondary", fontWeight: 600 }}>/ ₹{Number(item.value).toLocaleString()}</Typography>
+                                                  </Typography>
+                                                </Box>
                                                 <Chip
-                                                  label={`${item.percent}%`}
+                                                  label={`${item.collectedPct}% Collected`}
                                                   size="small"
                                                   sx={{
                                                     height: 20,
-                                                    fontSize: "0.68rem",
+                                                    fontSize: "0.65rem",
                                                     fontWeight: 900,
                                                     bgcolor: alpha(item.color, 0.12),
                                                     color: item.color,

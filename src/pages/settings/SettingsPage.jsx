@@ -896,40 +896,14 @@ export default function SettingsPage() {
                           <Typography variant="subtitle1" fontWeight={800}>
                             Email Template Settings
                           </Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                            Configure email subject and description against categories.
-                          </Typography>
+
                         </Box>
                       </Box>
 
                       {/* Quick Action Buttons */}
                       <Box sx={{ display: "flex", gap: 1 }}>
-                        <AppButton
-                          variant="outlined"
-                          size="small"
-                          startIcon={<HistoryOutlinedIcon sx={{ fontSize: 17 }} />}
-                          onClick={() => setLogsDialogOpen(true)}
-                          sx={{ fontSize: "0.76rem", fontWeight: 700, py: 0.5, px: 1.4 }}
-                        >
-                          Email Logs
-                        </AppButton>
-                        <AppButton
-                          variant="outlined"
-                          size="small"
-                          startIcon={<SendOutlinedIcon sx={{ fontSize: 16 }} />}
-                          onClick={() => setTestEmailDialogOpen(true)}
-                          sx={{
-                            fontSize: "0.76rem",
-                            fontWeight: 700,
-                            py: 0.5,
-                            px: 1.4,
-                            borderColor: "#0284c7",
-                            color: "#0284c7",
-                            "&:hover": { borderColor: "#0369a1", bgcolor: "rgba(2,132,199,0.06)" },
-                          }}
-                        >
-                          Send Test Email
-                        </AppButton>
+                        
+                        
                       </Box>
                     </Box>
 
@@ -1063,40 +1037,8 @@ export default function SettingsPage() {
                             />
                           </Grid>
                         </Grid>
-
-                        {/* Visual Schedule Roadmap */}
-                        <Box sx={{ mt: 2, p: 1.5, borderRadius: "8px", bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#ffffff", border: `1px solid ${theme.palette.divider}` }}>
-                          <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", display: "block", mb: 0.6 }}>
-                            Scheduled Dispatch Cycle:
-                          </Typography>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap", fontSize: "0.72rem" }}>
-                            <Chip label="Day 1: Initial Email" size="small" color="info" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                            <Typography variant="caption" color="text.secondary">→</Typography>
-                            <Chip label="Day 11: Reminder 1" size="small" color="primary" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                            <Typography variant="caption" color="text.secondary">→</Typography>
-                            <Chip label="Day 21: Reminder 2" size="small" color="warning" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                            <Typography variant="caption" color="text.secondary">→</Typography>
-                            <Chip label="Day 31: Reminder 3" size="small" color="error" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                            <Typography variant="caption" color="text.secondary">→</Typography>
-                            <Chip label="Halts When Paid (Max 3)" size="small" variant="outlined" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                          </Box>
-                        </Box>
-
                         {/* Manual Scheduler Trigger Action */}
                         <Box sx={{ mt: 2, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
-                            Want to run a reminder check right now? Duplicate emails are automatically blocked.
-                          </Typography>
-                          <AppButton
-                            variant="outlined"
-                            size="small"
-                            startIcon={schedulerRunning ? <CircularProgress size={14} color="inherit" /> : <PlayArrowOutlinedIcon sx={{ fontSize: 16 }} />}
-                            onClick={handleRunSchedulerCheck}
-                            disabled={schedulerRunning}
-                            sx={{ fontSize: "0.75rem", fontWeight: 700, py: 0.4 }}
-                          >
-                            {schedulerRunning ? "Running..." : "Run Scheduler Check Now"}
-                          </AppButton>
                         </Box>
                       </Box>
                     </Stack>
@@ -1115,21 +1057,7 @@ export default function SettingsPage() {
                         fontWeight: 700,
                       }}
                     >
-                      Save Email Template
-                    </AppButton>
-                    <AppButton
-                      variant="outlined"
-                      startIcon={<SendOutlinedIcon />}
-                      onClick={() => setTestEmailDialogOpen(true)}
-                      sx={{
-                        fontWeight: 700,
-                        px: 2.5,
-                        borderColor: "#0284c7",
-                        color: "#0284c7",
-                        "&:hover": { borderColor: "#0369a1", bgcolor: "rgba(2,132,199,0.06)" },
-                      }}
-                    >
-                      Send Test Email
+                      Save 
                     </AppButton>
                   </Box>
                 </Card>
