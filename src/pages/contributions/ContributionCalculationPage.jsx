@@ -225,6 +225,11 @@ export default function ContributionCalculationPage() {
         </Typography>
       )
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   return (

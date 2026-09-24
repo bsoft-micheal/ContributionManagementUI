@@ -582,6 +582,11 @@ export default function SupportTicketsPage() {
       key: "createdDate",
       render: (row) => formatGridDate(row.createdDate),
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   return (

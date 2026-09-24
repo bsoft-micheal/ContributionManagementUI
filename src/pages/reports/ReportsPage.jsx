@@ -228,7 +228,12 @@ export default function ReportsPage({ mode = "event" }) {
           />
         );
       }
-    }
+    },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   // 2. Member Contributions Columns
@@ -255,7 +260,12 @@ export default function ReportsPage({ mode = "event" }) {
           />
         );
       }
-    }
+    },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   // 3. Pending Dues Columns
@@ -282,7 +292,12 @@ export default function ReportsPage({ mode = "event" }) {
           />
         );
       }
-    }
+    },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   // Chart Data calculation per mode

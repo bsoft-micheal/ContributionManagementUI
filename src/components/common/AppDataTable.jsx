@@ -53,7 +53,13 @@ function exportToCSV(columns, data, filename = "export.csv") {
   const headers = columns.filter(c => c.key).map(c => c.label);
   const keys = columns.filter(c => c.key).map(c => c.key);
   const rows = data.map(row =>
-    keys.map(k => `"${(row[k] ?? "").toString().replace(/"/g, '""')}"`).join(",")
+    keys.map(k => {
+      let val = row[k];
+      if (val === undefined && typeof k === "string" && k.length > 0) {
+        val = row[k[0].toUpperCase() + k.slice(1)] ?? row[k[0].toLowerCase() + k.slice(1)];
+      }
+      return `"${(val ?? "").toString().replace(/"/g, '""')}"`;
+    }).join(",")
   );
   const csv = [headers.join(","), ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
@@ -166,8 +172,16 @@ export default function AppDataTable({
     // 3. Sort
     if (orderBy) {
       result.sort((a, b) => {
-        const va = a[orderBy] ?? "";
-        const vb = b[orderBy] ?? "";
+        let va = a[orderBy];
+        if (va === undefined && typeof orderBy === "string" && orderBy.length > 0) {
+          va = a[orderBy[0].toUpperCase() + orderBy.slice(1)] ?? a[orderBy[0].toLowerCase() + orderBy.slice(1)];
+        }
+        let vb = b[orderBy];
+        if (vb === undefined && typeof orderBy === "string" && orderBy.length > 0) {
+          vb = b[orderBy[0].toUpperCase() + orderBy.slice(1)] ?? b[orderBy[0].toLowerCase() + orderBy.slice(1)];
+        }
+        va = va ?? "";
+        vb = vb ?? "";
         
         // Handle sorting of numeric strings or normal comparison
         const numA = Number(va);
@@ -836,7 +850,7 @@ export default function AppDataTable({
                               ? formatGridDate(row[column.key])
                               : column.type === "datetime"
                               ? formatGridDateTime(row[column.key])
-                              : (row[column.key] ?? "--")}
+                              : (row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? "--")}
                           </Typography>
                         )}
                       </TableCell>

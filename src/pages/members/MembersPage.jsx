@@ -497,6 +497,11 @@ export default function MembersPage() {
     },
     { label: "Date of Birth", key: "dateOfBirth", render: (row) => formatGridDate(row.dateOfBirth) },
     { label: "Joining Date", key: "joiningDate", render: (row) => formatGridDate(row.joiningDate) },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--"
+    },
   ];
 
   return (

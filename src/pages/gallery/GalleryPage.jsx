@@ -607,6 +607,11 @@ export default function GalleryPage() {
       key: "takenDate",
       render: (row) => formatGridDate(row.takenDate),
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   return (

@@ -140,6 +140,11 @@ export default function RolesPage() {
         </Typography>
       )
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   return (
