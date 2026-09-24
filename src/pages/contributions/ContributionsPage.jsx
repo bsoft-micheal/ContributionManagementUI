@@ -188,36 +188,57 @@ export default function ContributionsPage() {
 
   const handleCashAmountChange = (val) => {
     setPayment((prev) => {
+      const total = Number(prev.amount) || 0;
       const parsedCash = val === "" ? 0 : (Number(val) || 0);
-      const parsedUpi = prev.upiAmount === "" ? 0 : (Number(prev.upiAmount) || 0);
-      const newTotal = Math.round((parsedCash + parsedUpi) * 100) / 100;
+      const remainingUpi = Math.max(0, Math.round((total - parsedCash) * 100) / 100);
       return {
         ...prev,
         cashAmount: val,
-        amount: (val !== "" || prev.upiAmount !== "") ? String(newTotal) : prev.amount
+        upiAmount: val === "" ? "" : String(remainingUpi)
       };
     });
-    if (errors.cashAmount || errors.split) setErrors(prev => ({ ...prev, cashAmount: "", split: "" }));
+    if (errors.cashAmount || errors.upiAmount || errors.split) {
+      setErrors(prev => ({ ...prev, cashAmount: "", upiAmount: "", split: "" }));
+    }
   };
 
   const handleUpiAmountChange = (val) => {
     setPayment((prev) => {
-      const parsedCash = prev.cashAmount === "" ? 0 : (Number(prev.cashAmount) || 0);
+      const total = Number(prev.amount) || 0;
       const parsedUpi = val === "" ? 0 : (Number(val) || 0);
-      const newTotal = Math.round((parsedCash + parsedUpi) * 100) / 100;
+      const remainingCash = Math.max(0, Math.round((total - parsedUpi) * 100) / 100);
       return {
         ...prev,
         upiAmount: val,
-        amount: (prev.cashAmount !== "" || val !== "") ? String(newTotal) : prev.amount
+        cashAmount: val === "" ? "" : String(remainingCash)
       };
     });
-    if (errors.upiAmount || errors.split) setErrors(prev => ({ ...prev, upiAmount: "", split: "" }));
+    if (errors.cashAmount || errors.upiAmount || errors.split) {
+      setErrors(prev => ({ ...prev, cashAmount: "", upiAmount: "", split: "" }));
+    }
+  };
+
+  const handlePaymentScopeChange = (scope) => {
+    let newAmt = payment.currentEventDue || 0;
+    if (scope === "PreviousArrears") newAmt = payment.previousArrears || 0;
+    else if (scope === "AllOutstanding") newAmt = payment.totalDue || 0;
+
+    setPayment((prev) => {
+      const next = { ...prev, paymentScope: scope, amount: String(newAmt) };
+      if (prev.paymentMode === "Split") {
+        const half = Math.round((newAmt / 2) * 100) / 100;
+        next.cashAmount = String(half);
+        next.upiAmount = String(Math.round((newAmt - half) * 100) / 100);
+      }
+      return next;
+    });
+    if (errors.amount || errors.split) setErrors((prev) => ({ ...prev, amount: "", split: "" }));
   };
 
   async function handlePay() {
     const filed = "This field is required";
     const schema = {
-      amount: { required: true, type: "numberonly", min: 0, max: 1000000, label: filed },
+      amount: { required: true, type: "decimalonly", min: 0, max: 1000000, label: filed },
       paymentMode: { required: true, label: filed },
       paymentDate: { required: true, label: filed }
     };
@@ -259,6 +280,7 @@ export default function ContributionsPage() {
         amount: payment.amount === "" ? null : Number(payment.amount),
         cashAmount: payment.paymentMode === "Split" ? (payment.cashAmount === "" ? null : Number(payment.cashAmount)) : null,
         upiAmount: payment.paymentMode === "Split" ? (payment.upiAmount === "" ? null : Number(payment.upiAmount)) : null,
+        paymentScope: payment.paymentScope || "CurrentEvent",
       });
       toast.success("Payment recorded successfully");
       setDialogOpen(false);
@@ -308,49 +330,60 @@ export default function ContributionsPage() {
   const columns = [
     {
       label: "Action",
-      render: (row) => (
-        <Box sx={{ display: "flex", gap: 0.3, alignItems: "center" }}>
-          <Tooltip title={row.paymentStatus === "Paid" ? "Already Paid" : (hasWriteAccess ? "Record Payment" : "")}>
-            <span>
-              <IconButton
-                size="small"
-                disabled={row.paymentStatus === "Paid" || !hasWriteAccess}
-                onClick={() => {
-                  const initialAmt = row.amount || "";
-                  setPayment({
-                    eventId: row.eventId,
-                    memberId: row.memberId,
-                    amount: initialAmt,
-                    paymentMode: "Upi",
-                    paymentDate: dayjs(),
-                    cashAmount: "",
-                    upiAmount: "",
-                  });
-                  setErrors({});
-                  setDialogOpen(true);
-                }}
-                sx={{ p: 0.3, color: row.paymentStatus === "Paid" || !hasWriteAccess ? "#cbd5e1" : actionIconColor }}
-              >
-                <PaymentsIcon sx={{ fontSize: "1.1rem" }} />
-              </IconButton>
-            </span>
-          </Tooltip>
+      render: (row) => {
+        const currentDue = row.paymentStatus === "Paid" ? 0 : (row.amount || 0);
+        const previousArrears = row.previousUnpaid || 0;
+        const totalDue = currentDue + previousArrears;
 
-          <Tooltip title={row.paymentStatus === "Paid" ? "View Dynamic Payment QR" : "Scan Dynamic QR & Send Reminder"}>
-            <IconButton
-              size="small"
-              onClick={() => {
-                setSelectedContributionForQr(row);
-                setQrDialogOpen(true);
-              }}
-              sx={{ p: 0.3, color: actionIconColor }}
-            >
-              <QrCodeIcon sx={{ fontSize: "1.1rem" }} />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      )
-    },
+        const isFullyPaid = row.paymentStatus === "Paid" && previousArrears <= 0;
+        const isButtonDisabled = isFullyPaid || !hasWriteAccess;
+        const buttonTooltip = isFullyPaid
+          ? "Fully Paid"
+          : (row.paymentStatus === "Paid" && previousArrears > 0 ? "Pay Previous Arrears" : (hasWriteAccess ? "Record Payment" : ""));
+
+        return (
+          <Box sx={{ display: "flex", gap: 0.3, alignItems: "center" }}>
+            <Tooltip title={buttonTooltip}>
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={isButtonDisabled}
+                  onClick={() => {
+                    let defaultScope = "CurrentEvent";
+                    if (row.paymentStatus === "Paid" && previousArrears > 0) {
+                      defaultScope = "PreviousArrears";
+                    } else if (currentDue > 0 && previousArrears > 0) {
+                      defaultScope = "AllOutstanding";
+                    }
+
+                    const initAmt = defaultScope === "PreviousArrears" ? previousArrears : (defaultScope === "AllOutstanding" ? totalDue : currentDue);
+
+                    setPayment({
+                      eventId: row.eventId,
+                      memberId: row.memberId,
+                      amount: String(initAmt),
+                      paymentMode: "Upi",
+                      paymentDate: dayjs(),
+                      cashAmount: "",
+                      upiAmount: "",
+                      paymentScope: defaultScope,
+                      currentEventDue: currentDue,
+                      previousArrears: previousArrears,
+                      totalDue: totalDue,
+                    });
+                    setErrors({});
+                    setDialogOpen(true);
+                  }}
+                  sx={{ p: 0.3, color: isButtonDisabled ? "#cbd5e1" : actionIconColor }}
+                >
+                  <PaymentsIcon sx={{ fontSize: "1.1rem" }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+      );
+    }
+  },
     { label: "Member", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
     {
       label: "Status",
@@ -369,7 +402,19 @@ export default function ContributionsPage() {
         </Typography>
       )
     },
-    { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{(row.amount || 0).toLocaleString()}</Typography> },
+    {
+      label: "Amount",
+      key: "amount",
+      align: "right",
+      render: (row) => {
+        const currentDue = row.paymentStatus === "Paid" ? 0 : (row.amount || 0);
+        return (
+          <Typography variant="body2" fontWeight={700} color={row.paymentStatus === "Paid" ? "text.secondary" : "inherit"}>
+            ₹{currentDue.toLocaleString()}
+          </Typography>
+        );
+      }
+    },
     {
       label: "Arrears",
       key: "previousUnpaid",
@@ -551,15 +596,73 @@ export default function ContributionsPage() {
         }
       >
         <Stack spacing={2.5} sx={{ pt: 1 }}>
+          {/* Member Dues Summary Banner */}
+          {(payment.previousArrears > 0 || payment.currentEventDue > 0) && (
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: "10px",
+                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(74,63,107,0.04)",
+                border: "1px solid rgba(0,0,0,0.08)",
+              }}
+            >
+              <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ display: "block", textTransform: "uppercase", letterSpacing: "0.05em", mb: 0.8, fontSize: "0.68rem" }}>
+                Member Dues Summary
+              </Typography>
+              <Grid container spacing={1} textAlign="center">
+                <Grid size={{ xs: 4 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem", display: "block" }}>Current Event</Typography>
+                  <Typography variant="body2" fontWeight={800} color={payment.currentEventDue > 0 ? "error.main" : "success.main"}>
+                    ₹{(payment.currentEventDue || 0).toLocaleString()}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 4 }} sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem", display: "block" }}>Previous Arrears</Typography>
+                  <Typography variant="body2" fontWeight={800} color={payment.previousArrears > 0 ? "error.main" : "text.secondary"}>
+                    ₹{(payment.previousArrears || 0).toLocaleString()}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 4 }} sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem", display: "block" }}>Total Due</Typography>
+                  <Typography variant="body2" fontWeight={900} color="primary.main">
+                    ₹{(payment.totalDue || 0).toLocaleString()}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+
+          {/* Payment Scope Selector */}
+          {(payment.previousArrears > 0 || payment.currentEventDue > 0) && (
+            <AppSelect
+              label="Payment For *"
+              placeholder="Select payment target"
+              value={payment.paymentScope || "CurrentEvent"}
+              onChange={(e) => handlePaymentScopeChange(e.target.value)}
+              options={[
+                ...(payment.currentEventDue > 0 ? [{ label: `Current Event Only (₹${payment.currentEventDue.toLocaleString()})`, value: "CurrentEvent" }] : []),
+                ...(payment.previousArrears > 0 ? [{ label: `Previous Arrears Only (₹${payment.previousArrears.toLocaleString()})`, value: "PreviousArrears" }] : []),
+                ...((payment.currentEventDue > 0 && payment.previousArrears > 0) ? [{ label: `All Outstanding (₹${payment.totalDue.toLocaleString()})`, value: "AllOutstanding" }] : []),
+              ]}
+              required
+            />
+          )}
+
           <AppInput
             label="Amount"
-            placeholder="Enter payment amount (₹)"
+            placeholder="Fixed payment amount (₹)"
             value={payment.amount}
             onChange={(event) => handleAmountChange(event.target.value)}
-            restrictType="numberonly"
+            restrictType="decimalonly"
             maxLength={10}
+            disabled={true}
             error={!!errors.amount}
-            helperText={errors.amount}
+            helperText={
+              errors.amount ||
+              (payment.paymentMode === "Split"
+                ? "Total fixed due amount. You can adjust Cash and UPI amounts below."
+                : "Fixed due amount for the selected payment scope.")
+            }
             required
           />
           <AppSelect
@@ -583,34 +686,10 @@ export default function ContributionsPage() {
                 borderColor: (t) => t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(74, 63, 107, 0.25)",
               }}
             >
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+              <Box sx={{ mb: 1.5 }}>
                 <Typography variant="caption" fontWeight={800} sx={{ color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.7rem" }}>
                   Split Payment Breakdown
                 </Typography>
-                <AppButton
-                  size="small"
-                  variant="outlined"
-                  onClick={() => {
-                    const tot = Number(payment.amount) || 0;
-                    const half = Math.round((tot / 2) * 100) / 100;
-                    setPayment((prev) => ({
-                      ...prev,
-                      cashAmount: String(half),
-                      upiAmount: String(Math.round((tot - half) * 100) / 100),
-                    }));
-                    setErrors((prev) => ({ ...prev, cashAmount: "", upiAmount: "", split: "" }));
-                  }}
-                  sx={{
-                    fontSize: "0.68rem",
-                    py: 0.2,
-                    px: 1,
-                    height: 24,
-                    minHeight: 24,
-                    fontWeight: 700,
-                  }}
-                >
-                  50 / 50 Split
-                </AppButton>
               </Box>
 
               <Grid container spacing={1.5}>
@@ -620,7 +699,7 @@ export default function ContributionsPage() {
                     placeholder="₹ Cash"
                     value={payment.cashAmount}
                     onChange={(e) => handleCashAmountChange(e.target.value)}
-                    restrictType="numberonly"
+                    restrictType="decimalonly"
                     maxLength={10}
                     error={!!errors.cashAmount}
                     helperText={errors.cashAmount}
@@ -633,7 +712,7 @@ export default function ContributionsPage() {
                     placeholder="₹ UPI"
                     value={payment.upiAmount}
                     onChange={(e) => handleUpiAmountChange(e.target.value)}
-                    restrictType="numberonly"
+                    restrictType="decimalonly"
                     maxLength={10}
                     error={!!errors.upiAmount}
                     helperText={errors.upiAmount}
