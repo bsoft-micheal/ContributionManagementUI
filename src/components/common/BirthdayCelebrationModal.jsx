@@ -29,7 +29,7 @@ export default function BirthdayCelebrationModal({
   open,
   onClose,
   celebrants = [],
-  autoCloseSeconds = 5,
+  autoCloseSeconds = 0,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -57,7 +57,7 @@ export default function BirthdayCelebrationModal({
     formattedNames = `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`;
   }
 
-  // Trigger grand confetti paper blast and close unconditionally after autoCloseSeconds (5s)
+  // Trigger grand confetti paper blast; remain static unless autoCloseSeconds is set (> 0)
   useEffect(() => {
     if (!open || celebrantList.length === 0) return;
 
@@ -68,20 +68,25 @@ export default function BirthdayCelebrationModal({
       launchCelebrationBlast();
     }, 150);
 
-    // Strict 5-second auto-close timer
-    const closeTimer = setTimeout(() => {
-      onClose?.();
-    }, autoCloseSeconds * 1000);
+    let closeTimer;
+    let intervalTimer;
 
-    // Second-by-second countdown for progress bar
-    const intervalTimer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 1 ? prev - 1 : 0));
-    }, 1000);
+    // Only set auto-close timer if explicitly configured (> 0)
+    if (autoCloseSeconds > 0) {
+      closeTimer = setTimeout(() => {
+        onClose?.();
+      }, autoCloseSeconds * 1000);
+
+      // Second-by-second countdown for progress bar
+      intervalTimer = setInterval(() => {
+        setTimeLeft((prev) => (prev > 1 ? prev - 1 : 0));
+      }, 1000);
+    }
 
     return () => {
       clearTimeout(blastTimer);
-      clearTimeout(closeTimer);
-      clearInterval(intervalTimer);
+      if (closeTimer) clearTimeout(closeTimer);
+      if (intervalTimer) clearInterval(intervalTimer);
     };
   }, [open, celebrantList.length, autoCloseSeconds, onClose]);
 

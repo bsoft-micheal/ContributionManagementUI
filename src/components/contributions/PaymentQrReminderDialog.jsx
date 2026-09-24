@@ -50,19 +50,22 @@ export default function PaymentQrReminderDialog({
 
   if (!contribution) return null;
 
-  const config = getPaymentQrConfig();
+  const eventName = event?.eventName || contribution.eventName || "Contribution Event";
+  const categoryName = contribution.categoryName || event?.eventTypeName || event?.name || "Contribution";
+  const categoryId = event?.eventTypeId || contribution.eventTypeId;
+  const config = getPaymentQrConfig(categoryName);
+  const isConfigured = config.isConfigured;
+
   const memberName = contribution.memberName || member?.name || "Member";
   const memberEmail = member?.email || contribution.memberEmail || `${memberName.toLowerCase().replace(/\s+/g, ".")}@example.com`;
-  const eventName = event?.eventName || contribution.eventName || "Contribution Event";
-  const categoryName = contribution.categoryName || event?.eventTypeName || "Contribution";
-  const categoryId = event?.eventTypeId || contribution.eventTypeId;
   const amount = Number(contribution.totalAccumulated || contribution.amount || 0);
 
-  // Generate dynamic QR code specific to this member's contribution amount
+  // Generate dynamic QR code specific to this member's contribution amount and event type
   const { upiUri, qrImageUrl, receiverName, upiId, mode } = generateDynamicPaymentQr({
     amount,
     note: `Contribution for ${categoryName}`,
     customConfig: config,
+    eventType: categoryName,
   });
 
   const formattedDueDate = event?.eventDate ? new Date(event.eventDate).toLocaleDateString() : undefined;
@@ -180,6 +183,7 @@ export default function PaymentQrReminderDialog({
               variant="outlined"
               startIcon={<DownloadOutlinedIcon />}
               onClick={handleDownloadQr}
+              disabled={!isConfigured}
               sx={{ fontSize: "0.8rem" }}
             >
               Download QR
@@ -188,7 +192,7 @@ export default function PaymentQrReminderDialog({
               variant="contained"
               startIcon={sending ? <CircularProgress size={16} color="inherit" /> : <EmailOutlinedIcon />}
               onClick={handleSendEmailReminder}
-              disabled={sending}
+              disabled={sending || !isConfigured}
               sx={{ bgcolor: "#0284c7 !important", "&:hover": { bgcolor: "#0369a1 !important" } }}
             >
               {sending ? "Sending..." : sentSuccess ? "Resend Email" : "Send Email Reminder"}
@@ -218,6 +222,26 @@ export default function PaymentQrReminderDialog({
         {/* Tab 0: Dynamic QR Code View */}
         {activeTab === 0 && (
           <Stack spacing={2.5}>
+            {/* Not Configured Notice */}
+            {!isConfigured && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: "12px",
+                  bgcolor: "rgba(239, 68, 68, 0.08)",
+                  border: "1px solid rgba(239, 68, 68, 0.25)",
+                  textAlign: "center",
+                }}
+              >
+                <Typography variant="body2" fontWeight={800} sx={{ color: "#dc2626" }}>
+                  Payment QR is not configured for this event type.
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                  Please configure UPI ID and Receiver Name in Payment QR Settings for <strong>{categoryName}</strong>.
+                </Typography>
+              </Box>
+            )}
+
             {/* Member & Event Summary Header */}
             <Box
               sx={{
@@ -239,9 +263,22 @@ export default function PaymentQrReminderDialog({
                   <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.8rem" }}>
                     {eventName}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "#0284c7", display: "block", mt: 0.3 }}>
-                    {memberEmail}
-                  </Typography>
+                  <Box sx={{ display: "flex", gap: 0.8, alignItems: "center", mt: 0.4, flexWrap: "wrap" }}>
+                    <Chip
+                      label={`Event Type: ${categoryName}`}
+                      size="small"
+                      sx={{
+                        height: 20,
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        bgcolor: "rgba(2, 132, 199, 0.1)",
+                        color: "#0284c7",
+                      }}
+                    />
+                    <Typography variant="caption" sx={{ color: "#0284c7" }}>
+                      {memberEmail}
+                    </Typography>
+                  </Box>
                 </Grid>
 
                 <Grid size={{ xs: 5 }} sx={{ textAlign: "right" }}>

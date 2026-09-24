@@ -35,8 +35,6 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import EventFormDialog from "../../components/events/EventFormDialog";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
-import { launchPaperBlast } from "../../components/common/PaperBlast";
-import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
 
 /**
  * Safely parse date of birth (supports DD/MM/YYYY and standard ISO)
@@ -140,12 +138,10 @@ export default function CalendarPage() {
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
 
-  // Modals for Create, View, and Birthday Celebration
+  // Modals for Create and View
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [bdayCelebrationOpen, setBdayCelebrationOpen] = useState(false);
-  const [hasShownCelebration, setHasShownCelebration] = useState(false);
 
   const loadCalendarData = async () => {
     try {
@@ -655,21 +651,7 @@ export default function CalendarPage() {
     return Array.from(map.values());
   }, [isBirthdayView, filteredEvents, detailedEventsMap, members, categoryFilter]);
 
-  // Today's celebrants
-  const todayCelebrants = useMemo(() => {
-    return birthdayMembers.filter((m) => m.status === "today");
-  }, [birthdayMembers]);
 
-  // Automatic festive celebration: Trigger big pop up modal & paper blast confetti when there is a birthday today and viewing birthdays/all
-  useEffect(() => {
-    if (todayCelebrants.length > 0 && !hasShownCelebration && isBirthdayView) {
-      const timer = setTimeout(() => {
-        setBdayCelebrationOpen(true);
-        setHasShownCelebration(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [todayCelebrants, hasShownCelebration, isBirthdayView]);
 
   const handleDateClick = (day) => {
     if (!hasWriteAccess) return;
@@ -740,30 +722,6 @@ export default function CalendarPage() {
             </Typography>
           </Box>
 
-          {hasWriteAccess && (
-            <AppButton
-              variant="contained"
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setSelectedEvent({ eventDate: dayjs() });
-                setDialogOpen(true);
-              }}
-              sx={{
-                bgcolor: "#ffffff !important",
-                color: "#4a3f6b !important",
-                fontWeight: 700,
-                fontSize: "0.8rem",
-                borderRadius: "8px",
-                px: 1.8,
-                py: 0.5,
-                boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                "&:hover": { bgcolor: "#f3f0f7 !important" },
-              }}
-            >
-              Create Event
-            </AppButton>
-          )}
         </Box>
 
         <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
@@ -1712,13 +1670,7 @@ export default function CalendarPage() {
         members={members}
       />
 
-      {/* Big Celebratory Birthday Pop-up Modal with Paper Blast Confetti & Auto-Hide */}
-      <BirthdayCelebrationModal
-        open={bdayCelebrationOpen}
-        onClose={() => setBdayCelebrationOpen(false)}
-        celebrants={todayCelebrants}
-        autoCloseSeconds={5}
-      />
+
     </div>
   );
 }
