@@ -4,233 +4,226 @@ import {
   RadioGroup,
   FormControlLabel,
   Typography,
-  Grid
+  Grid,
+  Chip,
 } from "@mui/material";
 
 import { useAppToast } from "../../components/common/AppToast";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
-import { FilterList as FilterListIcon } from "@mui/icons-material";
+import { FilterList as FilterListIcon, Refresh as RefreshIcon, Save as SaveIcon } from "@mui/icons-material";
 import { GetUserRightsAsync, SaveUserRightsAsync } from "../../services/userRightsService";
 import { GetRolesAsync } from "../../services/roleService";
 
-const defaultRows = [
-  // Dashboard Module
-  { id: 1, module: "Dashboard", subModule: "Analytics", page: "Dashboard", access: "readWrite" },
+// Top-level module options for the Module filter dropdown
+const MODULE_OPTIONS = [
+  { label: "All Modules",    value: "All" },
+  { label: "Dashboard",      value: "Dashboard" },
+  { label: "Members",        value: "Members" },
+  { label: "Events",         value: "Events" },
+  { label: "Finance",        value: "Finance" },
+  { label: "Support Ticket", value: "Support Ticket" },
+  { label: "Tools",          value: "Tools" },
+  { label: "Reports",        value: "Reports" },
+];
 
-  // Members Module
-  { id: 2, module: "Members", subModule: "Directory", page: "Members", access: "readWrite" },
-
-  // Events Module
-  { id: 3, module: "Events", subModule: "Registry", page: "Events", access: "readWrite" },
-  { id: 4, module: "Events", subModule: "Calendar", page: "Calendar", access: "readWrite" },
-  { id: 16, module: "Events", subModule: "Media", page: "Gallery", access: "readWrite" },
-
-  // Contributions Module
-  { id: 5, module: "Contributions", subModule: "Ledger", page: "Contributions", access: "readWrite" },
-  { id: 6, module: "Contributions", subModule: "Calculation", page: "Calculation", access: "readWrite" },
-  { id: 17, module: "Contributions", subModule: "Expenses", page: "Expense", access: "readWrite" },
-  { id: 18, module: "Contributions", subModule: "Payments", page: "Payments", access: "readWrite" },
-
-  // Support Data Module
-  { id: 7, module: "Support Data", subModule: "Categories", page: "Event Types", access: "readWrite" },
-  { id: 8, module: "Support Data", subModule: "Clearance", page: "Exit Process", access: "readWrite" },
-  { id: 9, module: "Support Data", subModule: "Admin", page: "User Rights", access: "readWrite" },
-  { id: 11, module: "Support Data", subModule: "Admin", page: "Users", access: "readWrite" },
-  { id: 15, module: "Support Data", subModule: "Admin", page: "Roles", access: "readWrite" },
-  { id: 19, module: "Support Data", subModule: "Helpdesk", page: "Support Tickets", access: "readWrite" },
-  { id: 20, module: "Support Data", subModule: "Configuration", page: "Settings", access: "readWrite" },
-
-  // Reports Module
-  { id: 10, module: "Reports", subModule: "Analytics", page: "Event Audit", access: "readWrite" },
-  { id: 12, module: "Reports", subModule: "Analytics", page: "Member Velocity", access: "readWrite" },
-  { id: 13, module: "Reports", subModule: "Analytics", page: "Pending Dues", access: "readWrite" },
-  { id: 14, module: "Reports", subModule: "Analytics", page: "Member Category Paid", access: "readWrite" }
+const ACCESS_OPTIONS = [
+  { value: "readOnly",  label: "Read Only",  color: "#3b82f6" },
+  { value: "readWrite", label: "Read/Write", color: "#10b981" },
+  { value: "deny",      label: "Deny",       color: "#ef4444" },
 ];
 
 export default function UserRightsPage() {
   const [roles, setRoles] = useState([]);
   const [selectedRoleName, setSelectedRoleName] = useState("");
-  const [selectedSubModule, setSelectedSubModule] = useState("Dashboard");
+  const [selectedModule, setSelectedModule] = useState("All");
+
+  // filter panel state (applied only on "Filter" click)
   const [filterRoleName, setFilterRoleName] = useState("");
-  const [filterSubModule, setFilterSubModule] = useState("Dashboard");
+  const [filterModule, setFilterModule] = useState("All");
+
+  // rights keyed by roleName → array of right rows
   const [rights, setRights] = useState({});
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const toast = useAppToast();
 
+  // ── Initial load: fetch roles ─────────────────────────────────────────────
   useEffect(() => {
-    loadData();
+    loadRoles();
   }, []);
 
+  // ── Fetch rights whenever selected role changes ───────────────────────────
   useEffect(() => {
-    if (selectedRoleName) {
-      fetchRightsForRole(selectedRoleName);
-    }
+    if (selectedRoleName) fetchRightsForRole(selectedRoleName);
   }, [selectedRoleName]);
 
-  async function loadData() {
+  async function loadRoles() {
     try {
       const dbRoles = await GetRolesAsync();
-      if (Array.isArray(dbRoles) && dbRoles.length > 0) {
-        setRoles(dbRoles);
-        setSelectedRoleName(dbRoles[0].roleName);
-        setFilterRoleName(dbRoles[0].roleName);
-      } else {
-        const fallback = [
-          { roleName: "Admin" },
-          { roleName: "Manager" },
-          { roleName: "User" },
-          { roleName: "Member" },
-        ];
-        setRoles(fallback);
-        setSelectedRoleName(fallback[0].roleName);
-        setFilterRoleName(fallback[0].roleName);
-      }
-    } catch (err) {
-      console.warn("Could not load roles from database:", err);
+      const list = Array.isArray(dbRoles) && dbRoles.length > 0
+        ? dbRoles
+        : [{ roleName: "Admin" }, { roleName: "Manager" }, { roleName: "User" }, { roleName: "Member" }];
+      setRoles(list);
+      setSelectedRoleName(list[0].roleName);
+      setFilterRoleName(list[0].roleName);
+    } catch {
+      toast.error("Failed to load roles");
     }
   }
 
-  async function fetchRightsForRole(roleName) {
+  async function fetchRightsForRole(roleName, forceRefresh = false) {
+    // return cached if available and not forcing refresh
+    if (!forceRefresh && rights[roleName]) { setLoading(false); return; }
     setLoading(true);
     try {
       const serverRights = await GetUserRightsAsync(roleName);
-      // Align with defaultRows to handle any schema discrepancies
-      const alignedRights = defaultRows.map(defRow => {
-        let match = serverRights.find(r => r.page === defRow.page);
-
-        // Fallback for transition from single 'Reports' to split reports
-        if (!match && defRow.module === "Reports") {
-          match = serverRights.find(r => r.page === "Reports");
-        }
-
-        if (!match) {
-          match = serverRights.find(
-            r => r.subModule === defRow.subModule && r.module === defRow.module
-          );
-        }
-
-        return {
-          ...defRow,
-          access: match ? match.access : defRow.access,
-          createdBy: match ? (match.createdBy || match.CreatedBy) : null,
-        };
-      });
-      setRights(prev => ({ ...prev, [roleName]: alignedRights }));
+      const rows = Array.isArray(serverRights) ? serverRights : [];
+      // normalise: add a sequential ui id
+      const normalised = rows.map((r, i) => ({
+        ...r,
+        _uid: i + 1,
+        module:    r.module    || r.Module    || "",
+        subModule: r.subModule || r.SubModule || "",
+        page:      r.page      || r.Page      || "",
+        access:    r.access    || r.Access    || "readOnly",
+        createdBy: r.createdBy || r.CreatedBy || null,
+      }));
+      setRights(prev => ({ ...prev, [roleName]: normalised }));
     } catch {
-      toast.error("Failed to load ");
+      toast.error(`Failed to load rights for ${roleName}`);
     } finally {
       setLoading(false);
     }
   }
 
-  // Update inline radio accessibility state instantly
-  const handleAccessChange = async (rowId, newAccess) => {
+  // ── Handle radio change: update local state only ─────────────────────────
+  const handleAccessChange = (uid, newAccess) => {
     if (!selectedRoleName) return;
 
-    const updatedRights = { ...rights };
-    const roleRows = updatedRights[selectedRoleName];
+    setRights(prev => {
+      const updated = (prev[selectedRoleName] || []).map(r =>
+        r._uid === uid ? { ...r, access: newAccess } : r
+      );
+      return { ...prev, [selectedRoleName]: updated };
+    });
+  };
 
-    if (roleRows) {
-      const targetRow = roleRows.find(r => r.id === rowId);
-      if (targetRow) {
-        targetRow.access = newAccess;
-        setRights(updatedRights);
+  // ── Handle Save button click ─────────────────────────────────────────────
+  const handleSave = async () => {
+    if (!selectedRoleName) {
+      toast.error("Please select a Role before saving");
+      return;
+    }
 
-        try {
-          const payload = {
-            roleName: selectedRoleName,
-            rights: roleRows.map(r => ({
-              module: r.module,
-              subModule: r.subModule,
-              page: r.page,
-              access: r.access
-            }))
-          };
-          await SaveUserRightsAsync(payload);
+    const currentRows = rights[selectedRoleName] || [];
+    if (currentRows.length === 0) {
+      toast.error("No rights data available to save");
+      return;
+    }
 
-          // Update local storage so path authorization helper takes effect instantly
-          const savedRights = localStorage.getItem("projectRightsConfig");
-          let rightsMap = savedRights ? JSON.parse(savedRights) : {};
-          rightsMap[selectedRoleName] = roleRows;
-          localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
+    setSaving(true);
+    try {
+      // Build request payload: every Rights item explicitly contains `role: selectedRoleName`
+      const payload = {
+        roleName: selectedRoleName,
+        rights: currentRows.map(r => ({
+          role: selectedRoleName,
+          featureId: r.featureID || r.featureId || 0,
+          module: r.module,
+          subModule: r.subModule,
+          page: r.page,
+          access: r.access,
+        })),
+      };
 
-          const activeRole = roles.find(r => r.roleName === selectedRoleName);
-          const resourceName = targetRow.subModule || targetRow.page || targetRow.module;
+      await SaveUserRightsAsync(payload);
 
-          let accessLabel = "Read Only";
-          if (newAccess === "readWrite") accessLabel = "Read/Write";
-          if (newAccess === "deny") accessLabel = "Deny";
+      // Sync to localStorage for local RBAC effect if present
+      const stored = localStorage.getItem("projectRightsConfig");
+      const map = stored ? JSON.parse(stored) : {};
+      map[selectedRoleName] = currentRows;
+      localStorage.setItem("projectRightsConfig", JSON.stringify(map));
 
-          toast.success("Saved successfully");
-        } catch {
-          toast.error("Failed to save");
-        }
-      }
+      toast.success("User rights saved successfully");
+
+      // Reload rights from server after successful save to refresh Current Access & Set By
+      await fetchRightsForRole(selectedRoleName, true);
+    } catch (err) {
+      const msg = err.response?.data?.title || err.response?.data?.message || "Failed to save user rights";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Filter rows by Selected Sub Module
+  // ── Apply filter ───────────────────────────────────────────────────────────
+  const handleApplyFilter = () => {
+    setSelectedRoleName(filterRoleName);
+    setSelectedModule(filterModule);
+    toast.success("Filters applied");
+  };
+
+  const handleClearFilter = () => {
+    const defaultRole = roles.length > 0 ? roles[0].roleName : "Admin";
+    setFilterRoleName(defaultRole);
+    setFilterModule("All");
+    setSelectedRoleName(defaultRole);
+    setSelectedModule("All");
+    toast.success("Filters cleared");
+  };
+
+  const handleRefresh = () => {
+    fetchRightsForRole(selectedRoleName, true);
+  };
+
+  // ── Filtered rows ─────────────────────────────────────────────────────────
   const filteredRows = useMemo(() => {
-    const currentRows = rights[selectedRoleName] || [];
-
-    return currentRows.filter(row => {
-      // If the page is "User Rights" and selectedRoleName is not Admin or Manager, hide it
-      if (row.page === "User Rights" && selectedRoleName !== "Admin" && selectedRoleName !== "Manager") {
-        return false;
-      }
-      // Sub Module filter matches selected Module or acts as "All"
-      return selectedSubModule === "All" || row.module.toLowerCase() === selectedSubModule.toLowerCase();
+    const rows = rights[selectedRoleName] || [];
+    return rows.filter(row => {
+      if (selectedModule !== "All" && row.module.toLowerCase() !== selectedModule.toLowerCase()) return false;
+      return true;
     });
-  }, [rights, selectedRoleName, selectedSubModule]);
+  }, [rights, selectedRoleName, selectedModule]);
 
-  // AppDataTable Columns Mapping
+  // ── Columns ───────────────────────────────────────────────────────────────
   const columns = [
     {
       label: "S.No",
-      key: "id",
+      key: "_uid",
       sx: { width: 60 },
       render: (row) => {
-        const index = filteredRows.findIndex(r => r.id === row.id);
+        const idx = filteredRows.findIndex(r => r._uid === row._uid);
         return (
           <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
-            {index !== -1 ? index + 1 : ""}
+            {idx + 1}
           </Typography>
         );
-      }
+      },
     },
     {
       label: "Module",
       key: "module",
       render: (row) => {
-        const index = filteredRows.findIndex(r => r.id === row.id);
-        const isRepeated = index > 0 && filteredRows[index - 1].module === row.module;
+        const idx = filteredRows.findIndex(r => r._uid === row._uid);
+        const repeated = idx > 0 && filteredRows[idx - 1].module === row.module;
         return (
           <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.8rem" }}>
-            {isRepeated ? "" : row.module}
+            {repeated ? "" : row.module}
           </Typography>
         );
-      }
+      },
     },
     {
       label: "Sub Module",
       key: "subModule",
       render: (row) => (
         <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
-          {row.subModule || "--"}
+          {row.subModule || "—"}
         </Typography>
-      )
-    },
-    {
-      label: "Pages",
-      key: "page",
-      render: (row) => (
-        <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
-          {row.page || "--"}
-        </Typography>
-      )
+      ),
     },
     {
       label: "Rights Accessibility",
@@ -238,31 +231,62 @@ export default function UserRightsPage() {
         <RadioGroup
           row
           value={row.access}
-          onChange={(e) => handleAccessChange(row.id, e.target.value)}
-          sx={{ gap: 3 }}
+          onChange={(e) => handleAccessChange(row._uid, e.target.value)}
+          sx={{ gap: 2, flexWrap: "nowrap" }}
         >
-          <FormControlLabel
-            value="readOnly"
-            control={<Radio size="small" sx={{ color: "rgba(74,63,107,0.4)", "&.Mui-checked": { color: "#4a3f6b" } }} />}
-            label={<Typography variant="body2" sx={{ fontSize: "0.78rem", fontWeight: 500 }}>Read Only</Typography>}
-          />
-          <FormControlLabel
-            value="readWrite"
-            control={<Radio size="small" sx={{ color: "rgba(74,63,107,0.4)", "&.Mui-checked": { color: "#4a3f6b" } }} />}
-            label={<Typography variant="body2" sx={{ fontSize: "0.78rem", fontWeight: 500 }}>Read/Write</Typography>}
-          />
-          <FormControlLabel
-            value="deny"
-            control={<Radio size="small" sx={{ color: "rgba(74,63,107,0.4)", "&.Mui-checked": { color: "#4a3f6b" } }} />}
-            label={<Typography variant="body2" sx={{ fontSize: "0.78rem", fontWeight: 500 }}>Deny</Typography>}
-          />
+          {ACCESS_OPTIONS.map(opt => (
+            <FormControlLabel
+              key={opt.value}
+              value={opt.value}
+              control={
+                <Radio
+                  size="small"
+                  disabled={saving}
+                  sx={{
+                    color: "rgba(74,63,107,0.35)",
+                    "&.Mui-checked": { color: opt.color },
+                    p: 0.5,
+                  }}
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontSize: "0.78rem", fontWeight: 500 }}>
+                  {opt.label}
+                </Typography>
+              }
+            />
+          ))}
         </RadioGroup>
-      )
+      ),
     },
     {
-      label: "Created By",
+      label: "Current Access",
+      render: (row) => {
+        const opt = ACCESS_OPTIONS.find(o => o.value === row.access) || ACCESS_OPTIONS[0];
+        return (
+          <Chip
+            label={opt.label}
+            size="small"
+            sx={{
+              fontSize: "0.7rem",
+              fontWeight: 600,
+              bgcolor: `${opt.color}18`,
+              color: opt.color,
+              border: `1px solid ${opt.color}40`,
+              height: 22,
+            }}
+          />
+        );
+      },
+    },
+    {
+      label: "Set By",
       key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
+      render: (row) => (
+        <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.78rem" }}>
+          {row.createdBy || "—"}
+        </Typography>
+      ),
     },
   ];
 
@@ -288,66 +312,65 @@ export default function UserRightsPage() {
             </Grid>
             <Grid size={{ xs: 12, md: 3.5 }}>
               <AppSelect
-                label="Sub Module"
-                placeholder="Select Sub Module"
-                value={filterSubModule}
-                onChange={(e) => setFilterSubModule(e.target.value)}
-                options={[
-                  { label: "Dashboard", value: "Dashboard" },
-                  { label: "Members", value: "Members" },
-                  { label: "Events", value: "Events" },
-                  { label: "Contributions", value: "Contributions" },
-                  { label: "Support Data", value: "Support Data" },
-                  { label: "Reports", value: "Reports" }
-                ]}
+                label="Module"
+                placeholder="Select Module"
+                value={filterModule}
+                onChange={(e) => setFilterModule(e.target.value)}
+                options={MODULE_OPTIONS}
                 required
                 fullWidth
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 5 }} sx={{ display: "flex", gap: 1.5, alignItems: "center", mt: { xs: 0, md: 2.2 } }}>
+            <Grid size={{ xs: 12, md: 5 }} sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center", mt: { xs: 0, md: 2.2 } }}>
               <AppButton
                 variant="contained"
                 size="small"
                 startIcon={<FilterListIcon />}
-                onClick={() => {
-                  setSelectedRoleName(filterRoleName);
-                  setSelectedSubModule(filterSubModule);
-                  toast.success("Filters applied");
-                }}
-                sx={{
-                  height: 34,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                }}
+                onClick={handleApplyFilter}
+                sx={{ height: 34, fontWeight: 700, fontSize: "0.75rem", px: 2 }}
               >
                 Filter
               </AppButton>
               <AppButton
-                variant="outlined"
+                variant="contained"
                 size="small"
-                onClick={() => {
-                  const defaultRole = roles.length > 0 ? roles[0].roleName : "Admin";
-                  setFilterRoleName(defaultRole);
-                  setFilterSubModule("Dashboard");
-                  setSelectedRoleName(defaultRole);
-                  setSelectedSubModule("Dashboard");
-                  toast.success("Filters cleared");
-                }}
+                color="success"
+                startIcon={<SaveIcon />}
+                onClick={handleSave}
+                loading={saving}
+                disabled={saving || loading}
                 sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)"
-                  }
+                  height: 34, fontWeight: 700, fontSize: "0.75rem", px: 2,
+                  bgcolor: "#10b981",
+                  "&:hover": { bgcolor: "#059669" },
                 }}
               >
-                Clear Filter
+                Save
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={handleRefresh}
+                sx={{
+                  height: 34, fontWeight: 700, fontSize: "0.75rem", px: 2,
+                  color: "#6366f1", borderColor: "rgba(99,102,241,0.4)",
+                  "&:hover": { borderColor: "#6366f1", bgcolor: "rgba(99,102,241,0.05)" },
+                }}
+              >
+                Refresh
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                size="small"
+                onClick={handleClearFilter}
+                sx={{
+                  height: 34, fontWeight: 700, fontSize: "0.75rem", px: 2,
+                  color: "#ef4444", borderColor: "rgba(239,68,68,0.4)",
+                  "&:hover": { borderColor: "#ef4444", bgcolor: "rgba(239,68,68,0.05)" },
+                }}
+              >
+                Clear
               </AppButton>
             </Grid>
           </Grid>
