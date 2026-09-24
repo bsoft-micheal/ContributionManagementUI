@@ -528,7 +528,7 @@ export default function UsersPage() {
     {
       label: "Created On",
       key: "createdOn",
-      render: (row) => formatGridDate(row.createdOn),
+      render: (row) => formatGridDate(row.createdOn || row.CreatedOn || row.createdAt || row.CreatedAt),
     },
     {
       label: "Created By",

@@ -846,10 +846,12 @@ export default function AppDataTable({
                             variant="body2"
                             sx={{ fontSize: "inherit", color: "inherit" }}
                           >
-                            {column.type === "date"
-                              ? formatGridDate(row[column.key])
+                            {column.type === "date" || column.key === "createdOn" || column.key === "createdAt" || column.key === "CreatedOn" || column.key === "CreatedAt" || column.label === "Created On" || column.label === "Created At"
+                              ? formatGridDate(row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? row.createdOn ?? row.CreatedOn ?? row.createdAt ?? row.CreatedAt)
                               : column.type === "datetime"
                               ? formatGridDateTime(row[column.key])
+                              : (column.key === "createdBy" || column.label === "Created By")
+                              ? (row.createdBy || row.CreatedBy || row.createdByName || row.CreatedByName || row.createdByUser || row.CreatedByUser || row.created_by || row.Created_By || "--")
                               : (row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? "--")}
                           </Typography>
                         )}

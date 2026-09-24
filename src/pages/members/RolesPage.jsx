@@ -12,6 +12,7 @@ import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { GetRolesAsync, CreateRoleAsync, UpdateRoleAsync, DeleteRoleAsync } from "../../services/roleService";
 import { validateForm } from "../../utils/validation";
+import { formatGridDate } from "../../utils/dateHelper";
 
 const initialForm = { roleName: "" };
 
@@ -144,6 +145,11 @@ export default function RolesPage() {
       label: "Created By",
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
   ];
 

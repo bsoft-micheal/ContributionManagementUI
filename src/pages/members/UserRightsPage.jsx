@@ -14,6 +14,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import { FilterList as FilterListIcon } from "@mui/icons-material";
 import { GetUserRightsAsync, SaveUserRightsAsync } from "../../services/userRightsService";
 import { GetRolesAsync } from "../../services/roleService";
+import { formatGridDate } from "../../utils/dateHelper";
 
 const defaultRows = [
   // Dashboard Module
@@ -40,6 +41,7 @@ const defaultRows = [
   { id: 11, module: "Support Data", subModule: "Admin", page: "Users", access: "readWrite" },
   { id: 15, module: "Support Data", subModule: "Admin", page: "Roles", access: "readWrite" },
   { id: 19, module: "Support Data", subModule: "Helpdesk", page: "Support Tickets", access: "readWrite" },
+  { id: 21, module: "Support Data", subModule: "Calculations", page: "Budget Calculations", access: "readWrite" },
   { id: 20, module: "Support Data", subModule: "Configuration", page: "Settings", access: "readWrite" },
 
   // Reports Module
@@ -116,6 +118,7 @@ export default function UserRightsPage() {
           ...defRow,
           access: match ? match.access : defRow.access,
           createdBy: match ? (match.createdBy || match.CreatedBy) : null,
+          createdAt: match ? (match.createdAt || match.CreatedAt || match.createdOn || match.CreatedOn) : null,
         };
       });
       setRights(prev => ({ ...prev, [roleName]: alignedRights }));
@@ -264,6 +267,11 @@ export default function UserRightsPage() {
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
     },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
+    },
   ];
 
   return (
@@ -327,7 +335,7 @@ export default function UserRightsPage() {
                 variant="outlined"
                 size="small"
                 onClick={() => {
-                  const defaultRole = roles.length > 0 ? roles[0].roleName : "Admin";
+                  const defaultRole = roles.length > 0 ? roles[0].roleName : "";
                   setFilterRoleName(defaultRole);
                   setFilterSubModule("Dashboard");
                   setSelectedRoleName(defaultRole);

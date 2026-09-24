@@ -19,6 +19,7 @@ import AppDialog from "../common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../common/AppToast";
 import { CreateEventAsync, UpdateEventAsync, GetEventByIdAsync } from "../../services/eventService";
+import { GetBudgetCalculationsAsync } from "../../services/budgetCalculationService";
 import { updateSystemSettings } from "../../services/settingsService";
 import {
   getPaymentQrConfig,
@@ -79,6 +80,9 @@ export default function EventFormDialog({
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [budgetItemsList, setBudgetItemsList] = useState([]);
+  const [budgetRates, setBudgetRates] = useState(RULES);
+
   // Birthday-specific configuration states
   const [officeBirthdays, setOfficeBirthdays] = useState(1);
   const [wfhBirthdays, setWfhBirthdays] = useState(0);
@@ -125,22 +129,97 @@ export default function EventFormDialog({
   const total = Math.max(0, Number(totalMembers) || 0);
   const bdays = office + wfh;
   const eligible = Math.max(0, total - (exempt ? bdays : 0));
-
-  const cake = office * RULES.cakeRate;
   const puffsFactor = office > 0 ? office : 0;
-  const puffs = total * RULES.puffsRate * puffsFactor;
-  const gift = bdays * RULES.giftRate;
-  const plannedBudget = cake + puffs + gift;
 
+  const computedBudgetItems = useMemo(() => {
+    const items =
+      budgetItemsList.length > 0
+        ? budgetItemsList.filter((b) => b.isActive !== false)
+        : [
+            { expenseItem: "½ kg Cake", rate: 300 },
+            { expenseItem: "Chicken Roll / Puffs", rate: 20 },
+            { expenseItem: "Birthday Gift", rate: 1000 },
+          ];
+
+    return items.map((item) => {
+      const name = (item.expenseItem || "").toLowerCase();
+      const rate = Number(item.rate) || 0;
+      let calcText = "";
+      let amount = 0;
+      let formulaPart = "";
+
+      if (name.includes("cake")) {
+        calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
+        amount = office * rate;
+        formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+      } else if (
+        name.includes("gift") ||
+        name.includes("present") ||
+        name.includes("voucher") ||
+        name.includes("memento")
+      ) {
+        calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
+        amount = bdays * rate;
+        formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+      } else {
+        if (puffsFactor > 0) {
+          calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${
+            puffsFactor > 1 ? ` × ${puffsFactor}` : ""
+          }`;
+          amount = total * rate * puffsFactor;
+        } else {
+          calcText = "WFH only → Not provided";
+          amount = 0;
+        }
+        formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
+          "en-IN"
+        )})`;
+      }
+
+      return {
+        ...item,
+        rate,
+        calcText,
+        amount,
+        formulaPart,
+      };
+    });
+  }, [budgetItemsList, office, bdays, total, puffsFactor]);
+
+  const plannedBudget = computedBudgetItems.reduce((acc, curr) => acc + curr.amount, 0);
   const rawPerMember = eligible > 0 ? plannedBudget / eligible : 0;
   const contributionPerMember =
     eligible > 0 ? Math.ceil(rawPerMember / RULES.rounding) * RULES.rounding : 0;
   const expectedCollection = contributionPerMember * eligible;
   const roundingSurplus = Math.max(0, expectedCollection - plannedBudget);
 
+  const dynamicFormulaText = computedBudgetItems
+    .map((i) => i.formulaPart)
+    .filter(Boolean)
+    .join(" + ");
+
   // Dialog open & initialization
   useEffect(() => {
     if (open) {
+      GetBudgetCalculationsAsync()
+        .then((budgetData) => {
+          if (Array.isArray(budgetData) && budgetData.length > 0) {
+            const activeItems = budgetData.filter((b) => b.isActive !== false);
+            setBudgetItemsList(activeItems);
+            const cakeItem = activeItems.find((b) => b.expenseItem?.toLowerCase().includes("cake"));
+            const puffsItem = activeItems.find((b) => b.expenseItem?.toLowerCase().includes("puff") || b.expenseItem?.toLowerCase().includes("snack") || b.expenseItem?.toLowerCase().includes("roll"));
+            const giftItem = activeItems.find((b) => b.expenseItem?.toLowerCase().includes("gift"));
+
+            setBudgetRates((prev) => ({
+              ...prev,
+              cakeRate: cakeItem ? Number(cakeItem.rate) : prev.cakeRate,
+              puffsRate: puffsItem ? Number(puffsItem.rate) : prev.puffsRate,
+              giftRate: giftItem ? Number(giftItem.rate) : prev.giftRate,
+            }));
+          }
+        })
+        .catch(() => {});
+
       const bdayType = eventTypes.find((t) =>
         t.eventTypeName?.toLowerCase().includes("birthday")
       );
@@ -732,7 +811,11 @@ export default function EventFormDialog({
                     },
                   }}
                 >
-                  Calculation: <strong>Cake</strong> (Office Celebrants × ₹300) + <strong>Snacks / Puffs</strong> (Total Active Members × ₹20) + <strong>Gift</strong> (Total Birthday Celebrants × ₹1,000). Total planned budget is divided equally among eligible contributing members.
+                  Calculation: {dynamicFormulaText ? (
+                    <span>{dynamicFormulaText}</span>
+                  ) : (
+                    <span>Calculation of active budget items</span>
+                  )}. Total planned budget is divided equally among eligible contributing members.
                 </Typography>
               </Box>
 
@@ -758,85 +841,37 @@ export default function EventFormDialog({
                   <Box sx={{ textAlign: "right" }}>Amount</Box>
                 </Box>
 
-                {/* Row 1: ½ kg Cake */}
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
-                    gap: 2,
-                    py: 1.4,
-                    borderBottom: "1px solid",
-                    borderColor: "divider",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography variant="body2" fontWeight={600} sx={{ textAlign: "left" }}>
-                    ½ kg Cake
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>
-                    {office} × ₹300
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
-                    ₹300
-                  </Typography>
-                  <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ textAlign: "right" }}>
-                    ₹{cake.toLocaleString("en-IN")}
-                  </Typography>
-                </Box>
-
-                {/* Row 2: Chicken Roll / Puffs */}
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
-                    gap: 2,
-                    py: 1.4,
-                    borderBottom: "1px solid",
-                    borderColor: "divider",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography variant="body2" fontWeight={600} sx={{ textAlign: "left" }}>
-                    Chicken Roll / Puffs
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>
-                    {puffsFactor > 0
-                      ? `${total} × ₹20${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`
-                      : "WFH only → Not provided"}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
-                    ₹20
-                  </Typography>
-                  <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ textAlign: "right" }}>
-                    ₹{puffs.toLocaleString("en-IN")}
-                  </Typography>
-                </Box>
-
-                {/* Row 3: Birthday Gift */}
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
-                    gap: 2,
-                    py: 1.4,
-                    borderBottom: "2px solid",
-                    borderColor: "divider",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography variant="body2" fontWeight={600} sx={{ textAlign: "left" }}>
-                    Birthday Gift
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>
-                    {bdays} × ₹1,000
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
-                    ₹1,000
-                  </Typography>
-                  <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ textAlign: "right" }}>
-                    ₹{gift.toLocaleString("en-IN")}
-                  </Typography>
-                </Box>
+                {/* Dynamic Budget Calculation Rows */}
+                {computedBudgetItems.map((item, idx) => {
+                  const isLast = idx === computedBudgetItems.length - 1;
+                  return (
+                    <Box
+                      key={item.budgetCalculationId || item.expenseItem || idx}
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
+                        gap: 2,
+                        py: 1.4,
+                        borderBottom: isLast ? "2px solid" : "1px solid",
+                        borderColor: "divider",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography variant="body2" fontWeight={600} sx={{ textAlign: "left" }}>
+                        {item.expenseItem}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>
+                        {item.calcText}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
+                        ₹{item.rate.toLocaleString("en-IN")}
+                      </Typography>
+                      <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ textAlign: "right" }}>
+                        ₹{item.amount.toLocaleString("en-IN")}
+                      </Typography>
+                    </Box>
+                  );
+                })}
 
                 {/* Total Summary Row under Amount */}
                 <Box

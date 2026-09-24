@@ -299,6 +299,44 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
           </Box>
         </Grid>
 
+        {/* Created By */}
+        <Grid size={{ xs: 6, md: 3 }}>
+          <Box>
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 800,
+                color: "text.secondary",
+                fontSize: "0.65rem",
+              }}
+            >
+              Created By
+            </Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
+              {event.createdByName || event.createdBy || "--"}
+            </Typography>
+          </Box>
+        </Grid>
+
+        {/* Created On */}
+        <Grid size={{ xs: 6, md: 3 }}>
+          <Box>
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 800,
+                color: "text.secondary",
+                fontSize: "0.65rem",
+              }}
+            >
+              Created On
+            </Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
+              {formatViewDate(event.createdAt || event.createdOn)}
+            </Typography>
+          </Box>
+        </Grid>
+
         {/* Description Section with Birthday Members & DOB Table */}
         <Grid size={{ xs: 12 }}>
           <Box

@@ -234,6 +234,11 @@ export default function ReportsPage({ mode = "event" }) {
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
     },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
+    },
   ];
 
   // 2. Member Contributions Columns
@@ -266,6 +271,11 @@ export default function ReportsPage({ mode = "event" }) {
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
     },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
+    },
   ];
 
   // 3. Pending Dues Columns
@@ -297,6 +307,11 @@ export default function ReportsPage({ mode = "event" }) {
       label: "Created By",
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
   ];
 

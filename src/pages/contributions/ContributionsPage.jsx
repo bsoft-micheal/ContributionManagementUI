@@ -22,6 +22,7 @@ import {
 } from "@mui/icons-material";
 
 import dayjs from "dayjs";
+import { formatGridDate } from "../../utils/dateHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
@@ -470,6 +471,20 @@ export default function ContributionsPage() {
         }
         return row.paymentMode || "-";
       },
+    },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => (
+        <Typography variant="body2" color="text.secondary">
+          {row.createdBy || row.CreatedBy || "--"}
+        </Typography>
+      ),
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
   ];
 
