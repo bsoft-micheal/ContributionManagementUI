@@ -81,9 +81,10 @@ export default function AppInput({
             "& input, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
               py: size === "small" ? 0.8 : 1.2,
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
-              "&::placeholder": {
-                color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.45)" : "#94a3b8",
+              "&::placeholder, &::-webkit-input-placeholder": {
+                color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
                 opacity: 1,
+                fontWeight: 500,
               }
             },
             "& fieldset": {
@@ -92,10 +93,21 @@ export default function AppInput({
             "&:hover fieldset": {
               borderColor: "rgba(124, 58, 237, 0.45)",
             },
-            "&.Mui-focused fieldset": {
-              borderColor: "secondary.main",
-              borderWidth: "1.5px",
+            "&.Mui-disabled": {
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
+              "& input, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
+                color: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+                WebkitTextFillColor: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+                fontWeight: "700 !important",
+                opacity: "1 !important",
+              },
             },
+          },
+          "& .MuiFormHelperText-root": {
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            mt: 0.5,
+            color: (theme) => error ? "#dc2626 !important" : (theme.palette.mode === "dark" ? "#cbd5e1 !important" : "#334155 !important"),
           },
           transition: "all 0.2s ease",
         }}

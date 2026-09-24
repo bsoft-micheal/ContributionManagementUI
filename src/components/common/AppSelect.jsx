@@ -60,7 +60,8 @@ export default function AppSelect({
               return (
                 <span
                   style={{
-                    color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.45)" : "#94a3b8",
+                    color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
+                    fontWeight: 500,
                     fontSize: "0.82rem",
                   }}
                 >

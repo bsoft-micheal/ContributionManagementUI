@@ -182,6 +182,23 @@ export function createAppTheme(mode = "light") {
           },
         },
       },
+      MuiFormHelperText: {
+        styleOverrides: {
+          root: {
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            marginTop: 4,
+            color: mode === "dark" ? "#cbd5e1 !important" : "#334155 !important",
+            "&.Mui-error": {
+              color: "#dc2626 !important",
+              fontWeight: 700,
+            },
+            "&.Mui-disabled": {
+              color: mode === "dark" ? "#cbd5e1 !important" : "#334155 !important",
+            },
+          },
+        },
+      },
       MuiTextField: {
         styleOverrides: {
           root: {
@@ -191,6 +208,15 @@ export function createAppTheme(mode = "light") {
               "& fieldset": { borderColor: "var(--app-border-strong)" },
               "&:hover fieldset": { borderColor: mode === "dark" ? "rgba(214, 219, 239, 0.28)" : "rgba(74,63,107,0.4)" },
               "&.Mui-focused fieldset": { borderColor: mode === "dark" ? "#8d96b8" : "#4a3f6b", borderWidth: "2px" },
+              "&.Mui-disabled": {
+                backgroundColor: mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
+                "& .MuiOutlinedInput-input, & input": {
+                  color: mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+                  WebkitTextFillColor: mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+                  fontWeight: "700 !important",
+                  opacity: "1 !important",
+                },
+              },
             },
           },
         },
