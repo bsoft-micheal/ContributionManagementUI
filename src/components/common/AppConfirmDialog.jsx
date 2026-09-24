@@ -61,24 +61,6 @@ export default function AppConfirmDialog({
 
       <DialogActions sx={{ justifyContent: "center", gap: 1.5, pb: 2 }}>
         <AppButton
-          variant="contained"
-          onClick={onConfirm}
-          sx={{
-            bgcolor: "#392f5a !important",
-            color: "#ffffff !important",
-            textTransform: "none",
-            px: 3.5,
-            fontSize: "0.95rem",
-            fontWeight: 700,
-            borderRadius: "8px",
-            "&:hover": {
-              bgcolor: "#2e244d !important",
-            }
-          }}
-        >
-          {confirmText}
-        </AppButton>
-        <AppButton
           variant="outlined"
           onClick={onClose}
           sx={{
@@ -98,6 +80,24 @@ export default function AppConfirmDialog({
           }}
         >
           {cancelText}
+        </AppButton>
+        <AppButton
+          variant="contained"
+          onClick={onConfirm}
+          sx={{
+            bgcolor: "#392f5a !important",
+            color: "#ffffff !important",
+            textTransform: "none",
+            px: 3.5,
+            fontSize: "0.95rem",
+            fontWeight: 700,
+            borderRadius: "8px",
+            "&:hover": {
+              bgcolor: "#2e244d !important",
+            }
+          }}
+        >
+          {confirmText}
         </AppButton>
       </DialogActions>
     </Dialog>

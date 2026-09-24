@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Card, FormControlLabel, Link, Stack, Switch, Typography, IconButton, InputAdornment } from "@mui/material";
+import { Alert, Box, Card, FormControlLabel, Link, Stack, Switch, TextField, Typography, IconButton, InputAdornment } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
@@ -38,12 +38,12 @@ export default function LoginPage() {
       // Clear the state so refreshing the page doesn't re-show the message
       window.history.replaceState({}, document.title);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    
+
     if (showOtpField) {
       return handleOtpSubmit();
     }
@@ -223,51 +223,51 @@ export default function LoginPage() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
+            justifyContent: "center",
             background: `url(${rightLoginBg}) no-repeat center center`,
             backgroundSize: "cover",
-            p: { xs: 2.5, sm: 4, md: 6 },
+            p: { xs: 2.5, sm: 3.5 },
             minHeight: "100vh",
           }}
         >
           <Card
             sx={{
-              my: "auto",
               background: theme.palette.mode === "dark" ? theme.palette.background.paper : "#ffffff",
               boxShadow: theme.palette.mode === "dark"
-                ? "0 24px 64px rgba(0, 0, 0, 0.28), 0 8px 24px rgba(0, 0, 0, 0.2)"
-                : "0 24px 64px rgba(30, 26, 46, 0.06), 0 8px 24px rgba(30, 26, 46, 0.04)",
+                ? "0 20px 60px rgba(0, 0, 0, 0.3)"
+                : "0 16px 48px rgba(74, 63, 107, 0.08), 0 4px 16px rgba(74, 63, 107, 0.04)",
               border: "1px solid",
               borderColor: theme.palette.mode === "dark" ? "rgba(231, 235, 247, 0.08)" : "rgba(74, 63, 107, 0.06)",
-              borderRadius: "24px",
-              p: { xs: 3.5, sm: 5 },
-              width: "90%",
-              maxWidth: "440px",
+              borderRadius: "20px",
+              p: { xs: 3, sm: 4 },
+              width: "100%",
+              maxWidth: "400px",
               position: "relative",
               zIndex: 1,
             }}
           >
             {/* Branding Container */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 6 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3 }}>
               <Box
                 sx={{
-                  width: 44,
-                  height: 44,
+                  width: 42,
+                  height: 42,
                   borderRadius: "10px",
                   bgcolor: "#ffffff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 6px 16px rgba(74, 63, 107, 0.1), inset 0 0 0 1px rgba(74, 63, 107, 0.05)",
-                  p: 0.7,
+                  boxShadow: "0 4px 14px rgba(74, 63, 107, 0.1), inset 0 0 0 1px rgba(74, 63, 107, 0.05)",
+                  p: 0.6,
                 }}
               >
                 <img src={logo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
               </Box>
               <Stack spacing={0} sx={{ textAlign: "left" }}>
-                <Typography sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 900, color: "text.primary", fontSize: "0.85rem", letterSpacing: "0.02em", lineHeight: 1.1 }}>
+                <Typography sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 900, color: "text.primary", fontSize: "0.85rem", letterSpacing: "0.02em", lineHeight: 1.15 }}>
                   CONTRIBUTION
                 </Typography>
-                <Typography sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 900, color: "#7c3aed", fontSize: "0.85rem", letterSpacing: "0.02em", lineHeight: 1.1 }}>
+                <Typography sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 900, color: "#7c3aed", fontSize: "0.85rem", letterSpacing: "0.02em", lineHeight: 1.15 }}>
                   MANAGEMENT
                 </Typography>
               </Stack>
@@ -275,23 +275,24 @@ export default function LoginPage() {
 
             {/* Header Text */}
             <Typography
-              variant="h4"
               sx={{
+                fontSize: "1.75rem",
                 fontWeight: 900,
                 color: "text.primary",
                 fontFamily: '"Outfit", sans-serif',
-                mb: 0.8,
+                mb: 0.5,
                 textAlign: "left",
+                lineHeight: 1.2,
               }}
             >
               Sign In
             </Typography>
             <Typography
               sx={{
-                fontSize: "0.85rem",
+                fontSize: "0.84rem",
                 color: "text.secondary",
                 fontWeight: 500,
-                mb: 4.5,
+                mb: 3,
                 textAlign: "left",
               }}
             >
@@ -300,59 +301,111 @@ export default function LoginPage() {
 
             {/* Form */}
             <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
-              <Stack spacing={3.2}>
+              <Stack spacing={2.2}>
                 {!showOtpField ? (
                   <>
-                    <AppInput
-                      label="Email Address"
-                      value={form.email}
-                      onChange={(e) => {
-                        setForm((c) => ({ ...c, email: e.target.value }));
-                        if (errors.email) setErrors((prev) => ({ ...prev, email: "" }));
-                      }}
-                      error={!!errors.email}
-                      helperText={errors.email}
-                      placeholder="Enter Email"
-                      required
-                    />
-                    
-                    <AppInput
-                      label="Password"
-                      type={showPassword ? "text" : "password"}
-                      value={form.password}
-                      onChange={(e) => {
-                        setForm((c) => ({ ...c, password: e.target.value }));
-                        if (errors.password) setErrors((prev) => ({ ...prev, password: "" }));
-                      }}
-                      error={!!errors.password}
-                      helperText={errors.password}
-                      placeholder="Enter Password"
-                      required
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              size="small"
-                              onClick={() => setShowPassword((prev) => !prev)}
-                              onMouseDown={(e) => e.preventDefault()}
-                              edge="end"
-                              sx={{
-                                color: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "rgba(255, 255, 255, 0.7)"
-                                    : "text.secondary",
-                              }}
-                            >
-                              {showPassword ? (
-                                <VisibilityOff sx={{ fontSize: "1.15rem" }} />
-                              ) : (
-                                <Visibility sx={{ fontSize: "1.15rem" }} />
-                              )}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
+                    <Box sx={{ textAlign: "left" }}>
+                      <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "text.primary", mb: 0.6 }}>
+                        Email Address <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        value={form.email}
+                        onChange={(e) => {
+                          setForm((c) => ({ ...c, email: e.target.value }));
+                          if (errors.email) setErrors((prev) => ({ ...prev, email: "" }));
+                        }}
+                        error={!!errors.email}
+                        helperText={errors.email}
+                        placeholder="Enter Email"
+                        size="small"
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "10px",
+                            height: 42,
+                            fontSize: "0.85rem",
+                            bgcolor: (theme) => theme.palette.mode === "dark" ? "background.paper" : "#faf9fd",
+                            "& fieldset": {
+                              borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(74, 63, 107, 0.12)",
+                            },
+                            "&:hover fieldset": {
+                              borderColor: "#7c3aed",
+                            },
+                            "&.Mui-focused fieldset": {
+                              borderColor: "#7c3aed",
+                              borderWidth: "1.5px",
+                            },
+                            "& input": {
+                              py: 1,
+                              px: 1.5,
+                            },
+                          },
+                        }}
+                      />
+                    </Box>
+
+                    <Box sx={{ textAlign: "left" }}>
+                      <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "text.primary", mb: 0.6 }}>
+                        Password <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        type={showPassword ? "text" : "password"}
+                        value={form.password}
+                        onChange={(e) => {
+                          setForm((c) => ({ ...c, password: e.target.value }));
+                          if (errors.password) setErrors((prev) => ({ ...prev, password: "" }));
+                        }}
+                        error={!!errors.password}
+                        helperText={errors.password}
+                        placeholder="Enter Password"
+                        size="small"
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={() => setShowPassword((prev) => !prev)}
+                                onMouseDown={(e) => e.preventDefault()}
+                                edge="end"
+                                sx={{
+                                  color: "text.secondary",
+                                  p: 0.6,
+                                }}
+                              >
+                                {showPassword ? (
+                                  <VisibilityOff sx={{ fontSize: "1.15rem" }} />
+                                ) : (
+                                  <Visibility sx={{ fontSize: "1.15rem" }} />
+                                )}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "10px",
+                            height: 42,
+                            fontSize: "0.85rem",
+                            bgcolor: (theme) => theme.palette.mode === "dark" ? "background.paper" : "#faf9fd",
+                            "& fieldset": {
+                              borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(74, 63, 107, 0.12)",
+                            },
+                            "&:hover fieldset": {
+                              borderColor: "#7c3aed",
+                            },
+                            "&.Mui-focused fieldset": {
+                              borderColor: "#7c3aed",
+                              borderWidth: "1.5px",
+                            },
+                            "& input": {
+                              py: 1,
+                              px: 1.5,
+                            },
+                          },
+                        }}
+                      />
+                    </Box>
 
                     {/* Forgot Password Link Row */}
                     <Box
@@ -361,14 +414,15 @@ export default function LoginPage() {
                         justifyContent: "flex-end",
                         alignItems: "center",
                         width: "100%",
-                        mt: -1,
+                        mt: -0.5,
+                        mb: 0.5,
                       }}
                     >
                       <Link
                         component={RouterLink}
                         to="/forgot-password"
                         sx={{
-                          fontSize: "0.78rem",
+                          fontSize: "0.8rem",
                           fontWeight: 700,
                           color: "#7c3aed",
                           textDecoration: "none",
@@ -381,7 +435,7 @@ export default function LoginPage() {
                   </>
                 ) : (
                   <>
-                    <Box sx={{ mb: 3 }}>
+                    <Box sx={{ mb: 2 }}>
                       {mfaStatusMessage && (
                         <Alert
                           severity={isLockedOut ? "error" : "warning"}
@@ -431,7 +485,7 @@ export default function LoginPage() {
                               textAlign: "center",
                               fontSize: "1.5rem",
                               fontWeight: "bold",
-                              borderRadius: "12px",
+                              borderRadius: "10px",
                               border: isLockedOut
                                 ? "2px solid rgba(239, 68, 68, 0.4)"
                                 : "2px solid rgba(124, 58, 237, 0.2)",
@@ -459,23 +513,25 @@ export default function LoginPage() {
                   disabled={loading || (showOtpField && isLockedOut)}
                   fullWidth
                   sx={{
-                    py: 1.1,
-                    fontSize: "0.82rem",
-                    borderRadius: "8px",
+                    height: 44,
+                    fontSize: "0.86rem",
+                    fontWeight: 800,
+                    letterSpacing: "0.04em",
+                    borderRadius: "10px",
                     background: (theme) => theme.palette.mode === "dark"
                       ? "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)"
                       : "linear-gradient(135deg, #1e1a2e 0%, #2d2550 100%)",
                     boxShadow: (theme) => theme.palette.mode === "dark"
-                      ? "0 8px 24px rgba(124, 58, 237, 0.3)"
-                      : "0 8px 24px rgba(30, 26, 46, 0.2)",
+                      ? "0 6px 20px rgba(124, 58, 237, 0.3)"
+                      : "0 6px 20px rgba(30, 26, 46, 0.2)",
                     "&:hover": {
                       background: (theme) => theme.palette.mode === "dark"
                         ? "linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%)"
                         : "linear-gradient(135deg, #2d2550 0%, #1e1a2e 100%)",
                       transform: "translateY(-1px)",
                       boxShadow: (theme) => theme.palette.mode === "dark"
-                        ? "0 12px 32px rgba(124, 58, 237, 0.4)"
-                        : "0 12px 32px rgba(30, 26, 46, 0.3)",
+                        ? "0 8px 24px rgba(124, 58, 237, 0.4)"
+                        : "0 8px 24px rgba(30, 26, 46, 0.3)",
                     },
                     transition: "all 0.2s ease",
                   }}
@@ -498,10 +554,10 @@ export default function LoginPage() {
                       setIsLockedOut(false);
                     }}
                     sx={{
-                      mt: 1.5,
-                      py: 1.1,
+                      mt: 1,
+                      height: 40,
                       fontSize: "0.82rem",
-                      borderRadius: "8px",
+                      borderRadius: "10px",
                       borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(231, 235, 247, 0.2)" : "rgba(74, 63, 107, 0.2)",
                       color: "text.primary",
                       "&:hover": {
