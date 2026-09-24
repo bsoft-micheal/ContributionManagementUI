@@ -107,7 +107,7 @@ export default function AppMultiSelect({
                         sx={{
                           display: "inline-flex",
                           alignItems: "center",
-                          bgcolor: "#4a3f6b",
+                          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.35)" : "#4a3f6b",
                           color: "#ffffff",
                           borderRadius: "50px",
                           px: 2.2,
@@ -118,7 +118,7 @@ export default function AppMultiSelect({
                           cursor: "default",
                           transition: "all 0.15s ease",
                           "&:hover": {
-                            bgcolor: "#3b325c",
+                            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.5)" : "#3b325c",
                           },
                         }}
                       >
@@ -180,14 +180,28 @@ export default function AppMultiSelect({
               alignItems: "center",
             },
             "& fieldset": {
-              borderColor: "rgba(74, 63, 107, 0.2)",
+              borderColor: (theme) => error
+                ? theme.palette.error.main
+                : theme.palette.mode === "dark"
+                  ? "rgba(231, 235, 247, 0.25)"
+                  : "rgba(74, 63, 107, 0.28)",
+              borderWidth: "1.5px",
             },
             "&:hover fieldset": {
-              borderColor: "rgba(74, 63, 107, 0.4)",
+              borderColor: (theme) => error
+                ? theme.palette.error.main
+                : theme.palette.mode === "dark"
+                  ? "rgba(157, 140, 230, 0.75)"
+                  : "#6f5bd3",
+              borderWidth: "1.5px",
             },
             "&.Mui-focused fieldset": {
-              borderColor: "#4a3f6b",
-              borderWidth: "1.5px",
+              borderColor: (theme) => error
+                ? theme.palette.error.main
+                : theme.palette.mode === "dark"
+                  ? "#9d8ce6"
+                  : "#6f5bd3",
+              borderWidth: "2px",
             },
           },
           transition: "all 0.2s ease",
@@ -207,9 +221,9 @@ export default function AppMultiSelect({
               indeterminate={value.length > 0 && value.length < options.length}
               size="small"
               sx={{
-                color: "rgba(74, 63, 107, 0.4)",
+                color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.4)" : "rgba(74, 63, 107, 0.4)",
                 "&.Mui-checked, &.MuiCheckbox-indeterminate": {
-                  color: "#4a3f6b",
+                  color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                 },
               }}
             />
@@ -231,9 +245,9 @@ export default function AppMultiSelect({
                 checked={isChecked}
                 size="small"
                 sx={{
-                  color: "rgba(74, 63, 107, 0.4)",
+                  color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.4)" : "rgba(74, 63, 107, 0.4)",
                   "&.Mui-checked": {
-                    color: "#4a3f6b",
+                    color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                   },
                 }}
               />

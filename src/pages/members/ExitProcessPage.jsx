@@ -97,7 +97,7 @@ export default function ExitProcessPage() {
       label: "Profile",
       render: (row) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Avatar sx={{ width: 32, height: 32, bgcolor: "#4a3f6b", fontSize: "0.8rem" }}>
+          <Avatar sx={{ width: 32, height: 32, bgcolor: (theme) => theme.palette.mode === "dark" ? "#7c3aed" : "#4a3f6b", fontSize: "0.8rem" }}>
             {row.name[0]}
           </Avatar>
           <Box>

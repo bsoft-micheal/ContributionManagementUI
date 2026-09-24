@@ -158,7 +158,7 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
                 fontSize: "0.65rem",
               }}
             >
-              Type
+              Work Type
             </Typography>
             <Box sx={{ mt: 0.5 }}>
               <Typography

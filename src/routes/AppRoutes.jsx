@@ -26,6 +26,8 @@ import SettingsPage from "../pages/settings/SettingsPage";
 import PaymentsPage from "../pages/payments/PaymentsPage";
 import GalleryPage from "../pages/gallery/GalleryPage";
 import BudgetCalculationsPage from "../pages/events/BudgetCalculationsPage";
+import TypesPage from "../pages/support/TypesPage";
+import StatusPage from "../pages/support/StatusPage";
 
 export default function AppRoutes() {
   return (
@@ -55,6 +57,9 @@ export default function AppRoutes() {
         <Route path="/gallery" element={<ProtectedRoute><GalleryPage /></ProtectedRoute>} />
         <Route path="/support-tickets" element={<ProtectedRoute><SupportTicketsPage /></ProtectedRoute>} />
         <Route path="/budget-calculations" element={<ProtectedRoute><BudgetCalculationsPage /></ProtectedRoute>} />
+        <Route path="/types" element={<ProtectedRoute><TypesPage /></ProtectedRoute>} />
+        <Route path="/ticket-types" element={<ProtectedRoute><TypesPage /></ProtectedRoute>} />
+        <Route path="/status" element={<ProtectedRoute><StatusPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/my-contributions" element={<ProtectedRoute><MyContributionSummaryPage /></ProtectedRoute>} />
         <Route path="/reports" element={<Navigate to="/reports/event-collection-audit" replace />} />

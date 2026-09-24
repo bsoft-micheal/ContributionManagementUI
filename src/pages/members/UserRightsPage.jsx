@@ -42,6 +42,8 @@ const defaultRows = [
   { id: 15, module: "Support Data", subModule: "Admin", page: "Roles", access: "readWrite" },
   { id: 19, module: "Support Data", subModule: "Helpdesk", page: "Support Tickets", access: "readWrite" },
   { id: 21, module: "Support Data", subModule: "Calculations", page: "Budget Calculations", access: "readWrite" },
+  { id: 22, module: "Support Data", subModule: "Helpdesk", page: "Types", access: "readWrite" },
+  { id: 23, module: "Support Data", subModule: "Helpdesk", page: "Status", access: "readWrite" },
   { id: 20, module: "Support Data", subModule: "Configuration", page: "Settings", access: "readWrite" },
 
   // Reports Module
@@ -246,17 +248,17 @@ export default function UserRightsPage() {
         >
           <FormControlLabel
             value="readOnly"
-            control={<Radio size="small" sx={{ color: "rgba(74,63,107,0.4)", "&.Mui-checked": { color: "#4a3f6b" } }} />}
+            control={<Radio size="small" sx={{ color: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.4)" : "rgba(74,63,107,0.4)", "&.Mui-checked": { color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b" } }} />}
             label={<Typography variant="body2" sx={{ fontSize: "0.78rem", fontWeight: 500 }}>Read Only</Typography>}
           />
           <FormControlLabel
             value="readWrite"
-            control={<Radio size="small" sx={{ color: "rgba(74,63,107,0.4)", "&.Mui-checked": { color: "#4a3f6b" } }} />}
+            control={<Radio size="small" sx={{ color: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.4)" : "rgba(74,63,107,0.4)", "&.Mui-checked": { color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b" } }} />}
             label={<Typography variant="body2" sx={{ fontSize: "0.78rem", fontWeight: 500 }}>Read/Write</Typography>}
           />
           <FormControlLabel
             value="deny"
-            control={<Radio size="small" sx={{ color: "rgba(74,63,107,0.4)", "&.Mui-checked": { color: "#4a3f6b" } }} />}
+            control={<Radio size="small" sx={{ color: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.4)" : "rgba(74,63,107,0.4)", "&.Mui-checked": { color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b" } }} />}
             label={<Typography variant="body2" sx={{ fontSize: "0.78rem", fontWeight: 500 }}>Deny</Typography>}
           />
         </RadioGroup>

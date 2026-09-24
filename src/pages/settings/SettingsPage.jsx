@@ -1052,12 +1052,14 @@ export default function SettingsPage() {
 
                 <Stack spacing={2.2} sx={{ mt: 2 }}>
                   {/* Organization Name */}
-                  <AppInput
-                    label="Organization Name"
-                    value={settings.orgName}
-                    onChange={(e) => handleChange("orgName", e.target.value)}
-                    placeholder="e.g. Unit 1A Residents Association"
-                  />
+                  <Box sx={{ maxWidth: { xs: "100%", sm: 460 } }}>
+                    <AppInput
+                      label="Organization Name"
+                      value={settings.orgName}
+                      onChange={(e) => handleChange("orgName", e.target.value)}
+                      placeholder="e.g. Unit 1A Residents Association"
+                    />
+                  </Box>
 
                   {/* Birthday Exemption */}
                   <Box sx={{ pt: 0.5 }}>
@@ -1147,31 +1149,35 @@ export default function SettingsPage() {
                   </Box>
 
                   <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <AppInput
-                        label="Forgot Password OTP Expiry (minutes)"
-                        value={settings.otpExpiry}
-                        onChange={(e) => handleChange("otpExpiry", e.target.value)}
-                        restrictType="numberonly"
-                        placeholder="e.g. 10"
-                        required
-                      />
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
-                        Validity window for the 6-digit OTP code emailed to users during password reset.
-                      </Typography>
+                    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                      <Box sx={{ maxWidth: { xs: "100%", sm: 260 } }}>
+                        <AppInput
+                          label="Forgot Password OTP Expiry (minutes)"
+                          value={settings.otpExpiry}
+                          onChange={(e) => handleChange("otpExpiry", e.target.value)}
+                          restrictType="numberonly"
+                          placeholder="e.g. 10"
+                          required
+                        />
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
+                          Validity window for the 6-digit OTP code emailed to users during password reset.
+                        </Typography>
+                      </Box>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <AppInput
-                        label="Max Retry Attempts"
-                        value={settings.maxRetry}
-                        onChange={(e) => handleChange("maxRetry", e.target.value)}
-                        restrictType="numberonly"
-                        placeholder="e.g. 3"
-                        required
-                      />
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
-                        Number of incorrect attempts allowed before the OTP is invalidated and locked.
-                      </Typography>
+                    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                      <Box sx={{ maxWidth: { xs: "100%", sm: 260 } }}>
+                        <AppInput
+                          label="Max Retry Attempts"
+                          value={settings.maxRetry}
+                          onChange={(e) => handleChange("maxRetry", e.target.value)}
+                          restrictType="numberonly"
+                          placeholder="e.g. 3"
+                          required
+                        />
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
+                          Number of incorrect attempts allowed before the OTP is invalidated and locked.
+                        </Typography>
+                      </Box>
                     </Grid>
                   </Grid>
 

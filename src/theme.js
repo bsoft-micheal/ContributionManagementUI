@@ -18,10 +18,10 @@ const darkTokens = {
   background: "#0f1220",
   surface: "#171b2d",
   surfaceAlt: "#1d2338",
-  text: "#e7ebf7",
+  text: "#ffffff",
   mutedText: "#a3acc7",
-  border: "rgba(231, 235, 247, 0.10)",
-  borderStrong: "rgba(231, 235, 247, 0.18)",
+  border: "rgba(255, 255, 255, 0.12)",
+  borderStrong: "rgba(255, 255, 255, 0.22)",
   sidebarBg: "#121628",
   sidebarText: "#d6dbef",
   sidebarMuted: "#8d96b8",
@@ -51,15 +51,15 @@ export function createAppTheme(mode = "light") {
     palette: {
       mode,
       primary: {
-        main: "#4a3f6b",
-        light: "#7b6faa",
-        dark: "#2d2550",
+        main: mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+        light: mode === "dark" ? "#e9d5ff" : "#7b6faa",
+        dark: mode === "dark" ? "#a78bfa" : "#2d2550",
         contrastText: "#ffffff",
       },
       secondary: {
-        main: "#6f5bd3",
-        light: "#9d8ce6",
-        dark: "#45358e",
+        main: mode === "dark" ? "#ddd6fe" : "#6f5bd3",
+        light: mode === "dark" ? "#f5f3ff" : "#9d8ce6",
+        dark: mode === "dark" ? "#8b5cf6" : "#45358e",
         contrastText: "#ffffff",
       },
       success: {
@@ -205,9 +205,18 @@ export function createAppTheme(mode = "light") {
             "& .MuiOutlinedInput-root": {
               borderRadius: 12,
               backgroundColor: "var(--app-surface)",
-              "& fieldset": { borderColor: "var(--app-border-strong)" },
-              "&:hover fieldset": { borderColor: mode === "dark" ? "rgba(214, 219, 239, 0.28)" : "rgba(74,63,107,0.4)" },
-              "&.Mui-focused fieldset": { borderColor: mode === "dark" ? "#8d96b8" : "#4a3f6b", borderWidth: "2px" },
+              "& fieldset": {
+                borderColor: mode === "dark" ? "rgba(231, 235, 247, 0.25)" : "rgba(74, 63, 107, 0.28)",
+                borderWidth: "1.5px",
+              },
+              "&:hover fieldset": {
+                borderColor: mode === "dark" ? "rgba(157, 140, 230, 0.75)" : "#6f5bd3",
+                borderWidth: "1.5px",
+              },
+              "&.Mui-focused fieldset": {
+                borderColor: mode === "dark" ? "#9d8ce6" : "#6f5bd3",
+                borderWidth: "2px",
+              },
               "&.Mui-disabled": {
                 backgroundColor: mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
                 "& .MuiOutlinedInput-input, & input": {

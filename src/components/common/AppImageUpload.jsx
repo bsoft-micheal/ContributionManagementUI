@@ -85,13 +85,21 @@ export default function AppImageUpload({
           height: size,
           borderRadius: "50%",
           cursor: "pointer",
-          border: error ? "2px solid #ef4444" : "2px solid rgba(74, 63, 107, 0.15)",
-          boxShadow: "0 4px 12px rgba(74, 63, 107, 0.08)",
+          border: error
+            ? "2px solid #ef4444"
+            : (theme) => (theme.palette.mode === "dark" ? "2px solid rgba(255, 255, 255, 0.15)" : "2px solid rgba(74, 63, 107, 0.15)"),
+          boxShadow: (theme) =>
+            theme.palette.mode === "dark"
+              ? "0 4px 12px rgba(0, 0, 0, 0.3)"
+              : "0 4px 12px rgba(74, 63, 107, 0.08)",
           transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           "&:hover": {
             transform: "scale(1.03)",
-            boxShadow: "0 6px 16px rgba(74, 63, 107, 0.15)",
-            borderColor: "#4a3f6b",
+            boxShadow: (theme) =>
+              theme.palette.mode === "dark"
+                ? "0 6px 16px rgba(0, 0, 0, 0.4)"
+                : "0 6px 16px rgba(74, 63, 107, 0.15)",
+            borderColor: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
           },
         }}
       >
@@ -102,7 +110,7 @@ export default function AppImageUpload({
             height: "100%",
             fontSize: `${size * 0.38}px`,
             fontWeight: 800,
-            bgcolor: "#4a3f6b",
+            bgcolor: (theme) => (theme.palette.mode === "dark" ? "#7c3aed" : "#4a3f6b"),
             color: "#ffffff",
           }}
         >
@@ -141,12 +149,12 @@ export default function AppImageUpload({
                 position: "absolute",
                 top: -2,
                 right: -2,
-                bgcolor: "#4a3f6b",
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "#7c3aed" : "#4a3f6b"),
                 color: "#ffffff",
                 boxShadow: "0 2px 8px rgba(74, 63, 107, 0.35)",
                 p: 0.5,
                 "&:hover": {
-                  bgcolor: "#3b325c",
+                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "#6d28d9" : "#3b325c"),
                   transform: "scale(1.1)",
                 },
                 transition: "all 0.2s ease",

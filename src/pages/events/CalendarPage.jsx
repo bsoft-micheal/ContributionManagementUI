@@ -845,9 +845,13 @@ export default function CalendarPage() {
                     size="small"
                     onClick={handlePrevMonth}
                     sx={{
-                      border: "1px solid rgba(124, 58, 237, 0.25)",
+                      border: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "1px solid rgba(255, 255, 255, 0.2)"
+                          : "1px solid rgba(124, 58, 237, 0.25)",
                       borderRadius: "8px",
                       p: 0.5,
+                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
                       "&:hover": {
                         bgcolor: "action.hover",
                         borderColor: "primary.main",
@@ -865,7 +869,7 @@ export default function CalendarPage() {
                       textAlign: "center",
                       fontSize: "1rem",
                       letterSpacing: "-0.01em",
-                      color: "text.primary",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
                     }}
                   >
                     {displayedMonthName}{" "}
@@ -876,9 +880,13 @@ export default function CalendarPage() {
                     size="small"
                     onClick={handleNextMonth}
                     sx={{
-                      border: "1px solid rgba(124, 58, 237, 0.25)",
+                      border: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "1px solid rgba(255, 255, 255, 0.2)"
+                          : "1px solid rgba(124, 58, 237, 0.25)",
                       borderRadius: "8px",
                       p: 0.5,
+                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
                       "&:hover": {
                         bgcolor: "action.hover",
                         borderColor: "primary.main",
@@ -900,7 +908,11 @@ export default function CalendarPage() {
                     px: 1.6,
                     py: 0.35,
                     minHeight: 28,
-                    borderColor: "rgba(124, 58, 237, 0.35)",
+                    borderColor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(255, 255, 255, 0.25)"
+                        : "rgba(124, 58, 237, 0.35)",
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "primary.main"),
                   }}
                 >
                   Today
@@ -930,7 +942,7 @@ export default function CalendarPage() {
                       fontWeight={800}
                       sx={{
                         textAlign: "center",
-                        color: "text.secondary",
+                        color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.secondary"),
                         letterSpacing: "0.06em",
                         fontSize: "0.7rem",
                       }}
@@ -950,8 +962,8 @@ export default function CalendarPage() {
                 >
                   {calendarDays.map((day) => {
                     const dayItems = getDayItems(day);
-                    const isDifferentMonth =
-                      filters.month !== 0 && day.month() + 1 !== filters.month;
+                    const isCurrentMonth = filters.month === 0 || day.month() + 1 === filters.month;
+                    const isDifferentMonth = !isCurrentMonth;
                     const isToday = day.isSame(dayjs(), "day");
 
                     return (
@@ -966,14 +978,14 @@ export default function CalendarPage() {
                             isToday
                               ? "2px solid #7c3aed"
                               : theme.palette.mode === "dark"
-                              ? "1px solid rgba(124, 58, 237, 0.2)"
+                              ? "1px solid rgba(255, 255, 255, 0.10)"
                               : "1px solid rgba(124, 58, 237, 0.15)",
                           borderRadius: "10px",
                           opacity: isDifferentMonth ? 0.35 : 1,
                           bgcolor: isToday
                             ? (theme) =>
                                 theme.palette.mode === "dark"
-                                  ? "rgba(124, 58, 237, 0.1)"
+                                  ? "rgba(124, 58, 237, 0.15)"
                                   : "rgba(124, 58, 237, 0.05)"
                             : "background.paper",
                           cursor: hasWriteAccess ? "pointer" : "default",
@@ -1005,7 +1017,8 @@ export default function CalendarPage() {
                               sx={{
                                 display: "inline-flex",
                                 alignItems: "center",
-                                bgcolor: "primary.main",
+                                bgcolor: (theme) =>
+                                  theme.palette.mode === "dark" ? "#7c3aed" : "primary.main",
                                 color: "#ffffff",
                                 borderRadius: "6px",
                                 px: 0.7,
@@ -1025,7 +1038,7 @@ export default function CalendarPage() {
                                 fontWeight: 700,
                                 color: isDifferentMonth
                                   ? "text.disabled"
-                                  : "text.secondary",
+                                  : (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.secondary"),
                                 lineHeight: 1,
                               }}
                             >
@@ -1241,9 +1254,12 @@ export default function CalendarPage() {
                 </Box>
                 <Box
                   sx={{
-                    bgcolor: isBirthdayView
-                      ? "primary.main"
-                      : getEventTypeInfo(categoryFilter).color || "primary.main",
+                    bgcolor: (theme) =>
+                      isBirthdayView
+                        ? theme.palette.mode === "dark"
+                          ? "rgba(255, 255, 255, 0.15)"
+                          : "primary.main"
+                        : getEventTypeInfo(categoryFilter).color || "primary.main",
                     color: "#ffffff",
                     borderRadius: "10px",
                     px: 1,
@@ -1296,7 +1312,7 @@ export default function CalendarPage() {
                               borderRadius: "10px",
                               border: (theme) =>
                                 theme.palette.mode === "dark"
-                                  ? "1.5px solid rgba(124, 58, 237, 0.25)"
+                                  ? "1.5px solid rgba(255, 255, 255, 0.12)"
                                   : "1.5px solid rgba(124, 58, 237, 0.18)",
                               bgcolor: "background.paper",
                               display: "flex",
@@ -1308,7 +1324,7 @@ export default function CalendarPage() {
                                 transform: "translateY(-1px)",
                                 boxShadow: (theme) =>
                                   theme.palette.mode === "dark"
-                                    ? "0 3px 12px rgba(124, 58, 237, 0.2)"
+                                    ? "0 3px 12px rgba(0, 0, 0, 0.3)"
                                     : "0 3px 8px rgba(124, 58, 237, 0.12)",
                               },
                             }}
@@ -1322,15 +1338,21 @@ export default function CalendarPage() {
                                   borderRadius: "50%",
                                   bgcolor: (theme) =>
                                     theme.palette.mode === "dark"
-                                      ? catInfo.darkBg || "rgba(245, 158, 11, 0.18)"
+                                      ? "rgba(255, 255, 255, 0.08)"
                                       : catInfo.bg || "rgba(245, 158, 11, 0.1)",
-                                  color: catInfo.color || "primary.main",
+                                  color: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "#ffffff"
+                                      : catInfo.color || "primary.main",
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   fontWeight: 800,
                                   fontSize: "0.82rem",
-                                  border: `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
+                                  border: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "1px solid rgba(255, 255, 255, 0.18)"
+                                      : `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
                                   flexShrink: 0,
                                 }}
                               >
@@ -1341,7 +1363,7 @@ export default function CalendarPage() {
                                   variant="body2"
                                   fontWeight={700}
                                   sx={{
-                                    color: "text.primary",
+                                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
                                     fontSize: "0.84rem",
                                     lineHeight: 1.2,
                                     whiteSpace: "nowrap",
@@ -1369,10 +1391,14 @@ export default function CalendarPage() {
                                 sx={{
                                   bgcolor: (theme) =>
                                     theme.palette.mode === "dark"
-                                      ? catInfo.darkBg || "rgba(245, 158, 11, 0.18)"
+                                      ? "rgba(255, 255, 255, 0.12)"
                                       : catInfo.bg || "rgba(245, 158, 11, 0.08)",
-                                  color: catInfo.color || "text.primary",
-                                  border: `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
+                                  color: (theme) =>
+                                    theme.palette.mode === "dark" ? "#ffffff" : catInfo.color || "text.primary",
+                                  border: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "1px solid rgba(255, 255, 255, 0.2)"
+                                      : `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
                                   borderRadius: "6px",
                                   px: 0.9,
                                   py: 0.2,
@@ -1434,7 +1460,7 @@ export default function CalendarPage() {
                                 isToday
                                   ? "2px solid #ec4899"
                                   : theme.palette.mode === "dark"
-                                  ? "1.5px solid rgba(124, 58, 237, 0.25)"
+                                  ? "1.5px solid rgba(255, 255, 255, 0.12)"
                                   : "1.5px solid rgba(124, 58, 237, 0.18)",
                               bgcolor: (theme) =>
                                 isToday
@@ -1465,16 +1491,29 @@ export default function CalendarPage() {
                                   width: 34,
                                   height: 34,
                                   borderRadius: "50%",
-                                  bgcolor: isToday ? "rgba(236, 72, 153, 0.2)" : "rgba(236, 72, 153, 0.12)",
-                                  color: "#db2777",
+                                  bgcolor: (theme) =>
+                                    isToday
+                                      ? "rgba(236, 72, 153, 0.2)"
+                                      : theme.palette.mode === "dark"
+                                      ? "rgba(255, 255, 255, 0.08)"
+                                      : "rgba(236, 72, 153, 0.12)",
+                                  color: (theme) =>
+                                    isToday
+                                      ? "#db2777"
+                                      : theme.palette.mode === "dark"
+                                      ? "#ffffff"
+                                      : "#db2777",
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   fontWeight: 800,
                                   fontSize: "0.82rem",
-                                  border: isToday
-                                    ? "1.5px solid #ec4899"
-                                    : "1px solid rgba(236, 72, 153, 0.25)",
+                                  border: (theme) =>
+                                    isToday
+                                      ? "1.5px solid #ec4899"
+                                      : theme.palette.mode === "dark"
+                                      ? "1px solid rgba(255, 255, 255, 0.18)"
+                                      : "1px solid rgba(236, 72, 153, 0.25)",
                                   flexShrink: 0,
                                 }}
                               >
@@ -1486,7 +1525,7 @@ export default function CalendarPage() {
                                     variant="body2"
                                     fontWeight={700}
                                     sx={{
-                                      color: "text.primary",
+                                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
                                       fontSize: "0.84rem",
                                       lineHeight: 1.2,
                                       whiteSpace: "nowrap",
@@ -1530,12 +1569,19 @@ export default function CalendarPage() {
                                     isToday
                                       ? "rgba(236, 72, 153, 0.15)"
                                       : theme.palette.mode === "dark"
-                                      ? "rgba(124, 58, 237, 0.15)"
+                                      ? "rgba(255, 255, 255, 0.12)"
                                       : "rgba(124, 58, 237, 0.08)",
-                                  color: isToday ? "#db2777" : "primary.main",
+                                  color: (theme) =>
+                                    isToday
+                                      ? "#db2777"
+                                      : theme.palette.mode === "dark"
+                                      ? "#ffffff"
+                                      : "#4a3f6b",
                                   border: (theme) =>
                                     isToday
                                       ? "1px solid rgba(236, 72, 153, 0.35)"
+                                      : theme.palette.mode === "dark"
+                                      ? "1px solid rgba(255, 255, 255, 0.2)"
                                       : "1px solid rgba(124, 58, 237, 0.2)",
                                   borderRadius: "6px",
                                   px: 0.9,
@@ -1580,7 +1626,11 @@ export default function CalendarPage() {
                                   size="small"
                                   icon={
                                     <ScheduleRoundedIcon
-                                      sx={{ fontSize: "0.75rem !important", color: "#7c3aed !important" }}
+                                      sx={{
+                                        fontSize: "0.75rem !important",
+                                        color: (theme) =>
+                                          theme.palette.mode === "dark" ? "#c4b5fd !important" : "#7c3aed !important",
+                                      }}
                                     />
                                   }
                                   label="Upcoming"
@@ -1590,10 +1640,13 @@ export default function CalendarPage() {
                                     fontWeight: 700,
                                     bgcolor: (theme) =>
                                       theme.palette.mode === "dark"
-                                        ? "rgba(124, 58, 237, 0.18)"
+                                        ? "rgba(124, 58, 237, 0.22)"
                                         : "rgba(124, 58, 237, 0.08)",
-                                    color: "#7c3aed",
-                                    border: "1px solid rgba(124, 58, 237, 0.28)",
+                                    color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#7c3aed"),
+                                    border: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? "1px solid rgba(196, 181, 253, 0.3)"
+                                        : "1px solid rgba(124, 58, 237, 0.28)",
                                     "& .MuiChip-label": { px: 0.5 },
                                     "& .MuiChip-icon": { ml: 0.4, mr: -0.3 },
                                   }}
