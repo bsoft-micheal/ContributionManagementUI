@@ -481,6 +481,15 @@ export default function ExpensePage() {
         </Typography>
       ),
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => (
+        <Typography variant="body2" color="text.secondary">
+          {row.createdBy || row.CreatedBy || "--"}
+        </Typography>
+      ),
+    },
   ];
 
   return (

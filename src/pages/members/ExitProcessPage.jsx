@@ -129,6 +129,11 @@ export default function ExitProcessPage() {
       )
     },
     {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
+    {
       label: "Final Action",
       align: "center",
       render: (row) => (

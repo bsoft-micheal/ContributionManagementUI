@@ -219,6 +219,11 @@ export default function EventTypesPage() {
         </Typography>
       )
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   return (

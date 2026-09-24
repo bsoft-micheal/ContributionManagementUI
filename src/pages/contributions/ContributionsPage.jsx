@@ -281,6 +281,11 @@ export default function ContributionsPage() {
       )
     },
     { label: "Mode", key: "paymentMode" },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   return (

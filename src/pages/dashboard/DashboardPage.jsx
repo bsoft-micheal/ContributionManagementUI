@@ -996,6 +996,11 @@ export default function DashboardPage() {
         );
       },
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   // ── Render ────────────────────────────────────────────────────────────────

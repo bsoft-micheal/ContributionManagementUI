@@ -426,6 +426,15 @@ export default function PaymentsPage() {
         </Typography>
       ),
     },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => (
+        <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
+          {row.createdBy || row.CreatedBy || "--"}
+        </Typography>
+      ),
+    },
   ];
 
   return (

@@ -145,7 +145,12 @@ export default function EventsPage() {
       key: "totalExpectedAmount",
       align: "right",
       render: (row) => <Typography variant="body2" fontWeight={700}>₹{row.totalExpectedAmount}</Typography>
-    }
+    },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
   ];
 
   return (
