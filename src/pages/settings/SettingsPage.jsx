@@ -28,6 +28,7 @@ import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
@@ -58,6 +59,7 @@ import AppSelect from "../../components/common/AppSelect";
 import AppSwitch from "../../components/common/AppSwitch";
 import AppButton from "../../components/common/AppButton";
 import AppTextArea from "../../components/common/AppTextArea";
+import AppDataTable from "../../components/common/AppDataTable";
 import MfaSettings from "../../components/common/MfaSettings";
 import { useAppToast } from "../../components/common/AppToast";
 import {
@@ -286,13 +288,234 @@ export default function SettingsPage() {
     ? (currentQrConfig.qrMode === "uploaded" && currentQrConfig.qrImage
         ? currentQrConfig.qrImage
         : generateQrPngDataUrl(liveUpiUri, 300))
-    : defaultPaymentQr;
+    : "";
 
   const copyToClipboard = (text, label) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard!`);
   };
+
+  // Directory of all Event Types and their configured UPI IDs for the AppDataTable Grid
+  const qrTableData = useMemo(() => {
+    const rows = [];
+    const processedTypes = new Set();
+
+    if (Array.isArray(categoriesList) && categoriesList.length > 0) {
+      categoriesList.forEach((c) => {
+        const typeName = c.eventTypeName || c.name || "";
+        if (typeName && !processedTypes.has(typeName.toLowerCase())) {
+          processedTypes.add(typeName.toLowerCase());
+          const config = getPaymentQrConfig(typeName);
+          const hasUpi = Boolean(config.upiId && config.upiId.trim());
+          rows.push({
+            id: c.eventTypeId || typeName,
+            eventTypeId: c.eventTypeId,
+            eventTypeName: typeName,
+            receiverName: config.receiverName || config.qrReceiverName || "",
+            upiId: config.upiId || config.qrUpiId || "",
+            qrMode: config.qrMode || "generated",
+            qrImage: config.qrImage || null,
+            isConfigured: Boolean(config.isConfigured && hasUpi),
+            isActive: config.isActive !== false,
+          });
+        }
+      });
+    }
+
+    Object.keys(eventPaymentQrConfigs).forEach((k) => {
+      if (k && !processedTypes.has(k.toLowerCase())) {
+        processedTypes.add(k.toLowerCase());
+        const config = getPaymentQrConfig(k);
+        const hasUpi = Boolean(config.upiId && config.upiId.trim());
+        rows.push({
+          id: k,
+          eventTypeName: k,
+          receiverName: config.receiverName || config.qrReceiverName || "",
+          upiId: config.upiId || config.qrUpiId || "",
+          qrMode: config.qrMode || "generated",
+          qrImage: config.qrImage || null,
+          isConfigured: Boolean(config.isConfigured && hasUpi),
+          isActive: config.isActive !== false,
+        });
+      }
+    });
+
+    if (rows.length === 0) {
+      ["Birthday", "Farewell", "Team Dinner", "Teamouting"].forEach((typeName) => {
+        const config = getPaymentQrConfig(typeName);
+        const hasUpi = Boolean(config.upiId && config.upiId.trim());
+        rows.push({
+          id: typeName,
+          eventTypeName: typeName,
+          receiverName: config.receiverName || config.qrReceiverName || "",
+          upiId: config.upiId || config.qrUpiId || "",
+          qrMode: config.qrMode || "generated",
+          qrImage: config.qrImage || null,
+          isConfigured: Boolean(config.isConfigured && hasUpi),
+          isActive: config.isActive !== false,
+        });
+      });
+    }
+
+    return rows;
+  }, [categoriesList, eventPaymentQrConfigs]);
+
+  const qrTableColumns = useMemo(
+    () => [
+      {
+        label: "Action",
+        render: (row) => {
+          const isSelected = selectedQrEventType === row.eventTypeName;
+          return (
+            <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+              <Tooltip title={`Configure Payment QR for ${row.eventTypeName}`}>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setSelectedQrEventType(row.eventTypeName);
+                    const formCard = document.getElementById("payment-qr-form-card");
+                    if (formCard) {
+                      formCard.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                  }}
+                  sx={{
+                    p: 0.4,
+                    bgcolor: isSelected ? "rgba(2, 132, 199, 0.15)" : "transparent",
+                    color: isSelected ? "#0284c7" : "inherit",
+                    "&:hover": { bgcolor: "rgba(2, 132, 199, 0.2)", color: "#0284c7" },
+                  }}
+                >
+                  <EditOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              {row.upiId && (
+                <Tooltip title="Copy UPI ID">
+                  <IconButton
+                    size="small"
+                    onClick={() => copyToClipboard(row.upiId, `UPI ID (${row.eventTypeName})`)}
+                    sx={{ p: 0.4, "&:hover": { color: "#0284c7" } }}
+                  >
+                    <ContentCopyOutlinedIcon sx={{ fontSize: 15 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
+          );
+        },
+      },
+      {
+        label: "Event Type",
+        key: "eventTypeName",
+        render: (row) => (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                bgcolor: row.isConfigured ? "#16a34a" : "#cbd5e1",
+              }}
+            />
+            <Typography variant="body2" fontWeight={700}>
+              {row.eventTypeName}
+            </Typography>
+            {selectedQrEventType === row.eventTypeName && (
+              <Chip
+                label="Selected"
+                size="small"
+                sx={{
+                  height: 18,
+                  fontSize: "0.62rem",
+                  fontWeight: 700,
+                  bgcolor: "rgba(2, 132, 199, 0.12)",
+                  color: "#0284c7",
+                }}
+              />
+            )}
+          </Box>
+        ),
+      },
+      {
+        label: "UPI ID (VPA)",
+        key: "upiId",
+        render: (row) =>
+          row.upiId ? (
+            <Typography
+              variant="body2"
+              sx={{
+                fontFamily: "monospace",
+                fontSize: "0.82rem",
+                fontWeight: 650,
+                color: "#0284c7",
+              }}
+            >
+              {row.upiId}
+            </Typography>
+          ) : (
+            <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
+              -- Not Configured --
+            </Typography>
+          ),
+      },
+      {
+        label: "Receiver Name",
+        key: "receiverName",
+        render: (row) => (
+          <Typography variant="body2" sx={{ fontSize: "0.82rem", color: row.receiverName ? "text.primary" : "text.secondary" }}>
+            {row.receiverName || "--"}
+          </Typography>
+        ),
+      },
+      {
+        label: "QR Mode",
+        key: "qrMode",
+        render: (row) => {
+          if (!row.isConfigured) {
+            return (
+              <Chip
+                label="None"
+                size="small"
+                sx={{ height: 22, fontSize: "0.68rem", fontWeight: 600, bgcolor: "rgba(148, 163, 184, 0.15)", color: "#64748b" }}
+              />
+            );
+          }
+          return row.qrMode === "uploaded" ? (
+            <Chip
+              label="Uploaded QR"
+              size="small"
+              sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: "rgba(234, 88, 12, 0.12)", color: "#ea580c" }}
+            />
+          ) : (
+            <Chip
+              label="Dynamic UPI QR"
+              size="small"
+              sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: "rgba(2, 132, 199, 0.12)", color: "#0284c7" }}
+            />
+          );
+        },
+      },
+      {
+        label: "Status",
+        key: "isConfigured",
+        render: (row) => (
+          <Chip
+            label={row.isConfigured ? "Configured" : "Pending Setup"}
+            size="small"
+            sx={{
+              height: 22,
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              bgcolor: row.isConfigured ? "rgba(22, 163, 74, 0.12)" : "rgba(239, 68, 68, 0.12)",
+              color: row.isConfigured ? "#16a34a" : "#dc2626",
+              border: row.isConfigured ? "1px solid rgba(22, 163, 74, 0.25)" : "1px solid rgba(239, 68, 68, 0.25)",
+            }}
+          />
+        ),
+      },
+    ],
+    [selectedQrEventType]
+  );
 
   // Helper to load template for given category and type
   const loadTemplateForCategoryAndType = (catId, tType, currentSettings = settings, catList = categoriesList) => {
@@ -1443,20 +1666,364 @@ export default function SettingsPage() {
 
           {/* ── 4. Payment QR Settings (Per-Event-Type) ────────────────────────── */}
           {activeTab === "paymentQr" && (
-            <Grid container spacing={2.5} alignItems="flex-start">
-              {/* Left: Payment QR Form (65-70% on desktop) */}
-              <Grid size={{ xs: 12, lg: 8 }}>
-                <Card
-                  sx={{
-                    borderRadius: "16px",
-                    border: (t) => `1px solid ${t.palette.divider}`,
-                    p: 2.5,
-                    bgcolor: "background.paper",
-                  }}
-                >
-                  <Box>
-                    {/* Card Header with Status Badge */}
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
+            <Stack spacing={3}>
+              <Grid container spacing={2.5} alignItems="flex-start">
+                {/* Left: Payment QR Form (65-70% on desktop) */}
+                <Grid size={{ xs: 12, lg: 8 }}>
+                  <Card
+                    id="payment-qr-form-card"
+                    sx={{
+                      borderRadius: "16px",
+                      border: (t) => `1px solid ${t.palette.divider}`,
+                      p: 2.5,
+                      bgcolor: "background.paper",
+                    }}
+                  >
+                    <Box>
+                      {/* Card Header with Status Badge */}
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                          <Box
+                            sx={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: "10px",
+                              bgcolor: "rgba(2, 132, 199, 0.1)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#0284c7",
+                            }}
+                          >
+                            <QrCodeScannerOutlinedIcon fontSize="small" />
+                          </Box>
+                          <Box>
+                            <Typography variant="subtitle1" fontWeight={800}>
+                              Payment QR Settings
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
+                              Configure independent UPI & QR code accounts for each Event Type.
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        {/* Status Badge */}
+                        <Chip
+                          label={
+                            isCurrentConfigured
+                              ? `${selectedQrEventType}: Configured`
+                              : `${selectedQrEventType || "Event"}: Not Configured`
+                          }
+                          size="small"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: "0.72rem",
+                            height: 24,
+                            bgcolor: isCurrentConfigured ? "rgba(22, 163, 74, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                            color: isCurrentConfigured ? "#16a34a" : "#dc2626",
+                            border: isCurrentConfigured ? "1px solid rgba(22, 163, 74, 0.25)" : "1px solid rgba(239, 68, 68, 0.25)",
+                          }}
+                        />
+                      </Box>
+
+                      <Stack spacing={2} sx={{ mt: 2 }}>
+                        {/* STEP 1: SELECT EVENT TYPE (Compact field size) */}
+                        <Box
+                          sx={{
+                            p: 1.25,
+                            bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                            borderRadius: "10px",
+                            border: (t) => `1px solid ${t.palette.divider}`,
+                          }}
+                        >
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.6, flexWrap: "wrap", gap: 0.5 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 800, color: "#0284c7", fontSize: "0.74rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                              SELECT EVENT TYPE
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem" }}>
+                              Independent UPI/QR settings per category
+                            </Typography>
+                          </Box>
+                          <Box sx={{ maxWidth: { xs: "100%", sm: 300 } }}>
+                            <AppSelect
+                              label=""
+                              placeholder="Select Event Type"
+                              value={selectedQrEventType}
+                              onChange={(e) => handleQrEventTypeChange(e.target.value)}
+                              options={qrEventTypeOptions}
+                              size="small"
+                              required
+                              fullWidth
+                            />
+                          </Box>
+                        </Box>
+
+                        {/* Unconfigured Event Type Banner */}
+                        {!isCurrentConfigured && (
+                          <Box
+                            sx={{
+                              p: 1.4,
+                              borderRadius: "10px",
+                              bgcolor: "rgba(239, 68, 68, 0.06)",
+                              border: "1px solid rgba(239, 68, 68, 0.25)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.2,
+                            }}
+                          >
+                            <InfoOutlinedIcon sx={{ color: "#ef4444", fontSize: 20, flexShrink: 0 }} />
+                            <Box>
+                              <Typography variant="caption" fontWeight={750} sx={{ color: "#dc2626", display: "block", fontSize: "0.76rem" }}>
+                                Payment QR is not configured for this event type.
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
+                                Enter the Receiver Name and UPI ID below for <strong>{selectedQrEventType}</strong> and click Save to activate.
+                              </Typography>
+                            </Box>
+                          </Box>
+                        )}
+
+                        {/* QR Code Mode Selector */}
+                        <Box>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mb: 0.5, display: "block", fontSize: "0.72rem" }}>
+                            QR Code Mode for {selectedQrEventType}
+                          </Typography>
+                          <Box sx={{ maxWidth: { xs: "100%", sm: 440 } }}>
+                            <ToggleButtonGroup
+                              value={currentQrConfig.qrMode || "generated"}
+                              exclusive
+                              onChange={(e, val) => {
+                                if (val) handleQrFieldChange("qrMode", val);
+                              }}
+                              size="small"
+                              fullWidth
+                              sx={{
+                                "& .MuiToggleButton-root": {
+                                  py: 0.6,
+                                  fontSize: "0.76rem",
+                                  fontWeight: 700,
+                                  textTransform: "none",
+                                  borderRadius: "8px",
+                                  "&.Mui-selected": {
+                                    bgcolor: "rgba(2, 132, 199, 0.12)",
+                                    color: "#0284c7",
+                                    borderColor: "#0284c7",
+                                  },
+                                },
+                              }}
+                            >
+                              <ToggleButton value="generated">
+                                <AutoAwesomeOutlinedIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                                Dynamic UPI QR (Auto-Generated)
+                              </ToggleButton>
+                              <ToggleButton value="uploaded">
+                                <CloudUploadOutlinedIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                                Uploaded Custom QR
+                              </ToggleButton>
+                            </ToggleButtonGroup>
+                          </Box>
+                        </Box>
+
+                        {/* Receiver Name and UPI ID (Reduced Compact Size) */}
+                        <Grid container spacing={1.5}>
+                          <Grid size={{ xs: 12, sm: 5, md: 5 }}>
+                            <AppInput
+                              label={`Receiver Name (${selectedQrEventType})`}
+                              value={currentQrConfig.receiverName || ""}
+                              onChange={(e) => handleQrFieldChange("receiverName", e.target.value)}
+                              placeholder={`e.g. ${selectedQrEventType} Lead`}
+                              required
+                              size="small"
+                              error={Boolean(receiverError)}
+                              helperText={receiverError}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 7, md: 6 }}>
+                            <AppInput
+                              label={`UPI ID (${selectedQrEventType})`}
+                              value={currentQrConfig.upiId || ""}
+                              onChange={(e) => handleQrFieldChange("upiId", e.target.value)}
+                              placeholder={`e.g. name@okaxis`}
+                              required
+                              size="small"
+                              error={Boolean(upiError)}
+                              helperText={upiError}
+                            />
+                          </Grid>
+                        </Grid>
+
+                        {/* Upload Section / Static Fallback */}
+                        <Box sx={{ mt: 0.5 }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", fontSize: "0.72rem" }}>
+                              {(currentQrConfig.qrMode || "generated") === "uploaded"
+                                ? `Upload Custom QR Code for ${selectedQrEventType}`
+                                : `Custom QR Image for ${selectedQrEventType} (Optional Fallback)`}
+                            </Typography>
+                            {currentQrConfig.qrImage && (
+                              <Tooltip title="Remove Uploaded Image">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => {
+                                    handleQrFieldChange("qrImage", null);
+                                    if (currentQrConfig.qrMode === "uploaded") {
+                                      handleQrFieldChange("qrMode", "generated");
+                                    }
+                                    toast.info(`Uploaded QR image for ${selectedQrEventType} removed.`);
+                                  }}
+                                  sx={{ p: 0.3 }}
+                                >
+                                  <DeleteOutlineOutlinedIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Box>
+
+                          <Box sx={{ width: "100%", maxWidth: { xs: "100%", sm: 520 }, mt: 0.3 }}>
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              onChange={handleQrUpload}
+                              accept="image/*"
+                              style={{ display: "none" }}
+                            />
+                            <Box
+                              sx={{
+                                border: "1.5px dashed",
+                                borderColor: (t) => t.palette.divider,
+                                borderRadius: "10px",
+                                p: 1.5,
+                                textAlign: "center",
+                                cursor: currentQrConfig.qrImage ? "default" : "pointer",
+                                transition: "all 0.2s ease",
+                                "&:hover": { borderColor: "#0284c7", bgcolor: "rgba(2, 132, 199, 0.04)" },
+                              }}
+                              onClick={() => {
+                                if (!currentQrConfig.qrImage) fileInputRef.current?.click();
+                              }}
+                            >
+                              {currentQrConfig.qrImage ? (
+                                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                                  <Box
+                                    component="img"
+                                    src={currentQrConfig.qrImage}
+                                    alt={`Uploaded QR Code for ${selectedQrEventType}`}
+                                    sx={{
+                                      width: 80,
+                                      height: 80,
+                                      borderRadius: "8px",
+                                      border: (t) => `1.5px solid ${t.palette.divider}`,
+                                      p: 0.5,
+                                      bgcolor: "#fff",
+                                      display: "block",
+                                      margin: "0 auto",
+                                      objectFit: "contain",
+                                      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                                    }}
+                                  />
+                                  <Chip
+                                    label={
+                                      currentQrConfig.qrMode === "uploaded"
+                                        ? `Uploaded QR Active (${selectedQrEventType})`
+                                        : `Uploaded Image Fallback (${selectedQrEventType})`
+                                    }
+                                    size="small"
+                                    sx={{
+                                      mt: 0.8,
+                                      height: 19,
+                                      fontSize: "0.64rem",
+                                      fontWeight: 700,
+                                      bgcolor:
+                                        currentQrConfig.qrMode === "uploaded"
+                                          ? "rgba(22, 163, 74, 0.12)"
+                                          : "rgba(234, 88, 12, 0.12)",
+                                      color: currentQrConfig.qrMode === "uploaded" ? "#16a34a" : "#ea580c",
+                                    }}
+                                  />
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                                    <AppButton
+                                      size="small"
+                                      variant="outlined"
+                                      startIcon={<CloudUploadOutlinedIcon sx={{ fontSize: 13 }} />}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        fileInputRef.current?.click();
+                                      }}
+                                      sx={{ fontSize: "0.7rem", height: 26, px: 1.5 }}
+                                    >
+                                      Change Image
+                                    </AppButton>
+                                    <AppButton
+                                      size="small"
+                                      variant="outlined"
+                                      color="error"
+                                      startIcon={<DeleteOutlineOutlinedIcon sx={{ fontSize: 13 }} />}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleQrFieldChange("qrImage", null);
+                                        if (currentQrConfig.qrMode === "uploaded") {
+                                          handleQrFieldChange("qrMode", "generated");
+                                        }
+                                        toast.info(`Uploaded QR image for ${selectedQrEventType} removed.`);
+                                        if (fileInputRef.current) fileInputRef.current.value = "";
+                                      }}
+                                      sx={{ fontSize: "0.7rem", height: 26, px: 1.5 }}
+                                    >
+                                      Remove
+                                    </AppButton>
+                                  </Box>
+                                </Box>
+                              ) : (
+                                <>
+                                  <CloudUploadOutlinedIcon sx={{ fontSize: 24, color: "#0284c7" }} />
+                                  <Typography variant="body2" sx={{ display: "block", fontWeight: 700, fontSize: "0.76rem", mt: 0.3 }}>
+                                    Click to upload static QR code image for {selectedQrEventType}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.66rem" }}>
+                                    PNG or JPG format (up to 2MB)
+                                  </Typography>
+                                </>
+                              )}
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Stack>
+                    </Box>
+
+                    {/* Save Button for Payment QR Settings */}
+                    <Box sx={{ mt: 2.5, pt: 1.5, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "flex-start" }}>
+                      <AppButton
+                        variant="contained"
+                        startIcon={<SaveOutlinedIcon />}
+                        onClick={handleSavePaymentQr}
+                        sx={{
+                          bgcolor: "#1e1a2e !important",
+                          "&:hover": { bgcolor: "#2d2448 !important" },
+                          px: 2.5,
+                          py: 0.6,
+                          fontWeight: 700,
+                          fontSize: "0.8rem",
+                        }}
+                      >
+                        Save 
+                      </AppButton>
+                    </Box>
+                  </Card>
+                </Grid>
+
+                {/* Right: Live QR Preview Panel (30-35% on desktop) */}
+                <Grid size={{ xs: 12, lg: 4 }}>
+                  <Card
+                    sx={{
+                      borderRadius: "16px",
+                      border: (t) => `1px solid ${t.palette.divider}`,
+                      p: 2.5,
+                      bgcolor: "background.paper",
+                    }}
+                  >
+                    {/* Header */}
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                         <Box
                           sx={{
@@ -1474,470 +2041,163 @@ export default function SettingsPage() {
                         </Box>
                         <Box>
                           <Typography variant="subtitle1" fontWeight={800}>
-                            Payment QR Settings
+                            Live QR Preview
                           </Typography>
                           <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                            Configure independent UPI & QR code accounts for each Event Type.
+                            Real-time scannable QR code.
                           </Typography>
                         </Box>
                       </Box>
-
-                      {/* Status Badge */}
                       <Chip
-                        label={
-                          isCurrentConfigured
-                            ? `${selectedQrEventType}: Configured`
-                            : `${selectedQrEventType || "Event"}: Not Configured`
-                        }
+                        label={selectedQrEventType}
                         size="small"
-                        sx={{
-                          fontWeight: 700,
-                          fontSize: "0.72rem",
-                          height: 24,
-                          bgcolor: isCurrentConfigured ? "rgba(22, 163, 74, 0.12)" : "rgba(239, 68, 68, 0.12)",
-                          color: isCurrentConfigured ? "#16a34a" : "#dc2626",
-                          border: isCurrentConfigured ? "1px solid rgba(22, 163, 74, 0.25)" : "1px solid rgba(239, 68, 68, 0.25)",
-                        }}
+                        color="primary"
+                        variant="outlined"
+                        sx={{ fontWeight: 700, fontSize: "0.72rem" }}
                       />
                     </Box>
 
-                    <Stack spacing={2.2} sx={{ mt: 2 }}>
-                      {/* STEP 1: SELECT EVENT TYPE */}
-                      <Box sx={{ p: 1.5, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc", borderRadius: "12px", border: (t) => `1px solid ${t.palette.divider}` }}>
-                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.8, flexWrap: "wrap", gap: 0.5 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 800, color: "#0284c7", fontSize: "0.76rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                            STEP 1: SELECT EVENT TYPE
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
-                            Each event type maintains independent UPI/QR settings
-                          </Typography>
-                        </Box>
-                        <AppSelect
-                          label=""
-                          placeholder="Select Event Type"
-                          value={selectedQrEventType}
-                          onChange={(e) => handleQrEventTypeChange(e.target.value)}
-                          options={qrEventTypeOptions}
-                          size="small"
-                          required
-                          fullWidth
-                        />
-                      </Box>
+                    <Divider sx={{ mb: 2.5 }} />
 
-                      {/* Unconfigured Event Type Banner */}
-                      {!isCurrentConfigured && (
-                        <Box
-                          sx={{
-                            p: 1.6,
-                            borderRadius: "12px",
-                            bgcolor: "rgba(239, 68, 68, 0.06)",
-                            border: "1px solid rgba(239, 68, 68, 0.25)",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.4,
-                          }}
-                        >
-                          <InfoOutlinedIcon sx={{ color: "#ef4444", fontSize: 22, flexShrink: 0 }} />
-                          <Box>
-                            <Typography variant="caption" fontWeight={750} sx={{ color: "#dc2626", display: "block", fontSize: "0.78rem" }}>
-                              Payment QR is not configured for this event type.
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
-                              Enter the Receiver Name and UPI ID below for <strong>{selectedQrEventType}</strong> and click Save to activate.
-                            </Typography>
-                          </Box>
-                        </Box>
-                      )}
-
-                      {/* QR Code Mode Selector */}
-                      <Box>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mb: 0.6, display: "block" }}>
-                          QR Code Mode for {selectedQrEventType}
+                    <Stack spacing={2.2} alignItems="center" sx={{ textAlign: "center" }}>
+                      {/* Receiver Name */}
+                      <Box sx={{ width: "100%" }}>
+                        <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em", display: "block" }}>
+                          RECEIVER NAME ({selectedQrEventType.toUpperCase()})
                         </Typography>
-                        <ToggleButtonGroup
-                          value={currentQrConfig.qrMode || "generated"}
-                          exclusive
-                          onChange={(e, val) => {
-                            if (val) handleQrFieldChange("qrMode", val);
-                          }}
-                          size="small"
-                          fullWidth
-                          sx={{
-                            "& .MuiToggleButton-root": {
-                              py: 0.7,
-                              fontSize: "0.78rem",
-                              fontWeight: 700,
-                              textTransform: "none",
-                              borderRadius: "8px",
-                              "&.Mui-selected": {
-                                bgcolor: "rgba(2, 132, 199, 0.12)",
-                                color: "#0284c7",
-                                borderColor: "#0284c7",
-                              },
-                            },
-                          }}
-                        >
-                          <ToggleButton value="generated">
-                            <AutoAwesomeOutlinedIcon sx={{ fontSize: 15, mr: 0.6 }} />
-                            Dynamic UPI QR (Auto-Generated)
-                          </ToggleButton>
-                          <ToggleButton value="uploaded">
-                            <CloudUploadOutlinedIcon sx={{ fontSize: 15, mr: 0.6 }} />
-                            Uploaded Custom QR Code
-                          </ToggleButton>
-                        </ToggleButtonGroup>
-                      </Box>
-
-                      {/* Receiver Name and UPI ID */}
-                      <Grid container spacing={1.5}>
-                        <Grid size={{ xs: 12, sm: 6 }}>
-                          <AppInput
-                            label={`QR Receiver Name (${selectedQrEventType})`}
-                            value={currentQrConfig.receiverName || ""}
-                            onChange={(e) => handleQrFieldChange("receiverName", e.target.value)}
-                            placeholder={`e.g. ${selectedQrEventType} Lead`}
-                            required
-                            error={Boolean(receiverError)}
-                            helperText={receiverError}
-                          />
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6 }}>
-                          <AppInput
-                            label={`QR UPI ID (${selectedQrEventType})`}
-                            value={currentQrConfig.upiId || ""}
-                            onChange={(e) => handleQrFieldChange("upiId", e.target.value)}
-                            placeholder={`e.g. ${selectedQrEventType.toLowerCase().replace(/\s+/g, "")}.unit1a@okaxis`}
-                            required
-                            error={Boolean(upiError)}
-                            helperText={upiError}
-                          />
-                        </Grid>
-                      </Grid>
-
-                      {/* Upload Section / Static Fallback */}
-                      <Box sx={{ mt: 1 }}>
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.6 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary" }}>
-                            {(currentQrConfig.qrMode || "generated") === "uploaded"
-                              ? `Upload Custom QR Code for ${selectedQrEventType}`
-                              : `Custom QR Image for ${selectedQrEventType} (Optional Fallback)`}
-                          </Typography>
-                          {currentQrConfig.qrImage && (
-                            <Tooltip title="Remove Uploaded Image">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => {
-                                  handleQrFieldChange("qrImage", null);
-                                  if (currentQrConfig.qrMode === "uploaded") {
-                                    handleQrFieldChange("qrMode", "generated");
-                                  }
-                                  toast.info(`Uploaded QR image for ${selectedQrEventType} removed.`);
-                                }}
-                                sx={{ p: 0.3 }}
-                              >
-                                <DeleteOutlineOutlinedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Tooltip>
+                        <Typography variant="subtitle1" fontWeight={800} sx={{ mt: 0.2, color: "text.primary" }}>
+                          {currentQrConfig.receiverName || (
+                            <span style={{ color: "#94a3b8", fontWeight: 500, fontSize: "0.85rem" }}>
+                              -- Not Configured --
+                            </span>
                           )}
-                        </Box>
-
-                        <Box sx={{ width: "100%", mt: 0.5 }}>
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleQrUpload}
-                            accept="image/*"
-                            style={{ display: "none" }}
-                          />
-                          <Box
-                            sx={{
-                              border: "1.5px dashed",
-                              borderColor: (t) => t.palette.divider,
-                              borderRadius: "12px",
-                              p: 2,
-                              textAlign: "center",
-                              cursor: currentQrConfig.qrImage ? "default" : "pointer",
-                              transition: "all 0.2s ease",
-                              "&:hover": { borderColor: "#0284c7", bgcolor: "rgba(2, 132, 199, 0.04)" },
-                            }}
-                            onClick={() => {
-                              if (!currentQrConfig.qrImage) fileInputRef.current?.click();
-                            }}
-                          >
-                            {currentQrConfig.qrImage ? (
-                              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                                <Box
-                                  component="img"
-                                  src={currentQrConfig.qrImage}
-                                  alt={`Uploaded QR Code for ${selectedQrEventType}`}
-                                  sx={{
-                                    width: 90,
-                                    height: 90,
-                                    borderRadius: "8px",
-                                    border: (t) => `1.5px solid ${t.palette.divider}`,
-                                    p: 0.5,
-                                    bgcolor: "#fff",
-                                    display: "block",
-                                    margin: "0 auto",
-                                    objectFit: "contain",
-                                    boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-                                  }}
-                                />
-                                <Chip
-                                  label={
-                                    currentQrConfig.qrMode === "uploaded"
-                                      ? `Uploaded QR Active (${selectedQrEventType})`
-                                      : `Uploaded Image Fallback (${selectedQrEventType})`
-                                  }
-                                  size="small"
-                                  sx={{
-                                    mt: 1,
-                                    height: 20,
-                                    fontSize: "0.65rem",
-                                    fontWeight: 700,
-                                    bgcolor:
-                                      currentQrConfig.qrMode === "uploaded"
-                                        ? "rgba(22, 163, 74, 0.12)"
-                                        : "rgba(234, 88, 12, 0.12)",
-                                    color: currentQrConfig.qrMode === "uploaded" ? "#16a34a" : "#ea580c",
-                                  }}
-                                />
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.2 }}>
-                                  <AppButton
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<CloudUploadOutlinedIcon sx={{ fontSize: 14 }} />}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      fileInputRef.current?.click();
-                                    }}
-                                    sx={{ fontSize: "0.72rem", height: 28 }}
-                                  >
-                                    Change QR Image
-                                  </AppButton>
-                                  <AppButton
-                                    size="small"
-                                    variant="outlined"
-                                    color="error"
-                                    startIcon={<DeleteOutlineOutlinedIcon sx={{ fontSize: 14 }} />}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleQrFieldChange("qrImage", null);
-                                      if (currentQrConfig.qrMode === "uploaded") {
-                                        handleQrFieldChange("qrMode", "generated");
-                                      }
-                                      toast.info(`Uploaded QR image for ${selectedQrEventType} removed.`);
-                                      if (fileInputRef.current) fileInputRef.current.value = "";
-                                    }}
-                                    sx={{ fontSize: "0.72rem", height: 28 }}
-                                  >
-                                    Remove
-                                  </AppButton>
-                                </Box>
-                              </Box>
-                            ) : (
-                              <>
-                                <CloudUploadOutlinedIcon sx={{ fontSize: 28, color: "#0284c7" }} />
-                                <Typography variant="body2" sx={{ display: "block", fontWeight: 700, fontSize: "0.8rem", mt: 0.4 }}>
-                                  Click to upload static QR code image for {selectedQrEventType}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem" }}>
-                                  PNG or JPG format (up to 2MB)
-                                </Typography>
-                              </>
-                            )}
-                          </Box>
-                        </Box>
+                        </Typography>
                       </Box>
-                    </Stack>
-                  </Box>
 
-                  {/* Save Button for Payment QR Settings */}
-                  <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center" }}>
-                    <AppButton
-                      variant="contained"
-                      startIcon={<SaveOutlinedIcon />}
-                      onClick={handleSavePaymentQr}
-                      sx={{
-                        bgcolor: "#1e1a2e !important",
-                        "&:hover": { bgcolor: "#2d2448 !important" },
-                        px: 3,
-                        fontWeight: 700,
-                      }}
-                    >
-                      Save Payment QR ({selectedQrEventType})
-                    </AppButton>
-                  </Box>
-                </Card>
-              </Grid>
-
-              {/* Right: Live QR Preview Panel (30-35% on desktop) */}
-              <Grid size={{ xs: 12, lg: 4 }}>
-                <Card
-                  sx={{
-                    borderRadius: "16px",
-                    border: (t) => `1px solid ${t.palette.divider}`,
-                    p: 2.5,
-                    bgcolor: "background.paper",
-                  }}
-                >
-                  {/* Header */}
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                      {/* Prominent QR Code Image */}
                       <Box
                         sx={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: "10px",
-                          bgcolor: "rgba(2, 132, 199, 0.1)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#0284c7",
+                          p: 1.2,
+                          bgcolor: "#ffffff",
+                          borderRadius: "16px",
+                          border: "2px solid #0284c7",
+                          boxShadow: "0 6px 20px rgba(2, 132, 199, 0.18)",
+                          display: "inline-block",
+                          transition: "transform 0.2s ease",
+                          "&:hover": { transform: "scale(1.02)" },
                         }}
                       >
-                        <QrCodeScannerOutlinedIcon fontSize="small" />
+                        {isCurrentConfigured ? (
+                          <Box
+                            component="img"
+                            src={currentQrConfig.qrMode === "uploaded" && currentQrConfig.qrImage ? currentQrConfig.qrImage : dynamicQrUrl}
+                            alt={`Payment QR Code - ${selectedQrEventType}`}
+                            sx={{
+                              width: 170,
+                              height: 170,
+                              display: "block",
+                              borderRadius: "10px",
+                              objectFit: "contain",
+                            }}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              width: 170,
+                              height: 170,
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "10px",
+                              bgcolor: "#f8fafc",
+                              p: 1.5,
+                              textAlign: "center",
+                            }}
+                          >
+                            <QrCodeScannerOutlinedIcon sx={{ fontSize: 44, color: "#cbd5e1", mb: 0.5 }} />
+                            <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 700, fontSize: "0.72rem", lineHeight: 1.3 }}>
+                              Payment QR is not configured for this event type.
+                            </Typography>
+                          </Box>
+                        )}
                       </Box>
-                      <Box>
-                        <Typography variant="subtitle1" fontWeight={800}>
-                          Live QR Preview
+
+                      {/* UPI ID Display */}
+                      <Box
+                        sx={{
+                          width: "100%",
+                          p: 1.2,
+                          borderRadius: "10px",
+                          bgcolor: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc",
+                          border: (t) => `1px solid ${t.palette.divider}`,
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", display: "block" }}>
+                          UPI ID ({selectedQrEventType})
                         </Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                          Real-time scannable QR code.
+                        <Typography
+                          variant="body2"
+                          fontWeight={750}
+                          sx={{
+                            fontFamily: "monospace",
+                            color: isCurrentConfigured ? "#0284c7" : "#ef4444",
+                            fontSize: "0.84rem",
+                            wordBreak: "break-all",
+                            mt: 0.2,
+                          }}
+                        >
+                          {currentQrConfig.upiId || "Payment QR is not configured for this event type."}
                         </Typography>
                       </Box>
-                    </Box>
+
+                      {/* Copy Action Buttons */}
+                      <Stack direction="row" spacing={1} sx={{ width: "100%", justifyContent: "center" }}>
+                        <AppButton
+                          size="small"
+                          variant="outlined"
+                          disabled={!isCurrentConfigured}
+                          startIcon={<ContentCopyOutlinedIcon sx={{ fontSize: 14 }} />}
+                          onClick={() => copyToClipboard(currentQrConfig.upiId, `UPI ID (${selectedQrEventType})`)}
+                          sx={{ flex: 1, fontSize: "0.72rem", height: 32 }}
+                        >
+                          Copy UPI
+                        </AppButton>
+                        <AppButton
+                          size="small"
+                          variant="outlined"
+                          disabled={!isCurrentConfigured}
+                          startIcon={<ContentCopyOutlinedIcon sx={{ fontSize: 14 }} />}
+                          onClick={() => copyToClipboard(liveUpiUri, `UPI URI (${selectedQrEventType})`)}
+                          sx={{ flex: 1, fontSize: "0.72rem", height: 32 }}
+                        >
+                          Copy URI
+                        </AppButton>
+                      </Stack>
+                    </Stack>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              {/* ── Payment QR Directory Table Grid (Common AppDataTable Component) ── */}
+              <Box sx={{ mt: 1 }}>
+                <AppDataTable
+                  title="Event Types & UPI Payment Settings"
+                  columns={qrTableColumns}
+                  data={qrTableData}
+                  loading={false}
+                  actions={
                     <Chip
-                      label={selectedQrEventType}
+                      label={`${qrTableData.filter((r) => r.isConfigured).length} of ${qrTableData.length} Configured`}
                       size="small"
                       color="primary"
                       variant="outlined"
-                      sx={{ fontWeight: 700, fontSize: "0.72rem" }}
+                      sx={{ fontWeight: 700, fontSize: "0.74rem" }}
                     />
-                  </Box>
-
-                  <Divider sx={{ mb: 2.5 }} />
-
-                  <Stack spacing={2.2} alignItems="center" sx={{ textAlign: "center" }}>
-                    {/* Receiver Name */}
-                    <Box sx={{ width: "100%" }}>
-                      <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em", display: "block" }}>
-                        RECEIVER NAME ({selectedQrEventType.toUpperCase()})
-                      </Typography>
-                      <Typography variant="subtitle1" fontWeight={800} sx={{ mt: 0.2, color: "text.primary" }}>
-                        {currentQrConfig.receiverName || (
-                          <span style={{ color: "#94a3b8", fontWeight: 500, fontSize: "0.85rem" }}>
-                            -- Not Configured --
-                          </span>
-                        )}
-                      </Typography>
-                    </Box>
-
-                    {/* Prominent QR Code Image */}
-                    <Box
-                      sx={{
-                        p: 1.2,
-                        bgcolor: "#ffffff",
-                        borderRadius: "16px",
-                        border: "2px solid #0284c7",
-                        boxShadow: "0 6px 20px rgba(2, 132, 199, 0.18)",
-                        display: "inline-block",
-                        transition: "transform 0.2s ease",
-                        "&:hover": { transform: "scale(1.02)" },
-                      }}
-                    >
-                      {isCurrentConfigured ? (
-                        <Box
-                          component="img"
-                          src={currentQrConfig.qrMode === "uploaded" && currentQrConfig.qrImage ? currentQrConfig.qrImage : dynamicQrUrl}
-                          alt={`Payment QR Code - ${selectedQrEventType}`}
-                          sx={{
-                            width: 170,
-                            height: 170,
-                            display: "block",
-                            borderRadius: "10px",
-                            objectFit: "contain",
-                          }}
-                        />
-                      ) : (
-                        <Box
-                          sx={{
-                            width: 170,
-                            height: 170,
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderRadius: "10px",
-                            bgcolor: "#f8fafc",
-                            p: 1.5,
-                            textAlign: "center",
-                          }}
-                        >
-                          <QrCodeScannerOutlinedIcon sx={{ fontSize: 44, color: "#cbd5e1", mb: 0.5 }} />
-                          <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 700, fontSize: "0.72rem", lineHeight: 1.3 }}>
-                            Payment QR is not configured for this event type.
-                          </Typography>
-                        </Box>
-                      )}
-                    </Box>
-
-                    {/* UPI ID Display */}
-                    <Box
-                      sx={{
-                        width: "100%",
-                        p: 1.2,
-                        borderRadius: "10px",
-                        bgcolor: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc",
-                        border: (t) => `1px solid ${t.palette.divider}`,
-                      }}
-                    >
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", display: "block" }}>
-                        UPI ID ({selectedQrEventType})
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight={750}
-                        sx={{
-                          fontFamily: "monospace",
-                          color: isCurrentConfigured ? "#0284c7" : "#ef4444",
-                          fontSize: "0.84rem",
-                          wordBreak: "break-all",
-                          mt: 0.2,
-                        }}
-                      >
-                        {currentQrConfig.upiId || "Payment QR is not configured for this event type."}
-                      </Typography>
-                    </Box>
-
-                    {/* Copy Action Buttons */}
-                    <Stack direction="row" spacing={1} sx={{ width: "100%", justifyContent: "center" }}>
-                      <AppButton
-                        size="small"
-                        variant="outlined"
-                        disabled={!isCurrentConfigured}
-                        startIcon={<ContentCopyOutlinedIcon sx={{ fontSize: 14 }} />}
-                        onClick={() => copyToClipboard(currentQrConfig.upiId, `UPI ID (${selectedQrEventType})`)}
-                        sx={{ flex: 1, fontSize: "0.72rem", height: 32 }}
-                      >
-                        Copy UPI
-                      </AppButton>
-                      <AppButton
-                        size="small"
-                        variant="outlined"
-                        disabled={!isCurrentConfigured}
-                        startIcon={<ContentCopyOutlinedIcon sx={{ fontSize: 14 }} />}
-                        onClick={() => copyToClipboard(liveUpiUri, `UPI URI (${selectedQrEventType})`)}
-                        sx={{ flex: 1, fontSize: "0.72rem", height: 32 }}
-                      >
-                        Copy URI
-                      </AppButton>
-                    </Stack>
-                  </Stack>
-                </Card>
-              </Grid>
-            </Grid>
+                  }
+                />
+              </Box>
+            </Stack>
           )}
         </Box>
       </Paper>
