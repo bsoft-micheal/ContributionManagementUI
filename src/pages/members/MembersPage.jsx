@@ -67,8 +67,8 @@ export default function MembersPage() {
   const [selectedMember, setSelectedMember] = useState(null);
   const toast = useAppToast();
 
-  const [filterRoleId, setFilterRoleId] = useState("ALL");
-  const [appliedRoleId, setAppliedRoleId] = useState("ALL");
+  const [filterRoleId, setFilterRoleId] = useState("");
+  const [appliedRoleId, setAppliedRoleId] = useState("");
 
   const filteredMembers = useMemo(() => {
     if (!appliedRoleId || appliedRoleId === "ALL") return members;
@@ -143,14 +143,12 @@ export default function MembersPage() {
     setRoles(safeRoles);
     if (safeRoles.length > 0) {
       setFilterRoleId((prev) => {
-        if (prev === "ALL") return "ALL";
-        if (prev && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
-        return "ALL";
+        if (prev && prev !== "ALL" && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
+        return "";
       });
       setAppliedRoleId((prev) => {
-        if (prev === "ALL") return "ALL";
-        if (prev && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
-        return "ALL";
+        if (prev && prev !== "ALL" && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
+        return "";
       });
     }
     setLoading(false);
@@ -402,13 +400,10 @@ export default function MembersPage() {
     }
   };
 
-  const roleOptions = [
-    { label: "All", value: "ALL" },
-    ...roles.map((r) => ({
-      label: r.roleName,
-      value: r.roleId,
-    })),
-  ];
+  const roleOptions = roles.map((r) => ({
+    label: r.roleName,
+    value: r.roleId,
+  }));
 
   const columns = [
     {
@@ -551,6 +546,7 @@ export default function MembersPage() {
               <Box sx={{ minWidth: 200 }}>
                 <AppSelect
                   label="Role"
+                  placeholder="Select Role"
                   value={filterRoleId}
                   onChange={(e) => setFilterRoleId(e.target.value)}
                   options={roleOptions}
@@ -565,7 +561,7 @@ export default function MembersPage() {
                 startIcon={<FilterListIcon />}
                 onClick={() => {
                   setAppliedRoleId(filterRoleId);
-                  toast.success("Filter applied");
+                  toast.success(filterRoleId ? "Filter applied" : "Filter cleared");
                 }}
                 sx={{
                   height: 34,
@@ -581,9 +577,9 @@ export default function MembersPage() {
                 variant="outlined"
                 size="small"
                 onClick={() => {
-                  setFilterRoleId("ALL");
-                  setAppliedRoleId("ALL");
-                  toast.success("Filter reset to All");
+                  setFilterRoleId("");
+                  setAppliedRoleId("");
+                  toast.success("Filter cleared");
                 }}
                 sx={{
                   color: "#ef4444",

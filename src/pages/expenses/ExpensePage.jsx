@@ -17,6 +17,10 @@ import {
   AttachFile as AttachFileIcon,
   DeleteOutline as DeleteOutlineIcon,
   FilterList as FilterListIcon,
+  OpenInNew as OpenInNewIcon,
+  ZoomIn as ZoomInIcon,
+  PictureAsPdf as PictureAsPdfIcon,
+  Image as ImageIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -26,6 +30,7 @@ import { formatGridDate, formatViewDate } from "../../utils/dateHelper";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
+import { getImageUrl } from "../../services/apiClient";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
@@ -43,6 +48,49 @@ import {
 import { GetEventsAsync } from "../../services/eventService";
 import { GetMembersAsync } from "../../services/memberService";
 import { GetEventTypesAsync } from "../../services/eventTypeService";
+
+const resolveAttachmentUrl = (filePath) => {
+  if (!filePath) return "";
+  if (filePath.startsWith("data:") || filePath.startsWith("http://") || filePath.startsWith("https://")) {
+    return filePath;
+  }
+  if (filePath.startsWith("/expense_attachments/") || filePath.startsWith("expense_attachments/")) {
+    return getImageUrl(filePath);
+  }
+  if (filePath.startsWith("/")) {
+    return getImageUrl(filePath);
+  }
+  return getImageUrl(`/expense_attachments/${filePath}`);
+};
+
+const getAttachmentDisplayName = (filePath) => {
+  if (!filePath) return "";
+  if (filePath.startsWith("data:")) return "Uploaded Receipt Image";
+  const name = filePath.split("/").pop() || filePath;
+  const cleaned = name.replace(/^\d{8}_\d{6}_/, "");
+  return cleaned || name;
+};
+
+const isImageFile = (filePath) => {
+  if (!filePath) return false;
+  if (filePath.startsWith("data:image/")) return true;
+  const lower = filePath.toLowerCase().split("?")[0];
+  return (
+    lower.endsWith(".png") ||
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".jpeg") ||
+    lower.endsWith(".webp") ||
+    lower.endsWith(".gif") ||
+    lower.endsWith(".svg")
+  );
+};
+
+const isPdfFile = (filePath) => {
+  if (!filePath) return false;
+  if (filePath.startsWith("data:application/pdf")) return true;
+  const lower = filePath.toLowerCase().split("?")[0];
+  return lower.endsWith(".pdf");
+};
 
 const initialForm = {
   eventName: "",
@@ -82,6 +130,7 @@ export default function ExpensePage() {
   const [expenseToDelete, setExpenseToDelete] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
+  const [previewImageModal, setPreviewImageModal] = useState({ open: false, url: "", title: "" });
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
@@ -113,6 +162,7 @@ export default function ExpensePage() {
           approvedBy: item.approvedBy || "-",
           description: item.description || "",
           fileName: item.fileName || "",
+          fileUrl: item.fileUrl || item.fileName || "",
         }));
         setExpenses(mapped);
       } else {
@@ -146,11 +196,75 @@ export default function ExpensePage() {
     fetchLookupData();
   }, []);
 
-  // Dynamically derive event options from DB events + existing expenses
+  // Event Type options for the Add/Edit form
+  const formEventTypeOptions = useMemo(() => {
+    const set = new Set();
+    eventTypesList.forEach((et) => {
+      if (et.eventTypeName) set.add(et.eventTypeName);
+    });
+    expenses.forEach((ex) => {
+      if (ex.category) set.add(ex.category);
+    });
+    const items = Array.from(set);
+    return [
+      { label: "Select Event Type", value: "" },
+      ...items.map((c) => ({ label: c, value: c })),
+    ];
+  }, [eventTypesList, expenses]);
+
+  // Cascading Event options for the Add/Edit form filtered by selected Event Type (form.category)
+  const formEventOptions = useMemo(() => {
+    let filtered = eventsList;
+    if (form.category) {
+      filtered = eventsList.filter((e) => {
+        const eventCat =
+          e.eventTypeName ||
+          e.category ||
+          eventTypesList.find((t) => t.eventTypeId === e.eventTypeId)?.eventTypeName;
+        return (
+          eventCat &&
+          eventCat.trim().toLowerCase() === form.category.trim().toLowerCase()
+        );
+      });
+    }
+
+    const list = [{ label: form.category ? "Select Event" : "Select Event Type first", value: "" }];
+    const unique = new Set();
+    filtered.forEach((e) => {
+      const name = e.name || e.eventName;
+      if (name && !unique.has(name)) {
+        unique.add(name);
+        list.push({ label: name, value: name });
+      }
+    });
+
+    // Keep existing event name if editing a record with a custom/historical event
+    if (form.eventName && !unique.has(form.eventName)) {
+      list.push({ label: form.eventName, value: form.eventName });
+    }
+
+    return list;
+  }, [eventsList, eventTypesList, form.category, form.eventName]);
+
+  // Event options for the filter panel (cascaded by filterCategory)
   const eventOptions = useMemo(() => {
+    let filtered = eventsList;
+    if (filterCategory && filterCategory !== "ALL") {
+      filtered = eventsList.filter((e) => {
+        const eventCat =
+          e.eventTypeName ||
+          e.category ||
+          eventTypesList.find((t) => t.eventTypeId === e.eventTypeId)?.eventTypeName;
+        return (
+          eventCat &&
+          eventCat.trim().toLowerCase() === filterCategory.trim().toLowerCase()
+        );
+      });
+    }
+
     const list = [{ label: "All Events", value: "ALL" }];
     const unique = new Set();
-    eventsList.forEach((e) => {
+    filtered.forEach((e) => {
       const name = e.name || e.eventName;
       if (name && !unique.has(name)) {
         unique.add(name);
@@ -158,13 +272,15 @@ export default function ExpensePage() {
       }
     });
     expenses.forEach((ex) => {
-      if (ex.eventName && !unique.has(ex.eventName)) {
-        unique.add(ex.eventName);
-        list.push({ label: ex.eventName, value: ex.eventName });
+      if (filterCategory === "ALL" || !filterCategory || ex.category === filterCategory) {
+        if (ex.eventName && !unique.has(ex.eventName)) {
+          unique.add(ex.eventName);
+          list.push({ label: ex.eventName, value: ex.eventName });
+        }
       }
     });
     return list;
-  }, [eventsList, expenses]);
+  }, [eventsList, eventTypesList, expenses, filterCategory]);
 
   // Dynamically derive member options from DB members table
   const memberOptions = useMemo(() => {
@@ -194,7 +310,7 @@ export default function ExpensePage() {
     });
     const items = Array.from(set);
     return [
-      { label: "All Categories", value: "ALL" },
+      { label: "All Event Types", value: "ALL" },
       ...items.map((c) => ({ label: c, value: c })),
     ];
   }, [eventTypesList, expenses]);
@@ -211,6 +327,7 @@ export default function ExpensePage() {
 
   const handleEditExpense = (row) => {
     setEditingExpense(row);
+    const resolvedUrl = resolveAttachmentUrl(row.fileName || row.fileUrl);
     setForm({
       eventName: row.eventName || "",
       category: row.category || "",
@@ -220,7 +337,11 @@ export default function ExpensePage() {
       submittedBy: row.submittedBy || "",
       status: row.status || "Pending",
       fileName: row.fileName || "",
-      filePreview: (row.fileName && (row.fileName.startsWith("data:image/") || row.fileName.startsWith("http"))) ? row.fileName : "",
+      filePreview: isImageFile(row.fileName || row.fileUrl)
+        ? resolvedUrl
+        : row.fileName?.startsWith("data:")
+          ? row.fileName
+          : "",
     });
     setErrors({});
     setDialogOpen(true);
@@ -251,21 +372,20 @@ export default function ExpensePage() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = (uploadEvt) => {
-          setForm((c) => ({
-            ...c,
-            fileName: file.name,
-            filePreview: uploadEvt.target.result,
-          }));
+      const reader = new FileReader();
+      reader.onload = (uploadEvt) => {
+        setForm((c) => ({
+          ...c,
+          fileName: file.name,
+          filePreview: uploadEvt.target.result,
+        }));
+        if (file.type.startsWith("image/")) {
           toast.success(`Image "${file.name}" attached successfully!`);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        setForm((c) => ({ ...c, fileName: file.name, filePreview: "" }));
-        toast.info(`Document "${file.name}" attached.`);
-      }
+        } else {
+          toast.info(`Attachment "${file.name}" attached.`);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -298,6 +418,7 @@ export default function ExpensePage() {
           approvedBy: form.status === "Approved" ? currentUserName : "-",
           description: form.description,
           fileName: form.fileName || editingExpense.fileName || "",
+          fileData: form.filePreview || (editingExpense.fileName?.startsWith("data:") ? editingExpense.fileName : null),
         });
         toast.success("Expense updated successfully!");
       } else {
@@ -311,6 +432,7 @@ export default function ExpensePage() {
           approvedBy: form.status === "Approved" ? currentUserName : "-",
           description: form.description,
           fileName: form.fileName || "",
+          fileData: form.filePreview || null,
         });
         toast.success("Expense added successfully!");
       }
@@ -520,6 +642,21 @@ export default function ExpensePage() {
         filterPanel={
           <Grid container spacing={2} alignItems="center">
             <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <Box sx={{ minWidth: 180 }}>
+                <AppSelect
+                  label="Select Event Type"
+                  value={filterCategory}
+                  onChange={(e) => {
+                    setFilterCategory(e.target.value);
+                    setFilterEvent("ALL");
+                  }}
+                  options={categoryOptions}
+                  size="small"
+                  placeholder="Select Event Type"
+                  required
+                  fullWidth
+                />
+              </Box>
               <Box sx={{ minWidth: 200 }}>
                 <AppSelect
                   label="Select Event"
@@ -530,20 +667,6 @@ export default function ExpensePage() {
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
-                  required
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: 180 }}>
-                <AppSelect
-                  label="Select Category"
-                  value={filterCategory}
-                  onChange={(e) => {
-                    setFilterCategory(e.target.value);
-                  }}
-                  options={categoryOptions}
-                  size="small"
-                  placeholder="Select Category"
                   required
                   fullWidth
                 />
@@ -644,33 +767,77 @@ export default function ExpensePage() {
         }
       >
         <Grid container spacing={2}>
+          {/* 1. Event Type FIRST */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppSelect
-              label="Event"
-              placeholder="Select Event"
-              value={form.eventName}
+              label="Event Type"
+              placeholder="Select Event Type"
+              value={form.category}
               onChange={(e) => {
-                setForm((c) => ({ ...c, eventName: e.target.value }));
-                if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
+                const selectedType = e.target.value;
+                setForm((c) => {
+                  const matchingEvents = eventsList.filter((ev) => {
+                    const eventCat =
+                      ev.eventTypeName ||
+                      ev.category ||
+                      eventTypesList.find((t) => t.eventTypeId === ev.eventTypeId)?.eventTypeName;
+                    return (
+                      eventCat &&
+                      eventCat.trim().toLowerCase() === selectedType.trim().toLowerCase()
+                    );
+                  });
+                  const stillMatches = matchingEvents.some(
+                    (ev) => (ev.name || ev.eventName) === c.eventName
+                  );
+                  return {
+                    ...c,
+                    category: selectedType,
+                    eventName: stillMatches ? c.eventName : "",
+                  };
+                });
+                if (errors.category) setErrors((p) => ({ ...p, category: "" }));
               }}
-              options={eventOptions.filter((o) => o.value !== "ALL")}
-              error={!!errors.eventName}
-              helperText={errors.eventName}
+              options={formEventTypeOptions}
+              error={!!errors.category}
+              helperText={errors.category}
               required
             />
           </Grid>
+
+          {/* 2. Event NEXT (loaded/filtered against selected Event Type) */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppSelect
-              label="Category"
-              placeholder="Select Category"
-              value={form.category}
+              label="Event"
+              placeholder={form.category ? "Select Event" : "Select Event Type first"}
+              value={form.eventName}
               onChange={(e) => {
-                setForm((c) => ({ ...c, category: e.target.value }));
-                if (errors.category) setErrors((p) => ({ ...p, category: "" }));
+                const selectedEventName = e.target.value;
+                setForm((c) => {
+                  let autoCategory = c.category;
+                  if (!autoCategory) {
+                    const matchedEv = eventsList.find(
+                      (ev) => (ev.name || ev.eventName) === selectedEventName
+                    );
+                    if (matchedEv) {
+                      autoCategory =
+                        matchedEv.eventTypeName ||
+                        matchedEv.category ||
+                        eventTypesList.find((t) => t.eventTypeId === matchedEv.eventTypeId)
+                          ?.eventTypeName ||
+                        "";
+                    }
+                  }
+                  return {
+                    ...c,
+                    eventName: selectedEventName,
+                    category: autoCategory,
+                  };
+                });
+                if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
               }}
-              options={categoryOptions.filter((o) => o.value !== "ALL")}
-              error={!!errors.category}
-              helperText={errors.category}
+              options={formEventOptions}
+              error={!!errors.eventName}
+              helperText={errors.eventName}
               required
             />
           </Grid>
@@ -1034,18 +1201,298 @@ export default function ExpensePage() {
               </Grid>
               {selectedExpense.fileName && (
                 <Grid size={{ xs: 12 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Receipt / Bill Attachment
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: "#4a3f6b", fontWeight: 600, mt: 0.5 }}>
-                    {selectedExpense.fileName}
-                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 1,
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Receipt / Bill Attachment
+                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Chip
+                        label={getAttachmentDisplayName(selectedExpense.fileName)}
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: "0.75rem",
+                          maxWidth: 200,
+                          textOverflow: "ellipsis",
+                          overflow: "hidden",
+                        }}
+                      />
+                      {isImageFile(selectedExpense.fileName) && (
+                        <Tooltip title="View Full Size">
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              setPreviewImageModal({
+                                open: true,
+                                url: resolveAttachmentUrl(selectedExpense.fileName),
+                                title: getAttachmentDisplayName(selectedExpense.fileName),
+                              })
+                            }
+                            sx={{ color: "#4a3f6b", p: 0.5 }}
+                          >
+                            <ZoomInIcon sx={{ fontSize: "1.15rem" }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      <Tooltip title="Open in New Tab">
+                        <IconButton
+                          size="small"
+                          component="a"
+                          href={resolveAttachmentUrl(selectedExpense.fileName)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          sx={{ color: "#4a3f6b", p: 0.5 }}
+                        >
+                          <OpenInNewIcon sx={{ fontSize: "1rem" }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+
+                  {isImageFile(selectedExpense.fileName) ? (
+                    <Box
+                      onClick={() =>
+                        setPreviewImageModal({
+                          open: true,
+                          url: resolveAttachmentUrl(selectedExpense.fileName),
+                          title: getAttachmentDisplayName(selectedExpense.fileName),
+                        })
+                      }
+                      sx={{
+                        position: "relative",
+                        width: "100%",
+                        minHeight: 180,
+                        maxHeight: 280,
+                        borderRadius: "12px",
+                        overflow: "hidden",
+                        border: (t) =>
+                          `1.5px solid ${
+                            t.palette.mode === "dark"
+                              ? "rgba(255,255,255,0.15)"
+                              : "rgba(74,63,107,0.2)"
+                          }`,
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.03)"
+                            : "#f8fafc",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.25s ease",
+                        "&:hover": {
+                          borderColor: "#4a3f6b",
+                          boxShadow: "0 6px 20px rgba(74,63,107,0.15)",
+                          "& .preview-overlay": {
+                            opacity: 1,
+                          },
+                        },
+                      }}
+                    >
+                      <Box
+                        component="img"
+                        src={resolveAttachmentUrl(selectedExpense.fileName)}
+                        alt={getAttachmentDisplayName(selectedExpense.fileName)}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          const fallback = document.getElementById(
+                            `fallback-${selectedExpense.id}`
+                          );
+                          if (fallback) fallback.style.display = "flex";
+                        }}
+                        sx={{
+                          width: "100%",
+                          maxHeight: 280,
+                          objectFit: "contain",
+                          display: "block",
+                          p: 1,
+                          borderRadius: "10px",
+                        }}
+                      />
+                      <Box
+                        id={`fallback-${selectedExpense.id}`}
+                        sx={{
+                          display: "none",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          p: 3,
+                          gap: 1,
+                        }}
+                      >
+                        <ImageIcon sx={{ fontSize: 40, color: "text.secondary" }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {getAttachmentDisplayName(selectedExpense.fileName)}
+                        </Typography>
+                      </Box>
+                      <Box
+                        className="preview-overlay"
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          bgcolor: "rgba(0,0,0,0.38)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 1,
+                          color: "#ffffff",
+                          opacity: 0,
+                          transition: "opacity 0.2s ease",
+                        }}
+                      >
+                        <ZoomInIcon sx={{ fontSize: 24 }} />
+                        <Typography variant="body2" fontWeight={700}>
+                          Click to expand full size
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ) : isPdfFile(selectedExpense.fileName) ? (
+                    <Box
+                      component="a"
+                      href={resolveAttachmentUrl(selectedExpense.fileName)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        p: 2,
+                        borderRadius: "12px",
+                        border: (t) => `1.5px solid ${t.palette.divider}`,
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.03)"
+                            : "#f8fafc",
+                        textDecoration: "none",
+                        color: "inherit",
+                        transition: "all 0.2s ease",
+                        "&:hover": {
+                          borderColor: "#ef4444",
+                          bgcolor: (t) =>
+                            t.palette.mode === "dark"
+                              ? "rgba(239, 68, 68, 0.08)"
+                              : "rgba(239, 68, 68, 0.04)",
+                        },
+                      }}
+                    >
+                      <PictureAsPdfIcon sx={{ fontSize: 36, color: "#ef4444" }} />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight={700}>
+                          {getAttachmentDisplayName(selectedExpense.fileName)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Click to view PDF document in new tab
+                        </Typography>
+                      </Box>
+                      <OpenInNewIcon sx={{ fontSize: 20, color: "text.secondary" }} />
+                    </Box>
+                  ) : (
+                    <Box
+                      component="a"
+                      href={resolveAttachmentUrl(selectedExpense.fileName)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        p: 2,
+                        borderRadius: "12px",
+                        border: (t) => `1.5px solid ${t.palette.divider}`,
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.03)"
+                            : "#f8fafc",
+                        textDecoration: "none",
+                        color: "inherit",
+                        transition: "all 0.2s ease",
+                        "&:hover": {
+                          borderColor: "#4a3f6b",
+                        },
+                      }}
+                    >
+                      <AttachFileIcon sx={{ fontSize: 32, color: "#4a3f6b" }} />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight={700}>
+                          {getAttachmentDisplayName(selectedExpense.fileName)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Click to open attachment
+                        </Typography>
+                      </Box>
+                      <OpenInNewIcon sx={{ fontSize: 20, color: "text.secondary" }} />
+                    </Box>
+                  )}
                 </Grid>
               )}
             </Grid>
           </Box>
         )}
       </AppDialog>
+
+      {/* Lightbox Full Size Image Preview Dialog */}
+      <AppDialog
+        open={previewImageModal.open}
+        onClose={() => setPreviewImageModal({ open: false, url: "", title: "" })}
+        title={previewImageModal.title || "Receipt Attachment Preview"}
+        maxWidth="md"
+        actions={
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <AppButton
+              variant="outlined"
+              startIcon={<OpenInNewIcon />}
+              component="a"
+              href={previewImageModal.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in New Tab
+            </AppButton>
+            <AppButton
+              variant="contained"
+              onClick={() => setPreviewImageModal({ open: false, url: "", title: "" })}
+            >
+              Close
+            </AppButton>
+          </Stack>
+        }
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            p: 1.5,
+            bgcolor: (t) => (t.palette.mode === "dark" ? "#0f172a" : "#0f172a08"),
+            borderRadius: "12px",
+            minHeight: 250,
+            maxHeight: "72vh",
+            overflow: "auto",
+          }}
+        >
+          <Box
+            component="img"
+            src={previewImageModal.url}
+            alt={previewImageModal.title || "Attachment"}
+            sx={{
+              maxWidth: "100%",
+              maxHeight: "68vh",
+              objectFit: "contain",
+              borderRadius: "8px",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.25)",
+            }}
+          />
+        </Box>
+      </AppDialog>
     </div>
   );
 }
+

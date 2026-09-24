@@ -45,7 +45,7 @@ export const navigationItems = [
     icon: <AccountBalanceRoundedIcon fontSize="small" />,
     children: [
       { label: "Contribution", path: "/contributions", icon: <SavingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { label: "Payments", path: "/payments", icon: <ReceiptLongRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { label: "Payment History", path: "/payments", icon: <ReceiptLongRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { label: "Calculation", path: "/contribution-calculation", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { label: "Expense", path: "/expense", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: "1rem" }} /> },
     ]
