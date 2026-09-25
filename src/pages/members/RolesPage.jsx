@@ -13,6 +13,7 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { GetRolesAsync, CreateRoleAsync, UpdateRoleAsync, DeleteRoleAsync } from "../../services/roleService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const initialForm = { roleName: "" };
 
@@ -40,22 +41,22 @@ export default function RolesPage() {
       const data = await GetRolesAsync();
       setRoles(data || []);
     } catch (error) {
-      toast.error("Failed to load roles");
+      toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleSubmit() {
-    const filed = "This field is required";
+    const requiredLabel = COMMON_STRINGS.VALIDATION.REQUIRED_FIELD;
     const schema = {
-      roleName: { required: true, type: "letteronly", min: 2, max: 50, label: filed },
+      roleName: { required: true, type: "letteronly", min: 2, max: 50, label: requiredLabel },
     };
     const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -67,15 +68,15 @@ export default function RolesPage() {
       };
       if (form.roleId) {
         await UpdateRoleAsync(form.roleId, payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.ROLES.SAVED_SUCCESS);
       } else {
         await CreateRoleAsync(payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.ROLES.SAVED_SUCCESS);
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save");
+      toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 
@@ -88,10 +89,10 @@ export default function RolesPage() {
     if (roleToDelete) {
       try {
         await DeleteRoleAsync(roleToDelete);
-        toast.success("Deleted successfully");
+        toast.success(TOAST_MESSAGES.ROLES.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        const errorMsg = error.response?.data?.message || error.response?.data?.title || error.message || "Failed to delete role";
+        const errorMsg = error.response?.data?.message || error.response?.data?.title || error.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED;
         toast.error(errorMsg);
       } finally {
         setDeleteConfirmOpen(false);
@@ -102,7 +103,7 @@ export default function RolesPage() {
 
   const columns = [
     {
-      label: "Action",
+      label: COMMON_STRINGS.TABLE.ACTION_COL,
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
           <Tooltip title={hasWriteAccess ? "Edit Role" : ""}>
@@ -142,12 +143,12 @@ export default function RolesPage() {
       )
     },
     {
-      label: "Created By",
+      label: COMMON_STRINGS.TABLE.CREATED_BY_COL,
       key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
+      render: (row) => row.createdBy || row.CreatedBy || COMMON_STRINGS.DEFAULTS.EMPTY_VALUE,
     },
     {
-      label: "Created On",
+      label: COMMON_STRINGS.TABLE.CREATED_ON_COL,
       key: "createdAt",
       render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
@@ -168,7 +169,7 @@ export default function RolesPage() {
             startIcon={<AddIcon />}
             onClick={() => { setForm(initialForm); setErrors({}); setDialogOpen(true); }}
           >
-            Add
+            {COMMON_STRINGS.ACTIONS.ADD}
           </AppButton>
         }
       />
@@ -179,8 +180,8 @@ export default function RolesPage() {
         title={form.roleId ? "Edit Role" : "Add Role"}
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
-            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
+            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>{COMMON_STRINGS.ACTIONS.CANCEL}</AppButton>
+            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>{COMMON_STRINGS.ACTIONS.SAVE}</AppButton>
           </>
         }
       >
@@ -211,9 +212,10 @@ export default function RolesPage() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this role?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
     </div>
   );
 }
+

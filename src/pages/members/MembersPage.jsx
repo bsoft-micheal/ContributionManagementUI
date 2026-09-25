@@ -38,6 +38,7 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import MemberDetailsDialog from "../../components/members/MemberDetailsDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import { validateForm } from "../../utils/validation";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const initialForm = {
   name: "",
@@ -167,22 +168,22 @@ export default function MembersPage() {
   }
 
   async function handleSubmit() {
-    const filed = "This field is required"
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
     const schema = {
-      name: { required: true, type: "letteronly", min: 2, max: 100, label: filed },
-      email: { required: true, email: true, label: filed },
-      phone: { required: true, type: "numberonly", min: 10, max: 10, label: filed },
-      roleId: { required: true, label: filed },
-      gender: { required: true, label: filed },
-      type: { required: true, label: filed },
-      dateOfBirth: { required: true, label: filed },
-      joiningDate: { required: true, label: filed },
+      name: { required: true, type: "letteronly", min: 2, max: 100, label: fieldRequired },
+      email: { required: true, email: true, label: fieldRequired },
+      phone: { required: true, type: "numberonly", min: 10, max: 10, label: fieldRequired },
+      roleId: { required: true, label: fieldRequired },
+      gender: { required: true, label: fieldRequired },
+      type: { required: true, label: fieldRequired },
+      dateOfBirth: { required: true, label: fieldRequired },
+      joiningDate: { required: true, label: fieldRequired },
     };
     const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -192,7 +193,7 @@ export default function MembersPage() {
     if (!form.memberId) {
       if (members.some((m) => m.email && m.email.trim().toLowerCase() === emailLower)) {
         setErrors((prev) => ({ ...prev, email: "This email is already registered" }));
-        toast.error("This email is already registered with another member");
+        toast.error(TOAST_MESSAGES.MEMBERS.EMAIL_EXISTS);
         return;
       }
       if (members.some((m) => m.phone && String(m.phone).trim() === phoneClean)) {
@@ -203,7 +204,7 @@ export default function MembersPage() {
     } else {
       if (members.some((m) => m.memberId !== form.memberId && m.email && m.email.trim().toLowerCase() === emailLower)) {
         setErrors((prev) => ({ ...prev, email: "This email is already registered" }));
-        toast.error("This email is already registered with another member");
+        toast.error(TOAST_MESSAGES.MEMBERS.EMAIL_EXISTS);
         return;
       }
       if (members.some((m) => m.memberId !== form.memberId && m.phone && String(m.phone).trim() === phoneClean)) {
@@ -217,10 +218,10 @@ export default function MembersPage() {
       let res;
       if (form.memberId) {
         res = await UpdateMemberAsync(form.memberId, form);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.MEMBERS.UPDATED_SUCCESS);
       } else {
         res = await CreateMemberAsync(form);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.MEMBERS.CREATED_SUCCESS);
       }
 
       const savedId = form.memberId || res?.memberId || res?.data?.memberId;
@@ -239,7 +240,7 @@ export default function MembersPage() {
       if (rawMsg.toLowerCase().includes("inner exception") || rawMsg.toLowerCase().includes("unique") || rawMsg.toLowerCase().includes("duplicate")) {
         toast.error("A member with this email or phone number already exists.");
       } else {
-        toast.error("Failed to save");
+        toast.error(TOAST_MESSAGES.GENERAL.SAVE_FAILED);
       }
     }
   }
@@ -253,10 +254,10 @@ export default function MembersPage() {
     if (memberToDelete) {
       try {
         await DeleteMemberAsync(memberToDelete);
-        toast.success("Deleted successfully");
+        toast.success(TOAST_MESSAGES.MEMBERS.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        toast.error("Failed to delete");
+        toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       } finally {
         setDeleteConfirmOpen(false);
         setMemberToDelete(null);
@@ -739,8 +740,8 @@ export default function MembersPage() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this record?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       <MemberDetailsDialog

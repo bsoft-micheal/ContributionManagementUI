@@ -11,6 +11,7 @@ import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 export default function ExitProcessPage() {
   const { authState } = useAuth();
@@ -85,10 +86,10 @@ export default function ExitProcessPage() {
 
     try {
       await UpdateMemberAsync(member.memberId, { ...member, isExited: true, isActive: false });
-      toast.success("Saved successfully");
+      toast.success(TOAST_MESSAGES.MEMBERS.EXIT_PROCESS_SUCCESS || TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       loadExitData();
     } catch (error) {
-      toast.error("Failed to save");
+      toast.error(TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 

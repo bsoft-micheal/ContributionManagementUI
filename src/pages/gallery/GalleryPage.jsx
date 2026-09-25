@@ -45,6 +45,7 @@ import {
 } from "../../services/galleryService";
 import { GetEventsAsync } from "../../services/eventService";
 import { GetEventTypesAsync } from "../../services/eventTypeService";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 // Helper to safely extract an array of image URLs/data from any format
 export const extractImages = (rawImageUrl) => {
@@ -480,11 +481,11 @@ export default function GalleryPage() {
           await deleteGalleryPhotoAsync(pid);
         }
       }
-      toast.success("Gallery entry deleted successfully");
+      toast.success(TOAST_MESSAGES.GALLERY.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchPhotosFromDb();
     } catch (err) {
       console.error("Backend delete photo call failed:", err);
-      toast.error("Failed to delete photo from database");
+      toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
     } finally {
       setDeleteConfirmOpen(false);
       setPhotoToDelete(null);
@@ -507,7 +508,7 @@ export default function GalleryPage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -537,13 +538,13 @@ export default function GalleryPage() {
         }
 
         await createGalleryPhotoAsync(payload);
-        toast.success("Gallery entry updated successfully!");
+        toast.success(TOAST_MESSAGES.GALLERY.SAVED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
         await createGalleryPhotoAsync(payload);
         toast.success(
           currentImages.length > 1
             ? `Gallery entry with ${currentImages.length} photos added successfully!`
-            : "Photo added successfully!"
+            : (TOAST_MESSAGES.GALLERY.UPLOAD_SUCCESS || TOAST_MESSAGES.GENERAL.SAVED_SUCCESS)
         );
       }
 
@@ -554,7 +555,7 @@ export default function GalleryPage() {
       await fetchPhotosFromDb();
     } catch (err) {
       console.error("Failed to save gallery photo:", err);
-      toast.error(err.response?.data?.message || "Failed to save photo to database");
+      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   };
 
@@ -1154,8 +1155,8 @@ export default function GalleryPage() {
           setPhotoToDelete(null);
         }}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this gallery entry and all attached photos?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       {/* View Photo Details Dialog */}

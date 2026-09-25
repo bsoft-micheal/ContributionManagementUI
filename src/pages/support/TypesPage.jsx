@@ -32,6 +32,7 @@ import {
 } from "../../services/workTypeService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const initialTicketTypeForm = {
   typeName: "",
@@ -91,7 +92,7 @@ export default function TypesPage() {
   }
 
   async function handleTicketTypeSubmit() {
-    const fieldRequired = "This field is required";
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
     const schema = {
       typeName: { required: true, min: 2, max: 150, label: fieldRequired },
     };
@@ -100,7 +101,7 @@ export default function TypesPage() {
 
     if (Object.keys(newErrors).length > 0) {
       setTicketTypeErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -112,15 +113,15 @@ export default function TypesPage() {
 
       if (ticketTypeForm.ticketTypeId) {
         await UpdateTicketTypeAsync(ticketTypeForm.ticketTypeId, payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       } else {
         await CreateTicketTypeAsync(payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       }
       setTicketTypeDialogOpen(false);
       loadTicketTypes();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save ticket type");
+      toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 
@@ -133,10 +134,10 @@ export default function TypesPage() {
     if (ticketTypeToDelete) {
       try {
         await DeleteTicketTypeAsync(ticketTypeToDelete);
-        toast.success("Deleted successfully");
+        toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadTicketTypes();
       } catch (error) {
-        toast.error(error.response?.data?.message || "Failed to delete ticket type");
+        toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       } finally {
         setTicketTypeDeleteConfirmOpen(false);
         setTicketTypeToDelete(null);
@@ -157,10 +158,10 @@ export default function TypesPage() {
         isActive: !ticketTypeToToggle.isActive,
       };
       await UpdateTicketTypeAsync(ticketTypeToToggle.ticketTypeId, payload);
-      toast.success("Status updated successfully");
+      toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadTicketTypes();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? "Failed to update status");
+      toast.error(err.response?.data?.message ?? TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
     } finally {
       setTicketTypeStatusConfirmOpen(false);
       setTicketTypeToToggle(null);
@@ -174,14 +175,14 @@ export default function TypesPage() {
       const data = await GetWorkTypesAsync();
       setWorkTypes(Array.isArray(data) ? data : []);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to load work types");
+      toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setWorkTypesLoading(false);
     }
   }
 
   async function handleWorkTypeSubmit() {
-    const fieldRequired = "This field is required";
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
     const schema = {
       workTypeName: { required: true, min: 2, max: 100, label: fieldRequired },
     };
@@ -190,7 +191,7 @@ export default function TypesPage() {
 
     if (Object.keys(newErrors).length > 0) {
       setWorkTypeErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -202,15 +203,15 @@ export default function TypesPage() {
 
       if (workTypeForm.workTypeId) {
         await UpdateWorkTypeAsync(workTypeForm.workTypeId, payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       } else {
         await CreateWorkTypeAsync(payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       }
       setWorkTypeDialogOpen(false);
       loadWorkTypes();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save work type");
+      toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 
@@ -223,10 +224,10 @@ export default function TypesPage() {
     if (workTypeToDelete) {
       try {
         await DeleteWorkTypeAsync(workTypeToDelete);
-        toast.success("Deleted successfully");
+        toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadWorkTypes();
       } catch (error) {
-        toast.error(error.response?.data?.message || "Failed to delete work type");
+        toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       } finally {
         setWorkTypeDeleteConfirmOpen(false);
         setWorkTypeToDelete(null);
@@ -247,10 +248,10 @@ export default function TypesPage() {
         isActive: !workTypeToToggle.isActive,
       };
       await UpdateWorkTypeAsync(workTypeToToggle.workTypeId, payload);
-      toast.success("Status updated successfully");
+      toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadWorkTypes();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? "Failed to update status");
+      toast.error(err.response?.data?.message ?? TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
     } finally {
       setWorkTypeStatusConfirmOpen(false);
       setWorkTypeToToggle(null);
@@ -644,8 +645,8 @@ export default function TypesPage() {
         open={ticketTypeDeleteConfirmOpen}
         onClose={() => setTicketTypeDeleteConfirmOpen(false)}
         onConfirm={handleConfirmTicketTypeDelete}
-        title="Confirm Delete"
-        content="Are you sure you want to delete this ticket type?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       {/* Ticket Type Status Toggle Confirmation */}
@@ -712,8 +713,8 @@ export default function TypesPage() {
         open={workTypeDeleteConfirmOpen}
         onClose={() => setWorkTypeDeleteConfirmOpen(false)}
         onConfirm={handleConfirmWorkTypeDelete}
-        title="Confirm Delete"
-        content="Are you sure you want to delete this work type?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       {/* Work Type Status Toggle Confirmation */}

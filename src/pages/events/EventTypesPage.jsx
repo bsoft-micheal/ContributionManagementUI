@@ -14,6 +14,7 @@ import AppSwitch from "../../components/common/AppSwitch";
 import { GetEventTypesAsync, CreateEventTypeAsync, UpdateEventTypeAsync, DeleteEventTypeAsync } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const formatBaseAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -61,20 +62,20 @@ export default function EventTypesPage() {
   }
 
   async function handleSubmit() {
-    const filed = "This field is required";
+    const requiredLabel = COMMON_STRINGS.VALIDATION.REQUIRED_FIELD;
     const schema = {
-      eventTypeName: { required: true, type: "letteronly", min: 2, max: 50, label: filed },
+      eventTypeName: { required: true, type: "letteronly", min: 2, max: 50, label: requiredLabel },
       baseAmount: { 
         required: true, 
         type: "numberonly", 
-        label: filed,
+        label: requiredLabel,
         customValidate: (val) => {
           const num = Number(String(val).replace(/[^0-9]/g, ""));
           if (val === "" || val === undefined || val === null || num <= 0) {
-            return filed;
+            return requiredLabel;
           }
           if (num > 1000000) {
-            return "Base amount cannot exceed 1,000,000";
+            return COMMON_STRINGS.VALIDATION.MAX_AMOUNT_EXCEEDED("1,000,000");
           }
           return "";
         }
@@ -84,7 +85,7 @@ export default function EventTypesPage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -100,15 +101,15 @@ export default function EventTypesPage() {
       };
       if (form.eventTypeId) {
         await UpdateEventTypeAsync(form.eventTypeId, payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.EVENT_TYPES.SAVED_SUCCESS);
       } else {
         await CreateEventTypeAsync(payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.EVENT_TYPES.SAVED_SUCCESS);
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save");
+      toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 
@@ -121,10 +122,10 @@ export default function EventTypesPage() {
     if (typeToDelete) {
       try {
         await DeleteEventTypeAsync(typeToDelete);
-        toast.success("Deleted successfully");
+        toast.success(TOAST_MESSAGES.EVENT_TYPES.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        toast.error(error.response?.data?.message || "Failed to delete");
+        toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       } finally {
         setDeleteConfirmOpen(false);
         setTypeToDelete(null);
@@ -145,10 +146,10 @@ export default function EventTypesPage() {
         isActive: !typeToToggle.isActive,
       };
       await UpdateEventTypeAsync(typeToToggle.eventTypeId, payload);
-      toast.success("Category status updated successfully");
+      toast.success(TOAST_MESSAGES.EVENT_TYPES.STATUS_UPDATED);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? "Failed to update status");
+      toast.error(err.response?.data?.message ?? TOAST_MESSAGES.EVENT_TYPES.STATUS_UPDATE_FAILED);
     } finally {
       setStatusConfirmOpen(false);
       setTypeToToggle(null);
@@ -247,7 +248,7 @@ export default function EventTypesPage() {
       }
     },
     {
-      label: "Status",
+      label: COMMON_STRINGS.TABLE.STATUS_COL,
       key: "isActive",
       render: (row) => (
         <Typography
@@ -262,17 +263,17 @@ export default function EventTypesPage() {
             letterSpacing: "0.04em"
           }}
         >
-          {row.isActive ? "Active" : "Inactive"}
+          {row.isActive ? COMMON_STRINGS.TABLE.ACTIVE : COMMON_STRINGS.TABLE.INACTIVE}
         </Typography>
       )
     },
     {
-      label: "Created By",
+      label: COMMON_STRINGS.TABLE.CREATED_BY_COL,
       key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
+      render: (row) => row.createdBy || row.CreatedBy || COMMON_STRINGS.DEFAULTS.EMPTY_VALUE,
     },
     {
-      label: "Created On",
+      label: COMMON_STRINGS.TABLE.CREATED_ON_COL,
       key: "createdAt",
       render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
@@ -293,7 +294,7 @@ export default function EventTypesPage() {
             startIcon={<AddIcon />}
             onClick={handleOpenAddDialog}
           >
-            Add
+            {COMMON_STRINGS.ACTIONS.ADD}
           </AppButton>
         }
       />
@@ -304,8 +305,8 @@ export default function EventTypesPage() {
         title={form.eventTypeId ? "Edit Event Type" : "Add Event Type"}
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
-            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>Save</AppButton>
+            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>{COMMON_STRINGS.ACTIONS.CANCEL}</AppButton>
+            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>{COMMON_STRINGS.ACTIONS.SAVE}</AppButton>
           </>
         }
       >
@@ -435,17 +436,18 @@ export default function EventTypesPage() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this record?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       <AppConfirmDialog
         open={statusConfirmOpen}
         onClose={() => setStatusConfirmOpen(false)}
         onConfirm={handleConfirmStatusToggle}
-        title="Confirm"
-        content={`Are you sure you want to ${typeToToggle?.isActive ? "deactivate" : "activate"} this category?`}
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.STATUS_CONFIRM_MSG(typeToToggle?.isActive ? "deactivate" : "activate", "category")}
       />
     </div>
   );
 }
+

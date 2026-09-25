@@ -43,6 +43,7 @@ import {
   buildUpiPaymentUri,
   getQrCodeApiUrl,
 } from "../../utils/upiQrHelper";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 // Standard calculation rules for Birthday events
 const RULES = {
@@ -401,7 +402,7 @@ export default function EventFormPage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -428,10 +429,12 @@ export default function EventFormPage() {
           });
         } else {
           allActiveParticipantIds.forEach((mId) => {
-            contributionOverrides.push({
-              memberId: mId,
-              amount: contributionPerMember,
-            });
+            if (!celebrantIds.includes(mId)) {
+              contributionOverrides.push({
+                memberId: mId,
+                amount: contributionPerMember,
+              });
+            }
           });
         }
 
@@ -472,7 +475,7 @@ export default function EventFormPage() {
 
       if (isEdit) {
         await UpdateEventAsync(id, payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.EVENTS.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
         // Sync dynamic QR code with per-member contribution amount to backend settings before event creation
         try {
@@ -503,12 +506,12 @@ export default function EventFormPage() {
         }
 
         const createdEvent = await CreateEventAsync(payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.EVENTS.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
       }
 
       navigate("/events");
     } catch (error) {
-      const errMsg = error.response?.data?.message || error.message || "Failed to save event";
+      const errMsg = error.response?.data?.message || error.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED;
       toast.error(errMsg);
       console.error("Error saving event:", error);
     } finally {

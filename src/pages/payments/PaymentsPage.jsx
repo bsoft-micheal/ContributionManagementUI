@@ -33,16 +33,10 @@ import {
 } from "../../services/paymentService";
 import { GetMembersAsync } from "../../services/memberService";
 import { GetEventsAsync } from "../../services/eventService";
+import { GetStatusesAsync } from "../../services/statusService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
-
-const statusOptions = [
-  { label: "All Statuses", value: "ALL" },
-  { label: "Verified", value: "Verified" },
-  { label: "Pending", value: "Pending" },
-  { label: "Failed", value: "Failed" },
-  { label: "Needs Clarification", value: "Needs Clarification" },
-];
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 export default function PaymentsPage() {
   const toast = useAppToast();
@@ -53,6 +47,7 @@ export default function PaymentsPage() {
   const [transactions, setTransactions] = useState([]);
   const [membersList, setMembersList] = useState([]);
   const [eventsList, setEventsList] = useState([]);
+  const [dbStatuses, setDbStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Dialog state
@@ -104,18 +99,39 @@ export default function PaymentsPage() {
     ];
   }, [eventsList]);
 
+  const statusOptions = useMemo(() => {
+    if (dbStatuses && dbStatuses.length > 0) {
+      return [
+        { label: "All Statuses", value: "ALL" },
+        ...dbStatuses.map((s) => ({
+          label: s.statusName || s.name || s.status_name,
+          value: s.statusName || s.name || s.status_name,
+        })),
+      ];
+    }
+    return [
+      { label: "All Statuses", value: "ALL" },
+      { label: "Verified", value: "Verified" },
+      { label: "Pending", value: "Pending" },
+      { label: "Failed", value: "Failed" },
+      { label: "Needs Clarification", value: "Needs Clarification" },
+    ];
+  }, [dbStatuses]);
+
   // Load transactions and master data from backend on mount
   const loadBackendData = async () => {
     try {
       setLoading(true);
-      const [txnRes, memsRes, eventsRes] = await Promise.all([
+      const [txnRes, memsRes, eventsRes, statusRes] = await Promise.all([
         getPaymentTransactionsAsync().catch(() => []),
         GetMembersAsync().catch(() => []),
         GetEventsAsync().catch(() => []),
+        GetStatusesAsync().catch(() => []),
       ]);
 
       if (Array.isArray(memsRes)) setMembersList(memsRes);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
+      if (Array.isArray(statusRes)) setDbStatuses(statusRes);
 
       if (Array.isArray(txnRes)) {
         const mapped = txnRes.map((t) => ({
@@ -140,7 +156,7 @@ export default function PaymentsPage() {
       }
     } catch (err) {
       console.warn("Could not fetch payments from backend:", err);
-      toast.error("Could not load payment transactions from database");
+      toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
     }
@@ -173,11 +189,11 @@ export default function PaymentsPage() {
           verifiedBy: verifier,
           notes: verifier ? `Payment verified by ${verifier}.` : "Payment verified.",
         });
-        toast.success(`Transaction ${target.id} marked as Verified!`);
+        toast.success(TOAST_MESSAGES.PAYMENTS.VERIFIED_SUCCESS);
         await loadBackendData();
       } catch (err) {
         console.error("Backend verify failed:", err);
-        toast.error("Failed to verify transaction in database");
+        toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
       }
     }
 
@@ -203,11 +219,11 @@ export default function PaymentsPage() {
           verifiedBy: "-",
           notes: "Marked as pending.",
         });
-        toast.info(`Transaction ${target.id} marked as Pending`);
+        toast.info(TOAST_MESSAGES.PAYMENTS.STATUS_UPDATED || TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
         await loadBackendData();
       } catch (err) {
         console.error("Backend update failed:", err);
-        toast.error("Failed to update status in database");
+        toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
       }
     }
 

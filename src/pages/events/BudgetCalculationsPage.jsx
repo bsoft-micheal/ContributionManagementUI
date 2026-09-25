@@ -26,6 +26,7 @@ import {
 } from "../../services/budgetCalculationService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
+import { COMMON_STRINGS } from "../../constants";
 
 const formatRateAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -419,8 +420,8 @@ export default function BudgetCalculationsPage() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this budget calculation item?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       <AppConfirmDialog
