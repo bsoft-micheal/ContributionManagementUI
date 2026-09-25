@@ -625,7 +625,6 @@ export default function UsersPage() {
                 onClick={() => {
                   setAppliedRole(filterRole);
                   setAppliedStatus(filterStatus);
-                  toast.success("Filters applied");
                 }}
                 sx={{
                   height: 34,
@@ -647,7 +646,6 @@ export default function UsersPage() {
                   setFilterStatus("");
                   setAppliedRole("");
                   setAppliedStatus("");
-                  toast.success("Filters cleared");
                 }}
                 sx={{
                   color: "#ef4444",

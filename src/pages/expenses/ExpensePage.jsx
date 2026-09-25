@@ -701,7 +701,6 @@ export default function ExpensePage() {
                   setAppliedEvent(filterEvent);
                   setAppliedCategory(filterCategory);
                   setAppliedStatus(filterStatus);
-                  toast.success("Filters applied");
                 }}
                 sx={{
                   height: 34,
@@ -723,7 +722,6 @@ export default function ExpensePage() {
                   setAppliedEvent("ALL");
                   setAppliedCategory("ALL");
                   setAppliedStatus("ALL");
-                  toast.success("Filters cleared");
                 }}
                 sx={{
                   color: "#ef4444",
