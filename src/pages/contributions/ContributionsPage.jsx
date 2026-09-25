@@ -38,6 +38,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import PaymentQrReminderDialog from "../../components/contributions/PaymentQrReminderDialog";
+import { getPaymentQrConfig, generateQrPngDataUrl, buildUpiPaymentUri } from "../../utils/upiQrHelper";
 
 const initialPayment = {
   eventId: "",

@@ -46,8 +46,7 @@ import { GetUsersAsync, CreateUserAsync, UpdateUserAsync, DeleteUserAsync, Creat
 // ─── Role color map ───────────────────────────────────────────────────────────
 const ROLE_COLORS = {
   Admin: { bg: "rgba(239,68,68,0.10)", darkBg: "rgba(239,68,68,0.20)", color: "#dc2626", darkColor: "#fca5a5" },
-  Manager: { bg: "rgba(234,179,8,0.12)", darkBg: "rgba(234,179,8,0.22)", color: "#b45309", darkColor: "#fde047" },
-  User: { bg: "rgba(74,63,107,0.10)", darkBg: "rgba(124,58,237,0.20)", color: "#4a3f6b", darkColor: "#c4b5fd" },
+  Organizer: { bg: "rgba(234,179,8,0.12)", darkBg: "rgba(234,179,8,0.22)", color: "#b45309", darkColor: "#fde047" },
   Member: { bg: "rgba(74,63,107,0.08)", darkBg: "rgba(124,58,237,0.15)", color: "#4a3f6b", darkColor: "#c4b5fd" },
 };
 const getRoleStyle = (roleName = "") =>
@@ -56,8 +55,7 @@ const getRoleStyle = (roleName = "") =>
 // ─── User Roles enum options ──────────────────────────────────────────────────
 const USER_ROLES = [
   { label: "Admin", value: "Admin" },
-  { label: "Manager", value: "Manager" },
-  { label: "User", value: "User" },
+  { label: "Organizer", value: "Organizer" },
   { label: "Member", value: "Member" },
 ];
 
@@ -96,7 +94,7 @@ export default function UsersPage() {
   const templateValidations = {
     "Role": {
       type: "list",
-      formulae: ['"Admin,Manager,User,Member"'],
+      formulae: ['"Admin,Organizer,Member"'],
       error: "Please select a role from the list."
     }
   };
@@ -366,7 +364,7 @@ export default function UsersPage() {
     // Match role case-insensitively
     const matchedRole = USER_ROLES.find(r => r.value.toLowerCase() === roleName.toLowerCase());
     if (!matchedRole) {
-      return { error: `Row ${rowNum}: Invalid role '${roleName}'. Allowed: Admin, Manager, User, Member` };
+      return { error: `Row ${rowNum}: Invalid role '${roleName}'. Allowed: Admin, Organizer, Member` };
     }
 
     if (password && password.length < 6) {

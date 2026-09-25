@@ -113,7 +113,7 @@ export default function MembersPage() {
       },
       "Role": {
         type: "list",
-        formulae: [`"${roleNamesList || "Admin,Manager,User,Member"}"`],
+        formulae: [`"${roleNamesList || "Admin,Organizer,Member"}"`],
         error: "Please select a role from the list."
       },
       "Date of Birth": {

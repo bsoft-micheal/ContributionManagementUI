@@ -66,7 +66,7 @@ export default function UserRightsPage() {
       const dbRoles = await GetRolesAsync();
       const list = Array.isArray(dbRoles) && dbRoles.length > 0
         ? dbRoles
-        : [{ roleName: "Admin" }, { roleName: "Manager" }, { roleName: "User" }, { roleName: "Member" }];
+        : [{ roleName: "Admin" }, { roleName: "Organizer" }, { roleName: "Member" }];
       setRoles(list);
       setSelectedRoleName(list[0].roleName);
       setFilterRoleName(list[0].roleName);

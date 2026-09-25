@@ -46,7 +46,7 @@ const initialWorkTypeForm = {
 export default function TypesPage() {
   const { authState } = useAuth();
   const rights = getRightsForPage("Types", authState?.role) || getRightsForPage("Ticket Types", authState?.role);
-  const hasWriteAccess = rights?.write ?? (authState?.role === "Admin" || authState?.role === "Manager");
+  const hasWriteAccess = rights?.write ?? (authState?.role === "Admin" || authState?.role === "Organizer");
 
   const toast = useAppToast();
 
