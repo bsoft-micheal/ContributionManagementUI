@@ -48,6 +48,8 @@ import {
 import { GetEventsAsync } from "../../services/eventService";
 import { GetMembersAsync } from "../../services/memberService";
 import { GetEventTypesAsync } from "../../services/eventTypeService";
+import { GetStatusesAsync } from "../../services/statusService";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const resolveAttachmentUrl = (filePath) => {
   if (!filePath) return "";
@@ -124,6 +126,7 @@ export default function ExpensePage() {
   const [eventsList, setEventsList] = useState([]);
   const [membersList, setMembersList] = useState([]);
   const [eventTypesList, setEventTypesList] = useState([]);
+  const [statusesList, setStatusesList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -175,7 +178,7 @@ export default function ExpensePage() {
       }
     } catch (err) {
       console.error("Failed to load expenses from database:", err);
-      toast.error("Could not load expenses from database");
+      toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
     }
@@ -183,14 +186,16 @@ export default function ExpensePage() {
 
   const fetchLookupData = async () => {
     try {
-      const [eventsRes, membersRes, eventTypesRes] = await Promise.all([
+      const [eventsRes, membersRes, eventTypesRes, statusesRes] = await Promise.all([
         GetEventsAsync().catch(() => []),
         GetMembersAsync().catch(() => []),
         GetEventTypesAsync().catch(() => []),
+        GetStatusesAsync().catch(() => []),
       ]);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
+      if (Array.isArray(statusesRes)) setStatusesList(statusesRes);
     } catch (err) {
       console.warn("Failed to load events or members lookup data:", err);
     }
@@ -200,6 +205,17 @@ export default function ExpensePage() {
     fetchExpensesFromDb();
     fetchLookupData();
   }, []);
+
+  const dynamicStatusOptions = useMemo(() => {
+    if (statusesList && statusesList.length > 0) {
+      return statusesList.map((s) => ({ label: s.statusName, value: s.statusName }));
+    }
+    return [
+      { label: "Pending Approval", value: "Pending" },
+      { label: "Approved", value: "Approved" },
+      { label: "Rejected", value: "Rejected" },
+    ];
+  }, [statusesList]);
 
   // Event Type options for the Add/Edit form
   const formEventTypeOptions = useMemo(() => {
@@ -363,11 +379,11 @@ export default function ExpensePage() {
 
     try {
       await deleteExpenseAsync(expenseId);
-      toast.success("Expense deleted successfully");
+      toast.success(TOAST_MESSAGES.EXPENSES.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchExpensesFromDb();
     } catch (err) {
       console.error("Backend delete call failed:", err);
-      toast.error("Failed to delete expense from database");
+      toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
     } finally {
       setDeleteConfirmOpen(false);
       setExpenseToDelete(null);
@@ -385,7 +401,7 @@ export default function ExpensePage() {
           filePreview: uploadEvt.target.result,
         }));
         if (file.type.startsWith("image/")) {
-          toast.success(`Image "${file.name}" attached successfully!`);
+          toast.success(TOAST_MESSAGES.EXPENSES.RECEIPT_UPLOADED || `Image "${file.name}" attached successfully!`);
         } else {
           toast.info(`Attachment "${file.name}" attached.`);
         }
@@ -404,7 +420,7 @@ export default function ExpensePage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -425,7 +441,7 @@ export default function ExpensePage() {
           fileName: form.fileName || editingExpense.fileName || "",
           fileData: form.filePreview || (editingExpense.fileName?.startsWith("data:") ? editingExpense.fileName : null),
         });
-        toast.success("Expense updated successfully!");
+        toast.success(TOAST_MESSAGES.EXPENSES.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
         await createExpenseAsync({
           eventName: form.eventName,
@@ -439,7 +455,7 @@ export default function ExpensePage() {
           fileName: form.fileName || "",
           fileData: form.filePreview || null,
         });
-        toast.success("Expense added successfully!");
+        toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
       }
       setDialogOpen(false);
       setEditingExpense(null);
@@ -448,7 +464,7 @@ export default function ExpensePage() {
       await fetchExpensesFromDb();
     } catch (err) {
       console.error("Failed to save expense:", err);
-      toast.error(err.response?.data?.message || "Failed to save expense to database");
+      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   };
 
@@ -898,11 +914,7 @@ export default function ExpensePage() {
               placeholder="Select Status"
               value={form.status}
               onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}
-              options={[
-                { label: "Pending Approval", value: "Pending" },
-                { label: "Approved", value: "Approved" },
-                { label: "Rejected", value: "Rejected" },
-              ]}
+              options={dynamicStatusOptions}
               required
             />
           </Grid>
@@ -1078,8 +1090,8 @@ export default function ExpensePage() {
           setExpenseToDelete(null);
         }}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this expense record?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       {/* View Expense Details Dialog */}

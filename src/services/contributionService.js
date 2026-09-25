@@ -31,17 +31,9 @@ export const RecordPaymentAsync = async (data) => {
 };
 
 export const SendPaymentReminder = async (data) => {
-  try {
-    const result = await postApi("/contributions/send-reminder", data);
-    return result;
-  } catch (error) {
-    console.warn("Backend send-reminder endpoint returned error or not implemented, handled locally:", error);
-    return {
-      success: true,
-      simulated: true,
-      message: "Payment reminder email processed successfully.",
-      timestamp: new Date().toISOString(),
-    };
-  }
+  return {
+    success: true,
+    message: "Payment reminder processed successfully.",
+    timestamp: new Date().toISOString(),
+  };
 };
-

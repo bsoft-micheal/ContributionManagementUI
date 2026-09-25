@@ -43,6 +43,7 @@ import {
   buildUpiPaymentUri,
   getQrCodeApiUrl,
 } from "../../utils/upiQrHelper";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 
@@ -67,6 +68,7 @@ const initialForm = {
   eventTypeId: "",
   eventDate: dayjs(),
   description: "",
+  status: "Planned",
   baseAmount: "",
   participantIds: [],
 };
@@ -187,6 +189,7 @@ export default function EventFormPage() {
             eventTypeId: detailedEvent.eventTypeId || defaultTypeId,
             eventDate: currentEventDate,
             description: detailedEvent.description || "",
+            status: detailedEvent.status || "Planned",
             baseAmount:
               detailedEvent.baseAmount !== undefined &&
                 detailedEvent.baseAmount !== null &&
@@ -402,7 +405,7 @@ export default function EventFormPage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -429,10 +432,12 @@ export default function EventFormPage() {
           });
         } else {
           allActiveParticipantIds.forEach((mId) => {
-            contributionOverrides.push({
-              memberId: mId,
-              amount: contributionPerMember,
-            });
+            if (!celebrantIds.includes(mId)) {
+              contributionOverrides.push({
+                memberId: mId,
+                amount: contributionPerMember,
+              });
+            }
           });
         }
 
@@ -450,6 +455,7 @@ export default function EventFormPage() {
             }. Planned Budget: ₹${plannedBudget.toLocaleString(
               "en-IN"
             )}, Contribution/member: ₹${contributionPerMember}`,
+          status: form.status || "Planned",
           baseAmount: plannedBudget,
           participantIds:
             allActiveParticipantIds.length > 0
@@ -459,15 +465,20 @@ export default function EventFormPage() {
         };
       } else {
         payload = {
-          ...form,
-          baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
+          eventName: form.eventName.trim(),
+          eventTypeId: form.eventTypeId,
           eventDate: dayjs(form.eventDate).hour(12).toISOString(),
+          description: form.description?.trim() || "",
+          status: form.status || "Planned",
+          baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
+          participantIds: form.participantIds || [],
+          contributionOverrides: [],
         };
       }
 
       if (isEdit) {
         await UpdateEventAsync(id, payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.EVENTS.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
         // Sync dynamic QR code with per-member contribution amount to backend settings before event creation
         try {
@@ -498,12 +509,13 @@ export default function EventFormPage() {
         }
 
         const createdEvent = await CreateEventAsync(payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.EVENTS.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
       }
 
       navigate("/events");
     } catch (error) {
-      toast.error("Failed to save event");
+      const errMsg = error.response?.data?.message || error.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED;
+      toast.error(errMsg);
       console.error("Error saving event:", error);
     } finally {
       setSaving(false);

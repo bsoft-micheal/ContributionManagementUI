@@ -51,6 +51,7 @@ import { GetMembersAsync } from "../../services/memberService";
 import { GetEventsAsync } from "../../services/eventService";
 import { GetTicketTypesAsync } from "../../services/ticketTypeService";
 import { GetStatusesAsync } from "../../services/statusService";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const initialForm = {
   memberName: "",
@@ -208,7 +209,7 @@ export default function SupportTicketsPage() {
       }
     } catch (err) {
       console.error("Failed to load support tickets from database:", err);
-      toast.error("Could not load support tickets from database");
+      toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
     }
@@ -352,11 +353,11 @@ export default function SupportTicketsPage() {
 
     try {
       await deleteSupportTicketAsync(ticketId);
-      toast.success("Support ticket deleted successfully");
+      toast.success(TOAST_MESSAGES.SUPPORT.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchTicketsFromDb();
     } catch (err) {
       console.error("Backend delete ticket call failed:", err);
-      toast.error("Failed to delete support ticket from database");
+      toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
     } finally {
       setDeleteConfirmOpen(false);
       setTicketToDelete(null);
@@ -372,7 +373,7 @@ export default function SupportTicketsPage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -397,7 +398,7 @@ export default function SupportTicketsPage() {
           assignedTo: form.assignedTo || "",
           attachment: form.attachment || null,
         });
-        toast.success("Support ticket updated successfully!");
+        toast.success(TOAST_MESSAGES.SUPPORT.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
         const nextIdx = tickets.length + 1;
         const newTicketNo = `TKT-2026-${String(nextIdx).padStart(3, "0")}`;
@@ -415,7 +416,7 @@ export default function SupportTicketsPage() {
           assignedTo: form.assignedTo || "",
           attachment: form.attachment || null,
         });
-        toast.success(`Ticket created successfully!`);
+        toast.success(TOAST_MESSAGES.SUPPORT.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
       }
 
       setDialogOpen(false);
@@ -425,7 +426,7 @@ export default function SupportTicketsPage() {
       await fetchTicketsFromDb();
     } catch (err) {
       console.error("Failed to save support ticket:", err);
-      toast.error(err.response?.data?.message || "Failed to save support ticket to database");
+      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   };
 
@@ -442,13 +443,13 @@ export default function SupportTicketsPage() {
           replyMessage: replyText,
           status: replyStatus,
         });
-        toast.success("Reply submitted and status updated in database!");
+        toast.success(TOAST_MESSAGES.SUPPORT.STATUS_UPDATED || TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
         setReplyText("");
         setViewDialogOpen(false);
         await fetchTicketsFromDb();
       } catch (err) {
         console.error("Backend reply call failed:", err);
-        toast.error("Failed to submit reply to database");
+        toast.error(TOAST_MESSAGES.GENERAL.SAVE_FAILED);
       }
     }
   };
@@ -1110,8 +1111,8 @@ export default function SupportTicketsPage() {
           setTicketToDelete(null);
         }}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this support ticket?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       {/* View Details & Reply Dialog */}

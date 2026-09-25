@@ -12,6 +12,7 @@ import { Visibility, VisibilityOff } from "@mui/icons-material";
 import logo from "../../assets/logo.png";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 export default function LoginPage() {
   const theme = useTheme();
@@ -34,7 +35,7 @@ export default function LoginPage() {
   // ── Show session-expired toast when redirected by idle timer ─────────────────
   useEffect(() => {
     if (location.state?.sessionExpired) {
-      toast.warning("You were logged out due to inactivity.");
+      toast.warning(TOAST_MESSAGES.AUTH.SESSION_EXPIRED || "You were logged out due to inactivity.");
       // Clear the state so refreshing the page doesn't re-show the message
       window.history.replaceState({}, document.title);
     }
@@ -48,13 +49,14 @@ export default function LoginPage() {
       return handleOtpSubmit();
     }
 
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
     const newErrors = {};
-    if (!form.email?.trim()) newErrors.email = "This field is required";
-    if (!form.password?.trim()) newErrors.password = "This field is required";
+    if (!form.email?.trim()) newErrors.email = fieldRequired;
+    if (!form.password?.trim()) newErrors.password = fieldRequired;
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -65,12 +67,12 @@ export default function LoginPage() {
         setShowOtpField(true);
         setMfaStatusMessage("");
         setIsLockedOut(false);
-        toast.info("Please check OTP code in Authenticator app.");
+        toast.info(TOAST_MESSAGES.AUTH.TWO_FACTOR_REQUIRED || "Please check OTP code in Authenticator app.");
       } else {
         navigate("/");
       }
     } catch (error) {
-      toast.error(error.response?.data?.message ?? "Unable to login.");
+      toast.error(error.response?.data?.message ?? TOAST_MESSAGES.AUTH.LOGIN_FAILED);
     } finally {
       setLoading(false);
     }

@@ -23,6 +23,7 @@ import { RequestForgotPasswordOtpAsync, VerifyForgotPasswordOtpAsync } from "../
 import { getSystemSettingsAsync } from "../../services/settingsService";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 export default function ForgotPasswordVerifyPage() {
   const theme = useTheme();
@@ -138,26 +139,26 @@ export default function ForgotPasswordVerifyPage() {
       return;
     }
     if (!otp.trim()) {
-      setOtpError("OTP code is required.");
-      toast.error("Please enter the 6-digit OTP code.");
+      setOtpError(COMMON_STRINGS.VALIDATION.REQUIRED || "OTP code is required.");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
     if (otp.trim().length !== 6) {
       setOtpError("OTP must be exactly 6 digits.");
-      toast.error("The OTP code must be exactly 6 digits.");
+      toast.error(TOAST_MESSAGES.AUTH.OTP_INVALID || "The OTP code must be exactly 6 digits.");
       return;
     }
 
     setLoading(true);
     try {
       await VerifyForgotPasswordOtpAsync(email, otp.trim());
-      toast.success("OTP verified successfully! Please choose a new password.");
+      toast.success(TOAST_MESSAGES.AUTH.OTP_VERIFIED || "OTP verified successfully! Please choose a new password.");
       setIsTimerActive(false);
       localStorage.setItem("recovery_otp", otp.trim());
       localStorage.removeItem("otp_sent_time");
       navigate("/forgot-password/reset", { state: { email, otp: otp.trim() } });
     } catch (error) {
-      const msg = error.response?.data?.message || "Invalid or expired OTP. Please try again.";
+      const msg = error.response?.data?.message || TOAST_MESSAGES.AUTH.OTP_INVALID || "Invalid or expired OTP. Please try again.";
       toast.error(msg);
       setAttemptsMsg(msg);
       if (msg.toLowerCase().includes("maximum otp attempts exceeded") || msg.toLowerCase().includes("maximum attempts")) {
@@ -175,7 +176,7 @@ export default function ForgotPasswordVerifyPage() {
     setLoading(true);
     try {
       await RequestForgotPasswordOtpAsync(email);
-      toast.success("A new password reset OTP has been sent successfully.");
+      toast.success(TOAST_MESSAGES.AUTH.OTP_SENT || "A new password reset OTP has been sent successfully.");
       localStorage.setItem("otp_sent_time", Date.now().toString());
       setTimer(expiryDuration);
       setIsTimerActive(true);

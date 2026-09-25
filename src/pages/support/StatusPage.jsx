@@ -26,6 +26,7 @@ import {
 } from "../../services/statusService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const initialForm = {
   statusName: "",
@@ -65,7 +66,7 @@ export default function StatusPage() {
   }
 
   async function handleSubmit() {
-    const fieldRequired = "This field is required";
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
     const schema = {
       statusName: { required: true, min: 2, max: 100, label: fieldRequired },
     };
@@ -74,7 +75,7 @@ export default function StatusPage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -86,15 +87,15 @@ export default function StatusPage() {
 
       if (form.statusId) {
         await UpdateStatusAsync(form.statusId, payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       } else {
         await CreateStatusAsync(payload);
-        toast.success("Saved successfully");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       }
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save");
+      toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 
@@ -107,10 +108,10 @@ export default function StatusPage() {
     if (itemToDelete) {
       try {
         await DeleteStatusAsync(itemToDelete);
-        toast.success("Deleted successfully");
+        toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        toast.error(error.response?.data?.message || "Failed to delete");
+        toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       } finally {
         setDeleteConfirmOpen(false);
         setItemToDelete(null);
@@ -131,10 +132,10 @@ export default function StatusPage() {
         isActive: !itemToToggle.isActive,
       };
       await UpdateStatusAsync(itemToToggle.statusId, payload);
-      toast.success("Status updated successfully");
+      toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? "Failed to update status");
+      toast.error(err.response?.data?.message ?? TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
     } finally {
       setStatusConfirmOpen(false);
       setItemToToggle(null);
@@ -364,8 +365,8 @@ export default function StatusPage() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this status?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       <AppConfirmDialog

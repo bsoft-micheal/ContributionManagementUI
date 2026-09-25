@@ -42,6 +42,8 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import { validateForm } from "../../utils/validation";
 import { GetUsersAsync, CreateUserAsync, UpdateUserAsync, DeleteUserAsync, CreateUsersBulkAsync } from "../../services/userService";
+import { GetRolesAsync } from "../../services/roleService";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 // ─── Role color map ───────────────────────────────────────────────────────────
 const ROLE_COLORS = {
@@ -52,14 +54,6 @@ const ROLE_COLORS = {
 };
 const getRoleStyle = (roleName = "") =>
   ROLE_COLORS[roleName] ?? { bg: "rgba(74,63,107,0.08)", darkBg: "rgba(124,58,237,0.15)", color: "#4a3f6b", darkColor: "#c4b5fd" };
-
-// ─── User Roles enum options ──────────────────────────────────────────────────
-const USER_ROLES = [
-  { label: "Admin", value: "Admin" },
-  { label: "Manager", value: "Manager" },
-  { label: "User", value: "User" },
-  { label: "Member", value: "Member" },
-];
 
 // ─── Initial form state ───────────────────────────────────────────────────────
 import useAccessByLocation from "../../hooks/useAccessByLocation";
@@ -80,6 +74,7 @@ export default function UsersPage() {
   const hasWriteAccess = canEdit;
 
   const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -93,13 +88,26 @@ export default function UsersPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const templateValidations = {
+  // Dynamic user roles from database
+  const userRolesList = useMemo(() => {
+    if (roles && roles.length > 0) {
+      return roles.map((r) => ({ label: r.roleName, value: r.roleName }));
+    }
+    return [
+      { label: "Admin", value: "Admin" },
+      { label: "Manager", value: "Manager" },
+      { label: "User", value: "User" },
+      { label: "Member", value: "Member" },
+    ];
+  }, [roles]);
+
+  const templateValidations = useMemo(() => ({
     "Role": {
       type: "list",
-      formulae: ['"Admin,Manager,User,Member"'],
+      formulae: [`"${userRolesList.map((r) => r.value).join(",")}"`],
       error: "Please select a role from the list."
     }
-  };
+  }), [userRolesList]);
 
   // Filter state
   const [filterRole, setFilterRole] = useState("");
@@ -124,10 +132,14 @@ export default function UsersPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const usersData = await GetUsersAsync();
-      setUsers(usersData);
+      const [usersData, rolesData] = await Promise.all([
+        GetUsersAsync(),
+        GetRolesAsync().catch(() => [])
+      ]);
+      setUsers(usersData || []);
+      setRoles(rolesData || []);
     } catch {
-      toast.error("Failed to load users");
+      toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
     }
@@ -141,6 +153,7 @@ export default function UsersPage() {
     setShowConfirm(false);
     setDialogOpen(true);
   }
+
 
   function openEdit(row) {
     setForm({
@@ -592,7 +605,7 @@ export default function UsersPage() {
                   onChange={(e) => {
                     setFilterRole(e.target.value);
                   }}
-                  options={[{ label: "All Roles", value: "" }, ...USER_ROLES]}
+                  options={[{ label: "All Roles", value: "" }, ...userRolesList]}
                   size="small"
                   required
                   fullWidth
@@ -789,7 +802,7 @@ export default function UsersPage() {
               placeholder="Select role…"
               value={form.roleName}
               onChange={(e) => fieldChange("roleName", e.target.value)}
-              options={USER_ROLES}
+              options={userRolesList}
               error={!!errors.roleName}
               helperText={errors.roleName}
               required
@@ -841,8 +854,8 @@ export default function UsersPage() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this record?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       {/* ── Status Confirm ────────────────────────────────────────────────── */}

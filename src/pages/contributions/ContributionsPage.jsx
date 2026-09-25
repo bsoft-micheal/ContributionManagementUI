@@ -38,6 +38,13 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import PaymentQrReminderDialog from "../../components/contributions/PaymentQrReminderDialog";
+import {
+  getPaymentQrConfig,
+  buildUpiPaymentUri,
+  getQrCodeApiUrl,
+  generateQrPngDataUrl,
+} from "../../utils/upiQrHelper";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const initialPayment = {
   eventId: "",
@@ -263,7 +270,7 @@ export default function ContributionsPage() {
       if (newErrors.split) {
         toast.error(newErrors.split);
       } else {
-        toast.error("Please fill all the required fields correctly");
+        toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       }
       return;
     }
@@ -277,7 +284,7 @@ export default function ContributionsPage() {
         upiAmount: payment.paymentMode === "Split" ? (payment.upiAmount === "" ? null : Number(payment.upiAmount)) : null,
         paymentScope: payment.paymentScope || "CurrentEvent",
       });
-      toast.success("Payment recorded successfully");
+      toast.success(TOAST_MESSAGES.CONTRIBUTIONS.SAVED_SUCCESS || TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       setDialogOpen(false);
 
       // Reload global and event contributions to update all outstanding balances
@@ -308,7 +315,7 @@ export default function ContributionsPage() {
         error.response?.data?.message ||
         (error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(" ") : null) ||
         error.response?.data?.title ||
-        "Unable to save payment.";
+        TOAST_MESSAGES.GENERAL.SAVE_FAILED;
       toast.error(apiErrorMsg);
     }
   }
