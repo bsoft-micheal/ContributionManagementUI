@@ -803,52 +803,71 @@ export default function ContributionsPage() {
           />
 
           {((payment.paymentMode === "Upi" && Number(payment.amount) > 0) ||
-            (payment.paymentMode === "Split" && Number(payment.upiAmount) > 0)) && (
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: "12px",
-                bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.08)" : "rgba(2, 132, 199, 0.04)"),
-                border: "1px solid rgba(2, 132, 199, 0.2)",
-                textAlign: "center",
-              }}
-            >
-              <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", display: "block", mb: 0.8 }}>
-                {payment.paymentMode === "Split"
-                  ? `Dynamic UPI QR (Split UPI Portion: ₹${Number(payment.upiAmount).toLocaleString("en-IN")})`
-                  : `Dynamic UPI Payment QR (₹${Number(payment.amount).toLocaleString("en-IN")})`}
-              </Typography>
-              <Box
-                component="img"
-                src={generateQrPngDataUrl(
+            (payment.paymentMode === "Split" && Number(payment.upiAmount) > 0)) && (() => {
+              const activeEventObj = events.find(e => e.eventId === selectedEventId);
+              const qrConfig = getPaymentQrConfig(activeEventObj);
+              const targetAmount = payment.paymentMode === "Split" ? payment.upiAmount : payment.amount;
+
+              let qrSrc = "";
+              if (qrConfig.qrMode === "uploaded" && qrConfig.qrImage) {
+                qrSrc = qrConfig.qrImage;
+              } else {
+                qrSrc = generateQrPngDataUrl(
                   buildUpiPaymentUri({
-                    upiId: getPaymentQrConfig().qrUpiId,
-                    receiverName: getPaymentQrConfig().qrReceiverName,
-                    amount: payment.paymentMode === "Split" ? payment.upiAmount : payment.amount,
-                    note: "Contribution Payment",
+                    upiId: qrConfig.upiId || qrConfig.qrUpiId,
+                    receiverName: qrConfig.receiverName || qrConfig.qrReceiverName,
+                    amount: targetAmount,
+                    note: `Contribution Payment - ${activeEventObj?.eventName || ""}`,
                   }),
                   200
-                )}
-                alt="UPI QR Code"
-                sx={{
-                  width: 120,
-                  height: 120,
-                  display: "block",
-                  margin: "0 auto",
-                  p: 0.6,
-                  bgcolor: "#ffffff",
-                  borderRadius: "10px",
-                  border: "1.5px solid #0284c7",
-                  boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)",
-                }}
-              />
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.6, display: "block" }}>
-                {payment.paymentMode === "Split"
-                  ? `Scan with any UPI app to pay ₹${Number(payment.upiAmount).toLocaleString("en-IN")} online. Collect ₹${Number(payment.cashAmount || 0).toLocaleString("en-IN")} in cash.`
-                  : `Scan with any UPI app to pay ₹${Number(payment.amount).toLocaleString("en-IN")} directly.`}
-              </Typography>
-            </Box>
-          )}
+                );
+              }
+
+              return (
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: "12px",
+                    bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.08)" : "rgba(2, 132, 199, 0.04)"),
+                    border: "1px solid rgba(2, 132, 199, 0.2)",
+                    textAlign: "center",
+                  }}
+                >
+                  <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", display: "block", mb: 0.8 }}>
+                    {payment.paymentMode === "Split"
+                      ? `Dynamic UPI QR (Split UPI Portion: ₹${Number(payment.upiAmount).toLocaleString("en-IN")})`
+                      : `Dynamic UPI Payment QR (₹${Number(payment.amount).toLocaleString("en-IN")})`}
+                  </Typography>
+                  <Box
+                    component="img"
+                    src={qrSrc}
+                    alt="UPI QR Code"
+                    sx={{
+                      width: 130,
+                      height: 130,
+                      objectFit: "contain",
+                      display: "block",
+                      margin: "0 auto",
+                      p: 0.6,
+                      bgcolor: "#ffffff",
+                      borderRadius: "10px",
+                      border: "1.5px solid #0284c7",
+                      boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)",
+                    }}
+                  />
+                  {qrConfig.upiId && (
+                    <Typography variant="caption" fontWeight={700} sx={{ color: "#0284c7", fontSize: "0.72rem", mt: 0.5, display: "block" }}>
+                      UPI ID: {qrConfig.upiId} {qrConfig.receiverName ? `(${qrConfig.receiverName})` : ""}
+                    </Typography>
+                  )}
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.4, display: "block" }}>
+                    {payment.paymentMode === "Split"
+                      ? `Scan with any UPI app to pay ₹${Number(payment.upiAmount).toLocaleString("en-IN")} online. Collect ₹${Number(payment.cashAmount || 0).toLocaleString("en-IN")} in cash.`
+                      : `Scan with any UPI app to pay ₹${Number(payment.amount).toLocaleString("en-IN")} directly.`}
+                  </Typography>
+                </Box>
+              );
+            })()}
         </Stack>
       </AppDialog>
 
