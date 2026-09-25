@@ -78,8 +78,8 @@ export default function SubmitPaymentPage() {
   });
 
   const [upiSettings, setUpiSettings] = useState({
-    upiId: "danielrobertanto604@okicici",
-    receiverName: "Daniel A",
+    upiId: "",
+    receiverName: "",
     qrImage: "",
   });
 
@@ -104,13 +104,13 @@ export default function SubmitPaymentPage() {
           }));
 
           setUpiSettings({
-            upiId: res.qrUpiId || "danielrobertanto604@okicici",
-            receiverName: res.qrReceiverName || "Daniel A",
+            upiId: res.qrUpiId || "",
+            receiverName: res.qrReceiverName || "",
             qrImage: res.qrImage || "",
           });
         }
       } catch (err) {
-        console.warn("Could not load payment context:", err);
+        toast.error("Failed to load payment context details");
       } finally {
         setLoadingContext(false);
       }
@@ -119,31 +119,42 @@ export default function SubmitPaymentPage() {
     loadContext();
   }, [eventIdParam, memberIdParam, amountParam]);
 
-  const handleCopyUpi = () => {
-    navigator.clipboard.writeText(upiSettings.upiId);
-    toast.success("UPI ID copied to clipboard!");
+  const handleCopyUpi = async () => {
+    try {
+      await navigator.clipboard.writeText(upiSettings.upiId);
+      toast.success("UPI ID copied to clipboard!");
+    } catch {
+      toast.error("Failed to copy UPI ID");
+    }
   };
 
   const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    try {
+      const file = e.target.files[0];
+      if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file (PNG, JPG, JPEG)");
-      return;
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please upload an image file (PNG, JPG, JPEG)");
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("File size exceeds 5MB limit");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData((prev) => ({ ...prev, screenshot: reader.result }));
+        toast.success("Payment screenshot attached successfully!");
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read image file");
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast.error("Failed to process uploaded file");
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size exceeds 5MB limit");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData((prev) => ({ ...prev, screenshot: reader.result }));
-      toast.success("Payment screenshot attached successfully!");
-    };
-    reader.readAsDataURL(file);
   };
 
   const removeScreenshot = () => {
@@ -194,7 +205,6 @@ export default function SubmitPaymentPage() {
       setIsSuccess(true);
       toast.success("Payment proof submitted successfully!");
     } catch (err) {
-      console.error("Submission failed:", err);
       const msg = err.response?.data?.message || "Failed to submit payment proof. Please try again.";
       toast.error(msg);
     } finally {

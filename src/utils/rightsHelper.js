@@ -100,8 +100,7 @@ export function getRightsForFeatureId(featureId, roleName) {
       write: val === 2,              // 2 = ReadWrite
       deny: val === 3               // 3 = Deny
     };
-  } catch (error) {
-    console.error("Error evaluating featureId rights:", error);
+  } catch {
     return { read: true, write: true, deny: false };
   }
 }
@@ -162,8 +161,7 @@ export function getRightsForPage(pageName, roleName) {
       write: val === 2,              // 2 = ReadWrite
       deny: val === 3               // 3 = Deny
     };
-  } catch (error) {
-    console.error("Error evaluating getRightsForPage:", error);
+  } catch {
     return { read: true, write: true, deny: false };
   }
 }

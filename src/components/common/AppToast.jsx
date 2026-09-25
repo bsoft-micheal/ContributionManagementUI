@@ -16,6 +16,7 @@ export const useAppToast = () => {
     success: (msg) => context.showToast(msg, "success"),
     error: (msg) => context.showToast(msg, "error"),
     warning: (msg) => context.showToast(msg, "warning"),
+    warn: (msg) => context.showToast(msg, "warning"),
     info: (msg) => context.showToast(msg, "info")
   };
 };

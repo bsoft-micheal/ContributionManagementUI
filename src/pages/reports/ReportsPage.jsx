@@ -180,6 +180,8 @@ export default function ReportsPage({ mode = "event" }) {
         const { data: resData } = await apiClient.get("/reports/getSummaryReportAsync", { params: apiParams });
         const data = (resData && resData.data !== undefined) ? resData.data : resData;
         setReport(data);
+      } catch (err) {
+        toast.error("Failed to load reports. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -371,11 +373,16 @@ export default function ReportsPage({ mode = "event" }) {
   const exportCurrentView = () => {
     if (!hasWriteAccess) return;
 
-    exportSheets("team-contribution-reports.xlsx", [
-      { name: "Event Collections", data: report?.eventCollections ?? [] },
-      { name: "Member Contributions", data: report?.memberContributionHistory ?? [] },
-      { name: "Pending Dues", data: report?.pendingDues ?? [] },
-    ]);
+    try {
+      exportSheets("team-contribution-reports.xlsx", [
+        { name: "Event Collections", data: report?.eventCollections ?? [] },
+        { name: "Member Contributions", data: report?.memberContributionHistory ?? [] },
+        { name: "Pending Dues", data: report?.pendingDues ?? [] },
+      ]);
+      toast.success("Reports exported to Excel successfully!");
+    } catch {
+      toast.error("Failed to export reports to Excel");
+    }
   };
 
   const navTabs = [

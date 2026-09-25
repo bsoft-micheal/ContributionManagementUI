@@ -35,6 +35,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import EventFormDialog from "../../components/events/EventFormDialog";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
+import { useAppToast } from "../../components/common/AppToast";
 import { launchPaperBlast, launchCelebrationBlast } from "../../components/common/PaperBlast";
 import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
 
@@ -124,6 +125,7 @@ const getEventTypeInfo = (typeName = "") => {
 
 export default function CalendarPage() {
   const theme = useTheme();
+  const toast = useAppToast();
   const { authState } = useAuth();
   const hasWriteAccess = useMemo(() => {
     return getRightsForPage("Calendar", authState?.role).write;
@@ -133,7 +135,7 @@ export default function CalendarPage() {
     month: dayjs().month() + 1,
     year: dayjs().year(),
   });
-  const [categoryFilter, setCategoryFilter] = useState("Birthday");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
   const [events, setEvents] = useState([]);
@@ -158,8 +160,8 @@ export default function CalendarPage() {
       });
       const data = resData && resData.data !== undefined ? resData.data : resData;
       setEvents(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Error loading events:", error);
+    } catch {
+      toast.error("Failed to load calendar events.");
     }
   };
 
@@ -176,8 +178,8 @@ export default function CalendarPage() {
         ]);
         setEventTypes(types || []);
         setMembers(mems || []);
-      } catch (error) {
-        console.error("Error loading static calendar data:", error);
+      } catch {
+        toast.error("Failed to load event types and members.");
       }
     }
     loadEventTypesAndMembers();
@@ -304,7 +306,7 @@ export default function CalendarPage() {
 
   const categoryOptions = useMemo(() => {
     const set = new Set();
-    const list = [];
+    const list = [{ label: "All Categories", value: "ALL" }];
 
     // 1. From eventTypes loaded from backend API
     (eventTypes || []).forEach((t) => {
@@ -324,30 +326,17 @@ export default function CalendarPage() {
       }
     });
 
-    // 3. Fallback defaults if none were populated yet
-    if (list.length === 0) {
-      ["Birthday", "Farewell"].forEach((fallback) => {
-        if (!set.has(fallback.toLowerCase())) {
-          set.add(fallback.toLowerCase());
-          list.push({ label: fallback, value: fallback });
-        }
-      });
-    }
-
     return list;
   }, [eventTypes, events]);
 
   // Keep categoryFilter valid if options change
   useEffect(() => {
-    if (categoryOptions.length > 0) {
+    if (categoryOptions.length > 0 && categoryFilter !== "ALL") {
       const exists = categoryOptions.some(
         (opt) => opt.value.toLowerCase() === categoryFilter.toLowerCase()
       );
       if (!exists) {
-        const bdayOpt = categoryOptions.find((opt) =>
-          opt.value.toLowerCase().includes("birthday")
-        );
-        setCategoryFilter(bdayOpt ? bdayOpt.value : categoryOptions[0].value);
+        setCategoryFilter("ALL");
       }
     }
   }, [categoryOptions, categoryFilter]);
@@ -564,8 +553,8 @@ export default function CalendarPage() {
             ...prev,
             [ev.eventId]: combined,
           }));
-        } catch (e) {
-          console.warn(`Could not load details for event ${ev.eventId}:`, e);
+        } catch {
+          // Event details load error ignored
         }
       });
     }

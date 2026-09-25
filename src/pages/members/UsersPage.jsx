@@ -93,12 +93,7 @@ export default function UsersPage() {
     if (roles && roles.length > 0) {
       return roles.map((r) => ({ label: r.roleName, value: r.roleName }));
     }
-    return [
-      { label: "Admin", value: "Admin" },
-      { label: "Manager", value: "Manager" },
-      { label: "User", value: "User" },
-      { label: "Member", value: "Member" },
-    ];
+    return [];
   }, [roles]);
 
   const templateValidations = useMemo(() => ({
@@ -377,9 +372,10 @@ export default function UsersPage() {
     }
 
     // Match role case-insensitively
-    const matchedRole = USER_ROLES.find(r => r.value.toLowerCase() === roleName.toLowerCase());
+    const matchedRole = userRolesList.find(r => r.value.toLowerCase() === roleName.toLowerCase());
     if (!matchedRole) {
-      return { error: `Row ${rowNum}: Invalid role '${roleName}'. Allowed: Admin, Manager, User, Member` };
+      const allowedStr = userRolesList.length > 0 ? userRolesList.map(r => r.value).join(", ") : "Defined Roles";
+      return { error: `Row ${rowNum}: Invalid role '${roleName}'. Allowed: ${allowedStr}` };
     }
 
     if (password && password.length < 6) {

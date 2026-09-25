@@ -47,10 +47,6 @@ export default function ForgotPasswordPage() {
       const sentTime = Date.now().toString();
       localStorage.setItem("otp_sent_time", sentTime);
       localStorage.setItem("recovery_email", email.trim());
-      console.log("[ForgotPasswordPage] Saved to localStorage:", {
-        otp_sent_time: sentTime,
-        recovery_email: email.trim()
-      });
       navigate("/forgot-password/verify", { state: { email: email.trim() } });
     } catch (error) {
       toast.error(error.response?.data?.message ?? "Failed to request password reset OTP. Please check your email.");

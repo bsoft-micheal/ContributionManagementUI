@@ -725,8 +725,8 @@ export default function DashboardPage() {
         if (Array.isArray(types)) {
           setEventTypes(types);
         }
-      } catch (err) {
-        console.error("Failed to load event types:", err);
+      } catch {
+        // Event types fetch error ignored
       }
     }
     fetchEventTypes();
@@ -737,8 +737,7 @@ export default function DashboardPage() {
     try {
       const data = await GetDashboardSummaryAsync({ month, year });
       setSummary(data);
-    } catch (err) {
-      console.error("Failed to fetch dashboard summary:", err);
+    } catch {
       toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
@@ -795,8 +794,8 @@ export default function DashboardPage() {
           setBdayModalOpen(true);
           setHasCelebrated(true);
         }
-      } catch (err) {
-        console.error("Error checking birthdays in Dashboard:", err);
+      } catch {
+        // Birthday check error ignored
       }
     }
 

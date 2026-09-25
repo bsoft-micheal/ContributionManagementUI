@@ -56,8 +56,8 @@ export default function PaymentQrReminderDialog({
   const config = getPaymentQrConfig(categoryName);
   const isConfigured = config.isConfigured;
 
-  const memberName = contribution.memberName || member?.name || "Member";
-  const memberEmail = member?.email || contribution.memberEmail || `${memberName.toLowerCase().replace(/\s+/g, ".")}@example.com`;
+  const memberName = contribution.memberName || member?.name || "";
+  const memberEmail = member?.email || contribution.memberEmail || "";
   const amount = Number(contribution.totalAccumulated || contribution.amount || 0);
 
   // Generate dynamic QR code specific to this member's contribution amount and event type
@@ -71,12 +71,23 @@ export default function PaymentQrReminderDialog({
   const formattedDueDate = event?.eventDate ? new Date(event.eventDate).toLocaleDateString() : undefined;
   const template = resolveCategoryTemplate(categoryId, categoryName, "reminder");
 
+  let orgName = "";
+  try {
+    const saved = localStorage.getItem("cm_system_settings");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      orgName = parsed.organizationName || "";
+    }
+  } catch {
+    // Ignored
+  }
+
   const placeholderData = {
     memberName,
     categoryName,
     amount,
     dueDate: formattedDueDate,
-    orgName: "Unit 1A Residents Association",
+    orgName,
     paymentLink: upiUri,
     qrImageUrl,
   };
@@ -84,10 +95,14 @@ export default function PaymentQrReminderDialog({
   const previewSubject = interpolatePlaceholders(template.subject, placeholderData);
   const previewDescription = interpolatePlaceholders(template.description, placeholderData);
 
-  const copyToClipboard = (text, label) => {
+  const copyToClipboard = async (text, label) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard!`);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied to clipboard!`);
+    } catch {
+      toast.error(`Failed to copy ${label}`);
+    }
   };
 
   const handleSendEmailReminder = async () => {
@@ -142,7 +157,6 @@ export default function PaymentQrReminderDialog({
       setSentSuccess(true);
       toast.success(`Payment reminder email for "${categoryName}" sent to ${memberName}!`);
     } catch (err) {
-      console.error("Failed to send reminder:", err);
       toast.error("Failed to send reminder email. Please try again.");
     } finally {
       setSending(false);
@@ -151,13 +165,17 @@ export default function PaymentQrReminderDialog({
 
   const handleDownloadQr = () => {
     if (!qrImageUrl) return;
-    const a = document.createElement("a");
-    a.href = qrImageUrl;
-    a.download = `UPI_QR_${memberName.replace(/\s+/g, "_")}_INR_${amount}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    toast.success("QR Code downloaded!");
+    try {
+      const a = document.createElement("a");
+      a.href = qrImageUrl;
+      a.download = `UPI_QR_${memberName.replace(/\s+/g, "_")}_INR_${amount}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success("QR Code downloaded!");
+    } catch {
+      toast.error("Failed to download QR Code");
+    }
   };
 
   return (

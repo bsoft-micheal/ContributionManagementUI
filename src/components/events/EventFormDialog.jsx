@@ -27,13 +27,13 @@ import {
   getQrCodeApiUrl,
 } from "../../utils/upiQrHelper";
 
-// Hardcoded calculation rules as requested
+// Dynamic calculation rules for Birthday events loaded from backend
 const RULES = {
-  cakeRate: 300,        // ₹300 per office birthday member
-  puffsRate: 20,        // ₹20 per person / puff
-  giftRate: 1000,       // ₹1,000 per birthday celebrant (Office + WFH)
-  rounding: 1,          // Round up to ₹1
-  puffsBasis: "office", // Per office birthday member
+  cakeRate: 0,
+  puffsRate: 0,
+  giftRate: 0,
+  rounding: 1,
+  puffsBasis: "office",
 };
 
 const formatBaseAmount = (value) => {
@@ -62,7 +62,7 @@ const getDefaultBirthdayExempt = () => {
       }
     }
   } catch (e) {
-    console.warn("Could not read birthdayMembersExempt setting:", e);
+    // Setting read error ignored
   }
   return true;
 };
@@ -84,9 +84,9 @@ export default function EventFormDialog({
   const [budgetRates, setBudgetRates] = useState(RULES);
 
   // Birthday-specific configuration states
-  const [officeBirthdays, setOfficeBirthdays] = useState(1);
+  const [officeBirthdays, setOfficeBirthdays] = useState(0);
   const [wfhBirthdays, setWfhBirthdays] = useState(0);
-  const [totalMembers, setTotalMembers] = useState(47);
+  const [totalMembers, setTotalMembers] = useState(0);
   const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
 
   const toast = useAppToast();
@@ -132,14 +132,7 @@ export default function EventFormDialog({
   const puffsFactor = office > 0 ? office : 0;
 
   const computedBudgetItems = useMemo(() => {
-    const items =
-      budgetItemsList.length > 0
-        ? budgetItemsList.filter((b) => b.isActive !== false)
-        : [
-            { expenseItem: "½ kg Cake", rate: 300 },
-            { expenseItem: "Chicken Roll / Puffs", rate: 20 },
-            { expenseItem: "Birthday Gift", rate: 1000 },
-          ];
+    const items = budgetItemsList.filter((b) => b.isActive !== false);
 
     return items.map((item) => {
       const name = (item.expenseItem || "").toLowerCase();
@@ -246,9 +239,9 @@ export default function EventFormDialog({
               (m) => (m.memberType || "Office").toLowerCase() === "wfh"
             ).length;
 
-            setOfficeBirthdays(offCount > 0 ? offCount : 1);
+            setOfficeBirthdays(offCount);
             setWfhBirthdays(wfhCount);
-            setTotalMembers(activeMembers.length > 0 ? activeMembers.length : 47);
+            setTotalMembers(activeMembers.length);
             setExempt(true);
 
             setForm({
@@ -267,7 +260,6 @@ export default function EventFormDialog({
             });
           } catch (error) {
             toast.error("Failed to load event details");
-            console.error("Error loading event details:", error);
           } finally {
             setLoading(false);
           }
@@ -287,9 +279,9 @@ export default function EventFormDialog({
           (m) => (m.memberType || "Office").toLowerCase() === "wfh"
         ).length;
 
-        setOfficeBirthdays(offCount > 0 ? offCount : 1);
+        setOfficeBirthdays(offCount);
         setWfhBirthdays(wfhCount);
-        setTotalMembers(activeMembers.length > 0 ? activeMembers.length : 47);
+        setTotalMembers(activeMembers.length);
         setExempt(getDefaultBirthdayExempt());
 
         setForm({
@@ -463,7 +455,7 @@ export default function EventFormDialog({
             });
           }
         } catch (syncErr) {
-          console.warn("Could not sync event dynamic QR to backend settings before creation:", syncErr);
+          // QR sync warning ignored
         }
 
         const createdEvent = await CreateEventAsync(payload);
@@ -476,7 +468,6 @@ export default function EventFormDialog({
       onClose();
     } catch (error) {
       toast.error("Failed to save event");
-      console.error("Error saving event:", error);
     } finally {
       setSaving(false);
     }

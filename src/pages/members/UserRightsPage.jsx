@@ -43,19 +43,7 @@ export default function UserRightsPage() {
   const moduleOptions = useMemo(() => {
     const roleRights = rights[selectedRoleName] || [];
     const uniqueModules = Array.from(new Set(roleRights.map((r) => r.module).filter(Boolean)));
-    if (uniqueModules.length > 0) {
-      return [{ label: "All Modules", value: "All" }, ...uniqueModules.map((m) => ({ label: m, value: m }))];
-    }
-    return [
-      { label: "All Modules", value: "All" },
-      { label: "Dashboard", value: "Dashboard" },
-      { label: "Members", value: "Members" },
-      { label: "Events", value: "Events" },
-      { label: "Finance", value: "Finance" },
-      { label: "Support Ticket", value: "Support Ticket" },
-      { label: "Tools", value: "Tools" },
-      { label: "Reports", value: "Reports" },
-    ];
+    return [{ label: "All Modules", value: "All" }, ...uniqueModules.map((m) => ({ label: m, value: m }))];
   }, [rights, selectedRoleName]);
 
   // ── Initial load: fetch roles ─────────────────────────────────────────────
@@ -71,12 +59,12 @@ export default function UserRightsPage() {
   async function loadRoles() {
     try {
       const dbRoles = await GetRolesAsync();
-      const list = Array.isArray(dbRoles) && dbRoles.length > 0
-        ? dbRoles
-        : [{ roleName: "Admin" }, { roleName: "Manager" }, { roleName: "User" }, { roleName: "Member" }];
+      const list = Array.isArray(dbRoles) ? dbRoles : [];
       setRoles(list);
-      setSelectedRoleName(list[0].roleName);
-      setFilterRoleName(list[0].roleName);
+      if (list.length > 0) {
+        setSelectedRoleName(list[0].roleName);
+        setFilterRoleName(list[0].roleName);
+      }
     } catch {
       toast.error("Failed to load roles");
     }
@@ -198,7 +186,7 @@ export default function UserRightsPage() {
   };
 
   const handleClearFilter = () => {
-    const defaultRole = roles.length > 0 ? roles[0].roleName : "Admin";
+    const defaultRole = roles.length > 0 ? roles[0].roleName : "";
     setFilterRoleName(defaultRole);
     setFilterModule("All");
     setSelectedRoleName(defaultRole);

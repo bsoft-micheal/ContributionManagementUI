@@ -68,8 +68,8 @@ export function getCategoryTemplates() {
         };
       }
     }
-  } catch (e) {
-    console.warn("Could not read categoryTemplates from settings:", e);
+  } catch {
+    // Template read error handled silently
   }
   return { ...DEFAULT_CATEGORY_TEMPLATES };
 }
@@ -155,8 +155,8 @@ export function getEmailReminderLogs() {
         return parsed.sort((a, b) => new Date(b.sentDate) - new Date(a.sentDate));
       }
     }
-  } catch (e) {
-    console.warn("Could not read email reminder logs:", e);
+  } catch {
+    // Email reminder log read error handled silently
   }
   return [];
 }
@@ -176,8 +176,7 @@ export function logEmailReminder(entry) {
     const updated = [newRecord, ...existing].slice(0, 500); // keep last 500 logs
     localStorage.setItem(EMAIL_LOGS_STORAGE_KEY, JSON.stringify(updated));
     return newRecord;
-  } catch (e) {
-    console.warn("Could not save email reminder log:", e);
+  } catch {
     return null;
   }
 }
@@ -413,8 +412,8 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
     allEvents = Array.isArray(eRes) ? eRes : [];
     allMembers = Array.isArray(mRes) ? mRes : [];
     allEventTypes = Array.isArray(tRes) ? tRes : [];
-  } catch (err) {
-    console.error("Scheduler failed to fetch system data:", err);
+  } catch {
+    // Scheduler fetch system data error handled silently
   }
 
   // Maps for fast category lookup
@@ -558,8 +557,8 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
       });
 
       dispatched++;
-    } catch (e) {
-      console.error(`Failed to send email to ${memberName}:`, e);
+    } catch {
+      // Failed to send email ignored
     }
   }
 

@@ -47,13 +47,13 @@ import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 
-// Standard calculation rules for Birthday events
+// Standard calculation rules for Birthday events loaded dynamically from backend
 const RULES = {
-  cakeRate: 300,        // ₹300 per office birthday member
-  puffsRate: 20,        // ₹20 per person / puff
-  giftRate: 1000,       // ₹1,000 per birthday celebrant (Office + WFH)
-  rounding: 1,          // Round up to ₹1
-  puffsBasis: "office", // Per office birthday member
+  cakeRate: 0,
+  puffsRate: 0,
+  giftRate: 0,
+  rounding: 1,
+  puffsBasis: "office",
 };
 
 const formatBaseAmount = (value) => {
@@ -82,8 +82,8 @@ const getDefaultBirthdayExempt = () => {
         return Boolean(parsed.birthdayMembersExempt);
       }
     }
-  } catch (e) {
-    console.warn("Could not read birthdayMembersExempt setting:", e);
+  } catch {
+    // Setting read error ignored
   }
   return true;
 };
@@ -108,9 +108,9 @@ export default function EventFormPage() {
   const [budgetRates, setBudgetRates] = useState(RULES);
 
   // Birthday-specific configuration states
-  const [officeBirthdays, setOfficeBirthdays] = useState(1);
+  const [officeBirthdays, setOfficeBirthdays] = useState(0);
   const [wfhBirthdays, setWfhBirthdays] = useState(0);
-  const [totalMembers, setTotalMembers] = useState(47);
+  const [totalMembers, setTotalMembers] = useState(0);
   const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
 
   // Active members count
@@ -178,9 +178,9 @@ export default function EventFormPage() {
             (m) => (m.memberType || "Office").toLowerCase() === "wfh"
           ).length;
 
-          setOfficeBirthdays(offCount > 0 ? offCount : 1);
+          setOfficeBirthdays(offCount);
           setWfhBirthdays(wfhCount);
-          setTotalMembers(activeMems.length > 0 ? activeMems.length : 47);
+          setTotalMembers(activeMems.length);
           setExempt(true);
 
           setForm({
@@ -212,9 +212,9 @@ export default function EventFormPage() {
             (m) => (m.memberType || "Office").toLowerCase() === "wfh"
           ).length;
 
-          setOfficeBirthdays(offCount > 0 ? offCount : 1);
+          setOfficeBirthdays(offCount);
           setWfhBirthdays(wfhCount);
-          setTotalMembers(activeMems.length > 0 ? activeMems.length : 47);
+          setTotalMembers(activeMems.length);
           setExempt(getDefaultBirthdayExempt());
 
           setForm({
@@ -226,8 +226,7 @@ export default function EventFormPage() {
             participantIds: activeMems.map((m) => m.memberId),
           });
         }
-      } catch (err) {
-        console.error("Failed to load event form initial data:", err);
+      } catch {
         toast.error("Failed to load event details");
       } finally {
         if (isMounted) setLoading(false);
@@ -275,14 +274,7 @@ export default function EventFormPage() {
   const puffsFactor = office > 0 ? office : 0;
 
   const computedBudgetItems = useMemo(() => {
-    const items =
-      budgetItemsList.length > 0
-        ? budgetItemsList.filter((b) => b.isActive !== false)
-        : [
-            { expenseItem: "½ kg Cake", rate: 300 },
-            { expenseItem: "Chicken Roll / Puffs", rate: 20 },
-            { expenseItem: "Birthday Gift", rate: 1000 },
-          ];
+    const items = budgetItemsList.filter((b) => b.isActive !== false);
 
     return items.map((item) => {
       const name = (item.expenseItem || "").toLowerCase();
@@ -504,8 +496,8 @@ export default function EventFormPage() {
               qrImage: eventQrImage,
             });
           }
-        } catch (syncErr) {
-          console.warn("Could not sync event dynamic QR to backend settings before creation:", syncErr);
+        } catch {
+          // Dynamic QR sync fallback
         }
 
         const createdEvent = await CreateEventAsync(payload);
@@ -516,7 +508,6 @@ export default function EventFormPage() {
     } catch (error) {
       const errMsg = error.response?.data?.message || error.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED;
       toast.error(errMsg);
-      console.error("Error saving event:", error);
     } finally {
       setSaving(false);
     }

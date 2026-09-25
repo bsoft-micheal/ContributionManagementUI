@@ -108,13 +108,6 @@ const initialForm = {
 
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 
-const statusOptions = [
-  { label: "All Statuses", value: "ALL" },
-  { label: "Approved", value: "Approved" },
-  { label: "Pending", value: "Pending" },
-  { label: "Rejected", value: "Rejected" },
-];
-
 export default function ExpensePage() {
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
@@ -176,8 +169,7 @@ export default function ExpensePage() {
       } else {
         setExpenses([]);
       }
-    } catch (err) {
-      console.error("Failed to load expenses from database:", err);
+    } catch {
       toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
@@ -196,8 +188,8 @@ export default function ExpensePage() {
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
       if (Array.isArray(statusesRes)) setStatusesList(statusesRes);
-    } catch (err) {
-      console.warn("Failed to load events or members lookup data:", err);
+    } catch {
+      toast.error("Failed to load lookup data.");
     }
   };
 
@@ -207,14 +199,7 @@ export default function ExpensePage() {
   }, []);
 
   const dynamicStatusOptions = useMemo(() => {
-    if (statusesList && statusesList.length > 0) {
-      return statusesList.map((s) => ({ label: s.statusName, value: s.statusName }));
-    }
-    return [
-      { label: "Pending Approval", value: "Pending" },
-      { label: "Approved", value: "Approved" },
-      { label: "Rejected", value: "Rejected" },
-    ];
+    return (statusesList || []).map((s) => ({ label: s.statusName, value: s.statusName }));
   }, [statusesList]);
 
   // Event Type options for the Add/Edit form
@@ -381,8 +366,7 @@ export default function ExpensePage() {
       await deleteExpenseAsync(expenseId);
       toast.success(TOAST_MESSAGES.EXPENSES.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchExpensesFromDb();
-    } catch (err) {
-      console.error("Backend delete call failed:", err);
+    } catch {
       toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
     } finally {
       setDeleteConfirmOpen(false);
@@ -463,7 +447,6 @@ export default function ExpensePage() {
       setErrors({});
       await fetchExpensesFromDb();
     } catch (err) {
-      console.error("Failed to save expense:", err);
       toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   };

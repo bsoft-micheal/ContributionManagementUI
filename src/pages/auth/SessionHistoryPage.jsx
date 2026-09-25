@@ -43,7 +43,6 @@ export default function SessionHistoryPage() {
       setActiveSessions(Array.isArray(activeData) ? activeData : []);
       setLoginHistory(Array.isArray(historyData) ? historyData : []);
     } catch (error) {
-      console.error(error);
       toast.error("Failed to load session data.");
     } finally {
       setLoading(false);
@@ -61,7 +60,6 @@ export default function SessionHistoryPage() {
       toast.success("Session logged out successfully.");
       fetchData(); // Refresh the lists
     } catch (error) {
-      console.error(error);
       toast.error("Failed to logout session.");
     }
   };

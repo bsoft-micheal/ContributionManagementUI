@@ -292,10 +292,14 @@ export default function SettingsPage() {
       : generateQrPngDataUrl(liveUpiUri, 300))
     : "";
 
-  const copyToClipboard = (text, label) => {
+  const copyToClipboard = async (text, label) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard!`);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied to clipboard!`);
+    } catch {
+      toast.error(`Failed to copy ${label}`);
+    }
   };
 
   // Directory of all Event Types and their configured UPI IDs for the AppDataTable Grid
@@ -573,8 +577,8 @@ export default function SettingsPage() {
           // Initial template populate once categories arrive
           loadTemplateForCategoryAndType(selectedCategoryId, templateType, settings, types);
         }
-      } catch (err) {
-        console.warn("Could not fetch categories for template settings:", err);
+      } catch {
+        toast.error("Failed to load event types for email templates");
       }
     };
     loadCategories();
@@ -674,12 +678,12 @@ export default function SettingsPage() {
                 return updated;
               });
             }
-          } catch (qrErr) {
-            console.warn("Could not load per-event QR settings from API:", qrErr);
+          } catch {
+            // Per-event QR settings error handled silently
           }
         }
-      } catch (err) {
-        console.warn("Could not fetch settings from backend, using cached settings:", err);
+      } catch {
+        toast.error("Failed to load system settings");
       }
     };
     loadBackendSettings();
@@ -702,8 +706,8 @@ export default function SettingsPage() {
 
     try {
       await updateSystemSettings(updated);
-    } catch (err) {
-      console.warn("Could not sync birthdayMembersExempt to backend:", err);
+    } catch {
+      // Sync birthdayMembersExempt error handled silently
     }
   };
 
@@ -715,8 +719,7 @@ export default function SettingsPage() {
       setLastUpdated(dayjs().format("DD MMM YYYY"));
       localStorage.setItem("cm_system_settings", JSON.stringify(finalState));
       return finalState;
-    } catch (err) {
-      console.warn("Backend settings update failed, saved locally:", err);
+    } catch {
       setSettings(updated);
       setLastUpdated(dayjs().format("DD MMM YYYY"));
       localStorage.setItem("cm_system_settings", JSON.stringify(updated));
@@ -738,8 +741,12 @@ export default function SettingsPage() {
       toast.error("Please enter a valid Max Retry Attempt.");
       return;
     }
-    await persistSettings(settings);
-    toast.success("General & Security settings saved successfully!");
+    try {
+      await persistSettings(settings);
+      toast.success("General & Security settings saved successfully!");
+    } catch {
+      toast.error("Failed to save general settings");
+    }
   };
 
   // 2. Handle Category Selection Change in Email Template Settings
@@ -766,44 +773,48 @@ export default function SettingsPage() {
       return;
     }
 
-    const updatedCategoryTemplates = { ...(settings.categoryTemplates || DEFAULT_CATEGORY_TEMPLATES) };
-    const currentEntry = { ...(updatedCategoryTemplates[selectedCategoryId] || {}) };
+    try {
+      const updatedCategoryTemplates = { ...(settings.categoryTemplates || DEFAULT_CATEGORY_TEMPLATES) };
+      const currentEntry = { ...(updatedCategoryTemplates[selectedCategoryId] || {}) };
 
-    if (templateType === "initial") {
-      currentEntry.initialSubject = templateSubject;
-      currentEntry.initialDescription = templateDescription;
-    } else {
-      currentEntry.reminderSubject = templateSubject;
-      currentEntry.reminderDescription = templateDescription;
+      if (templateType === "initial") {
+        currentEntry.initialSubject = templateSubject;
+        currentEntry.initialDescription = templateDescription;
+      } else {
+        currentEntry.reminderSubject = templateSubject;
+        currentEntry.reminderDescription = templateDescription;
+      }
+
+      updatedCategoryTemplates[selectedCategoryId] = currentEntry;
+
+      let defaultSub = settings.emailSubject;
+      let defaultDesc = settings.emailDescription;
+      if (selectedCategoryId === "all" && templateType === "initial") {
+        defaultSub = templateSubject;
+        defaultDesc = templateDescription;
+      }
+
+      const updated = {
+        ...settings,
+        emailSubject: defaultSub,
+        emailDescription: defaultDesc,
+        categoryTemplates: updatedCategoryTemplates,
+        selectedTemplateCategoryId: selectedCategoryId,
+        enableMonthlyEmail: settings.enableMonthlyEmail !== false,
+        enableReminderEmail: settings.enableReminderEmail !== false,
+        reminderIntervalDays: settings.reminderIntervalDays || "10",
+        maxReminders: settings.maxReminders || "3",
+      };
+
+      await persistSettings(updated);
+      const targetLabel =
+        selectedCategoryId === "all"
+          ? "All Categories (Default)"
+          : categoriesList.find((c) => String(c.eventTypeId) === String(selectedCategoryId))?.eventTypeName || "Selected Category";
+      toast.success(`Email template for "${targetLabel}" (${templateType === "initial" ? "Initial Email" : "Reminder Email"}) saved successfully!`);
+    } catch {
+      toast.error("Failed to save email template settings");
     }
-
-    updatedCategoryTemplates[selectedCategoryId] = currentEntry;
-
-    let defaultSub = settings.emailSubject;
-    let defaultDesc = settings.emailDescription;
-    if (selectedCategoryId === "all" && templateType === "initial") {
-      defaultSub = templateSubject;
-      defaultDesc = templateDescription;
-    }
-
-    const updated = {
-      ...settings,
-      emailSubject: defaultSub,
-      emailDescription: defaultDesc,
-      categoryTemplates: updatedCategoryTemplates,
-      selectedTemplateCategoryId: selectedCategoryId,
-      enableMonthlyEmail: settings.enableMonthlyEmail !== false,
-      enableReminderEmail: settings.enableReminderEmail !== false,
-      reminderIntervalDays: settings.reminderIntervalDays || "10",
-      maxReminders: settings.maxReminders || "3",
-    };
-
-    await persistSettings(updated);
-    const targetLabel =
-      selectedCategoryId === "all"
-        ? "All Categories (Default)"
-        : categoriesList.find((c) => String(c.eventTypeId) === String(selectedCategoryId))?.eventTypeName || "Selected Category";
-    toast.success(`Email template for "${targetLabel}" (${templateType === "initial" ? "Initial Email" : "Reminder Email"}) saved successfully!`);
   };
 
   // Manual Trigger to Run Scheduler check
@@ -816,8 +827,7 @@ export default function SettingsPage() {
       } else {
         toast.info(res.message || "Scheduler evaluation finished.");
       }
-    } catch (e) {
-      console.error("Scheduler error:", e);
+    } catch {
       toast.error("Error executing scheduler check.");
     } finally {
       setSchedulerRunning(false);
@@ -834,8 +844,12 @@ export default function SettingsPage() {
       toast.error("Please enter a valid Max Retry Attempt.");
       return;
     }
-    await persistSettings(settings);
-    toast.success("OTP & 2FA settings saved successfully!");
+    try {
+      await persistSettings(settings);
+      toast.success("OTP & 2FA settings saved successfully!");
+    } catch {
+      toast.error("Failed to save OTP settings");
+    }
   };
 
   // 4. Per-Event-Type Payment QR Handlers
@@ -869,25 +883,25 @@ export default function SettingsPage() {
       return;
     }
 
-    const scannerQrUrl = getQrCodeApiUrl(liveUpiUri, 300);
-    const isCustomUploaded = configToSave.qrMode === "uploaded" && configToSave.qrImage;
-    const effectiveQrImage = isCustomUploaded ? configToSave.qrImage : scannerQrUrl;
-
-    const updatedConfig = {
-      ...configToSave,
-      receiverName: configToSave.receiverName.trim(),
-      upiId: configToSave.upiId.trim(),
-      qrImage: effectiveQrImage,
-      isActive: true,
-    };
-
-    // 1. Save in local per-event-type storage & update state (isolated per event type)
-    const updatedAll = savePaymentQrConfigForEventType(selectedQrEventType, updatedConfig);
-    setEventPaymentQrConfigs(updatedAll);
-
-    // 2. Persist to backend API with eventType and eventTypeId
-    const foundCat = categoriesList.find((c) => (c.eventTypeName || c.name || "").toLowerCase() === selectedQrEventType.toLowerCase());
     try {
+      const scannerQrUrl = getQrCodeApiUrl(liveUpiUri, 300);
+      const isCustomUploaded = configToSave.qrMode === "uploaded" && configToSave.qrImage;
+      const effectiveQrImage = isCustomUploaded ? configToSave.qrImage : scannerQrUrl;
+
+      const updatedConfig = {
+        ...configToSave,
+        receiverName: configToSave.receiverName.trim(),
+        upiId: configToSave.upiId.trim(),
+        qrImage: effectiveQrImage,
+        isActive: true,
+      };
+
+      // 1. Save in local per-event-type storage & update state (isolated per event type)
+      const updatedAll = savePaymentQrConfigForEventType(selectedQrEventType, updatedConfig);
+      setEventPaymentQrConfigs(updatedAll);
+
+      // 2. Persist to backend API with eventType and eventTypeId
+      const foundCat = categoriesList.find((c) => (c.eventTypeName || c.name || "").toLowerCase() === selectedQrEventType.toLowerCase());
       await savePaymentQrSettingAsync({
         eventType: selectedQrEventType,
         eventTypeId: foundCat?.eventTypeId || null,
@@ -897,27 +911,34 @@ export default function SettingsPage() {
         qrCodeImage: updatedConfig.qrImage,
         isActive: true,
       });
-    } catch (apiErr) {
-      console.warn("Could not save to backend API, saved locally:", apiErr);
-    }
 
-    toast.success(`Payment QR settings for "${selectedQrEventType}" saved successfully!`);
+      toast.success(`Payment QR settings for "${selectedQrEventType}" saved successfully!`);
+    } catch {
+      toast.error(`Failed to save payment QR settings for "${selectedQrEventType}"`);
+    }
   };
 
   const handleQrUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("File size must be under 2MB");
-      return;
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error("File size must be under 2MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        handleQrFieldChange("qrImage", reader.result);
+        handleQrFieldChange("qrMode", "uploaded");
+        toast.success(`QR Code image for ${selectedQrEventType} uploaded successfully!`);
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read image file");
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast.error("Failed to upload QR image");
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      handleQrFieldChange("qrImage", reader.result);
-      handleQrFieldChange("qrMode", "uploaded");
-      toast.success(`QR Code image for ${selectedQrEventType} uploaded successfully!`);
-    };
-    reader.readAsDataURL(file);
   };
 
   // Category dropdown options

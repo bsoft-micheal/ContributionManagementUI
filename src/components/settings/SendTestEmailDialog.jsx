@@ -105,7 +105,6 @@ export default function SendTestEmailDialog({
       toast.success(`Test email for "${categoryName}" successfully dispatched to ${recipientEmail.trim()}!`);
       onClose();
     } catch (err) {
-      console.error("Test email error:", err);
       toast.error("Failed to send test email. Please check your SMTP settings or network.");
     } finally {
       setSending(false);

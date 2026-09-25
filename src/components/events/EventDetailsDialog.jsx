@@ -14,10 +14,12 @@ import dayjs from "dayjs";
 import { formatViewDate } from "../../utils/dateHelper";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
+import { useAppToast } from "../common/AppToast";
 import { GetContributionsByEventAsync } from "../../services/contributionService";
 import { GetMembersAsync } from "../../services/memberService";
 
 export default function EventDetailsDialog({ open, onClose, event, members = [] }) {
+  const toast = useAppToast();
   const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [internalMembers, setInternalMembers] = useState([]);
@@ -31,7 +33,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
           const data = await GetContributionsByEventAsync(event.eventId);
           setContributions(data || []);
         } catch (error) {
-          console.error("Failed to load contributions:", error);
+          toast.error("Failed to load event contributions");
         } finally {
           setLoading(false);
         }
@@ -49,7 +51,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
         .then((res) => {
           if (Array.isArray(res)) setInternalMembers(res);
         })
-        .catch((err) => console.warn("Failed to load members for event details:", err));
+        .catch(() => {});
     }
   }, [open, members]);
 
