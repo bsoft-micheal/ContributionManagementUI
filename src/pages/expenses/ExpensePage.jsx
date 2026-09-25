@@ -198,9 +198,22 @@ export default function ExpensePage() {
     fetchLookupData();
   }, []);
 
-  const dynamicStatusOptions = useMemo(() => {
-    return (statusesList || []).map((s) => ({ label: s.statusName, value: s.statusName }));
+  // Filter panel status options (including "All Statuses")
+  const statusOptions = useMemo(() => {
+    return [
+      { label: "All Statuses", value: "ALL" },
+      ...(statusesList || []).map((s) => ({ label: s.statusName, value: s.statusName })),
+    ];
   }, [statusesList]);
+
+  // Form status options for Add/Edit dialog
+  const dynamicStatusOptions = useMemo(() => {
+    const list = (statusesList || []).map((s) => ({ label: s.statusName, value: s.statusName }));
+    if (form.status && !list.some((o) => o.value === form.status)) {
+      list.unshift({ label: form.status, value: form.status });
+    }
+    return list;
+  }, [statusesList, form.status]);
 
   // Event Type options for the Add/Edit form
   const formEventTypeOptions = useMemo(() => {
