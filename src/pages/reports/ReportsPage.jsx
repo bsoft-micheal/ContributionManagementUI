@@ -474,7 +474,6 @@ export default function ReportsPage({ mode = "event" }) {
                   startIcon={<FilterListIcon />}
                   onClick={() => {
                     setFilters({ month: filterMonth, year: filterYear });
-                    toast.success("Filters applied");
                   }}
                   sx={{
                     height: 38,
@@ -494,7 +493,6 @@ export default function ReportsPage({ mode = "event" }) {
                     setFilterMonth(defaultMonth);
                     setFilterYear(defaultYear);
                     setFilters({ month: defaultMonth, year: defaultYear });
-                    toast.success("Filters cleared");
                   }}
                   sx={{
                     color: "#ef4444",

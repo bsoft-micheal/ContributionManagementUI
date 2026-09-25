@@ -766,7 +766,6 @@ export default function GalleryPage() {
                 onClick={() => {
                   setAppliedEvent(filterEvent);
                   setAppliedCategory(filterCategory);
-                  toast.success("Filters applied");
                 }}
                 sx={{
                   height: 34,
@@ -786,7 +785,6 @@ export default function GalleryPage() {
                   setFilterCategory("ALL");
                   setAppliedEvent("ALL");
                   setAppliedCategory("ALL");
-                  toast.success("Filters cleared");
                 }}
                 sx={{
                   color: "#ef4444",

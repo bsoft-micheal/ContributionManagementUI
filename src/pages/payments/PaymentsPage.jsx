@@ -535,7 +535,6 @@ export default function PaymentsPage() {
                   setAppliedMode(filterMode);
                   setAppliedStatus(filterStatus);
                   setAppliedDate(filterDate);
-                  toast.success("Filters applied");
                 }}
                 sx={{
                   height: 34,
@@ -561,7 +560,6 @@ export default function PaymentsPage() {
                   setAppliedMode("ALL");
                   setAppliedStatus("ALL");
                   setAppliedDate(null);
-                  toast.success("Filters cleared");
                 }}
                 sx={{
                   color: "#ef4444",

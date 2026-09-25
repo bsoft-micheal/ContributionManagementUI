@@ -811,7 +811,6 @@ export default function SupportTicketsPage() {
                   setAppliedType(filterType);
                   setAppliedPriority(filterPriority);
                   setAppliedStatus(filterStatus);
-                  toast.success("Filters applied");
                 }}
                 sx={{
                   height: 34,
@@ -833,7 +832,6 @@ export default function SupportTicketsPage() {
                   setAppliedType("ALL");
                   setAppliedPriority("ALL");
                   setAppliedStatus("ALL");
-                  toast.success("Filters cleared");
                 }}
                 sx={{
                   color: "#ef4444",

@@ -832,7 +832,6 @@ export default function DashboardPage() {
   function handleFilter() {
     setAppliedFilters({ ...pendingFilters });
     loadDashboard(pendingFilters.month, pendingFilters.year);
-    toast.success("Filters applied");
   }
 
   function handleClear() {
@@ -845,7 +844,6 @@ export default function DashboardPage() {
     setAppliedFilters(defaultValues);
     loadDashboard(defaultValues.month, defaultValues.year);
     setSearch("");
-    toast.info("Dashboard filters reset to defaults");
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
