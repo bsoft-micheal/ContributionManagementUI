@@ -30,9 +30,9 @@ const MODULE_OPTIONS = [
 ];
 
 const ACCESS_OPTIONS = [
-  { value: "readOnly", label: "Read Only", color: "#3b82f6" },
-  { value: "readWrite", label: "Read/Write", color: "#10b981" },
-  { value: "deny", label: "Deny", color: "#ef4444" },
+  { value: 1, label: "Read Only", color: "#3b82f6", stringVal: "readOnly" },
+  { value: 2, label: "Read/Write", color: "#10b981", stringVal: "readWrite" },
+  { value: 3, label: "Deny", color: "#ef4444", stringVal: "deny" },
 ];
 
 export default function UserRightsPage() {
@@ -83,15 +83,23 @@ export default function UserRightsPage() {
       const serverRights = await GetUserRightsAsync(roleName);
       const rows = Array.isArray(serverRights) ? serverRights : [];
       // normalise: add a sequential ui id
-      const normalised = rows.map((r, i) => ({
-        ...r,
-        _uid: i + 1,
-        module: r.module || r.Module || "",
-        subModule: r.subModule || r.SubModule || "",
-        page: r.page || r.Page || "",
-        access: r.access || r.Access || "readOnly",
-        createdBy: r.createdBy || r.CreatedBy || null,
-      }));
+      const normalised = rows.map((r, i) => {
+        let typeVal = r.accessType ?? r.AccessType;
+        if (!typeVal || Number(typeVal) === 0) {
+          const str = r.access || r.Access || "readOnly";
+          typeVal = str === "deny" ? 3 : (str === "readOnly" ? 1 : 2);
+        }
+        return {
+          ...r,
+          _uid: i + 1,
+          module: r.module || r.Module || "",
+          subModule: r.subModule || r.SubModule || "",
+          page: r.page || r.Page || "",
+          accessType: Number(typeVal),
+          access: r.access || r.Access || (Number(typeVal) === 3 ? "deny" : (Number(typeVal) === 1 ? "readOnly" : "readWrite")),
+          createdBy: r.createdBy || r.CreatedBy || null,
+        };
+      });
       setRights(prev => ({ ...prev, [roleName]: normalised }));
     } catch {
       toast.error(`Failed to load rights for ${roleName}`);
@@ -101,8 +109,10 @@ export default function UserRightsPage() {
   }
 
   // ── Handle radio change: Master row updates all sub-modules, Child row updates itself ──
-  const handleAccessChange = (uid, newAccess) => {
+  const handleAccessChange = (uid, newAccessType) => {
     if (!selectedRoleName) return;
+    const numAccessType = Number(newAccessType);
+    const strAccess = numAccessType === 3 ? "deny" : (numAccessType === 1 ? "readOnly" : "readWrite");
 
     setRights(prev => {
       const currentList = prev[selectedRoleName] || [];
@@ -115,10 +125,10 @@ export default function UserRightsPage() {
       const updated = currentList.map(r => {
         if (isMasterRow && r.module === targetModule) {
           // Master row selection: cascade to all sub-modules under this parent module
-          return { ...r, access: newAccess };
+          return { ...r, accessType: numAccessType, access: strAccess };
         } else if (r._uid === uid) {
           // Sub-module row selection: update individual row
-          return { ...r, access: newAccess };
+          return { ...r, accessType: numAccessType, access: strAccess };
         }
         return r;
       });
@@ -145,14 +155,19 @@ export default function UserRightsPage() {
       // Build request payload: every Rights item explicitly contains `role: selectedRoleName`
       const payload = {
         roleName: selectedRoleName,
-        rights: currentRows.map(r => ({
-          role: selectedRoleName,
-          featureId: r.featureID || r.featureId || 0,
-          module: r.module || "",
-          subModule: r.subModule || "",
-          page: r.page || "",
-          access: r.access || "readOnly",
-        })),
+        rights: currentRows.map(r => {
+          const typeVal = Number(r.accessType) || (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2));
+          const strVal = typeVal === 3 ? "deny" : (typeVal === 1 ? "readOnly" : "readWrite");
+          return {
+            role: selectedRoleName,
+            featureId: r.featureID || r.featureId || 0,
+            module: r.module || "",
+            subModule: r.subModule || "",
+            page: r.page || "",
+            accessType: typeVal,
+            access: strVal,
+          };
+        }),
       };
 
       await SaveUserRightsAsync(payload);
@@ -238,8 +253,8 @@ export default function UserRightsPage() {
       render: (row) => (
         <RadioGroup
           row
-          value={row.access}
-          onChange={(e) => handleAccessChange(row._uid, e.target.value)}
+          value={row.accessType || (row.access === "deny" ? 3 : (row.access === "readOnly" ? 1 : 2))}
+          onChange={(e) => handleAccessChange(row._uid, Number(e.target.value))}
           sx={{ gap: 2, flexWrap: "nowrap" }}
         >
           {ACCESS_OPTIONS.map(opt => (
@@ -270,7 +285,8 @@ export default function UserRightsPage() {
     {
       label: "Current Access",
       render: (row) => {
-        const opt = ACCESS_OPTIONS.find(o => o.value === row.access) || ACCESS_OPTIONS[0];
+        const typeVal = Number(row.accessType) || (row.access === "deny" ? 3 : (row.access === "readOnly" ? 1 : 2));
+        const opt = ACCESS_OPTIONS.find(o => o.value === typeVal) || ACCESS_OPTIONS[1];
         return (
           <Chip
             label={opt.label}
