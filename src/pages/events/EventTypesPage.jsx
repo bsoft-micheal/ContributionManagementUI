@@ -13,6 +13,7 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
 import { GetEventTypesAsync, CreateEventTypeAsync, UpdateEventTypeAsync, DeleteEventTypeAsync } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
+import { formatGridDate } from "../../utils/dateHelper";
 
 const formatBaseAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -223,6 +224,11 @@ export default function EventTypesPage() {
       label: "Created By",
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
   ];
 

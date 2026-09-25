@@ -339,7 +339,7 @@ export default function ExcelImportDialog({
         <Stack spacing={3} sx={{ py: 1 }}>
           {loading ? (
             <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }}>
-              <CircularProgress size={40} sx={{ color: "#4a3f6b" }} />
+              <CircularProgress size={40} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                 Reading and validating Excel sheet...
               </Typography>

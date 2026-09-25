@@ -15,6 +15,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import { FilterList as FilterListIcon, Refresh as RefreshIcon, Save as SaveIcon } from "@mui/icons-material";
 import { GetUserRightsAsync, SaveUserRightsAsync } from "../../services/userRightsService";
 import { GetRolesAsync } from "../../services/roleService";
+import { formatGridDate } from "../../utils/dateHelper";
 
 // Top-level module options for the Module filter dropdown
 const MODULE_OPTIONS = [
@@ -287,6 +288,11 @@ export default function UserRightsPage() {
           {row.createdBy || "—"}
         </Typography>
       ),
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
   ];
 

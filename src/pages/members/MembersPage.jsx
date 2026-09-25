@@ -31,6 +31,7 @@ import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
 import { GetMembersAsync, CreateMemberAsync, UpdateMemberAsync, DeleteMemberAsync, CreateMembersBulkAsync } from "../../services/memberService";
 import { GetRolesAsync } from "../../services/roleService";
+import { GetWorkTypesAsync } from "../../services/workTypeService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -56,6 +57,7 @@ export default function MembersPage() {
 
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [workTypes, setWorkTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -81,23 +83,31 @@ export default function MembersPage() {
     { label: "Other", value: "Other" },
   ];
 
-  const typeOptions = [
-    { label: "Office", value: "Office" },
-    { label: "WFH", value: "WFH" },
-  ];
+  const typeOptions = useMemo(() => {
+    if (workTypes && workTypes.length > 0) {
+      return workTypes
+        .filter((w) => w.isActive !== false)
+        .map((w) => ({ label: w.workTypeName, value: w.workTypeName }));
+    }
+    return [
+      { label: "Office", value: "Office" },
+      { label: "WFH", value: "WFH" },
+    ];
+  }, [workTypes]);
 
   const templateValidations = useMemo(() => {
     const roleNamesList = roles.map((r) => r.roleName).join(",");
+    const workTypesList = typeOptions.map((t) => t.value).join(",");
     return {
       "Gender": {
         type: "list",
         formulae: [`"Male,Female,Other"`],
         error: "Please select a gender from the list."
       },
-      "Type": {
+      "Work Type": {
         type: "list",
-        formulae: [`"Office,WFH"`],
-        error: "Please select a type from the list."
+        formulae: [`"${workTypesList || "Office,WFH"}"`],
+        error: "Please select a work type from the list."
       },
       "Role": {
         type: "list",
@@ -125,9 +135,10 @@ export default function MembersPage() {
 
   async function loadData() {
     setLoading(true);
-    const [membersData, rolesData] = await Promise.all([
+    const [membersData, rolesData, workTypesData] = await Promise.all([
       GetMembersAsync(),
       GetRolesAsync(),
+      GetWorkTypesAsync(true).catch(() => []),
     ]);
     const localOverrides = JSON.parse(localStorage.getItem("cm_member_overrides") || "{}");
     const normalizedMembers = (membersData || []).map((m) => {
@@ -141,6 +152,7 @@ export default function MembersPage() {
     setMembers(normalizedMembers);
     const safeRoles = rolesData || [];
     setRoles(safeRoles);
+    setWorkTypes(Array.isArray(workTypesData) ? workTypesData : []);
     if (safeRoles.length > 0) {
       setFilterRoleId((prev) => {
         if (prev && prev !== "ALL" && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
@@ -258,7 +270,9 @@ export default function MembersPage() {
     const phone = row["phone"] !== undefined && row["phone"] !== null ? String(row["phone"]).trim() : "";
     const gender = row["gender"] !== undefined && row["gender"] !== null ? String(row["gender"]).trim() : "";
     const roleName = row["role"] !== undefined && row["role"] !== null ? String(row["role"]).trim() : "";
-    const rawType = row["type"] !== undefined && row["type"] !== null ? String(row["type"]).trim() : "";
+    const rawType = row["work type"] !== undefined && row["work type"] !== null
+      ? String(row["work type"]).trim()
+      : (row["type"] !== undefined && row["type"] !== null ? String(row["type"]).trim() : "");
     const dobStr = row["date of birth"] !== undefined && row["date of birth"] !== null ? row["date of birth"] : (row["dob"] || "");
     const joiningStr = row["joining date"] !== undefined && row["joining date"] !== null ? row["joining date"] : (row["joiningdate"] || "");
 
@@ -323,16 +337,16 @@ export default function MembersPage() {
       return { error: `Row ${rowNum}: Role '${roleName}' not found in system` };
     }
 
-    // Match Type
+    // Match Work Type
     let normalizedType = "Office";
     if (rawType) {
-      const upperType = rawType.toUpperCase();
-      if (upperType === "WFH") {
-        normalizedType = "WFH";
-      } else if (upperType === "OFFICE") {
-        normalizedType = "Office";
+      const matchedType = typeOptions.find(
+        (t) => t.value.toLowerCase() === rawType.toLowerCase()
+      );
+      if (matchedType) {
+        normalizedType = matchedType.value;
       } else {
-        return { error: `Row ${rowNum}: Type must be Office or WFH` };
+        return { error: `Row ${rowNum}: Work Type '${rawType}' must be one of: ${typeOptions.map(t => t.value).join(", ")}` };
       }
     }
 
@@ -466,7 +480,7 @@ export default function MembersPage() {
       ),
     },
     {
-      label: "Type",
+      label: "Work Type",
       key: "type",
       render: (row) => {
         const isWfh = (row.type || "").toUpperCase() === "WFH";
@@ -496,6 +510,11 @@ export default function MembersPage() {
       label: "Created By",
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--"
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn)
     },
   ];
 
@@ -614,7 +633,7 @@ export default function MembersPage() {
         }
       >
         <Grid container spacing={4}>
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <AppInput label="Name" placeholder="Enter name" value={form.name}
               onChange={(e) => {
                 setForm((c) => ({ ...c, name: e.target.value }));
@@ -624,6 +643,21 @@ export default function MembersPage() {
               maxLength={100}
               error={!!errors.name}
               helperText={errors.name}
+              required
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AppSelect
+              label="Work Type"
+              placeholder="Select work type..."
+              value={form.type || "Office"}
+              onChange={(e) => {
+                setForm((c) => ({ ...c, type: e.target.value }));
+                if (errors.type) setErrors(prev => ({ ...prev, type: "" }));
+              }}
+              options={typeOptions}
+              error={!!errors.type}
+              helperText={errors.type}
               required
             />
           </Grid>
@@ -698,21 +732,6 @@ export default function MembersPage() {
               required
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppSelect
-              label="Type"
-              placeholder="Select type..."
-              value={form.type || "Office"}
-              onChange={(e) => {
-                setForm((c) => ({ ...c, type: e.target.value }));
-                if (errors.type) setErrors(prev => ({ ...prev, type: "" }));
-              }}
-              options={typeOptions}
-              error={!!errors.type}
-              helperText={errors.type}
-              required
-            />
-          </Grid>
         </Grid>
       </AppDialog>
 
@@ -735,7 +754,7 @@ export default function MembersPage() {
         onClose={() => setImportDialogOpen(false)}
         onImport={handleBulkImport}
         title="Import Members"
-        templateHeaders={["Name", "Email", "Phone", "Role", "Gender", "Type", "Date of Birth", "Joining Date"]}
+        templateHeaders={["Name", "Email", "Phone", "Role", "Gender", "Work Type", "Date of Birth", "Joining Date"]}
         templateValidations={templateValidations}
         validateRow={validateRow}
       />

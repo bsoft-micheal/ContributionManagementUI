@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Box,
   Grid,
@@ -8,6 +8,9 @@ import {
   Stack,
   Chip,
   Divider,
+  Dialog,
+  DialogContent,
+  DialogTitle,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -16,6 +19,11 @@ import {
   Add as AddIcon,
   Send as SendIcon,
   FilterList as FilterListIcon,
+  CloudUpload as CloudUploadIcon,
+  FileDownload as DownloadIcon,
+  Close as CloseIcon,
+  Image as ImageIcon,
+  ZoomIn as ZoomInIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -41,6 +49,8 @@ import {
 } from "../../services/supportTicketService";
 import { GetMembersAsync } from "../../services/memberService";
 import { GetEventsAsync } from "../../services/eventService";
+import { GetTicketTypesAsync } from "../../services/ticketTypeService";
+import { GetStatusesAsync } from "../../services/statusService";
 
 const initialForm = {
   memberName: "",
@@ -48,10 +58,12 @@ const initialForm = {
   relatedEvent: "",
   ticketType: "",
   priority: "Medium",
-  status: "Open",
+  status: "",
   subject: "",
   description: "",
   assignedTo: "",
+  attachment: "",
+  attachmentName: "",
 };
 
 const priorityOptions = [
@@ -59,14 +71,6 @@ const priorityOptions = [
   { label: "High", value: "High" },
   { label: "Medium", value: "Medium" },
   { label: "Low", value: "Low" },
-];
-
-const statusOptions = [
-  { label: "All Statuses", value: "ALL" },
-  { label: "Open", value: "Open" },
-  { label: "In Progress", value: "In Progress" },
-  { label: "Resolved", value: "Resolved" },
-  { label: "Closed", value: "Closed" },
 ];
 
 export default function SupportTicketsPage() {
@@ -78,6 +82,8 @@ export default function SupportTicketsPage() {
   const [tickets, setTickets] = useState([]);
   const [membersList, setMembersList] = useState([]);
   const [eventsList, setEventsList] = useState([]);
+  const [dbTicketTypes, setDbTicketTypes] = useState([]);
+  const [dbStatuses, setDbStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -89,6 +95,74 @@ export default function SupportTicketsPage() {
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+
+  // Image attachment & preview states
+  const fileInputRef = useRef(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewImageSrc, setPreviewImageSrc] = useState("");
+  const [previewImageTitle, setPreviewImageTitle] = useState("");
+
+  const openImagePreview = (src, title = "Attached Image Preview") => {
+    if (!src) return;
+    setPreviewImageSrc(src);
+    setPreviewImageTitle(title);
+    setPreviewModalOpen(true);
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file (PNG, JPG, JPEG, WEBP).");
+      return;
+    }
+
+    const MAX_SIZE = 3 * 1024 * 1024; // 3MB limit
+    if (file.size > MAX_SIZE) {
+      toast.error("Image size exceeds maximum limit of 3 MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (uploadEvt) => {
+      setForm((c) => ({
+        ...c,
+        attachment: uploadEvt.target.result,
+        attachmentName: file.name,
+      }));
+      toast.success(`Image "${file.name}" attached successfully!`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAttachment = (e) => {
+    if (e) e.stopPropagation();
+    setForm((c) => ({
+      ...c,
+      attachment: "",
+      attachmentName: "",
+    }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDownloadImage = (dataUrl, fileName = "ticket_attachment.png") => {
+    if (!dataUrl) return;
+    try {
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Image downloaded successfully!");
+    } catch (err) {
+      console.error("Failed to download image:", err);
+      toast.error("Could not download image");
+    }
+  };
 
   // View / Reply state
   const [replyText, setReplyText] = useState("");
@@ -121,8 +195,9 @@ export default function SupportTicketsPage() {
           description: item.description || "",
           status: item.status || "Open",
           priority: item.priority || "Medium",
-          assignedTo: item.assignedTo || "Admin",
-          createdDate: item.createdOn || new Date().toISOString(),
+          assignedTo: item.assignedTo || "--",
+          createdDate: item.createdOn || item.createdAt || new Date().toISOString(),
+          createdBy: item.createdBy || item.CreatedBy || "--",
           refNo: item.refNo || "-",
           utr: item.utr || "-",
           attachment: item.attachment || null,
@@ -141,14 +216,18 @@ export default function SupportTicketsPage() {
 
   const fetchLookupData = async () => {
     try {
-      const [membersRes, eventsRes] = await Promise.all([
+      const [membersRes, eventsRes, ticketTypesRes, statusesRes] = await Promise.all([
         GetMembersAsync().catch(() => []),
         GetEventsAsync().catch(() => []),
+        GetTicketTypesAsync(true).catch(() => []),
+        GetStatusesAsync(true).catch(() => []),
       ]);
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
+      if (Array.isArray(ticketTypesRes)) setDbTicketTypes(ticketTypesRes);
+      if (Array.isArray(statusesRes)) setDbStatuses(statusesRes);
     } catch (err) {
-      console.warn("Failed to load members or events lookup data:", err);
+      console.warn("Failed to load members, events, ticket types, or statuses lookup data:", err);
     }
   };
 
@@ -188,18 +267,33 @@ export default function SupportTicketsPage() {
     return list;
   }, [eventsList]);
 
-  // Dynamically derive ticket types from DB tickets + default categories
+  // Dynamically derive ticket types strictly from DB ticket types table in Support Data
   const ticketTypeOptions = useMemo(() => {
-    const set = new Set();
-    tickets.forEach((t) => {
-      if (t.ticketType) set.add(t.ticketType);
-    });
-    ["Payment Issue", "Event Clarification", "Application Issue", "Feedback", "Other"].forEach((st) => set.add(st));
+    const list = Array.isArray(dbTicketTypes)
+      ? dbTicketTypes
+          .filter((t) => t.typeName && t.isActive !== false)
+          .map((t) => ({ label: t.typeName, value: t.typeName }))
+      : [];
+
     return [
       { label: "All Types", value: "ALL" },
-      ...Array.from(set).map((t) => ({ label: t, value: t })),
+      ...list,
     ];
-  }, [tickets]);
+  }, [dbTicketTypes]);
+
+  // Dynamically derive status options strictly from DB statuses table in Support Data
+  const statusOptions = useMemo(() => {
+    const list = Array.isArray(dbStatuses)
+      ? dbStatuses
+          .filter((s) => s.statusName && s.isActive !== false)
+          .map((s) => ({ label: s.statusName, value: s.statusName }))
+      : [];
+
+    return [
+      { label: "All Statuses", value: "ALL" },
+      ...list,
+    ];
+  }, [dbStatuses]);
 
   // Dynamically derive assignee options from DB members list
   const assignedToOptions = useMemo(() => {
@@ -240,6 +334,8 @@ export default function SupportTicketsPage() {
       subject: row.subject || "",
       description: row.description || "",
       assignedTo: row.assignedTo || "",
+      attachment: row.attachment || "",
+      attachmentName: row.attachment ? `${row.ticketNo || "ticket"}_attachment.png` : "",
     });
     setErrors({});
     setDialogOpen(true);
@@ -290,13 +386,16 @@ export default function SupportTicketsPage() {
       if (editingTicket) {
         const ticketId = editingTicket.ticketId || editingTicket.id;
         await updateSupportTicketAsync(ticketId, {
+          memberName: form.memberName,
+          memberId: resolvedMemberId || "",
+          relatedEvent: form.relatedEvent || "",
           ticketType: form.ticketType,
           subject: form.subject,
           description: form.description,
           priority: form.priority,
           status: form.status,
           assignedTo: form.assignedTo || "",
-          relatedEvent: form.relatedEvent || "",
+          attachment: form.attachment || null,
         });
         toast.success("Support ticket updated successfully!");
       } else {
@@ -314,6 +413,7 @@ export default function SupportTicketsPage() {
           priority: form.priority,
           status: form.status,
           assignedTo: form.assignedTo || "",
+          attachment: form.attachment || null,
         });
         toast.success(`Ticket created successfully!`);
       }
@@ -575,12 +675,50 @@ export default function SupportTicketsPage() {
     {
       label: "Assigned To",
       key: "assignedTo",
-      render: (row) => row.assignedTo || "Admin",
+      render: (row) => row.assignedTo || "--",
     },
     {
-      label: "Created Date",
+      label: "Attachment",
+      key: "attachment",
+      render: (row) => {
+        if (!row.attachment) return "--";
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+            <Tooltip title="Click to view full image">
+              <Box
+                component="img"
+                src={row.attachment}
+                alt="Thumbnail"
+                onClick={() => openImagePreview(row.attachment, `${row.ticketNo} - Attachment`)}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "4px",
+                  objectFit: "cover",
+                  cursor: "pointer",
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  "&:hover": { transform: "scale(1.15)", boxShadow: "0 2px 6px rgba(0,0,0,0.2)" },
+                  transition: "all 0.15s ease",
+                }}
+              />
+            </Tooltip>
+            <Tooltip title="Download Image">
+              <IconButton
+                size="small"
+                sx={{ p: 0.2 }}
+                onClick={() => handleDownloadImage(row.attachment, `${row.ticketNo}_attachment.png`)}
+              >
+                <DownloadIcon sx={{ fontSize: 16, color: "#0284c7" }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        );
+      },
+    },
+    {
+      label: "Created On",
       key: "createdDate",
-      render: (row) => formatGridDate(row.createdDate),
+      render: (row) => formatGridDate(row.createdDate || row.createdOn || row.createdAt),
     },
     {
       label: "Created By",
@@ -604,8 +742,14 @@ export default function SupportTicketsPage() {
               disabled={!hasWriteAccess}
               startIcon={<AddIcon />}
               onClick={() => {
+                const firstTicketType = dbTicketTypes.find((t) => t.isActive !== false)?.typeName || "";
+                const firstStatus = dbStatuses.find((s) => s.isActive !== false)?.statusName || "";
                 setEditingTicket(null);
-                setForm(initialForm);
+                setForm({
+                  ...initialForm,
+                  ticketType: firstTicketType,
+                  status: firstStatus,
+                });
                 setErrors({});
                 setDialogOpen(true);
               }}
@@ -800,7 +944,7 @@ export default function SupportTicketsPage() {
               placeholder="Select Status"
               value={form.status}
               onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}
-              options={statusOptions}
+              options={statusOptions.filter((o) => o.value !== "ALL")}
               required
             />
           </Grid>
@@ -813,7 +957,7 @@ export default function SupportTicketsPage() {
               options={assignedToOptions}
             />
           </Grid>
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
               label="Subject"
               placeholder="Brief summary of the issue or inquiry"
@@ -826,6 +970,121 @@ export default function SupportTicketsPage() {
               helperText={errors.subject}
               required
             />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="caption" fontWeight={700} sx={{ color: (t) => t.palette.mode === "dark" ? "#e2e8f0" : "#334155" }}>
+                  Attachment (1 Image, Max 3MB)
+                </Typography>
+                {form.attachment && (
+                  <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem" }}>
+                    ✓ Image Attached
+                  </Typography>
+                )}
+              </Box>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                style={{ display: "none" }}
+              />
+
+              {!form.attachment ? (
+                <Box
+                  onClick={() => fileInputRef.current?.click()}
+                  sx={{
+                    border: "1.5px dashed",
+                    borderColor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)",
+                    borderRadius: "10px",
+                    p: 1.1,
+                    minHeight: 46,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 1,
+                    cursor: "pointer",
+                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      borderColor: (t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.07)",
+                    },
+                  }}
+                >
+                  <CloudUploadIcon sx={{ fontSize: 20, color: (t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b" }} />
+                  <Typography variant="caption" fontWeight={600} color="text.secondary">
+                    Click to attach image (Max 3MB)
+                  </Typography>
+                </Box>
+              ) : (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    p: 0.6,
+                    px: 1,
+                    border: (t) => `1px solid ${t.palette.divider}`,
+                    borderRadius: "10px",
+                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
+                    minHeight: 46,
+                  }}
+                >
+                  <Box
+                    sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer", overflow: "hidden" }}
+                    onClick={() => openImagePreview(form.attachment, form.attachmentName || "Attached Image")}
+                  >
+                    <Box
+                      component="img"
+                      src={form.attachment}
+                      alt="Preview"
+                      sx={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: "6px",
+                        objectFit: "cover",
+                        border: "1px solid rgba(0,0,0,0.1)",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Box sx={{ overflow: "hidden" }}>
+                      <Typography variant="caption" fontWeight={700} sx={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>
+                        {form.attachmentName || "Attached Image"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#0284c7", fontSize: "0.66rem", display: "block" }}>
+                        Click to preview
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Stack direction="row" spacing={0.3}>
+                    <Tooltip title="Preview">
+                      <IconButton size="small" onClick={() => openImagePreview(form.attachment, form.attachmentName || "Attached Image")}>
+                        <ViewIcon sx={{ fontSize: 17, color: (t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b" }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Download">
+                      <IconButton size="small" onClick={() => handleDownloadImage(form.attachment, form.attachmentName || "ticket_attachment.png")}>
+                        <DownloadIcon sx={{ fontSize: 17, color: "#0284c7" }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Change">
+                      <IconButton size="small" onClick={() => fileInputRef.current?.click()}>
+                        <CloudUploadIcon sx={{ fontSize: 17, color: "#d97706" }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Remove">
+                      <IconButton size="small" onClick={handleRemoveAttachment}>
+                        <DeleteIcon sx={{ fontSize: 17, color: "#ef4444" }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                </Box>
+              )}
+            </Box>
           </Grid>
           <Grid size={{ xs: 12 }}>
             <AppTextArea
@@ -1001,12 +1260,68 @@ export default function SupportTicketsPage() {
               </Grid>
               {selectedTicket.attachment && (
                 <Grid size={{ xs: 12 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Attachment
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.8 }}>
+                    Attached Image
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "#4a3f6b", fontWeight: 600, mt: 0.5 }}>
-                    {selectedTicket.attachment}
-                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      p: 1.5,
+                      border: (t) => `1px solid ${t.palette.divider}`,
+                      borderRadius: "10px",
+                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                    }}
+                  >
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", gap: 1.5, cursor: "pointer" }}
+                      onClick={() => openImagePreview(selectedTicket.attachment, `${selectedTicket.ticketNo} - Attachment`)}
+                    >
+                      <Box
+                        component="img"
+                        src={selectedTicket.attachment}
+                        alt="Attachment preview"
+                        sx={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: "8px",
+                          objectFit: "cover",
+                          border: "1px solid rgba(0,0,0,0.12)",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+                          bgcolor: "#fff",
+                          "&:hover": { transform: "scale(1.05)" },
+                          transition: "transform 0.2s ease",
+                        }}
+                      />
+                      <Box>
+                        <Typography variant="body2" fontWeight={700}>
+                          Image Attachment
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#0284c7" }}>
+                          Click to view enlarged preview
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Stack direction="row" spacing={1}>
+                      <AppButton
+                        variant="outlined"
+                        size="small"
+                        startIcon={<ViewIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => openImagePreview(selectedTicket.attachment, `${selectedTicket.ticketNo} - Attachment`)}
+                      >
+                        Preview
+                      </AppButton>
+                      <AppButton
+                        variant="contained"
+                        size="small"
+                        startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => handleDownloadImage(selectedTicket.attachment, `${selectedTicket.ticketNo}_attachment.png`)}
+                      >
+                        Download
+                      </AppButton>
+                    </Stack>
+                  </Box>
                 </Grid>
               )}
             </Grid>
@@ -1049,6 +1364,56 @@ export default function SupportTicketsPage() {
           </Box>
         )}
       </AppDialog>
+
+      {/* Image Preview / Lightbox Modal */}
+      <Dialog
+        open={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "14px",
+            bgcolor: "background.paper",
+            p: 1.5,
+          },
+        }}
+      >
+        <DialogTitle sx={{ p: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Typography variant="subtitle1" fontWeight={700}>
+            {previewImageTitle}
+          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <AppButton
+              variant="outlined"
+              size="small"
+              startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
+              onClick={() => handleDownloadImage(previewImageSrc, `${previewImageTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.png`)}
+            >
+              Download
+            </AppButton>
+            <IconButton size="small" onClick={() => setPreviewModalOpen(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+        <DialogContent sx={{ p: 1, display: "flex", justifyContent: "center", alignItems: "center", minHeight: 300, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(0,0,0,0.3)" : "#f8fafc", borderRadius: "10px" }}>
+          {previewImageSrc && (
+            <Box
+              component="img"
+              src={previewImageSrc}
+              alt="Full Preview"
+              sx={{
+                maxWidth: "100%",
+                maxHeight: "75vh",
+                objectFit: "contain",
+                borderRadius: "8px",
+                boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

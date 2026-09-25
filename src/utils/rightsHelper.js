@@ -36,7 +36,10 @@ export function getRightsForPath(path, roleName) {
     else if (path === "/payments") targetName = "Payment History";
     else if (path === "/expense") targetName = "Expense";
     else if (path === "/gallery") targetName = "Gallery";
-    else if (path === "/support-tickets") targetName = "Support Ticket";
+    else if (path === "/support-tickets") targetName = "Support Tickets";
+    else if (path === "/budget-calculations") targetName = "Budget Calculations";
+    else if (path === "/types" || path === "/ticket-types") targetName = "Types";
+    else if (path === "/status") targetName = "Status";
     else if (path === "/settings") targetName = "Settings";
     else if (path === "/user-rights") targetName = "User Rights";
     else if (path === "/users") targetName = "Users";

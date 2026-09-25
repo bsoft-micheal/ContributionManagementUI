@@ -698,10 +698,12 @@ export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [eventTypes, setEventTypes] = useState([]);
 
-  // Birthday Celebration Modal States
+  // Birthday Celebration Modal States (Only opens once upon login per session)
   const [todayCelebrants, setTodayCelebrants] = useState([]);
   const [bdayModalOpen, setBdayModalOpen] = useState(false);
-  const [hasCelebrated, setHasCelebrated] = useState(false);
+  const [hasCelebrated, setHasCelebrated] = useState(() => {
+    return sessionStorage.getItem("birthdayModalShownSession") === "true";
+  });
 
   const [pendingFilters, setPendingFilters] = useState({
     month: dayjs().month() + 1,
@@ -747,11 +749,18 @@ export default function DashboardPage() {
     loadDashboard(appliedFilters.month, appliedFilters.year);
   }, []);
 
-  // Detect today's birthdays on Dashboard open & trigger celebratory pop up message with paper blast
+  // Detect today's birthdays on login & trigger celebratory pop up message only once per login session
   useEffect(() => {
+    // If already shown in this login session, do not trigger again
+    if (sessionStorage.getItem("birthdayModalShownSession") === "true") {
+      return;
+    }
+
     let cancelled = false;
     async function checkTodayBirthdays() {
       try {
+        if (sessionStorage.getItem("birthdayModalShownSession") === "true") return;
+
         const membersData = await GetMembersAsync().catch(() => []);
         if (cancelled || !Array.isArray(membersData)) return;
 
@@ -772,35 +781,15 @@ export default function DashboardPage() {
               celebrants.push({
                 memberId: m.memberId,
                 name,
-                type: m.type || m.memberType || "Member",
+                type: "Birthday",
                 dateOfBirth: m.dateOfBirth,
               });
             }
           }
         }
 
-        // Also check if any upcoming event or event in summary is a Birthday today
-        if (summary?.upcomingEvents && Array.isArray(summary.upcomingEvents)) {
-          for (const ev of summary.upcomingEvents) {
-            const isBday =
-              (ev.eventTypeName || "").toLowerCase().includes("birthday") ||
-              (ev.eventName || "").toLowerCase().includes("birthday");
-            if (isBday && ev.eventDate && dayjs(ev.eventDate).isSame(today, "day")) {
-              const name = ev.eventName || "Birthday Celebrant";
-              const key = `event|${name.toLowerCase()}`;
-              if (!seen.has(key)) {
-                seen.add(key);
-                celebrants.push({
-                  memberId: ev.eventId,
-                  name,
-                  type: "Birthday Event",
-                });
-              }
-            }
-          }
-        }
-
-        if (celebrants.length > 0 && !hasCelebrated) {
+        if (celebrants.length > 0 && sessionStorage.getItem("birthdayModalShownSession") !== "true") {
+          sessionStorage.setItem("birthdayModalShownSession", "true");
           setTodayCelebrants(celebrants);
           setBdayModalOpen(true);
           setHasCelebrated(true);
@@ -1042,6 +1031,11 @@ export default function DashboardPage() {
       label: "Created By",
       key: "createdBy",
       render: (row) => row.createdBy || row.CreatedBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
     },
   ];
 
@@ -1494,7 +1488,10 @@ export default function DashboardPage() {
       {/* Big Celebratory Birthday Pop-up Modal with Paper Blast Confetti (Static) */}
       <BirthdayCelebrationModal
         open={bdayModalOpen}
-        onClose={() => setBdayModalOpen(false)}
+        onClose={() => {
+          sessionStorage.setItem("birthdayModalShownSession", "true");
+          setBdayModalOpen(false);
+        }}
         celebrants={todayCelebrants}
         autoCloseSeconds={0}
       />

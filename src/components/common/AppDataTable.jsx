@@ -314,7 +314,9 @@ export default function AppDataTable({
       {/* ── 1. Top Header Bar (Store Dispatch / Member Directory layout) ──── */}
       <Box
         sx={{
-          background: "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+          background: theme.palette.mode === "dark"
+            ? "linear-gradient(90deg, #171b2d 0%, #1d2338 100%)"
+            : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
           color: "#ffffff",
           px: 3,
           py: 1,
@@ -336,7 +338,7 @@ export default function AppDataTable({
           <Box
             sx={{
               "& .MuiButton-root": {
-                bgcolor: "#2a1b4d !important", // Deep indigo/purple button to match theme
+                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12) !important" : "#2a1b4d !important",
                 color: "#ffffff !important",
                 borderRadius: "4px !important",
                 fontSize: "0.75rem !important",
@@ -349,7 +351,7 @@ export default function AppDataTable({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 0.5,
-                "&:hover": { bgcolor: "#1a1033 !important" },
+                "&:hover": { bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2) !important" : "#1a1033 !important" },
               },
             }}
           >
@@ -846,10 +848,12 @@ export default function AppDataTable({
                             variant="body2"
                             sx={{ fontSize: "inherit", color: "inherit" }}
                           >
-                            {column.type === "date"
-                              ? formatGridDate(row[column.key])
+                            {column.type === "date" || column.key === "createdOn" || column.key === "createdAt" || column.key === "CreatedOn" || column.key === "CreatedAt" || column.label === "Created On" || column.label === "Created At"
+                              ? formatGridDate(row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? row.createdOn ?? row.CreatedOn ?? row.createdAt ?? row.CreatedAt)
                               : column.type === "datetime"
                               ? formatGridDateTime(row[column.key])
+                              : (column.key === "createdBy" || column.label === "Created By")
+                              ? (row.createdBy || row.CreatedBy || row.createdByName || row.CreatedByName || row.createdByUser || row.CreatedByUser || row.created_by || row.Created_By || "--")
                               : (row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? "--")}
                           </Typography>
                         )}
