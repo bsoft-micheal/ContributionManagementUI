@@ -440,8 +440,7 @@ export function generateQrPngDataUrl(text, targetSize = 300, margin = 4) {
     }
 
     return canvas.toDataURL("image/png");
-  } catch (err) {
-    console.error("Local QR PNG generation failed, using QR API fallback:", err);
+  } catch {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${targetSize}x${targetSize}&margin=10&data=${encodeURIComponent(text)}`;
   }
 }

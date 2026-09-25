@@ -211,10 +211,10 @@ export default function AppLayout() {
               profileImage: profile.profileImage || authState?.profileImage || "",
               phone: profile.phone || "",
               gender: profile.gender || "",
-              memberType: profile.memberType || "Office",
+              memberType: profile.memberType || "",
               dateOfBirth: profile.dateOfBirth ? dayjs(profile.dateOfBirth) : null,
               joiningDate: profile.joiningDate ? dayjs(profile.joiningDate) : null,
-              roleName: profile.roleName || authState?.role || "Member",
+              roleName: profile.roleName || authState?.role || "",
               password: "",
               confirmPassword: "",
             });
@@ -222,7 +222,7 @@ export default function AppLayout() {
             return;
           }
         } catch (e) {
-          console.error("Failed to load latest profile:", e);
+          // Profile fetch error handled silently
         }
 
         if (isMounted && authState) {
@@ -232,10 +232,10 @@ export default function AppLayout() {
             profileImage: authState.profileImage || "",
             phone: authState.phone || "",
             gender: authState.gender || "",
-            memberType: authState.memberType || "Office",
+            memberType: authState.memberType || "",
             dateOfBirth: authState.dateOfBirth ? dayjs(authState.dateOfBirth) : null,
             joiningDate: authState.joiningDate ? dayjs(authState.joiningDate) : null,
-            roleName: authState.role || "Member",
+            roleName: authState.role || "",
             password: "",
             confirmPassword: "",
           });

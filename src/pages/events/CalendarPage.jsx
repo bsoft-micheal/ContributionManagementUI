@@ -35,6 +35,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import EventFormDialog from "../../components/events/EventFormDialog";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
+import { useAppToast } from "../../components/common/AppToast";
+import { launchPaperBlast, launchCelebrationBlast } from "../../components/common/PaperBlast";
+import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
 
 /**
  * Safely parse date of birth (supports DD/MM/YYYY and standard ISO)
@@ -122,6 +125,7 @@ const getEventTypeInfo = (typeName = "") => {
 
 export default function CalendarPage() {
   const theme = useTheme();
+  const toast = useAppToast();
   const { authState } = useAuth();
   const hasWriteAccess = useMemo(() => {
     return getRightsForPage("Calendar", authState?.role).write;
@@ -131,7 +135,7 @@ export default function CalendarPage() {
     month: dayjs().month() + 1,
     year: dayjs().year(),
   });
-  const [categoryFilter, setCategoryFilter] = useState("Birthday");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
   const [events, setEvents] = useState([]);
@@ -142,6 +146,8 @@ export default function CalendarPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [bdayCelebrationOpen, setBdayCelebrationOpen] = useState(false);
+  const [celebrantsForCelebration, setCelebrantsForCelebration] = useState([]);
 
   const loadCalendarData = async () => {
     try {
@@ -154,8 +160,8 @@ export default function CalendarPage() {
       });
       const data = resData && resData.data !== undefined ? resData.data : resData;
       setEvents(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Error loading events:", error);
+    } catch {
+      toast.error("Failed to load calendar events.");
     }
   };
 
@@ -172,8 +178,8 @@ export default function CalendarPage() {
         ]);
         setEventTypes(types || []);
         setMembers(mems || []);
-      } catch (error) {
-        console.error("Error loading static calendar data:", error);
+      } catch {
+        toast.error("Failed to load event types and members.");
       }
     }
     loadEventTypesAndMembers();
@@ -300,7 +306,7 @@ export default function CalendarPage() {
 
   const categoryOptions = useMemo(() => {
     const set = new Set();
-    const list = [];
+    const list = [{ label: "All Categories", value: "ALL" }];
 
     // 1. From eventTypes loaded from backend API
     (eventTypes || []).forEach((t) => {
@@ -320,30 +326,17 @@ export default function CalendarPage() {
       }
     });
 
-    // 3. Fallback defaults if none were populated yet
-    if (list.length === 0) {
-      ["Birthday", "Farewell"].forEach((fallback) => {
-        if (!set.has(fallback.toLowerCase())) {
-          set.add(fallback.toLowerCase());
-          list.push({ label: fallback, value: fallback });
-        }
-      });
-    }
-
     return list;
   }, [eventTypes, events]);
 
   // Keep categoryFilter valid if options change
   useEffect(() => {
-    if (categoryOptions.length > 0) {
+    if (categoryOptions.length > 0 && categoryFilter !== "ALL") {
       const exists = categoryOptions.some(
         (opt) => opt.value.toLowerCase() === categoryFilter.toLowerCase()
       );
       if (!exists) {
-        const bdayOpt = categoryOptions.find((opt) =>
-          opt.value.toLowerCase().includes("birthday")
-        );
-        setCategoryFilter(bdayOpt ? bdayOpt.value : categoryOptions[0].value);
+        setCategoryFilter("ALL");
       }
     }
   }, [categoryOptions, categoryFilter]);
@@ -560,8 +553,8 @@ export default function CalendarPage() {
             ...prev,
             [ev.eventId]: combined,
           }));
-        } catch (e) {
-          console.warn(`Could not load details for event ${ev.eventId}:`, e);
+        } catch {
+          // Event details load error ignored
         }
       });
     }
@@ -972,8 +965,12 @@ export default function CalendarPage() {
                         elevation={0}
                         onClick={() => handleDateClick(day)}
                         sx={{
-                          p: 0.8,
-                          minHeight: 82, // Reduced calendar size
+                          p: 0.6,
+                          height: 98,
+                          maxHeight: 98,
+                          minHeight: 98,
+                          boxSizing: "border-box",
+                          overflow: "hidden",
                           border: (theme) =>
                             isToday
                               ? "2px solid #7c3aed"
@@ -1009,7 +1006,8 @@ export default function CalendarPage() {
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
-                            mb: 0.5,
+                            mb: 0.4,
+                            flexShrink: 0,
                           }}
                         >
                           {isToday ? (
@@ -1021,9 +1019,9 @@ export default function CalendarPage() {
                                   theme.palette.mode === "dark" ? "#7c3aed" : "primary.main",
                                 color: "#ffffff",
                                 borderRadius: "6px",
-                                px: 0.7,
-                                py: 0.15,
-                                fontSize: "0.64rem",
+                                px: 0.6,
+                                py: 0.1,
+                                fontSize: "0.62rem",
                                 fontWeight: 800,
                                 lineHeight: 1.2,
                                 boxShadow: "0 2px 4px rgba(124, 58, 237, 0.3)",
@@ -1034,7 +1032,7 @@ export default function CalendarPage() {
                           ) : (
                             <Typography
                               sx={{
-                                fontSize: "0.74rem",
+                                fontSize: "0.72rem",
                                 fontWeight: 700,
                                 color: isDifferentMonth
                                   ? "text.disabled"
@@ -1047,8 +1045,36 @@ export default function CalendarPage() {
                           )}
                         </Box>
 
-                        {/* Day event cards: Icon + Name, and Category label */}
-                        <Stack spacing={0.4} sx={{ flex: 1 }}>
+                        {/* Day event cards: scrollable within fixed height cell */}
+                        <Stack
+                          spacing={0.35}
+                          sx={{
+                            flex: 1,
+                            minHeight: 0,
+                            overflowY: "auto",
+                            overflowX: "hidden",
+                            pr: 0.2,
+                            "&::-webkit-scrollbar": {
+                              width: "3px",
+                            },
+                            "&::-webkit-scrollbar-track": {
+                              background: "transparent",
+                            },
+                            "&::-webkit-scrollbar-thumb": {
+                              background: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(255, 255, 255, 0.22)"
+                                  : "rgba(124, 58, 237, 0.35)",
+                              borderRadius: "3px",
+                            },
+                            "&::-webkit-scrollbar-thumb:hover": {
+                              background: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(255, 255, 255, 0.45)"
+                                  : "rgba(124, 58, 237, 0.7)",
+                            },
+                          }}
+                        >
                           {dayItems.map((item) => {
                             const typeInfo = getEventTypeInfo(item.colorType);
                             const isBirthdayItem = item.colorType?.toLowerCase().includes("birthday");
@@ -1073,13 +1099,16 @@ export default function CalendarPage() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (isBirthdayItem && isTodayDay) {
-                                      launchPaperBlast(e.clientX, e.clientY);
+                                      launchPaperBlast(e.clientX, e.clientY, 100);
+                                      setCelebrantsForCelebration([item.celebrant || { name: item.displayName }]);
+                                      setBdayCelebrationOpen(true);
+                                    } else if (item.eventItem) {
+                                      handleEventClick(item.eventItem);
                                     }
-                                    handleEventClick(item.eventItem);
                                   }}
                                   sx={{
-                                    p: "3px 6px",
-                                    borderRadius: "6px",
+                                    p: "2.5px 5px",
+                                    borderRadius: "5px",
                                     bgcolor: (theme) =>
                                       isBirthdayItem && isTodayDay
                                         ? theme.palette.mode === "dark"
@@ -1102,7 +1131,7 @@ export default function CalendarPage() {
                                     "&:hover": {
                                       transform: "translateY(-1px)",
                                       boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
-                                      borderColor: typeInfo.color,
+                                      borderColor: isBirthdayItem && isTodayDay ? "#ec4899" : typeInfo.color,
                                     },
                                   }}
                                 >
@@ -1111,18 +1140,18 @@ export default function CalendarPage() {
                                     sx={{
                                       display: "flex",
                                       alignItems: "center",
-                                      gap: 0.5,
+                                      gap: 0.4,
                                     }}
                                   >
                                     <Typography
                                       component="span"
-                                      sx={{ fontSize: "0.74rem", lineHeight: 1 }}
+                                      sx={{ fontSize: "0.7rem", lineHeight: 1 }}
                                     >
                                       {isBirthdayItem && isTodayDay ? "🎂" : typeInfo.emoji}
                                     </Typography>
                                     <Typography
                                       sx={{
-                                        fontSize: "0.72rem",
+                                        fontSize: "0.7rem",
                                         fontWeight: 700,
                                         color: (theme) =>
                                           theme.palette.mode === "dark"
@@ -1140,7 +1169,7 @@ export default function CalendarPage() {
                                       <Typography
                                         component="span"
                                         sx={{
-                                          fontSize: "0.7rem",
+                                          fontSize: "0.68rem",
                                           display: "inline-block",
                                           animation: "bouncePopper 1.5s infinite ease-in-out",
                                         }}
@@ -1151,10 +1180,10 @@ export default function CalendarPage() {
                                   </Box>
 
                                   {/* Line 2: Category & Status label */}
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.4, pl: "1.1rem", mt: 0.2 }}>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.3, pl: "1rem", mt: 0.1 }}>
                                     <Typography
                                       sx={{
-                                        fontSize: "0.62rem",
+                                        fontSize: "0.6rem",
                                         fontWeight: isBirthdayItem && isTodayDay ? 800 : 600,
                                         color: (theme) =>
                                           isBirthdayItem && isTodayDay
@@ -1275,7 +1304,21 @@ export default function CalendarPage() {
               </Box>
 
               {/* Sidebar Items: Birthday Members or Category Participants (NO DOB) */}
-              <Box sx={{ p: 2, flex: 1, overflowY: "auto", maxH: { lg: 580 } }}>
+              <Box
+                sx={{
+                  p: 2,
+                  flex: 1,
+                  overflowY: "auto",
+                  maxHeight: { lg: 580 },
+                  "&::-webkit-scrollbar": {
+                    width: "4px",
+                  },
+                  "&::-webkit-scrollbar-thumb": {
+                    backgroundColor: "rgba(124, 58, 237, 0.25)",
+                    borderRadius: "4px",
+                  },
+                }}
+              >
                 {!isBirthdayView ? (
                   /* ─── Non-Birthday Category Participants List (NO DOB) ─── */
                   categoryParticipants.length === 0 ? (
@@ -1449,7 +1492,9 @@ export default function CalendarPage() {
                             elevation={0}
                             onClick={(e) => {
                               if (isToday) {
-                                launchPaperBlast(e.clientX, e.clientY);
+                                launchPaperBlast(e.clientX, e.clientY, 100);
+                                setCelebrantsForCelebration([mem]);
+                                setBdayCelebrationOpen(true);
                               }
                             }}
                             sx={{
@@ -1671,7 +1716,8 @@ export default function CalendarPage() {
                                     label="Today"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      launchPaperBlast(e.clientX, e.clientY);
+                                      launchPaperBlast(e.clientX, e.clientY, 100);
+                                      setCelebrantsForCelebration([mem]);
                                       setBdayCelebrationOpen(true);
                                     }}
                                     sx={{
@@ -1723,6 +1769,13 @@ export default function CalendarPage() {
         members={members}
       />
 
+      {/* Big Celebratory Birthday Pop-up Modal */}
+      <BirthdayCelebrationModal
+        open={bdayCelebrationOpen}
+        onClose={() => setBdayCelebrationOpen(false)}
+        celebrants={celebrantsForCelebration}
+        autoCloseSeconds={5}
+      />
 
     </div>
   );

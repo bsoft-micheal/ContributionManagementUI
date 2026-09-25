@@ -20,6 +20,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import { exportSheets } from "../../utils/exportToExcel";
 import AppButton from "../../components/common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
+import { useAppToast } from "../../components/common/AppToast";
 import PaymentQrReminderDialog from "../../components/contributions/PaymentQrReminderDialog";
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ function StatCard({ icon, label, value, color, bg }) {
 export default function MyContributionSummaryPage() {
   const theme = useTheme();
   const { authState } = useAuth();
+  const toast = useAppToast();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
@@ -83,8 +85,8 @@ export default function MyContributionSummaryPage() {
         const { data: resData } = await apiClient.get("/contributions/getMySummaryAsync");
         const data = (resData && resData.data !== undefined) ? resData.data : resData;
         setSummary(data);
-      } catch (err) {
-        console.error("Failed to load contribution summary:", err);
+      } catch {
+        toast.error("Failed to load contribution summary.");
       } finally {
         setLoading(false);
       }

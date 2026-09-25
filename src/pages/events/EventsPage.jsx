@@ -24,6 +24,7 @@ import { GetMembersAsync } from "../../services/memberService";
 import AppDataTable from "../../components/common/AppDataTable";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 export default function EventsPage() {
   const theme = useTheme();
@@ -45,14 +46,18 @@ export default function EventsPage() {
   const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
 
   async function loadData() {
-    const [events, types, members] = await Promise.all([
-      GetEventsAsync(filters),
-      GetEventTypesAsync(),
-      GetMembersAsync(),
-    ]);
-    setEvents(events);
-    setEventTypes(types);
-    setMembers(members);
+    try {
+      const [events, types, members] = await Promise.all([
+        GetEventsAsync(filters),
+        GetEventTypesAsync(),
+        GetMembersAsync(),
+      ]);
+      setEvents(events || []);
+      setEventTypes(types || []);
+      setMembers(members || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load events data");
+    }
   }
 
   useEffect(() => {
@@ -85,10 +90,10 @@ export default function EventsPage() {
     if (eventToDelete) {
       try {
         await DeleteEventAsync(eventToDelete.eventId);
-        toast.success("Event deleted successfully");
+        toast.success(TOAST_MESSAGES.EVENTS.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        toast.error(error.response?.data?.message || "Failed to delete event");
+        toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       } finally {
         setDeleteConfirmOpen(false);
         setEventToDelete(null);
@@ -271,8 +276,8 @@ export default function EventsPage() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this record?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
     </div>
   );

@@ -42,6 +42,8 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import { validateForm } from "../../utils/validation";
 import { GetUsersAsync, CreateUserAsync, UpdateUserAsync, DeleteUserAsync, CreateUsersBulkAsync } from "../../services/userService";
+import { GetRolesAsync } from "../../services/roleService";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 // ─── Role color map ───────────────────────────────────────────────────────────
 const ROLE_COLORS = {
@@ -78,6 +80,7 @@ export default function UsersPage() {
   const hasWriteAccess = canEdit;
 
   const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -91,13 +94,21 @@ export default function UsersPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const templateValidations = {
+  // Dynamic user roles from database
+  const userRolesList = useMemo(() => {
+    if (roles && roles.length > 0) {
+      return roles.map((r) => ({ label: r.roleName, value: r.roleName }));
+    }
+    return [];
+  }, [roles]);
+
+  const templateValidations = useMemo(() => ({
     "Role": {
       type: "list",
       formulae: ['"Admin,Organizer,Member"'],
       error: "Please select a role from the list."
     }
-  };
+  }), [userRolesList]);
 
   // Filter state
   const [filterRole, setFilterRole] = useState("");
@@ -122,10 +133,14 @@ export default function UsersPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const usersData = await GetUsersAsync();
-      setUsers(usersData);
+      const [usersData, rolesData] = await Promise.all([
+        GetUsersAsync(),
+        GetRolesAsync().catch(() => [])
+      ]);
+      setUsers(usersData || []);
+      setRoles(rolesData || []);
     } catch {
-      toast.error("Failed to load users");
+      toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
     }
@@ -139,6 +154,7 @@ export default function UsersPage() {
     setShowConfirm(false);
     setDialogOpen(true);
   }
+
 
   function openEdit(row) {
     setForm({
@@ -362,7 +378,7 @@ export default function UsersPage() {
     }
 
     // Match role case-insensitively
-    const matchedRole = USER_ROLES.find(r => r.value.toLowerCase() === roleName.toLowerCase());
+    const matchedRole = userRolesList.find(r => r.value.toLowerCase() === roleName.toLowerCase());
     if (!matchedRole) {
       return { error: `Row ${rowNum}: Invalid role '${roleName}'. Allowed: Admin, Organizer, Member` };
     }
@@ -590,7 +606,7 @@ export default function UsersPage() {
                   onChange={(e) => {
                     setFilterRole(e.target.value);
                   }}
-                  options={[{ label: "All Roles", value: "" }, ...USER_ROLES]}
+                  options={[{ label: "All Roles", value: "" }, ...userRolesList]}
                   size="small"
                   required
                   fullWidth
@@ -787,7 +803,7 @@ export default function UsersPage() {
               placeholder="Select role…"
               value={form.roleName}
               onChange={(e) => fieldChange("roleName", e.target.value)}
-              options={USER_ROLES}
+              options={userRolesList}
               error={!!errors.roleName}
               helperText={errors.roleName}
               required
@@ -839,8 +855,8 @@ export default function UsersPage() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Confirm"
-        content="Are you sure you want to delete this record?"
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
       />
 
       {/* ── Status Confirm ────────────────────────────────────────────────── */}

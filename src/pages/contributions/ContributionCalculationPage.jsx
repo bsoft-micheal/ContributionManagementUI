@@ -45,7 +45,7 @@ export default function ContributionCalculationPage() {
         setFilterEventId(evts[0].eventId);
       }
     } catch (error) {
-      console.error("Failed to load calculation data:", error);
+      toast.error("Failed to load calculation data.");
     } finally {
       setLoading(false);
     }
@@ -63,7 +63,6 @@ export default function ContributionCalculationPage() {
       const detailedEvent = await GetEventByIdAsync(selectedEventId);
       setSelectedEventDetails(detailedEvent);
     } catch (error) {
-      console.error("Failed to load event details:", error);
       toast.error("Failed to load event details");
     } finally {
       setLoading(false);
@@ -89,58 +88,57 @@ export default function ContributionCalculationPage() {
     const eventDate = dayjs(selectedEventDetails.eventDate);
     const eventParticipants = selectedEventDetails.participants || [];
 
-    const eventTypeName = selectedEventDetails.eventTypeName || 
-      events.find(e => e.eventId === selectedEventDetails.eventId)?.eventTypeName || "";
-    const eventName = selectedEventDetails.eventName || 
-      events.find(e => e.eventId === selectedEventDetails.eventId)?.eventName || "";
-    const isBirthdayEvent = 
-      eventTypeName.toLowerCase().includes("birthday") || 
-      eventName.toLowerCase().includes("birthday");
+    const hasTenureRule = Boolean(selectedEventDetails.hasTenureRule);
+    const thresholdYears = Number(selectedEventDetails.tenureThresholdYears) > 0 ? Number(selectedEventDetails.tenureThresholdYears) : 1;
+    const newEntrantPct = Number(selectedEventDetails.newEntrantSharePercentage) > 0 ? Number(selectedEventDetails.newEntrantSharePercentage) : 50;
+    const standardPct = Number(selectedEventDetails.standardSharePercentage) > 0 ? Number(selectedEventDetails.standardSharePercentage) : 100;
+    const newEntrantRatio = newEntrantPct / 100;
+    const standardRatio = standardPct / 100;
 
     // 1. Identify which members are participants and find their tenure/joining date
     const enrichedParticipants = eventParticipants.map(ep => {
       const memberInfo = members.find(m => m.memberId === ep.memberId);
       const joiningDate = memberInfo ? dayjs(memberInfo.joiningDate) : dayjs();
       const tenureYears = eventDate.diff(joiningDate, 'year', true);
-      const isLessThanOneYear = tenureYears < 1;
+      const isNewEntrant = hasTenureRule && tenureYears < thresholdYears;
 
       return {
         memberId: ep.memberId,
         name: ep.memberName || (memberInfo ? memberInfo.name : ""),
         joiningDate: memberInfo ? memberInfo.joiningDate : null,
         tenure: tenureYears,
-        isLessThanOneYear,
+        isNewEntrant,
         createdBy: memberInfo?.createdBy || memberInfo?.CreatedBy || ep.createdBy || ep.CreatedBy || "--",
         createdAt: memberInfo?.createdAt || memberInfo?.CreatedAt || memberInfo?.createdOn || memberInfo?.CreatedOn || ep.createdAt || ep.createdOn || null,
       };
     });
 
     const totalAmount = selectedEventDetails.baseAmount || 0;
-    let fullShare = 0;
+    let standardFullShare = 0;
     let equalShare = 0;
 
-    if (isBirthdayEvent) {
-      // 2. Count full vs half shares (Only for Birthday events)
-      const halfShareCount = enrichedParticipants.filter(p => p.isLessThanOneYear).length;
-      const fullShareCount = enrichedParticipants.length - halfShareCount;
+    if (hasTenureRule) {
+      // 2. Count standard vs new entrant shares
+      const newEntrantCount = enrichedParticipants.filter(p => p.isNewEntrant).length;
+      const standardCount = enrichedParticipants.length - newEntrantCount;
 
-      // 3. Split calculation: Full share = total / (fullShareCount + 0.5 * halfShareCount)
-      const divisor = fullShareCount + 0.5 * halfShareCount;
-      fullShare = divisor > 0 ? (totalAmount / divisor) : 0;
-      setFullShareAmount(fullShare);
+      // 3. Split calculation: Divisor = (standardCount * standardRatio) + (newEntrantCount * newEntrantRatio)
+      const divisor = (standardCount * standardRatio) + (newEntrantCount * newEntrantRatio);
+      standardFullShare = divisor > 0 ? (totalAmount / divisor) : 0;
+      setFullShareAmount(standardFullShare);
     } else {
-      // For other events (Except Birthday), everyone pays an equal share amount
+      // For other events without tenure rule, everyone pays an equal share amount
       const divisor = enrichedParticipants.length;
       equalShare = divisor > 0 ? (totalAmount / divisor) : 0;
       setFullShareAmount(equalShare);
     }
 
-    // 4. Calculate for each participant (Birthday category applies 50% half share for new entrants)
+    // 4. Calculate for each participant
     const calculated = enrichedParticipants.map(p => {
       const epContribution = selectedEventDetails.contributions?.find(c => c.memberId === p.memberId);
       let calculatedAmount;
-      if (isBirthdayEvent) {
-        calculatedAmount = p.isLessThanOneYear ? (fullShare * 0.5) : fullShare;
+      if (hasTenureRule) {
+        calculatedAmount = p.isNewEntrant ? (standardFullShare * newEntrantRatio) : (standardFullShare * standardRatio);
       } else if (epContribution !== undefined && epContribution !== null && epContribution.amount !== undefined) {
         calculatedAmount = epContribution.amount;
       } else {
@@ -149,7 +147,10 @@ export default function ContributionCalculationPage() {
 
       return {
         ...p,
-        isBirthdayEvent,
+        hasTenureRule,
+        thresholdYears,
+        newEntrantPct,
+        standardPct,
         tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
         calculatedAmount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimals
       };
@@ -158,13 +159,10 @@ export default function ContributionCalculationPage() {
     setCalculationData(calculated);
   };
 
-  const currentEventTypeName = selectedEventDetails?.eventTypeName || 
-    events.find(e => e.eventId === selectedEventDetails?.eventId)?.eventTypeName || "";
-  const currentEventName = selectedEventDetails?.eventName || 
-    events.find(e => e.eventId === selectedEventDetails?.eventId)?.eventName || "";
-  const isCurrentEventBirthday = 
-    currentEventTypeName.toLowerCase().includes("birthday") ||
-    currentEventName.toLowerCase().includes("birthday");
+  const hasDynamicTenureRule = Boolean(selectedEventDetails?.hasTenureRule);
+  const currentThresholdYears = Number(selectedEventDetails?.tenureThresholdYears) > 0 ? Number(selectedEventDetails?.tenureThresholdYears) : 1;
+  const currentNewEntrantPct = Number(selectedEventDetails?.newEntrantSharePercentage) > 0 ? Number(selectedEventDetails?.newEntrantSharePercentage) : 50;
+  const currentStandardPct = Number(selectedEventDetails?.standardSharePercentage) > 0 ? Number(selectedEventDetails?.standardSharePercentage) : 100;
 
   const columns = [
     {
@@ -190,14 +188,14 @@ export default function ContributionCalculationPage() {
     },
     {
       label: "Rule Applied",
-      sx: { minWidth: 150 },
-      cellSx: { minWidth: 150 },
+      sx: { minWidth: 170 },
+      cellSx: { minWidth: 170 },
       render: (row) => {
-        if (!row.isBirthdayEvent) {
+        if (!row.hasTenureRule) {
           return (
             <Chip
               size="small"
-              label="Equal Share"
+              label="Equal Share (100%)"
               color="primary"
               variant="outlined"
               sx={{ fontWeight: 800, fontSize: "0.65rem" }}
@@ -207,8 +205,8 @@ export default function ContributionCalculationPage() {
         return (
           <Chip
             size="small"
-            label={row.isLessThanOneYear ? "50% (New Entrant)" : "100% (Standard)"}
-            color={row.isLessThanOneYear ? "warning" : "success"}
+            label={row.isNewEntrant ? `${row.newEntrantPct}% (New Entrant < ${row.thresholdYears} yr)` : `${row.standardPct}% (Standard)`}
+            color={row.isNewEntrant ? "warning" : "success"}
             variant="outlined"
             sx={{ fontWeight: 800, fontSize: "0.65rem" }}
           />
@@ -315,7 +313,7 @@ export default function ContributionCalculationPage() {
                 </Typography>
                 <Grid container spacing={2}>
                   {/* Column 1: Cost & Participants */}
-                  <Grid size={{ xs: 12, sm: isCurrentEventBirthday ? 3.5 : 4 }}>
+                  <Grid size={{ xs: 12, sm: hasDynamicTenureRule ? 3.5 : 4 }}>
                     <Stack spacing={0.5}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Event Cost:</Typography>
@@ -328,35 +326,35 @@ export default function ContributionCalculationPage() {
                     </Stack>
                   </Grid>
 
-                  {isCurrentEventBirthday ? (
+                  {hasDynamicTenureRule ? (
                     <>
-                      {/* Column 2: Full/Half share counts for Birthday */}
+                      {/* Column 2: Full/Half share counts */}
                       <Grid size={{ xs: 12, sm: 4.5 }} sx={{ borderLeft: { xs: "none", sm: `1px solid ${theme.palette.divider}` }, pl: { xs: 0, sm: 2 } }}>
                         <Stack spacing={0.5}>
                           <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Full Share Members (100%):</Typography>
-                            <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => !x.isLessThanOneYear).length}</Typography>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Standard ({currentStandardPct}%):</Typography>
+                            <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => !x.isNewEntrant).length} Members</Typography>
                           </Box>
                           <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Half Share Members (50%):</Typography>
-                            <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => x.isLessThanOneYear).length}</Typography>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>New Entrant ({currentNewEntrantPct}%, &lt; {currentThresholdYears} yr):</Typography>
+                            <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{calculationData.filter(x => x.isNewEntrant).length} Members</Typography>
                           </Box>
                         </Stack>
                       </Grid>
 
-                      {/* Column 3: Full Share Amount */}
+                      {/* Column 3: Standard Share Amount */}
                       <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Full Share</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Standard ({currentStandardPct}%)</Typography>
                         <Typography variant="body2" fontWeight={900} color="primary.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
-                          ₹{fullShareAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          ₹{(fullShareAmount * (currentStandardPct / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Typography>
                       </Grid>
 
-                      {/* Column 4: Half Share Amount */}
+                      {/* Column 4: New Entrant Share Amount */}
                       <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Half Share (50%)</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>New Entrant ({currentNewEntrantPct}%)</Typography>
                         <Typography variant="body2" fontWeight={900} color="warning.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
-                          ₹{(fullShareAmount * 0.5).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          ₹{(fullShareAmount * (currentNewEntrantPct / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Typography>
                       </Grid>
                     </>

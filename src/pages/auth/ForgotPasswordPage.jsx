@@ -21,6 +21,7 @@ import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import { RequestForgotPasswordOtpAsync } from "../../services/userService";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 export default function ForgotPasswordPage() {
   const theme = useTheme();
@@ -34,22 +35,18 @@ export default function ForgotPasswordPage() {
   const handleRequestOtp = async (e) => {
     e.preventDefault();
     if (!email.trim()) {
-      setEmailError("Email address is required.");
-      toast.error("Please enter your email address.");
+      setEmailError(COMMON_STRINGS.VALIDATION.REQUIRED || "Email address is required.");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
     setLoading(true);
     try {
       await RequestForgotPasswordOtpAsync(email.trim());
-      toast.success("A password reset OTP has been sent to your email!");
+      toast.success(TOAST_MESSAGES.AUTH.OTP_SENT || "A password reset OTP has been sent to your email!");
       const sentTime = Date.now().toString();
       localStorage.setItem("otp_sent_time", sentTime);
       localStorage.setItem("recovery_email", email.trim());
-      console.log("[ForgotPasswordPage] Saved to localStorage:", {
-        otp_sent_time: sentTime,
-        recovery_email: email.trim()
-      });
       navigate("/forgot-password/verify", { state: { email: email.trim() } });
     } catch (error) {
       toast.error(error.response?.data?.message ?? "Failed to request password reset OTP. Please check your email.");

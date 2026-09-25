@@ -16,18 +16,7 @@ import { FilterList as FilterListIcon, Refresh as RefreshIcon, Save as SaveIcon 
 import { GetUserRightsAsync, SaveUserRightsAsync } from "../../services/userRightsService";
 import { GetRolesAsync } from "../../services/roleService";
 import { formatGridDate } from "../../utils/dateHelper";
-
-// Top-level module options for the Module filter dropdown
-const MODULE_OPTIONS = [
-  { label: "All Modules", value: "All" },
-  { label: "Dashboard", value: "Dashboard" },
-  { label: "Members", value: "Members" },
-  { label: "Events", value: "Events" },
-  { label: "Finance", value: "Finance" },
-  { label: "Support Ticket", value: "Support Ticket" },
-  { label: "Tools", value: "Tools" },
-  { label: "Reports", value: "Reports" },
-];
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const ACCESS_OPTIONS = [
   { value: 1, label: "Read Only", color: "#3b82f6", stringVal: "readOnly" },
@@ -51,6 +40,12 @@ export default function UserRightsPage() {
 
   const toast = useAppToast();
 
+  const moduleOptions = useMemo(() => {
+    const roleRights = rights[selectedRoleName] || [];
+    const uniqueModules = Array.from(new Set(roleRights.map((r) => r.module).filter(Boolean)));
+    return [{ label: "All Modules", value: "All" }, ...uniqueModules.map((m) => ({ label: m, value: m }))];
+  }, [rights, selectedRoleName]);
+
   // ── Initial load: fetch roles ─────────────────────────────────────────────
   useEffect(() => {
     loadRoles();
@@ -68,8 +63,10 @@ export default function UserRightsPage() {
         ? dbRoles
         : [{ roleName: "Admin" }, { roleName: "Organizer" }, { roleName: "Member" }];
       setRoles(list);
-      setSelectedRoleName(list[0].roleName);
-      setFilterRoleName(list[0].roleName);
+      if (list.length > 0) {
+        setSelectedRoleName(list[0].roleName);
+        setFilterRoleName(list[0].roleName);
+      }
     } catch {
       toast.error("Failed to load roles");
     }
@@ -191,7 +188,7 @@ export default function UserRightsPage() {
   };
 
   const handleClearFilter = () => {
-    const defaultRole = roles.length > 0 ? roles[0].roleName : "Admin";
+    const defaultRole = roles.length > 0 ? roles[0].roleName : "";
     setFilterRoleName(defaultRole);
     setFilterModule("All");
     setSelectedRoleName(defaultRole);
@@ -336,7 +333,7 @@ export default function UserRightsPage() {
                 placeholder="Select Module"
                 value={filterModule}
                 onChange={(e) => setFilterModule(e.target.value)}
-                options={MODULE_OPTIONS}
+                options={moduleOptions}
                 required
                 fullWidth
               />

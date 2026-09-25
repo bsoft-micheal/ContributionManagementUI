@@ -1,55 +1,25 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
 export const getSupportTicketsAsync = async (params) => {
-  try {
-    return await getApi("/support-tickets/getAllSupportTicketAsync", params);
-  } catch (error) {
-    console.error("Error fetching support tickets:", error.response?.data || error.message);
-    throw error;
-  }
+  return await getApi("/support-tickets/getAllSupportTicketAsync", params);
 };
 
 export const getSupportTicketByIdAsync = async (id) => {
-  try {
-    return await getApi(`/support-tickets/getSupportTicketAsyncById/${id}`);
-  } catch (error) {
-    console.error("Error fetching support ticket:", error.response?.data || error.message);
-    throw error;
-  }
+  return await getApi(`/support-tickets/getSupportTicketAsyncById/${id}`);
 };
 
 export const createSupportTicketAsync = async (data) => {
-  try {
-    return await postApi("/support-tickets/saveSupportTicketAsync", data);
-  } catch (error) {
-    console.error("Error creating support ticket:", error.response?.data || error.message);
-    throw error;
-  }
+  return await postApi("/support-tickets/saveSupportTicketAsync", data);
 };
 
 export const updateSupportTicketAsync = async (id, data) => {
-  try {
-    return await putApi(`/support-tickets/updateSupportTicketAsyncById/${id}`, data);
-  } catch (error) {
-    console.error("Error updating support ticket:", error.response?.data || error.message);
-    throw error;
-  }
+  return await putApi(`/support-tickets/updateSupportTicketAsyncById/${id}`, data);
 };
 
 export const replySupportTicketAsync = async (id, data) => {
-  try {
-    return await postApi(`/support-tickets/replySupportTicketAsync/${id}`, data);
-  } catch (error) {
-    console.error("Error replying to ticket:", error.response?.data || error.message);
-    throw error;
-  }
+  return await postApi(`/support-tickets/replySupportTicketAsync/${id}`, data);
 };
 
 export const deleteSupportTicketAsync = async (id) => {
-  try {
-    return await deleteApi(`/support-tickets/deleteSupportTicketAsyncById/${id}`);
-  } catch (error) {
-    console.error("Error deleting ticket:", error.response?.data || error.message);
-    throw error;
-  }
+  return await deleteApi(`/support-tickets/deleteSupportTicketAsyncById/${id}`);
 };

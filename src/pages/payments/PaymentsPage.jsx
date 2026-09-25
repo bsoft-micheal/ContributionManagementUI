@@ -15,6 +15,7 @@ import {
   FileDownloadOutlined as FileDownloadIcon,
   ReceiptLongOutlined as ReceiptIcon,
   FilterList as FilterListIcon,
+  ContentCopy as CopyIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
@@ -32,16 +33,10 @@ import {
 } from "../../services/paymentService";
 import { GetMembersAsync } from "../../services/memberService";
 import { GetEventsAsync } from "../../services/eventService";
+import { GetStatusesAsync } from "../../services/statusService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
-
-const statusOptions = [
-  { label: "All Statuses", value: "ALL" },
-  { label: "Verified", value: "Verified" },
-  { label: "Pending", value: "Pending" },
-  { label: "Failed", value: "Failed" },
-  { label: "Needs Clarification", value: "Needs Clarification" },
-];
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 export default function PaymentsPage() {
   const toast = useAppToast();
@@ -52,6 +47,7 @@ export default function PaymentsPage() {
   const [transactions, setTransactions] = useState([]);
   const [membersList, setMembersList] = useState([]);
   const [eventsList, setEventsList] = useState([]);
+  const [dbStatuses, setDbStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Dialog state
@@ -71,9 +67,9 @@ export default function PaymentsPage() {
   const [appliedStatus, setAppliedStatus] = useState("ALL");
   const [appliedDate, setAppliedDate] = useState(null);
 
-  // Dynamically derive payment modes from DB transactions + standard options
+  // Dynamically derive payment modes from DB transactions
   const modeOptions = useMemo(() => {
-    const set = new Set(["GPay", "PhonePe", "Paytm", "UPI"]);
+    const set = new Set();
     transactions.forEach((t) => {
       if (t.paymentMode) set.add(t.paymentMode);
     });
@@ -103,18 +99,30 @@ export default function PaymentsPage() {
     ];
   }, [eventsList]);
 
+  const statusOptions = useMemo(() => {
+    return [
+      { label: "All Statuses", value: "ALL" },
+      ...(dbStatuses || []).map((s) => ({
+        label: s.statusName || s.name || s.status_name,
+        value: s.statusName || s.name || s.status_name,
+      })),
+    ];
+  }, [dbStatuses]);
+
   // Load transactions and master data from backend on mount
   const loadBackendData = async () => {
     try {
       setLoading(true);
-      const [txnRes, memsRes, eventsRes] = await Promise.all([
+      const [txnRes, memsRes, eventsRes, statusRes] = await Promise.all([
         getPaymentTransactionsAsync().catch(() => []),
         GetMembersAsync().catch(() => []),
         GetEventsAsync().catch(() => []),
+        GetStatusesAsync().catch(() => []),
       ]);
 
       if (Array.isArray(memsRes)) setMembersList(memsRes);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
+      if (Array.isArray(statusRes)) setDbStatuses(statusRes);
 
       if (Array.isArray(txnRes)) {
         const mapped = txnRes.map((t) => ({
@@ -137,9 +145,8 @@ export default function PaymentsPage() {
         }));
         setTransactions(mapped);
       }
-    } catch (err) {
-      console.warn("Could not fetch payments from backend:", err);
-      toast.error("Could not load payment transactions from database");
+    } catch {
+      toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
     }
@@ -172,11 +179,10 @@ export default function PaymentsPage() {
           verifiedBy: verifier,
           notes: verifier ? `Payment verified by ${verifier}.` : "Payment verified.",
         });
-        toast.success(`Transaction ${target.id} marked as Verified!`);
+        toast.success(TOAST_MESSAGES.PAYMENTS.VERIFIED_SUCCESS);
         await loadBackendData();
-      } catch (err) {
-        console.error("Backend verify failed:", err);
-        toast.error("Failed to verify transaction in database");
+      } catch {
+        toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
       }
     }
 
@@ -202,11 +208,10 @@ export default function PaymentsPage() {
           verifiedBy: "-",
           notes: "Marked as pending.",
         });
-        toast.info(`Transaction ${target.id} marked as Pending`);
+        toast.info(TOAST_MESSAGES.PAYMENTS.STATUS_UPDATED || TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
         await loadBackendData();
-      } catch (err) {
-        console.error("Backend update failed:", err);
-        toast.error("Failed to update status in database");
+      } catch {
+        toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
       }
     }
 
@@ -685,9 +690,29 @@ export default function PaymentsPage() {
                 <Typography variant="caption" color="text.secondary">
                   UTR / Reference No
                 </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {selectedTxn.utr || "--"}
-                </Typography>
+                <Stack direction="row" alignItems="center" spacing={0.6}>
+                  <Typography variant="body2" fontWeight={700} color="#1e293b">
+                    {selectedTxn.utr || "--"}
+                  </Typography>
+                  {selectedTxn.utr && selectedTxn.utr !== "-" && (
+                    <Tooltip title="Copy UTR">
+                      <IconButton
+                        size="small"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(selectedTxn.utr);
+                            toast.success("UTR copied to clipboard!");
+                          } catch {
+                            toast.error("Failed to copy UTR");
+                          }
+                        }}
+                        sx={{ p: 0.3 }}
+                      >
+                        <CopyIcon sx={{ fontSize: 15, color: "#64748b" }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Stack>
               </Grid>
               <Grid size={{ xs: 6 }}>
                 <Typography variant="caption" color="text.secondary">
@@ -739,33 +764,53 @@ export default function PaymentsPage() {
               {selectedTxn.screenshot && (
                 <Grid size={{ xs: 12 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-                    Payment Screenshot
+                    Payment Screenshot / Receipt Proof
                   </Typography>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      p: 1.2,
-                      borderRadius: "10px",
-                      bgcolor: (t) =>
-                        t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                      border: (t) => `1px solid ${t.palette.divider}`,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <ReceiptIcon sx={{ fontSize: 20, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
-                      <Typography variant="body2" fontWeight={600}>
-                        {selectedTxn.screenshot}
-                      </Typography>
-                    </Box>
-                    <IconButton
-                      size="small"
-                      onClick={() => toast.info(`Downloading ${selectedTxn.screenshot}`)}
+                  {selectedTxn.screenshot.startsWith("data:image") || selectedTxn.screenshot.startsWith("http") ? (
+                    <Box
+                      sx={{
+                        mt: 0.5,
+                        p: 1.5,
+                        border: "1.5px solid #e2e8f0",
+                        borderRadius: 2.5,
+                        bgcolor: "#f8fafc",
+                        textAlign: "center",
+                      }}
                     >
-                      <FileDownloadIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
+                      <img
+                        src={selectedTxn.screenshot}
+                        alt="Payment proof receipt"
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: 240,
+                          borderRadius: 8,
+                          display: "block",
+                          margin: "0 auto",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                        }}
+                      />
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        p: 1.2,
+                        borderRadius: "10px",
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                        border: (t) => `1px solid ${t.palette.divider}`,
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <ReceiptIcon sx={{ fontSize: 20, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
+                        <Typography variant="body2" fontWeight={600}>
+                          {selectedTxn.screenshot}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
                 </Grid>
               )}
             </Grid>

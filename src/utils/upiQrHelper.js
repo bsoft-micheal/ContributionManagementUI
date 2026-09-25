@@ -114,8 +114,8 @@ export function getAllPaymentQrConfigs() {
         return parsed;
       }
     }
-  } catch (err) {
-    console.warn("Could not read event payment QR configs from localStorage:", err);
+  } catch {
+    // Read event payment QR configs error ignored
   }
   return {};
 }
@@ -148,8 +148,8 @@ export function savePaymentQrConfigForEventType(eventType, config) {
 
   try {
     localStorage.setItem(EVENT_QR_STORAGE_KEY, JSON.stringify(all));
-  } catch (err) {
-    console.warn("Could not save event payment QR configs to localStorage:", err);
+  } catch {
+    // Save event payment QR configs error ignored
   }
 
   return all;

@@ -25,6 +25,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { ResetPasswordWithOtpAsync } from "../../services/userService";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
+import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 export default function ForgotPasswordResetPage() {
   const theme = useTheme();
@@ -53,8 +54,8 @@ export default function ForgotPasswordResetPage() {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     if (!newPassword.trim()) {
-      setPasswordError("New password is required.");
-      toast.error("Please enter a new password.");
+      setPasswordError(COMMON_STRINGS.VALIDATION.REQUIRED || "New password is required.");
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
     if (newPassword.length < 6) {
@@ -71,7 +72,7 @@ export default function ForgotPasswordResetPage() {
     setLoading(true);
     try {
       await ResetPasswordWithOtpAsync(email, otp, newPassword.trim());
-      toast.success("Password updated successfully! Redirecting you to Login...");
+      toast.success(TOAST_MESSAGES.AUTH.PASSWORD_RESET_SUCCESS || "Password updated successfully! Redirecting you to Login...");
       
       // Clear recovery session storage items
       localStorage.removeItem("otp_sent_time");
@@ -83,7 +84,7 @@ export default function ForgotPasswordResetPage() {
         navigate("/login");
       }, 3000);
     } catch (error) {
-      toast.error(error.response?.data?.message ?? "Failed to reset password. Please request a new OTP.");
+      toast.error(error.response?.data?.message ?? (TOAST_MESSAGES.AUTH.PASSWORD_RESET_FAILED || "Failed to reset password. Please request a new OTP."));
     } finally {
       setLoading(false);
     }
