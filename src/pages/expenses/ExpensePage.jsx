@@ -104,6 +104,8 @@ const initialForm = {
   filePreview: "",
 };
 
+import useAccessByLocation from "../../hooks/useAccessByLocation";
+
 const statusOptions = [
   { label: "All Statuses", value: "ALL" },
   { label: "Approved", value: "Approved" },
@@ -113,8 +115,8 @@ const statusOptions = [
 
 export default function ExpensePage() {
   const { authState } = useAuth();
-  const rights = getRightsForPage("Expense", authState?.role);
-  const hasWriteAccess = rights?.write !== undefined ? rights.write : true;
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
   const toast = useAppToast();
   const fileInputRef = useRef(null);
 

@@ -1,6 +1,65 @@
-// Reusable Role-Based Access Control (RBAC) rights helper
+import { navigationItems } from "../config/menuConfig";
 
-export function getRightsForPath(path, roleName) {
+/**
+ * Resolves the DB feature_id associated with a routing path based on menuConfig.
+ */
+export function getFeatureIdForPath(path) {
+  if (!path) return null;
+  const cleanPath = path.toLowerCase();
+
+  for (const item of navigationItems) {
+    if (item.path && item.path.toLowerCase() === cleanPath) {
+      return item.featureId;
+    }
+    if (item.path && item.path !== "/" && cleanPath.startsWith(item.path.toLowerCase())) {
+      return item.featureId;
+    }
+    if (item.children) {
+      for (const child of item.children) {
+        if (child.path && child.path.toLowerCase() === cleanPath) {
+          return child.featureId;
+        }
+        if (child.path && child.path !== "/" && cleanPath.startsWith(child.path.toLowerCase())) {
+          return child.featureId;
+        }
+      }
+    }
+  }
+
+  // Route path fallbacks
+  if (cleanPath === "/") return 1;
+  if (cleanPath === "/members") return 2;
+  if (cleanPath.startsWith("/events")) return 4;
+  if (cleanPath === "/calendar") return 5;
+  if (cleanPath === "/gallery") return 6;
+  if (cleanPath === "/contributions" || cleanPath === "/my-contributions") return 8;
+  if (cleanPath === "/payments") return 9;
+  if (cleanPath === "/contribution-calculation") return 10;
+  if (cleanPath === "/expense") return 11;
+  if (cleanPath === "/support-tickets") return 12;
+  if (cleanPath === "/users") return 14;
+  if (cleanPath === "/roles") return 15;
+  if (cleanPath === "/user-rights") return 16;
+  if (cleanPath === "/event-types") return 17;
+  if (cleanPath === "/budget-calculations") return 18;
+  if (cleanPath === "/types" || cleanPath === "/ticket-types") return 19;
+  if (cleanPath === "/status") return 20;
+  if (cleanPath === "/exit-process") return 21;
+  if (cleanPath === "/settings") return 22;
+  if (cleanPath.startsWith("/reports")) return 23;
+
+  return null;
+}
+
+/**
+ * Resolves permissions for a given featureId and roleName.
+ * 
+ * AccessType mapping:
+ *   1 = ReadOnly  -> read: true, write: false, deny: false
+ *   2 = ReadWrite -> read: true, write: true, deny: false
+ *   3 = Deny      -> read: false, write: false, deny: true
+ */
+export function getRightsForFeatureId(featureId, roleName) {
   if (!roleName) {
     return { read: false, write: false, deny: true };
   }
@@ -17,93 +76,48 @@ export function getRightsForPath(path, roleName) {
       return { read: true, write: true, deny: false };
     }
 
-    // Map URL path to target SubModule / Module label
-    let targetName = "";
-    if (path === "/") targetName = "Dashboard";
-    else if (path === "/members") targetName = "Members";
-    else if (path === "/exit-process") targetName = "Exit Process";
-    else if (path === "/calendar") targetName = "Calendar";
-    else if (path === "/events" || path.startsWith("/events/")) targetName = "Event";
-    else if (path === "/event-types") targetName = "Event Types";
-    else if (path === "/roles") targetName = "Roles";
-    else if (path === "/contributions") targetName = "Contribution";
-    else if (path === "/contribution-calculation") targetName = "Calculation";
-    else if (path === "/reports/event-collection-audit" || path === "/reports") targetName = "Reports";
-    else if (path === "/reports/member-velocity") targetName = "Reports";
-    else if (path === "/reports/pending-dues") targetName = "Reports";
-    else if (path === "/reports/member-category-paid") targetName = "Reports";
-    else if (path === "/my-contributions") targetName = "Contribution";
-    else if (path === "/payments") targetName = "Payment History";
-    else if (path === "/expense") targetName = "Expense";
-    else if (path === "/gallery") targetName = "Gallery";
-    else if (path === "/support-tickets") targetName = "Support Tickets";
-    else if (path === "/budget-calculations") targetName = "Budget Calculations";
-    else if (path === "/types" || path === "/ticket-types") targetName = "Types";
-    else if (path === "/status") targetName = "Status";
-    else if (path === "/settings") targetName = "Settings";
-    else if (path === "/user-rights") targetName = "User Rights";
-    else if (path === "/users") targetName = "Users";
+    const numericFeatureId = Number(featureId);
+    let matchedRight = null;
 
-    const matchedRight = roleRights.find(r => {
-      const sub = (r.subModule || r.SubModule || "").toLowerCase();
-      const mod = (r.module || r.Module || "").toLowerCase();
-      const target = targetName.toLowerCase();
-      return sub === target || mod === target;
-    });
-
-    if (!matchedRight) {
-      return { read: true, write: true, deny: false };
+    if (numericFeatureId > 0) {
+      matchedRight = roleRights.find(r => Number(r.featureId || r.featureID) === numericFeatureId);
     }
 
-    const access = matchedRight.access || matchedRight.Access || "readWrite";
+    if (!matchedRight) {
+      return { read: false, write: false, deny: true };
+    }
+
+    let accessType = matchedRight.accessType ?? matchedRight.AccessType;
+    if (accessType === undefined || accessType === null || isNaN(Number(accessType)) || Number(accessType) === 0) {
+      const accessStr = (matchedRight.access || matchedRight.Access || "").toLowerCase();
+      accessType = accessStr === "deny" ? 3 : (accessStr === "readonly" ? 1 : 2);
+    }
+
+    const val = Number(accessType);
+
     return {
-      read: access !== "deny",
-      write: access === "readWrite",
-      deny: access === "deny"
+      read: val === 1 || val === 2,  // 1 = ReadOnly, 2 = ReadWrite
+      write: val === 2,              // 2 = ReadWrite
+      deny: val === 3               // 3 = Deny
     };
   } catch (error) {
-    console.error("Error evaluating path rights:", error);
+    console.error("Error evaluating featureId rights:", error);
     return { read: true, write: true, deny: false };
   }
 }
 
+/**
+ * Resolves permissions for a URL path by finding its featureId and evaluating rights.
+ */
+export function getRightsForPath(path, roleName) {
+  const featureId = getFeatureIdForPath(path);
+  return getRightsForFeatureId(featureId, roleName);
+}
+
 export function getRightsForPage(pageName, roleName) {
-  if (!roleName) {
-    return { read: false, write: false, deny: true };
+  const featureId = getFeatureIdForPath(pageName);
+  if (featureId) {
+    return getRightsForFeatureId(featureId, roleName);
   }
-
-  const savedRights = localStorage.getItem("projectRightsConfig");
-  if (!savedRights) {
-    return { read: true, write: true, deny: false };
-  }
-
-  try {
-    const rightsMap = JSON.parse(savedRights);
-    const roleRights = rightsMap[roleName];
-    if (!roleRights || !Array.isArray(roleRights)) {
-      return { read: true, write: true, deny: false };
-    }
-
-    const pageRight = roleRights.find(r => {
-      const sub = (r.subModule || r.SubModule || "").toLowerCase();
-      const mod = (r.module || r.Module || "").toLowerCase();
-      const page = (r.page || r.Page || "").toLowerCase();
-      const target = pageName.toLowerCase();
-      return sub === target || mod === target || page === target;
-    });
-
-    if (!pageRight) {
-      return { read: true, write: true, deny: false };
-    }
-
-    const access = pageRight.access || pageRight.Access || "readWrite";
-    return {
-      read: access !== "deny",
-      write: access === "readWrite",
-      deny: access === "deny"
-    };
-  } catch (error) {
-    console.error("Error evaluating page rights:", error);
-    return { read: true, write: true, deny: false };
-  }
+  return getRightsForFeatureId(0, roleName);
 }

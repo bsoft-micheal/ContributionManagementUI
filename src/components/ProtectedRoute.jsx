@@ -18,6 +18,15 @@ export default function ProtectedRoute({ children, roles = [] }) {
   // 2. Dynamic rights mapping checks from configurator
   const rights = getRightsForPath(location.pathname, authState?.role);
   if (rights.deny) {
+    // If root route "/" itself is denied, redirecting to "/" causes an infinite redirect loop (blank screen).
+    // In that scenario, fallback to a safe path or login.
+    if (location.pathname === "/") {
+      return (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", fontFamily: "sans-serif" }}>
+          <h2>Access Denied: You do not have permission to access the Dashboard.</h2>
+        </div>
+      );
+    }
     return <Navigate to="/" replace />;
   }
 
