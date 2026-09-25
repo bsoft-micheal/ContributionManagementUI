@@ -756,7 +756,7 @@ export default function PaymentsPage() {
                     }}
                   >
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <ReceiptIcon sx={{ fontSize: 20, color: "#4a3f6b" }} />
+                      <ReceiptIcon sx={{ fontSize: 20, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
                       <Typography variant="body2" fontWeight={600}>
                         {selectedTxn.screenshot}
                       </Typography>

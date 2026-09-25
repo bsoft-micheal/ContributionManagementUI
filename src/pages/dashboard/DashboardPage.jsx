@@ -781,30 +781,9 @@ export default function DashboardPage() {
               celebrants.push({
                 memberId: m.memberId,
                 name,
-                type: m.type || m.memberType || "Member",
+                type: "Birthday",
                 dateOfBirth: m.dateOfBirth,
               });
-            }
-          }
-        }
-
-        // Also check if any upcoming event or event in summary is a Birthday today
-        if (summary?.upcomingEvents && Array.isArray(summary.upcomingEvents)) {
-          for (const ev of summary.upcomingEvents) {
-            const isBday =
-              (ev.eventTypeName || "").toLowerCase().includes("birthday") ||
-              (ev.eventName || "").toLowerCase().includes("birthday");
-            if (isBday && ev.eventDate && dayjs(ev.eventDate).isSame(today, "day")) {
-              const name = ev.eventName || "Birthday Celebrant";
-              const key = `event|${name.toLowerCase()}`;
-              if (!seen.has(key)) {
-                seen.add(key);
-                celebrants.push({
-                  memberId: ev.eventId,
-                  name,
-                  type: "Birthday Event",
-                });
-              }
             }
           }
         }

@@ -1059,12 +1059,12 @@ export default function EventFormPage() {
                   required
                 />
               </Grid>
-              <Grid size={{ xs: 12 }}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <AppTextArea
                   label="Description"
                   placeholder="Enter event description..."
-                  minRows={3}
-                  maxRows={6}
+                  minRows={2}
+                  maxRows={4}
                   value={form.description}
                   onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
                 />

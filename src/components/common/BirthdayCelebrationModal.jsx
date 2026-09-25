@@ -37,12 +37,21 @@ export default function BirthdayCelebrationModal({
   // Auto-hide countdown state
   const [timeLeft, setTimeLeft] = useState(autoCloseSeconds);
 
-  // Normalize celebrant names
-  const celebrantList = Array.isArray(celebrants)
+  // Normalize celebrant names (strictly filter out non-member events)
+  const rawList = Array.isArray(celebrants)
     ? celebrants
     : celebrants
     ? [celebrants]
     : [];
+
+  const celebrantList = rawList.filter((c) => {
+    if (!c) return false;
+    if (typeof c === "string") return true;
+    if (c.type === "Birthday Event") return false;
+    const nameStr = (c.name || c.memberName || "").toLowerCase();
+    if (nameStr.includes("birthday celebration") || nameStr.includes("birthday event")) return false;
+    return true;
+  });
 
   const names = celebrantList
     .map((c) => (typeof c === "string" ? c : c?.name || c?.memberName || "Celebrant"))
@@ -236,7 +245,7 @@ export default function BirthdayCelebrationModal({
             fontSize: { xs: "1.6rem", sm: "2rem" },
           }}
         >
-          Happy Birthday! 🎂
+          Happy Birthday! 
         </Typography>
       </Box>
 
@@ -288,9 +297,9 @@ export default function BirthdayCelebrationModal({
               fontSize: { xs: "0.92rem", sm: "1rem" },
             }}
           >
-            🎉 Wishing {names.length > 1 ? "our wonderful members" : formattedNames} an amazing
+            🎉Wishing {names.length > 1 ? "our wonderful members" : formattedNames} an amazing
             day filled with happiness, wonderful smiles, and great achievements! Have a delightful
-            celebration! 🎈🥳
+            celebration!🥳
           </Typography>
 
           {/* Celebrant details pills */}
@@ -305,9 +314,7 @@ export default function BirthdayCelebrationModal({
               {celebrantList.map((c, idx) => (
                 <Chip
                   key={c.memberId || idx}
-                  label={`🎂 ${c.name || c.memberName || formattedNames}${
-                    c.type ? ` • ${c.type}` : ""
-                  }`}
+                  label={`🎂 ${c.name || c.memberName || formattedNames} • Birthday`}
                   size="small"
                   sx={{
                     bgcolor: isDark ? alpha("#ec4899", 0.18) : alpha("#ec4899", 0.1),
@@ -348,7 +355,7 @@ export default function BirthdayCelebrationModal({
               transition: "all 0.18s ease",
             }}
           >
-            Blast More! 🎊
+            Blast More! 
           </Button>
 
           <Button
@@ -370,7 +377,7 @@ export default function BirthdayCelebrationModal({
               transition: "all 0.18s ease",
             }}
           >
-            Celebrate! 🥳
+            Celebrate! 
           </Button>
         </Stack>
       </DialogContent>

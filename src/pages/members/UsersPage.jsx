@@ -45,13 +45,13 @@ import { GetUsersAsync, CreateUserAsync, UpdateUserAsync, DeleteUserAsync, Creat
 
 // ─── Role color map ───────────────────────────────────────────────────────────
 const ROLE_COLORS = {
-  Admin: { bg: "rgba(239,68,68,0.10)", color: "#dc2626" },
-  Manager: { bg: "rgba(234,179,8,0.12)", color: "#b45309" },
-  User: { bg: "rgba(74,63,107,0.10)", color: "#4a3f6b" },
-  Member: { bg: "rgba(74,63,107,0.08)", color: "#4a3f6b" },
+  Admin: { bg: "rgba(239,68,68,0.10)", darkBg: "rgba(239,68,68,0.20)", color: "#dc2626", darkColor: "#fca5a5" },
+  Manager: { bg: "rgba(234,179,8,0.12)", darkBg: "rgba(234,179,8,0.22)", color: "#b45309", darkColor: "#fde047" },
+  User: { bg: "rgba(74,63,107,0.10)", darkBg: "rgba(124,58,237,0.20)", color: "#4a3f6b", darkColor: "#c4b5fd" },
+  Member: { bg: "rgba(74,63,107,0.08)", darkBg: "rgba(124,58,237,0.15)", color: "#4a3f6b", darkColor: "#c4b5fd" },
 };
 const getRoleStyle = (roleName = "") =>
-  ROLE_COLORS[roleName] ?? { bg: "rgba(74,63,107,0.08)", color: "#4a3f6b" };
+  ROLE_COLORS[roleName] ?? { bg: "rgba(74,63,107,0.08)", darkBg: "rgba(124,58,237,0.15)", color: "#4a3f6b", darkColor: "#c4b5fd" };
 
 // ─── User Roles enum options ──────────────────────────────────────────────────
 const USER_ROLES = [
@@ -478,8 +478,8 @@ export default function UsersPage() {
             label={row.roleName ?? "—"}
             size="small"
             sx={{
-              bgcolor: style.bg,
-              color: style.color,
+              bgcolor: (theme) => (theme.palette.mode === "dark" ? style.darkBg : style.bg),
+              color: (theme) => (theme.palette.mode === "dark" ? style.darkColor : style.color),
               fontWeight: 700,
               fontSize: "0.72rem",
               height: 22,
