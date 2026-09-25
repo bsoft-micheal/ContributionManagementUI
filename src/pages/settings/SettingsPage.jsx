@@ -1267,76 +1267,50 @@ export default function SettingsPage() {
               .replace(/https?:\/\/\S+/gi, "")
               .trim();
 
-            return (
-              <Grid container spacing={2.5} alignItems="flex-start">
-                {/* Left: Email Template Form (65-70% on desktop) */}
-                <Grid size={{ xs: 12, lg: 8 }}>
-                  <Card
-                    sx={{
-                      borderRadius: "16px",
-                      border: (t) => `1px solid ${t.palette.divider}`,
-                      p: 2.5,
-                      bgcolor: "background.paper",
-                    }}
-                  >
-                    <Box>
-                      {/* Card Header with Test Email & Logs action buttons */}
-                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                          <Box
-                            sx={{
-                              width: 38,
-                              height: 38,
-                              borderRadius: "10px",
-                              bgcolor: "rgba(2, 132, 199, 0.1)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#0284c7",
-                            }}
-                          >
-                            <EmailOutlinedIcon fontSize="small" />
-                          </Box>
-                          <Box>
-                            <Typography variant="subtitle1" fontWeight={800}>
-                              Email Template Settings
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                              Configure email subject and description against categories.
-                            </Typography>
-                          </Box>
+          return (
+            <Grid container spacing={2.5} alignItems="flex-start">
+              {/* Left: Email Template Form (65-70% on desktop) */}
+              <Grid size={{ xs: 12, lg: 8 }}>
+                <Card
+                  sx={{
+                    borderRadius: "16px",
+                    border: (t) => `1px solid ${t.palette.divider}`,
+                    p: 2.5,
+                    bgcolor: "background.paper",
+                  }}
+                >
+                  <Box>
+                    {/* Card Header with Test Email & Logs action buttons */}
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Box
+                          sx={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: "10px",
+                            bgcolor: "rgba(2, 132, 199, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#0284c7",
+                          }}
+                        >
+                          <EmailOutlinedIcon fontSize="small" />
                         </Box>
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight={800}>
+                            Email Template Settings
+                          </Typography>
 
-                        {/* Quick Action Buttons */}
-                        <Box sx={{ display: "flex", gap: 1 }}>
-                          <AppButton
-                            variant="outlined"
-                            size="small"
-                            startIcon={<HistoryOutlinedIcon sx={{ fontSize: 17 }} />}
-                            onClick={() => setLogsDialogOpen(true)}
-                            sx={{ fontSize: "0.76rem", fontWeight: 700, py: 0.5, px: 1.4 }}
-                          >
-                            Email Logs
-                          </AppButton>
-                          <AppButton
-                            variant="outlined"
-                            size="small"
-                            startIcon={<SendOutlinedIcon sx={{ fontSize: 16 }} />}
-                            onClick={() => setTestEmailDialogOpen(true)}
-                            sx={{
-                              fontSize: "0.76rem",
-                              fontWeight: 700,
-                              py: 0.5,
-                              px: 1.4,
-                              borderColor: "#0284c7",
-                              color: "#0284c7",
-                              "&:hover": { borderColor: "#0369a1", bgcolor: "rgba(2,132,199,0.06)" },
-                            }}
-                          >
-                            Send Test Email
-                          </AppButton>
                         </Box>
                       </Box>
+
+                      {/* Quick Action Buttons */}
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        
+                        
+                      </Box>
+                    </Box>
 
                       <Stack spacing={2.4} sx={{ mt: 2 }}>
                         {/* 1. Category Selector Dropdown */}
@@ -1451,94 +1425,48 @@ export default function SettingsPage() {
                               </Typography>
                             </Grid>
 
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                              <AppInput
-                                label="Reminder Interval (Days)"
-                                value={settings.reminderIntervalDays || "10"}
-                                onChange={(e) => handleChange("reminderIntervalDays", e.target.value)}
-                                restrictType="numberonly"
-                              />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                              <AppInput
-                                label="Maximum Reminders Allowed"
-                                value={settings.maxReminders || "3"}
-                                onChange={(e) => handleChange("maxReminders", e.target.value)}
-                                restrictType="numberonly"
-                              />
-                            </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <AppInput
+                              label="Reminder Interval (Days)"
+                              value={settings.reminderIntervalDays || "10"}
+                              onChange={(e) => handleChange("reminderIntervalDays", e.target.value)}
+                              restrictType="numberonly"
+                            />
                           </Grid>
-
-                          {/* Visual Schedule Roadmap */}
-                          <Box sx={{ mt: 2, p: 1.5, borderRadius: "8px", bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#ffffff", border: `1px solid ${theme.palette.divider}` }}>
-                            <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", display: "block", mb: 0.6 }}>
-                              Scheduled Dispatch Cycle:
-                            </Typography>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap", fontSize: "0.72rem" }}>
-                              <Chip label="Day 1: Initial Email" size="small" color="info" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                              <Typography variant="caption" color="text.secondary">→</Typography>
-                              <Chip label="Day 11: Reminder 1" size="small" color="primary" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                              <Typography variant="caption" color="text.secondary">→</Typography>
-                              <Chip label="Day 21: Reminder 2" size="small" color="warning" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                              <Typography variant="caption" color="text.secondary">→</Typography>
-                              <Chip label="Day 31: Reminder 3" size="small" color="error" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                              <Typography variant="caption" color="text.secondary">→</Typography>
-                              <Chip label="Halts When Paid (Max 3)" size="small" variant="outlined" sx={{ fontWeight: 700, fontSize: "0.68rem", height: 22 }} />
-                            </Box>
-                          </Box>
-
-                          {/* Manual Scheduler Trigger Action */}
-                          <Box sx={{ mt: 2, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
-                              Want to run a reminder check right now? Duplicate emails are automatically blocked.
-                            </Typography>
-                            <AppButton
-                              variant="outlined"
-                              size="small"
-                              startIcon={schedulerRunning ? <CircularProgress size={14} color="inherit" /> : <PlayArrowOutlinedIcon sx={{ fontSize: 16 }} />}
-                              onClick={handleRunSchedulerCheck}
-                              disabled={schedulerRunning}
-                              sx={{ fontSize: "0.75rem", fontWeight: 700, py: 0.4 }}
-                            >
-                              {schedulerRunning ? "Running..." : "Run Scheduler Check Now"}
-                            </AppButton>
-                          </Box>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <AppInput
+                              label="Maximum Reminders Allowed"
+                              value={settings.maxReminders || "3"}
+                              onChange={(e) => handleChange("maxReminders", e.target.value)}
+                              restrictType="numberonly"
+                            />
+                          </Grid>
+                        </Grid>
+                        {/* Manual Scheduler Trigger Action */}
+                        <Box sx={{ mt: 2, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                         </Box>
-                      </Stack>
-                    </Box>
+                      </Box>
+                    </Stack>
+                  </Box>
 
-                    {/* Save Button for Email Template Settings */}
-                    <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center", gap: 2 }}>
-                      <AppButton
-                        variant="contained"
-                        startIcon={<SaveOutlinedIcon />}
-                        onClick={handleSaveEmailTemplate}
-                        sx={{
-                          bgcolor: "#0284c7 !important",
-                          "&:hover": { bgcolor: "#0369a1 !important" },
-                          px: 3,
-                          fontWeight: 700,
-                        }}
-                      >
-                        Save Email Template
-                      </AppButton>
-                      <AppButton
-                        variant="outlined"
-                        startIcon={<SendOutlinedIcon />}
-                        onClick={() => setTestEmailDialogOpen(true)}
-                        sx={{
-                          fontWeight: 700,
-                          px: 2.5,
-                          borderColor: "#0284c7",
-                          color: "#0284c7",
-                          "&:hover": { borderColor: "#0369a1", bgcolor: "rgba(2,132,199,0.06)" },
-                        }}
-                      >
-                        Send Test Email
-                      </AppButton>
-                    </Box>
-                  </Card>
-                </Grid>
+                  {/* Save Button for Email Template Settings */}
+                  <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center", gap: 2 }}>
+                    <AppButton
+                      variant="contained"
+                      startIcon={<SaveOutlinedIcon />}
+                      onClick={handleSaveEmailTemplate}
+                      sx={{
+                        bgcolor: "#0284c7 !important",
+                        "&:hover": { bgcolor: "#0369a1 !important" },
+                        px: 3,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Save 
+                    </AppButton>
+                  </Box>
+                </Card>
+              </Grid>
 
                 {/* Right: Live Email Preview Panel (30-35% on desktop) */}
                 <Grid size={{ xs: 12, lg: 4 }}>
