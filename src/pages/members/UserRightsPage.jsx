@@ -19,20 +19,20 @@ import { formatGridDate } from "../../utils/dateHelper";
 
 // Top-level module options for the Module filter dropdown
 const MODULE_OPTIONS = [
-  { label: "All Modules",    value: "All" },
-  { label: "Dashboard",      value: "Dashboard" },
-  { label: "Members",        value: "Members" },
-  { label: "Events",         value: "Events" },
-  { label: "Finance",        value: "Finance" },
+  { label: "All Modules", value: "All" },
+  { label: "Dashboard", value: "Dashboard" },
+  { label: "Members", value: "Members" },
+  { label: "Events", value: "Events" },
+  { label: "Finance", value: "Finance" },
   { label: "Support Ticket", value: "Support Ticket" },
-  { label: "Tools",          value: "Tools" },
-  { label: "Reports",        value: "Reports" },
+  { label: "Tools", value: "Tools" },
+  { label: "Reports", value: "Reports" },
 ];
 
 const ACCESS_OPTIONS = [
-  { value: "readOnly",  label: "Read Only",  color: "#3b82f6" },
+  { value: "readOnly", label: "Read Only", color: "#3b82f6" },
   { value: "readWrite", label: "Read/Write", color: "#10b981" },
-  { value: "deny",      label: "Deny",       color: "#ef4444" },
+  { value: "deny", label: "Deny", color: "#ef4444" },
 ];
 
 export default function UserRightsPage() {
@@ -86,10 +86,10 @@ export default function UserRightsPage() {
       const normalised = rows.map((r, i) => ({
         ...r,
         _uid: i + 1,
-        module:    r.module    || r.Module    || "",
+        module: r.module || r.Module || "",
         subModule: r.subModule || r.SubModule || "",
-        page:      r.page      || r.Page      || "",
-        access:    r.access    || r.Access    || "readOnly",
+        page: r.page || r.Page || "",
+        access: r.access || r.Access || "readOnly",
         createdBy: r.createdBy || r.CreatedBy || null,
       }));
       setRights(prev => ({ ...prev, [roleName]: normalised }));
@@ -100,14 +100,29 @@ export default function UserRightsPage() {
     }
   }
 
-  // ── Handle radio change: update local state only ─────────────────────────
+  // ── Handle radio change: Master row updates all sub-modules, Child row updates itself ──
   const handleAccessChange = (uid, newAccess) => {
     if (!selectedRoleName) return;
 
     setRights(prev => {
-      const updated = (prev[selectedRoleName] || []).map(r =>
-        r._uid === uid ? { ...r, access: newAccess } : r
-      );
+      const currentList = prev[selectedRoleName] || [];
+      const targetRow = currentList.find(r => r._uid === uid);
+      if (!targetRow) return prev;
+
+      const targetModule = targetRow.module;
+      const isMasterRow = !targetRow.subModule || targetRow.subModule.trim() === "";
+
+      const updated = currentList.map(r => {
+        if (isMasterRow && r.module === targetModule) {
+          // Master row selection: cascade to all sub-modules under this parent module
+          return { ...r, access: newAccess };
+        } else if (r._uid === uid) {
+          // Sub-module row selection: update individual row
+          return { ...r, access: newAccess };
+        }
+        return r;
+      });
+
       return { ...prev, [selectedRoleName]: updated };
     });
   };
@@ -133,24 +148,18 @@ export default function UserRightsPage() {
         rights: currentRows.map(r => ({
           role: selectedRoleName,
           featureId: r.featureID || r.featureId || 0,
-          module: r.module,
-          subModule: r.subModule,
-          page: r.page,
-          access: r.access,
+          module: r.module || "",
+          subModule: r.subModule || "",
+          page: r.page || "",
+          access: r.access || "readOnly",
         })),
       };
 
       await SaveUserRightsAsync(payload);
 
-      // Sync to localStorage for local RBAC effect if present
-      const stored = localStorage.getItem("projectRightsConfig");
-      const map = stored ? JSON.parse(stored) : {};
-      map[selectedRoleName] = currentRows;
-      localStorage.setItem("projectRightsConfig", JSON.stringify(map));
-
       toast.success("User rights saved successfully");
 
-      // Reload rights from server after successful save to refresh Current Access & Set By
+      // Reload rights from server after successful save to refresh Current Access
       await fetchRightsForRole(selectedRoleName, true);
     } catch (err) {
       const msg = err.response?.data?.title || err.response?.data?.message || "Failed to save user rights";
@@ -164,7 +173,6 @@ export default function UserRightsPage() {
   const handleApplyFilter = () => {
     setSelectedRoleName(filterRoleName);
     setSelectedModule(filterModule);
-    toast.success("Filters applied");
   };
 
   const handleClearFilter = () => {
@@ -173,7 +181,6 @@ export default function UserRightsPage() {
     setFilterModule("All");
     setSelectedRoleName(defaultRole);
     setSelectedModule("All");
-    toast.success("Filters cleared");
   };
 
   const handleRefresh = () => {
@@ -279,15 +286,6 @@ export default function UserRightsPage() {
           />
         );
       },
-    },
-    {
-      label: "Set By",
-      key: "createdBy",
-      render: (row) => (
-        <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.78rem" }}>
-          {row.createdBy || "—"}
-        </Typography>
-      ),
     },
     {
       label: "Created On",
