@@ -15,6 +15,7 @@ import {
   FileDownloadOutlined as FileDownloadIcon,
   ReceiptLongOutlined as ReceiptIcon,
   FilterList as FilterListIcon,
+  ContentCopy as CopyIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
@@ -685,9 +686,25 @@ export default function PaymentsPage() {
                 <Typography variant="caption" color="text.secondary">
                   UTR / Reference No
                 </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {selectedTxn.utr || "--"}
-                </Typography>
+                <Stack direction="row" alignItems="center" spacing={0.6}>
+                  <Typography variant="body2" fontWeight={700} color="#1e293b">
+                    {selectedTxn.utr || "--"}
+                  </Typography>
+                  {selectedTxn.utr && selectedTxn.utr !== "-" && (
+                    <Tooltip title="Copy UTR">
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedTxn.utr);
+                          toast.success("UTR copied to clipboard!");
+                        }}
+                        sx={{ p: 0.3 }}
+                      >
+                        <CopyIcon sx={{ fontSize: 15, color: "#64748b" }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Stack>
               </Grid>
               <Grid size={{ xs: 6 }}>
                 <Typography variant="caption" color="text.secondary">
@@ -739,33 +756,53 @@ export default function PaymentsPage() {
               {selectedTxn.screenshot && (
                 <Grid size={{ xs: 12 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-                    Payment Screenshot
+                    Payment Screenshot / Receipt Proof
                   </Typography>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      p: 1.2,
-                      borderRadius: "10px",
-                      bgcolor: (t) =>
-                        t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                      border: (t) => `1px solid ${t.palette.divider}`,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <ReceiptIcon sx={{ fontSize: 20, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
-                      <Typography variant="body2" fontWeight={600}>
-                        {selectedTxn.screenshot}
-                      </Typography>
-                    </Box>
-                    <IconButton
-                      size="small"
-                      onClick={() => toast.info(`Downloading ${selectedTxn.screenshot}`)}
+                  {selectedTxn.screenshot.startsWith("data:image") || selectedTxn.screenshot.startsWith("http") ? (
+                    <Box
+                      sx={{
+                        mt: 0.5,
+                        p: 1.5,
+                        border: "1.5px solid #e2e8f0",
+                        borderRadius: 2.5,
+                        bgcolor: "#f8fafc",
+                        textAlign: "center",
+                      }}
                     >
-                      <FileDownloadIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
+                      <img
+                        src={selectedTxn.screenshot}
+                        alt="Payment proof receipt"
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: 240,
+                          borderRadius: 8,
+                          display: "block",
+                          margin: "0 auto",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                        }}
+                      />
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        p: 1.2,
+                        borderRadius: "10px",
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                        border: (t) => `1px solid ${t.palette.divider}`,
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <ReceiptIcon sx={{ fontSize: 20, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
+                        <Typography variant="body2" fontWeight={600}>
+                          {selectedTxn.screenshot}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
                 </Grid>
               )}
             </Grid>

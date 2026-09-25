@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { FormControlLabel, Checkbox, Typography, Box, IconButton, Tooltip } from "@mui/material";
-import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon, Delete as DeleteIcon, ToggleOn as ToggleOnIcon, ToggleOff as ToggleOffIcon } from "@mui/icons-material";
+import { FormControlLabel, Checkbox, Typography, Box, IconButton, Tooltip, Chip, Paper, Grid } from "@mui/material";
+import { Edit as EditIcon, Add as AddIcon, Save as SaveIcon, Delete as DeleteIcon, ToggleOn as ToggleOnIcon, ToggleOff as ToggleOffIcon, Calculate as CalculateIcon } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -22,7 +22,16 @@ const formatBaseAmount = (value) => {
   return Number(cleanVal).toLocaleString("en-US");
 };
 
-const initialForm = { eventTypeName: "", isActive: true, baseAmount: "" };
+const initialForm = {
+  eventTypeName: "",
+  isActive: true,
+  baseAmount: "",
+  hasTenureRule: false,
+  tenureThresholdYears: 1,
+  newEntrantSharePercentage: 50,
+  standardSharePercentage: 100,
+  ruleDescription: "",
+};
 
 export default function EventTypesPage() {
   const { authState } = useAuth();
@@ -82,7 +91,12 @@ export default function EventTypesPage() {
     try {
       const payload = {
         ...form,
-        baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0)
+        baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
+        hasTenureRule: Boolean(form.hasTenureRule),
+        tenureThresholdYears: Number(form.tenureThresholdYears) || 1,
+        newEntrantSharePercentage: Number(form.newEntrantSharePercentage) || 50,
+        standardSharePercentage: Number(form.standardSharePercentage) || 100,
+        ruleDescription: form.ruleDescription?.trim() || (form.hasTenureRule ? `${form.newEntrantSharePercentage || 50}% (< ${form.tenureThresholdYears || 1} yr)` : "Equal Share")
       };
       if (form.eventTypeId) {
         await UpdateEventTypeAsync(form.eventTypeId, payload);
@@ -118,20 +132,6 @@ export default function EventTypesPage() {
     }
   }
 
-  async function handleToggleStatus(row) {
-    try {
-      const payload = {
-        ...row,
-        isActive: !row.isActive,
-      };
-      await UpdateEventTypeAsync(row.eventTypeId, payload);
-      toast.success("Status updated successfully");
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.message ?? "Failed to update status");
-    }
-  }
-
   function handleToggleStatusRequest(row) {
     setTypeToToggle(row);
     setStatusConfirmOpen(true);
@@ -155,6 +155,25 @@ export default function EventTypesPage() {
     }
   }
 
+  const handleOpenAddDialog = () => {
+    setForm(initialForm);
+    setErrors({});
+    setDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (row) => {
+    setForm({
+      ...row,
+      hasTenureRule: Boolean(row.hasTenureRule),
+      tenureThresholdYears: row.tenureThresholdYears ?? 1,
+      newEntrantSharePercentage: row.newEntrantSharePercentage ?? 50,
+      standardSharePercentage: row.standardSharePercentage ?? 100,
+      ruleDescription: row.ruleDescription ?? "",
+    });
+    setErrors({});
+    setDialogOpen(true);
+  };
+
   const columns = [
     {
       label: "Action",
@@ -162,7 +181,7 @@ export default function EventTypesPage() {
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
           <Tooltip title={hasWriteAccess ? "Edit Category" : ""}>
             <span>
-              <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}>
+              <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => handleOpenEditDialog(row)}>
                 <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
               </IconButton>
             </span>
@@ -199,6 +218,33 @@ export default function EventTypesPage() {
       key: "baseAmount",
       align: "right",
       render: (row) => <Typography variant="body2" fontWeight={700}>₹{(row.baseAmount ?? 0).toLocaleString()}</Typography>
+    },
+    {
+      label: "Calculation Rule",
+      key: "hasTenureRule",
+      render: (row) => {
+        if (row.hasTenureRule) {
+          return (
+            <Chip
+              size="small"
+              icon={<CalculateIcon sx={{ fontSize: "0.9rem !important" }} />}
+              label={`New Entrant: ${row.newEntrantSharePercentage ?? 50}% (< ${row.tenureThresholdYears ?? 1} yr)`}
+              color="warning"
+              variant="outlined"
+              sx={{ fontWeight: 800, fontSize: "0.7rem", px: 0.5 }}
+            />
+          );
+        }
+        return (
+          <Chip
+            size="small"
+            label="Equal Share (100%)"
+            color="primary"
+            variant="outlined"
+            sx={{ fontWeight: 800, fontSize: "0.7rem" }}
+          />
+        );
+      }
     },
     {
       label: "Status",
@@ -245,7 +291,7 @@ export default function EventTypesPage() {
             variant="contained"
             disabled={!hasWriteAccess}
             startIcon={<AddIcon />}
-            onClick={() => { setForm(initialForm); setErrors({}); setDialogOpen(true); }}
+            onClick={handleOpenAddDialog}
           >
             Add
           </AppButton>
@@ -263,7 +309,7 @@ export default function EventTypesPage() {
           </>
         }
       >
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
           <AppInput
             label="Event Type"
             placeholder="Enter event type name"
@@ -298,6 +344,83 @@ export default function EventTypesPage() {
             helperText={errors.baseAmount}
             required
           />
+
+          {/* Dynamic Contribution Calculation Rule Settings */}
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)",
+              borderColor: (theme) => theme.palette.divider,
+            }}
+          >
+            <AppSwitch
+              label="Enable Dynamic Tenure Calculation Rule"
+              checked={form.hasTenureRule}
+              onChange={(e) => setForm(f => ({ ...f, hasTenureRule: e.target.checked }))}
+            />
+
+            {form.hasTenureRule && (
+              <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                  Configure custom contribution split percentages based on employee tenure / joining date for this event category.
+                </Typography>
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <AppInput
+                      label="Tenure Criteria (Years)"
+                      placeholder="e.g. 1"
+                      fullWidth
+                      value={form.tenureThresholdYears}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        setForm(f => ({ ...f, tenureThresholdYears: val }));
+                      }}
+                      helperText="Threshold in years (e.g., 1 yr)"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <AppInput
+                      label="New Entrant Share (%)"
+                      placeholder="e.g. 50"
+                      fullWidth
+                      value={form.newEntrantSharePercentage}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        setForm(f => ({ ...f, newEntrantSharePercentage: val }));
+                      }}
+                      helperText="Discounted share percentage"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <AppInput
+                      label="Standard Share (%)"
+                      placeholder="e.g. 100"
+                      fullWidth
+                      value={form.standardSharePercentage}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        setForm(f => ({ ...f, standardSharePercentage: val }));
+                      }}
+                      helperText="Standard share percentage"
+                    />
+                  </Grid>
+                </Grid>
+
+                <AppInput
+                  label="Rule Description / Note"
+                  placeholder="e.g. 50% for new entrants with less than 1 year tenure"
+                  fullWidth
+                  value={form.ruleDescription}
+                  onChange={(e) => setForm(f => ({ ...f, ruleDescription: e.target.value }))}
+                  maxLength={100}
+                />
+              </Box>
+            )}
+          </Paper>
+
           {form.eventTypeId && (
             <AppSwitch
               label="Active Or InActive types"

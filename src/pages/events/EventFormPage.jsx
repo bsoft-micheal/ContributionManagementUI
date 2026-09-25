@@ -65,6 +65,7 @@ const initialForm = {
   eventTypeId: "",
   eventDate: dayjs(),
   description: "",
+  status: "Planned",
   baseAmount: "",
   participantIds: [],
 };
@@ -184,6 +185,7 @@ export default function EventFormPage() {
             eventTypeId: detailedEvent.eventTypeId || defaultTypeId,
             eventDate: currentEventDate,
             description: detailedEvent.description || "",
+            status: detailedEvent.status || "Planned",
             baseAmount:
               detailedEvent.baseAmount !== undefined &&
                 detailedEvent.baseAmount !== null &&
@@ -447,6 +449,7 @@ export default function EventFormPage() {
             }. Planned Budget: ₹${plannedBudget.toLocaleString(
               "en-IN"
             )}, Contribution/member: ₹${contributionPerMember}`,
+          status: form.status || "Planned",
           baseAmount: plannedBudget,
           participantIds:
             allActiveParticipantIds.length > 0
@@ -456,9 +459,14 @@ export default function EventFormPage() {
         };
       } else {
         payload = {
-          ...form,
-          baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
+          eventName: form.eventName.trim(),
+          eventTypeId: form.eventTypeId,
           eventDate: dayjs(form.eventDate).hour(12).toISOString(),
+          description: form.description?.trim() || "",
+          status: form.status || "Planned",
+          baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
+          participantIds: form.participantIds || [],
+          contributionOverrides: [],
         };
       }
 
@@ -500,7 +508,8 @@ export default function EventFormPage() {
 
       navigate("/events");
     } catch (error) {
-      toast.error("Failed to save event");
+      const errMsg = error.response?.data?.message || error.message || "Failed to save event";
+      toast.error(errMsg);
       console.error("Error saving event:", error);
     } finally {
       setSaving(false);

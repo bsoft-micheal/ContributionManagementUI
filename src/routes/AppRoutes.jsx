@@ -28,6 +28,7 @@ import GalleryPage from "../pages/gallery/GalleryPage";
 import BudgetCalculationsPage from "../pages/events/BudgetCalculationsPage";
 import TypesPage from "../pages/support/TypesPage";
 import StatusPage from "../pages/support/StatusPage";
+import SubmitPaymentPage from "../pages/payments/SubmitPaymentPage";
 
 export default function AppRoutes() {
   return (
@@ -36,6 +37,7 @@ export default function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/forgot-password/verify" element={<ForgotPasswordVerifyPage />} />
       <Route path="/forgot-password/reset" element={<ForgotPasswordResetPage />} />
+      <Route path="/confirm-payment" element={<SubmitPaymentPage />} />
       <Route
         element={
           <ProtectedRoute>

@@ -44,3 +44,22 @@ export const deletePaymentTransactionAsync = async (id) => {
     throw error;
   }
 };
+
+export const submitPaymentProofAsync = async (data) => {
+  try {
+    return await postApi("/payments/submitProofAsync", data);
+  } catch (error) {
+    console.error("Error submitting payment proof:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const getPaymentContextAsync = async (params) => {
+  try {
+    return await getApi("/payments/getPaymentContextAsync", params);
+  } catch (error) {
+    console.error("Error loading payment context:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
