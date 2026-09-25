@@ -10,6 +10,7 @@ import {
   Divider,
   Grid,
   InputAdornment,
+  Paper,
   Stack,
   Tab,
   Tabs,
@@ -972,6 +973,14 @@ export default function DashboardPage() {
       : events;
   }, [events, search]);
 
+  // Totals for Dashboard Events table
+  const tableTotals = useMemo(() => {
+    const expected = filteredEvents.reduce((sum, e) => sum + (Number(e.expectedAmount) || 0), 0);
+    const collected = filteredEvents.reduce((sum, e) => sum + (Number(e.collectedAmount) || 0), 0);
+    const pending = filteredEvents.reduce((sum, e) => sum + (Number(e.pendingAmount) || 0), 0);
+    return { expected, collected, pending };
+  }, [filteredEvents]);
+
   // Table columns (Dashboard tab)
   const columns = [
     {
@@ -1419,28 +1428,6 @@ export default function DashboardPage() {
                       </Typography>
                     </Box>
                   )}
-
-                  {/* ③ Per-event breakdown list */}
-                  {chartEvents.length > 0 && (
-                    <Box>
-                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-                        <TrendingUpIcon sx={{ fontSize: 18, color: "text.secondary" }} />
-                        <Typography variant="body2" fontWeight={800} color="text.secondary"
-                          sx={{ textTransform: "uppercase", letterSpacing: "0.07em", fontSize: "0.72rem" }}>
-                          Event Breakdown
-                        </Typography>
-                        <Chip label={`${chartEvents.length} events`} size="small"
-                          sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700 }} />
-                      </Stack>
-                      <Grid container spacing={1.5}>
-                        {chartEvents.map((event, i) => (
-                          <Grid key={event.eventId ?? i} size={{ xs: 12, sm: 6, lg: 4 }}>
-                            <EventMiniCard event={event} index={i} />
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </Box>
-                  )}
                 </Stack>
               </CardContent>
             )}
@@ -1454,6 +1441,83 @@ export default function DashboardPage() {
                   defaultOpen
                 >
                   <Stack spacing={2}>
+                    <Grid container spacing={2} sx={{ mb: 1 }}>
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2.5,
+                            border: "1px solid",
+                            borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+                            bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                            display: "flex",
+                            alignItems: "center",
+                            justify: "space-between",
+                          }}
+                        >
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" fontWeight={700} textTransform="uppercase" letterSpacing="0.05em">
+                              Total Expected
+                            </Typography>
+                            <Typography variant="h6" fontWeight={800} color="text.primary" sx={{ mt: 0.5 }}>
+                              ₹{tableTotals.expected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Typography>
+                          </Box>
+                        </Paper>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2.5,
+                            border: "1px solid",
+                            borderColor: "rgba(16, 185, 129, 0.2)",
+                            bgcolor: isDark ? "rgba(16, 185, 129, 0.08)" : "rgba(16, 185, 129, 0.05)",
+                            display: "flex",
+                            alignItems: "center",
+                            justify: "space-between",
+                          }}
+                        >
+                          <Box>
+                            <Typography variant="caption" color="#10b981" fontWeight={700} textTransform="uppercase" letterSpacing="0.05em">
+                              Total Collected
+                            </Typography>
+                            <Typography variant="h6" fontWeight={800} color="#10b981" sx={{ mt: 0.5 }}>
+                              ₹{tableTotals.collected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Typography>
+                          </Box>
+                        </Paper>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2.5,
+                            border: "1px solid",
+                            borderColor: "rgba(239, 68, 68, 0.2)",
+                            bgcolor: isDark ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.05)",
+                            display: "flex",
+                            alignItems: "center",
+                            justify: "space-between",
+                          }}
+                        >
+                          <Box>
+                            <Typography variant="caption" color="#ef4444" fontWeight={700} textTransform="uppercase" letterSpacing="0.05em">
+                              Total Collection Pending
+                            </Typography>
+                            <Typography variant="h6" fontWeight={800} color="#ef4444" sx={{ mt: 0.5 }}>
+                              ₹{tableTotals.pending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Typography>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+
                     <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
                       <TextField
                         size="small"

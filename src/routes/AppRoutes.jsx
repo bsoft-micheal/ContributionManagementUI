@@ -74,8 +74,8 @@ export default function AppRoutes() {
         <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
         <Route path="/contribution-calculation" element={<ProtectedRoute><ContributionCalculationPage /></ProtectedRoute>} />
         <Route path="/exit-process" element={<ProtectedRoute><ExitProcessPage /></ProtectedRoute>} />
-        <Route path="/user-rights" element={<ProtectedRoute roles={["Admin", "Manager"]}><UserRightsPage /></ProtectedRoute>} />
-        <Route path="/users" element={<ProtectedRoute roles={["Admin", "Manager"]}><UsersPage /></ProtectedRoute>} />
+        <Route path="/user-rights" element={<ProtectedRoute><UserRightsPage /></ProtectedRoute>} />
+        <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

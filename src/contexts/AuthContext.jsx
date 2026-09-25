@@ -95,10 +95,12 @@ export function AuthProvider({ children }) {
 
       rightsMap[data.role] = data.rights.map((r, idx) => ({
         id: idx + 1,
+        featureId: r.featureID ?? r.featureId,
         module: r.module,
         subModule: r.subModule,
         page: r.page,
         access: r.access,
+        accessType: r.accessType ?? r.AccessType ?? (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2))
       }));
 
       localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
@@ -137,10 +139,12 @@ export function AuthProvider({ children }) {
 
       rightsMap[data.role] = data.rights.map((r, idx) => ({
         id: idx + 1,
+        featureId: r.featureID ?? r.featureId,
         module: r.module,
         subModule: r.subModule,
         page: r.page,
         access: r.access,
+        accessType: r.accessType ?? r.AccessType ?? (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2))
       }));
 
       localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));

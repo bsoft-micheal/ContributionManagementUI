@@ -36,8 +36,8 @@ const initialForm = {
 
 export default function EventTypesPage() {
   const { authState } = useAuth();
-  const rights = getRightsForPage("Event Types", authState?.role);
-  const hasWriteAccess = rights.write;
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
 
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);

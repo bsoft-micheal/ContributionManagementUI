@@ -56,6 +56,8 @@ const getRoleStyle = (roleName = "") =>
   ROLE_COLORS[roleName] ?? { bg: "rgba(74,63,107,0.08)", darkBg: "rgba(124,58,237,0.15)", color: "#4a3f6b", darkColor: "#c4b5fd" };
 
 // ─── Initial form state ───────────────────────────────────────────────────────
+import useAccessByLocation from "../../hooks/useAccessByLocation";
+
 const initialForm = {
   username: "",
   email: "",
@@ -68,8 +70,8 @@ const initialForm = {
 export default function UsersPage() {
   const theme = useTheme();
   const { authState } = useAuth();
-  const rights = getRightsForPage("Users", authState?.role);
-  const hasWriteAccess = rights.write;
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
 
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);

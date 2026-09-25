@@ -45,6 +45,8 @@ import {
 } from "../../utils/upiQrHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
+import useAccessByLocation from "../../hooks/useAccessByLocation";
+
 // Standard calculation rules for Birthday events
 const RULES = {
   cakeRate: 300,        // ₹300 per office birthday member
@@ -91,6 +93,7 @@ export default function EventFormPage() {
   const navigate = useNavigate();
   const theme = useTheme();
   const toast = useAppToast();
+  const { canEdit, readOnly } = useAccessByLocation();
 
   const isEdit = Boolean(id);
 
@@ -1094,20 +1097,22 @@ export default function EventFormPage() {
               onClick={() => navigate("/events")}
               disabled={saving}
             >
-              Cancel
+              {readOnly ? "Back to Events" : "Cancel"}
             </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSubmit}
-              disabled={saving}
-              sx={{
-                bgcolor: "#4a3f6b !important",
-                "&:hover": { bgcolor: "#3b325c !important" },
-              }}
-            >
-              {saving ? "Saving..." : isEdit ? "Update" : "Save"}
-            </AppButton>
+            {canEdit && (
+              <AppButton
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={handleSubmit}
+                disabled={saving}
+                sx={{
+                  bgcolor: "#4a3f6b !important",
+                  "&:hover": { bgcolor: "#3b325c !important" },
+                }}
+              >
+                {saving ? "Saving..." : isEdit ? "Update" : "Save"}
+              </AppButton>
+            )}
           </Box>
         </Box>
       </Paper>
