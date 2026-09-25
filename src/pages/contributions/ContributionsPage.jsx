@@ -35,15 +35,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
-import { useAuth } from "../../contexts/AuthContext";
-import { getRightsForPage } from "../../utils/rightsHelper";
-import PaymentQrReminderDialog from "../../components/contributions/PaymentQrReminderDialog";
-import {
-  getPaymentQrConfig,
-  buildUpiPaymentUri,
-  getQrCodeApiUrl,
-  generateQrPngDataUrl,
-} from "../../utils/upiQrHelper";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
 
 const initialPayment = {
   eventId: "",
@@ -58,8 +50,8 @@ const initialPayment = {
 export default function ContributionsPage() {
   const theme = useTheme();
   const { authState } = useAuth();
-  const rights = getRightsForPage("Contributions", authState?.role);
-  const hasWriteAccess = rights.write;
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
 
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState("");
