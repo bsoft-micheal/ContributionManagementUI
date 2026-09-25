@@ -115,9 +115,55 @@ export function getRightsForPath(path, roleName) {
 }
 
 export function getRightsForPage(pageName, roleName) {
+  if (!roleName) {
+    return { read: false, write: false, deny: true };
+  }
+
+  // 1. Try resolving via featureId matching first
   const featureId = getFeatureIdForPath(pageName);
   if (featureId) {
     return getRightsForFeatureId(featureId, roleName);
   }
-  return getRightsForFeatureId(0, roleName);
+
+  // 2. Fallback to direct localStorage matching by module / subModule / page name
+  const savedRights = localStorage.getItem("projectRightsConfig");
+  if (!savedRights) {
+    return { read: true, write: true, deny: false };
+  }
+
+  try {
+    const rightsMap = JSON.parse(savedRights);
+    const roleRights = rightsMap[roleName];
+    if (!roleRights || !Array.isArray(roleRights)) {
+      return { read: true, write: true, deny: false };
+    }
+
+    const cleanTarget = (pageName || "").toLowerCase();
+    const matchedRight = roleRights.find(r => {
+      const sub = (r.subModule || r.SubModule || "").toLowerCase();
+      const mod = (r.module || r.Module || "").toLowerCase();
+      const page = (r.page || r.Page || "").toLowerCase();
+      return sub === cleanTarget || mod === cleanTarget || page === cleanTarget;
+    });
+
+    if (!matchedRight) {
+      return { read: false, write: false, deny: true };
+    }
+
+    let accessType = matchedRight.accessType ?? matchedRight.AccessType;
+    if (accessType === undefined || accessType === null || isNaN(Number(accessType)) || Number(accessType) === 0) {
+      const accessStr = (matchedRight.access || matchedRight.Access || "").toLowerCase();
+      accessType = accessStr === "deny" ? 3 : (accessStr === "readonly" ? 1 : 2);
+    }
+    const val = Number(accessType);
+
+    return {
+      read: val === 1 || val === 2,  // 1 = ReadOnly, 2 = ReadWrite
+      write: val === 2,              // 2 = ReadWrite
+      deny: val === 3               // 3 = Deny
+    };
+  } catch (error) {
+    console.error("Error evaluating getRightsForPage:", error);
+    return { read: true, write: true, deny: false };
+  }
 }

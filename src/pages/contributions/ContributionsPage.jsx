@@ -35,7 +35,9 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
+import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
+import PaymentQrReminderDialog from "../../components/contributions/PaymentQrReminderDialog";
 
 const initialPayment = {
   eventId: "",

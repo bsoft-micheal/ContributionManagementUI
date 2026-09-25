@@ -39,6 +39,8 @@ import MemberDetailsDialog from "../../components/members/MemberDetailsDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import { validateForm } from "../../utils/validation";
 
+import useAccessByLocation from "../../hooks/useAccessByLocation";
+
 const initialForm = {
   name: "",
   email: "",
@@ -52,8 +54,8 @@ const initialForm = {
 
 export default function MembersPage() {
   const { authState } = useAuth();
-  const rights = getRightsForPage("Members", authState?.role);
-  const hasWriteAccess = rights.write;
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
 
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState([]);

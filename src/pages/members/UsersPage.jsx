@@ -62,6 +62,8 @@ const USER_ROLES = [
 ];
 
 // ─── Initial form state ───────────────────────────────────────────────────────
+import useAccessByLocation from "../../hooks/useAccessByLocation";
+
 const initialForm = {
   username: "",
   email: "",
@@ -74,8 +76,8 @@ const initialForm = {
 export default function UsersPage() {
   const theme = useTheme();
   const { authState } = useAuth();
-  const rights = getRightsForPage("Users", authState?.role);
-  const hasWriteAccess = rights.write;
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
