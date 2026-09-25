@@ -82,8 +82,7 @@ export function dataURLtoBlob(dataurl) {
       u8arr[n] = bstr.charCodeAt(n);
     }
     return new Blob([u8arr], { type: mime });
-  } catch (e) {
-    console.error("Failed to parse data URL to blob:", e);
+  } catch {
     return null;
   }
 }
@@ -191,8 +190,7 @@ export default function GalleryPage() {
       } else {
         setPhotos([]);
       }
-    } catch (err) {
-      console.error("Failed to load gallery photos from database:", err);
+    } catch {
       toast.error("Could not load gallery photos from database");
     } finally {
       setLoading(false);
@@ -207,8 +205,8 @@ export default function GalleryPage() {
       ]);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
-    } catch (err) {
-      console.warn("Failed to load events or event types lookup data:", err);
+    } catch {
+      toast.error("Failed to load events lookup data.");
     }
   };
 
@@ -322,8 +320,7 @@ export default function GalleryPage() {
         document.body.removeChild(link);
         toast.success("Image downloaded successfully");
       }
-    } catch (error) {
-      console.error("Download failed:", error);
+    } catch {
       try {
         const cleanName = suggestedName.replace(/[^a-zA-Z0-9_-]/g, "_");
         const link = document.createElement("a");
@@ -483,8 +480,7 @@ export default function GalleryPage() {
       }
       toast.success(TOAST_MESSAGES.GALLERY.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchPhotosFromDb();
-    } catch (err) {
-      console.error("Backend delete photo call failed:", err);
+    } catch {
       toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
     } finally {
       setDeleteConfirmOpen(false);
@@ -531,8 +527,8 @@ export default function GalleryPage() {
           if (pid) {
             try {
               await deleteGalleryPhotoAsync(pid);
-            } catch (delErr) {
-              console.warn("Failed to delete old record during update:", pid, delErr);
+            } catch {
+              // Delete old record error ignored
             }
           }
         }
@@ -554,7 +550,6 @@ export default function GalleryPage() {
       setErrors({});
       await fetchPhotosFromDb();
     } catch (err) {
-      console.error("Failed to save gallery photo:", err);
       toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   };

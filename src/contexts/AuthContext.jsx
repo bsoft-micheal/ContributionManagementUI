@@ -172,7 +172,7 @@ export function AuthProvider({ children }) {
         await apiClient.post("/device-info/logoutCurrentSessionAsync");
       }
     } catch (error) {
-      console.error("Failed to logout from backend", error);
+      // Backend logout cleanup error ignored
     } finally {
       sessionStorage.removeItem("teamContributionAuth");
       sessionStorage.removeItem("birthdayModalShownSession");
@@ -203,7 +203,6 @@ export function AuthProvider({ children }) {
       });
       return data;
     } catch (err) {
-      console.error("Failed to fetch profile", err);
       throw err;
     }
   }

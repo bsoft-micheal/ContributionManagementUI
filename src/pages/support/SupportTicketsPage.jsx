@@ -111,30 +111,37 @@ export default function SupportTicketsPage() {
   };
 
   const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload a valid image file (PNG, JPG, JPEG, WEBP).");
-      return;
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please upload a valid image file (PNG, JPG, JPEG, WEBP).");
+        return;
+      }
+
+      const MAX_SIZE = 3 * 1024 * 1024; // 3MB limit
+      if (file.size > MAX_SIZE) {
+        toast.error("Image size exceeds maximum limit of 3 MB");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (uploadEvt) => {
+        setForm((c) => ({
+          ...c,
+          attachment: uploadEvt.target.result,
+          attachmentName: file.name,
+        }));
+        toast.success(`Image "${file.name}" attached successfully!`);
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read image file");
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast.error("Failed to process attachment");
     }
-
-    const MAX_SIZE = 3 * 1024 * 1024; // 3MB limit
-    if (file.size > MAX_SIZE) {
-      toast.error("Image size exceeds maximum limit of 3 MB");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (uploadEvt) => {
-      setForm((c) => ({
-        ...c,
-        attachment: uploadEvt.target.result,
-        attachmentName: file.name,
-      }));
-      toast.success(`Image "${file.name}" attached successfully!`);
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleRemoveAttachment = (e) => {
@@ -159,8 +166,7 @@ export default function SupportTicketsPage() {
       link.click();
       document.body.removeChild(link);
       toast.success("Image downloaded successfully!");
-    } catch (err) {
-      console.error("Failed to download image:", err);
+    } catch {
       toast.error("Could not download image");
     }
   };
@@ -207,8 +213,7 @@ export default function SupportTicketsPage() {
       } else {
         setTickets([]);
       }
-    } catch (err) {
-      console.error("Failed to load support tickets from database:", err);
+    } catch {
       toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
@@ -227,8 +232,8 @@ export default function SupportTicketsPage() {
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(ticketTypesRes)) setDbTicketTypes(ticketTypesRes);
       if (Array.isArray(statusesRes)) setDbStatuses(statusesRes);
-    } catch (err) {
-      console.warn("Failed to load members, events, ticket types, or statuses lookup data:", err);
+    } catch {
+      toast.error("Failed to load lookup data for tickets");
     }
   };
 
@@ -355,8 +360,7 @@ export default function SupportTicketsPage() {
       await deleteSupportTicketAsync(ticketId);
       toast.success(TOAST_MESSAGES.SUPPORT.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchTicketsFromDb();
-    } catch (err) {
-      console.error("Backend delete ticket call failed:", err);
+    } catch {
       toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
     } finally {
       setDeleteConfirmOpen(false);
@@ -425,7 +429,6 @@ export default function SupportTicketsPage() {
       setErrors({});
       await fetchTicketsFromDb();
     } catch (err) {
-      console.error("Failed to save support ticket:", err);
       toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   };
@@ -447,8 +450,7 @@ export default function SupportTicketsPage() {
         setReplyText("");
         setViewDialogOpen(false);
         await fetchTicketsFromDb();
-      } catch (err) {
-        console.error("Backend reply call failed:", err);
+      } catch {
         toast.error(TOAST_MESSAGES.GENERAL.SAVE_FAILED);
       }
     }

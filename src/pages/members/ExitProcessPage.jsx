@@ -64,8 +64,8 @@ export default function ExitProcessPage() {
       });
 
       setExitCandidates(candidates);
-    } catch (error) {
-      console.error("Failed to load", error);
+    } catch {
+      toast.error(TOAST_MESSAGES.MEMBERS.LOAD_ERROR || "Failed to load exit candidates");
     } finally {
       setLoading(false);
     }

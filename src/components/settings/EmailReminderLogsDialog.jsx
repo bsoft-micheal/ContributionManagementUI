@@ -47,10 +47,14 @@ export default function EmailReminderLogsDialog({ open, onClose }) {
   }, [open]);
 
   const handleClear = () => {
-    if (window.confirm("Are you sure you want to clear all email reminder sending logs?")) {
-      clearEmailReminderLogs();
-      refreshLogs();
-      toast.info("Email reminder logs cleared.");
+    try {
+      if (window.confirm("Are you sure you want to clear all email reminder sending logs?")) {
+        clearEmailReminderLogs();
+        refreshLogs();
+        toast.info("Email reminder logs cleared.");
+      }
+    } catch {
+      toast.error("Failed to clear email reminder logs");
     }
   };
 

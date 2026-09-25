@@ -16,10 +16,12 @@ import apiClient from "../../services/apiClient";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppButton from "../../components/common/AppButton";
 import PageHeader from "../../components/PageHeader";
+import { useAppToast } from "../../components/common/AppToast";
 
 export default function EventDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useAppToast();
   const [eventDetails, setEventDetails] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,8 +32,8 @@ export default function EventDetailsPage() {
         const { data: resData } = await apiClient.get(`/events/getEventAsyncById/${id}`);
         const data = (resData && resData.data !== undefined) ? resData.data : resData;
         setEventDetails(data);
-      } catch (error) {
-        console.error("Failed to load event details", error);
+      } catch {
+        toast.error("Failed to load event details.");
       } finally {
         setLoading(false);
       }

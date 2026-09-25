@@ -67,9 +67,9 @@ export default function PaymentsPage() {
   const [appliedStatus, setAppliedStatus] = useState("ALL");
   const [appliedDate, setAppliedDate] = useState(null);
 
-  // Dynamically derive payment modes from DB transactions + standard options
+  // Dynamically derive payment modes from DB transactions
   const modeOptions = useMemo(() => {
-    const set = new Set(["GPay", "PhonePe", "Paytm", "UPI"]);
+    const set = new Set();
     transactions.forEach((t) => {
       if (t.paymentMode) set.add(t.paymentMode);
     });
@@ -100,21 +100,12 @@ export default function PaymentsPage() {
   }, [eventsList]);
 
   const statusOptions = useMemo(() => {
-    if (dbStatuses && dbStatuses.length > 0) {
-      return [
-        { label: "All Statuses", value: "ALL" },
-        ...dbStatuses.map((s) => ({
-          label: s.statusName || s.name || s.status_name,
-          value: s.statusName || s.name || s.status_name,
-        })),
-      ];
-    }
     return [
       { label: "All Statuses", value: "ALL" },
-      { label: "Verified", value: "Verified" },
-      { label: "Pending", value: "Pending" },
-      { label: "Failed", value: "Failed" },
-      { label: "Needs Clarification", value: "Needs Clarification" },
+      ...(dbStatuses || []).map((s) => ({
+        label: s.statusName || s.name || s.status_name,
+        value: s.statusName || s.name || s.status_name,
+      })),
     ];
   }, [dbStatuses]);
 
@@ -154,8 +145,7 @@ export default function PaymentsPage() {
         }));
         setTransactions(mapped);
       }
-    } catch (err) {
-      console.warn("Could not fetch payments from backend:", err);
+    } catch {
       toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
@@ -191,8 +181,7 @@ export default function PaymentsPage() {
         });
         toast.success(TOAST_MESSAGES.PAYMENTS.VERIFIED_SUCCESS);
         await loadBackendData();
-      } catch (err) {
-        console.error("Backend verify failed:", err);
+      } catch {
         toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
       }
     }
@@ -221,8 +210,7 @@ export default function PaymentsPage() {
         });
         toast.info(TOAST_MESSAGES.PAYMENTS.STATUS_UPDATED || TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
         await loadBackendData();
-      } catch (err) {
-        console.error("Backend update failed:", err);
+      } catch {
         toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
       }
     }
@@ -710,9 +698,13 @@ export default function PaymentsPage() {
                     <Tooltip title="Copy UTR">
                       <IconButton
                         size="small"
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedTxn.utr);
-                          toast.success("UTR copied to clipboard!");
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(selectedTxn.utr);
+                            toast.success("UTR copied to clipboard!");
+                          } catch {
+                            toast.error("Failed to copy UTR");
+                          }
                         }}
                         sx={{ p: 0.3 }}
                       >

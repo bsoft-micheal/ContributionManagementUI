@@ -46,14 +46,18 @@ export default function EventsPage() {
   const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
 
   async function loadData() {
-    const [events, types, members] = await Promise.all([
-      GetEventsAsync(filters),
-      GetEventTypesAsync(),
-      GetMembersAsync(),
-    ]);
-    setEvents(events);
-    setEventTypes(types);
-    setMembers(members);
+    try {
+      const [events, types, members] = await Promise.all([
+        GetEventsAsync(filters),
+        GetEventTypesAsync(),
+        GetMembersAsync(),
+      ]);
+      setEvents(events || []);
+      setEventTypes(types || []);
+      setMembers(members || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load events data");
+    }
   }
 
   useEffect(() => {

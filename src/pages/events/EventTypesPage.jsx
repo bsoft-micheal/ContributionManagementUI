@@ -56,9 +56,14 @@ export default function EventTypesPage() {
 
   async function loadData() {
     setLoading(true);
-    const data = await GetEventTypesAsync();
-    setTypes(data);
-    setLoading(false);
+    try {
+      const data = await GetEventTypesAsync();
+      setTypes(data || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load event types");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit() {

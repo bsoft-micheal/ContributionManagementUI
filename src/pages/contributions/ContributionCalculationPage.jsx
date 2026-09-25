@@ -45,7 +45,7 @@ export default function ContributionCalculationPage() {
         setFilterEventId(evts[0].eventId);
       }
     } catch (error) {
-      console.error("Failed to load calculation data:", error);
+      toast.error("Failed to load calculation data.");
     } finally {
       setLoading(false);
     }
@@ -63,7 +63,6 @@ export default function ContributionCalculationPage() {
       const detailedEvent = await GetEventByIdAsync(selectedEventId);
       setSelectedEventDetails(detailedEvent);
     } catch (error) {
-      console.error("Failed to load event details:", error);
       toast.error("Failed to load event details");
     } finally {
       setLoading(false);

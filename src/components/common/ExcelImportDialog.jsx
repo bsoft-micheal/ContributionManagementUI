@@ -92,7 +92,6 @@ export default function ExcelImportDialog({
 
         setParsedRows(processed);
       } catch (err) {
-        console.error(err);
         setParsedRows([{ rowNumber: 1, raw: {}, error: "Failed to read Excel file. Please ensure it is a valid format.", parsed: {} }]);
       } finally {
         setLoading(false);
@@ -162,7 +161,7 @@ export default function ExcelImportDialog({
       link.click();
       URL.revokeObjectURL(link.href);
     } catch (err) {
-      console.error("Failed to generate Excel template:", err);
+      // Ignored
     }
   };
 

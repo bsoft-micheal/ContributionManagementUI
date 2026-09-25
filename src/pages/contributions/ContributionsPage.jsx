@@ -95,12 +95,11 @@ export default function ContributionsPage() {
         try {
           const allData = await GetContributionsAsync();
           setAllContributions(allData);
-        } catch (allDataErr) {
-          console.warn("Global contributions endpoint not available yet:", allDataErr);
+        } catch {
           setAllContributions([]);
         }
-      } catch (error) {
-        console.error("Error loading events & contributions:", error);
+      } catch {
+        toast.error("Failed to load events and contributions data.");
       }
     }
 
@@ -144,7 +143,7 @@ export default function ContributionsPage() {
 
         setContributions(enrichedData);
       } catch (error) {
-        console.error("Error loading contributions:", error);
+        toast.error("Failed to load contributions.");
       }
     }
 

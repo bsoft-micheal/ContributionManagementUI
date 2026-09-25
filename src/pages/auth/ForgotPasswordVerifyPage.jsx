@@ -82,7 +82,7 @@ export default function ForgotPasswordVerifyPage() {
           }
         }
       } catch (err) {
-        console.warn("Could not load dynamic OTP settings:", err);
+        // Ignored fallback
       }
     }
     loadConfig();

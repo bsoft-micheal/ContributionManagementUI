@@ -48,7 +48,7 @@ const initialForm = {
   phone: "",
   roleId: "",
   gender: "",
-  type: "Office",
+  type: "",
   dateOfBirth: dayjs().subtract(18, "year"),
   joiningDate: dayjs(),
 };
@@ -87,15 +87,9 @@ export default function MembersPage() {
   ];
 
   const typeOptions = useMemo(() => {
-    if (workTypes && workTypes.length > 0) {
-      return workTypes
-        .filter((w) => w.isActive !== false)
-        .map((w) => ({ label: w.workTypeName, value: w.workTypeName }));
-    }
-    return [
-      { label: "Office", value: "Office" },
-      { label: "WFH", value: "WFH" },
-    ];
+    return (workTypes || [])
+      .filter((w) => w.isActive !== false)
+      .map((w) => ({ label: w.workTypeName, value: w.workTypeName }));
   }, [workTypes]);
 
   const templateValidations = useMemo(() => {
@@ -114,7 +108,7 @@ export default function MembersPage() {
       },
       "Role": {
         type: "list",
-        formulae: [`"${roleNamesList || "Admin,Manager,User,Member"}"`],
+        formulae: [`"${roleNamesList}"`],
         error: "Please select a role from the list."
       },
       "Date of Birth": {
@@ -138,35 +132,40 @@ export default function MembersPage() {
 
   async function loadData() {
     setLoading(true);
-    const [membersData, rolesData, workTypesData] = await Promise.all([
-      GetMembersAsync(),
-      GetRolesAsync(),
-      GetWorkTypesAsync(true).catch(() => []),
-    ]);
-    const localOverrides = JSON.parse(localStorage.getItem("cm_member_overrides") || "{}");
-    const normalizedMembers = (membersData || []).map((m) => {
-      const override = localOverrides[m.memberId] || {};
-      const type = override.type || m.type || "Office";
-      return {
-        ...m,
-        type,
-      };
-    });
-    setMembers(normalizedMembers);
-    const safeRoles = rolesData || [];
-    setRoles(safeRoles);
-    setWorkTypes(Array.isArray(workTypesData) ? workTypesData : []);
-    if (safeRoles.length > 0) {
-      setFilterRoleId((prev) => {
-        if (prev && prev !== "ALL" && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
-        return "";
+    try {
+      const [membersData, rolesData, workTypesData] = await Promise.all([
+        GetMembersAsync(),
+        GetRolesAsync(),
+        GetWorkTypesAsync(true).catch(() => []),
+      ]);
+      const localOverrides = JSON.parse(localStorage.getItem("cm_member_overrides") || "{}");
+      const normalizedMembers = (membersData || []).map((m) => {
+        const override = localOverrides[m.memberId] || {};
+        const type = override.type || m.type || "";
+        return {
+          ...m,
+          type,
+        };
       });
-      setAppliedRoleId((prev) => {
-        if (prev && prev !== "ALL" && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
-        return "";
-      });
+      setMembers(normalizedMembers);
+      const safeRoles = rolesData || [];
+      setRoles(safeRoles);
+      setWorkTypes(Array.isArray(workTypesData) ? workTypesData : []);
+      if (safeRoles.length > 0) {
+        setFilterRoleId((prev) => {
+          if (prev && prev !== "ALL" && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
+          return "";
+        });
+        setAppliedRoleId((prev) => {
+          if (prev && prev !== "ALL" && safeRoles.some((r) => String(r.roleId) === String(prev))) return prev;
+          return "";
+        });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load members data");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   async function handleSubmit() {
@@ -502,7 +501,7 @@ export default function MembersPage() {
               display: "inline-block"
             }}
           >
-            {row.type || "Office"}
+            {row.type || "--"}
           </Typography>
         );
       },
