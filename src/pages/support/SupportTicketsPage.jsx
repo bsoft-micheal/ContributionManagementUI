@@ -32,7 +32,7 @@ import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
-import { getRightsForPage } from "../../utils/rightsHelper";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppTextArea from "../../components/common/AppTextArea";
@@ -75,9 +75,7 @@ const priorityOptions = [
 ];
 
 export default function SupportTicketsPage() {
-  const { authState } = useAuth();
-  const rights = getRightsForPage("Support Tickets", authState?.role);
-  const hasWriteAccess = rights?.write !== undefined ? rights.write : true;
+  const { canEdit } = useAccessByLocation();
   const toast = useAppToast();
 
   const [tickets, setTickets] = useState([]);
@@ -480,19 +478,19 @@ export default function SupportTicketsPage() {
               />
             </IconButton>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Edit" : ""}>
+          <Tooltip title={canEdit ? "Edit" : ""}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!canEdit}
                 onClick={() => handleEditTicket(row)}
               >
                 <EditIcon
                   sx={{
                     fontSize: "1.05rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      canEdit
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"
@@ -504,19 +502,19 @@ export default function SupportTicketsPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete" : ""}>
+          <Tooltip title={canEdit ? "Delete" : ""}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!canEdit}
                 onClick={() => handleDeleteRequest(row)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.05rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      canEdit
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"
@@ -742,7 +740,7 @@ export default function SupportTicketsPage() {
             <AppButton
               variant="contained"
               size="small"
-              disabled={!hasWriteAccess}
+              disabled={!canEdit}
               startIcon={<AddIcon />}
               onClick={() => {
                 const firstTicketType = dbTicketTypes.find((t) => t.isActive !== false)?.typeName || "";

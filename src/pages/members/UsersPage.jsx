@@ -48,12 +48,18 @@ import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 // ─── Role color map ───────────────────────────────────────────────────────────
 const ROLE_COLORS = {
   Admin: { bg: "rgba(239,68,68,0.10)", darkBg: "rgba(239,68,68,0.20)", color: "#dc2626", darkColor: "#fca5a5" },
-  Manager: { bg: "rgba(234,179,8,0.12)", darkBg: "rgba(234,179,8,0.22)", color: "#b45309", darkColor: "#fde047" },
-  User: { bg: "rgba(74,63,107,0.10)", darkBg: "rgba(124,58,237,0.20)", color: "#4a3f6b", darkColor: "#c4b5fd" },
+  Organizer: { bg: "rgba(234,179,8,0.12)", darkBg: "rgba(234,179,8,0.22)", color: "#b45309", darkColor: "#fde047" },
   Member: { bg: "rgba(74,63,107,0.08)", darkBg: "rgba(124,58,237,0.15)", color: "#4a3f6b", darkColor: "#c4b5fd" },
 };
 const getRoleStyle = (roleName = "") =>
   ROLE_COLORS[roleName] ?? { bg: "rgba(74,63,107,0.08)", darkBg: "rgba(124,58,237,0.15)", color: "#4a3f6b", darkColor: "#c4b5fd" };
+
+// ─── User Roles enum options ──────────────────────────────────────────────────
+const USER_ROLES = [
+  { label: "Admin", value: "Admin" },
+  { label: "Organizer", value: "Organizer" },
+  { label: "Member", value: "Member" },
+];
 
 // ─── Initial form state ───────────────────────────────────────────────────────
 import useAccessByLocation from "../../hooks/useAccessByLocation";
@@ -99,7 +105,7 @@ export default function UsersPage() {
   const templateValidations = useMemo(() => ({
     "Role": {
       type: "list",
-      formulae: [`"${userRolesList.map((r) => r.value).join(",")}"`],
+      formulae: ['"Admin,Organizer,Member"'],
       error: "Please select a role from the list."
     }
   }), [userRolesList]);
@@ -374,8 +380,7 @@ export default function UsersPage() {
     // Match role case-insensitively
     const matchedRole = userRolesList.find(r => r.value.toLowerCase() === roleName.toLowerCase());
     if (!matchedRole) {
-      const allowedStr = userRolesList.length > 0 ? userRolesList.map(r => r.value).join(", ") : "Defined Roles";
-      return { error: `Row ${rowNum}: Invalid role '${roleName}'. Allowed: ${allowedStr}` };
+      return { error: `Row ${rowNum}: Invalid role '${roleName}'. Allowed: Admin, Organizer, Member` };
     }
 
     if (password && password.length < 6) {

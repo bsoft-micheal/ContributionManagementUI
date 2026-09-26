@@ -59,7 +59,9 @@ export default function UserRightsPage() {
   async function loadRoles() {
     try {
       const dbRoles = await GetRolesAsync();
-      const list = Array.isArray(dbRoles) ? dbRoles : [];
+      const list = Array.isArray(dbRoles) && dbRoles.length > 0
+        ? dbRoles
+        : [{ roleName: "Admin" }, { roleName: "Organizer" }, { roleName: "Member" }];
       setRoles(list);
       if (list.length > 0) {
         setSelectedRoleName(list[0].roleName);
