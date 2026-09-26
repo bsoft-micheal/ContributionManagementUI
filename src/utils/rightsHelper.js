@@ -1,7 +1,10 @@
 import { navigationItems } from "../config/menuConfig";
 
 /**
- * Resolves the DB feature_id associated with a routing path based on menuConfig.
+ * Resolves the database feature_id associated with a routing path based on menuConfig.
+ *
+ * @param {string} path - The active URL path route (e.g. "/support-tickets").
+ * @returns {number|null} The numeric featureId associated with the path, or null if unmapped.
  */
 export function getFeatureIdForPath(path) {
   if (!path) return null;
@@ -54,10 +57,17 @@ export function getFeatureIdForPath(path) {
 /**
  * Resolves permissions for a given featureId and roleName.
  * 
- * AccessType mapping:
- *   1 = ReadOnly  -> read: true, write: false, deny: false
- *   2 = ReadWrite -> read: true, write: true, deny: false
- *   3 = Deny      -> read: false, write: false, deny: true
+ * Database accessType mapping:
+ *   1 = ReadOnly  -> { read: true,  write: false, deny: false }
+ *   2 = ReadWrite -> { read: true,  write: true,  deny: false }
+ *   3 = Deny      -> { read: false, write: false, deny: true }
+ *
+ * Missing permissions or unmatched features evaluate as Deny:
+ *   { read: false, write: false, deny: true }
+ *
+ * @param {number|string} featureId - The numeric feature ID.
+ * @param {string} roleName - The logged-in user's role name (e.g., "Admin", "Organizer", "Member").
+ * @returns {{ read: boolean, write: boolean, deny: boolean }} Permission flags for the feature.
  */
 export function getRightsForFeatureId(featureId, roleName) {
   if (!roleName) {
@@ -66,14 +76,14 @@ export function getRightsForFeatureId(featureId, roleName) {
 
   const savedRights = localStorage.getItem("projectRightsConfig");
   if (!savedRights) {
-    return { read: true, write: true, deny: false };
+    return { read: false, write: false, deny: true };
   }
 
   try {
     const rightsMap = JSON.parse(savedRights);
     const roleRights = rightsMap[roleName];
     if (!roleRights || !Array.isArray(roleRights)) {
-      return { read: true, write: true, deny: false };
+      return { read: false, write: false, deny: true };
     }
 
     const numericFeatureId = Number(featureId);
@@ -101,7 +111,7 @@ export function getRightsForFeatureId(featureId, roleName) {
       deny: val === 3               // 3 = Deny
     };
   } catch {
-    return { read: true, write: true, deny: false };
+    return { read: false, write: false, deny: true };
   }
 }
 
@@ -127,14 +137,14 @@ export function getRightsForPage(pageName, roleName) {
   // 2. Fallback to direct localStorage matching by module / subModule / page name
   const savedRights = localStorage.getItem("projectRightsConfig");
   if (!savedRights) {
-    return { read: true, write: true, deny: false };
+    return { read: false, write: false, deny: true };
   }
 
   try {
     const rightsMap = JSON.parse(savedRights);
     const roleRights = rightsMap[roleName];
     if (!roleRights || !Array.isArray(roleRights)) {
-      return { read: true, write: true, deny: false };
+      return { read: false, write: false, deny: true };
     }
 
     const cleanTarget = (pageName || "").toLowerCase();
@@ -162,6 +172,6 @@ export function getRightsForPage(pageName, roleName) {
       deny: val === 3               // 3 = Deny
     };
   } catch {
-    return { read: true, write: true, deny: false };
+    return { read: false, write: false, deny: true };
   }
 }

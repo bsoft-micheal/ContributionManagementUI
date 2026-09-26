@@ -30,13 +30,13 @@ import AppButton from "../../components/common/AppButton";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import {
-  CreateEventAsync,
-  UpdateEventAsync,
-  GetEventByIdAsync,
+  createEventAsync,
+  updateEventAsync,
+  getEventByIdAsync,
 } from "../../services/eventService";
-import { GetEventTypesAsync } from "../../services/eventTypeService";
-import { GetMembersAsync } from "../../services/memberService";
-import { GetBudgetCalculationsAsync } from "../../services/budgetCalculationService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getMembersAsync } from "../../services/memberService";
+import { getBudgetCalculationsAsync } from "../../services/budgetCalculationService";
 import { updateSystemSettings } from "../../services/settingsService";
 import {
   getPaymentQrConfig,
@@ -126,9 +126,9 @@ export default function EventFormPage() {
       setLoading(true);
       try {
         const [typesData, membersData, budgetData] = await Promise.all([
-          GetEventTypesAsync(),
-          GetMembersAsync(),
-          GetBudgetCalculationsAsync().catch(() => []),
+          getEventTypesAsync(),
+          getMembersAsync(),
+          getBudgetCalculationsAsync().catch(() => []),
         ]);
 
         if (!isMounted) return;
@@ -162,7 +162,7 @@ export default function EventFormPage() {
 
         if (id) {
           // Edit existing event
-          const detailedEvent = await GetEventByIdAsync(id);
+          const detailedEvent = await getEventByIdAsync(id);
           if (!isMounted) return;
 
           const pIds =
@@ -478,7 +478,7 @@ export default function EventFormPage() {
       }
 
       if (isEdit) {
-        await UpdateEventAsync(id, payload);
+        await updateEventAsync(id, payload);
         toast.success(TOAST_MESSAGES.EVENTS.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
         // Sync dynamic QR code with per-member contribution amount to backend settings before event creation
@@ -509,7 +509,7 @@ export default function EventFormPage() {
           // Dynamic QR sync fallback
         }
 
-        const createdEvent = await CreateEventAsync(payload);
+        const createdEvent = await createEventAsync(payload);
         toast.success(TOAST_MESSAGES.EVENTS.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
       }
 

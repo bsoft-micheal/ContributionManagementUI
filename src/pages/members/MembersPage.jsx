@@ -29,9 +29,9 @@ import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
-import { GetMembersAsync, CreateMemberAsync, UpdateMemberAsync, DeleteMemberAsync, CreateMembersBulkAsync } from "../../services/memberService";
-import { GetRolesAsync } from "../../services/roleService";
-import { GetWorkTypesAsync } from "../../services/workTypeService";
+import { getMembersAsync, createMemberAsync, updateMemberAsync, deleteMemberAsync, createMembersBulkAsync } from "../../services/memberService";
+import { getRolesAsync } from "../../services/roleService";
+import { getWorkTypesAsync } from "../../services/workTypeService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -134,9 +134,9 @@ export default function MembersPage() {
     setLoading(true);
     try {
       const [membersData, rolesData, workTypesData] = await Promise.all([
-        GetMembersAsync(),
-        GetRolesAsync(),
-        GetWorkTypesAsync(true).catch(() => []),
+        getMembersAsync(),
+        getRolesAsync(),
+        getWorkTypesAsync(true).catch(() => []),
       ]);
       const localOverrides = JSON.parse(localStorage.getItem("cm_member_overrides") || "{}");
       const normalizedMembers = (membersData || []).map((m) => {
@@ -218,10 +218,10 @@ export default function MembersPage() {
     try {
       let res;
       if (form.memberId) {
-        res = await UpdateMemberAsync(form.memberId, form);
+        res = await updateMemberAsync(form.memberId, form);
         toast.success(TOAST_MESSAGES.MEMBERS.UPDATED_SUCCESS);
       } else {
-        res = await CreateMemberAsync(form);
+        res = await createMemberAsync(form);
         toast.success(TOAST_MESSAGES.MEMBERS.CREATED_SUCCESS);
       }
 
@@ -254,7 +254,7 @@ export default function MembersPage() {
   async function handleConfirmDelete() {
     if (memberToDelete) {
       try {
-        await DeleteMemberAsync(memberToDelete);
+        await deleteMemberAsync(memberToDelete);
         toast.success(TOAST_MESSAGES.MEMBERS.DELETED_SUCCESS);
         loadData();
       } catch (error) {
@@ -401,7 +401,7 @@ export default function MembersPage() {
     if (!validData || validData.length === 0) return;
     setLoading(true);
     try {
-      await CreateMembersBulkAsync(validData);
+      await createMembersBulkAsync(validData);
       toast.success(`Successfully imported all ${validData.length} member(s)!`);
       loadData();
     } catch (err) {

@@ -1,6 +1,6 @@
 import { getApi } from "./apiActions";
 
-export const GetDashboardSummaryAsync = async (params) => {
+export const getDashboardSummaryAsync = async (params) => {
   const apiParams = {};
   if (params?.month && Number(params.month) > 0) {
     apiParams.month = Number(params.month);

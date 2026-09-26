@@ -1,17 +1,17 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetEventTypesAsync = async () => {
+export const getEventTypesAsync = async () => {
   return await getApi("/event-types/getAllEventTypeAsync");
 };
 
-export const CreateEventTypeAsync = async (data) => {
+export const createEventTypeAsync = async (data) => {
   return await postApi("/event-types/saveEventTypeAsync", data);
 };
 
-export const UpdateEventTypeAsync = async (id, data) => {
+export const updateEventTypeAsync = async (id, data) => {
   return await putApi(`/event-types/updateEventTypeAsyncById/${id}`, data);
 };
 
-export const DeleteEventTypeAsync = async (id) => {
+export const deleteEventTypeAsync = async (id) => {
   return await deleteApi(`/event-types/deleteEventTypeAsyncById/${id}`);
 };

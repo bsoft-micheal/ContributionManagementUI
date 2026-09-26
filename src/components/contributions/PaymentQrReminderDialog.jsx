@@ -26,7 +26,7 @@ import {
   generateDynamicPaymentQr,
   buildPaymentReminderEmailHtml,
 } from "../../utils/upiQrHelper";
-import { SendPaymentReminder } from "../../services/contributionService";
+import { sendPaymentReminder } from "../../services/contributionService";
 import {
   resolveCategoryTemplate,
   interpolatePlaceholders,
@@ -121,7 +121,7 @@ export default function PaymentQrReminderDialog({
         customBody: previewDescription,
       });
 
-      await SendPaymentReminder({
+      await sendPaymentReminder({
         memberId: contribution.memberId,
         memberName,
         recipientEmail: memberEmail,

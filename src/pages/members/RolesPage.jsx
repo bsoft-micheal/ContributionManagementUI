@@ -10,7 +10,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
-import { GetRolesAsync, CreateRoleAsync, UpdateRoleAsync, DeleteRoleAsync } from "../../services/roleService";
+import { getRolesAsync, createRoleAsync, updateRoleAsync, deleteRoleAsync } from "../../services/roleService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -38,7 +38,7 @@ export default function RolesPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await GetRolesAsync();
+      const data = await getRolesAsync();
       setRoles(data || []);
     } catch (error) {
       toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
@@ -67,10 +67,10 @@ export default function RolesPage() {
         defaultContributionAmount: form.defaultContributionAmount ? Number(form.defaultContributionAmount) : 0
       };
       if (form.roleId) {
-        await UpdateRoleAsync(form.roleId, payload);
+        await updateRoleAsync(form.roleId, payload);
         toast.success(TOAST_MESSAGES.ROLES.SAVED_SUCCESS);
       } else {
-        await CreateRoleAsync(payload);
+        await createRoleAsync(payload);
         toast.success(TOAST_MESSAGES.ROLES.SAVED_SUCCESS);
       }
       setDialogOpen(false);
@@ -88,7 +88,7 @@ export default function RolesPage() {
   async function handleConfirmDelete() {
     if (roleToDelete) {
       try {
-        await DeleteRoleAsync(roleToDelete);
+        await deleteRoleAsync(roleToDelete);
         toast.success(TOAST_MESSAGES.ROLES.DELETED_SUCCESS);
         loadData();
       } catch (error) {

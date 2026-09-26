@@ -15,8 +15,8 @@ import { formatViewDate } from "../../utils/dateHelper";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import { useAppToast } from "../common/AppToast";
-import { GetContributionsByEventAsync } from "../../services/contributionService";
-import { GetMembersAsync } from "../../services/memberService";
+import { getContributionsByEventAsync } from "../../services/contributionService";
+import { getMembersAsync } from "../../services/memberService";
 
 export default function EventDetailsDialog({ open, onClose, event, members = [] }) {
   const toast = useAppToast();
@@ -30,7 +30,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
       const fetchContributions = async () => {
         setLoading(true);
         try {
-          const data = await GetContributionsByEventAsync(event.eventId);
+          const data = await getContributionsByEventAsync(event.eventId);
           setContributions(data || []);
         } catch (error) {
           toast.error("Failed to load event contributions");
@@ -47,7 +47,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
   // Fallback to fetch members if not passed via props
   useEffect(() => {
     if (open && (!members || members.length === 0)) {
-      GetMembersAsync()
+      getMembersAsync()
         .then((res) => {
           if (Array.isArray(res)) setInternalMembers(res);
         })

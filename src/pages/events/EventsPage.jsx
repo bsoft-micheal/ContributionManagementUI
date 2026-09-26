@@ -18,9 +18,9 @@ import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
-import { GetEventsAsync, DeleteEventAsync } from "../../services/eventService";
-import { GetEventTypesAsync } from "../../services/eventTypeService";
-import { GetMembersAsync } from "../../services/memberService";
+import { getEventsAsync, deleteEventAsync } from "../../services/eventService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getMembersAsync } from "../../services/memberService";
 import AppDataTable from "../../components/common/AppDataTable";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -48,9 +48,9 @@ export default function EventsPage() {
   async function loadData() {
     try {
       const [events, types, members] = await Promise.all([
-        GetEventsAsync(filters),
-        GetEventTypesAsync(),
-        GetMembersAsync(),
+        getEventsAsync(filters),
+        getEventTypesAsync(),
+        getMembersAsync(),
       ]);
       setEvents(events || []);
       setEventTypes(types || []);
@@ -89,7 +89,7 @@ export default function EventsPage() {
   const handleConfirmDelete = async () => {
     if (eventToDelete) {
       try {
-        await DeleteEventAsync(eventToDelete.eventId);
+        await deleteEventAsync(eventToDelete.eventId);
         toast.success(TOAST_MESSAGES.EVENTS.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadData();
       } catch (error) {

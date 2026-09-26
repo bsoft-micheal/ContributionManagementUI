@@ -43,8 +43,8 @@ import {
   createGalleryPhotoAsync,
   deleteGalleryPhotoAsync,
 } from "../../services/galleryService";
-import { GetEventsAsync } from "../../services/eventService";
-import { GetEventTypesAsync } from "../../services/eventTypeService";
+import { getEventsAsync } from "../../services/eventService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 // Helper to safely extract an array of image URLs/data from any format
@@ -200,8 +200,8 @@ export default function GalleryPage() {
   const fetchLookupData = async () => {
     try {
       const [eventsRes, eventTypesRes] = await Promise.all([
-        GetEventsAsync().catch(() => []),
-        GetEventTypesAsync().catch(() => []),
+        getEventsAsync().catch(() => []),
+        getEventTypesAsync().catch(() => []),
       ]);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);

@@ -27,10 +27,10 @@ import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import apiClient from "../../services/apiClient";
-import { GetMembersAsync } from "../../services/memberService";
-import { GetEventTypesAsync } from "../../services/eventTypeService";
-import { GetEventByIdAsync } from "../../services/eventService";
-import { GetContributionsByEventAsync } from "../../services/contributionService";
+import { getMembersAsync } from "../../services/memberService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getEventByIdAsync } from "../../services/eventService";
+import { getContributionsByEventAsync } from "../../services/contributionService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import EventFormDialog from "../../components/events/EventFormDialog";
@@ -173,8 +173,8 @@ export default function CalendarPage() {
     async function loadEventTypesAndMembers() {
       try {
         const [types, mems] = await Promise.all([
-          GetEventTypesAsync(),
-          GetMembersAsync(),
+          getEventTypesAsync(),
+          getMembersAsync(),
         ]);
         setEventTypes(types || []);
         setMembers(mems || []);
@@ -540,8 +540,8 @@ export default function CalendarPage() {
 
         try {
           const [detail, contribs] = await Promise.all([
-            GetEventByIdAsync(ev.eventId).catch(() => null),
-            GetContributionsByEventAsync(ev.eventId).catch(() => []),
+            getEventByIdAsync(ev.eventId).catch(() => null),
+            getContributionsByEventAsync(ev.eventId).catch(() => []),
           ]);
 
           const combined = {

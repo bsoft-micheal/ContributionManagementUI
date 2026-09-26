@@ -19,10 +19,10 @@ import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
 import {
-  GetStatusesAsync,
-  CreateStatusAsync,
-  UpdateStatusAsync,
-  DeleteStatusAsync,
+  getStatusesAsync,
+  createStatusAsync,
+  updateStatusAsync,
+  deleteStatusAsync,
 } from "../../services/statusService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
@@ -56,7 +56,7 @@ export default function StatusPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await GetStatusesAsync();
+      const data = await getStatusesAsync();
       setItems(Array.isArray(data) ? data : []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load statuses");
@@ -86,10 +86,10 @@ export default function StatusPage() {
       };
 
       if (form.statusId) {
-        await UpdateStatusAsync(form.statusId, payload);
+        await updateStatusAsync(form.statusId, payload);
         toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       } else {
-        await CreateStatusAsync(payload);
+        await createStatusAsync(payload);
         toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       }
       setDialogOpen(false);
@@ -107,7 +107,7 @@ export default function StatusPage() {
   async function handleConfirmDelete() {
     if (itemToDelete) {
       try {
-        await DeleteStatusAsync(itemToDelete);
+        await deleteStatusAsync(itemToDelete);
         toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadData();
       } catch (error) {
@@ -131,7 +131,7 @@ export default function StatusPage() {
         statusName: itemToToggle.statusName,
         isActive: !itemToToggle.isActive,
       };
-      await UpdateStatusAsync(itemToToggle.statusId, payload);
+      await updateStatusAsync(itemToToggle.statusId, payload);
       toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadData();
     } catch (err) {

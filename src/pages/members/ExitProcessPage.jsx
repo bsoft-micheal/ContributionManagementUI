@@ -3,9 +3,9 @@ import { Box, Grid, Typography, Chip, Tooltip, IconButton, Avatar } from "@mui/m
 import { ExitToApp as ExitIcon, CheckCircle as CheckCircleIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
-import { GetMembersAsync, UpdateMemberAsync } from "../../services/memberService";
-import { GetContributionsAsync } from "../../services/contributionService";
-import { GetEventsAsync } from "../../services/eventService";
+import { getMembersAsync, updateMemberAsync } from "../../services/memberService";
+import { getContributionsAsync } from "../../services/contributionService";
+import { getEventsAsync } from "../../services/eventService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
@@ -29,9 +29,9 @@ export default function ExitProcessPage() {
     setLoading(true);
     try {
       const [members, contributions, events] = await Promise.all([
-        GetMembersAsync(),
-        GetContributionsAsync(),
-        GetEventsAsync()
+        getMembersAsync(),
+        getContributionsAsync(),
+        getEventsAsync()
       ]);
 
       // Identify farewell events
@@ -85,7 +85,7 @@ export default function ExitProcessPage() {
     }
 
     try {
-      await UpdateMemberAsync(member.memberId, { ...member, isExited: true, isActive: false });
+      await updateMemberAsync(member.memberId, { ...member, isExited: true, isActive: false });
       toast.success(TOAST_MESSAGES.MEMBERS.EXIT_PROCESS_SUCCESS || TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       loadExitData();
     } catch (error) {

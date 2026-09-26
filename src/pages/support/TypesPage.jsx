@@ -19,16 +19,16 @@ import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
 import {
-  GetTicketTypesAsync,
-  CreateTicketTypeAsync,
-  UpdateTicketTypeAsync,
-  DeleteTicketTypeAsync,
+  getTicketTypesAsync,
+  createTicketTypeAsync,
+  updateTicketTypeAsync,
+  deleteTicketTypeAsync,
 } from "../../services/ticketTypeService";
 import {
-  GetWorkTypesAsync,
-  CreateWorkTypeAsync,
-  UpdateWorkTypeAsync,
-  DeleteWorkTypeAsync,
+  getWorkTypesAsync,
+  createWorkTypeAsync,
+  updateWorkTypeAsync,
+  deleteWorkTypeAsync,
 } from "../../services/workTypeService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
@@ -82,7 +82,7 @@ export default function TypesPage() {
   async function loadTicketTypes() {
     setTicketTypesLoading(true);
     try {
-      const data = await GetTicketTypesAsync();
+      const data = await getTicketTypesAsync();
       setTicketTypes(Array.isArray(data) ? data : []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load ticket types");
@@ -112,10 +112,10 @@ export default function TypesPage() {
       };
 
       if (ticketTypeForm.ticketTypeId) {
-        await UpdateTicketTypeAsync(ticketTypeForm.ticketTypeId, payload);
+        await updateTicketTypeAsync(ticketTypeForm.ticketTypeId, payload);
         toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       } else {
-        await CreateTicketTypeAsync(payload);
+        await createTicketTypeAsync(payload);
         toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       }
       setTicketTypeDialogOpen(false);
@@ -133,7 +133,7 @@ export default function TypesPage() {
   async function handleConfirmTicketTypeDelete() {
     if (ticketTypeToDelete) {
       try {
-        await DeleteTicketTypeAsync(ticketTypeToDelete);
+        await deleteTicketTypeAsync(ticketTypeToDelete);
         toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadTicketTypes();
       } catch (error) {
@@ -157,7 +157,7 @@ export default function TypesPage() {
         typeName: ticketTypeToToggle.typeName,
         isActive: !ticketTypeToToggle.isActive,
       };
-      await UpdateTicketTypeAsync(ticketTypeToToggle.ticketTypeId, payload);
+      await updateTicketTypeAsync(ticketTypeToToggle.ticketTypeId, payload);
       toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadTicketTypes();
     } catch (err) {
@@ -172,7 +172,7 @@ export default function TypesPage() {
   async function loadWorkTypes() {
     setWorkTypesLoading(true);
     try {
-      const data = await GetWorkTypesAsync();
+      const data = await getWorkTypesAsync();
       setWorkTypes(Array.isArray(data) ? data : []);
     } catch (error) {
       toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.FETCH_FAILED);
@@ -202,10 +202,10 @@ export default function TypesPage() {
       };
 
       if (workTypeForm.workTypeId) {
-        await UpdateWorkTypeAsync(workTypeForm.workTypeId, payload);
+        await updateWorkTypeAsync(workTypeForm.workTypeId, payload);
         toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       } else {
-        await CreateWorkTypeAsync(payload);
+        await createWorkTypeAsync(payload);
         toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       }
       setWorkTypeDialogOpen(false);
@@ -223,7 +223,7 @@ export default function TypesPage() {
   async function handleConfirmWorkTypeDelete() {
     if (workTypeToDelete) {
       try {
-        await DeleteWorkTypeAsync(workTypeToDelete);
+        await deleteWorkTypeAsync(workTypeToDelete);
         toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadWorkTypes();
       } catch (error) {
@@ -247,7 +247,7 @@ export default function TypesPage() {
         workTypeName: workTypeToToggle.workTypeName,
         isActive: !workTypeToToggle.isActive,
       };
-      await UpdateWorkTypeAsync(workTypeToToggle.workTypeId, payload);
+      await updateWorkTypeAsync(workTypeToToggle.workTypeId, payload);
       toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadWorkTypes();
     } catch (err) {

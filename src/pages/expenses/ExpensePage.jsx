@@ -45,10 +45,10 @@ import {
   updateExpenseAsync,
   deleteExpenseAsync,
 } from "../../services/expenseService";
-import { GetEventsAsync } from "../../services/eventService";
-import { GetMembersAsync } from "../../services/memberService";
-import { GetEventTypesAsync } from "../../services/eventTypeService";
-import { GetStatusesAsync } from "../../services/statusService";
+import { getEventsAsync } from "../../services/eventService";
+import { getMembersAsync } from "../../services/memberService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getStatusesAsync } from "../../services/statusService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const resolveAttachmentUrl = (filePath) => {
@@ -179,10 +179,10 @@ export default function ExpensePage() {
   const fetchLookupData = async () => {
     try {
       const [eventsRes, membersRes, eventTypesRes, statusesRes] = await Promise.all([
-        GetEventsAsync().catch(() => []),
-        GetMembersAsync().catch(() => []),
-        GetEventTypesAsync().catch(() => []),
-        GetStatusesAsync().catch(() => []),
+        getEventsAsync().catch(() => []),
+        getMembersAsync().catch(() => []),
+        getEventTypesAsync().catch(() => []),
+        getStatusesAsync().catch(() => []),
       ]);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(membersRes)) setMembersList(membersRes);

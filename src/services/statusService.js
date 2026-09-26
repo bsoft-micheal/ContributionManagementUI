@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetStatusesAsync = async (activeOnly = false) => {
+export const getStatusesAsync = async (activeOnly = false) => {
   const url = activeOnly
     ? "/statuses/getAllStatusAsync?activeOnly=true"
     : "/statuses/getAllStatusAsync";
@@ -8,18 +8,18 @@ export const GetStatusesAsync = async (activeOnly = false) => {
   return result || [];
 };
 
-export const GetStatusByIdAsync = async (id) => {
+export const getStatusByIdAsync = async (id) => {
   return await getApi(`/statuses/getStatusAsyncById/${id}`);
 };
 
-export const CreateStatusAsync = async (data) => {
+export const createStatusAsync = async (data) => {
   return await postApi("/statuses/saveStatusAsync", data);
 };
 
-export const UpdateStatusAsync = async (id, data) => {
+export const updateStatusAsync = async (id, data) => {
   return await putApi(`/statuses/updateStatusAsyncById/${id}`, data);
 };
 
-export const DeleteStatusAsync = async (id) => {
+export const deleteStatusAsync = async (id) => {
   return await deleteApi(`/statuses/deleteStatusAsyncById/${id}`);
 };

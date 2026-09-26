@@ -47,10 +47,10 @@ import {
   replySupportTicketAsync,
   deleteSupportTicketAsync,
 } from "../../services/supportTicketService";
-import { GetMembersAsync } from "../../services/memberService";
-import { GetEventsAsync } from "../../services/eventService";
-import { GetTicketTypesAsync } from "../../services/ticketTypeService";
-import { GetStatusesAsync } from "../../services/statusService";
+import { getMembersAsync } from "../../services/memberService";
+import { getEventsAsync } from "../../services/eventService";
+import { getTicketTypesAsync } from "../../services/ticketTypeService";
+import { getStatusesAsync } from "../../services/statusService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const initialForm = {
@@ -221,10 +221,10 @@ export default function SupportTicketsPage() {
   const fetchLookupData = async () => {
     try {
       const [membersRes, eventsRes, ticketTypesRes, statusesRes] = await Promise.all([
-        GetMembersAsync().catch(() => []),
-        GetEventsAsync().catch(() => []),
-        GetTicketTypesAsync(true).catch(() => []),
-        GetStatusesAsync(true).catch(() => []),
+        getMembersAsync().catch(() => []),
+        getEventsAsync().catch(() => []),
+        getTicketTypesAsync(true).catch(() => []),
+        getStatusesAsync(true).catch(() => []),
       ]);
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);

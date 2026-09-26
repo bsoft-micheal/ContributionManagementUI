@@ -31,9 +31,9 @@ import {
   getPaymentTransactionsAsync,
   verifyPaymentTransactionAsync,
 } from "../../services/paymentService";
-import { GetMembersAsync } from "../../services/memberService";
-import { GetEventsAsync } from "../../services/eventService";
-import { GetStatusesAsync } from "../../services/statusService";
+import { getMembersAsync } from "../../services/memberService";
+import { getEventsAsync } from "../../services/eventService";
+import { getStatusesAsync } from "../../services/statusService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -115,9 +115,9 @@ export default function PaymentsPage() {
       setLoading(true);
       const [txnRes, memsRes, eventsRes, statusRes] = await Promise.all([
         getPaymentTransactionsAsync().catch(() => []),
-        GetMembersAsync().catch(() => []),
-        GetEventsAsync().catch(() => []),
-        GetStatusesAsync().catch(() => []),
+        getMembersAsync().catch(() => []),
+        getEventsAsync().catch(() => []),
+        getStatusesAsync().catch(() => []),
       ]);
 
       if (Array.isArray(memsRes)) setMembersList(memsRes);
