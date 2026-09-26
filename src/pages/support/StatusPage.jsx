@@ -25,10 +25,10 @@ import {
   deleteStatusAsync,
 } from "../../services/statusService";
 import {
-  GetPrioritiesAsync,
-  CreatePriorityAsync,
-  UpdatePriorityAsync,
-  DeletePriorityAsync,
+  getPrioritiesAsync,
+  createPriorityAsync,
+  updatePriorityAsync,
+  deletePriorityAsync,
 } from "../../services/priorityService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
@@ -171,7 +171,7 @@ export default function StatusPage() {
   async function loadPriorities() {
     setPrioritiesLoading(true);
     try {
-      const data = await GetPrioritiesAsync();
+      const data = await getPrioritiesAsync();
       setPriorities(Array.isArray(data) ? data : []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load priorities");
@@ -201,10 +201,10 @@ export default function StatusPage() {
       };
 
       if (priorityForm.priorityId) {
-        await UpdatePriorityAsync(priorityForm.priorityId, payload);
+        await updatePriorityAsync(priorityForm.priorityId, payload);
         toast.success("Priority updated successfully!");
       } else {
-        await CreatePriorityAsync(payload);
+        await createPriorityAsync(payload);
         toast.success("Priority created successfully!");
       }
       setPriorityDialogOpen(false);
@@ -222,7 +222,7 @@ export default function StatusPage() {
   async function handleConfirmPriorityDelete() {
     if (priorityToDelete) {
       try {
-        await DeletePriorityAsync(priorityToDelete);
+        await deletePriorityAsync(priorityToDelete);
         toast.success("Priority deleted successfully!");
         loadPriorities();
       } catch (error) {
@@ -246,7 +246,7 @@ export default function StatusPage() {
         priorityName: priorityToToggle.priorityName,
         isActive: !priorityToToggle.isActive,
       };
-      await UpdatePriorityAsync(priorityToToggle.priorityId, payload);
+      await updatePriorityAsync(priorityToToggle.priorityId, payload);
       toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadPriorities();
     } catch (err) {

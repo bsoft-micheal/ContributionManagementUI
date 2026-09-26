@@ -31,10 +31,10 @@ import {
   deleteWorkTypeAsync,
 } from "../../services/workTypeService";
 import {
-  GetPrioritiesAsync,
-  CreatePriorityAsync,
-  UpdatePriorityAsync,
-  DeletePriorityAsync,
+  getPrioritiesAsync,
+  createPriorityAsync,
+  updatePriorityAsync,
+  deletePriorityAsync,
 } from "../../services/priorityService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
@@ -285,7 +285,7 @@ export default function TypesPage() {
   async function loadPriorities() {
     setPrioritiesLoading(true);
     try {
-      const data = await GetPrioritiesAsync();
+      const data = await getPrioritiesAsync();
       setPriorities(Array.isArray(data) ? data : []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load priorities");
@@ -315,10 +315,10 @@ export default function TypesPage() {
       };
 
       if (priorityForm.priorityId) {
-        await UpdatePriorityAsync(priorityForm.priorityId, payload);
+        await updatePriorityAsync(priorityForm.priorityId, payload);
         toast.success("Priority updated successfully!");
       } else {
-        await CreatePriorityAsync(payload);
+        await createPriorityAsync(payload);
         toast.success("Priority created successfully!");
       }
 
@@ -339,7 +339,7 @@ export default function TypesPage() {
   async function handleConfirmPriorityDelete() {
     if (!priorityToDelete) return;
     try {
-      await DeletePriorityAsync(priorityToDelete);
+      await deletePriorityAsync(priorityToDelete);
       toast.success("Priority deleted successfully!");
       loadPriorities();
     } catch (error) {
@@ -362,7 +362,7 @@ export default function TypesPage() {
         priorityName: priorityToToggle.priorityName,
         isActive: !priorityToToggle.isActive,
       };
-      await UpdatePriorityAsync(priorityToToggle.priorityId, payload);
+      await updatePriorityAsync(priorityToToggle.priorityId, payload);
       toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadPriorities();
     } catch (err) {
