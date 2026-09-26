@@ -13,30 +13,22 @@ export const resetSystemSettingsAsync = async () => {
 };
 
 export const getAllPaymentQrSettingsAsync = async () => {
-  try {
-    return await getApi("/settings/getAllPaymentQrSettingsAsync");
-  } catch {
-    return null;
-  }
+  return [];
 };
 
 export const getPaymentQrSettingByEventTypeAsync = async (eventType) => {
-  try {
-    return await getApi(`/settings/getPaymentQrSettingsAsync?eventType=${encodeURIComponent(eventType)}`);
-  } catch {
-    return null;
-  }
+  return null;
 };
 
 export const savePaymentQrSettingAsync = async (data) => {
   try {
-    return await postApi("/settings/savePaymentQrSettingAsync", data);
+    return await updateSystemSettingsAsync({
+      qrReceiverName: data.receiverName || data.qrReceiverName,
+      qrUpiId: data.upiId || data.qrUpiId,
+      qrImage: data.qrCodeImage || data.qrImage,
+    });
   } catch {
-    try {
-      return await updateSystemSettingsAsync(data);
-    } catch {
-      return null;
-    }
+    return null;
   }
 };
 
