@@ -132,7 +132,13 @@ export default function EventFormDialog({
   const puffsFactor = office > 0 ? office : 0;
 
   const computedBudgetItems = useMemo(() => {
-    const items = budgetItemsList.filter((b) => b.isActive !== false);
+    const items = budgetItemsList.filter(
+      (b) =>
+        b.isActive !== false &&
+        (!b.category ||
+          b.category.toLowerCase() === "birthday" ||
+          (selectedType && b.category.toLowerCase() === selectedType.eventTypeName?.toLowerCase()))
+    );
 
     return items.map((item) => {
       const name = (item.expenseItem || "").toLowerCase();
@@ -199,9 +205,12 @@ export default function EventFormDialog({
           if (Array.isArray(budgetData) && budgetData.length > 0) {
             const activeItems = budgetData.filter((b) => b.isActive !== false);
             setBudgetItemsList(activeItems);
-            const cakeItem = activeItems.find((b) => b.expenseItem?.toLowerCase().includes("cake"));
-            const puffsItem = activeItems.find((b) => b.expenseItem?.toLowerCase().includes("puff") || b.expenseItem?.toLowerCase().includes("snack") || b.expenseItem?.toLowerCase().includes("roll"));
-            const giftItem = activeItems.find((b) => b.expenseItem?.toLowerCase().includes("gift"));
+            const bdayActive = activeItems.filter(
+              (b) => !b.category || b.category.toLowerCase().includes("birthday")
+            );
+            const cakeItem = bdayActive.find((b) => b.expenseItem?.toLowerCase().includes("cake"));
+            const puffsItem = bdayActive.find((b) => b.expenseItem?.toLowerCase().includes("puff") || b.expenseItem?.toLowerCase().includes("snack") || b.expenseItem?.toLowerCase().includes("roll"));
+            const giftItem = bdayActive.find((b) => b.expenseItem?.toLowerCase().includes("gift"));
 
             setBudgetRates((prev) => ({
               ...prev,

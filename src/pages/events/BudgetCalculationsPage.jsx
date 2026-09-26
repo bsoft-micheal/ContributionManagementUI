@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Typography, Box, IconButton, Tooltip } from "@mui/material";
+import React, { useEffect, useState, useMemo } from "react";
+import { Typography, Box, IconButton, Tooltip, Grid } from "@mui/material";
 import {
   Edit as EditIcon,
   Add as AddIcon,
@@ -7,12 +7,14 @@ import {
   Delete as DeleteIcon,
   ToggleOn as ToggleOnIcon,
   ToggleOff as ToggleOffIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
+import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
@@ -24,6 +26,7 @@ import {
   UpdateBudgetCalculationAsync,
   DeleteBudgetCalculationAsync,
 } from "../../services/budgetCalculationService";
+import { GetEventTypesAsync } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { COMMON_STRINGS } from "../../constants";
@@ -38,7 +41,7 @@ const formatRateAmount = (value) => {
 const initialForm = {
   expenseItem: "",
   rate: "",
-  category: "Birthday",
+  category: "",
   isActive: true,
 };
 
@@ -48,12 +51,15 @@ export default function BudgetCalculationsPage() {
   const hasWriteAccess = rights.write;
 
   const [items, setItems] = useState([]);
+  const [eventTypes, setEventTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
   const [itemToToggle, setItemToToggle] = useState(null);
+  const [filterCategory, setFilterCategory] = useState("ALL");
+  const [appliedCategory, setAppliedCategory] = useState("ALL");
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
@@ -65,8 +71,12 @@ export default function BudgetCalculationsPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await GetBudgetCalculationsAsync();
-      setItems(Array.isArray(data) ? data : []);
+      const [budgetData, typesData] = await Promise.all([
+        GetBudgetCalculationsAsync(),
+        GetEventTypesAsync().catch(() => []),
+      ]);
+      setItems(Array.isArray(budgetData) ? budgetData : []);
+      setEventTypes(Array.isArray(typesData) ? typesData : []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load budget calculations");
     } finally {
@@ -74,9 +84,45 @@ export default function BudgetCalculationsPage() {
     }
   }
 
+  // Filter panel Event Type dropdown options
+  const categoryFilterOptions = useMemo(() => {
+    return [
+      { label: "All Event Types", value: "ALL" },
+      ...(eventTypes || []).map((t) => ({
+        label: t.eventTypeName,
+        value: t.eventTypeName,
+      })),
+    ];
+  }, [eventTypes]);
+
+  // Form Event Type dropdown options for Add/Edit dialog
+  const formCategoryOptions = useMemo(() => {
+    const list = (eventTypes || []).map((t) => ({
+      label: t.eventTypeName,
+      value: t.eventTypeName,
+    }));
+    if (
+      form.category &&
+      !list.some((o) => o.value.toLowerCase() === form.category.toLowerCase())
+    ) {
+      list.unshift({ label: form.category, value: form.category });
+    }
+    return list;
+  }, [eventTypes, form.category]);
+
+  // Filtered rows based on applied Event Type filter
+  const filteredItems = useMemo(() => {
+    if (appliedCategory === "ALL") return items;
+    return items.filter((item) => {
+      const cat = item.category || "Birthday";
+      return cat.toLowerCase() === appliedCategory.toLowerCase();
+    });
+  }, [items, appliedCategory]);
+
   async function handleSubmit() {
     const fieldRequired = "This field is required";
     const schema = {
+      category: { required: true, label: fieldRequired },
       expenseItem: { required: true, min: 2, max: 100, label: fieldRequired },
       rate: {
         required: true,
@@ -103,11 +149,14 @@ export default function BudgetCalculationsPage() {
     }
 
     try {
+      const selectedCategory =
+        form.category?.trim() || eventTypes[0]?.eventTypeName || "Birthday";
       const payload = {
         ...form,
+        category: selectedCategory,
         expenseItem: form.expenseItem.trim(),
         rate: Number(String(form.rate).replace(/[^0-9]/g, "") || 0),
-        category: form.category || "Birthday",
+        isActive: form.isActive !== undefined ? form.isActive : true,
       };
 
       if (form.budgetCalculationId) {
@@ -179,7 +228,10 @@ export default function BudgetCalculationsPage() {
                 sx={{ p: 0.3 }}
                 disabled={!hasWriteAccess}
                 onClick={() => {
-                  setForm(row);
+                  setForm({
+                    ...row,
+                    category: row.category || "Birthday",
+                  });
                   setErrors({});
                   setDialogOpen(true);
                 }}
@@ -271,6 +323,21 @@ export default function BudgetCalculationsPage() {
       ),
     },
     {
+      label: "Event Type",
+      key: "category",
+      render: (row) => (
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          sx={{
+            color: (theme) => (theme.palette.mode === "dark" ? "#e2e8f0" : "#334155"),
+          }}
+        >
+          {row.category || "Birthday"}
+        </Typography>
+      ),
+    },
+    {
       label: "Rate",
       key: "rate",
       align: "right",
@@ -321,8 +388,67 @@ export default function BudgetCalculationsPage() {
       <AppDataTable
         title="Manage Budget Calculations"
         columns={columns}
-        data={items}
+        data={filteredItems}
         loading={loading}
+        filterPanel={
+          <Grid container spacing={2} alignItems="center">
+            <Grid
+              size={{ xs: 12, md: 8 }}
+              sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
+            >
+              <Box sx={{ minWidth: 200 }}>
+                <AppSelect
+                  label="Select Event Type"
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  options={categoryFilterOptions}
+                  size="small"
+                  placeholder="Select Event Type"
+                  required
+                  fullWidth
+                />
+              </Box>
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => setAppliedCategory(filterCategory)}
+                sx={{
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                }}
+              >
+                Filter
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  setFilterCategory("ALL");
+                  setAppliedCategory("ALL");
+                }}
+                sx={{
+                  color: "#ef4444",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
+                  height: 34,
+                  mt: 2.2,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                  "&:hover": {
+                    borderColor: "#ef4444",
+                    bgcolor: "rgba(239, 68, 68, 0.05)",
+                  },
+                }}
+              >
+                Clear Filter
+              </AppButton>
+            </Grid>
+          </Grid>
+        }
         actions={
           <AppButton
             size="small"
@@ -330,7 +456,10 @@ export default function BudgetCalculationsPage() {
             disabled={!hasWriteAccess}
             startIcon={<AddIcon />}
             onClick={() => {
-              setForm(initialForm);
+              setForm({
+                ...initialForm,
+                category: eventTypes[0]?.eventTypeName || "Birthday",
+              });
               setErrors({});
               setDialogOpen(true);
             }}
@@ -368,6 +497,22 @@ export default function BudgetCalculationsPage() {
         }
       >
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <AppSelect
+            label="Event Type"
+            placeholder="Select Event Type"
+            options={formCategoryOptions}
+            value={form.category}
+            onChange={(e) => {
+              setForm((f) => ({ ...f, category: e.target.value }));
+              if (errors.category) {
+                setErrors((prev) => ({ ...prev, category: "" }));
+              }
+            }}
+            error={!!errors.category}
+            helperText={errors.category}
+            required
+            fullWidth
+          />
           <AppInput
             label="Expense Item"
             placeholder="Enter expense item name (e.g. ½ kg Cake)"
