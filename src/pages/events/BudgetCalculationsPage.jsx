@@ -12,7 +12,7 @@ import {
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
-import { getRightsForPage } from "../../utils/rightsHelper";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
@@ -46,9 +46,8 @@ const initialForm = {
 };
 
 export default function BudgetCalculationsPage() {
-  const { authState } = useAuth();
-  const rights = getRightsForPage("Budget Calculations", authState?.role);
-  const hasWriteAccess = rights.write;
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
 
   const [items, setItems] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
