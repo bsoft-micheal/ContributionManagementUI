@@ -51,6 +51,7 @@ import { GetMembersAsync } from "../../services/memberService";
 import { GetEventsAsync } from "../../services/eventService";
 import { GetTicketTypesAsync } from "../../services/ticketTypeService";
 import { GetStatusesAsync } from "../../services/statusService";
+import { GetPrioritiesAsync } from "../../services/priorityService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const initialForm = {
@@ -67,13 +68,6 @@ const initialForm = {
   attachmentName: "",
 };
 
-const priorityOptions = [
-  { label: "All Priorities", value: "ALL" },
-  { label: "High", value: "High" },
-  { label: "Medium", value: "Medium" },
-  { label: "Low", value: "Low" },
-];
-
 export default function SupportTicketsPage() {
   const { canEdit } = useAccessByLocation();
   const toast = useAppToast();
@@ -83,6 +77,7 @@ export default function SupportTicketsPage() {
   const [eventsList, setEventsList] = useState([]);
   const [dbTicketTypes, setDbTicketTypes] = useState([]);
   const [dbStatuses, setDbStatuses] = useState([]);
+  const [dbPriorities, setDbPriorities] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -220,16 +215,18 @@ export default function SupportTicketsPage() {
 
   const fetchLookupData = async () => {
     try {
-      const [membersRes, eventsRes, ticketTypesRes, statusesRes] = await Promise.all([
+      const [membersRes, eventsRes, ticketTypesRes, statusesRes, prioritiesRes] = await Promise.all([
         GetMembersAsync().catch(() => []),
         GetEventsAsync().catch(() => []),
         GetTicketTypesAsync(true).catch(() => []),
         GetStatusesAsync(true).catch(() => []),
+        GetPrioritiesAsync(true).catch(() => []),
       ]);
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(ticketTypesRes)) setDbTicketTypes(ticketTypesRes);
       if (Array.isArray(statusesRes)) setDbStatuses(statusesRes);
+      if (Array.isArray(prioritiesRes)) setDbPriorities(prioritiesRes);
     } catch {
       toast.error("Failed to load lookup data for tickets");
     }
@@ -298,6 +295,26 @@ export default function SupportTicketsPage() {
       ...list,
     ];
   }, [dbStatuses]);
+
+  // Dynamically derive priority options strictly from DB priorities table
+  const priorityOptions = useMemo(() => {
+    const list = Array.isArray(dbPriorities)
+      ? dbPriorities
+          .filter((p) => p.priorityName && p.isActive !== false)
+          .map((p) => ({ label: p.priorityName, value: p.priorityName }))
+      : [];
+
+    return [
+      { label: "All Priorities", value: "ALL" },
+      ...(list.length > 0
+        ? list
+        : [
+            { label: "High", value: "High" },
+            { label: "Medium", value: "Medium" },
+            { label: "Low", value: "Low" },
+          ]),
+    ];
+  }, [dbPriorities]);
 
   // Dynamically derive assignee options from DB members list
   const assignedToOptions = useMemo(() => {
