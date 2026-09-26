@@ -30,6 +30,12 @@ import {
   updateWorkTypeAsync,
   deleteWorkTypeAsync,
 } from "../../services/workTypeService";
+import {
+  GetPrioritiesAsync,
+  CreatePriorityAsync,
+  UpdatePriorityAsync,
+  DeletePriorityAsync,
+} from "../../services/priorityService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -41,6 +47,11 @@ const initialTicketTypeForm = {
 
 const initialWorkTypeForm = {
   workTypeName: "",
+  isActive: true,
+};
+
+const initialPriorityForm = {
+  priorityName: "",
   isActive: true,
 };
 
@@ -73,9 +84,21 @@ export default function TypesPage() {
   const [workTypeForm, setWorkTypeForm] = useState(initialWorkTypeForm);
   const [workTypeErrors, setWorkTypeErrors] = useState({});
 
+  // ==================== Priorities State ====================
+  const [priorities, setPriorities] = useState([]);
+  const [prioritiesLoading, setPrioritiesLoading] = useState(true);
+  const [priorityDialogOpen, setPriorityDialogOpen] = useState(false);
+  const [priorityDeleteConfirmOpen, setPriorityDeleteConfirmOpen] = useState(false);
+  const [priorityToDelete, setPriorityToDelete] = useState(null);
+  const [priorityStatusConfirmOpen, setPriorityStatusConfirmOpen] = useState(false);
+  const [priorityToToggle, setPriorityToToggle] = useState(null);
+  const [priorityForm, setPriorityForm] = useState(initialPriorityForm);
+  const [priorityErrors, setPriorityErrors] = useState({});
+
   useEffect(() => {
     loadTicketTypes();
     loadWorkTypes();
+    loadPriorities();
   }, []);
 
   // -------------------- Ticket Types Operations --------------------
@@ -255,6 +278,98 @@ export default function TypesPage() {
     } finally {
       setWorkTypeStatusConfirmOpen(false);
       setWorkTypeToToggle(null);
+    }
+  }
+
+  // -------------------- Priorities Operations --------------------
+  async function loadPriorities() {
+    setPrioritiesLoading(true);
+    try {
+      const data = await GetPrioritiesAsync();
+      setPriorities(Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load priorities");
+    } finally {
+      setPrioritiesLoading(false);
+    }
+  }
+
+  async function handlePrioritySubmit() {
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
+    const schema = {
+      priorityName: { required: true, min: 2, max: 100, label: fieldRequired },
+    };
+
+    const newErrors = validateForm(priorityForm, schema);
+
+    if (Object.keys(newErrors).length > 0) {
+      setPriorityErrors(newErrors);
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
+      return;
+    }
+
+    try {
+      const payload = {
+        priorityName: priorityForm.priorityName.trim(),
+        isActive: priorityForm.isActive,
+      };
+
+      if (priorityForm.priorityId) {
+        await UpdatePriorityAsync(priorityForm.priorityId, payload);
+        toast.success("Priority updated successfully!");
+      } else {
+        await CreatePriorityAsync(payload);
+        toast.success("Priority created successfully!");
+      }
+
+      setPriorityDialogOpen(false);
+      setPriorityForm(initialPriorityForm);
+      setPriorityErrors({});
+      loadPriorities();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to save priority");
+    }
+  }
+
+  function handlePriorityDeleteRequest(id) {
+    setPriorityToDelete(id);
+    setPriorityDeleteConfirmOpen(true);
+  }
+
+  async function handleConfirmPriorityDelete() {
+    if (!priorityToDelete) return;
+    try {
+      await DeletePriorityAsync(priorityToDelete);
+      toast.success("Priority deleted successfully!");
+      loadPriorities();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete priority");
+    } finally {
+      setPriorityDeleteConfirmOpen(false);
+      setPriorityToDelete(null);
+    }
+  }
+
+  function handlePriorityToggleStatusRequest(row) {
+    setPriorityToToggle(row);
+    setPriorityStatusConfirmOpen(true);
+  }
+
+  async function handleConfirmPriorityStatusToggle() {
+    if (!priorityToToggle) return;
+    try {
+      const payload = {
+        priorityName: priorityToToggle.priorityName,
+        isActive: !priorityToToggle.isActive,
+      };
+      await UpdatePriorityAsync(priorityToToggle.priorityId, payload);
+      toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
+      loadPriorities();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
+    } finally {
+      setPriorityStatusConfirmOpen(false);
+      setPriorityToToggle(null);
     }
   }
 
@@ -544,6 +659,141 @@ export default function TypesPage() {
     },
   ];
 
+  // ==================== Priorities Table Columns ====================
+  const priorityColumns = [
+    {
+      label: "Action",
+      render: (row) => (
+        <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
+          <Tooltip title={hasWriteAccess ? "Edit Priority" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => {
+                  setPriorityForm({
+                    priorityId: row.priorityId,
+                    priorityName: row.priorityName || "",
+                    isActive: row.isActive ?? true,
+                  });
+                  setPriorityErrors({});
+                  setPriorityDialogOpen(true);
+                }}
+              >
+                <EditIcon
+                  sx={{
+                    fontSize: "1.1rem",
+                    color: (theme) =>
+                      hasWriteAccess
+                        ? theme.palette.mode === "dark"
+                          ? "#ffffff"
+                          : "#4a3f6b"
+                        : theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.3)"
+                        : "#cbd5e1",
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={hasWriteAccess ? "Delete Priority" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => handlePriorityDeleteRequest(row.priorityId)}
+              >
+                <DeleteIcon
+                  sx={{
+                    fontSize: "1.1rem",
+                    color: (theme) =>
+                      hasWriteAccess
+                        ? theme.palette.mode === "dark"
+                          ? "#ffffff"
+                          : "#4a3f6b"
+                        : theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.3)"
+                        : "#cbd5e1",
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={hasWriteAccess ? (row.isActive ? "Deactivate Priority" : "Activate Priority") : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => handlePriorityToggleStatusRequest(row)}
+              >
+                {row.isActive ? (
+                  <ToggleOnIcon sx={{ color: "#10b981", fontSize: "1.4rem" }} />
+                ) : (
+                  <ToggleOffIcon sx={{ color: "#94a3b8", fontSize: "1.4rem" }} />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+      ),
+    },
+    {
+      label: "Priority",
+      key: "priorityName",
+      render: (row) => {
+        const isHigh = row.priorityName === "High" || row.priorityName === "Urgent";
+        const isMedium = row.priorityName === "Medium";
+        return (
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            sx={{
+              color: isHigh ? "#ef4444" : isMedium ? "#f59e0b" : "#3b82f6",
+            }}
+          >
+            {row.priorityName}
+          </Typography>
+        );
+      },
+    },
+    {
+      label: "Status",
+      key: "isActive",
+      render: (row) => (
+        <Typography
+          variant="caption"
+          fontWeight={700}
+          sx={{
+            bgcolor: row.isActive
+              ? "rgba(16, 185, 129, 0.1)"
+              : "rgba(239, 68, 68, 0.1)",
+            color: row.isActive ? "#10b981" : "#ef4444",
+            px: 1.2,
+            py: 0.3,
+            borderRadius: "4px",
+            fontSize: "0.75rem",
+            display: "inline-block",
+          }}
+        >
+          {row.isActive ? "Active" : "Inactive"}
+        </Typography>
+      ),
+    },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.createdOn),
+    },
+  ];
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3.5, pb: 4 }}>
       {/* 1. Ticket Types Table */}
@@ -585,6 +835,29 @@ export default function TypesPage() {
               setWorkTypeForm(initialWorkTypeForm);
               setWorkTypeErrors({});
               setWorkTypeDialogOpen(true);
+            }}
+          >
+            Add
+          </AppButton>
+        }
+      />
+
+      {/* 3. Priorities Table */}
+      <AppDataTable
+        title="Priorities"
+        columns={priorityColumns}
+        data={priorities}
+        loading={prioritiesLoading}
+        actions={
+          <AppButton
+            variant="contained"
+            size="small"
+            disabled={!hasWriteAccess}
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setPriorityForm(initialPriorityForm);
+              setPriorityErrors({});
+              setPriorityDialogOpen(true);
             }}
           >
             Add
@@ -726,6 +999,74 @@ export default function TypesPage() {
         content={`Are you sure you want to ${
           workTypeToToggle?.isActive ? "deactivate" : "activate"
         } this work type?`}
+      />
+
+      {/* ==================== Priority Dialog ==================== */}
+      <AppDialog
+        open={priorityDialogOpen}
+        onClose={() => setPriorityDialogOpen(false)}
+        title={priorityForm.priorityId ? "Edit Priority" : "Add Priority"}
+        actions={
+          <>
+            <AppButton variant="outlined" onClick={() => setPriorityDialogOpen(false)}>
+              Cancel
+            </AppButton>
+            <AppButton
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handlePrioritySubmit}
+            >
+              Save
+            </AppButton>
+          </>
+        }
+      >
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 1 }}>
+          <AppInput
+            label="Priority Name"
+            placeholder="Enter priority name (e.g. High, Medium, Low)"
+            value={priorityForm.priorityName}
+            onChange={(e) => {
+              setPriorityForm((prev) => ({ ...prev, priorityName: e.target.value }));
+              if (priorityErrors.priorityName) {
+                setPriorityErrors((prev) => ({ ...prev, priorityName: "" }));
+              }
+            }}
+            maxLength={100}
+            error={!!priorityErrors.priorityName}
+            helperText={priorityErrors.priorityName}
+            required
+            fullWidth
+          />
+
+          <AppSwitch
+            label="Status"
+            checked={priorityForm.isActive}
+            onChange={(e) =>
+              setPriorityForm((prev) => ({ ...prev, isActive: e.target.checked }))
+            }
+          />
+        </Box>
+      </AppDialog>
+
+      {/* Priority Delete Confirmation */}
+      <AppConfirmDialog
+        open={priorityDeleteConfirmOpen}
+        onClose={() => setPriorityDeleteConfirmOpen(false)}
+        onConfirm={handleConfirmPriorityDelete}
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
+      />
+
+      {/* Priority Status Toggle Confirmation */}
+      <AppConfirmDialog
+        open={priorityStatusConfirmOpen}
+        onClose={() => setPriorityStatusConfirmOpen(false)}
+        onConfirm={handleConfirmPriorityStatusToggle}
+        title="Confirm Status Change"
+        content={`Are you sure you want to ${
+          priorityToToggle?.isActive ? "deactivate" : "activate"
+        } this priority?`}
       />
     </Box>
   );
