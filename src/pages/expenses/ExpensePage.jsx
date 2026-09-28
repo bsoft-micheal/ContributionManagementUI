@@ -1346,7 +1346,7 @@ export default function ExpensePage() {
                       >
                         <ImageIcon sx={{ fontSize: 40, color: "text.secondary" }} />
                         <Typography variant="caption" color="text.secondary">
-                          {getAttachmentDisplayName(selectedExpense.fileName)}
+                          Receipt Image Attached
                         </Typography>
                       </Box>
                       <Box

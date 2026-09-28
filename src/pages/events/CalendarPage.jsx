@@ -483,7 +483,7 @@ export default function CalendarPage() {
             dateOfBirth: mem.dateOfBirth,
             formattedDate: dob.format("DD MMM"),
             dayOfMonth: dob.date(),
-            type: mem.type || mem.memberType || "Member",
+            type: mem.workType || mem.type || mem.memberType || "Member",
             status: calculateStatus(dob),
           });
         }
@@ -511,7 +511,7 @@ export default function CalendarPage() {
                 dateOfBirth: c.dateOfBirth,
                 formattedDate: dob.format("DD MMM"),
                 dayOfMonth: dob.date(),
-                type: c.type || c.memberType || "Member",
+                type: c.workType || c.type || c.memberType || "Member",
                 status: calculateStatus(dob),
               });
             }
@@ -588,7 +588,7 @@ export default function CalendarPage() {
         map.set(dedupeKey, {
           memberId: memId || fullMem?.memberId || dedupeKey,
           name: fullMem?.name || memName,
-          type: fullMem?.type || fullMem?.memberType || memberObj.type || memberObj.roleName || "Member",
+          type: fullMem?.workType || fullMem?.type || fullMem?.memberType || memberObj.workType || memberObj.type || memberObj.roleName || "Member",
           eventName: eventInfo?.eventName || eventInfo?.eventTypeName || categoryFilter,
           eventDate: eventInfo?.eventDate ? dayjs(eventInfo.eventDate).format("DD MMM") : null,
         });
