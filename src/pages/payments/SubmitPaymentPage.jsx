@@ -48,14 +48,19 @@ import { getMembersAsync } from "../../services/memberService";
 import { getEventsAsync } from "../../services/eventService";
 import { getStatusesAsync } from "../../services/statusService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getPaymentModesAsync } from "../../services/paymentModeService";
+import { getImageUrl } from "../../services/apiClient";
 
-const PAYMENT_MODES = [
-  { label: "Google Pay", value: "GPay", color: "#2563eb" },
-  { label: "PhonePe", value: "PhonePe", color: "#7c3aed" },
-  { label: "Paytm", value: "Paytm", color: "#0284c7" },
-  { label: "BHIM / UPI", value: "UPI", color: "#ea580c" },
-  { label: "Bank Transfer / IMPS", value: "Bank Transfer", color: "#059669" },
-];
+const getModeColor = (name) => {
+  const lower = String(name || "").toLowerCase().replace(/[\s\-_/]+/g, "");
+  if (lower.includes("gpay") || lower.includes("google")) return "#2563eb";
+  if (lower.includes("phonepe") || lower.includes("phone")) return "#7c3aed";
+  if (lower.includes("paytm")) return "#0284c7";
+  if (lower.includes("upi") || lower.includes("bhim")) return "#ea580c";
+  if (lower.includes("bank") || lower.includes("transfer") || lower.includes("neft") || lower.includes("imps")) return "#059669";
+  if (lower.includes("cash")) return "#16a34a";
+  return "#4a3f6b";
+};
 
 export default function SubmitPaymentPage() {
   const [searchParams] = useSearchParams();
@@ -74,6 +79,7 @@ export default function SubmitPaymentPage() {
   const [eventsList, setEventsList] = useState([]);
   const [eventTypesList, setEventTypesList] = useState([]);
   const [dbStatuses, setDbStatuses] = useState([]);
+  const [dbPaymentModes, setDbPaymentModes] = useState([]);
 
   // Modals
   const [formModalOpen, setFormModalOpen] = useState(false);
@@ -119,18 +125,20 @@ export default function SubmitPaymentPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [txnRes, memsRes, eventsRes, statusRes, eventTypesRes] = await Promise.all([
+      const [txnRes, memsRes, eventsRes, statusRes, eventTypesRes, modesRes] = await Promise.all([
         getPaymentTransactionsAsync().catch(() => []),
         getMembersAsync().catch(() => []),
         getEventsAsync().catch(() => []),
         getStatusesAsync().catch(() => []),
         getEventTypesAsync().catch(() => []),
+        getPaymentModesAsync(true).catch(() => []),
       ]);
 
       if (Array.isArray(memsRes)) setMembersList(memsRes);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(statusRes)) setDbStatuses(statusRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
+      if (Array.isArray(modesRes)) setDbPaymentModes(modesRes);
 
       if (Array.isArray(txnRes)) {
         const mapped = txnRes.map((t, idx) => ({
@@ -294,12 +302,57 @@ export default function SubmitPaymentPage() {
     ];
   }, [eventsList]);
 
+  const dynamicPaymentModes = useMemo(() => {
+    const list = [];
+    const set = new Set();
+
+    (dbPaymentModes || [])
+      .filter((m) => m.isActive !== false)
+      .forEach((m) => {
+        const name = m.paymentModeName || m.name || m.modeName;
+        if (name && !set.has(name.toLowerCase())) {
+          set.add(name.toLowerCase());
+          list.push({
+            label: name,
+            value: name,
+            color: getModeColor(name),
+          });
+        }
+      });
+
+    if (list.length === 0) {
+      return [
+        { label: "GPay", value: "GPay", color: "#2563eb" },
+        { label: "PhonePe", value: "PhonePe", color: "#7c3aed" },
+        { label: "Paytm", value: "Paytm", color: "#0284c7" },
+        { label: "UPI", value: "UPI", color: "#ea580c" },
+        { label: "Bank Transfer", value: "Bank Transfer", color: "#059669" },
+      ];
+    }
+
+    return list;
+  }, [dbPaymentModes]);
+
+  useEffect(() => {
+    if (dynamicPaymentModes.length > 0) {
+      setFormData((prev) => {
+        const exists = dynamicPaymentModes.some(
+          (m) => m.value.toLowerCase() === (prev.paymentMode || "").toLowerCase()
+        );
+        if (!exists) {
+          return { ...prev, paymentMode: dynamicPaymentModes[0].value };
+        }
+        return prev;
+      });
+    }
+  }, [dynamicPaymentModes]);
+
   const modeOptions = useMemo(() => {
     return [
       { label: "All Modes", value: "ALL" },
-      ...PAYMENT_MODES.map((m) => ({ label: m.label, value: m.value })),
+      ...dynamicPaymentModes.map((m) => ({ label: m.label, value: m.value })),
     ];
-  }, []);
+  }, [dynamicPaymentModes]);
 
   const statusOptions = useMemo(() => {
     return [
@@ -380,7 +433,7 @@ export default function SubmitPaymentPage() {
         eventName: "",
         memberName: authState?.fullName || "",
         amount: "",
-        paymentMode: "GPay",
+        paymentMode: dynamicPaymentModes[0]?.value || "GPay",
         utr: "",
         paymentDate: dayjs(),
         notes: "",
@@ -551,19 +604,22 @@ export default function SubmitPaymentPage() {
     {
       label: "Payment Mode",
       key: "paymentMode",
-      render: (row) => (
-        <Chip
-          label={row.paymentMode}
-          size="small"
-          sx={{
-            bgcolor: "rgba(99, 102, 241, 0.12)",
-            color: "#6366f1",
-            fontWeight: 700,
-            fontSize: "0.72rem",
-            height: 22,
-          }}
-        />
-      ),
+      render: (row) => {
+        const color = getModeColor(row.paymentMode);
+        return (
+          <Chip
+            label={row.paymentMode}
+            size="small"
+            sx={{
+              bgcolor: `${color}18`,
+              color: color,
+              fontWeight: 700,
+              fontSize: "0.72rem",
+              height: 22,
+            }}
+          />
+        );
+      },
     },
     {
       label: "UTR / Reference No",
@@ -591,7 +647,7 @@ export default function SubmitPaymentPage() {
               size="small"
               clickable
               onClick={() => {
-                setPreviewImageSrc(row.screenshot);
+                setPreviewImageSrc(getImageUrl(row.screenshot));
                 setPreviewImageTitle(`Attachment Proof - ${row.id}`);
                 setPreviewModalOpen(true);
               }}
@@ -816,7 +872,7 @@ export default function SubmitPaymentPage() {
                 </Grid>
               </Grid>
 
-              {/* Row 4: UTR & Payment Method Chips */}
+              {/* Row 4: UTR & Payment Method Dropdown */}
               <Grid container spacing={2} alignItems="flex-start">
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <AppInput
@@ -831,41 +887,36 @@ export default function SubmitPaymentPage() {
                   />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.8, display: "block" }}>
-                    Payment Method Used *
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {PAYMENT_MODES.map((mode) => (
-                      <Chip
-                        key={mode.value}
-                        label={mode.label}
-                        clickable
-                        onClick={() => setFormData((prev) => ({ ...prev, paymentMode: mode.value }))}
-                        sx={{
-                          bgcolor: formData.paymentMode === mode.value ? mode.color : "transparent",
-                          color: formData.paymentMode === mode.value ? "#ffffff" : "text.primary",
-                          fontWeight: 700,
-                          fontSize: "0.78rem",
-                          border: "1px solid",
-                          borderColor: formData.paymentMode === mode.value ? mode.color : "divider",
-                          px: 0.5,
-                          py: 1.5,
-                        }}
-                      />
-                    ))}
-                  </Stack>
+                  <AppSelect
+                    label="Payment Method"
+                    value={formData.paymentMode}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, paymentMode: e.target.value }))}
+                    options={dynamicPaymentModes.map((m) => ({ label: m.label, value: m.value }))}
+                    placeholder="Select Payment Method"
+                    required
+                  />
                 </Grid>
               </Grid>
             </>
           ) : (
             <>
-              {/* Row 3: Date & UTR */}
+              {/* Row 3: Date & Payment Method */}
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <AppDateInput
                     label="Payment Date"
                     value={formData.paymentDate}
                     onChange={(newVal) => setFormData((prev) => ({ ...prev, paymentDate: newVal }))}
+                    required
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppSelect
+                    label="Payment Method"
+                    value={formData.paymentMode}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, paymentMode: e.target.value }))}
+                    options={dynamicPaymentModes.map((m) => ({ label: m.label, value: m.value }))}
+                    placeholder="Select Payment Method"
                     required
                   />
                 </Grid>
@@ -882,33 +933,6 @@ export default function SubmitPaymentPage() {
                   />
                 </Grid>
               </Grid>
-
-              {/* Row 4: Payment Method Chips */}
-              <Box>
-                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.8, display: "block" }}>
-                  Payment Method Used *
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {PAYMENT_MODES.map((mode) => (
-                    <Chip
-                      key={mode.value}
-                      label={mode.label}
-                      clickable
-                      onClick={() => setFormData((prev) => ({ ...prev, paymentMode: mode.value }))}
-                      sx={{
-                        bgcolor: formData.paymentMode === mode.value ? mode.color : "transparent",
-                        color: formData.paymentMode === mode.value ? "#ffffff" : "text.primary",
-                        fontWeight: 700,
-                        fontSize: "0.78rem",
-                        border: "1px solid",
-                        borderColor: formData.paymentMode === mode.value ? mode.color : "divider",
-                        px: 0.5,
-                        py: 1.5,
-                      }}
-                    />
-                  ))}
-                </Stack>
-              </Box>
             </>
           )}
 
@@ -1122,7 +1146,7 @@ export default function SubmitPaymentPage() {
                 </Typography>
                 <Box
                   component="img"
-                  src={selectedTxn.screenshot}
+                  src={getImageUrl(selectedTxn.screenshot)}
                   alt="Payment Proof"
                   sx={{
                     width: "100%",

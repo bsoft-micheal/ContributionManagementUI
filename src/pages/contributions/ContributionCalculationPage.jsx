@@ -266,7 +266,6 @@ export default function ContributionCalculationPage() {
                 startIcon={<FilterListIcon />}
                 onClick={() => {
                   setSelectedEventId(filterEventId);
-                  toast.success("Filter applied");
                 }}
                 sx={{
                   height: 34,
