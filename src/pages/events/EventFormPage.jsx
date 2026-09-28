@@ -175,10 +175,10 @@ export default function EventFormPage() {
             (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
           );
           const offCount = celebrantsInMonth.filter(
-            (m) => (m.memberType || "Office").toLowerCase() === "office"
+            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
           ).length;
           const wfhCount = celebrantsInMonth.filter(
-            (m) => (m.memberType || "Office").toLowerCase() === "wfh"
+            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
           ).length;
 
           setOfficeBirthdays(offCount);
@@ -209,10 +209,10 @@ export default function EventFormPage() {
             (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
           );
           const offCount = celebrantsInMonth.filter(
-            (m) => (m.memberType || "Office").toLowerCase() === "office"
+            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
           ).length;
           const wfhCount = celebrantsInMonth.filter(
-            (m) => (m.memberType || "Office").toLowerCase() === "wfh"
+            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
           ).length;
 
           setOfficeBirthdays(offCount);
@@ -361,10 +361,10 @@ export default function EventFormPage() {
         (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === newMonth
       );
       const offCount = celebrantsInNewMonth.filter(
-        (m) => (m.memberType || "Office").toLowerCase() === "office"
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
       ).length;
       const wfhCount = celebrantsInNewMonth.filter(
-        (m) => (m.memberType || "Office").toLowerCase() === "wfh"
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
       ).length;
       setOfficeBirthdays(offCount > 0 ? offCount : 1);
       setWfhBirthdays(wfhCount);
@@ -742,18 +742,18 @@ export default function EventFormPage() {
                           {monthCelebrants.map((m) => (
                             <Chip
                               key={m.memberId}
-                              label={`${m.name} (${m.memberType || "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
+                              label={`${m.name} (${m.workType || m.memberType || "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
                                 }`}
                               size="small"
                               sx={{
                                 fontWeight: 600,
                                 fontSize: "0.75rem",
                                 bgcolor:
-                                  (m.memberType || "Office").toLowerCase() === "wfh"
+                                  (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
                                     ? "rgba(121, 87, 213, 0.1)"
                                     : "rgba(22, 119, 200, 0.1)",
                                 color:
-                                  (m.memberType || "Office").toLowerCase() === "wfh"
+                                  (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
                                     ? "#7957d5"
                                     : "#1677c8",
                               }}

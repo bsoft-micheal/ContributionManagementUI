@@ -47,27 +47,29 @@ import { getUsersAsync } from "../../services/userService";
 import { getEventsAsync } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { getImageUrl } from "../../services/apiClient";
 
 // Helper to safely extract an array of image URLs/data from any format
 export const extractImages = (rawImageUrl) => {
   if (!rawImageUrl) return [];
-  if (Array.isArray(rawImageUrl)) return rawImageUrl.filter(Boolean);
-  if (typeof rawImageUrl === "string") {
+  let list = [];
+  if (Array.isArray(rawImageUrl)) list = rawImageUrl.filter(Boolean);
+  else if (typeof rawImageUrl === "string") {
     const trimmed = rawImageUrl.trim();
     if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
       try {
         const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+        if (Array.isArray(parsed)) list = parsed.filter(Boolean);
       } catch (e) {
         // fallback
       }
+    } else if (trimmed.includes("|||")) {
+      list = trimmed.split("|||").map((s) => s.trim()).filter(Boolean);
+    } else if (trimmed) {
+      list = [trimmed];
     }
-    if (trimmed.includes("|||")) {
-      return trimmed.split("|||").map((s) => s.trim()).filter(Boolean);
-    }
-    return [trimmed];
   }
-  return [];
+  return list.map((img) => getImageUrl(img));
 };
 
 // Helper to convert base64 data URL to Blob for reliable downloading

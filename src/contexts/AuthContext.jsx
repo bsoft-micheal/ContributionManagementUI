@@ -200,7 +200,8 @@ export function AuthProvider({ children }) {
           profileImage: data.profileImage,
           phone: data.phone,
           gender: data.gender,
-          memberType: data.memberType,
+          workType: data.workType || data.memberType || current.workType,
+          memberType: data.workType || data.memberType || current.memberType,
           dateOfBirth: data.dateOfBirth,
           joiningDate: data.joiningDate,
           role: data.roleName || current.role,
@@ -213,6 +214,7 @@ export function AuthProvider({ children }) {
   }
 
   async function updateProfile(profileData) {
+    const wtVal = profileData.workType || profileData.memberType;
     const payload = {
       fullName: profileData.fullName,
       email: profileData.email,
@@ -220,7 +222,8 @@ export function AuthProvider({ children }) {
       password: profileData.password,
       phone: profileData.phone,
       gender: profileData.gender,
-      memberType: profileData.memberType,
+      workType: wtVal,
+      memberType: wtVal,
       dateOfBirth: profileData.dateOfBirth,
       joiningDate: profileData.joiningDate,
       roleName: profileData.roleName,
@@ -231,6 +234,7 @@ export function AuthProvider({ children }) {
 
     setAuthState((current) => {
       if (!current) return current;
+      const resolvedWt = data.workType !== undefined ? data.workType : (data.memberType !== undefined ? data.memberType : current.workType);
       return {
         ...current,
         fullName: data.fullName || current.fullName,
@@ -238,7 +242,8 @@ export function AuthProvider({ children }) {
         profileImage: data.profileImage,
         phone: data.phone !== undefined ? data.phone : current.phone,
         gender: data.gender !== undefined ? data.gender : current.gender,
-        memberType: data.memberType !== undefined ? data.memberType : current.memberType,
+        workType: resolvedWt,
+        memberType: resolvedWt,
         dateOfBirth: data.dateOfBirth !== undefined ? data.dateOfBirth : current.dateOfBirth,
         joiningDate: data.joiningDate !== undefined ? data.joiningDate : current.joiningDate,
         role: data.roleName || current.role,

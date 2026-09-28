@@ -152,7 +152,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
           dobDayMonth: resolvedDob
             ? dayjs(resolvedDob).format("D MMMM")
             : item.dobText,
-          memberType: match?.memberType,
+          memberType: match?.workType || match?.memberType,
         });
       }
     });
@@ -181,7 +181,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
           dateOfBirth: m.dateOfBirth,
           dobFormatted: m.dateOfBirth ? dayjs(m.dateOfBirth).format("DD/MM/YYYY") : "--",
           dobDayMonth: m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMMM") : "--",
-          memberType: m.memberType || "Office",
+          memberType: m.workType || m.memberType || "Office",
         });
       } else {
         // If already present, enrich missing birth date or ID if parsed item didn't have it
@@ -191,7 +191,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
           existing.dateOfBirth = m.dateOfBirth;
           existing.dobFormatted = dayjs(m.dateOfBirth).format("DD/MM/YYYY");
           existing.dobDayMonth = dayjs(m.dateOfBirth).format("D MMMM");
-          existing.memberType = m.memberType || existing.memberType || "Office";
+          existing.memberType = m.workType || m.memberType || existing.memberType || "Office";
         }
       }
     });
@@ -451,13 +451,13 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
                         <TableCell sx={{ fontSize: "0.75rem", py: 0.8 }}>
                           <Chip
                             size="small"
-                            label={celebrant.memberType || "Office"}
+                            label={celebrant.workType || celebrant.memberType || "Office"}
                             sx={{
                               height: 18,
                               fontSize: "0.64rem",
                               fontWeight: 700,
-                              bgcolor: celebrant.memberType === "WFH" ? "rgba(234, 88, 12, 0.1)" : "rgba(2, 132, 199, 0.1)",
-                              color: celebrant.memberType === "WFH" ? "#ea580c" : "#0284c7",
+                              bgcolor: (celebrant.workType || celebrant.memberType) === "WFH" ? "rgba(234, 88, 12, 0.1)" : "rgba(2, 132, 199, 0.1)",
+                              color: (celebrant.workType || celebrant.memberType) === "WFH" ? "#ea580c" : "#0284c7",
                               borderRadius: "4px",
                             }}
                           />

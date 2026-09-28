@@ -48,8 +48,6 @@ const initialForm = {
   phone: "",
   gender: "",
   workType: "",
-  type: "",
-  memberType: "",
   dateOfBirth: dayjs().subtract(18, "year"),
   joiningDate: dayjs(),
 };
@@ -144,8 +142,6 @@ export default function MembersPage() {
         return {
           ...m,
           workType,
-          memberType: workType,
-          type: workType,
         };
       });
       setMembers(normalizedMembers);
@@ -216,15 +212,13 @@ export default function MembersPage() {
     }
 
     try {
-      const workTypeVal = form.workType || form.type || form.memberType || "";
+      const workTypeVal = form.workType || "";
       const payload = {
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
         gender: form.gender,
         workType: workTypeVal,
-        memberType: workTypeVal,
-        type: workTypeVal,
         dateOfBirth: form.dateOfBirth ? (dayjs.isDayjs(form.dateOfBirth) ? form.dateOfBirth.toISOString() : form.dateOfBirth) : null,
         joiningDate: form.joiningDate ? (dayjs.isDayjs(form.joiningDate) ? form.joiningDate.toISOString() : form.joiningDate) : null,
         ...(form.roleId ? { roleId: form.roleId } : {}),
@@ -410,8 +404,6 @@ export default function MembersPage() {
         phone,
         gender: normalizedGender,
         workType: normalizedType,
-        memberType: normalizedType,
-        type: normalizedType,
         roleId: matchedRole.roleId,
         dateOfBirth: dob.toISOString(),
         joiningDate: joiningDate.toISOString(),
@@ -464,8 +456,6 @@ export default function MembersPage() {
                 setForm({
                   ...row,
                   workType: wt,
-                  memberType: wt,
-                  type: wt,
                   dateOfBirth: row.dateOfBirth ? dayjs(row.dateOfBirth) : null,
                   joiningDate: row.joiningDate ? dayjs(row.joiningDate) : null
                 });
@@ -681,13 +671,12 @@ export default function MembersPage() {
               value={form.workType || ""}
               onChange={(e) => {
                 const val = e.target.value;
-                setForm((c) => ({ ...c, workType: val, type: val, memberType: val }));
+                setForm((c) => ({ ...c, workType: val }));
                 if (errors.workType) setErrors((prev) => ({ ...prev, workType: "" }));
-                if (errors.type) setErrors((prev) => ({ ...prev, type: "" }));
               }}
               options={typeOptions}
-              error={!!errors.workType || !!errors.type}
-              helperText={errors.workType || errors.type}
+              error={!!errors.workType}
+              helperText={errors.workType}
               required
             />
           </Grid>
