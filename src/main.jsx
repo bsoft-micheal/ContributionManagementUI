@@ -7,6 +7,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import App from "./App";
 import { AuthProvider } from "./contexts/AuthContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import { ThemeModeProvider, useThemeMode } from "./contexts/ThemeModeContext";
 import { createAppTheme } from "./theme";
 import "./styles.css";
@@ -21,9 +22,11 @@ function ThemedApp() {
         <CssBaseline enableColorScheme />
         <BrowserRouter>
           <AuthProvider>
-            <ToastProvider>
-              <App />
-            </ToastProvider>
+            <NotificationProvider>
+              <ToastProvider>
+                <App />
+              </ToastProvider>
+            </NotificationProvider>
           </AuthProvider>
         </BrowserRouter>
       </LocalizationProvider>

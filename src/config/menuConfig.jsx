@@ -19,6 +19,8 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import RuleRoundedIcon from "@mui/icons-material/RuleRounded";
 
+import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
+
 export const navigationItems = [
   {
     featureId: 1,
@@ -50,6 +52,7 @@ export const navigationItems = [
     icon: <AccountBalanceRoundedIcon fontSize="small" />,
     children: [
       { featureId: 8, label: "Contribution", path: "/contributions", icon: <SavingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: 24, label: "Payment Submission", path: "/payment-submission", icon: <PaymentsRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 9, label: "Payment History", path: "/payments", icon: <ReceiptLongRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 10, label: "Calculation", path: "/contribution-calculation", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 11, label: "Expense", path: "/expense", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: "1rem" }} /> },
