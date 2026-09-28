@@ -73,7 +73,6 @@ export default function SupportTicketsPage() {
   const { canEdit } = useAccessByLocation();
   const toast = useAppToast();
   const location = useLocation();
-  const { authState } = useAuth();
   const { addNotification } = useNotifications();
 
   const getLoggedInMember = () => {
