@@ -24,6 +24,7 @@ import {
   Close as CloseIcon,
   Image as ImageIcon,
   ZoomIn as ZoomInIcon,
+  QuestionAnswer as ReplyActionIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -60,17 +61,39 @@ const initialForm = {
   relatedEvent: "",
   ticketType: "",
   priority: "Medium",
-  status: "",
-  subject: "",
   description: "",
-  assignedTo: "",
   attachment: "",
   attachmentName: "",
 };
 
 export default function SupportTicketsPage() {
+  const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
   const toast = useAppToast();
+
+  const getLoggedInMember = () => {
+    const rawName = (
+      authState?.fullName ||
+      authState?.name ||
+      authState?.user?.fullName ||
+      authState?.user?.name ||
+      authState?.username ||
+      ""
+    ).trim();
+    if (!rawName) return { name: "", id: "" };
+    const matched = membersList.find((m) => {
+      const mName = (m.name || m.memberName || "").trim().toLowerCase();
+      return (
+        mName === rawName.toLowerCase() ||
+        (m.email && authState?.email && m.email.toLowerCase() === authState.email.toLowerCase()) ||
+        (m.username && authState?.username && m.username.toLowerCase() === authState.username.toLowerCase())
+      );
+    });
+    return {
+      name: matched?.name || matched?.memberName || rawName,
+      id: matched?.memberId || matched?.id || "",
+    };
+  };
 
   const [tickets, setTickets] = useState([]);
   const [membersList, setMembersList] = useState([]);
@@ -126,6 +149,11 @@ export default function SupportTicketsPage() {
           attachment: uploadEvt.target.result,
           attachmentName: file.name,
         }));
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next.attachment;
+          return next;
+        });
         toast.success(`Image "${file.name}" attached successfully!`);
       };
       reader.onerror = () => {
@@ -164,7 +192,9 @@ export default function SupportTicketsPage() {
     }
   };
 
-  // View / Reply state
+  // Reply & Update Status dialog state
+  const [replyDialogOpen, setReplyDialogOpen] = useState(false);
+  const [replyTicket, setReplyTicket] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [replyStatus, setReplyStatus] = useState("In Progress");
 
@@ -195,7 +225,6 @@ export default function SupportTicketsPage() {
           description: item.description || "",
           status: item.status || "Open",
           priority: item.priority || "Medium",
-          assignedTo: item.assignedTo || "--",
           createdDate: item.createdOn || item.createdAt || new Date().toISOString(),
           createdBy: item.createdBy || item.CreatedBy || "--",
           refNo: item.refNo || "-",
@@ -316,23 +345,6 @@ export default function SupportTicketsPage() {
     ];
   }, [dbPriorities]);
 
-  // Dynamically derive assignee options from DB members list
-  const assignedToOptions = useMemo(() => {
-    const list = [{ label: "Unassigned", value: "" }];
-    const unique = new Set();
-    membersList.forEach((m) => {
-      const name = m.name || m.memberName;
-      if (name && !unique.has(name)) {
-        unique.add(name);
-        list.push({
-          label: `${name}${m.roleName ? ` (${m.roleName})` : ""}`,
-          value: name,
-        });
-      }
-    });
-    return list;
-  }, [membersList]);
-
   // Filtered tickets
   const filteredTickets = useMemo(() => {
     return tickets.filter((item) => {
@@ -352,9 +364,7 @@ export default function SupportTicketsPage() {
       ticketType: row.ticketType || "",
       priority: row.priority || "Medium",
       status: row.status || "Open",
-      subject: row.subject || "",
       description: row.description || "",
-      assignedTo: row.assignedTo || "",
       attachment: row.attachment || "",
       attachmentName: row.attachment ? `${row.ticketNo || "ticket"}_attachment.png` : "",
     });
@@ -387,8 +397,10 @@ export default function SupportTicketsPage() {
     const newErrors = {};
     if (!form.memberName) newErrors.memberName = "Member Name is required";
     if (!form.ticketType) newErrors.ticketType = "Ticket Type is required";
-    if (!form.subject || !form.subject.trim()) newErrors.subject = "Subject is required";
     if (!form.description || !form.description.trim()) newErrors.description = "Description is required";
+    if (!form.attachment && (!editingTicket || !editingTicket.attachment)) {
+      newErrors.attachment = "Attachment is required";
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -410,11 +422,9 @@ export default function SupportTicketsPage() {
           memberId: resolvedMemberId || "",
           relatedEvent: form.relatedEvent || "",
           ticketType: form.ticketType,
-          subject: form.subject,
           description: form.description,
           priority: form.priority,
-          status: form.status,
-          assignedTo: form.assignedTo || "",
+          status: editingTicket.status || "Open",
           attachment: form.attachment || null,
         });
         toast.success(TOAST_MESSAGES.SUPPORT.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
@@ -428,11 +438,9 @@ export default function SupportTicketsPage() {
           memberId: resolvedMemberId || "",
           relatedEvent: form.relatedEvent || "",
           ticketType: form.ticketType,
-          subject: form.subject,
           description: form.description,
           priority: form.priority,
-          status: form.status,
-          assignedTo: form.assignedTo || "",
+          status: "Open",
           attachment: form.attachment || null,
         });
         toast.success(TOAST_MESSAGES.SUPPORT.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
@@ -449,25 +457,43 @@ export default function SupportTicketsPage() {
   };
 
   const handleSendReply = async () => {
-    if (!replyText.trim()) {
-      toast.error("Please enter a reply or resolution note");
+    if (!replyTicket) return;
+    const ticketId = replyTicket.ticketId || replyTicket.id;
+    const hasNote = replyText && replyText.trim().length > 0;
+    const statusChanged = replyStatus !== replyTicket.status;
+
+    if (!hasNote && !statusChanged) {
+      toast.error("Please enter a reply note or select a new status.");
       return;
     }
 
-    if (selectedTicket) {
-      const ticketId = selectedTicket.ticketId || selectedTicket.id;
-      try {
+    try {
+      if (hasNote) {
         await replySupportTicketAsync(ticketId, {
-          replyMessage: replyText,
+          message: replyText.trim(),
+          replyMessage: replyText.trim(),
           status: replyStatus,
         });
-        toast.success(TOAST_MESSAGES.SUPPORT.STATUS_UPDATED || TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
-        setReplyText("");
-        setViewDialogOpen(false);
-        await fetchTicketsFromDb();
-      } catch {
-        toast.error(TOAST_MESSAGES.GENERAL.SAVE_FAILED);
       }
+      if (!hasNote && statusChanged) {
+        await updateSupportTicketAsync(ticketId, {
+          memberName: replyTicket.memberName,
+          memberId: replyTicket.memberId || "",
+          relatedEvent: replyTicket.relatedEvent || "",
+          ticketType: replyTicket.ticketType,
+          description: replyTicket.description,
+          priority: replyTicket.priority,
+          status: replyStatus,
+          attachment: replyTicket.attachment || null,
+        });
+      }
+      toast.success(TOAST_MESSAGES.SUPPORT.STATUS_UPDATED || "Support ticket updated successfully!");
+      setReplyDialogOpen(false);
+      setReplyTicket(null);
+      setReplyText("");
+      await fetchTicketsFromDb();
+    } catch (err) {
+      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   };
 
@@ -476,14 +502,12 @@ export default function SupportTicketsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5 }}>
-          <Tooltip title="View Details & Reply">
+          <Tooltip title="View Details">
             <IconButton
               size="small"
               sx={{ p: 0.3 }}
               onClick={() => {
                 setSelectedTicket(row);
-                setReplyStatus(row.status || "In Progress");
-                setReplyText("");
                 setViewDialogOpen(true);
               }}
             >
@@ -494,6 +518,35 @@ export default function SupportTicketsPage() {
                 }}
               />
             </IconButton>
+          </Tooltip>
+          <Tooltip title={canEdit ? "Verify Ticket" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!canEdit}
+                onClick={() => {
+                  setReplyTicket(row);
+                  setReplyStatus(row.status || "In Progress");
+                  setReplyText("");
+                  setReplyDialogOpen(true);
+                }}
+              >
+                <ReplyActionIcon
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) =>
+                      canEdit
+                        ? theme.palette.mode === "dark"
+                          ? "#38bdf8"
+                          : "#0284c7"
+                        : theme.palette.mode === "dark"
+                          ? "rgba(255,255,255,0.3)"
+                          : "#cbd5e1",
+                  }}
+                />
+              </IconButton>
+            </span>
           </Tooltip>
           <Tooltip title={canEdit ? "Edit" : ""}>
             <span>
@@ -699,11 +752,7 @@ export default function SupportTicketsPage() {
         );
       },
     },
-    {
-      label: "Assigned To",
-      key: "assignedTo",
-      render: (row) => row.assignedTo || "--",
-    },
+
     {
       label: "Attachment",
       key: "attachment",
@@ -771,9 +820,12 @@ export default function SupportTicketsPage() {
               onClick={() => {
                 const firstTicketType = dbTicketTypes.find((t) => t.isActive !== false)?.typeName || "";
                 const firstStatus = dbStatuses.find((s) => s.isActive !== false)?.statusName || "";
+                const loggedIn = getLoggedInMember();
                 setEditingTicket(null);
                 setForm({
                   ...initialForm,
+                  memberName: loggedIn.name,
+                  memberId: loggedIn.id,
                   ticketType: firstTicketType,
                   status: firstStatus,
                 });
@@ -963,44 +1015,11 @@ export default function SupportTicketsPage() {
               required
             />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppSelect
-              label="Status"
-              placeholder="Select Status"
-              value={form.status}
-              onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}
-              options={statusOptions.filter((o) => o.value !== "ALL")}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppSelect
-              label="Assigned To"
-              placeholder="Select Assignee"
-              value={form.assignedTo}
-              onChange={(e) => setForm((c) => ({ ...c, assignedTo: e.target.value }))}
-              options={assignedToOptions}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppInput
-              label="Subject"
-              placeholder="Brief summary of the issue or inquiry"
-              value={form.subject}
-              onChange={(e) => {
-                setForm((c) => ({ ...c, subject: e.target.value }));
-                if (errors.subject) setErrors((p) => ({ ...p, subject: "" }));
-              }}
-              error={!!errors.subject}
-              helperText={errors.subject}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid size={{ xs: 12 }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="caption" fontWeight={700} sx={{ color: (t) => t.palette.mode === "dark" ? "#e2e8f0" : "#334155" }}>
-                  Attachment (1 Image, Max 3MB)
+                  Attachment (1 Image, Max 3MB) <span style={{ color: "#ef4444" }}>*</span>
                 </Typography>
                 {form.attachment && (
                   <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem" }}>
@@ -1021,8 +1040,10 @@ export default function SupportTicketsPage() {
                 <Box
                   onClick={() => fileInputRef.current?.click()}
                   sx={{
-                    border: "1.5px dashed",
-                    borderColor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)",
+                    border: errors.attachment ? "1.5px dashed #ef4444" : "1.5px dashed",
+                    borderColor: errors.attachment
+                      ? "#ef4444"
+                      : ((t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)"),
                     borderRadius: "10px",
                     p: 1.1,
                     minHeight: 46,
@@ -1031,16 +1052,20 @@ export default function SupportTicketsPage() {
                     justifyContent: "center",
                     gap: 1,
                     cursor: "pointer",
-                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)",
+                    bgcolor: errors.attachment
+                      ? "rgba(239, 68, 68, 0.05)"
+                      : ((t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)"),
                     transition: "all 0.2s ease",
                     "&:hover": {
-                      borderColor: (t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                      borderColor: errors.attachment
+                        ? "#dc2626"
+                        : ((t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
                       bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.07)",
                     },
                   }}
                 >
-                  <CloudUploadIcon sx={{ fontSize: 20, color: (t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b" }} />
-                  <Typography variant="caption" fontWeight={600} color="text.secondary">
+                  <CloudUploadIcon sx={{ fontSize: 20, color: errors.attachment ? "#ef4444" : ((t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b") }} />
+                  <Typography variant="caption" fontWeight={600} sx={{ color: errors.attachment ? "#ef4444" : "text.secondary" }}>
                     Click to attach image (Max 3MB)
                   </Typography>
                 </Box>
@@ -1108,6 +1133,11 @@ export default function SupportTicketsPage() {
                     </Tooltip>
                   </Stack>
                 </Box>
+              )}
+              {errors.attachment && (
+                <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 600, mt: 0.3, px: 0.5 }}>
+                  {errors.attachment}
+                </Typography>
               )}
             </Box>
           </Grid>
@@ -1359,42 +1389,129 @@ export default function SupportTicketsPage() {
                 </Grid>
               )}
             </Grid>
+          </Box>
+        )}
+      </AppDialog>
 
-            <Divider />
-
-            {/* Quick Response Section */}
-            <Box sx={{ bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#faf9fd", p: 2, borderRadius: "10px", border: (t) => `1px solid ${t.palette.divider}` }}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
-                Reply & Update Ticket Status
-              </Typography>
+      {/* Reply & Update Ticket Status Modal */}
+      <AppDialog
+        open={replyDialogOpen}
+        onClose={() => {
+          setReplyDialogOpen(false);
+          setReplyTicket(null);
+          setReplyText("");
+        }}
+        title="Verify Support Ticket"
+        maxWidth="sm"
+        actions={
+          <Stack direction="row" spacing={1.5}>
+            <AppButton
+              variant="outlined"
+              onClick={() => {
+                setReplyDialogOpen(false);
+                setReplyTicket(null);
+                setReplyText("");
+              }}
+            >
+              Cancel
+            </AppButton>
+            <AppButton
+              variant="contained"
+              startIcon={<SendIcon />}
+              onClick={handleSendReply}
+            >
+              Update Ticket
+            </AppButton>
+          </Stack>
+        }
+      >
+        {replyTicket && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Quick Ticket Summary Card */}
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: "10px",
+                bgcolor: (t) =>
+                  t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
+                border: (t) => `1px solid ${t.palette.divider}`,
+              }}
+            >
               <Grid container spacing={1.5}>
-                <Grid size={{ xs: 12, sm: 8 }}>
-                  <AppTextArea
-                    placeholder="Type resolution notes or reply message..."
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    minRows={2}
-                  />
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Member Name
+                  </Typography>
+                  <Typography variant="body2" fontWeight={700}>
+                    {replyTicket.memberName || "--"}
+                  </Typography>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 4 }} sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                  <AppSelect
-                    label="Update Status"
-                    value={replyStatus}
-                    onChange={(e) => setReplyStatus(e.target.value)}
-                    options={statusOptions.filter((o) => o.value !== "ALL")}
-                    size="small"
-                  />
-                  <AppButton
-                    variant="contained"
-                    size="small"
-                    startIcon={<SendIcon />}
-                    onClick={handleSendReply}
-                  >
-                    Send Reply
-                  </AppButton>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Current Status
+                  </Typography>
+                  <Box sx={{ mt: 0.2 }}>
+                    <Chip
+                      label={replyTicket.status}
+                      size="small"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.72rem",
+                        bgcolor:
+                          replyTicket.status === "Resolved" || replyTicket.status === "Closed"
+                            ? "rgba(22, 163, 74, 0.12)"
+                            : replyTicket.status === "In Progress"
+                            ? "rgba(2, 132, 199, 0.12)"
+                            : "rgba(234, 179, 8, 0.15)",
+                        color:
+                          replyTicket.status === "Resolved" || replyTicket.status === "Closed"
+                            ? "#16a34a"
+                            : replyTicket.status === "In Progress"
+                            ? "#0284c7"
+                            : "#d97706",
+                      }}
+                    />
+                  </Box>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Ticket Type
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {replyTicket.ticketType}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Priority
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {replyTicket.priority}
+                  </Typography>
                 </Grid>
               </Grid>
             </Box>
+
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <AppSelect
+                  label="Update Status"
+                  value={replyStatus}
+                  onChange={(e) => setReplyStatus(e.target.value)}
+                  options={statusOptions.filter((o) => o.value !== "ALL")}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <AppTextArea
+                  label="Resolution Notes / Reply Message"
+                  placeholder="Type resolution notes or reply message..."
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  minRows={3}
+                />
+              </Grid>
+            </Grid>
           </Box>
         )}
       </AppDialog>

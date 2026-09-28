@@ -21,6 +21,7 @@ import {
   ZoomIn as ZoomInIcon,
   PictureAsPdf as PictureAsPdfIcon,
   Image as ImageIcon,
+  AssignmentTurnedIn as StatusActionIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -129,6 +130,13 @@ export default function ExpensePage() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [previewImageModal, setPreviewImageModal] = useState({ open: false, url: "", title: "" });
+
+  // Dedicated Status Update / Approval dialog state
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [statusExpense, setStatusExpense] = useState(null);
+  const [newStatus, setNewStatus] = useState("Pending");
+  const [reviewerName, setReviewerName] = useState("");
+  const [statusRemarks, setStatusRemarks] = useState("");
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
@@ -414,6 +422,9 @@ export default function ExpensePage() {
     if (!form.amount || Number(form.amount) <= 0) newErrors.amount = "Valid amount is required";
     if (!form.description || !form.description.trim()) newErrors.description = "Description is required";
     if (!form.submittedBy) newErrors.submittedBy = "Submitted by is required";
+    if (!form.filePreview && !form.fileName && (!editingExpense || (!editingExpense.fileName && !editingExpense.fileUrl))) {
+      newErrors.file = "Bill / Receipt Attachment is required";
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -431,9 +442,9 @@ export default function ExpensePage() {
           category: form.category,
           amount: Number(form.amount),
           expenseDate: form.expenseDate ? form.expenseDate.toISOString() : new Date().toISOString(),
-          status: form.status,
+          status: editingExpense.status || "Pending",
           submittedBy: form.submittedBy,
-          approvedBy: form.status === "Approved" ? currentUserName : "-",
+          approvedBy: editingExpense.approvedBy || "-",
           description: form.description,
           fileName: form.fileName || editingExpense.fileName || "",
           fileData: form.filePreview || (editingExpense.fileName?.startsWith("data:") ? editingExpense.fileName : null),
@@ -445,9 +456,9 @@ export default function ExpensePage() {
           category: form.category,
           amount: Number(form.amount),
           expenseDate: form.expenseDate ? form.expenseDate.toISOString() : new Date().toISOString(),
-          status: form.status,
+          status: "Pending",
           submittedBy: form.submittedBy,
-          approvedBy: form.status === "Approved" ? currentUserName : "-",
+          approvedBy: "-",
           description: form.description,
           fileName: form.fileName || "",
           fileData: form.filePreview || null,
@@ -458,6 +469,53 @@ export default function ExpensePage() {
       setEditingExpense(null);
       setForm(initialForm);
       setErrors({});
+      await fetchExpensesFromDb();
+    } catch (err) {
+      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+    }
+  };
+
+  const handleOpenStatusDialog = (row) => {
+    setStatusExpense(row);
+    setNewStatus(row.status || "Pending");
+    const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "Admin";
+    setReviewerName(row.approvedBy && row.approvedBy !== "-" ? row.approvedBy : currentUserName);
+    setStatusRemarks("");
+    setStatusDialogOpen(true);
+  };
+
+  const handleUpdateExpenseStatus = async () => {
+    if (!statusExpense) return;
+    const expenseId = statusExpense.expenseId || statusExpense.id;
+    try {
+      const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "Admin";
+      const approvedByVal = reviewerName.trim() || currentUserName;
+      let updatedDescription = statusExpense.description || "";
+      if (statusRemarks && statusRemarks.trim()) {
+        const timestamp = dayjs().format("DD MMM YYYY, hh:mm A");
+        const userTag = approvedByVal;
+        updatedDescription = updatedDescription
+          ? `${updatedDescription}\n[Status Note - ${newStatus} (${timestamp}) by ${userTag}]: ${statusRemarks.trim()}`
+          : `[Status Note - ${newStatus} (${timestamp}) by ${userTag}]: ${statusRemarks.trim()}`;
+      }
+
+      await updateExpenseAsync(expenseId, {
+        eventName: statusExpense.eventName,
+        category: statusExpense.category,
+        amount: Number(statusExpense.amount),
+        expenseDate: statusExpense.expenseDate ? dayjs(statusExpense.expenseDate).toISOString() : new Date().toISOString(),
+        status: newStatus,
+        submittedBy: statusExpense.submittedBy,
+        approvedBy: approvedByVal,
+        description: updatedDescription,
+        fileName: statusExpense.fileName || "",
+        fileData: statusExpense.fileName?.startsWith("data:") ? statusExpense.fileName : null,
+      });
+
+      toast.success("Expense verified successfully!");
+      setStatusDialogOpen(false);
+      setStatusExpense(null);
+      setStatusRemarks("");
       await fetchExpensesFromDb();
     } catch (err) {
       toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
@@ -485,6 +543,30 @@ export default function ExpensePage() {
                 }}
               />
             </IconButton>
+          </Tooltip>
+          <Tooltip title={hasWriteAccess ? "Verify" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => handleOpenStatusDialog(row)}
+              >
+                <StatusActionIcon
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) =>
+                      hasWriteAccess
+                        ? theme.palette.mode === "dark"
+                          ? "#38bdf8"
+                          : "#0284c7"
+                        : theme.palette.mode === "dark"
+                          ? "rgba(255,255,255,0.3)"
+                          : "#cbd5e1",
+                  }}
+                />
+              </IconButton>
+            </span>
           </Tooltip>
           <Tooltip title={hasWriteAccess ? "Edit" : ""}>
             <span>
@@ -651,8 +733,16 @@ export default function ExpensePage() {
               disabled={!hasWriteAccess}
               startIcon={<AddIcon />}
               onClick={() => {
+                const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
+                const matched = membersList.find((m) => {
+                  const mName = (m.name || m.memberName || "").trim().toLowerCase();
+                  return mName === currentUserName.trim().toLowerCase();
+                });
                 setEditingExpense(null);
-                setForm(initialForm);
+                setForm({
+                  ...initialForm,
+                  submittedBy: matched ? (matched.name || matched.memberName) : currentUserName,
+                });
                 setErrors({});
                 setDialogOpen(true);
               }}
@@ -889,7 +979,7 @@ export default function ExpensePage() {
             />
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12 }}>
             <AppSelect
               label="Submitted By"
               placeholder="Select Member"
@@ -901,16 +991,6 @@ export default function ExpensePage() {
               options={memberOptions}
               error={!!errors.submittedBy}
               helperText={errors.submittedBy}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppSelect
-              label="Status"
-              placeholder="Select Status"
-              value={form.status}
-              onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}
-              options={dynamicStatusOptions}
               required
             />
           </Grid>
@@ -933,7 +1013,7 @@ export default function ExpensePage() {
 
           <Grid size={{ xs: 12 }}>
             <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mb: 0.5, display: "block" }}>
-              Bill / Receipt Attachment
+              Bill / Receipt Attachment <span style={{ color: "#ef4444" }}>*</span>
             </Typography>
             <input
               type="file"
@@ -1507,6 +1587,138 @@ export default function ExpensePage() {
             }}
           />
         </Box>
+      </AppDialog>
+
+      {/* Dedicated Verify Expense Modal */}
+      <AppDialog
+        open={statusDialogOpen}
+        onClose={() => {
+          setStatusDialogOpen(false);
+          setStatusExpense(null);
+          setStatusRemarks("");
+        }}
+        title="Verify"
+        maxWidth="sm"
+        actions={
+          <Stack direction="row" spacing={1.5}>
+            <AppButton
+              variant="outlined"
+              onClick={() => {
+                setStatusDialogOpen(false);
+                setStatusExpense(null);
+                setStatusRemarks("");
+              }}
+            >
+              Cancel
+            </AppButton>
+            <AppButton
+              variant="contained"
+              onClick={handleUpdateExpenseStatus}
+            >
+              Verify
+            </AppButton>
+          </Stack>
+        }
+      >
+        {statusExpense && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Expense Summary Card */}
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: "10px",
+                bgcolor: (t) =>
+                  t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
+                border: (t) => `1px solid ${t.palette.divider}`,
+              }}
+            >
+              <Grid container spacing={1.5}>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Event Name
+                  </Typography>
+                  <Typography variant="body2" fontWeight={700}>
+                    {statusExpense.eventName || "--"}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Current Status
+                  </Typography>
+                  <Box sx={{ mt: 0.2 }}>
+                    <Chip
+                      label={statusExpense.status}
+                      size="small"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.72rem",
+                        bgcolor:
+                          statusExpense.status === "Approved"
+                            ? "rgba(22, 163, 74, 0.12)"
+                            : statusExpense.status === "Pending"
+                            ? "rgba(234, 179, 8, 0.15)"
+                            : "rgba(220, 38, 38, 0.12)",
+                        color:
+                          statusExpense.status === "Approved"
+                            ? "#16a34a"
+                            : statusExpense.status === "Pending"
+                            ? "#d97706"
+                            : "#dc2626",
+                      }}
+                    />
+                  </Box>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Amount
+                  </Typography>
+                  <Typography variant="body2" fontWeight={700} sx={{ color: "#16a34a" }}>
+                    ₹{Number(statusExpense.amount || 0).toLocaleString("en-IN")}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Submitted By
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {statusExpense.submittedBy || "--"}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <AppSelect
+                  label="Status"
+                  placeholder="Select Status"
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  options={dynamicStatusOptions}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <AppInput
+                  label="Verified By / Reviewer"
+                  value={reviewerName}
+                  onChange={(e) => setReviewerName(e.target.value)}
+                  placeholder="Enter reviewer name"
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <AppTextArea
+                  label="Remarks / Verification Notes"
+                  placeholder="Enter remarks or verification notes (optional)..."
+                  value={statusRemarks}
+                  onChange={(e) => setStatusRemarks(e.target.value)}
+                  minRows={3}
+                />
+              </Grid>
+            </Grid>
+          </Box>
+        )}
       </AppDialog>
     </div>
   );
