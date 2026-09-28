@@ -18,8 +18,8 @@ import AppButton from "../common/AppButton";
 import AppDialog from "../common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../common/AppToast";
-import { CreateEventAsync, UpdateEventAsync, GetEventByIdAsync } from "../../services/eventService";
-import { GetBudgetCalculationsAsync } from "../../services/budgetCalculationService";
+import { createEventAsync, updateEventAsync, getEventByIdAsync } from "../../services/eventService";
+import { getBudgetCalculationsAsync } from "../../services/budgetCalculationService";
 import { updateSystemSettings } from "../../services/settingsService";
 import {
   getPaymentQrConfig,
@@ -200,7 +200,7 @@ export default function EventFormDialog({
   // Dialog open & initialization
   useEffect(() => {
     if (open) {
-      GetBudgetCalculationsAsync()
+      getBudgetCalculationsAsync()
         .then((budgetData) => {
           if (Array.isArray(budgetData) && budgetData.length > 0) {
             const activeItems = budgetData.filter((b) => b.isActive !== false);
@@ -231,7 +231,7 @@ export default function EventFormDialog({
         const fetchDetails = async () => {
           setLoading(true);
           try {
-            const detailedEvent = await GetEventByIdAsync(event.eventId);
+            const detailedEvent = await getEventByIdAsync(event.eventId);
             const pIds =
               detailedEvent.participantIds ||
               (detailedEvent.participants ? detailedEvent.participants.map((p) => p.memberId) : []);
@@ -434,7 +434,7 @@ export default function EventFormDialog({
       }
 
       if (form.eventId) {
-        await UpdateEventAsync(form.eventId, payload);
+        await updateEventAsync(form.eventId, payload);
         toast.success("Saved successfully");
       } else {
         // Sync dynamic QR code with per-member contribution amount to backend settings before event creation
@@ -467,7 +467,7 @@ export default function EventFormDialog({
           // QR sync warning ignored
         }
 
-        const createdEvent = await CreateEventAsync(payload);
+        const createdEvent = await createEventAsync(payload);
         toast.success("Saved successfully");
       }
 

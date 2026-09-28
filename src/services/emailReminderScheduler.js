@@ -5,11 +5,11 @@ import {
   buildUpiPaymentUri,
   getQrCodeApiUrl,
 } from "../utils/upiQrHelper";
-import { SendPaymentReminder } from "./contributionService";
-import { GetContributionsAsync } from "./contributionService";
-import { GetEventsAsync } from "./eventService";
-import { GetMembersAsync } from "./memberService";
-import { GetEventTypesAsync } from "./eventTypeService";
+import { sendPaymentReminder } from "./contributionService";
+import { getContributionsAsync } from "./contributionService";
+import { getEventsAsync } from "./eventService";
+import { getMembersAsync } from "./memberService";
+import { getEventTypesAsync } from "./eventTypeService";
 
 // LocalStorage keys
 export const EMAIL_LOGS_STORAGE_KEY = "cm_email_reminder_logs";
@@ -284,8 +284,8 @@ export async function sendTestEmail({
 </html>
   `.trim();
 
-  // Dispatch via SendPaymentReminder API
-  const res = await SendPaymentReminder({
+  // Dispatch via sendPaymentReminder API
+  const res = await sendPaymentReminder({
     memberId: "test-preview-id",
     memberName: "Alex Morgan (Test)",
     recipientEmail: recipientEmail || "admin@example.com",
@@ -403,10 +403,10 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
 
   try {
     const [cRes, eRes, mRes, tRes] = await Promise.all([
-      GetContributionsAsync().catch(() => []),
-      GetEventsAsync().catch(() => []),
-      GetMembersAsync().catch(() => []),
-      GetEventTypesAsync().catch(() => []),
+      getContributionsAsync().catch(() => []),
+      getEventsAsync().catch(() => []),
+      getMembersAsync().catch(() => []),
+      getEventTypesAsync().catch(() => []),
     ]);
     allContributions = Array.isArray(cRes) ? cRes : [];
     allEvents = Array.isArray(eRes) ? eRes : [];
@@ -523,7 +523,7 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
     `.trim();
 
     try {
-      await SendPaymentReminder({
+      await sendPaymentReminder({
         memberId: c.memberId,
         memberName,
         recipientEmail,

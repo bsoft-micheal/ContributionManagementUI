@@ -11,7 +11,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
-import { GetEventTypesAsync, CreateEventTypeAsync, UpdateEventTypeAsync, DeleteEventTypeAsync } from "../../services/eventTypeService";
+import { getEventTypesAsync, createEventTypeAsync, updateEventTypeAsync, deleteEventTypeAsync } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -58,7 +58,7 @@ export default function EventTypesPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await GetEventTypesAsync();
+      const data = await getEventTypesAsync();
       setTypes(data || []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load event types");
@@ -106,10 +106,10 @@ export default function EventTypesPage() {
         ruleDescription: form.ruleDescription?.trim() || (form.hasTenureRule ? `${form.newEntrantSharePercentage || 50}% (< ${form.tenureThresholdYears || 1} yr)` : "Equal Share")
       };
       if (form.eventTypeId) {
-        await UpdateEventTypeAsync(form.eventTypeId, payload);
+        await updateEventTypeAsync(form.eventTypeId, payload);
         toast.success(TOAST_MESSAGES.EVENT_TYPES.SAVED_SUCCESS);
       } else {
-        await CreateEventTypeAsync(payload);
+        await createEventTypeAsync(payload);
         toast.success(TOAST_MESSAGES.EVENT_TYPES.SAVED_SUCCESS);
       }
       setDialogOpen(false);
@@ -127,7 +127,7 @@ export default function EventTypesPage() {
   async function handleConfirmDelete() {
     if (typeToDelete) {
       try {
-        await DeleteEventTypeAsync(typeToDelete);
+        await deleteEventTypeAsync(typeToDelete);
         toast.success(TOAST_MESSAGES.EVENT_TYPES.DELETED_SUCCESS);
         loadData();
       } catch (error) {
@@ -151,7 +151,7 @@ export default function EventTypesPage() {
         ...typeToToggle,
         isActive: !typeToToggle.isActive,
       };
-      await UpdateEventTypeAsync(typeToToggle.eventTypeId, payload);
+      await updateEventTypeAsync(typeToToggle.eventTypeId, payload);
       toast.success(TOAST_MESSAGES.EVENT_TYPES.STATUS_UPDATED);
       loadData();
     } catch (err) {

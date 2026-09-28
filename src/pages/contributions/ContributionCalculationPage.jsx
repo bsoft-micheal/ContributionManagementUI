@@ -4,12 +4,12 @@ import { useTheme } from "@mui/material/styles";
 import { FilterList as FilterListIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
-import { GetMembersAsync } from "../../services/memberService";
-import { GetRolesAsync } from "../../services/roleService";
+import { getMembersAsync } from "../../services/memberService";
+import { getRolesAsync } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
-import { GetEventsAsync, GetEventByIdAsync } from "../../services/eventService";
+import { getEventsAsync, getEventByIdAsync } from "../../services/eventService";
 import { useAppToast } from "../../components/common/AppToast";
 
 export default function ContributionCalculationPage() {
@@ -33,9 +33,9 @@ export default function ContributionCalculationPage() {
     setLoading(true);
     try {
       const [mems, rls, evts] = await Promise.all([
-        GetMembersAsync(),
-        GetRolesAsync(),
-        GetEventsAsync()
+        getMembersAsync(),
+        getRolesAsync(),
+        getEventsAsync()
       ]);
       setMembers(mems);
       setRoles(rls);
@@ -60,7 +60,7 @@ export default function ContributionCalculationPage() {
   async function loadEventDetails() {
     setLoading(true);
     try {
-      const detailedEvent = await GetEventByIdAsync(selectedEventId);
+      const detailedEvent = await getEventByIdAsync(selectedEventId);
       setSelectedEventDetails(detailedEvent);
     } catch (error) {
       toast.error("Failed to load event details");

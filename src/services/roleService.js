@@ -1,17 +1,17 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetRolesAsync = async () => {
+export const getRolesAsync = async () => {
   return await getApi("/roles/getAllRoleAsync");
 };
 
-export const CreateRoleAsync = async (data) => {
+export const createRoleAsync = async (data) => {
   return await postApi("/roles/saveRoleAsync", data);
 };
 
-export const UpdateRoleAsync = async (id, data) => {
+export const updateRoleAsync = async (id, data) => {
   return await putApi(`/roles/updateRoleAsyncById/${id}`, data);
 };
 
-export const DeleteRoleAsync = async (id) => {
+export const deleteRoleAsync = async (id) => {
   return await deleteApi(`/roles/deleteRoleAsyncById/${id}`);
 };

@@ -13,8 +13,8 @@ import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import { FilterList as FilterListIcon, Refresh as RefreshIcon, Save as SaveIcon } from "@mui/icons-material";
-import { GetUserRightsAsync, SaveUserRightsAsync } from "../../services/userRightsService";
-import { GetRolesAsync } from "../../services/roleService";
+import { getUserRightsAsync, saveUserRightsAsync } from "../../services/userRightsService";
+import { getRolesAsync } from "../../services/roleService";
 import { formatGridDate } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
@@ -58,7 +58,7 @@ export default function UserRightsPage() {
 
   async function loadRoles() {
     try {
-      const dbRoles = await GetRolesAsync();
+      const dbRoles = await getRolesAsync();
       const list = Array.isArray(dbRoles) && dbRoles.length > 0
         ? dbRoles
         : [{ roleName: "Admin" }, { roleName: "Organizer" }, { roleName: "Member" }];
@@ -77,7 +77,7 @@ export default function UserRightsPage() {
     if (!forceRefresh && rights[roleName]) { setLoading(false); return; }
     setLoading(true);
     try {
-      const serverRights = await GetUserRightsAsync(roleName);
+      const serverRights = await getUserRightsAsync(roleName);
       const rows = Array.isArray(serverRights) ? serverRights : [];
       // normalise: add a sequential ui id
       const normalised = rows.map((r, i) => {
@@ -167,7 +167,7 @@ export default function UserRightsPage() {
         }),
       };
 
-      await SaveUserRightsAsync(payload);
+      await saveUserRightsAsync(payload);
 
       toast.success("User rights saved successfully");
 

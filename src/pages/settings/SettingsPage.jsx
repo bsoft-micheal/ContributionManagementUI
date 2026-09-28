@@ -69,7 +69,7 @@ import {
   getAllPaymentQrSettingsAsync,
   savePaymentQrSettingAsync,
 } from "../../services/settingsService";
-import { GetEventTypesAsync } from "../../services/eventTypeService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
 import SendTestEmailDialog from "../../components/settings/SendTestEmailDialog";
 import EmailReminderLogsDialog from "../../components/settings/EmailReminderLogsDialog";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -197,7 +197,7 @@ export default function SettingsPage() {
   const [eventPaymentQrConfigs, setEventPaymentQrConfigs] = useState(() => getAllPaymentQrConfigs());
   const [selectedQrEventType, setSelectedQrEventType] = useState("");
 
-  // Dynamically derive event type options from categoriesList (GetEventTypesAsync) and saved configs - NO HARDCODING!
+  // Dynamically derive event type options from categoriesList (getEventTypesAsync) and saved configs - NO HARDCODING!
   const qrEventTypeOptions = useMemo(() => {
     const list = [];
     if (Array.isArray(categoriesList) && categoriesList.length > 0) {
@@ -571,7 +571,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const types = await GetEventTypesAsync();
+        const types = await getEventTypesAsync();
         if (Array.isArray(types)) {
           setCategoriesList(types);
           // Initial template populate once categories arrive

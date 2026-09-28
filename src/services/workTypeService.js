@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetWorkTypesAsync = async (activeOnly = false) => {
+export const getWorkTypesAsync = async (activeOnly = false) => {
   const url = activeOnly
     ? "/work-types/getAllWorkTypeAsync?activeOnly=true"
     : "/work-types/getAllWorkTypeAsync";
@@ -8,18 +8,18 @@ export const GetWorkTypesAsync = async (activeOnly = false) => {
   return result || [];
 };
 
-export const GetWorkTypeByIdAsync = async (id) => {
+export const getWorkTypeByIdAsync = async (id) => {
   return await getApi(`/work-types/getWorkTypeAsyncById/${id}`);
 };
 
-export const CreateWorkTypeAsync = async (data) => {
+export const createWorkTypeAsync = async (data) => {
   return await postApi("/work-types/saveWorkTypeAsync", data);
 };
 
-export const UpdateWorkTypeAsync = async (id, data) => {
+export const updateWorkTypeAsync = async (id, data) => {
   return await putApi(`/work-types/updateWorkTypeAsyncById/${id}`, data);
 };
 
-export const DeleteWorkTypeAsync = async (id) => {
+export const deleteWorkTypeAsync = async (id) => {
   return await deleteApi(`/work-types/deleteWorkTypeAsyncById/${id}`);
 };

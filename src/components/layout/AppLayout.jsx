@@ -35,7 +35,7 @@ import AppImageUpload from "../common/AppImageUpload";
 import { useAppToast } from "../common/AppToast";
 import { validateForm } from "../../utils/validation";
 import { getImageUrl } from "../../services/apiClient";
-import { GetProfileAsync } from "../../services/userService";
+import { getProfileAsync } from "../../services/userService";
 import { useThemeMode } from "../../contexts/ThemeModeContext";
 import dayjs from "dayjs";
 import logo from "../../assets/logo.png";
@@ -202,7 +202,7 @@ export default function AppLayout() {
       let isMounted = true;
       const loadProfile = async () => {
         try {
-          const res = await GetProfileAsync();
+          const res = await getProfileAsync();
           const profile = res?.data || res;
           if (profile && isMounted) {
             setProfileForm({

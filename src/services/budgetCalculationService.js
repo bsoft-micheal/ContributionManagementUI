@@ -1,22 +1,22 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetBudgetCalculationsAsync = async () => {
+export const getBudgetCalculationsAsync = async () => {
   const result = await getApi("/budget-calculations/getAllBudgetCalculationAsync");
   return result || [];
 };
 
-export const GetBudgetCalculationByIdAsync = async (id) => {
+export const getBudgetCalculationByIdAsync = async (id) => {
   return await getApi(`/budget-calculations/getBudgetCalculationAsyncById/${id}`);
 };
 
-export const CreateBudgetCalculationAsync = async (data) => {
+export const createBudgetCalculationAsync = async (data) => {
   return await postApi("/budget-calculations/saveBudgetCalculationAsync", data);
 };
 
-export const UpdateBudgetCalculationAsync = async (id, data) => {
+export const updateBudgetCalculationAsync = async (id, data) => {
   return await putApi(`/budget-calculations/updateBudgetCalculationAsyncById/${id}`, data);
 };
 
-export const DeleteBudgetCalculationAsync = async (id) => {
+export const deleteBudgetCalculationAsync = async (id) => {
   return await deleteApi(`/budget-calculations/deleteBudgetCalculationAsyncById/${id}`);
 };

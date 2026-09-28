@@ -4,15 +4,20 @@ import apiClient from "../services/apiClient";
 import { useIdleTimer } from "../hooks/useIdleTimer";
 import { getDeviceInfo } from "../utils/deviceInfo";
 
+/**
+ * Context for managing user authentication state, tokens, and active permissions.
+ */
 const AuthContext = createContext(null);
 
 // ─── Idle timeout ─────────────────────────────────────────────────────────────
-// Change this one value to adjust the inactivity timeout:
-//   60_000          →  60 seconds  (current — for testing)
-//   5  * 60 * 1000  →  5 minutes
-//   15 * 60 * 1000  →  15 minutes  (recommended for production)
 const IDLE_TIMEOUT_MS = 15*60*1000;
 
+/**
+ * Provider component wrapping the application to supply authentication state and methods.
+ *
+ * @param {object} props
+ * @param {React.ReactNode} props.children
+ */
 export function AuthProvider({ children }) {
   const navigate = useNavigate();
 

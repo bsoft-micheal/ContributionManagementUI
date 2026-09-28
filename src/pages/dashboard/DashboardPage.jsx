@@ -31,9 +31,9 @@ import { formatGridDate, parseMemberDob } from "../../utils/dateHelper";
 import MetricCard from "../../components/MetricCard";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
-import { GetDashboardSummaryAsync } from "../../services/dashboardService";
-import { GetEventTypesAsync } from "../../services/eventTypeService";
-import { GetMembersAsync } from "../../services/memberService";
+import { getDashboardSummaryAsync } from "../../services/dashboardService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getMembersAsync } from "../../services/memberService";
 import { useAppToast } from "../../components/common/AppToast";
 import AppDataTable from "../../components/common/AppDataTable";
 import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
@@ -721,7 +721,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchEventTypes() {
       try {
-        const types = await GetEventTypesAsync();
+        const types = await getEventTypesAsync();
         if (Array.isArray(types)) {
           setEventTypes(types);
         }
@@ -735,7 +735,7 @@ export default function DashboardPage() {
   const loadDashboard = useCallback(async (month, year) => {
     setLoading(true);
     try {
-      const data = await GetDashboardSummaryAsync({ month, year });
+      const data = await getDashboardSummaryAsync({ month, year });
       setSummary(data);
     } catch {
       toast.error("Failed to load dashboard data");
@@ -761,7 +761,7 @@ export default function DashboardPage() {
       try {
         if (sessionStorage.getItem("birthdayModalShownSession") === "true") return;
 
-        const membersData = await GetMembersAsync().catch(() => []);
+        const membersData = await getMembersAsync().catch(() => []);
         if (cancelled || !Array.isArray(membersData)) return;
 
         const today = dayjs();

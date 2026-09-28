@@ -21,12 +21,12 @@ import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
 import {
-  GetBudgetCalculationsAsync,
-  CreateBudgetCalculationAsync,
-  UpdateBudgetCalculationAsync,
-  DeleteBudgetCalculationAsync,
+  getBudgetCalculationsAsync,
+  createBudgetCalculationAsync,
+  updateBudgetCalculationAsync,
+  deleteBudgetCalculationAsync,
 } from "../../services/budgetCalculationService";
-import { GetEventTypesAsync } from "../../services/eventTypeService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { COMMON_STRINGS } from "../../constants";
@@ -71,8 +71,8 @@ export default function BudgetCalculationsPage() {
     setLoading(true);
     try {
       const [budgetData, typesData] = await Promise.all([
-        GetBudgetCalculationsAsync(),
-        GetEventTypesAsync().catch(() => []),
+        getBudgetCalculationsAsync(),
+        getEventTypesAsync().catch(() => []),
       ]);
       setItems(Array.isArray(budgetData) ? budgetData : []);
       setEventTypes(Array.isArray(typesData) ? typesData : []);
@@ -159,10 +159,10 @@ export default function BudgetCalculationsPage() {
       };
 
       if (form.budgetCalculationId) {
-        await UpdateBudgetCalculationAsync(form.budgetCalculationId, payload);
+        await updateBudgetCalculationAsync(form.budgetCalculationId, payload);
         toast.success("Saved successfully");
       } else {
-        await CreateBudgetCalculationAsync(payload);
+        await createBudgetCalculationAsync(payload);
         toast.success("Saved successfully");
       }
       setDialogOpen(false);
@@ -180,7 +180,7 @@ export default function BudgetCalculationsPage() {
   async function handleConfirmDelete() {
     if (itemToDelete) {
       try {
-        await DeleteBudgetCalculationAsync(itemToDelete);
+        await deleteBudgetCalculationAsync(itemToDelete);
         toast.success("Deleted successfully");
         loadData();
       } catch (error) {
@@ -204,7 +204,7 @@ export default function BudgetCalculationsPage() {
         ...itemToToggle,
         isActive: !itemToToggle.isActive,
       };
-      await UpdateBudgetCalculationAsync(itemToToggle.budgetCalculationId, payload);
+      await updateBudgetCalculationAsync(itemToToggle.budgetCalculationId, payload);
       toast.success("Status updated successfully");
       loadData();
     } catch (err) {

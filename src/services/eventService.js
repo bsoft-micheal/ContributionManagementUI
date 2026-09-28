@@ -1,6 +1,6 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const GetEventsAsync = async (params) => {
+export const getEventsAsync = async (params) => {
   let apiParams = undefined;
   if (params && (params.month !== undefined || params.year !== undefined)) {
     apiParams = {
@@ -12,18 +12,18 @@ export const GetEventsAsync = async (params) => {
   return result || [];
 };
 
-export const CreateEventAsync = async (data) => {
+export const createEventAsync = async (data) => {
   return await postApi("/events/saveEventAsync", data);
 };
 
-export const UpdateEventAsync = async (id, data) => {
+export const updateEventAsync = async (id, data) => {
   return await putApi(`/events/updateEventAsyncById/${id}`, data);
 };
 
-export const DeleteEventAsync = async (id) => {
+export const deleteEventAsync = async (id) => {
   return await deleteApi(`/events/deleteEventAsyncById/${id}`);
 };
 
-export const GetEventByIdAsync = async (id) => {
+export const getEventByIdAsync = async (id) => {
   return await getApi(`/events/getEventAsyncById/${id}`);
 };
