@@ -605,12 +605,21 @@ export default function SupportTicketsPage() {
     {
       label: "Member Name",
       key: "memberName",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={600}>
-          {row.memberName}
-        </Typography>
-      ),
+      render: (row) => {
+        let name = row.memberName;
+        if (!name && row.memberId) {
+          const matched = membersList.find((m) => (m.memberId || m.id) === row.memberId);
+          name = matched?.name || matched?.memberName;
+        }
+        const cleanName = (name || "").replace(/\s*\([0-9a-fA-F-]{36}\)/g, "").trim() || name || "--";
+        return (
+          <Typography variant="body2" fontWeight={600}>
+            {cleanName}
+          </Typography>
+        );
+      },
     },
+
     {
       label: "Related Event",
       key: "relatedEvent",
@@ -1266,9 +1275,18 @@ export default function SupportTicketsPage() {
                   Member Name
                 </Typography>
                 <Typography variant="body2" fontWeight={700}>
-                  {selectedTicket.memberName} {selectedTicket.memberId ? `(${selectedTicket.memberId})` : ""}
+                  {(() => {
+                    let name = selectedTicket.memberName;
+                    if (!name && selectedTicket.memberId) {
+                      const matched = membersList.find((m) => (m.memberId || m.id) === selectedTicket.memberId);
+                      name = matched?.name || matched?.memberName;
+                    }
+                    if (!name) return "--";
+                    return name.replace(/\s*\([0-9a-fA-F-]{36}\)/g, "").trim() || name;
+                  })()}
                 </Typography>
               </Grid>
+
               <Grid size={{ xs: 6 }}>
                 <Typography variant="caption" color="text.secondary">
                   Related Event

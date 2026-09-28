@@ -31,7 +31,9 @@ import { getContributionsAsync, getContributionsByEventAsync, recordPaymentAsync
 import { getEventsAsync } from "../../services/eventService";
 import { getMembersAsync } from "../../services/memberService";
 import { getRolesAsync } from "../../services/roleService";
+import { getPaymentModesAsync } from "../../services/paymentModeService";
 import AppDataTable from "../../components/common/AppDataTable";
+
 import AppDialog from "../../components/common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
@@ -73,6 +75,7 @@ export default function ContributionsPage() {
   const [allContributions, setAllContributions] = useState([]);
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [paymentModes, setPaymentModes] = useState([]);
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
   const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
@@ -80,15 +83,18 @@ export default function ContributionsPage() {
   useEffect(() => {
     async function loadEvents() {
       try {
-        const [mems, rls, data] = await Promise.all([
+        const [mems, rls, data, modes] = await Promise.all([
           getMembersAsync(),
           getRolesAsync(),
-          getEventsAsync()
+          getEventsAsync(),
+          getPaymentModesAsync(true).catch(() => []),
         ]);
         setMembers(mems);
         setRoles(rls);
         setEvents(data);
+        setPaymentModes(Array.isArray(modes) ? modes : []);
         if (data.length > 0) {
+
           setSelectedEventId(data[0].eventId);
           setFilterEventId(data[0].eventId);
         }
@@ -320,11 +326,25 @@ export default function ContributionsPage() {
   }
 
   const eventOptions = events.map(e => ({ label: e.eventName, value: e.eventId }));
-  const modeOptions = [
-    { label: "Cash", value: "Cash" },
-    { label: "UPI", value: "Upi" },
-    { label: "Split Payment (Cash + UPI)", value: "Split" },
-  ];
+  const modeOptions = paymentModes.length > 0
+    ? paymentModes.map(m => {
+        const rawName = m.paymentModeName || "";
+        const lower = rawName.toLowerCase();
+        let value = rawName;
+        if (lower === "upi") value = "Upi";
+        else if (lower === "cash") value = "Cash";
+        else if (lower === "split" || lower.includes("split")) value = "Split";
+        return {
+          label: rawName,
+          value: value
+        };
+      })
+    : [
+        { label: "Cash", value: "Cash" },
+        { label: "UPI", value: "Upi" },
+        { label: "Split Payment (Cash + UPI)", value: "Split" },
+      ];
+
 
   const columns = [
     {

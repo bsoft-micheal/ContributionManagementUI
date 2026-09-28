@@ -104,7 +104,7 @@ export default function AppLayout() {
     { label: "Other", value: "Other" },
   ];
 
-  const memberTypeOptions = [
+  const workTypeOptions = [
     { label: "Office", value: "Office" },
     { label: "WFH", value: "WFH" },
   ];
@@ -116,6 +116,7 @@ export default function AppLayout() {
     profileImage: "",
     phone: "",
     gender: "",
+    workType: "Office",
     memberType: "Office",
     dateOfBirth: null,
     joiningDate: null,
@@ -212,7 +213,8 @@ export default function AppLayout() {
               profileImage: profile.profileImage || authState?.profileImage || "",
               phone: profile.phone || "",
               gender: profile.gender || "",
-              memberType: profile.memberType || "",
+              workType: profile.workType || profile.memberType || "",
+              memberType: profile.workType || profile.memberType || "",
               dateOfBirth: profile.dateOfBirth ? dayjs(profile.dateOfBirth) : null,
               joiningDate: profile.joiningDate ? dayjs(profile.joiningDate) : null,
               roleName: profile.roleName || authState?.role || "",
@@ -233,7 +235,8 @@ export default function AppLayout() {
             profileImage: authState.profileImage || "",
             phone: authState.phone || "",
             gender: authState.gender || "",
-            memberType: authState.memberType || "",
+            workType: authState.workType || authState.memberType || "",
+            memberType: authState.workType || authState.memberType || "",
             dateOfBirth: authState.dateOfBirth ? dayjs(authState.dateOfBirth) : null,
             joiningDate: authState.joiningDate ? dayjs(authState.joiningDate) : null,
             roleName: authState.role || "",
@@ -295,7 +298,8 @@ export default function AppLayout() {
         profileImage: profileForm.profileImage,
         phone: profileForm.phone.trim(),
         gender: profileForm.gender,
-        memberType: profileForm.memberType,
+        workType: profileForm.workType || profileForm.memberType,
+        memberType: profileForm.workType || profileForm.memberType,
         dateOfBirth: profileForm.dateOfBirth ? dayjs(profileForm.dateOfBirth).toISOString() : undefined,
         joiningDate: profileForm.joiningDate ? dayjs(profileForm.joiningDate).toISOString() : undefined,
         roleName: profileForm.roleName,
@@ -785,16 +789,17 @@ export default function AppLayout() {
             </Box>
             <Box sx={{ flex: 1 }}>
               <AppSelect
-                label="Member Type"
-                value={profileForm.memberType || "Office"}
+                label="Work Type"
+                value={profileForm.workType || profileForm.memberType || "Office"}
                 onChange={(e) => {
-                  setProfileForm((prev) => ({ ...prev, memberType: e.target.value }));
+                  setProfileForm((prev) => ({ ...prev, workType: e.target.value, memberType: e.target.value }));
+                  if (profileErrors.workType) setProfileErrors((prev) => ({ ...prev, workType: "" }));
                   if (profileErrors.memberType) setProfileErrors((prev) => ({ ...prev, memberType: "" }));
                 }}
-                options={memberTypeOptions}
-                placeholder="Select member type"
-                error={!!profileErrors.memberType}
-                helperText={profileErrors.memberType}
+                options={workTypeOptions}
+                placeholder="Select work type"
+                error={!!profileErrors.workType || !!profileErrors.memberType}
+                helperText={profileErrors.workType || profileErrors.memberType}
               />
             </Box>
           </Box>

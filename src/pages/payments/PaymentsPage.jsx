@@ -43,6 +43,7 @@ import { getStatusesAsync } from "../../services/statusService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { getImageUrl } from "../../services/apiClient";
 
 export default function PaymentsPage() {
   const navigate = useNavigate();
@@ -835,51 +836,32 @@ export default function PaymentsPage() {
                   <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
                     Payment Screenshot / Receipt Proof
                   </Typography>
-                  {selectedTxn.screenshot.startsWith("data:image") || selectedTxn.screenshot.startsWith("http") ? (
-                    <Box
-                      sx={{
-                        mt: 0.5,
-                        p: 1.5,
-                        border: "1.5px solid #e2e8f0",
-                        borderRadius: 2.5,
-                        bgcolor: "#f8fafc",
-                        textAlign: "center",
+                  <Box
+                    sx={{
+                      mt: 0.5,
+                      p: 1.5,
+                      border: "1.5px solid",
+                      borderColor: (t) =>
+                        t.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "#e2e8f0",
+                      borderRadius: 2.5,
+                      bgcolor: (t) =>
+                        t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                      textAlign: "center",
+                    }}
+                  >
+                    <img
+                      src={getImageUrl(selectedTxn.screenshot)}
+                      alt="Payment proof receipt"
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: 240,
+                        borderRadius: 8,
+                        display: "block",
+                        margin: "0 auto",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                       }}
-                    >
-                      <img
-                        src={selectedTxn.screenshot}
-                        alt="Payment proof receipt"
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: 240,
-                          borderRadius: 8,
-                          display: "block",
-                          margin: "0 auto",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                        }}
-                      />
-                    </Box>
-                  ) : (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        p: 1.2,
-                        borderRadius: "10px",
-                        bgcolor: (t) =>
-                          t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                        border: (t) => `1px solid ${t.palette.divider}`,
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <ReceiptIcon sx={{ fontSize: 20, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
-                        <Typography variant="body2" fontWeight={600}>
-                          {selectedTxn.screenshot}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  )}
+                    />
+                  </Box>
                 </Grid>
               )}
 

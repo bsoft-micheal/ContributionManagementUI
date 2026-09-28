@@ -36,9 +36,16 @@ import {
   updatePriorityAsync,
   deletePriorityAsync,
 } from "../../services/priorityService";
+import {
+  getPaymentModesAsync,
+  createPaymentModeAsync,
+  updatePaymentModeAsync,
+  deletePaymentModeAsync,
+} from "../../services/paymentModeService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+
 
 const initialTicketTypeForm = {
   typeName: "",
@@ -54,6 +61,12 @@ const initialPriorityForm = {
   priorityName: "",
   isActive: true,
 };
+
+const initialPaymentModeForm = {
+  paymentModeName: "",
+  isActive: true,
+};
+
 
 export default function TypesPage() {
   const { authState } = useAuth();
@@ -95,11 +108,24 @@ export default function TypesPage() {
   const [priorityForm, setPriorityForm] = useState(initialPriorityForm);
   const [priorityErrors, setPriorityErrors] = useState({});
 
+  // ==================== Payment Modes State ====================
+  const [paymentModes, setPaymentModes] = useState([]);
+  const [paymentModesLoading, setPaymentModesLoading] = useState(true);
+  const [paymentModeDialogOpen, setPaymentModeDialogOpen] = useState(false);
+  const [paymentModeDeleteConfirmOpen, setPaymentModeDeleteConfirmOpen] = useState(false);
+  const [paymentModeToDelete, setPaymentModeToDelete] = useState(null);
+  const [paymentModeStatusConfirmOpen, setPaymentModeStatusConfirmOpen] = useState(false);
+  const [paymentModeToToggle, setPaymentModeToToggle] = useState(null);
+  const [paymentModeForm, setPaymentModeForm] = useState(initialPaymentModeForm);
+  const [paymentModeErrors, setPaymentModeErrors] = useState({});
+
   useEffect(() => {
     loadTicketTypes();
     loadWorkTypes();
     loadPriorities();
+    loadPaymentModes();
   }, []);
+
 
   // -------------------- Ticket Types Operations --------------------
   async function loadTicketTypes() {
@@ -115,7 +141,7 @@ export default function TypesPage() {
   }
 
   async function handleTicketTypeSubmit() {
-    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED_FIELD || "This field is required";
     const schema = {
       typeName: { required: true, min: 2, max: 150, label: fieldRequired },
     };
@@ -205,7 +231,7 @@ export default function TypesPage() {
   }
 
   async function handleWorkTypeSubmit() {
-    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED_FIELD || "This field is required";
     const schema = {
       workTypeName: { required: true, min: 2, max: 100, label: fieldRequired },
     };
@@ -295,7 +321,7 @@ export default function TypesPage() {
   }
 
   async function handlePrioritySubmit() {
-    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED_FIELD || "This field is required";
     const schema = {
       priorityName: { required: true, min: 2, max: 100, label: fieldRequired },
     };
@@ -372,6 +398,121 @@ export default function TypesPage() {
       setPriorityToToggle(null);
     }
   }
+
+  // -------------------- Payment Modes Operations --------------------
+  async function loadPaymentModes() {
+    setPaymentModesLoading(true);
+    try {
+      const data = await getPaymentModesAsync();
+      setPaymentModes(Array.isArray(data) ? data : []);
+    } catch (error) {
+      const errMsg =
+        error.response?.data?.message ||
+        (error.response?.status === 404 ? "Payment Modes endpoint not found (404). Please restart/rebuild the backend API server." : null) ||
+        error.message ||
+        "Failed to load payment modes";
+      toast.error(errMsg);
+    } finally {
+      setPaymentModesLoading(false);
+    }
+  }
+
+  async function handlePaymentModeSubmit() {
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED_FIELD || "This field is required";
+    const schema = {
+      paymentModeName: { required: true, min: 2, max: 100, label: fieldRequired },
+    };
+
+    const newErrors = validateForm(paymentModeForm, schema);
+
+    if (Object.keys(newErrors).length > 0) {
+      setPaymentModeErrors(newErrors);
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
+      return;
+    }
+
+    try {
+      const payload = {
+        paymentModeName: paymentModeForm.paymentModeName.trim(),
+        isActive: paymentModeForm.isActive !== undefined ? paymentModeForm.isActive : true,
+      };
+
+      if (paymentModeForm.paymentModeId) {
+        await updatePaymentModeAsync(paymentModeForm.paymentModeId, payload);
+        toast.success("Payment mode updated successfully!");
+      } else {
+        await createPaymentModeAsync(payload);
+        toast.success("Payment mode created successfully!");
+      }
+
+      setPaymentModeDialogOpen(false);
+      setPaymentModeForm(initialPaymentModeForm);
+      setPaymentModeErrors({});
+      loadPaymentModes();
+    } catch (error) {
+      const errMsg =
+        error.response?.data?.message ||
+        (error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(" ") : null) ||
+        error.response?.data?.title ||
+        (error.response?.status === 404 ? "Payment Modes API not running (404). Please rebuild/restart backend in Visual Studio." : null) ||
+        error.message ||
+        "Failed to save payment mode";
+      toast.error(errMsg);
+    }
+  }
+
+  function handlePaymentModeDeleteRequest(id) {
+    setPaymentModeToDelete(id);
+    setPaymentModeDeleteConfirmOpen(true);
+  }
+
+  async function handleConfirmPaymentModeDelete() {
+    if (!paymentModeToDelete) return;
+    try {
+      await deletePaymentModeAsync(paymentModeToDelete);
+      toast.success("Payment mode deleted successfully!");
+      loadPaymentModes();
+    } catch (error) {
+      const errMsg =
+        error.response?.data?.message ||
+        (error.response?.status === 404 ? "Payment Modes API not running (404). Please restart backend." : null) ||
+        error.message ||
+        "Failed to delete payment mode";
+      toast.error(errMsg);
+    } finally {
+      setPaymentModeDeleteConfirmOpen(false);
+      setPaymentModeToDelete(null);
+    }
+  }
+
+  function handlePaymentModeToggleStatusRequest(row) {
+    setPaymentModeToToggle(row);
+    setPaymentModeStatusConfirmOpen(true);
+  }
+
+  async function handleConfirmPaymentModeStatusToggle() {
+    if (!paymentModeToToggle) return;
+    try {
+      const payload = {
+        paymentModeName: paymentModeToToggle.paymentModeName,
+        isActive: !paymentModeToToggle.isActive,
+      };
+      await updatePaymentModeAsync(paymentModeToToggle.paymentModeId, payload);
+      toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
+      loadPaymentModes();
+    } catch (err) {
+      const errMsg =
+        err.response?.data?.message ||
+        (err.response?.status === 404 ? "Payment Modes API not running (404). Please restart backend." : null) ||
+        err.message ||
+        TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED;
+      toast.error(errMsg);
+    } finally {
+      setPaymentModeStatusConfirmOpen(false);
+      setPaymentModeToToggle(null);
+    }
+  }
+
 
   // ==================== Ticket Types Table Columns ====================
   const ticketTypeColumns = [
@@ -794,6 +935,150 @@ export default function TypesPage() {
     },
   ];
 
+  // ==================== Payment Modes Table Columns ====================
+  const paymentModeColumns = [
+    {
+      label: "Action",
+      render: (row) => (
+        <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
+          <Tooltip title={hasWriteAccess ? "Edit Payment Mode" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => {
+                  setPaymentModeForm({
+                    paymentModeId: row.paymentModeId,
+                    paymentModeName: row.paymentModeName || "",
+                    isActive: row.isActive ?? true,
+                  });
+                  setPaymentModeErrors({});
+                  setPaymentModeDialogOpen(true);
+                }}
+              >
+                <EditIcon
+                  sx={{
+                    fontSize: "1.1rem",
+                    color: (theme) =>
+                      hasWriteAccess
+                        ? theme.palette.mode === "dark"
+                          ? "#ffffff"
+                          : "#4a3f6b"
+                        : theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.3)"
+                        : "#cbd5e1",
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={hasWriteAccess ? "Delete Payment Mode" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => handlePaymentModeDeleteRequest(row.paymentModeId)}
+              >
+                <DeleteIcon
+                  sx={{
+                    fontSize: "1.1rem",
+                    color: (theme) =>
+                      hasWriteAccess
+                        ? theme.palette.mode === "dark"
+                          ? "#ffffff"
+                          : "#4a3f6b"
+                        : theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.3)"
+                        : "#cbd5e1",
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip
+            title={
+              hasWriteAccess
+                ? row.isActive
+                  ? "Deactivate Payment Mode"
+                  : "Activate Payment Mode"
+                : ""
+            }
+          >
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!hasWriteAccess}
+                onClick={() => handlePaymentModeToggleStatusRequest(row)}
+              >
+                {row.isActive ? (
+                  <ToggleOnIcon
+                    sx={{
+                      fontSize: "1.25rem",
+                      color: hasWriteAccess ? "#10b981" : "#cbd5e1",
+                    }}
+                  />
+                ) : (
+                  <ToggleOffIcon
+                    sx={{
+                      fontSize: "1.25rem",
+                      color: hasWriteAccess ? "#ef4444" : "#cbd5e1",
+                    }}
+                  />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+      ),
+    },
+    {
+      label: "Payment Mode",
+      key: "paymentModeName",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={700}>
+          {row.paymentModeName}
+        </Typography>
+      ),
+    },
+    {
+      label: "Status",
+      key: "isActive",
+      render: (row) => (
+        <Typography
+          variant="caption"
+          fontWeight={700}
+          sx={{
+            bgcolor: row.isActive
+              ? "rgba(16, 185, 129, 0.1)"
+              : "rgba(239, 68, 68, 0.1)",
+            color: row.isActive ? "#10b981" : "#ef4444",
+            px: 1.2,
+            py: 0.3,
+            borderRadius: "4px",
+            fontSize: "0.75rem",
+            display: "inline-block",
+          }}
+        >
+          {row.isActive ? "Active" : "Inactive"}
+        </Typography>
+      ),
+    },
+    {
+      label: "Created By",
+      key: "createdBy",
+      render: (row) => row.createdBy || "--",
+    },
+    {
+      label: "Created On",
+      key: "createdAt",
+      render: (row) => formatGridDate(row.createdAt || row.createdOn),
+    },
+  ];
+
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3.5, pb: 4 }}>
       {/* 1. Ticket Types Table */}
@@ -865,7 +1150,31 @@ export default function TypesPage() {
         }
       />
 
+      {/* 4. Payment Modes Table */}
+      <AppDataTable
+        title="Payment Modes"
+        columns={paymentModeColumns}
+        data={paymentModes}
+        loading={paymentModesLoading}
+        actions={
+          <AppButton
+            variant="contained"
+            size="small"
+            disabled={!hasWriteAccess}
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setPaymentModeForm(initialPaymentModeForm);
+              setPaymentModeErrors({});
+              setPaymentModeDialogOpen(true);
+            }}
+          >
+            Add
+          </AppButton>
+        }
+      />
+
       {/* ==================== Ticket Type Dialog ==================== */}
+
       <AppDialog
         open={ticketTypeDialogOpen}
         onClose={() => setTicketTypeDialogOpen(false)}
@@ -1068,6 +1377,75 @@ export default function TypesPage() {
           priorityToToggle?.isActive ? "deactivate" : "activate"
         } this priority?`}
       />
+
+      {/* ==================== Payment Mode Dialog ==================== */}
+      <AppDialog
+        open={paymentModeDialogOpen}
+        onClose={() => setPaymentModeDialogOpen(false)}
+        title={paymentModeForm.paymentModeId ? "Edit Payment Mode" : "Add Payment Mode"}
+        actions={
+          <>
+            <AppButton variant="outlined" onClick={() => setPaymentModeDialogOpen(false)}>
+              Cancel
+            </AppButton>
+            <AppButton
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handlePaymentModeSubmit}
+            >
+              Save
+            </AppButton>
+          </>
+        }
+      >
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 1 }}>
+          <AppInput
+            label="Payment Mode"
+            placeholder="Enter payment mode (e.g. UPI, Cash, Card, Net Banking)"
+            value={paymentModeForm.paymentModeName}
+            onChange={(e) => {
+              setPaymentModeForm((prev) => ({ ...prev, paymentModeName: e.target.value }));
+              if (paymentModeErrors.paymentModeName) {
+                setPaymentModeErrors((prev) => ({ ...prev, paymentModeName: "" }));
+              }
+            }}
+            maxLength={100}
+            error={!!paymentModeErrors.paymentModeName}
+            helperText={paymentModeErrors.paymentModeName}
+            required
+            fullWidth
+          />
+
+          <AppSwitch
+            label="Status"
+            checked={paymentModeForm.isActive}
+            onChange={(e) =>
+              setPaymentModeForm((prev) => ({ ...prev, isActive: e.target.checked }))
+            }
+          />
+        </Box>
+      </AppDialog>
+
+      {/* Payment Mode Delete Confirmation */}
+      <AppConfirmDialog
+        open={paymentModeDeleteConfirmOpen}
+        onClose={() => setPaymentModeDeleteConfirmOpen(false)}
+        onConfirm={handleConfirmPaymentModeDelete}
+        title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
+        content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
+      />
+
+      {/* Payment Mode Status Toggle Confirmation */}
+      <AppConfirmDialog
+        open={paymentModeStatusConfirmOpen}
+        onClose={() => setPaymentModeStatusConfirmOpen(false)}
+        onConfirm={handleConfirmPaymentModeStatusToggle}
+        title="Confirm Status Change"
+        content={`Are you sure you want to ${
+          paymentModeToToggle?.isActive ? "deactivate" : "activate"
+        } this payment mode?`}
+      />
     </Box>
   );
 }
+

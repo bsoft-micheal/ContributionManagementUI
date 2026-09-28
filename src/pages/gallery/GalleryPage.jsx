@@ -43,30 +43,33 @@ import {
   createGalleryPhotoAsync,
   deleteGalleryPhotoAsync,
 } from "../../services/galleryService";
+import { getUsersAsync } from "../../services/userService";
 import { getEventsAsync } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { getImageUrl } from "../../services/apiClient";
 
 // Helper to safely extract an array of image URLs/data from any format
 export const extractImages = (rawImageUrl) => {
   if (!rawImageUrl) return [];
-  if (Array.isArray(rawImageUrl)) return rawImageUrl.filter(Boolean);
-  if (typeof rawImageUrl === "string") {
+  let list = [];
+  if (Array.isArray(rawImageUrl)) list = rawImageUrl.filter(Boolean);
+  else if (typeof rawImageUrl === "string") {
     const trimmed = rawImageUrl.trim();
     if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
       try {
         const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+        if (Array.isArray(parsed)) list = parsed.filter(Boolean);
       } catch (e) {
         // fallback
       }
+    } else if (trimmed.includes("|||")) {
+      list = trimmed.split("|||").map((s) => s.trim()).filter(Boolean);
+    } else if (trimmed) {
+      list = [trimmed];
     }
-    if (trimmed.includes("|||")) {
-      return trimmed.split("|||").map((s) => s.trim()).filter(Boolean);
-    }
-    return [trimmed];
   }
-  return [];
+  return list.map((img) => getImageUrl(img));
 };
 
 // Helper to convert base64 data URL to Blob for reliable downloading
@@ -129,7 +132,52 @@ export default function GalleryPage() {
   const fetchPhotosFromDb = async () => {
     try {
       setLoading(true);
-      const data = await getGalleryPhotosAsync();
+      const [data, usersData] = await Promise.all([
+        getGalleryPhotosAsync(),
+        getUsersAsync().catch(() => []),
+      ]);
+
+      const userMap = {};
+      (usersData || []).forEach((u) => {
+        const id = String(u.userId || u.id || "").toLowerCase();
+        const username = String(u.username || "").toLowerCase();
+        const fullName = (u.fullName || u.name || "").trim();
+        const displayName = fullName || u.username;
+        if (id && displayName) userMap[id] = displayName;
+        if (username && displayName) userMap[username] = displayName;
+        if (fullName) userMap[fullName.toLowerCase()] = displayName;
+      });
+
+      const resolveCreator = (rawVal) => {
+        if (!rawVal || rawVal === "--") return "--";
+        const trimmed = String(rawVal).trim();
+        const lower = trimmed.toLowerCase();
+
+        // 1. Direct match in database user dictionary
+        if (userMap[lower]) return userMap[lower];
+
+        // 2. Active session logged in user match
+        if (authState?.user) {
+          const authId = String(authState.user.userId || "").toLowerCase();
+          const authUsername = String(authState.user.username || "").toLowerCase();
+          const authFullName = (authState.user.fullName || authState.user.name || "").trim();
+          if (authId && lower === authId) return authFullName || authState.user.username;
+          if (authUsername && lower === authUsername) return authFullName || authState.user.username;
+          if (authFullName && (lower === authFullName.toLowerCase() || authFullName.toLowerCase().startsWith(lower) || lower.startsWith(authFullName.toLowerCase()))) {
+            return authFullName;
+          }
+        }
+
+        // 3. Fallback prefix/substring match against known database users (e.g. "Dani" -> "Daniel")
+        for (const [key, name] of Object.entries(userMap)) {
+          if (name && (name.toLowerCase().startsWith(lower) || lower.startsWith(name.toLowerCase()))) {
+            return name;
+          }
+        }
+
+        return trimmed;
+      };
+
       if (Array.isArray(data)) {
         // Group items if they were saved with Title (1), Title (2) under same event/date
         const groupedMap = new Map();
@@ -149,6 +197,7 @@ export default function GalleryPage() {
 
           const itemImages = extractImages(item.imageUrl);
           const pid = item.photoId || item.id;
+          const resolvedCreatedBy = resolveCreator(item.createdBy || item.CreatedBy);
 
           if (groupedMap.has(groupKey)) {
             const existing = groupedMap.get(groupKey);
@@ -163,6 +212,9 @@ export default function GalleryPage() {
             if (!existing.description && item.description) {
               existing.description = item.description;
             }
+            if ((!existing.createdBy || existing.createdBy === "--") && resolvedCreatedBy && resolvedCreatedBy !== "--") {
+              existing.createdBy = resolvedCreatedBy;
+            }
           } else {
             groupedMap.set(groupKey, {
               id: pid ? `PHT-${String(idx + 1).padStart(3, "0")}` : `PHT-${String(idx + 1).padStart(3, "0")}`,
@@ -175,7 +227,7 @@ export default function GalleryPage() {
               description: item.description || "",
               images: itemImages,
               imageUrl: itemImages[0] || item.imageUrl || "",
-              createdBy: item.createdBy || item.CreatedBy || "--",
+              createdBy: resolvedCreatedBy,
               createdOn: item.createdOn || item.createdAt || item.CreatedOn || item.CreatedAt,
             });
           }
@@ -250,6 +302,38 @@ export default function GalleryPage() {
       ...items.map((c) => ({ label: c, value: c })),
     ];
   }, [eventTypesList, photos]);
+
+  // Event Type options for the Add / Edit Photos modal (from DB event types)
+  const modalEventTypeOptions = useMemo(() => {
+    const set = new Set();
+    const list = [];
+    (eventTypesList || []).forEach((et) => {
+      const name = et.eventTypeName || et.name;
+      if (name && !set.has(name)) {
+        set.add(name);
+        list.push({ label: name, value: name });
+      }
+    });
+    return list;
+  }, [eventTypesList]);
+
+  // Events filtered strictly by the selected Event Type for the Add / Edit Photos modal
+  const modalEventOptions = useMemo(() => {
+    if (!form.category) return [];
+    const set = new Set();
+    const list = [];
+    (eventsList || []).forEach((e) => {
+      const typeName = (e.eventTypeName || e.categoryName || "").trim().toLowerCase();
+      if (typeName === form.category.trim().toLowerCase()) {
+        const name = e.name || e.eventName;
+        if (name && !set.has(name)) {
+          set.add(name);
+          list.push({ label: name, value: name });
+        }
+      }
+    });
+    return list;
+  }, [eventsList, form.category]);
 
   // Filtered photos
   const filteredPhotos = useMemo(() => {
@@ -491,8 +575,8 @@ export default function GalleryPage() {
   const handleSavePhoto = async () => {
     const newErrors = {};
     if (!form.title || !form.title.trim()) newErrors.title = "Title is required";
-    if (!form.eventName) newErrors.eventName = "Event is required";
-    if (!form.category) newErrors.category = "Category is required";
+    if (!form.category) newErrors.category = "Event Type is required";
+    if (!form.eventName) newErrors.eventName = "Event Name is required";
     
     const currentImages = (form.imageUrls && form.imageUrls.length > 0)
       ? form.imageUrls
@@ -848,6 +932,27 @@ export default function GalleryPage() {
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
+              label="Event Type"
+              placeholder="Select Event Type"
+              value={form.category}
+              onChange={(e) => {
+                const newCategory = e.target.value;
+                setForm((c) => ({
+                  ...c,
+                  category: newCategory,
+                  eventName: "",
+                }));
+                if (errors.category) setErrors((p) => ({ ...p, category: "" }));
+                if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
+              }}
+              options={modalEventTypeOptions}
+              error={!!errors.category}
+              helperText={errors.category}
+              required
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <AppSelect
               label="Event Name"
               placeholder="Select Event"
               value={form.eventName}
@@ -855,24 +960,9 @@ export default function GalleryPage() {
                 setForm((c) => ({ ...c, eventName: e.target.value }));
                 if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
               }}
-              options={eventOptions.filter((o) => o.value !== "ALL")}
+              options={modalEventOptions}
               error={!!errors.eventName}
               helperText={errors.eventName}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppSelect
-              label="Category"
-              placeholder="Select Category"
-              value={form.category}
-              onChange={(e) => {
-                setForm((c) => ({ ...c, category: e.target.value }));
-                if (errors.category) setErrors((p) => ({ ...p, category: "" }));
-              }}
-              options={categoryOptions.filter((o) => o.value !== "ALL")}
-              error={!!errors.category}
-              helperText={errors.category}
               required
             />
           </Grid>

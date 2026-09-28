@@ -36,6 +36,7 @@ dayjs.extend(customParseFormat);
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
+import AppSwitch from "../../components/common/AppSwitch";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -43,6 +44,7 @@ import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import { validateForm } from "../../utils/validation";
 import { getUsersAsync, createUserAsync, updateUserAsync, deleteUserAsync, createUsersBulkAsync } from "../../services/userService";
 import { getRolesAsync } from "../../services/roleService";
+import { getMembersWithoutUserAccountAsync } from "../../services/memberService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 // ─── Role color map ───────────────────────────────────────────────────────────
@@ -65,6 +67,7 @@ const USER_ROLES = [
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 
 const initialForm = {
+  memberId: "",
   username: "",
   email: "",
   newPassword: "",
@@ -81,6 +84,7 @@ export default function UsersPage() {
 
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [availableMembers, setAvailableMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -133,12 +137,14 @@ export default function UsersPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [usersData, rolesData] = await Promise.all([
+      const [usersData, rolesData, membersWithoutAccount] = await Promise.all([
         getUsersAsync(),
-        getRolesAsync().catch(() => [])
+        getRolesAsync().catch(() => []),
+        getMembersWithoutUserAccountAsync().catch(() => []),
       ]);
       setUsers(usersData || []);
       setRoles(rolesData || []);
+      setAvailableMembers(membersWithoutAccount || []);
     } catch {
       toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
@@ -147,14 +153,19 @@ export default function UsersPage() {
   }
 
   // ── Open dialog ────────────────────────────────────────────────────────────
-  function openCreate() {
+  async function openCreate() {
     setForm(initialForm);
     setErrors({});
     setShowPassword(false);
     setShowConfirm(false);
+    try {
+      const membersWithoutAccount = await getMembersWithoutUserAccountAsync();
+      setAvailableMembers(membersWithoutAccount || []);
+    } catch {
+      // ignore
+    }
     setDialogOpen(true);
   }
-
 
   function openEdit(row) {
     setForm({
@@ -173,9 +184,16 @@ export default function UsersPage() {
     setDialogOpen(true);
   }
 
+  function fieldChange(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  }
+
   // ── Validation ─────────────────────────────────────────────────────────────
   function validate() {
-    const filed = "This field is required"
+    const filed = "This field is required";
     const schema = {
       username: { required: true, type: "letterandnumber", min: 3, max: 30, label: filed },
       email: { required: true, email: true, label: filed },
@@ -183,8 +201,9 @@ export default function UsersPage() {
     };
     const e = validateForm(form, schema);
 
-    // Password required only on create; optional on edit (change password)
+    // Password and Member required only on create; optional on edit (change password)
     if (!form.userId) {
+      if (!form.memberId) e.memberId = "Member is required";
       if (!form.newPassword) e.newPassword = "Password is required";
       else if (form.newPassword.length < 6)
         e.newPassword = "Minimum 6 characters";
@@ -242,6 +261,7 @@ export default function UsersPage() {
     setSaving(true);
     try {
       const payload = {
+        memberId: form.memberId || null,
         username: form.username.trim(),
         email: form.email.trim(),
         roleName: form.roleName,
@@ -707,6 +727,35 @@ export default function UsersPage() {
         }
       >
         <Grid container spacing={3}>
+          {/* Member */}
+          {!form.userId && (
+            <Grid size={{ xs: 12, md: 6 }}>
+              <AppSelect
+                label="Member"
+                placeholder="Select Member"
+                value={form.memberId || ""}
+                onChange={(e) => {
+                  const mId = e.target.value;
+                  const selectedMember = availableMembers.find((m) => String(m.memberId) === String(mId));
+                  setForm((c) => ({
+                    ...c,
+                    memberId: mId,
+                    email: selectedMember ? selectedMember.email : c.email,
+                  }));
+                  if (errors.memberId) setErrors((prev) => ({ ...prev, memberId: "" }));
+                  if (errors.email) setErrors((prev) => ({ ...prev, email: "" }));
+                }}
+                options={availableMembers.map((m) => ({
+                  label: `${m.name} (${m.email})`,
+                  value: m.memberId,
+                }))}
+                error={!!errors.memberId}
+                helperText={errors.memberId}
+                required
+              />
+            </Grid>
+          )}
+
           {/* Username */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppInput
