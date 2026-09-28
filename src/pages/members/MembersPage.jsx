@@ -598,7 +598,6 @@ export default function MembersPage() {
                 startIcon={<FilterListIcon />}
                 onClick={() => {
                   setAppliedRoleId(filterRoleId);
-                  toast.success(filterRoleId ? "Filter applied" : "Filter cleared");
                 }}
                 sx={{
                   height: 34,

@@ -39,6 +39,7 @@ import { getProfileAsync } from "../../services/userService";
 import { useThemeMode } from "../../contexts/ThemeModeContext";
 import dayjs from "dayjs";
 import logo from "../../assets/logo.png";
+import NotificationBell from "../notifications/NotificationBell";
 
 const drawerWidth = 240;
 
@@ -572,6 +573,9 @@ export default function AppLayout() {
               {isDark ? <LightModeOutlinedIcon sx={{ fontSize: "1.05rem" }} /> : <DarkModeOutlinedIcon sx={{ fontSize: "1.05rem" }} />}
             </IconButton>
           </Tooltip>
+          <Box onClick={(e) => e.stopPropagation()}>
+            <NotificationBell />
+          </Box>
         </Box>
       </Box>
     </Box>

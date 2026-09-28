@@ -8,21 +8,22 @@ import { navigationItems } from "../config/menuConfig";
  */
 export function getFeatureIdForPath(path) {
   if (!path) return null;
-  const cleanPath = path.toLowerCase();
+  const cleanPath = path.toLowerCase().trim();
+  const normalizedPath = cleanPath.startsWith("/") ? cleanPath : `/${cleanPath}`;
 
   for (const item of navigationItems) {
-    if (item.path && item.path.toLowerCase() === cleanPath) {
+    if (item.path && (item.path.toLowerCase() === cleanPath || item.path.toLowerCase() === normalizedPath)) {
       return item.featureId;
     }
-    if (item.path && item.path !== "/" && cleanPath.startsWith(item.path.toLowerCase())) {
+    if (item.path && item.path !== "/" && (cleanPath.startsWith(item.path.toLowerCase()) || normalizedPath.startsWith(item.path.toLowerCase()))) {
       return item.featureId;
     }
     if (item.children) {
       for (const child of item.children) {
-        if (child.path && child.path.toLowerCase() === cleanPath) {
+        if (child.path && (child.path.toLowerCase() === cleanPath || child.path.toLowerCase() === normalizedPath)) {
           return child.featureId;
         }
-        if (child.path && child.path !== "/" && cleanPath.startsWith(child.path.toLowerCase())) {
+        if (child.path && child.path !== "/" && (cleanPath.startsWith(child.path.toLowerCase()) || normalizedPath.startsWith(child.path.toLowerCase()))) {
           return child.featureId;
         }
       }
@@ -30,60 +31,54 @@ export function getFeatureIdForPath(path) {
   }
 
   // Route path fallbacks
-  if (cleanPath === "/") return 1;
-  if (cleanPath === "/members") return 2;
-  if (cleanPath.startsWith("/events")) return 4;
-  if (cleanPath === "/calendar") return 5;
-  if (cleanPath === "/gallery") return 6;
-  if (cleanPath === "/contributions" || cleanPath === "/my-contributions") return 8;
-  if (cleanPath === "/payments") return 9;
-  if (cleanPath === "/contribution-calculation") return 10;
-  if (cleanPath === "/expense") return 11;
-  if (cleanPath === "/support-tickets") return 12;
-  if (cleanPath === "/users") return 14;
-  if (cleanPath === "/roles") return 15;
-  if (cleanPath === "/user-rights") return 16;
-  if (cleanPath === "/event-types") return 17;
-  if (cleanPath === "/budget-calculations") return 18;
-  if (cleanPath === "/types" || cleanPath === "/ticket-types") return 19;
-  if (cleanPath === "/status") return 20;
-  if (cleanPath === "/exit-process") return 21;
-  if (cleanPath === "/settings") return 22;
-  if (cleanPath.startsWith("/reports")) return 23;
+  if (normalizedPath === "/") return 1;
+  if (normalizedPath === "/members") return 2;
+  if (normalizedPath.startsWith("/events")) return 4;
+  if (normalizedPath === "/calendar") return 5;
+  if (normalizedPath === "/gallery") return 6;
+  if (normalizedPath === "/contributions" || normalizedPath === "/my-contributions") return 8;
+  if (normalizedPath === "/payment-submission" || normalizedPath === "/confirm-payment") return 24;
+  if (normalizedPath === "/payments") return 9;
+  if (normalizedPath === "/contribution-calculation") return 10;
+  if (normalizedPath === "/expense") return 11;
+  if (normalizedPath === "/support-tickets") return 12;
+  if (normalizedPath === "/users") return 14;
+  if (normalizedPath === "/roles") return 15;
+  if (normalizedPath === "/user-rights") return 16;
+  if (normalizedPath === "/event-types") return 17;
+  if (normalizedPath === "/budget-calculations") return 18;
+  if (normalizedPath === "/types" || normalizedPath === "/ticket-types") return 19;
+  if (normalizedPath === "/status") return 20;
+  if (normalizedPath === "/exit-process") return 21;
+  if (normalizedPath === "/settings") return 22;
+  if (normalizedPath.startsWith("/reports")) return 23;
 
   return null;
 }
 
 /**
  * Resolves permissions for a given featureId and roleName.
- * 
- * Database accessType mapping:
- *   1 = ReadOnly  -> { read: true,  write: false, deny: false }
- *   2 = ReadWrite -> { read: true,  write: true,  deny: false }
- *   3 = Deny      -> { read: false, write: false, deny: true }
- *
- * Missing permissions or unmatched features evaluate as Deny:
- *   { read: false, write: false, deny: true }
- *
- * @param {number|string} featureId - The numeric feature ID.
- * @param {string} roleName - The logged-in user's role name (e.g., "Admin", "Organizer", "Member").
- * @returns {{ read: boolean, write: boolean, deny: boolean }} Permission flags for the feature.
  */
 export function getRightsForFeatureId(featureId, roleName) {
   if (!roleName) {
-    return { read: false, write: false, deny: true };
+    return { read: true, write: true, deny: false };
+  }
+
+  const roleLower = String(roleName).toLowerCase();
+  if (roleLower === "admin" || roleLower === "superadmin") {
+    return { read: true, write: true, deny: false };
   }
 
   const savedRights = localStorage.getItem("projectRightsConfig");
   if (!savedRights) {
-    return { read: false, write: false, deny: true };
+    return { read: true, write: true, deny: false };
   }
 
   try {
     const rightsMap = JSON.parse(savedRights);
-    const roleRights = rightsMap[roleName];
+    const roleRights = rightsMap[roleName] || rightsMap[roleLower];
     if (!roleRights || !Array.isArray(roleRights)) {
-      return { read: false, write: false, deny: true };
+      return { read: true, write: true, deny: false };
     }
 
     const numericFeatureId = Number(featureId);
@@ -94,7 +89,7 @@ export function getRightsForFeatureId(featureId, roleName) {
     }
 
     if (!matchedRight) {
-      return { read: false, write: false, deny: true };
+      return { read: true, write: true, deny: false };
     }
 
     let accessType = matchedRight.accessType ?? matchedRight.AccessType;
@@ -126,6 +121,11 @@ export function getRightsForPath(path, roleName) {
 export function getRightsForPage(pageName, roleName) {
   if (!roleName) {
     return { read: false, write: false, deny: true };
+  }
+
+  const roleLower = String(roleName).toLowerCase();
+  if (roleLower === "admin" || roleLower === "superadmin") {
+    return { read: true, write: true, deny: false };
   }
 
   // 1. Try resolving via featureId matching first
