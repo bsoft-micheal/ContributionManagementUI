@@ -46,9 +46,10 @@ const initialForm = {
   name: "",
   email: "",
   phone: "",
-  roleId: "",
   gender: "",
+  workType: "",
   type: "",
+  memberType: "",
   dateOfBirth: dayjs().subtract(18, "year"),
   joiningDate: dayjs(),
 };
@@ -138,13 +139,13 @@ export default function MembersPage() {
         getRolesAsync(),
         getWorkTypesAsync(true).catch(() => []),
       ]);
-      const localOverrides = JSON.parse(localStorage.getItem("cm_member_overrides") || "{}");
       const normalizedMembers = (membersData || []).map((m) => {
-        const override = localOverrides[m.memberId] || {};
-        const type = override.type || m.type || "";
+        const workType = m.workType || m.memberType || m.type || "";
         return {
           ...m,
-          type,
+          workType,
+          memberType: workType,
+          type: workType,
         };
       });
       setMembers(normalizedMembers);
@@ -169,14 +170,13 @@ export default function MembersPage() {
   }
 
   async function handleSubmit() {
-    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
+    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED_FIELD || "This field is required";
     const schema = {
       name: { required: true, type: "letteronly", min: 2, max: 100, label: fieldRequired },
       email: { required: true, email: true, label: fieldRequired },
       phone: { required: true, type: "numberonly", min: 10, max: 10, label: fieldRequired },
-      roleId: { required: true, label: fieldRequired },
       gender: { required: true, label: fieldRequired },
-      type: { required: true, label: fieldRequired },
+      workType: { required: true, label: fieldRequired },
       dateOfBirth: { required: true, label: fieldRequired },
       joiningDate: { required: true, label: fieldRequired },
     };
@@ -216,32 +216,52 @@ export default function MembersPage() {
     }
 
     try {
+      const workTypeVal = form.workType || form.type || form.memberType || "";
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        gender: form.gender,
+        workType: workTypeVal,
+        memberType: workTypeVal,
+        type: workTypeVal,
+        dateOfBirth: form.dateOfBirth ? (dayjs.isDayjs(form.dateOfBirth) ? form.dateOfBirth.toISOString() : form.dateOfBirth) : null,
+        joiningDate: form.joiningDate ? (dayjs.isDayjs(form.joiningDate) ? form.joiningDate.toISOString() : form.joiningDate) : null,
+        ...(form.roleId ? { roleId: form.roleId } : {}),
+        isActive: form.isActive !== undefined ? form.isActive : true,
+      };
+
       let res;
       if (form.memberId) {
-        res = await updateMemberAsync(form.memberId, form);
+        res = await updateMemberAsync(form.memberId, payload);
         toast.success(TOAST_MESSAGES.MEMBERS.UPDATED_SUCCESS);
       } else {
-        res = await createMemberAsync(form);
+        res = await createMemberAsync(payload);
         toast.success(TOAST_MESSAGES.MEMBERS.CREATED_SUCCESS);
-      }
-
-      const savedId = form.memberId || res?.memberId || res?.data?.memberId;
-      if (savedId) {
-        const localOverrides = JSON.parse(localStorage.getItem("cm_member_overrides") || "{}");
-        localOverrides[savedId] = {
-          type: form.type || "Office",
-        };
-        localStorage.setItem("cm_member_overrides", JSON.stringify(localOverrides));
       }
 
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      const rawMsg = error.response?.data?.message || (typeof error.response?.data === "string" ? error.response?.data : "") || error.message || "";
+      const errData = error.response?.data;
+      let rawMsg = "";
+      if (errData?.errors) {
+        if (Array.isArray(errData.errors)) {
+          rawMsg = errData.errors.join(", ");
+        } else if (typeof errData.errors === "object") {
+          rawMsg = Object.entries(errData.errors)
+            .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`)
+            .join("; ");
+        }
+      }
+      if (!rawMsg) {
+        rawMsg = errData?.message || (typeof errData === "string" ? errData : "") || error.message || "";
+      }
+
       if (rawMsg.toLowerCase().includes("inner exception") || rawMsg.toLowerCase().includes("unique") || rawMsg.toLowerCase().includes("duplicate")) {
         toast.error("A member with this email or phone number already exists.");
       } else {
-        toast.error(TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+        toast.error(rawMsg || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
       }
     }
   }
@@ -389,6 +409,8 @@ export default function MembersPage() {
         email,
         phone,
         gender: normalizedGender,
+        workType: normalizedType,
+        memberType: normalizedType,
         type: normalizedType,
         roleId: matchedRole.roleId,
         dateOfBirth: dob.toISOString(),
@@ -438,9 +460,12 @@ export default function MembersPage() {
           <Tooltip title={hasWriteAccess ? "Edit" : ""}>
             <span>
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => {
+                const wt = row.workType || row.memberType || row.type || "";
                 setForm({
                   ...row,
-                  type: row.type || "Office",
+                  workType: wt,
+                  memberType: wt,
+                  type: wt,
                   dateOfBirth: row.dateOfBirth ? dayjs(row.dateOfBirth) : null,
                   joiningDate: row.joiningDate ? dayjs(row.joiningDate) : null
                 });
@@ -477,15 +502,16 @@ export default function MembersPage() {
             fontSize: "0.75rem"
           }}
         >
-          {row.roleName}
+          {row.roleName || "--"}
         </Typography>
       ),
     },
     {
       label: "Work Type",
-      key: "type",
+      key: "workType",
       render: (row) => {
-        const isWfh = (row.type || "").toUpperCase() === "WFH";
+        const wt = row.workType || row.memberType || row.type || "";
+        const isWfh = wt.toUpperCase() === "WFH";
         return (
           <Typography
             variant="caption"
@@ -501,7 +527,7 @@ export default function MembersPage() {
               display: "inline-block"
             }}
           >
-            {row.type || "--"}
+            {wt || "--"}
           </Typography>
         );
       },
@@ -651,15 +677,17 @@ export default function MembersPage() {
           <Grid size={{ xs: 12, md: 6 }}>
             <AppSelect
               label="Work Type"
-              placeholder="Select work type..."
-              value={form.type || "Office"}
+              placeholder="Select Work Type"
+              value={form.workType || ""}
               onChange={(e) => {
-                setForm((c) => ({ ...c, type: e.target.value }));
-                if (errors.type) setErrors(prev => ({ ...prev, type: "" }));
+                const val = e.target.value;
+                setForm((c) => ({ ...c, workType: val, type: val, memberType: val }));
+                if (errors.workType) setErrors((prev) => ({ ...prev, workType: "" }));
+                if (errors.type) setErrors((prev) => ({ ...prev, type: "" }));
               }}
               options={typeOptions}
-              error={!!errors.type}
-              helperText={errors.type}
+              error={!!errors.workType || !!errors.type}
+              helperText={errors.workType || errors.type}
               required
             />
           </Grid>
@@ -685,18 +713,6 @@ export default function MembersPage() {
               maxLength={10}
               error={!!errors.phone}
               helperText={errors.phone}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppSelect label="Role" placeholder="select role..." value={form.roleId}
-              onChange={(e) => {
-                setForm((c) => ({ ...c, roleId: e.target.value }));
-                if (errors.roleId) setErrors(prev => ({ ...prev, roleId: "" }));
-              }}
-              options={roleOptions}
-              error={!!errors.roleId}
-              helperText={errors.roleId}
               required
             />
           </Grid>

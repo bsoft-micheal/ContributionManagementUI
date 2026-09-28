@@ -10,6 +10,15 @@ export const getMembersAsync = async () => {
 };
 
 /**
+ * Fetches members who do not have a user account yet.
+ *
+ * @returns {Promise<Array>} List of member objects.
+ */
+export const getMembersWithoutUserAccountAsync = async () => {
+  return await getApi("/members/getMembersWithoutUserAccountAsync");
+};
+
+/**
  * Creates a new member record.
  *
  * @param {object} data - Member creation payload.

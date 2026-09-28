@@ -152,7 +152,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
           dobDayMonth: resolvedDob
             ? dayjs(resolvedDob).format("D MMMM")
             : item.dobText,
-          memberType: match?.memberType || "Office",
+          memberType: match?.memberType,
         });
       }
     });
