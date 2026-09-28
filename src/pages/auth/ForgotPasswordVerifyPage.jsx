@@ -20,7 +20,6 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DialpadRoundedIcon from "@mui/icons-material/DialpadRounded";
 import TimerRoundedIcon from "@mui/icons-material/TimerRounded";
 import { requestForgotPasswordOtpAsync, verifyForgotPasswordOtpAsync } from "../../services/userService";
-import { getSystemSettingsAsync } from "../../services/settingsService";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -61,32 +60,7 @@ export default function ForgotPasswordVerifyPage() {
     return true;
   });
 
-  // Fetch dynamic OTP expiry from system settings
-  useEffect(() => {
-    async function loadConfig() {
-      try {
-        const sys = await getSystemSettingsAsync();
-        const mins = parseInt(sys?.otpExpiry, 10);
-        if (mins > 0) {
-          const secs = mins * 60;
-          setExpiryDuration(secs);
-          const sentTimeStr = localStorage.getItem("otp_sent_time");
-          if (sentTimeStr) {
-            const sentTime = parseInt(sentTimeStr, 10);
-            const elapsed = Math.floor((Date.now() - sentTime) / 1000);
-            const remaining = secs - elapsed;
-            setTimer(remaining > 0 ? remaining : 0);
-            setIsTimerActive(remaining > 0);
-          } else {
-            setTimer(secs);
-          }
-        }
-      } catch (err) {
-        // Ignored fallback
-      }
-    }
-    loadConfig();
-  }, []);
+
 
   // Security Redirect: if page is accessed directly, send back to step 1
   useEffect(() => {

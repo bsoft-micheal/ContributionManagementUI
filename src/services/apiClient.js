@@ -27,7 +27,10 @@ apiClient.interceptors.response.use(
       sessionStorage.removeItem("teamContributionAuth");
       localStorage.removeItem("teamContributionAuth");
       localStorage.removeItem("teamContributionRememberMe");
-      window.location.href = "/login";
+      const currentPath = window.location.pathname;
+      if (!currentPath.startsWith("/forgot-password") && currentPath !== "/login") {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Box,
   Grid,
@@ -32,6 +33,7 @@ import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
+import { useNotifications } from "../../contexts/NotificationContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -71,6 +73,9 @@ const initialForm = {
 export default function SupportTicketsPage() {
   const { canEdit } = useAccessByLocation();
   const toast = useAppToast();
+  const location = useLocation();
+  const { authState } = useAuth();
+  const { addNotification } = useNotifications();
 
   const [tickets, setTickets] = useState([]);
   const [membersList, setMembersList] = useState([]);
@@ -235,7 +240,21 @@ export default function SupportTicketsPage() {
   useEffect(() => {
     fetchTicketsFromDb();
     fetchLookupData();
-  }, []);
+
+    if (location.state?.raiseTicket) {
+      setEditingTicket(null);
+      setForm({
+        ...initialForm,
+        memberName: location.state.memberName || authState?.fullName || "",
+        relatedEvent: location.state.relatedEvent || "",
+        ticketType: "Payment Issue",
+        subject: `Payment Issue - Transaction ${location.state.transactionId || ""}`,
+        description: `Payment transaction ${location.state.transactionId || ""} for amount ₹${location.state.amount || ""} via ${location.state.paymentMode || ""} (UTR: ${location.state.utr || ""}) is currently pending verification. Please verify and resolve the issue.`,
+        priority: "High",
+      });
+      setDialogOpen(true);
+    }
+  }, [location.state]);
 
   // Dynamically derive member options from DB members
   const memberOptions = useMemo(() => {
@@ -435,6 +454,17 @@ export default function SupportTicketsPage() {
           assignedTo: form.assignedTo || "",
           attachment: form.attachment || null,
         });
+
+        // Trigger notification for Authority/Admin
+        addNotification({
+          type: "TICKET_RAISED",
+          title: `Support Ticket Raised: ${newTicketNo}`,
+          message: `Member ${form.memberName || authState?.fullName || "User"} raised support ticket #${newTicketNo} regarding "${form.subject}".`,
+          ticketNo: newTicketNo,
+          targetRole: "Authority",
+          link: "/support-tickets",
+        });
+
         toast.success(TOAST_MESSAGES.SUPPORT.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
       }
 
@@ -456,11 +486,24 @@ export default function SupportTicketsPage() {
 
     if (selectedTicket) {
       const ticketId = selectedTicket.ticketId || selectedTicket.id;
+      const tNo = selectedTicket.ticketNo || selectedTicket.id || ticketId;
       try {
         await replySupportTicketAsync(ticketId, {
           replyMessage: replyText,
           status: replyStatus,
         });
+
+        if (replyStatus === "Resolved") {
+          addNotification({
+            type: "TICKET_RESOLVED",
+            title: `Support Ticket Resolved: ${tNo}`,
+            message: `Authority user resolved support ticket #${tNo} with status ${replyStatus}.`,
+            ticketNo: tNo,
+            targetRole: "All",
+            link: "/support-tickets",
+          });
+        }
+
         toast.success(TOAST_MESSAGES.SUPPORT.STATUS_UPDATED || TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
         setReplyText("");
         setViewDialogOpen(false);

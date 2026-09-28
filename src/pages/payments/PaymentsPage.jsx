@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Grid,
@@ -11,11 +12,14 @@ import {
 import {
   Visibility as ViewIcon,
   CheckCircleOutline as CheckCircleIcon,
+  HighlightOff as CancelIcon,
   PaymentRounded as PaymentRoundedIcon,
   FileDownloadOutlined as FileDownloadIcon,
   ReceiptLongOutlined as ReceiptIcon,
   FilterList as FilterListIcon,
   ContentCopy as CopyIcon,
+  ConfirmationNumberOutlined as TicketIcon,
+  Save as SaveIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
@@ -23,10 +27,12 @@ import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
+import AppTextArea from "../../components/common/AppTextArea";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { useAppToast } from "../../components/common/AppToast";
+import { useNotifications } from "../../contexts/NotificationContext";
 import {
   getPaymentTransactionsAsync,
   verifyPaymentTransactionAsync,
@@ -40,10 +46,21 @@ import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 import { getImageUrl } from "../../services/apiClient";
 
 export default function PaymentsPage() {
+  const navigate = useNavigate();
   const toast = useAppToast();
   const { authState } = useAuth();
+  const { addNotification } = useNotifications();
   const rights = getRightsForPage("Payments", authState?.role);
-  const hasWriteAccess = rights?.write !== undefined ? rights.write : true;
+  const isAuthorityRole = [
+    "admin",
+    "superadmin",
+    "organizer",
+    "treasurer",
+    "president",
+    "secretary",
+    "committee",
+  ].includes(String(authState?.role || authState?.user?.role || "").toLowerCase());
+  const hasWriteAccess = isAuthorityRole || (rights?.write !== undefined ? rights.write : true);
 
   const [transactions, setTransactions] = useState([]);
   const [membersList, setMembersList] = useState([]);
@@ -54,6 +71,8 @@ export default function PaymentsPage() {
   // Dialog state
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState(null);
+  const [verificationNotes, setVerificationNotes] = useState("");
+  const [statusChangeValue, setStatusChangeValue] = useState("");
 
   // Filter state
   const [filterMember, setFilterMember] = useState("ALL");
@@ -108,6 +127,22 @@ export default function PaymentsPage() {
         value: s.statusName || s.name || s.status_name,
       })),
     ];
+  }, [dbStatuses]);
+
+  // Dynamic statuses loaded directly from Support Status Master database table
+  const modalStatusOptions = useMemo(() => {
+    const set = new Set();
+    const list = [];
+    (dbStatuses || [])
+      .filter((s) => s.isActive !== false)
+      .forEach((s) => {
+        const name = s.statusName || s.name || s.status_name;
+        if (name && !set.has(name.toLowerCase())) {
+          set.add(name.toLowerCase());
+          list.push({ label: name, value: name });
+        }
+      });
+    return list;
   }, [dbStatuses]);
 
   // Load transactions and master data from backend on mount
@@ -168,60 +203,44 @@ export default function PaymentsPage() {
     });
   }, [transactions, appliedMember, appliedEvent, appliedMode, appliedStatus, appliedDate]);
 
-  const handleVerify = async (txn) => {
+  const handleStatusUpdate = async (txn, newStatus, customNotes) => {
     const target = txn || selectedTxn;
     if (!target) return;
 
-    const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "";
+    const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "Admin";
+    const noteText = customNotes !== undefined
+      ? customNotes
+      : (verificationNotes || `Status updated to ${newStatus} by ${verifier}.`);
+
     if (target.transactionId) {
       try {
         await verifyPaymentTransactionAsync(target.transactionId, {
-          status: "Verified",
+          status: newStatus,
           verifiedBy: verifier,
-          notes: verifier ? `Payment verified by ${verifier}.` : "Payment verified.",
+          notes: noteText,
         });
-        toast.success(TOAST_MESSAGES.PAYMENTS.VERIFIED_SUCCESS);
+
+        toast.success(`Payment status updated to ${newStatus} successfully!`);
+        addNotification({
+          type: "PAYMENT_STATUS_UPDATED",
+          title: "Payment Status Updated",
+          message: `Payment ${target.id} of ₹${Number(target.amount).toLocaleString("en-IN")} status updated to ${newStatus}.`,
+          link: "/payments",
+        });
+
         await loadBackendData();
       } catch {
-        toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
+        toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED || "Failed to update payment status");
       }
     }
 
     if (selectedTxn && selectedTxn.id === target.id) {
       setSelectedTxn((prev) => ({
         ...prev,
-        status: "Verified",
+        status: newStatus,
         verifiedBy: verifier,
         verifiedOn: dayjs().format("YYYY-MM-DDTHH:mm:ss"),
-        notes: `Payment verified by ${verifier}.`,
-      }));
-    }
-  };
-
-  const handleMarkPending = async (txn) => {
-    const target = txn || selectedTxn;
-    if (!target) return;
-
-    if (target.transactionId) {
-      try {
-        await verifyPaymentTransactionAsync(target.transactionId, {
-          status: "Pending",
-          verifiedBy: "-",
-          notes: "Marked as pending.",
-        });
-        toast.info(TOAST_MESSAGES.PAYMENTS.STATUS_UPDATED || TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
-        await loadBackendData();
-      } catch {
-        toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
-      }
-    }
-
-    if (selectedTxn && selectedTxn.id === target.id) {
-      setSelectedTxn((prev) => ({
-        ...prev,
-        status: "Pending",
-        verifiedBy: "-",
-        verifiedOn: "-",
+        notes: noteText,
       }));
     }
   };
@@ -270,19 +289,29 @@ export default function PaymentsPage() {
     let color = "#64748b";
     let border = "rgba(100, 116, 139, 0.25)";
 
-    if (status === "Verified") {
+    const st = String(status || "").toLowerCase().trim();
+
+    if (st === "verified" || st === "closed") {
       bg = "rgba(22, 163, 74, 0.1)";
       color = "#16a34a";
       border = "rgba(22, 163, 74, 0.25)";
-    } else if (status === "Pending") {
+    } else if (st === "pending") {
       bg = "rgba(234, 179, 8, 0.12)";
       color = "#b45309";
       border = "rgba(234, 179, 8, 0.3)";
-    } else if (status === "Failed") {
+    } else if (st === "in progress") {
+      bg = "rgba(99, 102, 241, 0.12)";
+      color = "#6366f1";
+      border = "rgba(99, 102, 241, 0.25)";
+    } else if (st === "open") {
+      bg = "rgba(2, 132, 199, 0.1)";
+      color = "#0284c7";
+      border = "rgba(2, 132, 199, 0.25)";
+    } else if (st === "failed" || st === "rejected") {
       bg = "rgba(239, 68, 68, 0.1)";
       color = "#dc2626";
       border = "rgba(239, 68, 68, 0.25)";
-    } else if (status === "Needs Clarification") {
+    } else if (st === "needs clarification") {
       bg = "rgba(2, 132, 199, 0.1)";
       color = "#0284c7";
       border = "rgba(2, 132, 199, 0.25)";
@@ -313,12 +342,14 @@ export default function PaymentsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-          <Tooltip title="View Details">
+          <Tooltip title="View Details & Update Status">
             <IconButton
               size="small"
               sx={{ p: 0.3 }}
               onClick={() => {
                 setSelectedTxn(row);
+                setStatusChangeValue(row.status || modalStatusOptions[0]?.value || "Pending");
+                setVerificationNotes(row.notes || "");
                 setViewDialogOpen(true);
               }}
             >
@@ -330,19 +361,26 @@ export default function PaymentsPage() {
               />
             </IconButton>
           </Tooltip>
-          {hasWriteAccess && row.status !== "Verified" && (
-            <Tooltip title="Mark Verified">
+          {row.status !== "Closed" && (
+            <Tooltip title="Raise Support Ticket">
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                onClick={() => handleVerify(row)}
+                onClick={() => {
+                  navigate("/support-tickets", {
+                    state: {
+                      raiseTicket: true,
+                      transactionId: row.id,
+                      memberName: row.memberName,
+                      relatedEvent: row.eventName,
+                      amount: row.amount,
+                      paymentMode: row.paymentMode,
+                      utr: row.utr,
+                    },
+                  });
+                }}
               >
-                <CheckCircleIcon
-                  sx={{
-                    fontSize: "1.05rem",
-                    color: "#16a34a",
-                  }}
-                />
+                <TicketIcon sx={{ fontSize: "1.05rem", color: "#ef4444" }} />
               </IconButton>
             </Tooltip>
           )}
@@ -598,26 +636,57 @@ export default function PaymentsPage() {
         title="Transaction Details"
         maxWidth="sm"
         actions={
-          <Stack direction="row" spacing={1.5} alignItems="center">
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <AppButton variant="outlined" onClick={() => setViewDialogOpen(false)}>
               Close
             </AppButton>
-            {hasWriteAccess && selectedTxn && selectedTxn.status !== "Verified" && (
-              <AppButton
-                variant="contained"
-                onClick={() => handleVerify(selectedTxn)}
-                sx={{ bgcolor: "#16a34a !important", "&:hover": { bgcolor: "#15803d !important" } }}
-              >
-                Verify Payment
-              </AppButton>
-            )}
-            {hasWriteAccess && selectedTxn && selectedTxn.status === "Verified" && (
+            {selectedTxn && selectedTxn.status !== "Closed" && (
               <AppButton
                 variant="outlined"
-                color="warning"
-                onClick={() => handleMarkPending(selectedTxn)}
+                color="error"
+                startIcon={<TicketIcon />}
+                onClick={() => {
+                  setViewDialogOpen(false);
+                  navigate("/support-tickets", {
+                    state: {
+                      raiseTicket: true,
+                      transactionId: selectedTxn.id,
+                      memberName: selectedTxn.memberName,
+                      relatedEvent: selectedTxn.eventName,
+                      amount: selectedTxn.amount,
+                      paymentMode: selectedTxn.paymentMode,
+                      utr: selectedTxn.utr,
+                    },
+                  });
+                }}
               >
-                Mark Pending
+                Raise Support Ticket
+              </AppButton>
+            )}
+            {hasWriteAccess && selectedTxn && (
+              <AppButton
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={() =>
+                  handleStatusUpdate(
+                    selectedTxn,
+                    statusChangeValue || selectedTxn?.status,
+                    verificationNotes
+                  )
+                }
+                sx={{
+                  bgcolor:
+                    (statusChangeValue || selectedTxn?.status) === "Closed"
+                      ? "#16a34a !important"
+                      : (statusChangeValue || selectedTxn?.status) === "In Progress"
+                      ? "#4f46e5 !important"
+                      : (statusChangeValue || selectedTxn?.status) === "Open"
+                      ? "#0284c7 !important"
+                      : "#4a3f6b !important",
+                  "&:hover": { opacity: 0.9 },
+                }}
+              >
+                Save Status ({statusChangeValue || selectedTxn?.status || ""})
               </AppButton>
             )}
           </Stack>
@@ -791,6 +860,67 @@ export default function PaymentsPage() {
                         margin: "0 auto",
                         boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                       }}
+                    />
+                  </Box>
+                </Grid>
+              )}
+
+              {hasWriteAccess && (
+                <Grid size={{ xs: 12 }}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: "10px",
+                      bgcolor: (t) =>
+                        t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "rgba(74,63,107,0.04)",
+                      border: "1px solid",
+                      borderColor: (t) =>
+                        t.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "rgba(74,63,107,0.18)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1.8,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Typography
+                        variant="caption"
+                        fontWeight={800}
+                        color="primary.main"
+                        sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.7rem" }}
+                      >
+                        Authority Status Update (From Support Status Master)
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Authority: <b>{authState?.fullName || authState?.username || "Admin"}</b>
+                      </Typography>
+                    </Box>
+
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <AppSelect
+                          label="Select Status *"
+                          value={statusChangeValue || selectedTxn?.status || modalStatusOptions[0]?.value || ""}
+                          onChange={(e) => setStatusChangeValue(e.target.value)}
+                          options={modalStatusOptions}
+                          required
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                          Status Preview
+                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          {renderStatusBadge(statusChangeValue || selectedTxn?.status)}
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    <AppTextArea
+                      label="Audit Remarks / Notes"
+                      placeholder="Enter remarks or status update notes..."
+                      value={verificationNotes}
+                      onChange={(e) => setVerificationNotes(e.target.value)}
+                      rows={2}
                     />
                   </Box>
                 </Grid>
