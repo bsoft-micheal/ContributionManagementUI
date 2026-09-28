@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Typography, Box, IconButton, Tooltip } from "@mui/material";
+import React, { useEffect, useState, useMemo } from "react";
+import { Typography, Box, IconButton, Tooltip, Grid, Chip } from "@mui/material";
 import {
   Edit as EditIcon,
   Add as AddIcon,
@@ -7,12 +7,14 @@ import {
   Delete as DeleteIcon,
   ToggleOn as ToggleOnIcon,
   ToggleOff as ToggleOffIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
+import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
@@ -20,6 +22,7 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
 import {
   getStatusesAsync,
+  getModulesAsync,
   createStatusAsync,
   updateStatusAsync,
   deleteStatusAsync,
@@ -28,8 +31,20 @@ import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
+export const DEFAULT_MODULES = [
+  "Support Ticket",
+  "Expense",
+  "Events",
+  "Contributions / Payments",
+  "Members",
+  "Exit Process",
+  "Budget Calculations",
+  "General",
+];
+
 const initialStatusForm = {
   statusName: "",
+  module: "Support Ticket",
   isActive: true,
 };
 
@@ -41,12 +56,18 @@ export default function StatusPage() {
 
   // ==================== Status State ====================
   const [items, setItems] = useState([]);
+  const [dbModules, setDbModules] = useState(DEFAULT_MODULES);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
   const [itemToToggle, setItemToToggle] = useState(null);
+
+  // Module filter state
+  const [filterModule, setFilterModule] = useState("ALL");
+  const [appliedModule, setAppliedModule] = useState("ALL");
+
   const [form, setForm] = useState(initialStatusForm);
   const [errors, setErrors] = useState({});
 
@@ -58,8 +79,14 @@ export default function StatusPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await getStatusesAsync();
-      setItems(Array.isArray(data) ? data : []);
+      const [statusData, modulesData] = await Promise.all([
+        getStatusesAsync(),
+        getModulesAsync().catch(() => []),
+      ]);
+      setItems(Array.isArray(statusData) ? statusData : []);
+      if (Array.isArray(modulesData) && modulesData.length > 0) {
+        setDbModules(modulesData);
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load statuses");
     } finally {
@@ -67,10 +94,39 @@ export default function StatusPage() {
     }
   }
 
+  // Combined dynamic modules list
+  const availableModules = useMemo(() => {
+    const set = new Set(DEFAULT_MODULES);
+    (dbModules || []).forEach((m) => m && set.add(m));
+    (items || []).forEach((s) => s.module && set.add(s.module));
+    return Array.from(set).sort();
+  }, [dbModules, items]);
+
+  // Filter dropdown options
+  const moduleFilterOptions = useMemo(() => [
+    { label: "All Modules", value: "ALL" },
+    ...availableModules.map((m) => ({ label: m, value: m })),
+  ], [availableModules]);
+
+  // Form dropdown options
+  const formModuleOptions = useMemo(() => {
+    return availableModules.map((m) => ({ label: m, value: m }));
+  }, [availableModules]);
+
+  // Filtered rows based on applied module filter
+  const filteredItems = useMemo(() => {
+    if (appliedModule === "ALL") return items;
+    return items.filter((item) => {
+      const mod = item.module || "General";
+      return mod.toLowerCase() === appliedModule.toLowerCase();
+    });
+  }, [items, appliedModule]);
+
   async function handleSubmit() {
     const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED_FIELD || "This field is required";
     const schema = {
       statusName: { required: true, min: 2, max: 100, label: fieldRequired },
+      module: { required: true, label: "Module is required" },
     };
 
     const newErrors = validateForm(form, schema);
@@ -84,6 +140,7 @@ export default function StatusPage() {
     try {
       const payload = {
         statusName: form.statusName.trim(),
+        module: form.module ? form.module.trim() : "General",
         isActive: form.isActive !== undefined ? form.isActive : true,
       };
 
@@ -131,6 +188,7 @@ export default function StatusPage() {
     try {
       const payload = {
         statusName: itemToToggle.statusName,
+        module: itemToToggle.module || "General",
         isActive: !itemToToggle.isActive,
       };
       await updateStatusAsync(itemToToggle.statusId, payload);
@@ -143,8 +201,6 @@ export default function StatusPage() {
       setItemToToggle(null);
     }
   }
-
-
 
   // ==================== Status Columns ====================
   const statusColumns = [
@@ -162,6 +218,7 @@ export default function StatusPage() {
                   setForm({
                     statusId: row.statusId,
                     statusName: row.statusName || "",
+                    module: row.module || "Support Ticket",
                     isActive: row.isActive ?? true,
                   });
                   setErrors({});
@@ -255,6 +312,32 @@ export default function StatusPage() {
       ),
     },
     {
+      label: "Module",
+      key: "module",
+      render: (row) => (
+        <Chip
+          label={row.module || "General"}
+          size="small"
+          sx={{
+            fontWeight: 700,
+            fontSize: "0.72rem",
+            bgcolor: (t) =>
+              t.palette.mode === "dark"
+                ? "rgba(196, 181, 253, 0.12)"
+                : "rgba(74, 63, 107, 0.08)",
+            color: (t) =>
+              t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+            border: (t) =>
+              `1px solid ${
+                t.palette.mode === "dark"
+                  ? "rgba(196, 181, 253, 0.25)"
+                  : "rgba(74, 63, 107, 0.2)"
+              }`,
+          }}
+        />
+      ),
+    },
+    {
       label: "Active Status",
       key: "isActive",
       render: (row) => (
@@ -290,16 +373,46 @@ export default function StatusPage() {
     },
   ];
 
-
-
   return (
     <div className="page-shell">
-      {/* 1. Manage Status */}
+      {/* 1. Manage Status with Module Filter */}
       <AppDataTable
         title="Manage Status"
         columns={statusColumns}
-        data={items}
+        data={filteredItems}
         loading={loading}
+        filterPanel={
+          <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+              <AppSelect
+                label="Select Module"
+                value={filterModule}
+                onChange={(e) => setFilterModule(e.target.value)}
+                options={moduleFilterOptions}
+                required
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: "auto" }} sx={{ display: "flex", gap: 1, mt: { xs: 0, sm: 2.5 } }}>
+              <AppButton
+                variant="contained"
+                startIcon={<FilterListIcon />}
+                onClick={() => setAppliedModule(filterModule)}
+              >
+                Filter
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                color="error"
+                onClick={() => {
+                  setFilterModule("ALL");
+                  setAppliedModule("ALL");
+                }}
+              >
+                Clear Filter
+              </AppButton>
+            </Grid>
+          </Grid>
+        }
         actions={
           <AppButton
             size="small"
@@ -307,7 +420,10 @@ export default function StatusPage() {
             disabled={!hasWriteAccess}
             startIcon={<AddIcon />}
             onClick={() => {
-              setForm(initialStatusForm);
+              setForm({
+                ...initialStatusForm,
+                module: appliedModule !== "ALL" ? appliedModule : "Support Ticket",
+              });
               setErrors({});
               setDialogOpen(true);
             }}
@@ -341,10 +457,27 @@ export default function StatusPage() {
           </>
         }
       >
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+          <AppSelect
+            label="Module"
+            placeholder="Select Module"
+            fullWidth
+            value={form.module}
+            onChange={(e) => {
+              setForm((f) => ({ ...f, module: e.target.value }));
+              if (errors.module) {
+                setErrors((prev) => ({ ...prev, module: "" }));
+              }
+            }}
+            options={formModuleOptions}
+            error={!!errors.module}
+            helperText={errors.module}
+            required
+          />
+
           <AppInput
             label="Status Name"
-            placeholder="Enter status name (e.g. Open, In Progress)"
+            placeholder="Enter status name (e.g. Open, In Progress, Closed)"
             fullWidth
             value={form.statusName}
             onChange={(e) => {
@@ -358,6 +491,7 @@ export default function StatusPage() {
             helperText={errors.statusName}
             required
           />
+
           {form.statusId && (
             <AppSwitch
               label="Active Or Inactive"
