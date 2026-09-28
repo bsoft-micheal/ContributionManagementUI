@@ -21,6 +21,7 @@ import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { getEventsAsync, deleteEventAsync } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
+import { getUsersAsync } from "../../services/userService";
 import AppDataTable from "../../components/common/AppDataTable";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -31,6 +32,7 @@ export default function EventsPage() {
   const [events, setEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
+  const [users, setUsers] = useState([]);
   const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
   const [filterYear, setFilterYear] = useState(dayjs().year());
   const [filters, setFilters] = useState({ month: filterMonth, year: filterYear });
@@ -47,14 +49,55 @@ export default function EventsPage() {
 
   async function loadData() {
     try {
-      const [events, types, members] = await Promise.all([
+      const [eventsData, types, membersData, usersData] = await Promise.all([
         getEventsAsync(filters),
         getEventTypesAsync(),
         getMembersAsync(),
+        getUsersAsync().catch(() => []),
       ]);
-      setEvents(events || []);
       setEventTypes(types || []);
-      setMembers(members || []);
+      setMembers(membersData || []);
+      setUsers(usersData || []);
+
+      const userMap = {};
+      (usersData || []).forEach((u) => {
+        const id = String(u.userId || u.id || "").toLowerCase();
+        const name = u.fullName || u.name || u.username;
+        if (id && name) userMap[id] = name;
+      });
+
+      const isGuid = (val) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          String(val || "").trim()
+        );
+
+      const mappedEvents = (eventsData || []).map((e) => {
+        let name = e.createdByName;
+        const rawCreatedBy = String(e.createdBy || e.CreatedBy || "").toLowerCase();
+        const rawCreatedByName = String(e.createdByName || "").toLowerCase();
+
+        if (!name || isGuid(name)) {
+          if (userMap[rawCreatedByName]) {
+            name = userMap[rawCreatedByName];
+          } else if (userMap[rawCreatedBy]) {
+            name = userMap[rawCreatedBy];
+          } else if (authState?.user?.userId && (rawCreatedBy === String(authState.user.userId).toLowerCase() || rawCreatedByName === String(authState.user.userId).toLowerCase())) {
+            name = authState.user.fullName || authState.user.name || authState.user.username;
+          }
+        }
+
+        const resolvedDisplay = name && !isGuid(name)
+          ? name
+          : userMap[rawCreatedBy] || (e.createdBy && !isGuid(e.createdBy) ? e.createdBy : "--");
+
+        return {
+          ...e,
+          createdByName: resolvedDisplay,
+          createdBy: resolvedDisplay,
+        };
+      });
+
+      setEvents(mappedEvents);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load events data");
     }

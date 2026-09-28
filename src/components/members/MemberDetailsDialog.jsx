@@ -63,7 +63,7 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               Role
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
-              {member.roleName}
+              {member.roleName || "--"}
             </Typography>
           </Box>
         </Grid>
@@ -161,22 +161,28 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
               Work Type
             </Typography>
             <Box sx={{ mt: 0.5 }}>
-              <Typography
-                variant="caption"
-                fontWeight={700}
-                sx={{
-                  bgcolor: ((member.type || member.memberType || "")).toUpperCase() === "WFH" ? "rgba(147, 51, 234, 0.1)" : "rgba(37, 99, 235, 0.1)",
-                  color: ((member.type || member.memberType || "")).toUpperCase() === "WFH" ? "#9333ea" : "#2563eb",
-                  border: ((member.type || member.memberType || "")).toUpperCase() === "WFH" ? "1px solid rgba(147, 51, 234, 0.25)" : "1px solid rgba(37, 99, 235, 0.25)",
-                  px: 1.2,
-                  py: 0.3,
-                  borderRadius: "12px",
-                  fontSize: "0.75rem",
-                  display: "inline-block"
-                }}
-              >
-                {member.type || member.memberType || "Office"}
-              </Typography>
+              {(() => {
+                const wt = member.workType || member.type || member.memberType || "Office";
+                const isWfh = wt.toUpperCase() === "WFH";
+                return (
+                  <Typography
+                    variant="caption"
+                    fontWeight={700}
+                    sx={{
+                      bgcolor: isWfh ? "rgba(147, 51, 234, 0.1)" : "rgba(37, 99, 235, 0.1)",
+                      color: isWfh ? "#9333ea" : "#2563eb",
+                      border: isWfh ? "1px solid rgba(147, 51, 234, 0.25)" : "1px solid rgba(37, 99, 235, 0.25)",
+                      px: 1.2,
+                      py: 0.3,
+                      borderRadius: "12px",
+                      fontSize: "0.75rem",
+                      display: "inline-block"
+                    }}
+                  >
+                    {wt}
+                  </Typography>
+                );
+              })()}
             </Box>
           </Box>
         </Grid>
