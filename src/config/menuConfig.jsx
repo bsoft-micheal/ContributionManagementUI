@@ -29,7 +29,7 @@ export const navigationItems = [
     icon: <DashboardRoundedIcon fontSize="small" />
   },
   {
-    featureId: 14,
+    featureId: 2,
     label: "Users",
     path: "/users",
     icon: <ManageAccountsRoundedIcon fontSize="small" />

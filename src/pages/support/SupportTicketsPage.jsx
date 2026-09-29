@@ -36,6 +36,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNotifications } from "../../contexts/NotificationContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
+import { hasActionPermission } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppTextArea from "../../components/common/AppTextArea";
@@ -73,6 +74,17 @@ const initialForm = {
 export default function SupportTicketsPage() {
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
+
+  // Action-level feature IDs from navigation_menus (parent_id=12):
+  // 55=View, 56=Add, 57=Edit, 58=Delete, 59=Verify, 60=Export Support Ticket
+  const canViewTicket = hasActionPermission("View Support Ticket", 55, authState?.role).canView;
+  const canAddTicket = hasActionPermission("Add Support Ticket", 56, authState?.role).canExecute;
+  const canEditTicket = hasActionPermission("Edit Support Ticket", 57, authState?.role).canExecute;
+  const canDeleteTicket = hasActionPermission("Delete Support Ticket", 58, authState?.role).canExecute;
+  const canVerifyTicket = hasActionPermission("Verify Support Ticket", 59, authState?.role).canExecute;
+  const canExportTicket = hasActionPermission("Export Support Ticket", 60, authState?.role).canExecute;
+
   const toast = useAppToast();
   const location = useLocation();
   const { addNotification } = useNotifications();
@@ -500,7 +512,7 @@ export default function SupportTicketsPage() {
   };
 
   const handleConfirmDelete = async () => {
-    if (!ticketToDelete) return;
+    if (!ticketToDelete || !canDeleteTicket) return;
     const ticketId = ticketToDelete.ticketId || ticketToDelete.id;
 
     try {
@@ -516,6 +528,9 @@ export default function SupportTicketsPage() {
   };
 
   const handleSaveTicket = async () => {
+    if (editingTicket && !canEditTicket) return;
+    if (!editingTicket && !canAddTicket) return;
+
     const newErrors = {};
     if (!form.memberName) newErrors.memberName = "Member Name is required";
     if (!form.ticketType) newErrors.ticketType = "Ticket Type is required";
@@ -592,7 +607,7 @@ export default function SupportTicketsPage() {
   };
 
   const handleSendReply = async () => {
-    if (!replyTicket) return;
+    if (!replyTicket || !canVerifyTicket) return;
     const ticketId = replyTicket.ticketId || replyTicket.id;
     const hasNote = replyText && replyText.trim().length > 0;
     const statusChanged = replyStatus !== replyTicket.status;
@@ -637,65 +652,22 @@ export default function SupportTicketsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5 }}>
-          <Tooltip title="View Details">
-            <IconButton
-              size="small"
-              sx={{ p: 0.3 }}
-              onClick={() => {
-                setSelectedTicket(row);
-                setViewDialogOpen(true);
-              }}
-            >
-              <ViewIcon
-                sx={{
-                  fontSize: "1.05rem",
-                  color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
-                }}
-              />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={canEdit ? "Verify Ticket" : ""}>
+          <Tooltip title={canViewTicket ? "View Details" : ""}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!canEdit}
+                disabled={!canViewTicket}
                 onClick={() => {
-                  setReplyTicket(row);
-                  setReplyStatus(row.status || "In Progress");
-                  setReplyText("");
-                  setReplyDialogOpen(true);
+                  setSelectedTicket(row);
+                  setViewDialogOpen(true);
                 }}
               >
-                <ReplyActionIcon
+                <ViewIcon
                   sx={{
                     fontSize: "1.05rem",
                     color: (theme) =>
-                      canEdit
-                        ? theme.palette.mode === "dark"
-                          ? "#38bdf8"
-                          : "#0284c7"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
-                  }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={canEdit ? "Edit" : ""}>
-            <span>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canEdit}
-                onClick={() => handleEditTicket(row)}
-              >
-                <EditIcon
-                  sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) =>
-                      canEdit
+                      canViewTicket
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"
@@ -707,19 +679,72 @@ export default function SupportTicketsPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canEdit ? "Delete" : ""}>
+          <Tooltip title={canVerifyTicket ? "Verify Ticket" : ""}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!canEdit}
+                disabled={!canVerifyTicket}
+                onClick={() => {
+                  setReplyTicket(row);
+                  setReplyStatus(row.status || "In Progress");
+                  setReplyText("");
+                  setReplyDialogOpen(true);
+                }}
+              >
+                <ReplyActionIcon
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) =>
+                      canVerifyTicket
+                        ? theme.palette.mode === "dark"
+                          ? "#38bdf8"
+                          : "#0284c7"
+                        : theme.palette.mode === "dark"
+                          ? "rgba(255,255,255,0.3)"
+                          : "#cbd5e1",
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={canEditTicket ? "Edit" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!canEditTicket}
+                onClick={() => handleEditTicket(row)}
+              >
+                <EditIcon
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) =>
+                      canEditTicket
+                        ? theme.palette.mode === "dark"
+                          ? "#ffffff"
+                          : "#4a3f6b"
+                        : theme.palette.mode === "dark"
+                          ? "rgba(255,255,255,0.3)"
+                          : "#cbd5e1",
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={canDeleteTicket ? "Delete" : ""}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!canDeleteTicket}
                 onClick={() => handleDeleteRequest(row)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.05rem",
                     color: (theme) =>
-                      canEdit
+                      canDeleteTicket
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"
@@ -958,12 +983,13 @@ export default function SupportTicketsPage() {
         columns={columns}
         data={processedTickets}
         loading={loading}
+        allowExport={canExportTicket}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             <AppButton
               variant="contained"
               size="small"
-              disabled={!canEdit}
+              disabled={!canAddTicket}
               startIcon={<AddIcon />}
               onClick={() => {
                 const firstTicketType = dbTicketTypes.find((t) => t.isActive !== false)?.typeName || "";
