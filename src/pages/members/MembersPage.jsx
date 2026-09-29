@@ -92,7 +92,6 @@ export default function MembersPage() {
   }, [workTypes]);
 
   const templateValidations = useMemo(() => {
-    const roleNamesList = roles.map((r) => r.roleName).join(",");
     const workTypesList = typeOptions.map((t) => t.value).join(",");
     return {
       "Gender": {
@@ -104,11 +103,6 @@ export default function MembersPage() {
         type: "list",
         formulae: [`"${workTypesList || "Office,WFH"}"`],
         error: "Please select a work type from the list."
-      },
-      "Role": {
-        type: "list",
-        formulae: [`"${roleNamesList || "Admin,Organizer,Member"}"`],
-        error: "Please select a role from the list."
       },
       "Date of Birth": {
         type: "date",
@@ -123,7 +117,7 @@ export default function MembersPage() {
         error: "Please enter a valid joining date."
       }
     };
-  }, [roles]);
+  }, [typeOptions]);
 
   useEffect(() => {
     loadData();
@@ -285,7 +279,6 @@ export default function MembersPage() {
     const email = row["email"] !== undefined && row["email"] !== null ? String(row["email"]).trim() : "";
     const phone = row["phone"] !== undefined && row["phone"] !== null ? String(row["phone"]).trim() : "";
     const gender = row["gender"] !== undefined && row["gender"] !== null ? String(row["gender"]).trim() : "";
-    const roleName = row["role"] !== undefined && row["role"] !== null ? String(row["role"]).trim() : "";
     const rawType = row["work type"] !== undefined && row["work type"] !== null
       ? String(row["work type"]).trim()
       : (row["type"] !== undefined && row["type"] !== null ? String(row["type"]).trim() : "");
@@ -347,12 +340,6 @@ export default function MembersPage() {
       return { error: `Row ${rowNum}: Gender must be Male, Female, or Other` };
     }
 
-    // Match role
-    const matchedRole = roles.find(r => r.roleName.toLowerCase() === roleName.toLowerCase());
-    if (!matchedRole) {
-      return { error: `Row ${rowNum}: Role '${roleName}' not found in system` };
-    }
-
     // Match Work Type
     let normalizedType = "Office";
     if (rawType) {
@@ -404,7 +391,6 @@ export default function MembersPage() {
         phone,
         gender: normalizedGender,
         workType: normalizedType,
-        roleId: matchedRole.roleId,
         dateOfBirth: dob.toISOString(),
         joiningDate: joiningDate.toISOString(),
       }
@@ -760,7 +746,7 @@ export default function MembersPage() {
         onClose={() => setImportDialogOpen(false)}
         onImport={handleBulkImport}
         title="Import Members"
-        templateHeaders={["Name", "Email", "Phone", "Role", "Gender", "Work Type", "Date of Birth", "Joining Date"]}
+        templateHeaders={["Name", "Email", "Phone", "Gender", "Work Type", "Date of Birth", "Joining Date"]}
         templateValidations={templateValidations}
         validateRow={validateRow}
       />

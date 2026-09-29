@@ -249,6 +249,47 @@ export default function SubmitPaymentPage() {
     }
   }, []);
 
+  // Auto-fill and match Event Category, Event Name, Member Name when opened via URL params
+  useEffect(() => {
+    if (eventIdParam || memberIdParam || amountParam) {
+      setFormModalOpen(true);
+      setFormData((prev) => {
+        let updatedCat = prev.eventCategory;
+        let updatedEvName = prev.eventName;
+        let updatedMemName = prev.memberName;
+        let updatedAmount = amountParam || prev.amount;
+
+        if (eventIdParam && eventsList.length > 0) {
+          const matched = eventsList.find((e) => String(e.id || e.eventId) === String(eventIdParam));
+          if (matched) {
+            updatedEvName = matched.title || matched.name || matched.eventName || updatedEvName;
+            updatedCat = matched.eventTypeName || matched.categoryName || matched.eventType || matched.category || updatedCat;
+            if (!amountParam && (matched.amount || matched.contributionAmount)) {
+              updatedAmount = String(matched.amount || matched.contributionAmount);
+            }
+          }
+        }
+
+        if (memberIdParam && membersList.length > 0) {
+          const matchedMem = membersList.find((m) => String(m.id || m.memberId) === String(memberIdParam));
+          if (matchedMem) {
+            updatedMemName = matchedMem.name || matchedMem.memberName || updatedMemName;
+          }
+        }
+
+        return {
+          ...prev,
+          eventId: eventIdParam || prev.eventId,
+          memberId: memberIdParam || prev.memberId,
+          eventCategory: updatedCat,
+          eventName: updatedEvName,
+          memberName: updatedMemName || authState?.fullName || "",
+          amount: updatedAmount,
+        };
+      });
+    }
+  }, [eventIdParam, memberIdParam, amountParam, eventsList, membersList, authState?.fullName]);
+
   // Dynamic Dues Summary & Payment Scope State (Loaded from API)
   const [duesSummary, setDuesSummary] = useState(null);
   const [paymentScope, setPaymentScope] = useState("");
@@ -1309,7 +1350,7 @@ export default function SubmitPaymentPage() {
                     : undefined,
               }}
             >
-              Save Status ({statusChangeValue || statusModalTxn?.status || "Pending"})
+              Save
             </AppButton>
           </Stack>
         }

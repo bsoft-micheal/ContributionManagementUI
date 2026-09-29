@@ -510,7 +510,7 @@ export default function EventFormPage() {
         }
 
         const createdEvent = await createEventAsync(payload);
-        toast.success(TOAST_MESSAGES.EVENTS.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
+        toast.success("Event created successfully! Notification emails dispatched to contributors.");
       }
 
       navigate("/events");

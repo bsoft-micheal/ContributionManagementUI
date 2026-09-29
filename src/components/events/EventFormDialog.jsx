@@ -468,7 +468,7 @@ export default function EventFormDialog({
         }
 
         const createdEvent = await createEventAsync(payload);
-        toast.success("Saved successfully");
+        toast.success("Event created successfully! Notification emails dispatched to contributors.");
       }
 
       if (onSaveSuccess) {

@@ -377,6 +377,19 @@ export function buildPaymentReminderEmailHtml({
           Pay ${formattedAmount} via UPI
         </a>
       </div>
+
+      <!-- One-Click Confirmation Section -->
+      <div style="margin-top: 20px; padding-top: 16px; border-top: 1.5px dashed #e2e8f0; text-align: center;">
+        <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+          Already Paid? Submit Payment Proof
+        </div>
+        <div style="font-size: 12px; color: #64748b; margin-bottom: 12px;">
+          Click below to submit your 12-digit UPI Reference / UTR Number to automatically update your payment status.
+        </div>
+        <a href="http://localhost:5173/confirm-payment?amount=${amount || 0}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 700; padding: 10px 22px; border-radius: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
+          &#x2705; I Have Paid — Submit UTR / Ref No.
+        </a>
+      </div>
     </div>
 
     <!-- Footer -->
