@@ -121,40 +121,84 @@ export default function ExcelImportDialog({
       const worksheet = workbook.addWorksheet("Template");
 
       // Add headers
-      worksheet.addRow(templateHeaders);
+      const headerRow = worksheet.addRow(templateHeaders);
+      headerRow.height = 26;
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4A3F6B" },
+        };
+        cell.font = {
+          name: "Segoe UI",
+          color: { argb: "FFFFFFFF" },
+          bold: true,
+          size: 11,
+        };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FF3B325C" } },
+          bottom: { style: "thin", color: { argb: "FF3B325C" } },
+          left: { style: "thin", color: { argb: "FF3B325C" } },
+          right: { style: "thin", color: { argb: "FF3B325C" } },
+        };
+      });
 
       // Auto-fit column widths
       worksheet.columns = templateHeaders.map((header) => ({
         header: header,
         key: header,
-        width: Math.max(16, header.length + 4),
+        width: Math.max(18, header.length + 5),
       }));
 
-      // Apply data validation to rows 2 to 100
+      const getColLetter = (colName) => {
+        const idx = templateHeaders.findIndex(
+          (h) => h.toLowerCase() === colName.toLowerCase()
+        );
+        return idx !== -1 ? worksheet.getColumn(idx + 1).letter : "A";
+      };
+
+      // Apply data validation & cell formatting to rows 2 to 100
       for (let r = 2; r <= 100; r++) {
         templateHeaders.forEach((header, colIdx) => {
-          const validationRule = templateValidations?.[header];
-          if (validationRule) {
-            const colLetter = worksheet.getColumn(colIdx + 1).letter;
-            const cell = worksheet.getCell(`${colLetter}${r}`);
-            
-            cell.dataValidation = {
-              allowBlank: true,
-              showErrorMessage: true,
-              errorTitle: "Invalid Input",
-              ...validationRule,
-            };
+          const rawRule = templateValidations?.[header];
+          const colLetter = worksheet.getColumn(colIdx + 1).letter;
+          const cell = worksheet.getCell(`${colLetter}${r}`);
 
-            if (validationRule.type === "date") {
-              cell.numFmt = "dd/mm/yyyy";
+          if (rawRule) {
+            const rule =
+              typeof rawRule === "function" ? rawRule(r, getColLetter) : rawRule;
+
+            if (rule) {
+              cell.dataValidation = {
+                allowBlank: true,
+                showErrorMessage: true,
+                showInputMessage: !!rule.prompt,
+                errorTitle: rule.errorTitle || "Validation Error",
+                ...rule,
+              };
+
+              if (rule.type === "date") {
+                cell.numFmt = "dd/mm/yyyy";
+              }
             }
+          }
+
+          // Format phone as text to prevent Excel removing leading zeros
+          if (
+            header.toLowerCase().includes("phone") ||
+            header.toLowerCase().includes("mobile")
+          ) {
+            cell.numFmt = "@";
           }
         });
       }
 
       // Generate & trigger download
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `${title.replace(/\s+/g, "_")}_Template.xlsx`;
