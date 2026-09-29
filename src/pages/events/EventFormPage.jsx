@@ -638,7 +638,7 @@ export default function EventFormPage() {
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 12, sm: 6 }}>
                         <AppSelect
-                          label="Event Category"
+                          label="Event Type"
                           value={form.eventTypeId}
                           onChange={(e) => {
                             setForm((c) => ({ ...c, eventTypeId: e.target.value }));

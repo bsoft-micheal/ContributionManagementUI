@@ -36,6 +36,7 @@ import { useAppToast } from "../common/AppToast";
 import { validateForm } from "../../utils/validation";
 import { getImageUrl } from "../../services/apiClient";
 import { getProfileAsync } from "../../services/userService";
+import { getWorkTypesAsync } from "../../services/workTypeService";
 import { useThemeMode } from "../../contexts/ThemeModeContext";
 import dayjs from "dayjs";
 import logo from "../../assets/logo.png";
@@ -104,10 +105,10 @@ export default function AppLayout() {
     { label: "Other", value: "Other" },
   ];
 
-  const workTypeOptions = [
+  const [workTypeOptions, setWorkTypeOptions] = useState([
     { label: "Office", value: "Office" },
     { label: "WFH", value: "WFH" },
-  ];
+  ]);
 
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -198,23 +199,44 @@ export default function AppLayout() {
     };
   }, [location.pathname]);
 
-  // Sync profileForm with backend profile (or authState fallback) when dialog opens
+  // Sync profileForm with backend profile and fetch dynamic work types when dialog opens
   React.useEffect(() => {
     if (profileDialogOpen) {
       let isMounted = true;
       const loadProfile = async () => {
         try {
-          const res = await getProfileAsync();
-          const profile = res?.data || res;
+          const [profileRes, workTypesRes] = await Promise.all([
+            getProfileAsync().catch(() => null),
+            getWorkTypesAsync(true).catch(() => []),
+          ]);
+
+          let activeOptions = [];
+          if (Array.isArray(workTypesRes) && workTypesRes.length > 0) {
+            activeOptions = workTypesRes
+              .map((wt) => ({
+                label: wt.workTypeName || wt.name || "",
+                value: wt.workTypeName || wt.name || "",
+              }))
+              .filter((opt) => opt.value);
+
+            if (isMounted && activeOptions.length > 0) {
+              setWorkTypeOptions(activeOptions);
+            }
+          }
+
+          const profile = profileRes?.data || profileRes;
+          const defaultWorkType = activeOptions[0]?.value || workTypeOptions[0]?.value || "Office";
+
           if (profile && isMounted) {
+            const currentWorkType = profile.workType || profile.memberType || defaultWorkType;
             setProfileForm({
               fullName: profile.fullName || authState?.fullName || "",
               email: profile.email || authState?.email || "",
               profileImage: profile.profileImage || authState?.profileImage || "",
               phone: profile.phone || "",
               gender: profile.gender || "",
-              workType: profile.workType || profile.memberType || "",
-              memberType: profile.workType || profile.memberType || "",
+              workType: currentWorkType,
+              memberType: currentWorkType,
               dateOfBirth: profile.dateOfBirth ? dayjs(profile.dateOfBirth) : null,
               joiningDate: profile.joiningDate ? dayjs(profile.joiningDate) : null,
               roleName: profile.roleName || authState?.role || "",
@@ -229,14 +251,16 @@ export default function AppLayout() {
         }
 
         if (isMounted && authState) {
+          const fallbackWorkType = workTypeOptions[0]?.value || "Office";
+          const currentWorkType = authState.workType || authState.memberType || fallbackWorkType;
           setProfileForm({
             fullName: authState.fullName || "",
             email: authState.email || "",
             profileImage: authState.profileImage || "",
             phone: authState.phone || "",
             gender: authState.gender || "",
-            workType: authState.workType || authState.memberType || "",
-            memberType: authState.workType || authState.memberType || "",
+            workType: currentWorkType,
+            memberType: currentWorkType,
             dateOfBirth: authState.dateOfBirth ? dayjs(authState.dateOfBirth) : null,
             joiningDate: authState.joiningDate ? dayjs(authState.joiningDate) : null,
             roleName: authState.role || "",
@@ -292,14 +316,15 @@ export default function AppLayout() {
     }
 
     try {
+      const selectedWorkType = profileForm.workType || profileForm.memberType || workTypeOptions[0]?.value || "Office";
       await updateProfile({
         fullName: profileForm.fullName.trim(),
         email: profileForm.email.trim(),
         profileImage: profileForm.profileImage,
         phone: profileForm.phone.trim(),
         gender: profileForm.gender,
-        workType: profileForm.workType || profileForm.memberType,
-        memberType: profileForm.workType || profileForm.memberType,
+        workType: selectedWorkType,
+        memberType: selectedWorkType,
         dateOfBirth: profileForm.dateOfBirth ? dayjs(profileForm.dateOfBirth).toISOString() : undefined,
         joiningDate: profileForm.joiningDate ? dayjs(profileForm.joiningDate).toISOString() : undefined,
         roleName: profileForm.roleName,
@@ -790,7 +815,7 @@ export default function AppLayout() {
             <Box sx={{ flex: 1 }}>
               <AppSelect
                 label="Work Type"
-                value={profileForm.workType || profileForm.memberType || "Office"}
+                value={profileForm.workType || profileForm.memberType || workTypeOptions[0]?.value || "Office"}
                 onChange={(e) => {
                   setProfileForm((prev) => ({ ...prev, workType: e.target.value, memberType: e.target.value }));
                   if (profileErrors.workType) setProfileErrors((prev) => ({ ...prev, workType: "" }));
