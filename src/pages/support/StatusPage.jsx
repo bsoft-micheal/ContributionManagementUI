@@ -88,7 +88,7 @@ export default function StatusPage() {
         setDbModules(modulesData);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to load statuses");
+      toast.error(error, "Failed to load statuses");
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export default function StatusPage() {
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      toast.error(error, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 
@@ -170,7 +170,7 @@ export default function StatusPage() {
         toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        toast.error(error, TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       } finally {
         setDeleteConfirmOpen(false);
         setItemToDelete(null);
@@ -195,7 +195,7 @@ export default function StatusPage() {
       toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
+      toast.error(err, TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
     } finally {
       setStatusConfirmOpen(false);
       setItemToToggle(null);
@@ -241,19 +241,19 @@ export default function StatusPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete Status" : ""}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this status is assigned to tickets, expenses, transactions, or events" : (hasWriteAccess ? "Delete Status" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
                 onClick={() => handleDeleteRequest(row.statusId)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.1rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      hasWriteAccess && !(row.isReferred || row.IsReferred)
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"

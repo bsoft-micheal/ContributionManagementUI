@@ -76,9 +76,10 @@ export default function AppInput({
             fontSize: "0.82rem",
             bgcolor: "background.paper",
             borderRadius: "12px",
-            height: size === "small" ? 34 : 40,
+            height: props.multiline ? "auto" : (size === "small" ? 34 : 40),
+            minHeight: size === "small" ? 34 : 40,
             color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
-            "& input, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
+            "& input, & textarea, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
               py: size === "small" ? 0.8 : 1.2,
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
               "&::placeholder, &::-webkit-input-placeholder": {
@@ -113,7 +114,7 @@ export default function AppInput({
             },
             "&.Mui-disabled": {
               bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
-              "& input, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
+              "& input, & textarea, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
                 color: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
                 WebkitTextFillColor: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
                 fontWeight: "700 !important",

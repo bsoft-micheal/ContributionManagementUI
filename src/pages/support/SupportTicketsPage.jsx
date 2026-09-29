@@ -519,8 +519,8 @@ export default function SupportTicketsPage() {
       await deleteSupportTicketAsync(ticketId);
       toast.success(TOAST_MESSAGES.SUPPORT.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchTicketsFromDb();
-    } catch {
-      toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+    } catch (err) {
+      toast.error(err, TOAST_MESSAGES.GENERAL.DELETE_FAILED);
     } finally {
       setDeleteConfirmOpen(false);
       setTicketToDelete(null);

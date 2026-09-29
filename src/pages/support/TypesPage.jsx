@@ -552,19 +552,19 @@ export default function TypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete Ticket Type" : ""}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this ticket type is referenced in support tickets" : (hasWriteAccess ? "Delete Ticket Type" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
                 onClick={() => handleTicketTypeDeleteRequest(row.ticketTypeId)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.1rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      hasWriteAccess && !(row.isReferred || row.IsReferred)
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"
@@ -695,19 +695,19 @@ export default function TypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete Work Type" : ""}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this work type is assigned to active members" : (hasWriteAccess ? "Delete Work Type" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
                 onClick={() => handleWorkTypeDeleteRequest(row.workTypeId)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.1rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      hasWriteAccess && !(row.isReferred || row.IsReferred)
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"
@@ -838,19 +838,19 @@ export default function TypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete Priority" : ""}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this priority is assigned to support tickets" : (hasWriteAccess ? "Delete Priority" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
                 onClick={() => handlePriorityDeleteRequest(row.priorityId)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.1rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      hasWriteAccess && !(row.isReferred || row.IsReferred)
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"
@@ -973,19 +973,19 @@ export default function TypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete Payment Mode" : ""}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this payment mode is used in transactions or contributions" : (hasWriteAccess ? "Delete Payment Mode" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
                 onClick={() => handlePaymentModeDeleteRequest(row.paymentModeId)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.1rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      hasWriteAccess && !(row.isReferred || row.IsReferred)
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"

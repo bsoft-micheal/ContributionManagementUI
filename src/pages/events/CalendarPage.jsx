@@ -22,6 +22,7 @@ import CakeRoundedIcon from "@mui/icons-material/CakeRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import CelebrationRoundedIcon from "@mui/icons-material/CelebrationRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { formatViewDate } from "../../utils/dateHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -30,7 +31,10 @@ import apiClient from "../../services/apiClient";
 import { getMembersAsync } from "../../services/memberService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getEventByIdAsync } from "../../services/eventService";
-import { getContributionsByEventAsync } from "../../services/contributionService";
+import {
+  getContributionsAsync,
+  getContributionsByEventAsync,
+} from "../../services/contributionService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import EventFormDialog from "../../components/events/EventFormDialog";
@@ -141,6 +145,7 @@ export default function CalendarPage() {
   const [events, setEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
+  const [contributions, setContributions] = useState([]);
 
   // Modals for Create and View
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -155,11 +160,15 @@ export default function CalendarPage() {
         month: filters.month === 0 ? null : filters.month,
         year: filters.year === 0 ? null : filters.year,
       };
-      const { data: resData } = await apiClient.get("/events/getAllEventAsync", {
-        params: apiParams,
-      });
+      const [{ data: resData }, contribsData] = await Promise.all([
+        apiClient.get("/events/getAllEventAsync", {
+          params: apiParams,
+        }),
+        getContributionsAsync().catch(() => []),
+      ]);
       const data = resData && resData.data !== undefined ? resData.data : resData;
       setEvents(Array.isArray(data) ? data : []);
+      setContributions(Array.isArray(contribsData) ? contribsData : []);
     } catch {
       toast.error("Failed to load calendar events.");
     }
@@ -376,6 +385,62 @@ export default function CalendarPage() {
       ? "All Months"
       : dayjs().month(filters.month - 1).format("MMMM");
 
+  // Helper to determine if an event or member has pending payment (strictly based on unpaid amount > 0)
+  const isItemPaymentPending = (item) => {
+    // 1. Identify the event associated with this item
+    let targetEvent = item.eventItem;
+
+    if (!targetEvent) {
+      if (item.colorType?.toLowerCase().includes("birthday")) {
+        const itemMonth = item.celebrant
+          ? parseMemberDob(item.celebrant.dateOfBirth)?.month()
+          : (filters.month === 0 ? dayjs().month() : filters.month - 1);
+
+        targetEvent = events.find((e) => {
+          const isBday =
+            e.eventTypeName?.toLowerCase().includes("birthday") ||
+            e.eventName?.toLowerCase().includes("birthday");
+          if (!isBday) return false;
+          return dayjs(e.eventDate).month() === itemMonth;
+        });
+      }
+    }
+
+    // 2. If no event exists yet, there is no unpaid balance
+    if (!targetEvent) return false;
+
+    // 3. Compute total expected, total paid, and unpaid amount for this event
+    const totalExpected = Number(targetEvent.totalExpectedAmount) || 0;
+    let totalPaid = Number(targetEvent.totalPaidAmount) || 0;
+
+    // Check contributions matching this specific event
+    const eventContribs = contributions.filter(
+      (c) => String(c.eventId) === String(targetEvent.eventId)
+    );
+
+    if (eventContribs.length > 0) {
+      const paidFromContribs = eventContribs
+        .filter(
+          (c) =>
+            c.paymentStatus === "Paid" ||
+            c.paymentStatus === "Verified" ||
+            c.paymentStatus === "Completed"
+        )
+        .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+      totalPaid = Math.max(totalPaid, paidFromContribs);
+    }
+
+    const unpaidAmount = Math.max(0, totalExpected - totalPaid);
+
+    // If unpaid amount is 0, remove Payment Pending!
+    if (unpaidAmount <= 0) {
+      return false;
+    }
+
+    // Only if unpaid amount is strictly greater than 0, return true
+    return unpaidAmount > 0;
+  };
+
   // Get items for a particular day on the grid
   const getDayItems = (day) => {
     const dayStr = day.format("YYYY-MM-DD");
@@ -433,6 +498,35 @@ export default function CalendarPage() {
             categoryLabel: "Birthday",
             colorType: "Birthday",
           });
+        }
+      }
+    }
+
+    // Also include any members with DOB on this day if category is ALL or Birthday
+    if (categoryFilter === "ALL" || isBirthdayView) {
+      for (const mem of members) {
+        const dob = parseMemberDob(mem.dateOfBirth);
+        if (!dob) continue;
+        if (dob.month() === dayMonth && dob.date() === dayDate) {
+          if (!handledCelebrantIds.has(mem.memberId)) {
+            handledCelebrantIds.add(mem.memberId);
+            const matchedBdayEvent = events.find(
+              (e) =>
+                (e.eventTypeName?.toLowerCase().includes("birthday") ||
+                  e.eventName?.toLowerCase().includes("birthday")) &&
+                (dayjs(e.eventDate).month() === dayMonth ||
+                  (e.participants || []).some((p) => (p.memberId || p.id) === mem.memberId))
+            );
+
+            items.push({
+              key: `bday-${mem.memberId}`,
+              eventItem: matchedBdayEvent || null,
+              celebrant: mem,
+              displayName: mem.name || mem.memberName,
+              categoryLabel: "Birthday",
+              colorType: "Birthday",
+            });
+          }
         }
       }
     }
@@ -1080,6 +1174,7 @@ export default function CalendarPage() {
                             const isBirthdayItem = item.colorType?.toLowerCase().includes("birthday");
                             const isTodayDay = day.isSame(dayjs(), "day");
                             const isPastDay = day.isBefore(dayjs().startOf("day"), "day");
+                            const isPaymentPending = isItemPaymentPending(item);
 
                             let statusText = item.categoryLabel;
                             if (isBirthdayItem) {
@@ -1091,7 +1186,7 @@ export default function CalendarPage() {
                             return (
                               <Tooltip
                                 key={item.key}
-                                title={`${item.displayName} • ${statusText}`}
+                                title={`${item.displayName} • ${statusText}${isPaymentPending ? " • Payment Pending" : ""}`}
                                 arrow
                                 placement="top"
                               >
@@ -1107,13 +1202,13 @@ export default function CalendarPage() {
                                     }
                                   }}
                                   sx={{
-                                    p: "2.5px 5px",
-                                    borderRadius: "5px",
+                                    p: "4px 6px",
+                                    borderRadius: "8px",
                                     bgcolor: (theme) =>
                                       isBirthdayItem && isTodayDay
                                         ? theme.palette.mode === "dark"
-                                          ? "rgba(236, 72, 153, 0.22)"
-                                          : "rgba(236, 72, 153, 0.12)"
+                                          ? "rgba(236, 72, 153, 0.2)"
+                                          : "rgba(236, 72, 153, 0.08)"
                                         : theme.palette.mode === "dark"
                                         ? typeInfo.darkBg
                                         : typeInfo.bg,
@@ -1126,88 +1221,161 @@ export default function CalendarPage() {
                                         ? "0 2px 8px rgba(236, 72, 153, 0.25)"
                                         : "none",
                                     cursor: "pointer",
-                                    transition:
-                                      "transform 0.12s ease, box-shadow 0.12s ease",
+                                    transition: "transform 0.12s ease, box-shadow 0.12s ease",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 0.35,
                                     "&:hover": {
                                       transform: "translateY(-1px)",
-                                      boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+                                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                                       borderColor: isBirthdayItem && isTodayDay ? "#ec4899" : typeInfo.color,
                                     },
                                   }}
                                 >
-                                  {/* Line 1: Icon + Name */}
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.4,
-                                    }}
-                                  >
-                                    <Typography
-                                      component="span"
-                                      sx={{ fontSize: "0.7rem", lineHeight: 1 }}
-                                    >
-                                      {isBirthdayItem && isTodayDay ? "🎂" : typeInfo.emoji}
-                                    </Typography>
-                                    <Typography
+                                  {/* Top Row: Avatar Box + (Name & Status Pill) */}
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
+                                    {/* Avatar Box */}
+                                    <Box
                                       sx={{
-                                        fontSize: "0.7rem",
-                                        fontWeight: 700,
-                                        color: (theme) =>
-                                          theme.palette.mode === "dark"
-                                            ? typeInfo.darkText
-                                            : typeInfo.text,
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        lineHeight: 1.2,
+                                        width: 24,
+                                        height: 24,
+                                        minWidth: 24,
+                                        borderRadius: "6px",
+                                        bgcolor: (theme) =>
+                                          isBirthdayItem && isTodayDay
+                                            ? "rgba(236, 72, 153, 0.22)"
+                                            : "rgba(14, 165, 233, 0.14)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.8rem",
+                                        lineHeight: 1,
+                                        flexShrink: 0,
                                       }}
                                     >
-                                      {item.displayName}
-                                    </Typography>
-                                    {isBirthdayItem && isTodayDay && (
-                                      <Typography
-                                        component="span"
-                                        sx={{
-                                          fontSize: "0.68rem",
-                                          display: "inline-block",
-                                          animation: "bouncePopper 1.5s infinite ease-in-out",
-                                        }}
-                                      >
-                                        🎉
-                                      </Typography>
-                                    )}
+                                      {isBirthdayItem && isTodayDay ? "🎂" : isBirthdayItem ? "🎂" : typeInfo.emoji}
+                                    </Box>
+
+                                    {/* Name & Status Pill */}
+                                    <Box sx={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 0.15 }}>
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
+                                        <Typography
+                                          sx={{
+                                            fontSize: "0.74rem",
+                                            fontWeight: 800,
+                                            color: (theme) =>
+                                              theme.palette.mode === "dark"
+                                                ? typeInfo.darkText
+                                                : "#312e81",
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            lineHeight: 1.15,
+                                          }}
+                                        >
+                                          {item.displayName}
+                                        </Typography>
+                                        {isBirthdayItem && isTodayDay && (
+                                          <Typography
+                                            component="span"
+                                            sx={{
+                                              fontSize: "0.68rem",
+                                              display: "inline-block",
+                                              animation: "bouncePopper 1.5s infinite ease-in-out",
+                                            }}
+                                          >
+                                            🎉
+                                          </Typography>
+                                        )}
+                                      </Box>
+
+                                      {/* Status Pill */}
+                                      <Box sx={{ display: "inline-flex" }}>
+                                        <Box
+                                          sx={{
+                                            bgcolor: (theme) =>
+                                              isBirthdayItem && isTodayDay
+                                                ? "rgba(236, 72, 153, 0.15)"
+                                                : isBirthdayItem && isPastDay
+                                                ? "rgba(34, 197, 94, 0.15)"
+                                                : "rgba(124, 58, 237, 0.1)",
+                                            color: (theme) =>
+                                              isBirthdayItem && isTodayDay
+                                                ? "#db2777"
+                                                : isBirthdayItem && isPastDay
+                                                ? "#16a34a"
+                                                : "#7c3aed",
+                                            border: (theme) =>
+                                              isBirthdayItem && isTodayDay
+                                                ? "1px solid rgba(236, 72, 153, 0.3)"
+                                                : isBirthdayItem && isPastDay
+                                                ? "1px solid rgba(34, 197, 94, 0.25)"
+                                                : "1px solid rgba(124, 58, 237, 0.2)",
+                                            borderRadius: "10px",
+                                            px: 0.6,
+                                            py: "1px",
+                                            fontSize: "0.62rem",
+                                            fontWeight: 700,
+                                            lineHeight: 1.1,
+                                            whiteSpace: "nowrap",
+                                          }}
+                                        >
+                                          {isBirthdayItem
+                                            ? isTodayDay
+                                              ? "Today 🎉"
+                                              : isPastDay
+                                              ? "Completed ✓"
+                                              : "Upcoming"
+                                            : item.categoryLabel}
+                                        </Box>
+                                      </Box>
+                                    </Box>
                                   </Box>
 
-                                  {/* Line 2: Category & Status label */}
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.3, pl: "1rem", mt: 0.1 }}>
-                                    <Typography
+                                  {/* Bottom Row: Payment Pending Badge */}
+                                  {isPaymentPending && (
+                                    <Box
                                       sx={{
-                                        fontSize: "0.6rem",
-                                        fontWeight: isBirthdayItem && isTodayDay ? 800 : 600,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.35,
+                                        bgcolor: (theme) =>
+                                          theme.palette.mode === "dark"
+                                            ? "rgba(245, 158, 11, 0.2)"
+                                            : "#fef3c7",
                                         color: (theme) =>
-                                          isBirthdayItem && isTodayDay
-                                            ? "#db2777"
-                                            : isBirthdayItem && isPastDay
-                                            ? "#16a34a"
-                                            : theme.palette.mode === "dark"
-                                            ? "rgba(255,255,255,0.65)"
-                                            : "text.secondary",
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        lineHeight: 1.1,
+                                          theme.palette.mode === "dark" ? "#fde68a" : "#d97706",
+                                        border: (theme) =>
+                                          theme.palette.mode === "dark"
+                                            ? "1px solid rgba(245, 158, 11, 0.35)"
+                                            : "1px solid #fde68a",
+                                        borderRadius: "6px",
+                                        px: 0.6,
+                                        py: "2px",
+                                        mt: 0.1,
                                       }}
                                     >
-                                      {isBirthdayItem
-                                        ? isTodayDay
-                                          ? "Today 🎉"
-                                          : isPastDay
-                                          ? "Completed ✓"
-                                          : "Upcoming"
-                                        : item.categoryLabel}
-                                    </Typography>
-                                  </Box>
+                                      <WarningAmberRoundedIcon
+                                        sx={{
+                                          fontSize: "0.74rem",
+                                          color: (theme) =>
+                                            theme.palette.mode === "dark" ? "#fbbf24" : "#d97706",
+                                          flexShrink: 0,
+                                        }}
+                                      />
+                                      <Typography
+                                        sx={{
+                                          fontSize: "0.62rem",
+                                          fontWeight: 700,
+                                          color: "inherit",
+                                          lineHeight: 1.1,
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        Payment Pending
+                                      </Typography>
+                                    </Box>
+                                  )}
                                 </Box>
                               </Tooltip>
                             );
@@ -1737,6 +1905,50 @@ export default function CalendarPage() {
                                     }}
                                   />
                                 </Tooltip>
+                              )}
+
+                              {/* Payment Pending Badge in Sidebar */}
+                              {isItemPaymentPending({ celebrant: mem, memberId: mem.memberId, colorType: "Birthday" }) && (
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.3,
+                                    bgcolor: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? "rgba(245, 158, 11, 0.2)"
+                                        : "#fef3c7",
+                                    color: (theme) =>
+                                      theme.palette.mode === "dark" ? "#fde68a" : "#d97706",
+                                    border: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? "1px solid rgba(245, 158, 11, 0.35)"
+                                        : "1px solid #fde68a",
+                                    borderRadius: "5px",
+                                    px: 0.6,
+                                    py: "1.5px",
+                                  }}
+                                >
+                                  <WarningAmberRoundedIcon
+                                    sx={{
+                                      fontSize: "0.7rem",
+                                      color: (theme) =>
+                                        theme.palette.mode === "dark" ? "#fbbf24" : "#d97706",
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <Typography
+                                    sx={{
+                                      fontSize: "0.6rem",
+                                      fontWeight: 700,
+                                      color: "inherit",
+                                      lineHeight: 1.1,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    Payment Pending
+                                  </Typography>
+                                </Box>
                               )}
                             </Box>
                           </Paper>
