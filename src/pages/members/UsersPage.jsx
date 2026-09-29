@@ -9,8 +9,9 @@ import {
   InputAdornment,
   Stack,
   Alert,
+  Switch,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, styled } from "@mui/material/styles";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
@@ -53,6 +54,37 @@ import { getWorkTypesAsync } from "../../services/workTypeService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 
+// ─── Custom Green Switch matching screenshot ───────────────────────────────
+const CustomSwitch = styled(Switch)(({ theme }) => ({
+  width: 48,
+  height: 26,
+  padding: 0,
+  display: "flex",
+  "& .MuiSwitch-switchBase": {
+    padding: 3,
+    "&.Mui-checked": {
+      transform: "translateX(22px)",
+      color: "#fff",
+      "& + .MuiSwitch-track": {
+        opacity: 1,
+        backgroundColor: "#16a34a",
+      },
+    },
+  },
+  "& .MuiSwitch-thumb": {
+    width: 20,
+    height: 20,
+    borderRadius: "50%",
+    boxShadow: "0 2px 4px 0 rgba(0, 35, 11, 0.2)",
+  },
+  "& .MuiSwitch-track": {
+    borderRadius: 13,
+    opacity: 1,
+    backgroundColor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.15)" : "rgba(74, 63, 107, 0.18)",
+    boxSizing: "border-box",
+  },
+}));
+
 // ─── Role styling ─────────────────────────────────────────────────────────────
 const ROLE_COLORS = {
   Admin: { bg: "rgba(239,68,68,0.10)", darkBg: "rgba(239,68,68,0.20)", color: "#dc2626", darkColor: "#fca5a5" },
@@ -75,9 +107,10 @@ const initialForm = {
   email: "",
   phone: "",
   gender: "Male",
-  workType: "",
+  workType: "Office",
   dateOfBirth: dayjs().subtract(18, "year"),
   joiningDate: dayjs(),
+  createMemberProfile: false, // Enable User Access (OFF by default)
   roleName: "",
   newPassword: "",
   confirmPassword: "",
@@ -101,9 +134,9 @@ export default function UsersPage() {
   const [userToToggle, setUserToToggle] = useState(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
-  const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
   // Filter state
@@ -244,15 +277,20 @@ export default function UsersPage() {
       ...initialForm,
       workType: typeOptions.length > 0 ? typeOptions[0].value : "Office",
       gender: "Male",
-      roleName: userRolesList.length > 0 ? userRolesList[0].value : "Member",
+      createMemberProfile: false,
+      username: "",
+      roleName: "",
+      newPassword: "",
+      confirmPassword: "",
     });
-    setErrors({});
     setShowPassword(false);
     setShowConfirm(false);
+    setErrors({});
     setDialogOpen(true);
   }
 
   function openEdit(row) {
+    const hasAccess = row.hasMemberProfile !== false;
     setForm({
       userId: row.userId,
       fullName: row.fullName || row.FullName || "",
@@ -263,15 +301,16 @@ export default function UsersPage() {
       workType: row.workType || (typeOptions.length > 0 ? typeOptions[0].value : "Office"),
       dateOfBirth: row.dateOfBirth ? dayjs(row.dateOfBirth) : dayjs().subtract(18, "year"),
       joiningDate: row.joiningDate ? dayjs(row.joiningDate) : dayjs(),
+      createMemberProfile: hasAccess,
+      roleName: row.roleName ?? "",
       newPassword: "",
       confirmPassword: "",
-      roleName: row.roleName ?? (userRolesList.length > 0 ? userRolesList[0].value : "Member"),
       isActive: row.isActive ?? true,
       createdOn: row.createdOn || row.createdAt,
     });
-    setErrors({});
     setShowPassword(false);
     setShowConfirm(false);
+    setErrors({});
     setDialogOpen(true);
   }
 
@@ -287,31 +326,31 @@ export default function UsersPage() {
     const filed = "This field is required";
     const schema = {
       fullName: { required: true, type: "letteronly", min: 2, max: 100, label: filed },
-      username: { required: true, type: "letterandnumber", min: 3, max: 30, label: filed },
-      email: { required: true, email: true, label: filed },
       roleName: { required: true, label: filed },
+      email: { required: true, email: true, label: filed },
       phone: { required: true, type: "numberonly", min: 10, max: 10, label: filed },
       gender: { required: true, label: filed },
       workType: { required: true, label: filed },
       dateOfBirth: { required: true, label: filed },
       joiningDate: { required: true, label: filed },
     };
+
+    if (form.createMemberProfile) {
+      schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: filed };
+      if (!form.userId) {
+        schema.newPassword = { required: true, min: 6, max: 50, label: filed };
+        schema.confirmPassword = { required: true, min: 6, max: 50, label: filed };
+      } else if (form.newPassword) {
+        schema.newPassword = { required: false, min: 6, max: 50, label: filed };
+        schema.confirmPassword = { required: true, min: 6, max: 50, label: filed };
+      }
+    }
+
     const e = validateForm(form, schema);
 
-    // Password validation
-    if (!form.userId) {
-      if (!form.newPassword) e.newPassword = "Password is required";
-      else if (form.newPassword.length < 6)
-        e.newPassword = "Minimum 6 characters";
-      if (!form.confirmPassword) e.confirmPassword = "Please confirm your password";
-      else if (form.newPassword !== form.confirmPassword)
+    if (form.createMemberProfile) {
+      if (form.newPassword && form.confirmPassword && form.newPassword !== form.confirmPassword) {
         e.confirmPassword = "Passwords do not match";
-    } else {
-      if (form.newPassword) {
-        if (form.newPassword.length < 6)
-          e.newPassword = "Minimum 6 characters";
-        if (form.newPassword !== form.confirmPassword)
-          e.confirmPassword = "Passwords do not match";
       }
     }
 
@@ -358,7 +397,10 @@ export default function UsersPage() {
 
     // Check duplicate email, username, and mobile number
     const emailLower = form.email.trim().toLowerCase();
-    const usernameLower = form.username.trim().toLowerCase();
+    const isAccess = Boolean(form.createMemberProfile);
+    const resolvedUsername = isAccess && form.username
+      ? form.username.trim()
+      : (form.username?.trim() || null);
     const cleanPhone = String(form.phone || "").replace(/\D/g, "");
 
     if (!form.userId) {
@@ -367,7 +409,7 @@ export default function UsersPage() {
         toast.error("This email is already registered");
         return;
       }
-      if (users.some((u) => u.username && u.username.trim().toLowerCase() === usernameLower)) {
+      if (isAccess && resolvedUsername && users.some((u) => u.username && u.username.trim().toLowerCase() === resolvedUsername.toLowerCase())) {
         setErrors((prev) => ({ ...prev, username: "This username is already taken" }));
         toast.error("This username is already taken");
         return;
@@ -383,7 +425,7 @@ export default function UsersPage() {
         toast.error("This email is already registered");
         return;
       }
-      if (users.some((u) => u.userId !== form.userId && u.username && u.username.trim().toLowerCase() === usernameLower)) {
+      if (isAccess && resolvedUsername && users.some((u) => u.userId !== form.userId && u.username && u.username.trim().toLowerCase() === resolvedUsername.toLowerCase())) {
         setErrors((prev) => ({ ...prev, username: "This username is already taken" }));
         toast.error("This username is already taken");
         return;
@@ -399,16 +441,19 @@ export default function UsersPage() {
     try {
       const payload = {
         fullName: form.fullName.trim(),
-        username: form.username.trim(),
+        username: resolvedUsername,
         email: form.email.trim(),
         phone: cleanPhone,
         gender: form.gender,
         workType: form.workType,
         dateOfBirth: form.dateOfBirth ? (dayjs.isDayjs(form.dateOfBirth) ? form.dateOfBirth.toISOString() : form.dateOfBirth) : null,
         joiningDate: form.joiningDate ? (dayjs.isDayjs(form.joiningDate) ? form.joiningDate.toISOString() : form.joiningDate) : null,
-        roleName: form.roleName,
+        createMemberProfile: isAccess,
+        enableUserAccess: isAccess,
+        memberUsername: isAccess ? resolvedUsername : null,
+        roleName: isAccess ? form.roleName : (form.roleName || "Member"),
+        password: isAccess && form.newPassword ? form.newPassword.trim() : undefined,
         isActive: form.isActive,
-        ...(form.newPassword ? { password: form.newPassword } : {}),
       };
 
       if (form.userId) {
@@ -433,7 +478,7 @@ export default function UsersPage() {
       ) {
         toast.error("A user with this username, email, or mobile number already exists.");
       } else {
-        toast.error(err.response?.data?.message ?? "Failed to save");
+        toast.error(err.response?.data?.message ?? (rawMsg || "Failed to save"));
       }
     } finally {
       setSaving(false);
@@ -1018,11 +1063,34 @@ export default function UsersPage() {
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title={form.userId ? "Edit User & Member Profile" : "Add User & Member Profile"}
+        title={form.userId ? "Edit User" : "Add User"}
         maxWidth="md"
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setDialogOpen(false)} disabled={saving}>
+            <AppButton
+              variant="outlined"
+              onClick={() => setDialogOpen(false)}
+              disabled={saving}
+              sx={{
+                borderRadius: "8px",
+                px: 3.5,
+                py: 0.8,
+                textTransform: "none",
+                fontWeight: 600,
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(255,255,255,0.2)"
+                    : "rgba(74,63,107,0.25)",
+                color: "text.primary",
+                "&:hover": {
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.4)"
+                      : "#4a3f6b",
+                  bgcolor: "transparent",
+                },
+              }}
+            >
               Cancel
             </AppButton>
             <AppButton
@@ -1030,15 +1098,23 @@ export default function UsersPage() {
               startIcon={<SaveIcon />}
               disabled={saving}
               onClick={handleSubmit}
-              sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}
+              sx={{
+                borderRadius: "8px",
+                px: 3.5,
+                py: 0.8,
+                textTransform: "none",
+                fontWeight: 600,
+                bgcolor: "#4a3f6b !important",
+                "&:hover": { bgcolor: "#3b325c !important" },
+              }}
             >
               {saving ? "Saving…" : "Save"}
             </AppButton>
           </>
         }
       >
-        <Grid container spacing={3}>
-          {/* Full Name */}
+        <Grid container spacing={2.5}>
+          {/* Row 1: Full Name & Member Role */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppInput
               label="Full Name"
@@ -1052,23 +1128,20 @@ export default function UsersPage() {
               required
             />
           </Grid>
-
-          {/* Username */}
           <Grid size={{ xs: 12, md: 6 }}>
-            <AppInput
-              label="Username"
-              placeholder="Enter username"
-              value={form.username}
-              onChange={(e) => fieldChange("username", e.target.value)}
-              restrictType="letterandnumber"
-              maxLength={30}
-              error={!!errors.username}
-              helperText={errors.username}
+            <AppSelect
+              label="Member Role"
+              placeholder="Select role…"
+              value={form.roleName}
+              onChange={(e) => fieldChange("roleName", e.target.value)}
+              options={userRolesList}
+              error={!!errors.roleName}
+              helperText={errors.roleName}
               required
             />
           </Grid>
 
-          {/* Email */}
+          {/* Row 2: Email & Phone Number */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppInput
               label="Email"
@@ -1081,22 +1154,6 @@ export default function UsersPage() {
               required
             />
           </Grid>
-
-          {/* User Role */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppSelect
-              label="User Role"
-              placeholder="Select role…"
-              value={form.roleName}
-              onChange={(e) => fieldChange("roleName", e.target.value)}
-              options={userRolesList}
-              error={!!errors.roleName}
-              helperText={errors.roleName}
-              required
-            />
-          </Grid>
-
-          {/* Phone Number */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppInput
               label="Phone Number"
@@ -1111,7 +1168,7 @@ export default function UsersPage() {
             />
           </Grid>
 
-          {/* Gender */}
+          {/* Row 3: Gender & Work Type */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppSelect
               label="Gender"
@@ -1124,8 +1181,6 @@ export default function UsersPage() {
               required
             />
           </Grid>
-
-          {/* Work Type */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppSelect
               label="Work Type"
@@ -1139,7 +1194,7 @@ export default function UsersPage() {
             />
           </Grid>
 
-          {/* Date of Birth */}
+          {/* Row 4: Date of Birth & Joining Date */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppDateInput
               label="Date of Birth"
@@ -1150,8 +1205,6 @@ export default function UsersPage() {
               required
             />
           </Grid>
-
-          {/* Joining Date */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppDateInput
               label="Joining Date"
@@ -1163,90 +1216,145 @@ export default function UsersPage() {
             />
           </Grid>
 
-          {/* Is Active (Switch) */}
-          {form.userId ? (
-            <Grid size={{ xs: 12, md: 6 }} sx={{ display: "flex", alignItems: "center", mt: 2 }}>
-              <AppSwitch
-                label={form.isActive ? "Active Account" : "Inactive Account"}
-                checked={form.isActive}
-                onChange={(e) => fieldChange("isActive", e.target.checked)}
-              />
-            </Grid>
-          ) : (
-            <Grid size={{ xs: 12, md: 6 }} />
-          )}
-
-          {/* New Password */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppInput
-              label={form.userId ? "New Password (leave blank to keep current)" : "Password"}
-              placeholder="Enter password"
-              type={showPassword ? "text" : "password"}
-              value={form.newPassword}
-              onChange={(e) => fieldChange("newPassword", e.target.value)}
-              maxLength={50}
-              error={!!errors.newPassword}
-              helperText={errors.newPassword}
-              required={!form.userId}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowPassword((v) => !v)} edge="end">
-                      {showPassword ? <VisibilityOff sx={{ fontSize: "1.1rem" }} /> : <Visibility sx={{ fontSize: "1.1rem" }} />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
+          {/* Row 5: Enable User Access Card */}
+          <Grid size={{ xs: 12 }}>
+            <Box
+              sx={{
+                p: 1.75,
+                px: 2.5,
+                borderRadius: "10px",
+                border: "1px solid",
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.1)"
+                    : "rgba(74, 63, 107, 0.14)",
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.03)"
+                    : "#f8f7fc",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                minHeight: 52,
               }}
-            />
-          </Grid>
-
-          {/* Confirm Password */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppInput
-              label="Confirm Password"
-              placeholder="Re-enter password"
-              type={showConfirm ? "text" : "password"}
-              value={form.confirmPassword}
-              onChange={(e) => fieldChange("confirmPassword", e.target.value)}
-              maxLength={50}
-              error={!!errors.confirmPassword}
-              helperText={errors.confirmPassword}
-              required={!form.userId || !!form.newPassword}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowConfirm((v) => !v)} edge="end">
-                      {showConfirm ? <VisibilityOff sx={{ fontSize: "1.1rem" }} /> : <Visibility sx={{ fontSize: "1.1rem" }} />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-
-          {/* Created On — shown in edit mode only */}
-          {form.userId && (
-            <Grid size={{ xs: 12 }}>
-              <Box
+            >
+              <Typography
+                variant="subtitle1"
+                fontWeight={700}
                 sx={{
-                  bgcolor: "rgba(74,63,107,0.04)",
-                  border: "1px solid rgba(74,63,107,0.12)",
-                  borderRadius: "8px",
-                  px: 2,
-                  py: 1,
-                  display: "flex",
-                  gap: 1,
-                  alignItems: "center",
+                  color: (theme) =>
+                    theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+                  fontSize: "0.95rem",
                 }}
               >
-                <Typography variant="caption" sx={{ color: "#6b7280", fontWeight: 600 }}>
-                  Created On:
-                </Typography>
-                <Typography variant="caption" sx={{ color: "#1e1a2e", fontWeight: 700 }}>
-                  {formatViewDateTime(form.createdOn, "—")}
-                </Typography>
-              </Box>
-            </Grid>
+                Enable User Access
+              </Typography>
+              <CustomSwitch
+                checked={Boolean(form.createMemberProfile)}
+                onChange={(e) => fieldChange("createMemberProfile", e.target.checked)}
+              />
+            </Box>
+          </Grid>
+
+          {/* ── Conditional User Access Fields ── */}
+          {form.createMemberProfile && (
+            <>
+              {/* Row 6: Username */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <AppInput
+                  label="Username"
+                  placeholder="Enter username"
+                  value={form.username}
+                  onChange={(e) => fieldChange("username", e.target.value)}
+                  restrictType="letterandnumber"
+                  maxLength={30}
+                  error={!!errors.username}
+                  helperText={errors.username}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }} sx={{ display: { xs: "none", md: "block" } }} />
+
+              {/* Row 7: Password & Confirm Password */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <AppInput
+                  label={form.userId ? "New Password (leave blank to keep current)" : "Password"}
+                  placeholder="Enter password (min 6 characters)"
+                  type={showPassword ? "text" : "password"}
+                  value={form.newPassword}
+                  onChange={(e) => fieldChange("newPassword", e.target.value)}
+                  maxLength={50}
+                  error={!!errors.newPassword}
+                  helperText={errors.newPassword}
+                  required={!form.userId}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setShowPassword((v) => !v)} edge="end">
+                          {showPassword ? <VisibilityOff sx={{ fontSize: "1.1rem" }} /> : <Visibility sx={{ fontSize: "1.1rem" }} />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <AppInput
+                  label={form.userId ? "Confirm New Password" : "Confirm Password"}
+                  placeholder="Re-enter password"
+                  type={showConfirm ? "text" : "password"}
+                  value={form.confirmPassword}
+                  onChange={(e) => fieldChange("confirmPassword", e.target.value)}
+                  maxLength={50}
+                  error={!!errors.confirmPassword}
+                  helperText={errors.confirmPassword}
+                  required={!form.userId || !!form.newPassword}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setShowConfirm((v) => !v)} edge="end">
+                          {showConfirm ? <VisibilityOff sx={{ fontSize: "1.1rem" }} /> : <Visibility sx={{ fontSize: "1.1rem" }} />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+            </>
+          )}
+
+          {/* Is Active & Created On — shown in edit mode only */}
+          {form.userId && (
+            <>
+              <Grid size={{ xs: 12, md: 6 }} sx={{ display: "flex", alignItems: "center" }}>
+                <AppSwitch
+                  label={form.isActive ? "Active Account" : "Inactive Account"}
+                  checked={form.isActive}
+                  onChange={(e) => fieldChange("isActive", e.target.checked)}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Box
+                  sx={{
+                    bgcolor: "rgba(74,63,107,0.04)",
+                    border: "1px solid rgba(74,63,107,0.12)",
+                    borderRadius: "8px",
+                    px: 2,
+                    py: 1,
+                    display: "flex",
+                    gap: 1,
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ color: "#6b7280", fontWeight: 600 }}>
+                    Created On:
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#1e1a2e", fontWeight: 700 }}>
+                    {formatViewDateTime(form.createdOn, "—")}
+                  </Typography>
+                </Box>
+              </Grid>
+            </>
           )}
         </Grid>
       </AppDialog>

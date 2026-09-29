@@ -1556,14 +1556,14 @@ export default function ExpensePage() {
                           statusExpense.status === "Approved"
                             ? "rgba(22, 163, 74, 0.12)"
                             : statusExpense.status === "Pending"
-                            ? "rgba(234, 179, 8, 0.15)"
-                            : "rgba(220, 38, 38, 0.12)",
+                              ? "rgba(234, 179, 8, 0.15)"
+                              : "rgba(220, 38, 38, 0.12)",
                         color:
                           statusExpense.status === "Approved"
                             ? "#16a34a"
                             : statusExpense.status === "Pending"
-                            ? "#d97706"
-                            : "#dc2626",
+                              ? "#d97706"
+                              : "#dc2626",
                       }}
                     />
                   </Box>

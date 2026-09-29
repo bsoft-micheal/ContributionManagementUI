@@ -237,8 +237,9 @@ export function AuthProvider({ children }) {
     setAuthState((current) => {
       if (!current) return current;
       const resolvedWt = data.workType !== undefined ? data.workType : (data.memberType !== undefined ? data.memberType : current.workType);
-      return {
+      const updated = {
         ...current,
+        isFirstLogin: false,
         fullName: data.fullName || current.fullName,
         email: data.email || current.email,
         profileImage: data.profileImage,
@@ -250,6 +251,11 @@ export function AuthProvider({ children }) {
         joiningDate: data.joiningDate !== undefined ? data.joiningDate : current.joiningDate,
         role: data.roleName || current.role,
       };
+      sessionStorage.setItem("teamContributionAuth", JSON.stringify(updated));
+      if (localStorage.getItem("teamContributionRememberMe") === "true") {
+        localStorage.setItem("teamContributionAuth", JSON.stringify(updated));
+      }
+      return updated;
     });
     return data;
   }

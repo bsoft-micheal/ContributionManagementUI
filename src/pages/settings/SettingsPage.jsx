@@ -1118,7 +1118,7 @@ export default function SettingsPage() {
                       General Settings
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                      Basic organization information and preferences.
+                      
                     </Typography>
                   </Box>
                 </Box>

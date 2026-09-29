@@ -29,10 +29,10 @@ export const navigationItems = [
     icon: <DashboardRoundedIcon fontSize="small" />
   },
   {
-    featureId: 2,
-    label: "Members",
-    path: "/members",
-    icon: <Diversity3RoundedIcon fontSize="small" />
+    featureId: 14,
+    label: "Users",
+    path: "/users",
+    icon: <ManageAccountsRoundedIcon fontSize="small" />
   },
   {
     featureId: 3,
@@ -70,7 +70,6 @@ export const navigationItems = [
     id: "tools",
     icon: <BuildRoundedIcon fontSize="small" />,
     children: [
-      { featureId: 14, label: "Users", path: "/users", icon: <ManageAccountsRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 15, label: "Roles", path: "/roles", icon: <BadgeRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 16, label: "User Rights", path: "/user-rights", icon: <AdminPanelSettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 17, label: "Event Types", path: "/event-types", icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },

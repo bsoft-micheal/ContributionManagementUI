@@ -6,6 +6,7 @@ import {
   Divider,
   Drawer,
   IconButton,
+  InputAdornment,
   List,
   ListItemButton,
   ListItemIcon,
@@ -14,6 +15,7 @@ import {
   Popper,
   Tooltip,
   Typography,
+  Alert,
 } from "@mui/material";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
@@ -21,6 +23,9 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import SaveIcon from "@mui/icons-material/Save";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import LockResetIcon from "@mui/icons-material/LockReset";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../contexts/AuthContext";
@@ -337,6 +342,7 @@ export default function AppLayout() {
       toast.error(err.response?.data?.message || err.message || "Failed to update profile");
     }
   };
+
 
   const handleLogout = async () => {
     await logout();
@@ -867,6 +873,8 @@ export default function AppLayout() {
           </Box>
         </Box>
       </AppDialog>
+
+
 
       {/* ── Submodule Flyout Popper (Right Side) ─────────────────────────── */}
       <Popper
