@@ -42,7 +42,7 @@ export function getFeatureIdForPath(path) {
   if (normalizedPath === "/contribution-calculation") return 10;
   if (normalizedPath === "/expense") return 11;
   if (normalizedPath === "/support-tickets") return 12;
-  if (normalizedPath === "/users") return 14;
+  if (normalizedPath === "/users" || normalizedPath === "/members") return 2;
   if (normalizedPath === "/roles") return 15;
   if (normalizedPath === "/user-rights") return 16;
   if (normalizedPath === "/event-types") return 17;
@@ -64,11 +64,6 @@ export function getRightsForFeatureId(featureId, roleName) {
     return { read: true, write: true, deny: false };
   }
 
-  const roleLower = String(roleName).toLowerCase();
-  if (roleLower === "admin" || roleLower === "superadmin") {
-    return { read: true, write: true, deny: false };
-  }
-
   const savedRights = localStorage.getItem("projectRightsConfig");
   if (!savedRights) {
     return { read: true, write: true, deny: false };
@@ -76,6 +71,7 @@ export function getRightsForFeatureId(featureId, roleName) {
 
   try {
     const rightsMap = JSON.parse(savedRights);
+    const roleLower = String(roleName).toLowerCase();
     const roleRights = rightsMap[roleName] || rightsMap[roleLower];
     if (!roleRights || !Array.isArray(roleRights)) {
       return { read: true, write: true, deny: false };
@@ -85,7 +81,7 @@ export function getRightsForFeatureId(featureId, roleName) {
     let matchedRight = null;
 
     if (numericFeatureId > 0) {
-      matchedRight = roleRights.find(r => Number(r.featureId || r.featureID) === numericFeatureId);
+      matchedRight = roleRights.find(r => Number(r.featureId || r.featureID || r.FeatureID || r.FeatureId) === numericFeatureId);
     }
 
     if (!matchedRight) {
@@ -94,8 +90,8 @@ export function getRightsForFeatureId(featureId, roleName) {
 
     let accessType = matchedRight.accessType ?? matchedRight.AccessType;
     if (accessType === undefined || accessType === null || isNaN(Number(accessType)) || Number(accessType) === 0) {
-      const accessStr = (matchedRight.access || matchedRight.Access || "").toLowerCase();
-      accessType = accessStr === "deny" ? 3 : (accessStr === "readonly" ? 1 : 2);
+      const accessStr = String(matchedRight.access || matchedRight.Access || "").toLowerCase().replace(/[\s_-]/g, "");
+      accessType = (accessStr === "deny" || accessStr === "3") ? 3 : ((accessStr === "readonly" || accessStr === "1") ? 1 : 2);
     }
 
     const val = Number(accessType);
@@ -115,17 +111,15 @@ export function getRightsForFeatureId(featureId, roleName) {
  */
 export function getRightsForPath(path, roleName) {
   const featureId = getFeatureIdForPath(path);
-  return getRightsForFeatureId(featureId, roleName);
+  if (featureId) {
+    return getRightsForFeatureId(featureId, roleName);
+  }
+  return getRightsForPage(path, roleName);
 }
 
 export function getRightsForPage(pageName, roleName) {
   if (!roleName) {
     return { read: false, write: false, deny: true };
-  }
-
-  const roleLower = String(roleName).toLowerCase();
-  if (roleLower === "admin" || roleLower === "superadmin") {
-    return { read: true, write: true, deny: false };
   }
 
   // 1. Try resolving via featureId matching first
@@ -142,17 +136,19 @@ export function getRightsForPage(pageName, roleName) {
 
   try {
     const rightsMap = JSON.parse(savedRights);
-    const roleRights = rightsMap[roleName];
+    const roleLower = String(roleName).toLowerCase();
+    const roleRights = rightsMap[roleName] || rightsMap[roleLower];
     if (!roleRights || !Array.isArray(roleRights)) {
       return { read: false, write: false, deny: true };
     }
 
-    const cleanTarget = (pageName || "").toLowerCase();
+    const cleanTarget = (pageName || "").toLowerCase().trim();
     const matchedRight = roleRights.find(r => {
-      const sub = (r.subModule || r.SubModule || "").toLowerCase();
-      const mod = (r.module || r.Module || "").toLowerCase();
-      const page = (r.page || r.Page || "").toLowerCase();
-      return sub === cleanTarget || mod === cleanTarget || page === cleanTarget;
+      const sub = (r.subModule || r.SubModule || "").toLowerCase().trim();
+      const mod = (r.module || r.Module || "").toLowerCase().trim();
+      const page = (r.page || r.Page || "").toLowerCase().trim();
+      const act = (r.action || r.Action || "").toLowerCase().trim();
+      return sub === cleanTarget || mod === cleanTarget || page === cleanTarget || act === cleanTarget;
     });
 
     if (!matchedRight) {
@@ -161,8 +157,8 @@ export function getRightsForPage(pageName, roleName) {
 
     let accessType = matchedRight.accessType ?? matchedRight.AccessType;
     if (accessType === undefined || accessType === null || isNaN(Number(accessType)) || Number(accessType) === 0) {
-      const accessStr = (matchedRight.access || matchedRight.Access || "").toLowerCase();
-      accessType = accessStr === "deny" ? 3 : (accessStr === "readonly" ? 1 : 2);
+      const accessStr = String(matchedRight.access || matchedRight.Access || "").toLowerCase().replace(/[\s_-]/g, "");
+      accessType = (accessStr === "deny" || accessStr === "3") ? 3 : ((accessStr === "readonly" || accessStr === "1") ? 1 : 2);
     }
     const val = Number(accessType);
 
@@ -190,11 +186,6 @@ export function hasActionPermission(actionName, featureId, roleName) {
     return { canView: true, canExecute: true, isDenied: false, readOnly: false };
   }
 
-  const roleLower = String(roleName).toLowerCase();
-  if (roleLower === "admin" || roleLower === "superadmin") {
-    return { canView: true, canExecute: true, isDenied: false, readOnly: false };
-  }
-
   const savedRights = localStorage.getItem("projectRightsConfig");
   if (!savedRights) {
     return { canView: true, canExecute: true, isDenied: false, readOnly: false };
@@ -202,6 +193,7 @@ export function hasActionPermission(actionName, featureId, roleName) {
 
   try {
     const rightsMap = JSON.parse(savedRights);
+    const roleLower = String(roleName).toLowerCase();
     const roleRights = rightsMap[roleName] || rightsMap[roleLower];
     if (!roleRights || !Array.isArray(roleRights)) {
       return { canView: true, canExecute: true, isDenied: false, readOnly: false };
@@ -212,7 +204,7 @@ export function hasActionPermission(actionName, featureId, roleName) {
 
     // 1. Try matching by featureId
     if (numericFeatureId > 0) {
-      matchedRight = roleRights.find(r => Number(r.featureId || r.featureID) === numericFeatureId);
+      matchedRight = roleRights.find(r => Number(r.featureId || r.featureID || r.FeatureID || r.FeatureId) === numericFeatureId);
     }
 
     // 2. Fallback matching by action / page / subModule name
@@ -232,8 +224,8 @@ export function hasActionPermission(actionName, featureId, roleName) {
 
     let accessType = matchedRight.accessType ?? matchedRight.AccessType;
     if (accessType === undefined || accessType === null || isNaN(Number(accessType)) || Number(accessType) === 0) {
-      const accessStr = (matchedRight.access || matchedRight.Access || "").toLowerCase();
-      accessType = accessStr === "deny" ? 3 : (accessStr === "readonly" ? 1 : 2);
+      const accessStr = String(matchedRight.access || matchedRight.Access || "").toLowerCase().replace(/[\s_-]/g, "");
+      accessType = (accessStr === "deny" || accessStr === "3") ? 3 : ((accessStr === "readonly" || accessStr === "1") ? 1 : 2);
     }
 
     const val = Number(accessType);

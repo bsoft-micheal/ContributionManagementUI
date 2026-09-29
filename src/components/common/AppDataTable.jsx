@@ -293,6 +293,7 @@ export default function AppDataTable({
   loading,
   actions,
   filterPanel,
+  allowExport = true,
 }) {
   const theme = useTheme();
   const surface = theme.palette.background.paper;
@@ -606,41 +607,53 @@ export default function AppDataTable({
           >
             Export :
           </Typography>
-          <Tooltip title="Export Excel (.xlsx)">
-            <IconButton
-              size="small"
-              onClick={() => exportToExcel(orderedColumns, processedData, `${title || 'export'}.xlsx`, title)}
-              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
-            >
-              <ExcelIcon sx={{ fontSize: "1.1rem" }} />
-            </IconButton>
+          <Tooltip title={allowExport ? "Export Excel (.xlsx)" : "Export Disabled"}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={!allowExport}
+                onClick={() => exportToExcel(orderedColumns, processedData, `${title || 'export'}.xlsx`, title)}
+                sx={{ p: 0.4, color: allowExport ? (theme.palette.mode === "dark" ? "#94a3b8" : "#64748b") : "#cbd5e1", "&:hover": { color: allowExport ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : "#cbd5e1" } }}
+              >
+                <ExcelIcon sx={{ fontSize: "1.1rem" }} />
+              </IconButton>
+            </span>
           </Tooltip>
-          <Tooltip title="Save PDF / Printout">
-            <IconButton
-              size="small"
-              onClick={() => printTable(title, orderedColumns, processedData)}
-              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
-            >
-              <PdfIcon sx={{ fontSize: "1.1rem" }} />
-            </IconButton>
+          <Tooltip title={allowExport ? "Save PDF / Printout" : "Export Disabled"}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={!allowExport}
+                onClick={() => printTable(title, orderedColumns, processedData)}
+                sx={{ p: 0.4, color: allowExport ? (theme.palette.mode === "dark" ? "#94a3b8" : "#64748b") : "#cbd5e1", "&:hover": { color: allowExport ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : "#cbd5e1" } }}
+              >
+                <PdfIcon sx={{ fontSize: "1.1rem" }} />
+              </IconButton>
+            </span>
           </Tooltip>
-          <Tooltip title="Print Report">
-            <IconButton
-              size="small"
-              onClick={() => printTable(title, orderedColumns, processedData)}
-              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
-            >
-              <PrintIcon sx={{ fontSize: "1.1rem" }} />
-            </IconButton>
+          <Tooltip title={allowExport ? "Print Report" : "Export Disabled"}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={!allowExport}
+                onClick={() => printTable(title, orderedColumns, processedData)}
+                sx={{ p: 0.4, color: allowExport ? (theme.palette.mode === "dark" ? "#94a3b8" : "#64748b") : "#cbd5e1", "&:hover": { color: allowExport ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : "#cbd5e1" } }}
+              >
+                <PrintIcon sx={{ fontSize: "1.1rem" }} />
+              </IconButton>
+            </span>
           </Tooltip>
-          <Tooltip title="Download CSV">
-            <IconButton
-              size="small"
-              onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
-              sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
-            >
-              <DownloadIcon sx={{ fontSize: "1.1rem" }} />
-            </IconButton>
+          <Tooltip title={allowExport ? "Download CSV" : "Export Disabled"}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={!allowExport}
+                onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
+                sx={{ p: 0.4, color: allowExport ? (theme.palette.mode === "dark" ? "#94a3b8" : "#64748b") : "#cbd5e1", "&:hover": { color: allowExport ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : "#cbd5e1" } }}
+              >
+                <DownloadIcon sx={{ fontSize: "1.1rem" }} />
+              </IconButton>
+            </span>
           </Tooltip>
         </Stack>
 
