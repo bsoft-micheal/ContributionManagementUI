@@ -46,33 +46,244 @@ import {
   Visibility as ShowIcon,
   Sort as SortIcon,
 } from "@mui/icons-material";
+import * as XLSX from "xlsx";
 import { formatGridDate, formatGridDateTime } from "../../utils/dateHelper";
+
+// ─── Printout & PDF Helper ──────────────────────────────────────────────────
+function printTable(title, columns, data) {
+  const exportableCols = (columns || []).filter(
+    (c) => c && c.label && c.label.toLowerCase() !== "action" && (c.key || c.label)
+  );
+
+  const getCellText = (col, row) => {
+    let val = col.key ? row[col.key] : undefined;
+    if (val === undefined && typeof col.key === "string" && col.key.length > 0) {
+      val = row[col.key[0].toUpperCase() + col.key.slice(1)] ?? row[col.key[0].toLowerCase() + col.key.slice(1)];
+    }
+    if (typeof val === "boolean") return val ? "Active" : "Inactive";
+    if (val instanceof Date) return formatGridDate(val);
+    if (typeof val === "string" && (/^\d{4}-\d{2}-\d{2}T/.test(val) || /^\d{4}-\d{2}-\d{2}$/.test(val))) {
+      return formatGridDate(val);
+    }
+    if (val === null || val === undefined || val === "") return "--";
+    return String(val);
+  };
+
+  const printWindow = window.open("", "_blank", "width=1100,height=750");
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  const generatedDate = new Date().toLocaleString();
+  const tableHeaders = exportableCols.map((col) => `<th>${col.label}</th>`).join("");
+  const tableRows = data
+    .map(
+      (row, idx) => `
+    <tr class="${idx % 2 === 0 ? "even" : "odd"}">
+      ${exportableCols.map((col) => `<td>${getCellText(col, row)}</td>`).join("")}
+    </tr>`
+    )
+    .join("");
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>${title || "Print Report"} - Team Contribution Management</title>
+        <meta charset="utf-8" />
+        <style>
+          @page {
+            size: landscape;
+            margin: 12mm;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #1e1a2e;
+            margin: 0;
+            padding: 24px;
+            background: #ffffff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 2px solid #4a3f6b;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+          }
+          .header-left h1 {
+            margin: 0;
+            font-size: 22px;
+            color: #4a3f6b;
+            font-weight: 800;
+          }
+          .header-left p {
+            margin: 4px 0 0 0;
+            font-size: 13px;
+            color: #6b7280;
+            font-weight: 500;
+          }
+          .header-right {
+            text-align: right;
+            font-size: 12px;
+            color: #4b5563;
+            line-height: 1.5;
+          }
+          .header-right strong {
+            color: #1e1a2e;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-top: 12px;
+            margin-bottom: 20px;
+          }
+          th {
+            background-color: #4a3f6b !important;
+            color: #ffffff !important;
+            font-weight: 700;
+            text-align: left;
+            padding: 9px 10px;
+            border: 1px solid #4a3f6b;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            font-size: 10px;
+          }
+          td {
+            padding: 8px 10px;
+            border: 1px solid #e5e7eb;
+            color: #374151;
+            font-size: 11px;
+          }
+          tr.even {
+            background-color: #ffffff;
+          }
+          tr.odd {
+            background-color: #f8fafc;
+          }
+          .footer {
+            margin-top: 24px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+            font-size: 11px;
+            color: #9ca3af;
+            display: flex;
+            justify-content: space-between;
+          }
+          @media print {
+            body { padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="header-left">
+            <h1>${title || "Data Report"}</h1>
+            <p>Team Contribution Management System</p>
+          </div>
+          <div class="header-right">
+            <div>Printed On: <strong>${generatedDate}</strong></div>
+            <div>Total Records: <strong>${data.length}</strong></div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              ${tableHeaders}
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <span>Confidential — Internal Company Record</span>
+          <span>Printed from Contribution Management System</span>
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.focus();
+            window.print();
+          };
+        </script>
+      </body>
+    </html>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+}
+
+// ─── Excel (.xlsx) Export Helper ────────────────────────────────────────────
+function exportToExcel(columns, data, filename = "export.xlsx", title = "Data") {
+  const exportableCols = (columns || []).filter(
+    (c) => c && c.label && c.label.toLowerCase() !== "action" && (c.key || c.label)
+  );
+
+  const getCellText = (col, row) => {
+    let val = col.key ? row[col.key] : undefined;
+    if (val === undefined && typeof col.key === "string" && col.key.length > 0) {
+      val = row[col.key[0].toUpperCase() + col.key.slice(1)] ?? row[col.key[0].toLowerCase() + col.key.slice(1)];
+    }
+    if (typeof val === "boolean") return val ? "Active" : "Inactive";
+    if (val instanceof Date) return formatGridDate(val);
+    if (typeof val === "string" && (/^\d{4}-\d{2}-\d{2}T/.test(val) || /^\d{4}-\d{2}-\d{2}$/.test(val))) {
+      return formatGridDate(val);
+    }
+    if (val === null || val === undefined) return "";
+    return val;
+  };
+
+  const headers = exportableCols.map((c) => c.label);
+  const rows = data.map((row) => exportableCols.map((col) => getCellText(col, row)));
+
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, (title || "Sheet1").substring(0, 31));
+  XLSX.writeFile(workbook, filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`);
+}
 
 // ─── CSV Export Helper ──────────────────────────────────────────────────────
 function exportToCSV(columns, data, filename = "export.csv") {
-  const headers = columns.filter(c => c.key).map(c => c.label);
-  const keys = columns.filter(c => c.key).map(c => c.key);
-  const rows = data.map(row =>
-    keys.map(k => {
-      let val = row[k];
-      if (val === undefined && typeof k === "string" && k.length > 0) {
-        val = row[k[0].toUpperCase() + k.slice(1)] ?? row[k[0].toLowerCase() + k.slice(1)];
-      }
-      return `"${(val ?? "").toString().replace(/"/g, '""')}"`;
-    }).join(",")
+  const exportableCols = (columns || []).filter(
+    (c) => c && c.label && c.label.toLowerCase() !== "action" && (c.key || c.label)
+  );
+
+  const getCellText = (col, row) => {
+    let val = col.key ? row[col.key] : undefined;
+    if (val === undefined && typeof col.key === "string" && col.key.length > 0) {
+      val = row[col.key[0].toUpperCase() + col.key.slice(1)] ?? row[col.key[0].toLowerCase() + col.key.slice(1)];
+    }
+    if (typeof val === "boolean") return val ? "Active" : "Inactive";
+    if (val instanceof Date) return formatGridDate(val);
+    if (typeof val === "string" && (/^\d{4}-\d{2}-\d{2}T/.test(val) || /^\d{4}-\d{2}-\d{2}$/.test(val))) {
+      return formatGridDate(val);
+    }
+    return val ?? "";
+  };
+
+  const headers = exportableCols.map((c) => c.label);
+  const rows = data.map((row) =>
+    exportableCols
+      .map((col) => `"${String(getCellText(col, row)).replace(/"/g, '""')}"`)
+      .join(",")
   );
   const csv = [headers.join(","), ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename;
+  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function handlePrint() {
-  window.print();
 }
 
 export default function AppDataTable({
@@ -395,19 +606,19 @@ export default function AppDataTable({
           >
             Export :
           </Typography>
-          <Tooltip title="Export Excel">
+          <Tooltip title="Export Excel (.xlsx)">
             <IconButton
               size="small"
-              onClick={() => exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`)}
+              onClick={() => exportToExcel(orderedColumns, processedData, `${title || 'export'}.xlsx`, title)}
               sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <ExcelIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Save PDF">
+          <Tooltip title="Save PDF / Printout">
             <IconButton
               size="small"
-              onClick={handlePrint}
+              onClick={() => printTable(title, orderedColumns, processedData)}
               sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <PdfIcon sx={{ fontSize: "1.1rem" }} />
@@ -416,7 +627,7 @@ export default function AppDataTable({
           <Tooltip title="Print Report">
             <IconButton
               size="small"
-              onClick={handlePrint}
+              onClick={() => printTable(title, orderedColumns, processedData)}
               sx={{ p: 0.4, color: theme.palette.mode === "dark" ? "#94a3b8" : "#64748b", "&:hover": { color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" } }}
             >
               <PrintIcon sx={{ fontSize: "1.1rem" }} />
