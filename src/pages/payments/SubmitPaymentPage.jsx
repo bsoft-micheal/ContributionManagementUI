@@ -100,7 +100,7 @@ export default function SubmitPaymentPage() {
     eventName: "",
     memberName: authState?.fullName || "",
     amount: amountParam || "",
-    paymentMode: "GPay",
+    paymentMode: "",
     utr: "",
     paymentDate: dayjs(),
     notes: "",
@@ -319,16 +319,6 @@ export default function SubmitPaymentPage() {
           });
         }
       });
-
-    if (list.length === 0) {
-      return [
-        { label: "GPay", value: "GPay", color: "#2563eb" },
-        { label: "PhonePe", value: "PhonePe", color: "#7c3aed" },
-        { label: "Paytm", value: "Paytm", color: "#0284c7" },
-        { label: "UPI", value: "UPI", color: "#ea580c" },
-        { label: "Bank Transfer", value: "Bank Transfer", color: "#059669" },
-      ];
-    }
 
     return list;
   }, [dbPaymentModes]);

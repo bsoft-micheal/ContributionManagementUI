@@ -140,7 +140,7 @@ const initialSettings = {
   qrReceiverName: "Daniel A",
   qrUpiId: "danielrobertanto604@okicici",
   qrMode: "generated", // "generated" | "uploaded"
-  qrPreviewAmount: "100",
+  qrPreviewAmount: "",
   qrImage: null,
 };
 
@@ -246,7 +246,7 @@ export default function SettingsPage() {
         upiId: found.upiId || "",
         qrMode: found.qrMode || "generated",
         qrImage: found.qrImage || null,
-        previewAmount: found.previewAmount || "100",
+        previewAmount: found.previewAmount || "",
         isActive: found.isActive !== undefined ? found.isActive : true,
       };
     }
@@ -255,7 +255,7 @@ export default function SettingsPage() {
       upiId: "",
       qrMode: "generated",
       qrImage: null,
-      previewAmount: "100",
+      previewAmount: "",
       isActive: true,
     };
   }, [eventPaymentQrConfigs, selectedQrEventType]);
@@ -281,7 +281,7 @@ export default function SettingsPage() {
     ? buildUpiPaymentUri({
       upiId: currentQrConfig.upiId,
       receiverName: currentQrConfig.receiverName,
-      amount: currentQrConfig.previewAmount || 100,
+      amount: currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0 ? Number(currentQrConfig.previewAmount) : undefined,
       note: `Contribution for ${selectedQrEventType}`,
     })
     : "";
@@ -764,12 +764,24 @@ export default function SettingsPage() {
 
   // Save Email Template Settings
   const handleSaveEmailTemplate = async () => {
-    if (!templateSubject.trim()) {
+    if (!templateSubject || !templateSubject.trim()) {
       toast.error("Email Subject is required.");
       return;
     }
-    if (!templateDescription.trim()) {
+    if (!templateDescription || !templateDescription.trim()) {
       toast.error("Email Description is required.");
+      return;
+    }
+
+    const intervalNum = Number(settings.reminderIntervalDays);
+    if (!settings.reminderIntervalDays || isNaN(intervalNum) || intervalNum < 1 || intervalNum > 31) {
+      toast.error("Please enter a valid Reminder Interval between 1 and 31 days.");
+      return;
+    }
+
+    const maxRemindersNum = Number(settings.maxReminders);
+    if (!settings.maxReminders || isNaN(maxRemindersNum) || maxRemindersNum < 1 || maxRemindersNum > 10) {
+      toast.error("Please enter a valid Maximum Reminders limit between 1 and 10.");
       return;
     }
 
@@ -802,8 +814,8 @@ export default function SettingsPage() {
         selectedTemplateCategoryId: selectedCategoryId,
         enableMonthlyEmail: settings.enableMonthlyEmail !== false,
         enableReminderEmail: settings.enableReminderEmail !== false,
-        reminderIntervalDays: settings.reminderIntervalDays || "10",
-        maxReminders: settings.maxReminders || "3",
+        reminderIntervalDays: String(intervalNum),
+        maxReminders: String(maxRemindersNum),
       };
 
       await persistSettings(updated);
@@ -1329,8 +1341,31 @@ export default function SettingsPage() {
 
                       {/* Quick Action Buttons */}
                       <Box sx={{ display: "flex", gap: 1 }}>
-                        
-                        
+                        <AppButton
+                          size="small"
+                          variant="outlined"
+                          startIcon={<SendOutlinedIcon sx={{ fontSize: 15 }} />}
+                          onClick={() => setTestEmailDialogOpen(true)}
+                          sx={{
+                            fontSize: "0.75rem",
+                            height: 32,
+                            borderColor: "#0284c7",
+                            color: "#0284c7",
+                            fontWeight: 700,
+                            "&:hover": { borderColor: "#0369a1", bgcolor: "rgba(2,132,199,0.06)" },
+                          }}
+                        >
+                          Send Test Email
+                        </AppButton>
+                        <AppButton
+                          size="small"
+                          variant="outlined"
+                          startIcon={<HistoryOutlinedIcon sx={{ fontSize: 15 }} />}
+                          onClick={() => setLogsDialogOpen(true)}
+                          sx={{ fontSize: "0.75rem", height: 32, fontWeight: 700 }}
+                        >
+                          Reminder Logs
+                        </AppButton>
                       </Box>
                     </Box>
 
@@ -1383,7 +1418,12 @@ export default function SettingsPage() {
                               Initial Email Template (Day 1 of Month)
                             </ToggleButton>
                             <ToggleButton value="reminder">
-                              Reminder Email Template (Day 11, Day 21, Day 31)
+                              {(() => {
+                                const intVal = Math.max(1, Number(settings.reminderIntervalDays) || 10);
+                                const maxVal = Math.max(1, Number(settings.maxReminders) || 3);
+                                const days = Array.from({ length: maxVal }, (_, i) => `Day ${1 + (i + 1) * intVal}`).join(", ");
+                                return `Reminder Email Template (${days})`;
+                              })()}
                             </ToggleButton>
                           </ToggleButtonGroup>
                         </Box>
@@ -1421,7 +1461,7 @@ export default function SettingsPage() {
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
                             <ScheduleOutlinedIcon sx={{ fontSize: 19, color: "#0284c7" }} />
                             <Typography variant="subtitle2" fontWeight={800} sx={{ fontSize: "0.85rem" }}>
-                              Automated Monthly & 10-Day Reminder Settings
+                              Automated Monthly & {settings.reminderIntervalDays || "10"}-Day Reminder Settings
                             </Typography>
                           </Box>
 
@@ -1443,24 +1483,26 @@ export default function SettingsPage() {
                                 onChange={(e) => handleChange("enableReminderEmail", e.target.checked)}
                               />
                               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", display: "block", pl: 0.5 }}>
-                                Send reminders every 10 days for unpaid contributions (stops once paid).
+                                Send reminders every {settings.reminderIntervalDays || "10"} days for unpaid contributions (stops once paid).
                               </Typography>
                             </Grid>
 
                           <Grid size={{ xs: 12, sm: 6 }}>
                             <AppInput
                               label="Reminder Interval (Days)"
-                              value={settings.reminderIntervalDays || "10"}
+                              value={settings.reminderIntervalDays !== undefined && settings.reminderIntervalDays !== null ? settings.reminderIntervalDays : ""}
                               onChange={(e) => handleChange("reminderIntervalDays", e.target.value)}
                               restrictType="numberonly"
+                              placeholder="e.g. 10"
                             />
                           </Grid>
                           <Grid size={{ xs: 12, sm: 6 }}>
                             <AppInput
                               label="Maximum Reminders Allowed"
-                              value={settings.maxReminders || "3"}
+                              value={settings.maxReminders !== undefined && settings.maxReminders !== null ? settings.maxReminders : ""}
                               onChange={(e) => handleChange("maxReminders", e.target.value)}
                               restrictType="numberonly"
+                              placeholder="e.g. 3"
                             />
                           </Grid>
                         </Grid>
@@ -1521,13 +1563,10 @@ export default function SettingsPage() {
                           Email Preview
                         </Typography>
                         <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                          Live simulation using current template values.
                         </Typography>
                       </Box>
                     </Box>
-
                     <Divider sx={{ mb: 2 }} />
-
                     {/* Subject Line Display */}
                     <Box
                       sx={{

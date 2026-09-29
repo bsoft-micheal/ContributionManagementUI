@@ -142,7 +142,7 @@ export function savePaymentQrConfigForEventType(eventType, config) {
     upiId: (config.upiId || "").trim(),
     qrMode: config.qrMode || "generated",
     qrImage: config.qrImage || null,
-    previewAmount: config.previewAmount || "100",
+    previewAmount: config.previewAmount || "",
     isActive: config.isActive !== undefined ? config.isActive : true,
   };
 
@@ -202,7 +202,7 @@ export function getPaymentQrConfig(eventTypeOrEvent) {
       qrUpiId: upiId,
       qrMode,
       qrImage,
-      previewAmount: matchedConfig.previewAmount || "100",
+      previewAmount: matchedConfig.previewAmount || "",
       isActive: matchedConfig.isActive !== false,
       isConfigured: true,
       message: "",
@@ -218,7 +218,7 @@ export function getPaymentQrConfig(eventTypeOrEvent) {
     qrUpiId: "",
     qrMode: "generated",
     qrImage: null,
-    previewAmount: "100",
+    previewAmount: "",
     isActive: false,
     isConfigured: false,
     message: "Payment QR is not configured for this event type.",
