@@ -68,6 +68,7 @@ export default function ContributionsPage() {
   // Granular Action Permissions
   const canAddContribution = hasActionPermission("Add Contribution", 41, authState?.role).canExecute;
   const canViewContribution = hasActionPermission("View Contribution", 40, authState?.role).canView;
+  const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
 
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState("");
@@ -133,7 +134,7 @@ export default function ContributionsPage() {
       try {
         const data = await getContributionsByEventAsync(selectedEventId);
 
-        const enrichedData = data.map(c => {
+        let enrichedData = data.map(c => {
           // Calculate Arrears: sum of unpaid contributions for this member in other events
           const previousUnpaid = allContributions
             .filter(prev =>
@@ -151,6 +152,16 @@ export default function ContributionsPage() {
             totalAccumulated: currentOutstanding + previousUnpaid
           };
         });
+
+        if (isMemberRole) {
+          const userEmail = String(authState?.email || "").toLowerCase().trim();
+          const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
+          enrichedData = enrichedData.filter(c =>
+            (currentMemberId && String(c.memberId).toLowerCase() === currentMemberId) ||
+            (userEmail && String(c.email || c.memberEmail || "").toLowerCase().trim() === userEmail) ||
+            (authState?.user?.fullName && String(c.memberName || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim())
+          );
+        }
 
         setContributions(enrichedData);
       } catch (error) {
@@ -361,7 +372,7 @@ export default function ContributionsPage() {
       setAllContributions(allData);
 
       const eventData = await getContributionsByEventAsync(selectedEventId);
-      const enriched = eventData.map(c => {
+      let enriched = eventData.map(c => {
         const previousUnpaid = allData
           .filter(prev =>
             prev.memberId === c.memberId &&
@@ -378,6 +389,17 @@ export default function ContributionsPage() {
           totalAccumulated: currentOutstanding + previousUnpaid
         };
       });
+
+      if (isMemberRole) {
+        const userEmail = String(authState?.email || "").toLowerCase().trim();
+        const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
+        enriched = enriched.filter(c =>
+          (currentMemberId && String(c.memberId).toLowerCase() === currentMemberId) ||
+          (userEmail && String(c.email || c.memberEmail || "").toLowerCase().trim() === userEmail) ||
+          (authState?.user?.fullName && String(c.memberName || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim())
+        );
+      }
+
       setContributions(enriched);
     } catch (error) {
       const apiErrorMsg =
@@ -559,7 +581,7 @@ export default function ContributionsPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Contribution Collections"
+        title={isMemberRole ? "My Contribution Details" : "Contribution Collections"}
         columns={columns}
         data={contributions}
         filterPanel={
