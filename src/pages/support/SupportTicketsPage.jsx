@@ -55,11 +55,13 @@ import { getEventsAsync } from "../../services/eventService";
 import { getTicketTypesAsync } from "../../services/ticketTypeService";
 import { getStatusesAsync } from "../../services/statusService";
 import { getPrioritiesAsync } from "../../services/priorityService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const initialForm = {
   memberName: "",
   memberId: "",
+  eventType: "",
   relatedEvent: "",
   ticketType: "",
   priority: "Medium",
@@ -102,6 +104,7 @@ export default function SupportTicketsPage() {
   const [tickets, setTickets] = useState([]);
   const [membersList, setMembersList] = useState([]);
   const [eventsList, setEventsList] = useState([]);
+  const [eventTypesList, setEventTypesList] = useState([]);
   const [dbTicketTypes, setDbTicketTypes] = useState([]);
   const [dbStatuses, setDbStatuses] = useState([]);
   const [dbPriorities, setDbPriorities] = useState([]);
@@ -248,15 +251,17 @@ export default function SupportTicketsPage() {
 
   const fetchLookupData = async () => {
     try {
-      const [membersRes, eventsRes, ticketTypesRes, statusesRes, prioritiesRes] = await Promise.all([
+      const [membersRes, eventsRes, eventTypesRes, ticketTypesRes, statusesRes, prioritiesRes] = await Promise.all([
         getMembersAsync().catch(() => []),
         getEventsAsync().catch(() => []),
+        getEventTypesAsync().catch(() => []),
         getTicketTypesAsync(true).catch(() => []),
         getStatusesAsync(true).catch(() => []),
         getPrioritiesAsync(true).catch(() => []),
       ]);
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
+      if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
       if (Array.isArray(ticketTypesRes)) setDbTicketTypes(ticketTypesRes);
       if (Array.isArray(statusesRes)) setDbStatuses(statusesRes);
       if (Array.isArray(prioritiesRes)) setDbPriorities(prioritiesRes);
@@ -271,10 +276,17 @@ export default function SupportTicketsPage() {
 
     if (location.state?.raiseTicket) {
       setEditingTicket(null);
+      const relEvent = location.state.relatedEvent || "";
+      const matchedEvent = (eventsList || []).find(
+        (ev) => (ev.eventName || ev.name || ev.title) === relEvent
+      );
+      const derivedType = matchedEvent?.eventTypeName || matchedEvent?.categoryName || matchedEvent?.eventType || "";
+
       setForm({
         ...initialForm,
         memberName: location.state.memberName || authState?.fullName || "",
-        relatedEvent: location.state.relatedEvent || "",
+        eventType: derivedType,
+        relatedEvent: relEvent,
         ticketType: "Payment Issue",
         subject: `Payment Issue - Transaction ${location.state.transactionId || ""}`,
         description: `Payment transaction ${location.state.transactionId || ""} for amount ₹${location.state.amount || ""} via ${location.state.paymentMode || ""} (UTR: ${location.state.utr || ""}) is currently pending verification. Please verify and resolve the issue.`,
@@ -301,19 +313,53 @@ export default function SupportTicketsPage() {
     return list;
   }, [membersList]);
 
-  // Dynamically derive event options from DB events
-  const eventOptions = useMemo(() => {
-    const list = [{ label: "Select Event", value: "" }];
+  // Dynamically derive event type options from DB event types and events
+  const eventTypeOptions = useMemo(() => {
+    const list = [{ label: "Select Event Type", value: "" }];
     const unique = new Set();
-    eventsList.forEach((e) => {
-      const name = e.name || e.eventName;
+
+    (eventTypesList || [])
+      .filter((t) => t.isActive !== false)
+      .forEach((t) => {
+        const name = t.eventTypeName || t.typeName || t.name;
+        if (name && !unique.has(name.toLowerCase())) {
+          unique.add(name.toLowerCase());
+          list.push({ label: name, value: name });
+        }
+      });
+
+    (eventsList || []).forEach((e) => {
+      const type = e.eventTypeName || e.categoryName || e.eventType;
+      if (type && !unique.has(type.toLowerCase())) {
+        unique.add(type.toLowerCase());
+        list.push({ label: type, value: type });
+      }
+    });
+
+    return list;
+  }, [eventTypesList, eventsList]);
+
+  // Dynamically derive event name options filtered against selected eventType
+  const eventNameOptions = useMemo(() => {
+    const list = [{ label: "Select Event Name", value: "" }];
+    const unique = new Set();
+
+    const filtered = (eventsList || []).filter((e) => {
+      if (!form.eventType) return true;
+      const eType = (e.eventTypeName || e.categoryName || e.eventType || "").trim().toLowerCase();
+      return eType === form.eventType.trim().toLowerCase();
+    });
+
+    filtered.forEach((e) => {
+      const name = e.eventName || e.name || e.title;
       if (name && !unique.has(name)) {
         unique.add(name);
         list.push({ label: name, value: name });
       }
     });
+
     return list;
-  }, [eventsList]);
+  }, [eventsList, form.eventType]);
 
   // Dynamically derive ticket types strictly from DB ticket types table in Support Data
   const ticketTypeOptions = useMemo(() => {
@@ -373,11 +419,69 @@ export default function SupportTicketsPage() {
     });
   }, [tickets, appliedType, appliedPriority, appliedStatus]);
 
+  const getEventDetails = (relatedEvent) => {
+    if (!relatedEvent) return { eventType: "--", eventName: "--" };
+
+    const cleanStr = String(relatedEvent).trim();
+
+    // Check if it matches an existing event
+    const matchedEvent = (eventsList || []).find(
+      (e) => (e.eventName || e.name || e.title)?.trim().toLowerCase() === cleanStr.toLowerCase()
+    );
+    if (matchedEvent) {
+      const type = matchedEvent.eventTypeName || matchedEvent.categoryName || matchedEvent.eventType || "--";
+      const name = matchedEvent.eventName || matchedEvent.name || matchedEvent.title || cleanStr;
+      return { eventType: type, eventName: name };
+    }
+
+    // Check if it directly matches an event type
+    const matchedType = (eventTypesList || []).find(
+      (t) => (t.eventTypeName || t.typeName || t.name)?.trim().toLowerCase() === cleanStr.toLowerCase()
+    );
+    if (matchedType) {
+      return {
+        eventType: matchedType.eventTypeName || matchedType.typeName || matchedType.name || cleanStr,
+        eventName: "--",
+      };
+    }
+
+    // If it contains a birthday / event type keyword
+    const typeKeywordMatch = (eventTypesList || []).find((t) => {
+      const tName = (t.eventTypeName || t.typeName || t.name || "").trim().toLowerCase();
+      return tName && cleanStr.toLowerCase().includes(tName);
+    });
+    if (typeKeywordMatch) {
+      return {
+        eventType: typeKeywordMatch.eventTypeName || typeKeywordMatch.typeName || typeKeywordMatch.name,
+        eventName: cleanStr,
+      };
+    }
+
+    return { eventType: "--", eventName: cleanStr };
+  };
+
+  const processedTickets = useMemo(() => {
+    return filteredTickets.map((item) => {
+      const details = getEventDetails(item.relatedEvent);
+      return {
+        ...item,
+        eventType: details.eventType,
+        eventName: details.eventName,
+      };
+    });
+  }, [filteredTickets, eventsList, eventTypesList]);
+
   const handleEditTicket = (row) => {
     setEditingTicket(row);
+    const matchedEvent = (eventsList || []).find(
+      (ev) => (ev.eventName || ev.name || ev.title) === row.relatedEvent
+    );
+    const derivedType = matchedEvent?.eventTypeName || matchedEvent?.categoryName || matchedEvent?.eventType || "";
+
     setForm({
       memberName: row.memberName || "",
       memberId: row.memberId || "",
+      eventType: derivedType,
       relatedEvent: row.relatedEvent || "",
       ticketType: row.ticketType || "",
       priority: row.priority || "Medium",
@@ -450,7 +554,7 @@ export default function SupportTicketsPage() {
         const nextIdx = tickets.length + 1;
         const newTicketNo = `TKT-2026-${String(nextIdx).padStart(3, "0")}`;
 
-        await createSupportTicketAsync({
+        const created = await createSupportTicketAsync({
           ticketNo: newTicketNo,
           memberName: form.memberName,
           memberId: resolvedMemberId || "",
@@ -462,12 +566,14 @@ export default function SupportTicketsPage() {
           attachment: form.attachment || null,
         });
 
+        const actualTicketNo = created?.ticketNo || newTicketNo;
+
         // Trigger notification for Authority/Admin
         addNotification({
           type: "TICKET_RAISED",
-          title: `Support Ticket Raised: ${newTicketNo}`,
-          message: `Member ${form.memberName || authState?.fullName || "User"} raised support ticket #${newTicketNo} regarding "${form.subject}".`,
-          ticketNo: newTicketNo,
+          title: `Support Ticket Raised: ${actualTicketNo}`,
+          message: `Member ${form.memberName || authState?.fullName || "User"} raised support ticket #${actualTicketNo}.`,
+          ticketNo: actualTicketNo,
           targetRole: "Authority",
           link: "/support-tickets",
         });
@@ -660,9 +766,22 @@ export default function SupportTicketsPage() {
     },
 
     {
-      label: "Related Event",
-      key: "relatedEvent",
-      render: (row) => row.relatedEvent || "--",
+      label: "Event Type",
+      key: "eventType",
+      render: (row) => (
+        <Typography variant="body2" sx={{ fontSize: "0.82rem" }}>
+          {row.eventType || "--"}
+        </Typography>
+      ),
+    },
+    {
+      label: "Event Name",
+      key: "eventName",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.82rem" }}>
+          {row.eventName || "--"}
+        </Typography>
+      ),
     },
     {
       label: "Ticket Type",
@@ -837,7 +956,7 @@ export default function SupportTicketsPage() {
       <AppDataTable
         title="Support Tickets"
         columns={columns}
-        data={filteredTickets}
+        data={processedTickets}
         loading={loading}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1014,11 +1133,47 @@ export default function SupportTicketsPage() {
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
-              label="Related Event"
-              placeholder="Select Event"
+              label="Event Type"
+              placeholder="Select Event Type"
+              value={form.eventType}
+              onChange={(e) => {
+                const selectedType = e.target.value;
+                setForm((c) => {
+                  const currentEvent = (eventsList || []).find(
+                    (ev) => (ev.eventName || ev.name || ev.title) === c.relatedEvent
+                  );
+                  const currentEvType = (currentEvent?.eventTypeName || currentEvent?.categoryName || currentEvent?.eventType || "").trim().toLowerCase();
+                  const matches = selectedType && currentEvType === selectedType.trim().toLowerCase();
+
+                  return {
+                    ...c,
+                    eventType: selectedType,
+                    relatedEvent: matches ? c.relatedEvent : "",
+                  };
+                });
+              }}
+              options={eventTypeOptions}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <AppSelect
+              label="Event Name"
+              placeholder="Select Event Name"
               value={form.relatedEvent}
-              onChange={(e) => setForm((c) => ({ ...c, relatedEvent: e.target.value }))}
-              options={eventOptions}
+              onChange={(e) => {
+                const selectedName = e.target.value;
+                const matched = (eventsList || []).find(
+                  (ev) => (ev.eventName || ev.name || ev.title) === selectedName
+                );
+                const matchedType = matched?.eventTypeName || matched?.categoryName || matched?.eventType || "";
+
+                setForm((c) => ({
+                  ...c,
+                  relatedEvent: selectedName,
+                  eventType: matchedType || c.eventType,
+                }));
+              }}
+              options={eventNameOptions}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
@@ -1305,10 +1460,23 @@ export default function SupportTicketsPage() {
 
               <Grid size={{ xs: 6 }}>
                 <Typography variant="caption" color="text.secondary">
-                  Related Event
+                  Event Name
                 </Typography>
                 <Typography variant="body2" fontWeight={600}>
                   {selectedTicket.relatedEvent || "--"}
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Event Type
+                </Typography>
+                <Typography variant="body2" fontWeight={600}>
+                  {(() => {
+                    const matchedEvent = (eventsList || []).find(
+                      (ev) => (ev.eventName || ev.name || ev.title) === selectedTicket.relatedEvent
+                    );
+                    return matchedEvent?.eventTypeName || matchedEvent?.categoryName || matchedEvent?.eventType || "--";
+                  })()}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 6 }}>
