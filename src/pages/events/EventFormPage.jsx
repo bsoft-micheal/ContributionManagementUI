@@ -307,9 +307,8 @@ export default function EventFormPage() {
         formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
       } else {
         if (puffsFactor > 0) {
-          calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${
-            puffsFactor > 1 ? ` × ${puffsFactor}` : ""
-          }`;
+          calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""
+            }`;
           amount = total * rate * puffsFactor;
         } else {
           calcText = "WFH only → Not provided";
@@ -822,11 +821,7 @@ export default function EventFormPage() {
                       label="Expected Collection"
                       value={`₹${expectedCollection.toLocaleString("en-IN")}`}
                     />
-                    <MetricLine
-                      label="Rounding Surplus"
-                      value={`₹${roundingSurplus.toLocaleString("en-IN")}`}
-                      isLast
-                    />
+                   
                   </Box>
                 </Box>
               </Grid>

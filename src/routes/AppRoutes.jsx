@@ -12,7 +12,7 @@ import LoginPage from "../pages/auth/LoginPage";
 import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
 import ForgotPasswordVerifyPage from "../pages/auth/ForgotPasswordVerifyPage";
 import ForgotPasswordResetPage from "../pages/auth/ForgotPasswordResetPage";
-import MembersPage from "../pages/members/MembersPage";
+// import MembersPage from "../pages/members/MembersPage";
 import ReportsPage from "../pages/reports/ReportsPage";
 import MyContributionSummaryPage from "../pages/contributions/MyContributionSummaryPage";
 import ContributionCalculationPage from "../pages/contributions/ContributionCalculationPage";
@@ -45,7 +45,7 @@ export default function AppRoutes() {
         }
       >
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
+        {/* <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} /> */}
         <Route path="/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
         <Route path="/event-types" element={<ProtectedRoute><EventTypesPage /></ProtectedRoute>} />
         <Route path="/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />

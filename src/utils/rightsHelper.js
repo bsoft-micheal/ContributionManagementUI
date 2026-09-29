@@ -32,7 +32,7 @@ export function getFeatureIdForPath(path) {
 
   // Route path fallbacks
   if (normalizedPath === "/") return 1;
-  if (normalizedPath === "/members") return 2;
+  // if (normalizedPath === "/members") return 2;
   if (normalizedPath.startsWith("/events")) return 4;
   if (normalizedPath === "/calendar") return 5;
   if (normalizedPath === "/gallery") return 6;
