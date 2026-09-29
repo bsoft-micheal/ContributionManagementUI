@@ -8,6 +8,7 @@ import {
   CircularProgress,
   Collapse,
   Divider,
+  Drawer,
   Grid,
   InputAdornment,
   Paper,
@@ -21,6 +22,7 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import DonutLargeIcon from "@mui/icons-material/DonutLarge";
 import GridViewIcon from "@mui/icons-material/GridView";
+import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FilterListIcon from "@mui/icons-material/FilterList";
@@ -37,6 +39,7 @@ import { getMembersAsync } from "../../services/memberService";
 import { useAppToast } from "../../components/common/AppToast";
 import AppDataTable from "../../components/common/AppDataTable";
 import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
+import MemberPaymentQuickAccess from "../../components/dashboard/MemberPaymentQuickAccess";
 import { useAuth } from "../../contexts/AuthContext";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
@@ -663,6 +666,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [eventTypes, setEventTypes] = useState([]);
+  const [quickAccessDrawerOpen, setQuickAccessDrawerOpen] = useState(false);
+  const [quickAccessStatus, setQuickAccessStatus] = useState("all");
 
   // Birthday Celebration Modal States (Only opens once upon login per session)
   const [todayCelebrants, setTodayCelebrants] = useState([]);
@@ -1065,47 +1070,47 @@ export default function DashboardPage() {
               <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Stack spacing={3}>
 
-                  {/* ① Top Summary Metric Cards (5 Cards Grid, Total Collections hidden for Member) */}
+                  {/* ① Top Summary Metric Cards (4 Cards Grid, Total Collections hidden for Member) */}
                   <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 4 : 6, lg: isMember ? 4 : 3 }}>
                       <MetricCard
                         label="TOTAL EXPECTED"
                         value={`₹${totalExpected.toLocaleString()}`}
                         helper="Projected target amount"
                         accent="#7c3aed"
+                        onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
+                        actionText="All Members →"
                       />
                     </Grid>
                     {!isMember && (
-                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: 6, lg: 3 }}>
                         <MetricCard
                           label="TOTAL COLLECTIONS"
                           value={`₹${totalCollected.toLocaleString()}`}
                           helper="Amount collected (paid)"
                           accent="success.main"
+                          onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+                          actionText="View Paid →"
                         />
                       </Grid>
                     )}
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 4 : 6, lg: isMember ? 4 : 3 }}>
                       <MetricCard
                         label="TOTAL PENDING"
                         value={`₹${totalPending.toLocaleString()}`}
                         helper="Outstanding amount"
                         accent="error.main"
+                        onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
+                        actionText="View Unpaid →"
                       />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 4 : 6, lg: isMember ? 4 : 3 }}>
                       <MetricCard
                         label="TOTAL EVENTS"
                         value={events.length}
                         helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
-                      <MetricCard
-                        label="PENDING PAYMENTS"
-                        value={pendingCount}
-                        helper="Unpaid contributions"
-                        accent="warning.main"
+                        onClick={() => setActiveTab(1)}
+                        actionText="View Events →"
                       />
                     </Grid>
                   </Grid>
@@ -1400,6 +1405,7 @@ export default function DashboardPage() {
                       <Grid size={{ xs: 12, sm: 4 }}>
                         <Paper
                           elevation={0}
+                          onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
                           sx={{
                             p: 2,
                             borderRadius: 2.5,
@@ -1408,7 +1414,14 @@ export default function DashboardPage() {
                             bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#f8fafc",
                             display: "flex",
                             alignItems: "center",
-                            justify: "space-between",
+                            justifyContent: "space-between",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            "&:hover": {
+                              transform: "translateY(-2px)",
+                              borderColor: "primary.main",
+                              boxShadow: "0 6px 16px rgba(0,0,0,0.08)",
+                            },
                           }}
                         >
                           <Box>
@@ -1419,12 +1432,16 @@ export default function DashboardPage() {
                               ₹{tableTotals.expected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Typography>
                           </Box>
+                          <Typography variant="caption" color="primary.main" fontWeight={700}>
+                            View →
+                          </Typography>
                         </Paper>
                       </Grid>
 
                       <Grid size={{ xs: 12, sm: 4 }}>
                         <Paper
                           elevation={0}
+                          onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
                           sx={{
                             p: 2,
                             borderRadius: 2.5,
@@ -1433,7 +1450,14 @@ export default function DashboardPage() {
                             bgcolor: isDark ? "rgba(16, 185, 129, 0.08)" : "rgba(16, 185, 129, 0.05)",
                             display: "flex",
                             alignItems: "center",
-                            justify: "space-between",
+                            justifyContent: "space-between",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            "&:hover": {
+                              transform: "translateY(-2px)",
+                              borderColor: "#10b981",
+                              boxShadow: "0 6px 16px rgba(16,185,129,0.15)",
+                            },
                           }}
                         >
                           <Box>
@@ -1444,12 +1468,16 @@ export default function DashboardPage() {
                               ₹{tableTotals.collected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Typography>
                           </Box>
+                          <Typography variant="caption" color="#10b981" fontWeight={700}>
+                            View →
+                          </Typography>
                         </Paper>
                       </Grid>
 
                       <Grid size={{ xs: 12, sm: 4 }}>
                         <Paper
                           elevation={0}
+                          onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
                           sx={{
                             p: 2,
                             borderRadius: 2.5,
@@ -1458,7 +1486,14 @@ export default function DashboardPage() {
                             bgcolor: isDark ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.05)",
                             display: "flex",
                             alignItems: "center",
-                            justify: "space-between",
+                            justifyContent: "space-between",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            "&:hover": {
+                              transform: "translateY(-2px)",
+                              borderColor: "#ef4444",
+                              boxShadow: "0 6px 16px rgba(239,68,68,0.15)",
+                            },
                           }}
                         >
                           <Box>
@@ -1469,6 +1504,9 @@ export default function DashboardPage() {
                               ₹{tableTotals.pending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Typography>
                           </Box>
+                          <Typography variant="caption" color="#ef4444" fontWeight={700}>
+                            View →
+                          </Typography>
                         </Paper>
                       </Grid>
                     </Grid>
@@ -1501,6 +1539,29 @@ export default function DashboardPage() {
           </>
         )}
       </Card>
+
+      {/* Quick Access Slide-Over Drawer */}
+      <Drawer
+        anchor="right"
+        open={quickAccessDrawerOpen}
+        onClose={() => setQuickAccessDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: { xs: "100%", sm: 640, md: 780, lg: 900 },
+            boxShadow: isDark ? "-8px 0 32px rgba(0,0,0,0.5)" : "-8px 0 32px rgba(0,0,0,0.12)",
+            bgcolor: isDark ? "background.default" : "#ffffff",
+          },
+        }}
+      >
+        <MemberPaymentQuickAccess
+          events={events}
+          appliedFilters={appliedFilters}
+          isMember={isMember}
+          initialStatus={quickAccessStatus}
+          isDrawer
+          onClose={() => setQuickAccessDrawerOpen(false)}
+        />
+      </Drawer>
 
       {/* Big Celebratory Birthday Pop-up Modal with Paper Blast Confetti (Static) */}
       <BirthdayCelebrationModal
