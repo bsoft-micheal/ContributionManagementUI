@@ -140,7 +140,7 @@ const initialSettings = {
   qrReceiverName: "Daniel A",
   qrUpiId: "danielrobertanto604@okicici",
   qrMode: "generated", // "generated" | "uploaded"
-  qrPreviewAmount: "100",
+  qrPreviewAmount: "",
   qrImage: null,
 };
 
@@ -194,7 +194,23 @@ export default function SettingsPage() {
   const fileInputRef = useRef(null);
 
   // Per-event-type Payment QR State
-  const [eventPaymentQrConfigs, setEventPaymentQrConfigs] = useState(() => getAllPaymentQrConfigs());
+  const [eventPaymentQrConfigs, setEventPaymentQrConfigs] = useState(() => {
+    const configs = getAllPaymentQrConfigs();
+    let modified = false;
+    const sanitized = { ...configs };
+    Object.keys(sanitized).forEach((key) => {
+      if (sanitized[key]?.previewAmount === "100") {
+        sanitized[key] = { ...sanitized[key], previewAmount: "" };
+        modified = true;
+      }
+    });
+    if (modified) {
+      try {
+        localStorage.setItem(EVENT_QR_STORAGE_KEY, JSON.stringify(sanitized));
+      } catch (e) { }
+    }
+    return sanitized;
+  });
   const [selectedQrEventType, setSelectedQrEventType] = useState("");
 
   // Dynamically derive event type options from categoriesList (getEventTypesAsync) and saved configs - NO HARDCODING!
@@ -235,7 +251,7 @@ export default function SettingsPage() {
         upiId: "",
         qrMode: "generated",
         qrImage: null,
-        previewAmount: "100",
+        previewAmount: "",
         isActive: true,
       };
     }
@@ -246,7 +262,7 @@ export default function SettingsPage() {
         upiId: found.upiId || "",
         qrMode: found.qrMode || "generated",
         qrImage: found.qrImage || null,
-        previewAmount: found.previewAmount || "100",
+        previewAmount: found.previewAmount === "100" ? "" : (found.previewAmount || ""),
         isActive: found.isActive !== undefined ? found.isActive : true,
       };
     }
@@ -255,7 +271,7 @@ export default function SettingsPage() {
       upiId: "",
       qrMode: "generated",
       qrImage: null,
-      previewAmount: "100",
+      previewAmount: "",
       isActive: true,
     };
   }, [eventPaymentQrConfigs, selectedQrEventType]);
@@ -281,7 +297,7 @@ export default function SettingsPage() {
     ? buildUpiPaymentUri({
       upiId: currentQrConfig.upiId,
       receiverName: currentQrConfig.receiverName,
-      amount: currentQrConfig.previewAmount || 100,
+      amount: currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0 ? Number(currentQrConfig.previewAmount) : undefined,
       note: `Contribution for ${selectedQrEventType}`,
     })
     : "";
@@ -320,6 +336,7 @@ export default function SettingsPage() {
             eventTypeName: typeName,
             receiverName: config.receiverName || config.qrReceiverName || "",
             upiId: config.upiId || config.qrUpiId || "",
+            previewAmount: config.previewAmount || "",
             qrMode: config.qrMode || "generated",
             qrImage: config.qrImage || null,
             isConfigured: Boolean(config.isConfigured && hasUpi),
@@ -341,6 +358,7 @@ export default function SettingsPage() {
           eventTypeName: k,
           receiverName: config.receiverName || config.qrReceiverName || "",
           upiId: config.upiId || config.qrUpiId || "",
+          previewAmount: config.previewAmount || "",
           qrMode: config.qrMode || "generated",
           qrImage: config.qrImage || null,
           isConfigured: Boolean(config.isConfigured && hasUpi),
@@ -360,6 +378,7 @@ export default function SettingsPage() {
           eventTypeName: typeName,
           receiverName: config.receiverName || config.qrReceiverName || "",
           upiId: config.upiId || config.qrUpiId || "",
+          previewAmount: config.previewAmount || "",
           qrMode: config.qrMode || "generated",
           qrImage: config.qrImage || null,
           isConfigured: Boolean(config.isConfigured && hasUpi),
@@ -478,6 +497,24 @@ export default function SettingsPage() {
             {row.receiverName || "--"}
           </Typography>
         ),
+      },
+      {
+        label: "Amount",
+        key: "previewAmount",
+        render: (row) =>
+          row.previewAmount && Number(row.previewAmount) > 0 ? (
+            <Chip
+              label={`₹${Number(row.previewAmount).toLocaleString("en-IN")}`}
+              size="small"
+              sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: "rgba(2, 132, 199, 0.1)", color: "#0284c7" }}
+            />
+          ) : (
+            <Chip
+              label="Manual Entry"
+              size="small"
+              sx={{ height: 22, fontSize: "0.7rem", fontWeight: 650, bgcolor: "rgba(22, 163, 74, 0.1)", color: "#16a34a" }}
+            />
+          ),
       },
       {
         label: "QR Mode",
@@ -665,7 +702,7 @@ export default function SettingsPage() {
                     upiId: item.upiId || item.qrUpiId || "",
                     qrMode: item.qrCodeMode || item.qrMode || "generated",
                     qrImage: item.qrCodeImage || item.qrImage || null,
-                    previewAmount: item.previewAmount || "100",
+                    previewAmount: item.previewAmount || "",
                     isActive: item.isActive !== undefined ? item.isActive : true,
                   };
                 }
@@ -764,12 +801,24 @@ export default function SettingsPage() {
 
   // Save Email Template Settings
   const handleSaveEmailTemplate = async () => {
-    if (!templateSubject.trim()) {
+    if (!templateSubject || !templateSubject.trim()) {
       toast.error("Email Subject is required.");
       return;
     }
-    if (!templateDescription.trim()) {
+    if (!templateDescription || !templateDescription.trim()) {
       toast.error("Email Description is required.");
+      return;
+    }
+
+    const intervalNum = Number(settings.reminderIntervalDays);
+    if (!settings.reminderIntervalDays || isNaN(intervalNum) || intervalNum < 1 || intervalNum > 31) {
+      toast.error("Please enter a valid Reminder Interval between 1 and 31 days.");
+      return;
+    }
+
+    const maxRemindersNum = Number(settings.maxReminders);
+    if (!settings.maxReminders || isNaN(maxRemindersNum) || maxRemindersNum < 1 || maxRemindersNum > 10) {
+      toast.error("Please enter a valid Maximum Reminders limit between 1 and 10.");
       return;
     }
 
@@ -802,8 +851,8 @@ export default function SettingsPage() {
         selectedTemplateCategoryId: selectedCategoryId,
         enableMonthlyEmail: settings.enableMonthlyEmail !== false,
         enableReminderEmail: settings.enableReminderEmail !== false,
-        reminderIntervalDays: settings.reminderIntervalDays || "10",
-        maxReminders: settings.maxReminders || "3",
+        reminderIntervalDays: String(intervalNum),
+        maxReminders: String(maxRemindersNum),
       };
 
       await persistSettings(updated);
@@ -811,7 +860,7 @@ export default function SettingsPage() {
         selectedCategoryId === "all"
           ? "All Categories (Default)"
           : categoriesList.find((c) => String(c.eventTypeId) === String(selectedCategoryId))?.eventTypeName || "Selected Category";
-      toast.success(`Email template for "${targetLabel}" (${templateType === "initial" ? "Initial Email" : "Reminder Email"}) saved successfully!`);
+      toast.success(`"${targetLabel}" (${templateType === "initial" ? "Initial Email" : "Reminder Email"}) saved successfully!`);
     } catch {
       toast.error("Failed to save email template settings");
     }
@@ -892,6 +941,7 @@ export default function SettingsPage() {
         ...configToSave,
         receiverName: configToSave.receiverName.trim(),
         upiId: configToSave.upiId.trim(),
+        previewAmount: configToSave.previewAmount ? String(configToSave.previewAmount).trim() : "",
         qrImage: effectiveQrImage,
         isActive: true,
       };
@@ -909,6 +959,7 @@ export default function SettingsPage() {
         upiId: updatedConfig.upiId,
         qrCodeMode: updatedConfig.qrMode,
         qrCodeImage: updatedConfig.qrImage,
+        previewAmount: updatedConfig.previewAmount,
         isActive: true,
       });
 
@@ -1289,50 +1340,64 @@ export default function SettingsPage() {
               .replace(/https?:\/\/\S+/gi, "")
               .trim();
 
-          return (
-            <Grid container spacing={2.5} alignItems="flex-start">
-              {/* Left: Email Template Form (65-70% on desktop) */}
-              <Grid size={{ xs: 12, lg: 8 }}>
-                <Card
-                  sx={{
-                    borderRadius: "16px",
-                    border: (t) => `1px solid ${t.palette.divider}`,
-                    p: 2.5,
-                    bgcolor: "background.paper",
-                  }}
-                >
-                  <Box>
-                    {/* Card Header with Test Email & Logs action buttons */}
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                        <Box
-                          sx={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: "10px",
-                            bgcolor: "rgba(2, 132, 199, 0.1)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#0284c7",
-                          }}
-                        >
-                          <EmailOutlinedIcon fontSize="small" />
-                        </Box>
-                        <Box>
-                          <Typography variant="subtitle1" fontWeight={800}>
-                            Email Template Settings
-                          </Typography>
+            return (
+              <Grid container spacing={2.5} alignItems="flex-start">
+                {/* Left: Email Template Form (65-70% on desktop) */}
+                <Grid size={{ xs: 12, lg: 8 }}>
+                  <Card
+                    sx={{
+                      borderRadius: "16px",
+                      border: (t) => `1px solid ${t.palette.divider}`,
+                      p: 2.5,
+                      bgcolor: "background.paper",
+                    }}
+                  >
+                    <Box>
+                      {/* Card Header with Test Email & Logs action buttons */}
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                          <Box
+                            sx={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: "10px",
+                              bgcolor: "rgba(2, 132, 199, 0.1)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#0284c7",
+                            }}
+                          >
+                            <EmailOutlinedIcon fontSize="small" />
+                          </Box>
+                          <Box>
+                            <Typography variant="subtitle1" fontWeight={800}>
+                              Email Template Settings
+                            </Typography>
 
+                          </Box>
+                        </Box>
+
+                        {/* Quick Action Buttons */}
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          <AppButton
+                            size="small"
+                            variant="outlined"
+                            startIcon={<SendOutlinedIcon sx={{ fontSize: 15 }} />}
+                            onClick={() => setTestEmailDialogOpen(true)}
+                            sx={{
+                              fontSize: "0.75rem",
+                              height: 32,
+                              borderColor: "#0284c7",
+                              color: "#0284c7",
+                              fontWeight: 700,
+                              "&:hover": { borderColor: "#0369a1", bgcolor: "rgba(2,132,199,0.06)" },
+                            }}
+                          >
+                            Send Test Email
+                          </AppButton>
                         </Box>
                       </Box>
-
-                      {/* Quick Action Buttons */}
-                      <Box sx={{ display: "flex", gap: 1 }}>
-                        
-                        
-                      </Box>
-                    </Box>
 
                       <Stack spacing={2.4} sx={{ mt: 2 }}>
                         {/* 1. Category Selector Dropdown */}
@@ -1346,7 +1411,7 @@ export default function SettingsPage() {
                             fullWidth
                           />
                           <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
-                            Select a category (e.g. Birthday, Team Dinner, Farewell). Each category has one common template shared by all its events.
+
                           </Typography>
                         </Box>
 
@@ -1383,7 +1448,12 @@ export default function SettingsPage() {
                               Initial Email Template (Day 1 of Month)
                             </ToggleButton>
                             <ToggleButton value="reminder">
-                              Reminder Email Template (Day 11, Day 21, Day 31)
+                              {(() => {
+                                const intVal = Math.max(1, Number(settings.reminderIntervalDays) || 10);
+                                const maxVal = Math.max(1, Number(settings.maxReminders) || 3);
+                                const days = Array.from({ length: maxVal }, (_, i) => `Day ${1 + (i + 1) * intVal}`).join(", ");
+                                return `Reminder Email Template (${days})`;
+                              })()}
                             </ToggleButton>
                           </ToggleButtonGroup>
                         </Box>
@@ -1421,7 +1491,7 @@ export default function SettingsPage() {
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
                             <ScheduleOutlinedIcon sx={{ fontSize: 19, color: "#0284c7" }} />
                             <Typography variant="subtitle2" fontWeight={800} sx={{ fontSize: "0.85rem" }}>
-                              Automated Monthly & 10-Day Reminder Settings
+                              Automated Monthly & {settings.reminderIntervalDays || "10"}-Day Reminder Settings
                             </Typography>
                           </Box>
 
@@ -1443,52 +1513,54 @@ export default function SettingsPage() {
                                 onChange={(e) => handleChange("enableReminderEmail", e.target.checked)}
                               />
                               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", display: "block", pl: 0.5 }}>
-                                Send reminders every 10 days for unpaid contributions (stops once paid).
+                                Send reminders every {settings.reminderIntervalDays || "10"} days for unpaid contributions (stops once paid).
                               </Typography>
                             </Grid>
 
-                          <Grid size={{ xs: 12, sm: 6 }}>
-                            <AppInput
-                              label="Reminder Interval (Days)"
-                              value={settings.reminderIntervalDays || "10"}
-                              onChange={(e) => handleChange("reminderIntervalDays", e.target.value)}
-                              restrictType="numberonly"
-                            />
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                              <AppInput
+                                label="Reminder Interval (Days)"
+                                value={settings.reminderIntervalDays !== undefined && settings.reminderIntervalDays !== null ? settings.reminderIntervalDays : ""}
+                                onChange={(e) => handleChange("reminderIntervalDays", e.target.value)}
+                                restrictType="numberonly"
+                                placeholder="e.g. 10"
+                              />
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                              <AppInput
+                                label="Maximum Reminders Allowed"
+                                value={settings.maxReminders !== undefined && settings.maxReminders !== null ? settings.maxReminders : ""}
+                                onChange={(e) => handleChange("maxReminders", e.target.value)}
+                                restrictType="numberonly"
+                                placeholder="e.g. 3"
+                              />
+                            </Grid>
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
-                            <AppInput
-                              label="Maximum Reminders Allowed"
-                              value={settings.maxReminders || "3"}
-                              onChange={(e) => handleChange("maxReminders", e.target.value)}
-                              restrictType="numberonly"
-                            />
-                          </Grid>
-                        </Grid>
-                        {/* Manual Scheduler Trigger Action */}
-                        <Box sx={{ mt: 2, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                          {/* Manual Scheduler Trigger Action */}
+                          <Box sx={{ mt: 2, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                          </Box>
                         </Box>
-                      </Box>
-                    </Stack>
-                  </Box>
+                      </Stack>
+                    </Box>
 
-                  {/* Save Button for Email Template Settings */}
-                  <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center", gap: 2 }}>
-                    <AppButton
-                      variant="contained"
-                      startIcon={<SaveOutlinedIcon />}
-                      onClick={handleSaveEmailTemplate}
-                      sx={{
-                        bgcolor: "#0284c7 !important",
-                        "&:hover": { bgcolor: "#0369a1 !important" },
-                        px: 3,
-                        fontWeight: 700,
-                      }}
-                    >
-                      Save 
-                    </AppButton>
-                  </Box>
-                </Card>
-              </Grid>
+                    {/* Save Button for Email Template Settings */}
+                    <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center", gap: 2 }}>
+                      <AppButton
+                        variant="contained"
+                        startIcon={<SaveOutlinedIcon />}
+                        onClick={handleSaveEmailTemplate}
+                        sx={{
+                          bgcolor: "#0284c7 !important",
+                          "&:hover": { bgcolor: "#0369a1 !important" },
+                          px: 3,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Save
+                      </AppButton>
+                    </Box>
+                  </Card>
+                </Grid>
 
                 {/* Right: Live Email Preview Panel (30-35% on desktop) */}
                 <Grid size={{ xs: 12, lg: 4 }}>
@@ -1521,13 +1593,10 @@ export default function SettingsPage() {
                           Email Preview
                         </Typography>
                         <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                          Live simulation using current template values.
                         </Typography>
                       </Box>
                     </Box>
-
                     <Divider sx={{ mb: 2 }} />
-
                     {/* Subject Line Display */}
                     <Box
                       sx={{
@@ -1717,9 +1786,6 @@ export default function SettingsPage() {
                             <Typography variant="caption" sx={{ fontWeight: 800, color: "#0284c7", fontSize: "0.74rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                               SELECT EVENT TYPE
                             </Typography>
-                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem" }}>
-                              Independent UPI/QR settings per category
-                            </Typography>
                           </Box>
                           <Box sx={{ maxWidth: { xs: "100%", sm: 300 } }}>
                             <AppSelect
@@ -1801,9 +1867,9 @@ export default function SettingsPage() {
                           </Box>
                         </Box>
 
-                        {/* Receiver Name and UPI ID (Reduced Compact Size) */}
+                        {/* Receiver Name, UPI ID, and Amount */}
                         <Grid container spacing={1.5}>
-                          <Grid size={{ xs: 12, sm: 5, md: 5 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <AppInput
                               label={`Receiver Name (${selectedQrEventType})`}
                               value={currentQrConfig.receiverName || ""}
@@ -1815,7 +1881,7 @@ export default function SettingsPage() {
                               helperText={receiverError}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 7, md: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <AppInput
                               label={`UPI ID (${selectedQrEventType})`}
                               value={currentQrConfig.upiId || ""}
@@ -1825,6 +1891,25 @@ export default function SettingsPage() {
                               size="small"
                               error={Boolean(upiError)}
                               helperText={upiError}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 12, md: 4 }}>
+                            <AppInput
+                              label={`Amount (₹) - Optional`}
+                              value={currentQrConfig.previewAmount || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                  handleQrFieldChange("previewAmount", val);
+                                }
+                              }}
+                              placeholder="Leave blank for manual entry"
+                              size="small"
+                              helperText={
+                                currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
+                                  ? `QR pre-fills ₹${Number(currentQrConfig.previewAmount).toLocaleString("en-IN")}`
+                                  : "Leave blank: Payer enters amount on scan"
+                              }
                             />
                           </Grid>
                         </Grid>
@@ -2021,7 +2106,7 @@ export default function SettingsPage() {
                             Live QR Preview
                           </Typography>
                           <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                            Real-time scannable QR code.
+
                           </Typography>
                         </Box>
                       </Box>
@@ -2098,6 +2183,45 @@ export default function SettingsPage() {
                             </Typography>
                           </Box>
                         )}
+                      </Box>
+
+                      {/* Amount Indicator Badge */}
+                      <Box
+                        sx={{
+                          width: "100%",
+                          py: 0.8,
+                          px: 1.2,
+                          borderRadius: "8px",
+                          bgcolor:
+                            currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
+                              ? "rgba(2, 132, 199, 0.08)"
+                              : "rgba(22, 163, 74, 0.08)",
+                          border: (t) =>
+                            `1px solid ${currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
+                              ? "rgba(2, 132, 199, 0.25)"
+                              : "rgba(22, 163, 74, 0.25)"
+                            }`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 0.8,
+                        }}
+                      >
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 750,
+                            fontSize: "0.74rem",
+                            color:
+                              currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
+                                ? "#0284c7"
+                                : "#16a34a",
+                          }}
+                        >
+                          {currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
+                            ? `Preset Amount: ₹${Number(currentQrConfig.previewAmount).toLocaleString("en-IN")}`
+                            : "✨ Scan Amount: Manual Entry (Payer enters on scan)"}
+                        </Typography>
                       </Box>
 
                       {/* UPI ID Display */}

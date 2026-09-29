@@ -349,23 +349,37 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
   const currentDay = forcedDay !== null ? Number(forcedDay) : today.date();
   const currentMonthYear = today.format("YYYY-MM");
 
-  // Determine stage based on day
+  const interval = Math.max(1, Number(settings.reminderIntervalDays) || 10);
+  const maxReminders = Math.max(1, Number(settings.maxReminders) || 3);
+
+  // Determine stage based on day and configured interval
   let targetStage = null;
   if (currentDay === 1) {
     targetStage = "Initial";
-  } else if (currentDay >= 11 && currentDay < 21) {
-    targetStage = "Reminder 1";
-  } else if (currentDay >= 21 && currentDay < 31) {
-    targetStage = "Reminder 2";
-  } else if (currentDay >= 31 || currentDay === today.daysInMonth()) {
-    targetStage = "Reminder 3";
+  } else {
+    for (let i = 1; i <= maxReminders; i++) {
+      const stageStartDay = 1 + (i - 1) * interval + 1;
+      const stageEndDay = 1 + i * interval;
+      const isFinalBucket = i === maxReminders;
+
+      if (isFinalBucket) {
+        if (currentDay >= stageStartDay || currentDay === today.daysInMonth()) {
+          targetStage = `Reminder ${i}`;
+          break;
+        }
+      } else if (currentDay >= stageStartDay && currentDay <= stageEndDay) {
+        targetStage = `Reminder ${i}`;
+        break;
+      }
+    }
   }
 
-  // If no target stage matches (e.g. Day 5) and not forced, return early
+  // If no target stage matches and not forced, return early
   if (!targetStage) {
+    const scheduledDays = ["Day 1", ...Array.from({ length: maxReminders }, (_, idx) => `Day ${1 + (idx + 1) * interval}`)].join(", ");
     return {
       status: "idle",
-      message: `Scheduler checked: Day ${currentDay} is not an email dispatch day (Dispatches on Day 1, 11, 21, 31).`,
+      message: `Scheduler checked: Day ${currentDay} is not an email dispatch day (Dispatches on ${scheduledDays}).`,
       processed: 0,
       dispatched: 0,
       skippedPaid: 0,

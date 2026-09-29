@@ -7,6 +7,9 @@ import {
   Tooltip,
   Stack,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -21,6 +24,8 @@ import {
   ZoomIn as ZoomInIcon,
   PictureAsPdf as PictureAsPdfIcon,
   Image as ImageIcon,
+  FileDownload as DownloadIcon,
+  Close as CloseIcon,
   AssignmentTurnedIn as StatusActionIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
@@ -30,6 +35,7 @@ import { formatGridDate, formatViewDate } from "../../utils/dateHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import { getImageUrl } from "../../services/apiClient";
 import AppInput from "../../components/common/AppInput";
@@ -103,11 +109,9 @@ const initialForm = {
   description: "",
   submittedBy: "",
   status: "Pending",
-  fileName: "",
-  filePreview: "",
+  attachment: "",
+  attachmentName: "",
 };
-
-import useAccessByLocation from "../../hooks/useAccessByLocation";
 
 export default function ExpensePage() {
   const { authState } = useAuth();
@@ -139,6 +143,7 @@ export default function ExpensePage() {
   const [statusRemarks, setStatusRemarks] = useState("");
 
   const [form, setForm] = useState(initialForm);
+  const [formImageError, setFormImageError] = useState(false);
   const [errors, setErrors] = useState({});
 
   // Filter state inside AppDataTable filterPanel
@@ -352,9 +357,24 @@ export default function ExpensePage() {
     });
   }, [expenses, appliedEvent, appliedCategory, appliedStatus]);
 
+  const openImagePreview = (src, title = "Attached Receipt Preview") => {
+    if (!src) return;
+    setPreviewImageModal({
+      open: true,
+      url: src,
+      title: title,
+    });
+  };
+
   const handleEditExpense = (row) => {
     setEditingExpense(row);
-    const resolvedUrl = resolveAttachmentUrl(row.fileName || row.fileUrl);
+    setFormImageError(false);
+    const rawFile = row.fileName || row.fileUrl || "";
+    const resolvedUrl = resolveAttachmentUrl(rawFile);
+    const displayName = rawFile.startsWith("data:")
+      ? `${row.id || "EXP"}_attachment.png`
+      : getAttachmentDisplayName(rawFile) || `${row.id || "EXP"}_attachment.png`;
+
     setForm({
       eventName: row.eventName || "",
       category: row.category || "",
@@ -363,12 +383,8 @@ export default function ExpensePage() {
       description: row.description || "",
       submittedBy: row.submittedBy || "",
       status: row.status || "Pending",
-      fileName: row.fileName || "",
-      filePreview: isImageFile(row.fileName || row.fileUrl)
-        ? resolvedUrl
-        : row.fileName?.startsWith("data:")
-          ? row.fileName
-          : "",
+      attachment: resolvedUrl || rawFile,
+      attachmentName: displayName,
     });
     setErrors({});
     setDialogOpen(true);
@@ -395,36 +411,82 @@ export default function ExpensePage() {
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleImageChange = (e) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please upload a valid image file (PNG, JPG, JPEG, WEBP).");
+        return;
+      }
+
+      const MAX_SIZE = 3 * 1024 * 1024; // 3MB limit
+      if (file.size > MAX_SIZE) {
+        toast.error("Image size exceeds maximum limit of 3 MB");
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (uploadEvt) => {
         setForm((c) => ({
           ...c,
-          fileName: file.name,
-          filePreview: uploadEvt.target.result,
+          attachment: uploadEvt.target.result,
+          attachmentName: file.name,
         }));
-        if (file.type.startsWith("image/")) {
-          toast.success(TOAST_MESSAGES.EXPENSES.RECEIPT_UPLOADED || `Image "${file.name}" attached successfully!`);
-        } else {
-          toast.info(`Attachment "${file.name}" attached.`);
-        }
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next.attachment;
+          return next;
+        });
+        toast.success(`Image "${file.name}" attached successfully!`);
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read image file");
       };
       reader.readAsDataURL(file);
+    } catch {
+      toast.error("Failed to process attachment");
+    }
+  };
+
+  const handleRemoveAttachment = (e) => {
+    if (e) e.stopPropagation();
+    setForm((c) => ({
+      ...c,
+      attachment: "",
+      attachmentName: "",
+    }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDownloadImage = (dataUrl, fileName = "expense_receipt.png") => {
+    if (!dataUrl) return;
+    try {
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Image downloaded successfully!");
+    } catch {
+      toast.error("Could not download image");
     }
   };
 
   const handleSaveExpense = async () => {
     const newErrors = {};
     if (!form.eventName) newErrors.eventName = "Event is required";
-    if (!form.category) newErrors.category = "Category is required";
+    if (!form.category) newErrors.category = "Event Type is required";
     if (!form.amount || Number(form.amount) <= 0) newErrors.amount = "Valid amount is required";
-    if (!form.description || !form.description.trim()) newErrors.description = "Description is required";
     if (!form.submittedBy) newErrors.submittedBy = "Submitted by is required";
-    if (!form.filePreview && !form.fileName && (!editingExpense || (!editingExpense.fileName && !editingExpense.fileUrl))) {
-      newErrors.file = "Bill / Receipt Attachment is required";
+    if (!form.attachment && (!editingExpense || (!editingExpense.fileName && !editingExpense.fileUrl))) {
+      newErrors.attachment = "Attachment (1 Image) is required";
     }
+    if (!form.description || !form.description.trim()) newErrors.description = "Description is required";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -432,39 +494,29 @@ export default function ExpensePage() {
       return;
     }
 
-    const currentUserName = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || authState?.name || "";
-
     try {
+      const payload = {
+        eventName: form.eventName,
+        category: form.category,
+        amount: Number(form.amount),
+        expenseDate: form.expenseDate ? form.expenseDate.toISOString() : new Date().toISOString(),
+        status: editingExpense ? (editingExpense.status || "Pending") : (form.status || "Pending"),
+        submittedBy: form.submittedBy,
+        approvedBy: editingExpense ? (editingExpense.approvedBy || "-") : "-",
+        description: form.description.trim(),
+        fileName: form.attachmentName || (editingExpense ? (editingExpense.fileName || "") : ""),
+        fileData: form.attachment || (editingExpense ? (editingExpense.fileName?.startsWith("data:") ? editingExpense.fileName : null) : null),
+      };
+
       if (editingExpense) {
         const expenseId = editingExpense.expenseId || editingExpense.id;
-        await updateExpenseAsync(expenseId, {
-          eventName: form.eventName,
-          category: form.category,
-          amount: Number(form.amount),
-          expenseDate: form.expenseDate ? form.expenseDate.toISOString() : new Date().toISOString(),
-          status: editingExpense.status || "Pending",
-          submittedBy: form.submittedBy,
-          approvedBy: editingExpense.approvedBy || "-",
-          description: form.description,
-          fileName: form.fileName || editingExpense.fileName || "",
-          fileData: form.filePreview || (editingExpense.fileName?.startsWith("data:") ? editingExpense.fileName : null),
-        });
+        await updateExpenseAsync(expenseId, payload);
         toast.success(TOAST_MESSAGES.EXPENSES.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
-        await createExpenseAsync({
-          eventName: form.eventName,
-          category: form.category,
-          amount: Number(form.amount),
-          expenseDate: form.expenseDate ? form.expenseDate.toISOString() : new Date().toISOString(),
-          status: "Pending",
-          submittedBy: form.submittedBy,
-          approvedBy: "-",
-          description: form.description,
-          fileName: form.fileName || "",
-          fileData: form.filePreview || null,
-        });
+        await createExpenseAsync(payload);
         toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
       }
+
       setDialogOpen(false);
       setEditingExpense(null);
       setForm(initialForm);
@@ -878,7 +930,7 @@ export default function ExpensePage() {
       >
         <Grid container spacing={2}>
           {/* 1. Event Type FIRST */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
               label="Event Type"
               placeholder="Select Event Type"
@@ -915,7 +967,7 @@ export default function ExpensePage() {
           </Grid>
 
           {/* 2. Event NEXT (loaded/filtered against selected Event Type) */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
               label="Event"
               placeholder={form.category ? "Select Event" : "Select Event Type first"}
@@ -952,7 +1004,7 @@ export default function ExpensePage() {
             />
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
               label="Amount"
               placeholder="₹ Enter amount"
@@ -967,7 +1019,7 @@ export default function ExpensePage() {
               required
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <AppDateInput
               label="Expense Date"
               value={form.expenseDate}
@@ -995,6 +1047,154 @@ export default function ExpensePage() {
             />
           </Grid>
 
+          {/* Attachment Bar - Identical to Support Tickets */}
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="caption" fontWeight={700} sx={{ color: (t) => t.palette.mode === "dark" ? "#e2e8f0" : "#334155" }}>
+                  Attachment (1 Image, Max 3MB) <span style={{ color: "#ef4444" }}>*</span>
+                </Typography>
+                {form.attachment && (
+                  <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem" }}>
+                    ✓ Image Attached
+                  </Typography>
+                )}
+              </Box>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                style={{ display: "none" }}
+              />
+
+              {!form.attachment ? (
+                <Box
+                  onClick={() => fileInputRef.current?.click()}
+                  sx={{
+                    border: errors.attachment ? "1.5px dashed #ef4444" : "1.5px dashed",
+                    borderColor: errors.attachment
+                      ? "#ef4444"
+                      : ((t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)"),
+                    borderRadius: "10px",
+                    p: 1.1,
+                    minHeight: 46,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 1,
+                    cursor: "pointer",
+                    bgcolor: errors.attachment
+                      ? "rgba(239, 68, 68, 0.05)"
+                      : ((t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)"),
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      borderColor: errors.attachment
+                        ? "#dc2626"
+                        : ((t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
+                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.07)",
+                    },
+                  }}
+                >
+                  <CloudUploadIcon sx={{ fontSize: 20, color: errors.attachment ? "#ef4444" : ((t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b") }} />
+                  <Typography variant="caption" fontWeight={600} sx={{ color: errors.attachment ? "#ef4444" : "text.secondary" }}>
+                    Click to attach image (Max 3MB)
+                  </Typography>
+                </Box>
+              ) : (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    p: 0.6,
+                    px: 1,
+                    border: (t) => `1px solid ${t.palette.divider}`,
+                    borderRadius: "10px",
+                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
+                    minHeight: 46,
+                  }}
+                >
+                  <Box
+                    sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer", overflow: "hidden" }}
+                    onClick={() => openImagePreview(form.attachment, form.attachmentName || `${editingExpense?.id || "EXP"}_attachment.png`)}
+                  >
+                    <Box
+                      component="img"
+                      src={form.attachment}
+                      alt="Preview"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        const fb = e.currentTarget.nextSibling;
+                        if (fb) fb.style.display = "flex";
+                      }}
+                      sx={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: "6px",
+                        objectFit: "cover",
+                        border: "1px solid rgba(0,0,0,0.1)",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Box
+                      sx={{
+                        display: "none",
+                        width: 34,
+                        height: 34,
+                        borderRadius: "6px",
+                        bgcolor: "rgba(74,63,107,0.1)",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <ImageIcon sx={{ fontSize: 20, color: "#4a3f6b" }} />
+                    </Box>
+                    <Box sx={{ overflow: "hidden" }}>
+                      <Typography variant="caption" fontWeight={700} sx={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>
+                        {form.attachmentName || "Attached Image"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#0284c7", fontSize: "0.66rem", display: "block" }}>
+                        Click to preview
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Stack direction="row" spacing={0.3}>
+                    <Tooltip title="Preview">
+                      <IconButton size="small" onClick={() => openImagePreview(form.attachment, form.attachmentName || `${editingExpense?.id || "EXP"}_attachment.png`)}>
+                        <ViewIcon sx={{ fontSize: 17, color: (t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b" }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Download">
+                      <IconButton size="small" onClick={() => handleDownloadImage(form.attachment, form.attachmentName || `${editingExpense?.id || "EXP"}_attachment.png`)}>
+                        <DownloadIcon sx={{ fontSize: 17, color: "#0284c7" }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Change">
+                      <IconButton size="small" onClick={() => fileInputRef.current?.click()}>
+                        <CloudUploadIcon sx={{ fontSize: 17, color: "#d97706" }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Remove">
+                      <IconButton size="small" onClick={handleRemoveAttachment}>
+                        <DeleteIcon sx={{ fontSize: 17, color: "#ef4444" }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                </Box>
+              )}
+              {errors.attachment && (
+                <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 600, mt: 0.3, px: 0.5 }}>
+                  {errors.attachment}
+                </Typography>
+              )}
+            </Box>
+          </Grid>
+
+          {/* Description */}
           <Grid size={{ xs: 12 }}>
             <AppTextArea
               label="Description"
@@ -1009,151 +1209,6 @@ export default function ExpensePage() {
               minRows={3}
               required
             />
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mb: 0.5, display: "block" }}>
-              Bill / Receipt Attachment <span style={{ color: "#ef4444" }}>*</span>
-            </Typography>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              style={{ display: "none" }}
-              accept=".pdf,.png,.jpg,.jpeg"
-            />
-            <Box
-              sx={{
-                border: "1.5px dashed",
-                borderColor: (t) =>
-                  t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)",
-                borderRadius: "12px",
-                p: form.filePreview ? 1.5 : 2,
-                textAlign: "center",
-                cursor: form.filePreview ? "default" : "pointer",
-                transition: "all 0.2s ease",
-                "&:hover": {
-                  borderColor: "#4a3f6b",
-                  bgcolor: (t) =>
-                    t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.04)",
-                },
-              }}
-              onClick={() => {
-                if (!form.filePreview) fileInputRef.current?.click();
-              }}
-            >
-              {form.filePreview ? (
-                <Box sx={{ width: "100%", position: "relative" }}>
-                  <Box
-                    component="img"
-                    src={form.filePreview}
-                    alt="Receipt preview"
-                    sx={{
-                      maxHeight: 180,
-                      maxWidth: "100%",
-                      borderRadius: "8px",
-                      objectFit: "contain",
-                      display: "block",
-                      margin: "0 auto",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-                      bgcolor: "#00000008",
-                    }}
-                  />
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: "block",
-                      fontWeight: 700,
-                      color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
-                      mt: 1,
-                    }}
-                  >
-                    {form.fileName}
-                  </Typography>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 1.5,
-                      mt: 1,
-                    }}
-                  >
-                    <AppButton
-                      size="small"
-                      variant="outlined"
-                      startIcon={<CloudUploadIcon sx={{ fontSize: 16 }} />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        fileInputRef.current?.click();
-                      }}
-                      sx={{ fontSize: "0.75rem", height: 28 }}
-                    >
-                      Change File
-                    </AppButton>
-                    <AppButton
-                      size="small"
-                      variant="outlined"
-                      color="error"
-                      startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setForm((c) => ({ ...c, fileName: "", filePreview: "" }));
-                        if (fileInputRef.current) fileInputRef.current.value = "";
-                      }}
-                      sx={{ fontSize: "0.75rem", height: 28 }}
-                    >
-                      Remove
-                    </AppButton>
-                  </Box>
-                </Box>
-              ) : form.fileName ? (
-                <Box sx={{ py: 0.5 }}>
-                  <AttachFileIcon sx={{ fontSize: 28, color: "#4a3f6b", mb: 0.5 }} />
-                  <Typography variant="caption" sx={{ display: "block", fontWeight: 700, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
-                    Selected: {form.fileName}
-                  </Typography>
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mt: 1 }}>
-                    <AppButton
-                      size="small"
-                      variant="outlined"
-                      startIcon={<CloudUploadIcon sx={{ fontSize: 16 }} />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        fileInputRef.current?.click();
-                      }}
-                      sx={{ fontSize: "0.75rem", height: 28 }}
-                    >
-                      Change File
-                    </AppButton>
-                    <AppButton
-                      size="small"
-                      variant="outlined"
-                      color="error"
-                      startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setForm((c) => ({ ...c, fileName: "", filePreview: "" }));
-                        if (fileInputRef.current) fileInputRef.current.value = "";
-                      }}
-                      sx={{ fontSize: "0.75rem", height: 28 }}
-                    >
-                      Remove
-                    </AppButton>
-                  </Box>
-                </Box>
-              ) : (
-                <>
-                  <CloudUploadIcon sx={{ fontSize: 28, color: "#4a3f6b", mb: 0.5 }} />
-                  <Typography variant="caption" sx={{ display: "block", fontWeight: 700, color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
-                    Choose bill file from your device
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
-                    PDF, PNG, JPG (Max 5MB)
-                  </Typography>
-                </>
-              )}
-            </Box>
           </Grid>
         </Grid>
       </AppDialog>
@@ -1297,236 +1352,86 @@ export default function ExpensePage() {
               </Grid>
               {selectedExpense.fileName && (
                 <Grid size={{ xs: 12 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.8 }}>
+                    Receipt Attachment
+                  </Typography>
                   <Box
                     sx={{
                       display: "flex",
-                      justifyContent: "space-between",
                       alignItems: "center",
-                      mb: 1,
+                      justifyContent: "space-between",
+                      p: 1.5,
+                      border: (t) => `1px solid ${t.palette.divider}`,
+                      borderRadius: "10px",
+                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
                     }}
                   >
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      Receipt / Bill Attachment
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Chip
-                        label={getAttachmentDisplayName(selectedExpense.fileName)}
-                        size="small"
-                        variant="outlined"
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: "0.75rem",
-                          maxWidth: 200,
-                          textOverflow: "ellipsis",
-                          overflow: "hidden",
-                        }}
-                      />
-                      {isImageFile(selectedExpense.fileName) && (
-                        <Tooltip title="View Full Size">
-                          <IconButton
-                            size="small"
-                            onClick={() =>
-                              setPreviewImageModal({
-                                open: true,
-                                url: resolveAttachmentUrl(selectedExpense.fileName),
-                                title: getAttachmentDisplayName(selectedExpense.fileName),
-                              })
-                            }
-                            sx={{ color: "#4a3f6b", p: 0.5 }}
-                          >
-                            <ZoomInIcon sx={{ fontSize: "1.15rem" }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      <Tooltip title="Open in New Tab">
-                        <IconButton
-                          size="small"
-                          component="a"
-                          href={resolveAttachmentUrl(selectedExpense.fileName)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          sx={{ color: "#4a3f6b", p: 0.5 }}
-                        >
-                          <OpenInNewIcon sx={{ fontSize: "1rem" }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </Box>
-
-                  {isImageFile(selectedExpense.fileName) ? (
                     <Box
-                      onClick={() =>
-                        setPreviewImageModal({
-                          open: true,
-                          url: resolveAttachmentUrl(selectedExpense.fileName),
-                          title: getAttachmentDisplayName(selectedExpense.fileName),
-                        })
-                      }
-                      sx={{
-                        position: "relative",
-                        width: "100%",
-                        minHeight: 180,
-                        maxHeight: 280,
-                        borderRadius: "12px",
-                        overflow: "hidden",
-                        border: (t) =>
-                          `1.5px solid ${
-                            t.palette.mode === "dark"
-                              ? "rgba(255,255,255,0.15)"
-                              : "rgba(74,63,107,0.2)"
-                          }`,
-                        bgcolor: (t) =>
-                          t.palette.mode === "dark"
-                            ? "rgba(255,255,255,0.03)"
-                            : "#f8fafc",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.25s ease",
-                        "&:hover": {
-                          borderColor: "#4a3f6b",
-                          boxShadow: "0 6px 20px rgba(74,63,107,0.15)",
-                          "& .preview-overlay": {
-                            opacity: 1,
-                          },
-                        },
-                      }}
+                      sx={{ display: "flex", alignItems: "center", gap: 1.5, cursor: "pointer" }}
+                      onClick={() => openImagePreview(resolveAttachmentUrl(selectedExpense.fileName), `${selectedExpense.id} - Receipt Attachment`)}
                     >
                       <Box
                         component="img"
                         src={resolveAttachmentUrl(selectedExpense.fileName)}
-                        alt={getAttachmentDisplayName(selectedExpense.fileName)}
+                        alt="Receipt preview"
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
-                          const fallback = document.getElementById(
-                            `fallback-${selectedExpense.id}`
-                          );
-                          if (fallback) fallback.style.display = "flex";
+                          const fb = e.currentTarget.nextSibling;
+                          if (fb) fb.style.display = "flex";
                         }}
                         sx={{
-                          width: "100%",
-                          maxHeight: 280,
-                          objectFit: "contain",
-                          display: "block",
-                          p: 1,
-                          borderRadius: "10px",
+                          width: 48,
+                          height: 48,
+                          borderRadius: "8px",
+                          objectFit: "cover",
+                          border: "1px solid rgba(0,0,0,0.12)",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+                          bgcolor: "#fff",
+                          "&:hover": { transform: "scale(1.05)" },
+                          transition: "transform 0.2s ease",
                         }}
                       />
                       <Box
-                        id={`fallback-${selectedExpense.id}`}
                         sx={{
                           display: "none",
-                          flexDirection: "column",
+                          width: 48,
+                          height: 48,
+                          borderRadius: "8px",
+                          bgcolor: "rgba(74,63,107,0.1)",
                           alignItems: "center",
                           justifyContent: "center",
-                          p: 3,
-                          gap: 1,
                         }}
                       >
-                        <ImageIcon sx={{ fontSize: 40, color: "text.secondary" }} />
-                        <Typography variant="caption" color="text.secondary">
-                          Receipt Image Attached
+                        <ImageIcon sx={{ fontSize: 24, color: "#4a3f6b" }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="body2" fontWeight={700}>
+                          {getAttachmentDisplayName(selectedExpense.fileName) || "Receipt Attachment"}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#0284c7" }}>
+                          Click to view enlarged preview
                         </Typography>
                       </Box>
-                      <Box
-                        className="preview-overlay"
-                        sx={{
-                          position: "absolute",
-                          inset: 0,
-                          bgcolor: "rgba(0,0,0,0.38)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 1,
-                          color: "#ffffff",
-                          opacity: 0,
-                          transition: "opacity 0.2s ease",
-                        }}
+                    </Box>
+                    <Stack direction="row" spacing={1}>
+                      <AppButton
+                        variant="outlined"
+                        size="small"
+                        startIcon={<ViewIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => openImagePreview(resolveAttachmentUrl(selectedExpense.fileName), `${selectedExpense.id} - Receipt Attachment`)}
                       >
-                        <ZoomInIcon sx={{ fontSize: 24 }} />
-                        <Typography variant="body2" fontWeight={700}>
-                          Click to expand full size
-                        </Typography>
-                      </Box>
-                    </Box>
-                  ) : isPdfFile(selectedExpense.fileName) ? (
-                    <Box
-                      component="a"
-                      href={resolveAttachmentUrl(selectedExpense.fileName)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                        p: 2,
-                        borderRadius: "12px",
-                        border: (t) => `1.5px solid ${t.palette.divider}`,
-                        bgcolor: (t) =>
-                          t.palette.mode === "dark"
-                            ? "rgba(255,255,255,0.03)"
-                            : "#f8fafc",
-                        textDecoration: "none",
-                        color: "inherit",
-                        transition: "all 0.2s ease",
-                        "&:hover": {
-                          borderColor: "#ef4444",
-                          bgcolor: (t) =>
-                            t.palette.mode === "dark"
-                              ? "rgba(239, 68, 68, 0.08)"
-                              : "rgba(239, 68, 68, 0.04)",
-                        },
-                      }}
-                    >
-                      <PictureAsPdfIcon sx={{ fontSize: 36, color: "#ef4444" }} />
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={700}>
-                          {getAttachmentDisplayName(selectedExpense.fileName)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Click to view PDF document in new tab
-                        </Typography>
-                      </Box>
-                      <OpenInNewIcon sx={{ fontSize: 20, color: "text.secondary" }} />
-                    </Box>
-                  ) : (
-                    <Box
-                      component="a"
-                      href={resolveAttachmentUrl(selectedExpense.fileName)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                        p: 2,
-                        borderRadius: "12px",
-                        border: (t) => `1.5px solid ${t.palette.divider}`,
-                        bgcolor: (t) =>
-                          t.palette.mode === "dark"
-                            ? "rgba(255,255,255,0.03)"
-                            : "#f8fafc",
-                        textDecoration: "none",
-                        color: "inherit",
-                        transition: "all 0.2s ease",
-                        "&:hover": {
-                          borderColor: "#4a3f6b",
-                        },
-                      }}
-                    >
-                      <AttachFileIcon sx={{ fontSize: 32, color: "#4a3f6b" }} />
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={700}>
-                          {getAttachmentDisplayName(selectedExpense.fileName)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Click to open attachment
-                        </Typography>
-                      </Box>
-                      <OpenInNewIcon sx={{ fontSize: 20, color: "text.secondary" }} />
-                    </Box>
-                  )}
+                        Preview
+                      </AppButton>
+                      <AppButton
+                        variant="contained"
+                        size="small"
+                        startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => handleDownloadImage(resolveAttachmentUrl(selectedExpense.fileName), `${selectedExpense.id}_receipt.png`)}
+                      >
+                        Download
+                      </AppButton>
+                    </Stack>
+                  </Box>
                 </Grid>
               )}
             </Grid>
@@ -1534,60 +1439,55 @@ export default function ExpensePage() {
         )}
       </AppDialog>
 
-      {/* Lightbox Full Size Image Preview Dialog */}
-      <AppDialog
+      {/* Image Preview / Lightbox Modal */}
+      <Dialog
         open={previewImageModal.open}
         onClose={() => setPreviewImageModal({ open: false, url: "", title: "" })}
-        title={previewImageModal.title || "Receipt Attachment Preview"}
         maxWidth="md"
-        actions={
-          <Stack direction="row" spacing={1.5} alignItems="center">
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "14px",
+            bgcolor: "background.paper",
+            p: 1.5,
+          },
+        }}
+      >
+        <DialogTitle sx={{ p: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Typography variant="subtitle1" fontWeight={700}>
+            {previewImageModal.title || "Receipt Attachment Preview"}
+          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
             <AppButton
               variant="outlined"
-              startIcon={<OpenInNewIcon />}
-              component="a"
-              href={previewImageModal.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              size="small"
+              startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
+              onClick={() => handleDownloadImage(previewImageModal.url, `${(previewImageModal.title || "receipt").replace(/[^a-zA-Z0-9_-]/g, "_")}.png`)}
             >
-              Open in New Tab
+              Download
             </AppButton>
-            <AppButton
-              variant="contained"
-              onClick={() => setPreviewImageModal({ open: false, url: "", title: "" })}
-            >
-              Close
-            </AppButton>
+            <IconButton size="small" onClick={() => setPreviewImageModal({ open: false, url: "", title: "" })}>
+              <CloseIcon />
+            </IconButton>
           </Stack>
-        }
-      >
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            p: 1.5,
-            bgcolor: (t) => (t.palette.mode === "dark" ? "#0f172a" : "#0f172a08"),
-            borderRadius: "12px",
-            minHeight: 250,
-            maxHeight: "72vh",
-            overflow: "auto",
-          }}
-        >
-          <Box
-            component="img"
-            src={previewImageModal.url}
-            alt={previewImageModal.title || "Attachment"}
-            sx={{
-              maxWidth: "100%",
-              maxHeight: "68vh",
-              objectFit: "contain",
-              borderRadius: "8px",
-              boxShadow: "0 8px 30px rgba(0,0,0,0.25)",
-            }}
-          />
-        </Box>
-      </AppDialog>
+        </DialogTitle>
+        <DialogContent sx={{ p: 1, display: "flex", justifyContent: "center", alignItems: "center", minHeight: 300, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(0,0,0,0.3)" : "#f8fafc", borderRadius: "10px" }}>
+          {previewImageModal.url && (
+            <Box
+              component="img"
+              src={previewImageModal.url}
+              alt="Full Preview"
+              sx={{
+                maxWidth: "100%",
+                maxHeight: "75vh",
+                objectFit: "contain",
+                borderRadius: "8px",
+                boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Dedicated Verify Expense Modal */}
       <AppDialog

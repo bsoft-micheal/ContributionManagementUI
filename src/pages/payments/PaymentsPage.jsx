@@ -180,22 +180,16 @@ export default function PaymentsPage() {
 
 
   const renderPaymentModeBadge = (mode) => {
+    const raw = String(mode || "").trim();
+    const lower = raw.toLowerCase().replace(/[\s\-_/]+/g, "");
     let color = "#3b82f6";
-    let bg = "rgba(59, 130, 246, 0.1)";
 
-    if (mode === "GPay") {
-      color = "#2563eb";
-      bg = "rgba(37, 99, 235, 0.1)";
-    } else if (mode === "PhonePe") {
-      color = "#7c3aed";
-      bg = "rgba(124, 58, 237, 0.1)";
-    } else if (mode === "Paytm") {
-      color = "#0284c7";
-      bg = "rgba(2, 132, 199, 0.1)";
-    } else if (mode === "UPI") {
-      color = "#ea580c";
-      bg = "rgba(234, 88, 12, 0.1)";
-    }
+    if (lower.includes("gpay") || lower.includes("google")) color = "#2563eb";
+    else if (lower.includes("phonepe") || lower.includes("phone")) color = "#7c3aed";
+    else if (lower.includes("paytm")) color = "#0284c7";
+    else if (lower.includes("upi") || lower.includes("bhim")) color = "#ea580c";
+    else if (lower.includes("cash")) color = "#16a34a";
+    else if (lower.includes("bank") || lower.includes("transfer") || lower.includes("neft") || lower.includes("imps")) color = "#059669";
 
     return (
       <Box
@@ -203,7 +197,7 @@ export default function PaymentsPage() {
           display: "inline-flex",
           alignItems: "center",
           gap: 0.6,
-          bgcolor: bg,
+          bgcolor: `${color}18`,
           color: color,
           px: 1,
           py: 0.2,
@@ -212,7 +206,7 @@ export default function PaymentsPage() {
       >
         <PaymentRoundedIcon sx={{ fontSize: 13 }} />
         <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.72rem" }}>
-          {mode || "UPI"}
+          {raw || "Payment"}
         </Typography>
       </Box>
     );

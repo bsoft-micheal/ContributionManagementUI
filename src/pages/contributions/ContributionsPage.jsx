@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Dialog,
@@ -52,7 +52,7 @@ const initialPayment = {
   eventId: "",
   memberId: "",
   amount: "",
-  paymentMode: "Upi",
+  paymentMode: "",
   paymentDate: dayjs(),
   cashAmount: "",
   upiAmount: "",
@@ -159,7 +159,7 @@ export default function ContributionsPage() {
   const handleAmountChange = (val) => {
     setPayment((prev) => {
       const next = { ...prev, amount: val };
-      if (prev.paymentMode === "Split" && val !== "") {
+      if (isSplitMode && val !== "") {
         const total = Number(val) || 0;
         const currentCash = Number(prev.cashAmount);
         if (!isNaN(currentCash) && currentCash > 0 && currentCash <= total) {
@@ -176,9 +176,19 @@ export default function ContributionsPage() {
   };
 
   const handlePaymentModeChange = (newMode) => {
+    const matchedMode = (paymentModes || []).find(
+      (m) =>
+        (m.paymentModeName && m.paymentModeName.trim().toLowerCase() === String(newMode).trim().toLowerCase()) ||
+        (m.paymentModeId && String(m.paymentModeId).toLowerCase() === String(newMode).trim().toLowerCase())
+    );
+
+    const isSplit = matchedMode
+      ? (String(matchedMode.paymentType || "").toLowerCase() === "split" || String(matchedMode.paymentModeName || "").toLowerCase().includes("split"))
+      : false;
+
     setPayment((current) => {
       const next = { ...current, paymentMode: newMode };
-      if (newMode === "Split") {
+      if (isSplit) {
         const total = Number(current.amount) || 0;
         if (total > 0 && (!current.cashAmount || !current.upiAmount)) {
           const half = Math.round((total / 2) * 100) / 100;
@@ -232,7 +242,7 @@ export default function ContributionsPage() {
 
     setPayment((prev) => {
       const next = { ...prev, paymentScope: scope, amount: String(newAmt) };
-      if (prev.paymentMode === "Split") {
+      if (isSplitMode) {
         const half = Math.round((newAmt / 2) * 100) / 100;
         next.cashAmount = String(half);
         next.upiAmount = String(Math.round((newAmt - half) * 100) / 100);
@@ -241,6 +251,55 @@ export default function ContributionsPage() {
     });
     if (errors.amount || errors.split) setErrors((prev) => ({ ...prev, amount: "", split: "" }));
   };
+
+  const modeOptions = useMemo(() => {
+    return (paymentModes || [])
+      .filter((m) => m.isActive !== false)
+      .map((m) => {
+        const rawName = m.paymentModeName || m.name || "";
+        return {
+          label: rawName,
+          value: rawName,
+          isCash: m.isCash,
+          supportsQr: m.supportsQr,
+          paymentType: m.paymentType,
+        };
+      });
+  }, [paymentModes]);
+
+  const selectedModeObj = useMemo(() => {
+    if (!payment.paymentMode || !Array.isArray(paymentModes)) return null;
+    const search = String(payment.paymentMode).trim().toLowerCase();
+    return (
+      paymentModes.find(
+        (m) =>
+          (m.paymentModeName && m.paymentModeName.trim().toLowerCase() === search) ||
+          (m.paymentModeId && String(m.paymentModeId).toLowerCase() === search)
+      ) || null
+    );
+  }, [paymentModes, payment.paymentMode]);
+
+  // Determine QR display capability purely using API / database flags (isCash, supportsQr, paymentType)
+  const isQrSupported = useMemo(() => {
+    if (!selectedModeObj) return false;
+    if (typeof selectedModeObj.supportsQr === "boolean") {
+      return selectedModeObj.supportsQr;
+    }
+    if (typeof selectedModeObj.isCash === "boolean") {
+      return !selectedModeObj.isCash;
+    }
+    if (selectedModeObj.paymentType) {
+      return String(selectedModeObj.paymentType).trim().toLowerCase() !== "cash";
+    }
+    return false;
+  }, [selectedModeObj]);
+
+  const isSplitMode = useMemo(() => {
+    if (!selectedModeObj) return false;
+    const type = String(selectedModeObj.paymentType || "").toLowerCase();
+    const name = String(selectedModeObj.paymentModeName || "").toLowerCase();
+    return type === "split" || name.includes("split");
+  }, [selectedModeObj]);
 
   async function handlePay() {
     const filed = "This field is required";
@@ -251,7 +310,7 @@ export default function ContributionsPage() {
     };
     const newErrors = validateForm(payment, schema);
 
-    if (payment.paymentMode === "Split") {
+    if (isSplitMode) {
       const total = Number(payment.amount) || 0;
       const cash = Number(payment.cashAmount);
       const upi = Number(payment.upiAmount);
@@ -285,8 +344,8 @@ export default function ContributionsPage() {
         ...payment,
         paymentDate: payment.paymentDate?.toISOString(),
         amount: payment.amount === "" ? null : Number(payment.amount),
-        cashAmount: payment.paymentMode === "Split" ? (payment.cashAmount === "" ? null : Number(payment.cashAmount)) : null,
-        upiAmount: payment.paymentMode === "Split" ? (payment.upiAmount === "" ? null : Number(payment.upiAmount)) : null,
+        cashAmount: isSplitMode ? (payment.cashAmount === "" ? null : Number(payment.cashAmount)) : null,
+        upiAmount: isSplitMode ? (payment.upiAmount === "" ? null : Number(payment.upiAmount)) : null,
         paymentScope: payment.paymentScope || "CurrentEvent",
       });
       toast.success(TOAST_MESSAGES.CONTRIBUTIONS.SAVED_SUCCESS || TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
@@ -326,25 +385,6 @@ export default function ContributionsPage() {
   }
 
   const eventOptions = events.map(e => ({ label: e.eventName, value: e.eventId }));
-  const modeOptions = paymentModes.length > 0
-    ? paymentModes.map(m => {
-        const rawName = m.paymentModeName || "";
-        const lower = rawName.toLowerCase();
-        let value = rawName;
-        if (lower === "upi") value = "Upi";
-        else if (lower === "cash") value = "Cash";
-        else if (lower === "split" || lower.includes("split")) value = "Split";
-        return {
-          label: rawName,
-          value: value
-        };
-      })
-    : [
-        { label: "Cash", value: "Cash" },
-        { label: "UPI", value: "Upi" },
-        { label: "Split Payment (Cash + UPI)", value: "Split" },
-      ];
-
 
   const columns = [
     {
@@ -376,12 +416,13 @@ export default function ContributionsPage() {
                     }
 
                     const initAmt = defaultScope === "PreviousArrears" ? previousArrears : (defaultScope === "AllOutstanding" ? totalDue : currentDue);
+                    const defaultMode = modeOptions.length > 0 ? modeOptions[0].value : (paymentModes[0]?.paymentModeName || "");
 
                     setPayment({
                       eventId: row.eventId,
                       memberId: row.memberId,
                       amount: String(initAmt),
-                      paymentMode: "Upi",
+                      paymentMode: defaultMode,
                       paymentDate: dayjs(),
                       cashAmount: "",
                       upiAmount: "",
@@ -691,7 +732,7 @@ export default function ContributionsPage() {
             error={!!errors.amount}
             helperText={
               errors.amount ||
-              (payment.paymentMode === "Split"
+              (isSplitMode
                 ? "Total fixed due amount. You can adjust Cash and UPI amounts below."
                 : "Fixed due amount for the selected payment scope.")
             }
@@ -708,7 +749,7 @@ export default function ContributionsPage() {
             required
           />
 
-          {payment.paymentMode === "Split" && (
+          {isSplitMode && (
             <Box
               sx={{
                 p: 2,
@@ -821,72 +862,73 @@ export default function ContributionsPage() {
             required
           />
 
-          {((payment.paymentMode === "Upi" && Number(payment.amount) > 0) ||
-            (payment.paymentMode === "Split" && Number(payment.upiAmount) > 0)) && (() => {
-              const activeEventObj = events.find(e => e.eventId === selectedEventId);
-              const qrConfig = getPaymentQrConfig(activeEventObj);
-              const targetAmount = payment.paymentMode === "Split" ? payment.upiAmount : payment.amount;
+          {isQrSupported && (() => {
+            const targetAmount = isSplitMode ? Number(payment.upiAmount || 0) : Number(payment.amount || 0);
+            if (targetAmount <= 0) return null;
 
-              let qrSrc = "";
-              if (qrConfig.qrMode === "uploaded" && qrConfig.qrImage) {
-                qrSrc = qrConfig.qrImage;
-              } else {
-                qrSrc = generateQrPngDataUrl(
-                  buildUpiPaymentUri({
-                    upiId: qrConfig.upiId || qrConfig.qrUpiId,
-                    receiverName: qrConfig.receiverName || qrConfig.qrReceiverName,
-                    amount: targetAmount,
-                    note: `Contribution Payment - ${activeEventObj?.eventName || ""}`,
-                  }),
-                  200
-                );
-              }
+            const activeEventObj = events.find(e => e.eventId === selectedEventId);
+            const qrConfig = getPaymentQrConfig(activeEventObj);
 
-              return (
-                <Box
-                  sx={{
-                    p: 1.5,
-                    borderRadius: "12px",
-                    bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.08)" : "rgba(2, 132, 199, 0.04)"),
-                    border: "1px solid rgba(2, 132, 199, 0.2)",
-                    textAlign: "center",
-                  }}
-                >
-                  <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", display: "block", mb: 0.8 }}>
-                    {payment.paymentMode === "Split"
-                      ? `Dynamic UPI QR (Split UPI Portion: ₹${Number(payment.upiAmount).toLocaleString("en-IN")})`
-                      : `Dynamic UPI Payment QR (₹${Number(payment.amount).toLocaleString("en-IN")})`}
-                  </Typography>
-                  <Box
-                    component="img"
-                    src={qrSrc}
-                    alt="UPI QR Code"
-                    sx={{
-                      width: 130,
-                      height: 130,
-                      objectFit: "contain",
-                      display: "block",
-                      margin: "0 auto",
-                      p: 0.6,
-                      bgcolor: "#ffffff",
-                      borderRadius: "10px",
-                      border: "1.5px solid #0284c7",
-                      boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)",
-                    }}
-                  />
-                  {qrConfig.upiId && (
-                    <Typography variant="caption" fontWeight={700} sx={{ color: "#0284c7", fontSize: "0.72rem", mt: 0.5, display: "block" }}>
-                      UPI ID: {qrConfig.upiId} {qrConfig.receiverName ? `(${qrConfig.receiverName})` : ""}
-                    </Typography>
-                  )}
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.4, display: "block" }}>
-                    {payment.paymentMode === "Split"
-                      ? `Scan with any UPI app to pay ₹${Number(payment.upiAmount).toLocaleString("en-IN")} online. Collect ₹${Number(payment.cashAmount || 0).toLocaleString("en-IN")} in cash.`
-                      : `Scan with any UPI app to pay ₹${Number(payment.amount).toLocaleString("en-IN")} directly.`}
-                  </Typography>
-                </Box>
+            let qrSrc = "";
+            if (qrConfig.qrMode === "uploaded" && qrConfig.qrImage) {
+              qrSrc = qrConfig.qrImage;
+            } else {
+              qrSrc = generateQrPngDataUrl(
+                buildUpiPaymentUri({
+                  upiId: qrConfig.upiId || qrConfig.qrUpiId,
+                  receiverName: qrConfig.receiverName || qrConfig.qrReceiverName,
+                  amount: targetAmount,
+                  note: `Contribution Payment - ${activeEventObj?.eventName || ""}`,
+                }),
+                200
               );
-            })()}
+            }
+
+            return (
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: "12px",
+                  bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.08)" : "rgba(2, 132, 199, 0.04)"),
+                  border: "1px solid rgba(2, 132, 199, 0.2)",
+                  textAlign: "center",
+                }}
+              >
+                <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", display: "block", mb: 0.8 }}>
+                  {isSplitMode
+                    ? `Dynamic UPI QR (Split UPI Portion: ₹${targetAmount.toLocaleString("en-IN")})`
+                    : `Dynamic UPI Payment QR (₹${targetAmount.toLocaleString("en-IN")})`}
+                </Typography>
+                <Box
+                  component="img"
+                  src={qrSrc}
+                  alt="UPI QR Code"
+                  sx={{
+                    width: 130,
+                    height: 130,
+                    objectFit: "contain",
+                    display: "block",
+                    margin: "0 auto",
+                    p: 0.6,
+                    bgcolor: "#ffffff",
+                    borderRadius: "10px",
+                    border: "1.5px solid #0284c7",
+                    boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)",
+                  }}
+                />
+                {qrConfig.upiId && (
+                  <Typography variant="caption" fontWeight={700} sx={{ color: "#0284c7", fontSize: "0.72rem", mt: 0.5, display: "block" }}>
+                    UPI ID: {qrConfig.upiId} {qrConfig.receiverName ? `(${qrConfig.receiverName})` : ""}
+                  </Typography>
+                )}
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.4, display: "block" }}>
+                  {isSplitMode
+                    ? `Scan with any UPI app to pay ₹${targetAmount.toLocaleString("en-IN")} online. Collect ₹${Number(payment.cashAmount || 0).toLocaleString("en-IN")} in cash.`
+                    : `Scan with any UPI app to pay ₹${targetAmount.toLocaleString("en-IN")} directly.`}
+                </Typography>
+              </Box>
+            );
+          })()}
         </Stack>
       </AppDialog>
 

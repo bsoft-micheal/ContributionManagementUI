@@ -37,7 +37,6 @@ export default function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/forgot-password/verify" element={<ForgotPasswordVerifyPage />} />
       <Route path="/forgot-password/reset" element={<ForgotPasswordResetPage />} />
-      <Route path="/confirm-payment" element={<SubmitPaymentPage />} />
       <Route
         element={
           <ProtectedRoute>
@@ -55,6 +54,7 @@ export default function AppRoutes() {
         <Route path="/events/:id" element={<ProtectedRoute><EventDetailsPage /></ProtectedRoute>} />
         <Route path="/contributions" element={<ProtectedRoute><ContributionsPage /></ProtectedRoute>} />
         <Route path="/payment-submission" element={<ProtectedRoute><SubmitPaymentPage /></ProtectedRoute>} />
+        <Route path="/confirm-payment" element={<ProtectedRoute><SubmitPaymentPage /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
         <Route path="/expense" element={<ProtectedRoute><ExpensePage /></ProtectedRoute>} />
         <Route path="/gallery" element={<ProtectedRoute><GalleryPage /></ProtectedRoute>} />
