@@ -61,7 +61,7 @@ export default function EventTypesPage() {
       const data = await getEventTypesAsync();
       setTypes(data || []);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to load event types");
+      toast.error(error, "Failed to load event types");
     } finally {
       setLoading(false);
     }
@@ -115,7 +115,7 @@ export default function EventTypesPage() {
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      toast.error(error, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 
@@ -131,7 +131,7 @@ export default function EventTypesPage() {
         toast.success(TOAST_MESSAGES.EVENT_TYPES.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        toast.error(error, TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       } finally {
         setDeleteConfirmOpen(false);
         setTypeToDelete(null);
@@ -155,7 +155,7 @@ export default function EventTypesPage() {
       toast.success(TOAST_MESSAGES.EVENT_TYPES.STATUS_UPDATED);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? TOAST_MESSAGES.EVENT_TYPES.STATUS_UPDATE_FAILED);
+      toast.error(err, TOAST_MESSAGES.EVENT_TYPES.STATUS_UPDATE_FAILED);
     } finally {
       setStatusConfirmOpen(false);
       setTypeToToggle(null);
@@ -193,10 +193,10 @@ export default function EventTypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete Category" : ""}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this event type is referenced in events, budget rules, or expenses" : (hasWriteAccess ? "Delete Category" : "")}>
             <span>
-              <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => handleDeleteRequest(row.eventTypeId)}>
-                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
+              <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)} onClick={() => handleDeleteRequest(row.eventTypeId)}>
+                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess && !(row.isReferred || row.IsReferred) ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
               </IconButton>
             </span>
           </Tooltip>

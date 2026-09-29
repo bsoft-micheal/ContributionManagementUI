@@ -506,8 +506,8 @@ export default function UsersPage() {
       await deleteUserAsync(userToDelete);
       toast.success("Deleted successfully");
       loadData();
-    } catch {
-      toast.error("Failed to delete");
+    } catch (err) {
+      toast.error(err, "Failed to delete");
     } finally {
       setDeleteConfirmOpen(false);
       setUserToDelete(null);
@@ -782,15 +782,15 @@ export default function UsersPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete User" : ""}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this user is referenced in contributions, events, or transactions" : (hasWriteAccess ? "Delete User" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
                 onClick={() => handleDeleteRequest(row.userId)}
               >
-                <DeleteIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? actionIconColor : "#cbd5e1" }} />
+                <DeleteIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess && !(row.isReferred || row.IsReferred) ? actionIconColor : "#cbd5e1" }} />
               </IconButton>
             </span>
           </Tooltip>

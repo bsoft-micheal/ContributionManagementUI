@@ -77,7 +77,7 @@ export default function BudgetCalculationsPage() {
       setItems(Array.isArray(budgetData) ? budgetData : []);
       setEventTypes(Array.isArray(typesData) ? typesData : []);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to load budget calculations");
+      toast.error(error, "Failed to load budget calculations");
     } finally {
       setLoading(false);
     }
@@ -168,7 +168,7 @@ export default function BudgetCalculationsPage() {
       setDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save");
+      toast.error(error, "Failed to save");
     }
   }
 
@@ -184,7 +184,7 @@ export default function BudgetCalculationsPage() {
         toast.success("Deleted successfully");
         loadData();
       } catch (error) {
-        toast.error(error.response?.data?.message || "Failed to delete");
+        toast.error(error, "Failed to delete");
       } finally {
         setDeleteConfirmOpen(false);
         setItemToDelete(null);
@@ -208,7 +208,7 @@ export default function BudgetCalculationsPage() {
       toast.success("Status updated successfully");
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? "Failed to update status");
+      toast.error(err, "Failed to update status");
     } finally {
       setStatusConfirmOpen(false);
       setItemToToggle(null);
@@ -251,19 +251,19 @@ export default function BudgetCalculationsPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete Expense Item" : ""}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this item is referenced in expense records" : (hasWriteAccess ? "Delete Expense Item" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
                 onClick={() => handleDeleteRequest(row.budgetCalculationId)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.1rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      hasWriteAccess && !(row.isReferred || row.IsReferred)
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"

@@ -118,15 +118,15 @@ export default function RolesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete Role" : ""}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this role is assigned to users or members" : (hasWriteAccess ? "Delete Role" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
                 onClick={() => handleDeleteRequest(row.roleId ?? row.RoleId ?? row.id)}
               >
-                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
+                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess && !(row.isReferred || row.IsReferred) ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
               </IconButton>
             </span>
           </Tooltip>

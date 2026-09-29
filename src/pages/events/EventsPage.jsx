@@ -7,7 +7,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, FilterList as FilterListIcon } from "@mui/icons-material";
+import { Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, FilterList as FilterListIcon, AddPhotoAlternate as AddPhotoAlternateIcon, PhotoLibrary as PhotoLibraryIcon } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -25,6 +25,7 @@ import { getMembersAsync } from "../../services/memberService";
 import { getUsersAsync } from "../../services/userService";
 import AppDataTable from "../../components/common/AppDataTable";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
+import EventPhotoDetailsDialog from "../../components/events/EventPhotoDetailsDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
@@ -39,6 +40,8 @@ export default function EventsPage() {
   const [filters, setFilters] = useState({ month: filterMonth, year: filterYear });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [photoDetailsDialogOpen, setPhotoDetailsDialogOpen] = useState(false);
+  const [photoEvent, setPhotoEvent] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const { authState } = useAuth();
@@ -179,14 +182,44 @@ export default function EventsPage() {
             </Tooltip>
           )}
           {canDeleteEvent && (
-            <Tooltip title="Delete Event">
-              <IconButton size="small" sx={{ p: 0.3 }}
-                onClick={() => handleDeleteRequest(row)}
-              >
-                <DeleteIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-              </IconButton>
+            <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this event has recorded payments, expenses, or photos" : "Delete Event"}>
+              <span>
+                <IconButton size="small" sx={{ p: 0.3 }}
+                  disabled={Boolean(row.isReferred || row.IsReferred)}
+                  onClick={() => handleDeleteRequest(row)}
+                >
+                  <DeleteIcon sx={{ fontSize: "1.1rem", color: !(row.isReferred || row.IsReferred) ? actionIconColor : "#cbd5e1" }} />
+                </IconButton>
+              </span>
             </Tooltip>
           )}
+          <Tooltip title="Add Photos">
+            <IconButton size="small" sx={{ p: 0.3 }}
+              onClick={() =>
+                navigate("/gallery", {
+                  state: {
+                    openAddPhoto: true,
+                    eventName: row.eventName,
+                    category: row.eventTypeName,
+                    eventDate: row.eventDate,
+                    eventId: row.eventId,
+                  },
+                })
+              }
+            >
+              <AddPhotoAlternateIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="View Photos">
+            <IconButton size="small" sx={{ p: 0.3 }}
+              onClick={() => {
+                setPhotoEvent(row);
+                setPhotoDetailsDialogOpen(true);
+              }}
+            >
+              <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+            </IconButton>
+          </Tooltip>
         </Box>
       )
     },
@@ -196,13 +229,21 @@ export default function EventsPage() {
       )
     },
     { label: "Category", key: "eventTypeName", render: (row) => <Typography variant="body2">{row.eventTypeName}</Typography> },
-    { label: "Event Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
+    {
+      label: "Event Date",
+      key: "eventDate",
+      render: (row) => (
+        <Typography variant="body2" sx={{ maxWidth: 220, whiteSpace: "normal", wordBreak: "break-word" }}>
+          {row.eventDates || formatGridDate(row.eventDate)}
+        </Typography>
+      ),
+    },
 
     {
       label: "Valuation",
       key: "totalExpectedAmount",
       align: "right",
-      render: (row) => <Typography variant="body2" fontWeight={700}>₹{row.totalExpectedAmount}</Typography>
+      render: (row) => <Typography variant="body2" fontWeight={700}>₹{Number(row.totalExpectedAmount || 0).toLocaleString("en-IN")}</Typography>
     },
     {
       label: "Created By",
@@ -309,7 +350,7 @@ export default function EventsPage() {
               <Box sx={{ display: "flex", alignItems: "center", gap: 3, justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, fontSize: "0.65rem" }}>Expected Amount</Typography>
-                  <Typography variant="body2" fontWeight={800} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }} display="block">₹{events.reduce((sum, e) => sum + e.totalExpectedAmount, 0)}</Typography>
+                  <Typography variant="body2" fontWeight={800} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }} display="block">₹{events.reduce((sum, e) => sum + (Number(e.totalExpectedAmount) || 0), 0).toLocaleString("en-IN")}</Typography>
                 </Box>
               </Box>
             </Grid>
@@ -323,6 +364,26 @@ export default function EventsPage() {
         onClose={() => setViewDialogOpen(false)}
         event={selectedEvent}
         members={members}
+      />
+
+      <EventPhotoDetailsDialog
+        open={photoDetailsDialogOpen}
+        onClose={() => {
+          setPhotoDetailsDialogOpen(false);
+          setPhotoEvent(null);
+        }}
+        event={photoEvent}
+        onAddPhotosClick={(ev) => {
+          navigate("/gallery", {
+            state: {
+              openAddPhoto: true,
+              eventName: ev.eventName,
+              category: ev.eventTypeName,
+              eventDate: ev.eventDate,
+              eventId: ev.eventId,
+            },
+          });
+        }}
       />
 
       <AppConfirmDialog

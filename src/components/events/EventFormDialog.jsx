@@ -123,6 +123,16 @@ export default function EventFormDialog({
     return list;
   }, [form.eventDate, activeMembers]);
 
+  // Comma-separated birthday dates of all celebrants in the target month (sorted ascending by date)
+  const celebrantDatesCsv = useMemo(() => {
+    if (!monthCelebrants || monthCelebrants.length === 0) return "";
+    const sorted = [...monthCelebrants]
+      .filter((m) => m.dateOfBirth)
+      .sort((a, b) => dayjs(a.dateOfBirth).date() - dayjs(b.dateOfBirth).date());
+
+    return sorted.map((m) => dayjs(m.dateOfBirth).format("D MMM")).join(", ");
+  }, [monthCelebrants]);
+
   // Birthday calculation math
   const office = Math.max(0, Number(officeBirthdays) || 0);
   const wfh = Math.max(0, Number(wfhBirthdays) || 0);
@@ -275,7 +285,7 @@ export default function EventFormDialog({
         fetchDetails();
       } else {
         // Adding new event
-        const defaultDate = dayjs().date() > 25 ? dayjs().add(1, "month").date(25) : dayjs().date(25);
+        const defaultDate = dayjs();
         const targetMonth = defaultDate.month();
         const celebrantsInMonth = activeMembers.filter(
           (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
@@ -411,6 +421,7 @@ export default function EventFormDialog({
           eventName: form.eventName.trim(),
           eventTypeId: form.eventTypeId,
           eventDate: dayjs(form.eventDate).hour(12).toISOString(),
+          eventDates: celebrantDatesCsv || null,
           description:
             form.description?.trim() ||
             `Birthday celebration (${office} Office, ${wfh} WFH)${celebrantsSummary ? ` for ${celebrantsSummary}` : ""
@@ -429,6 +440,7 @@ export default function EventFormDialog({
           ...form,
           baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
           eventDate: dayjs(form.eventDate).hour(12).toISOString(),
+          eventDates: null,
         };
       }
 
@@ -581,14 +593,61 @@ export default function EventFormDialog({
                   </Grid>
 
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppDateInput
-                      label="Event Date"
-                      required
-                      value={form.eventDate}
-                      onChange={handleDateChange}
-                      error={!!errors.eventDate}
-                      helperText={errors.eventDate}
-                    />
+                    {isBirthday ? (
+                      <AppInput
+                        label="Event Date"
+                        required
+                        value={
+                          celebrantDatesCsv ||
+                          (form.eventDate
+                            ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
+                            : "Auto calculated")
+                        }
+                        disabled
+                        multiline
+                        minRows={1}
+                        maxRows={2}
+                        placeholder="Auto calculated"
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            minHeight: 34,
+                            height: "auto",
+                            py: 0.6,
+                            px: 1,
+                            bgcolor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(255, 255, 255, 0.05)"
+                                : "#f8fafd",
+                          },
+                          "& textarea": {
+                            fontSize: "0.82rem",
+                            fontWeight: 600,
+                            lineHeight: 1.45,
+                            maxHeight: 52,
+                            overflowY: "auto !important",
+                            cursor: "default",
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                            "&::-webkit-scrollbar": {
+                              width: "4px",
+                            },
+                            "&::-webkit-scrollbar-thumb": {
+                              backgroundColor: "rgba(124, 58, 237, 0.35)",
+                              borderRadius: "4px",
+                            },
+                          },
+                        }}
+                      />
+                    ) : (
+                      <AppDateInput
+                        label="Event Date"
+                        required
+                        value={form.eventDate}
+                        onChange={handleDateChange}
+                        error={!!errors.eventDate}
+                        helperText={errors.eventDate}
+                      />
+                    )}
                   </Grid>
 
                   <Grid size={{ xs: 12, sm: 6 }}>
