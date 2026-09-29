@@ -12,6 +12,8 @@ import { ThemeModeProvider, useThemeMode } from "./contexts/ThemeModeContext";
 import { createAppTheme } from "./theme";
 import "./styles.css";
 
+import { NavigationLoadingProvider } from "./contexts/NavigationLoadingContext";
+
 function ThemedApp() {
   const { mode } = useThemeMode();
   const theme = React.useMemo(() => createAppTheme(mode), [mode]);
@@ -24,7 +26,9 @@ function ThemedApp() {
           <AuthProvider>
             <NotificationProvider>
               <ToastProvider>
-                <App />
+                <NavigationLoadingProvider>
+                  <App />
+                </NavigationLoadingProvider>
               </ToastProvider>
             </NotificationProvider>
           </AuthProvider>
