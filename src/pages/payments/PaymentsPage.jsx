@@ -56,6 +56,7 @@ export default function PaymentsPage() {
 
   // Granular Action Permissions
   const canViewPaymentHistory = hasActionPermission("View Payment History", 42, authState?.role).canView;
+  const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
 
   const [transactions, setTransactions] = useState([]);
   const [membersList, setMembersList] = useState([]);
@@ -172,14 +173,23 @@ export default function PaymentsPage() {
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
-      if (appliedMember !== "ALL" && t.memberName !== appliedMember) return false;
+      if (isMemberRole) {
+        const userFullName = String(authState?.fullName || authState?.user?.fullName || authState?.name || "").trim().toLowerCase();
+        const userEmail = String(authState?.email || "").trim().toLowerCase();
+        const txnMember = String(t.memberName || "").trim().toLowerCase();
+        if (userFullName && txnMember !== userFullName && (!t.email || String(t.email).trim().toLowerCase() !== userEmail)) {
+          return false;
+        }
+      } else if (appliedMember !== "ALL" && t.memberName !== appliedMember) {
+        return false;
+      }
       if (appliedEvent !== "ALL" && t.eventName !== appliedEvent) return false;
       if (appliedMode !== "ALL" && t.paymentMode !== appliedMode) return false;
       if (appliedStatus !== "ALL" && t.status !== appliedStatus) return false;
       if (appliedDate && !dayjs(t.paymentDate).isSame(appliedDate, "day")) return false;
       return true;
     });
-  }, [transactions, appliedMember, appliedEvent, appliedMode, appliedStatus, appliedDate]);
+  }, [transactions, appliedMember, appliedEvent, appliedMode, appliedStatus, appliedDate, isMemberRole, authState]);
 
 
   const renderPaymentModeBadge = (mode) => {
@@ -400,7 +410,7 @@ export default function PaymentsPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Payment History"
+        title={isMemberRole ? "My Payment History" : "Payment History"}
         columns={columns}
         data={filteredTransactions}
         loading={loading}
@@ -410,20 +420,22 @@ export default function PaymentsPage() {
               size={{ xs: 12, md: 10 }}
               sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
             >
-              <Box sx={{ minWidth: 180 }}>
-                <AppSelect
-                  label="Select Member"
-                  value={filterMember}
-                  onChange={(e) => {
-                    setFilterMember(e.target.value);
-                  }}
-                  options={memberOptions}
-                  size="small"
-                  placeholder="Select Member"
-                  required
-                  fullWidth
-                />
-              </Box>
+              {!isMemberRole && (
+                <Box sx={{ minWidth: 180 }}>
+                  <AppSelect
+                    label="Select Member"
+                    value={filterMember}
+                    onChange={(e) => {
+                      setFilterMember(e.target.value);
+                    }}
+                    options={memberOptions}
+                    size="small"
+                    placeholder="Select Member"
+                    required
+                    fullWidth
+                  />
+                </Box>
+              )}
               <Box sx={{ minWidth: 180 }}>
                 <AppSelect
                   label="Select Event"

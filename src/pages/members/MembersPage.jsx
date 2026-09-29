@@ -12,6 +12,7 @@ import {
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
+import { useAuth } from "../../contexts/AuthContext";
 import { formatGridDate } from "../../utils/dateHelper";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
@@ -20,30 +21,13 @@ import MemberDetailsDialog from "../../components/members/MemberDetailsDialog";
 import { getMembersAsync } from "../../services/memberService";
 import { getRolesAsync } from "../../services/roleService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
-
-import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission } from "../../utils/rightsHelper";
-
-const initialForm = {
-  name: "",
-  email: "",
-  phone: "",
-  gender: "",
-  workType: "",
-  dateOfBirth: dayjs().subtract(18, "year"),
-  joiningDate: dayjs(),
-};
 
 export default function MembersPage() {
   const { authState } = useAuth();
-  const { canEdit } = useAccessByLocation();
-  const hasWriteAccess = canEdit;
+  const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
 
   // Granular Action Permissions
-  const canAddMember = hasActionPermission("Add Member", 26, authState?.role).canExecute;
-  const canEditMember = hasActionPermission("Edit Member", 27, authState?.role).canExecute;
-  const canDeleteMember = hasActionPermission("Delete Member", 28, authState?.role).canExecute;
-  const canImportExcel = hasActionPermission("Import Excel", 29, authState?.role).canExecute;
   const canViewMember = hasActionPermission("View Member", 25, authState?.role).canView;
 
   const [members, setMembers] = useState([]);
@@ -58,9 +42,19 @@ export default function MembersPage() {
   const [appliedRoleId, setAppliedRoleId] = useState("");
 
   const filteredMembers = useMemo(() => {
-    if (!appliedRoleId || appliedRoleId === "ALL") return members;
-    return members.filter((m) => String(m.roleId) === String(appliedRoleId));
-  }, [members, appliedRoleId]);
+    let list = members;
+    if (isMemberRole) {
+      const userEmail = String(authState?.email || "").toLowerCase().trim();
+      const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
+      list = list.filter(m => 
+        (currentMemberId && String(m.memberId).toLowerCase() === currentMemberId) ||
+        (userEmail && String(m.email).toLowerCase().trim() === userEmail)
+      );
+    } else if (appliedRoleId && appliedRoleId !== "ALL") {
+      list = list.filter((m) => String(m.roleId) === String(appliedRoleId));
+    }
+    return list;
+  }, [members, appliedRoleId, isMemberRole, authState]);
 
   const roleOptions = useMemo(() => {
     return (roles || []).map((r) => ({
@@ -111,30 +105,6 @@ export default function MembersPage() {
                 setViewDialogOpen(true);
               }}>
                 <ViewIcon sx={{ fontSize: "1.05rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
-              </IconButton>
-            </Tooltip>
-          )}
-          {canEditMember && (
-            <Tooltip title="Edit Member">
-              <IconButton size="small" sx={{ p: 0.3 }} onClick={() => {
-                const wt = row.workType || row.memberType || row.type || "";
-                setForm({
-                  ...row,
-                  workType: wt,
-                  dateOfBirth: row.dateOfBirth ? dayjs(row.dateOfBirth) : null,
-                  joiningDate: row.joiningDate ? dayjs(row.joiningDate) : null
-                });
-                setErrors({});
-                setDialogOpen(true);
-              }}>
-                <EditIcon sx={{ fontSize: "1.05rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
-              </IconButton>
-            </Tooltip>
-          )}
-          {canDeleteMember && (
-            <Tooltip title="Delete Member">
-              <IconButton size="small" sx={{ p: 0.3 }} onClick={() => handleDeleteRequest(row.memberId)}>
-                <DeleteIcon sx={{ fontSize: "1.05rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
               </IconButton>
             </Tooltip>
           )}
@@ -265,107 +235,73 @@ export default function MembersPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Member Directory"
+        title={isMemberRole ? "My Profile" : "Member Directory"}
         columns={columns}
         data={filteredMembers}
         loading={loading}
-        actions={
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            {canImportExcel && (
-              <AppButton
-                variant="outlined"
-                size="small"
-                startIcon={<ExcelIcon />}
-                onClick={() => setImportDialogOpen(true)}
-                sx={{
-                  borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(74, 63, 107, 0.3)",
-                  color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                  "&:hover": {
-                    borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                    bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.04)",
-                  },
-                }}
-              >
-                Import Excel
-              </AppButton>
-            )}
-            {canAddMember && (
-              <AppButton
-                variant="contained"
-                size="small"
-                startIcon={<PersonAddIcon />}
-                onClick={() => {
-                  setForm(initialForm);
-                  setErrors({});
-                  setDialogOpen(true);
-                }}
-              >
-                Add
-              </AppButton>
-            )}
-          </Stack>
-        }
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid
-              size={{ xs: 12, md: 8 }}
-              sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
-            >
-              <Box sx={{ minWidth: 200 }}>
-                <AppSelect
-                  label="Filter by Role"
-                  placeholder="Select Role"
-                  value={filterRoleId}
-                  onChange={(e) => setFilterRoleId(e.target.value)}
-                  options={[{ label: "All Roles", value: "" }, ...roleOptions]}
+          !isMemberRole ? (
+            <Grid container spacing={2} alignItems="center">
+              <Grid
+                size={{ xs: 12, md: 8 }}
+                sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
+              >
+                <Box sx={{ minWidth: 200 }}>
+                  <AppSelect
+                    label="Filter by Role"
+                    placeholder="Select Role"
+                    value={filterRoleId}
+                    onChange={(e) => setFilterRoleId(e.target.value)}
+                    options={[{ label: "All Roles", value: "" }, ...roleOptions]}
+                    size="small"
+                    required
+                    fullWidth
+                  />
+                </Box>
+                <AppButton
+                  variant="contained"
                   size="small"
-                  required
-                  fullWidth
-                />
-              </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                startIcon={<FilterListIcon />}
-                onClick={() => {
-                  setAppliedRoleId(filterRoleId);
-                }}
-                sx={{
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                }}
-              >
-                Filter
-              </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setFilterRoleId("");
-                  setAppliedRoleId("");
-                  toast.success("Filter cleared");
-                }}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)",
-                  },
-                }}
-              >
-                Clear Filter
-              </AppButton>
+                  startIcon={<FilterListIcon />}
+                  onClick={() => {
+                    setAppliedRoleId(filterRoleId);
+                  }}
+                  sx={{
+                    height: 34,
+                    mt: 2.2,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                  }}
+                >
+                  Filter
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    setFilterRoleId("");
+                    setAppliedRoleId("");
+                    toast.success("Filter cleared");
+                  }}
+                  sx={{
+                    color: "#ef4444",
+                    borderColor: "rgba(239, 68, 68, 0.4)",
+                    height: 34,
+                    mt: 2.2,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    "&:hover": {
+                      borderColor: "#ef4444",
+                      bgcolor: "rgba(239, 68, 68, 0.05)",
+                    },
+                  }}
+                >
+                  Clear Filter
+                </AppButton>
+              </Grid>
             </Grid>
-          </Grid>
+          ) : null
         }
       />
 
