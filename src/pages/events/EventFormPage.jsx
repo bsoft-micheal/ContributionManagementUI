@@ -10,22 +10,45 @@ import {
   Divider,
   Stack,
   CircularProgress,
+  InputAdornment,
+  Button,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
   Save as SaveIcon,
-  ArrowBack as ArrowBackIcon,
-  Event as EventIcon,
+  ArrowBackRounded as ArrowBackIcon,
+  EventRounded as EventIcon,
+  CalendarMonthRounded as CalendarIcon,
   CakeRounded as CakeIcon,
+  TuneRounded as SettingsIcon,
+  PeopleAltOutlined as PeopleIcon,
+  GroupsRounded as GroupsIcon,
+  GroupRounded as GroupIcon,
+  ApartmentRounded as OfficeIcon,
+  HomeRounded as HomeIcon,
+  HomeRounded as WfhIcon,
+  BarChartRounded as BarChartIcon,
+  InfoOutlined as InfoIcon,
+  PersonAddAlt1Rounded as PersonAddIcon,
+  AccountBalanceWalletRounded as WalletIcon,
+  PaidRounded as PaidIcon,
+  CalculateRounded as CalculateIcon,
+  FastfoodRounded as SnackIcon,
+  CardGiftcardRounded as GiftIcon,
+  LocalDrinkRounded as DrinkIcon,
+  ReceiptLongRounded as ReceiptIcon,
+  PersonOutlineRounded as ProfileIcon,
+  CategoryRounded as CategoryIcon,
+  CloseRounded as CloseRoundedIcon,
+  AddRounded as AddIcon,
+  RestartAltRounded as ResetIcon,
 } from "@mui/icons-material";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import dayjs from "dayjs";
 
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
-import AppMultiSelect from "../../components/common/AppMultiSelect";
-import AppTextArea from "../../components/common/AppTextArea";
 import AppButton from "../../components/common/AppButton";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
@@ -43,7 +66,7 @@ import {
   buildUpiPaymentUri,
   getQrCodeApiUrl,
 } from "../../utils/upiQrHelper";
-import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { TOAST_MESSAGES } from "../../constants";
 
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { useAuth } from "../../contexts/AuthContext";
@@ -90,9 +113,67 @@ const getDefaultBirthdayExempt = () => {
   return true;
 };
 
+// Helper for row icon styling in budget breakdown table
+const getItemStyle = (name = "") => {
+  const lower = name.toLowerCase();
+  if (lower.includes("cake")) {
+    return {
+      icon: <CakeIcon sx={{ color: "#fff", fontSize: "1.05rem" }} />,
+      bg: "#8b5cf6", // Purple
+    };
+  }
+  if (
+    lower.includes("snack") ||
+    lower.includes("puff") ||
+    lower.includes("roll") ||
+    lower.includes("food") ||
+    lower.includes("chicken") ||
+    lower.includes("lunch") ||
+    lower.includes("dinner") ||
+    lower.includes("meal") ||
+    lower.includes("catering")
+  ) {
+    return {
+      icon: <SnackIcon sx={{ color: "#fff", fontSize: "1.05rem" }} />,
+      bg: "#f59e0b", // Amber/Orange
+    };
+  }
+  if (
+    lower.includes("gift") ||
+    lower.includes("present") ||
+    lower.includes("voucher") ||
+    lower.includes("memento") ||
+    lower.includes("prize") ||
+    lower.includes("award")
+  ) {
+    return {
+      icon: <GiftIcon sx={{ color: "#fff", fontSize: "1.05rem" }} />,
+      bg: "#10b981", // Emerald
+    };
+  }
+  if (
+    lower.includes("juice") ||
+    lower.includes("drink") ||
+    lower.includes("beverage") ||
+    lower.includes("water") ||
+    lower.includes("tea") ||
+    lower.includes("coffee")
+  ) {
+    return {
+      icon: <DrinkIcon sx={{ color: "#fff", fontSize: "1.05rem" }} />,
+      bg: "#06b6d4", // Cyan
+    };
+  }
+  return {
+    icon: <ReceiptIcon sx={{ color: "#fff", fontSize: "1.05rem" }} />,
+    bg: "#6366f1", // Indigo
+  };
+};
+
 export default function EventFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
   const toast = useAppToast();
   const { authState } = useAuth();
@@ -125,19 +206,37 @@ export default function EventFormPage() {
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
   const [budgetItemsList, setBudgetItemsList] = useState([]);
-  const [budgetRates, setBudgetRates] = useState(RULES);
-
-  // Birthday-specific configuration states
-  const [officeBirthdays, setOfficeBirthdays] = useState(0);
-  const [wfhBirthdays, setWfhBirthdays] = useState(0);
-  const [totalMembers, setTotalMembers] = useState(0);
-  const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
 
   // Active members count
   const activeMembers = useMemo(
     () => members.filter((m) => m.isActive && !m.isExited),
     [members]
   );
+
+  // Member counts
+  const totalActiveCount = activeMembers.length;
+  const totalOfficeCount = useMemo(
+    () =>
+      activeMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length,
+    [activeMembers]
+  );
+  const totalWfhCount = useMemo(
+    () =>
+      activeMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length,
+    [activeMembers]
+  );
+
+  // Configuration counts states
+  const [officeBirthdays, setOfficeBirthdays] = useState(0);
+  const [wfhBirthdays, setWfhBirthdays] = useState(0);
+  const [totalMembers, setTotalMembers] = useState(totalActiveCount || 66);
+  const [officeMembers, setOfficeMembers] = useState(totalOfficeCount || 0);
+  const [wfhMembers, setWfhMembers] = useState(totalWfhCount || 0);
+  const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
 
   // Load initial dropdown data and event details if in edit mode
   useEffect(() => {
@@ -153,32 +252,30 @@ export default function EventFormPage() {
 
         if (!isMounted) return;
 
+        const activeMems = (membersData || []).filter((m) => m.isActive && !m.isExited);
         setEventTypes(typesData || []);
         setMembers(membersData || []);
 
-        if (Array.isArray(budgetData) && budgetData.length > 0) {
-          const activeItems = budgetData.filter((b) => b.isActive !== false);
-          setBudgetItemsList(activeItems);
-          const bdayActive = activeItems.filter(
-            (b) => !b.category || b.category.toLowerCase().includes("birthday")
-          );
-          const cakeItem = bdayActive.find((b) => b.expenseItem?.toLowerCase().includes("cake"));
-          const puffsItem = bdayActive.find((b) => b.expenseItem?.toLowerCase().includes("puff") || b.expenseItem?.toLowerCase().includes("snack") || b.expenseItem?.toLowerCase().includes("roll"));
-          const giftItem = bdayActive.find((b) => b.expenseItem?.toLowerCase().includes("gift"));
+        const activeBudgetItems = Array.isArray(budgetData)
+          ? budgetData.filter((b) => b.isActive !== false)
+          : [];
+        setBudgetItemsList(activeBudgetItems);
 
-          setBudgetRates((prev) => ({
-            ...prev,
-            cakeRate: cakeItem ? Number(cakeItem.rate) : prev.cakeRate,
-            puffsRate: puffsItem ? Number(puffsItem.rate) : prev.puffsRate,
-            giftRate: giftItem ? Number(giftItem.rate) : prev.giftRate,
-          }));
-        }
-
-        const activeMems = (membersData || []).filter((m) => m.isActive && !m.isExited);
         const bdayType = (typesData || []).find((t) =>
           t.eventTypeName?.toLowerCase().includes("birthday")
         );
         const defaultTypeId = bdayType ? bdayType.eventTypeId : typesData?.[0]?.eventTypeId || "";
+
+        const offTotal = activeMems.filter(
+          (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        ).length;
+        const wfhTotal = activeMems.filter(
+          (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        ).length;
+
+        setOfficeMembers(offTotal);
+        setWfhMembers(wfhTotal);
+        setTotalMembers(activeMems.length);
 
         if (id) {
           // Edit existing event
@@ -215,8 +312,8 @@ export default function EventFormPage() {
             status: detailedEvent.status || "Planned",
             baseAmount:
               detailedEvent.baseAmount !== undefined &&
-                detailedEvent.baseAmount !== null &&
-                Number(detailedEvent.baseAmount) > 0
+              detailedEvent.baseAmount !== null &&
+              Number(detailedEvent.baseAmount) > 0
                 ? String(detailedEvent.baseAmount)
                 : "",
             participantIds: pIds,
@@ -240,8 +337,13 @@ export default function EventFormPage() {
           setTotalMembers(activeMems.length);
           setExempt(getDefaultBirthdayExempt());
 
+          const initialTypeName = bdayType?.eventTypeName || typesData?.[0]?.eventTypeName || "Event";
+          const isInitialBday = initialTypeName.toLowerCase().includes("birthday");
+
           setForm({
-            eventName: `${defaultDate.format("MMMM")} Birthday Celebration`,
+            eventName: isInitialBday
+              ? `${defaultDate.format("MMMM")} Birthday Celebration`
+              : `${defaultDate.format("MMMM")} ${initialTypeName} Celebration`,
             eventTypeId: defaultTypeId,
             eventDate: defaultDate,
             description: "",
@@ -260,14 +362,111 @@ export default function EventFormPage() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, location.pathname, location.key]);
 
   const selectedType = eventTypes.find((t) => t.eventTypeId === form.eventTypeId);
+  const selectedTypeName = selectedType?.eventTypeName || "";
   const isBirthday = Boolean(
-    selectedType && selectedType.eventTypeName?.toLowerCase().includes("birthday")
+    selectedTypeName && selectedTypeName.toLowerCase().includes("birthday")
   );
 
-  // Detect month celebrants from active members (deduplicated by name + DOB or ID)
+  // Selected participants for non-birthday events (allows deselecting members)
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
+
+  useEffect(() => {
+    if (activeMembers.length > 0) {
+      if (form.participantIds && form.participantIds.length > 0 && isEdit) {
+        setSelectedParticipantIds(form.participantIds);
+      } else {
+        setSelectedParticipantIds(activeMembers.map((m) => m.memberId));
+      }
+    }
+  }, [activeMembers, form.participantIds, isEdit]);
+
+  // Participating members for the event
+  const participatingMembers = useMemo(() => {
+    if (isBirthday) {
+      return activeMembers;
+    }
+    return activeMembers.filter((m) => selectedParticipantIds.includes(m.memberId));
+  }, [isBirthday, activeMembers, selectedParticipantIds]);
+
+  const nonBdayTotal = participatingMembers.length;
+  const nonBdayOffice = useMemo(
+    () =>
+      participatingMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length,
+    [participatingMembers]
+  );
+  const nonBdayWfh = useMemo(
+    () =>
+      participatingMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length,
+    [participatingMembers]
+  );
+
+  // Auto-sync active member counts and monthly celebrant counts
+  useEffect(() => {
+    if (activeMembers.length > 0) {
+      if (isBirthday) {
+        setTotalMembers(activeMembers.length);
+        const offTotal = activeMembers.filter(
+          (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        ).length;
+        const wfhTotal = activeMembers.filter(
+          (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        ).length;
+        setOfficeMembers(offTotal);
+        setWfhMembers(wfhTotal);
+      } else {
+        setTotalMembers(nonBdayTotal);
+        setOfficeMembers(nonBdayOffice);
+        setWfhMembers(nonBdayWfh);
+      }
+    }
+  }, [isBirthday, activeMembers, nonBdayTotal, nonBdayOffice, nonBdayWfh]);
+
+  useEffect(() => {
+    if (form.eventDate && activeMembers.length > 0 && isBirthday) {
+      const targetMonth = dayjs(form.eventDate).month();
+      const celebrantsInMonth = activeMembers.filter(
+        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+      );
+      const offCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length;
+      const wfhCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length;
+      setOfficeBirthdays(offCount);
+      setWfhBirthdays(wfhCount);
+    }
+  }, [isBirthday, form.eventDate, activeMembers]);
+
+  // Handler to deselect/remove a member from non-birthday event
+  const handleRemoveParticipant = (memberId) => {
+    setSelectedParticipantIds((prev) => prev.filter((id) => id !== memberId));
+  };
+
+  // Handler to add back a deselected member
+  const handleAddParticipant = (memberId) => {
+    setSelectedParticipantIds((prev) => (prev.includes(memberId) ? prev : [...prev, memberId]));
+  };
+
+  // Handler to reset/select all members
+  const handleSelectAllParticipants = () => {
+    setSelectedParticipantIds(activeMembers.map((m) => m.memberId));
+  };
+
+  // Excluded (not attending) members for non-birthday events
+  const excludedMembers = useMemo(() => {
+    if (isBirthday) return [];
+    return activeMembers.filter((m) => !selectedParticipantIds.includes(m.memberId));
+  }, [isBirthday, activeMembers, selectedParticipantIds]);
+
+  // Detect month celebrants from active members
   const monthCelebrants = useMemo(() => {
     if (!form.eventDate) return [];
     const targetMonth = dayjs(form.eventDate).month();
@@ -288,78 +487,192 @@ export default function EventFormPage() {
     return list;
   }, [form.eventDate, activeMembers]);
 
-  // Birthday calculation math
-  const office = Math.max(0, Number(officeBirthdays) || 0);
-  const wfh = Math.max(0, Number(wfhBirthdays) || 0);
-  const total = Math.max(0, Number(totalMembers) || 0);
-  const bdays = office + wfh;
-  const eligible = Math.max(0, total - (exempt ? bdays : 0));
+  // Comma-separated birthday dates of all celebrants in the target month (sorted ascending by date)
+  const celebrantDatesCsv = useMemo(() => {
+    if (!monthCelebrants || monthCelebrants.length === 0) return "";
+    const sorted = [...monthCelebrants]
+      .filter((m) => m.dateOfBirth)
+      .sort((a, b) => dayjs(a.dateOfBirth).date() - dayjs(b.dateOfBirth).date());
+
+    return sorted.map((m) => dayjs(m.dateOfBirth).format("D MMM")).join(", ");
+  }, [monthCelebrants]);
+
+  // Calculation counts
+  const total = isBirthday ? activeMembers.length : nonBdayTotal;
+  const office = isBirthday ? Math.max(0, Number(officeBirthdays) || 0) : nonBdayOffice;
+  const wfh = isBirthday ? Math.max(0, Number(wfhBirthdays) || 0) : nonBdayWfh;
+  const bdays = isBirthday ? office + wfh : 0;
+  const eligible = isBirthday ? Math.max(0, total - (exempt ? bdays : 0)) : nonBdayTotal;
   const puffsFactor = office > 0 ? office : 0;
 
+  // Compute budget calculation items dynamically based on selected Event Type / Category from Master
   const computedBudgetItems = useMemo(() => {
-    const items = budgetItemsList.filter(
-      (b) =>
-        b.isActive !== false &&
-        (!b.category ||
-          b.category.toLowerCase() === "birthday" ||
-          (selectedType && b.category.toLowerCase() === selectedType.eventTypeName?.toLowerCase()))
-    );
+    const typeNameLower = (selectedTypeName || "").toLowerCase().trim();
 
-    return items.map((item) => {
-      const name = (item.expenseItem || "").toLowerCase();
-      const rate = Number(item.rate) || 0;
-      let calcText = "";
-      let amount = 0;
-      let formulaPart = "";
-
-      if (name.includes("cake")) {
-        calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
-        amount = office * rate;
-        formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
-      } else if (
-        name.includes("gift") ||
-        name.includes("present") ||
-        name.includes("voucher") ||
-        name.includes("memento")
-      ) {
-        calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
-        amount = bdays * rate;
-        formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
-      } else {
-        if (puffsFactor > 0) {
-          calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""
-            }`;
-          amount = total * rate * puffsFactor;
-        } else {
-          calcText = "WFH only → Not provided";
-          amount = 0;
-        }
-        formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
-          "en-IN"
-        )})`;
-      }
-
-      return {
-        ...item,
-        rate,
-        calcText,
-        amount,
-        formulaPart,
-      };
+    // 1. Filter active master items matching the selected Event Type Category
+    let categoryItems = budgetItemsList.filter((b) => {
+      if (b.isActive === false) return false;
+      const cat = (b.category || "").toLowerCase().trim();
+      if (!cat) return isBirthday; // Unassigned items default to birthday if birthday
+      return cat === typeNameLower || (isBirthday && cat.includes("birthday"));
     });
-  }, [budgetItemsList, office, bdays, total, puffsFactor]);
+
+    if (isBirthday) {
+      return categoryItems.map((item) => {
+        const name = (item.expenseItem || "").toLowerCase();
+        const rate = Number(item.rate) || 0;
+        let calcText = "";
+        let amount = 0;
+        let formulaPart = "";
+
+        if (name.includes("cake")) {
+          calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
+          amount = office * rate;
+          formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+        } else if (
+          name.includes("gift") ||
+          name.includes("present") ||
+          name.includes("voucher") ||
+          name.includes("memento")
+        ) {
+          calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
+          amount = bdays * rate;
+          formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+        } else {
+          if (puffsFactor > 0) {
+            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${
+              puffsFactor > 1 ? ` × ${puffsFactor}` : ""
+            }`;
+            amount = total * rate * puffsFactor;
+          } else {
+            calcText = "WFH only → Not provided";
+            amount = 0;
+          }
+          formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
+            "en-IN"
+          )})`;
+        }
+
+        return {
+          ...item,
+          rate,
+          calcText,
+          amount,
+          formulaPart,
+        };
+      });
+    } else {
+      // 2. Non-Birthday Event Types: Use items created in Master for this Category
+      if (categoryItems.length > 0) {
+        return categoryItems.map((item) => {
+          const rate = Number(item.rate) || 0;
+          const calcText = `${total} × ₹${rate.toLocaleString("en-IN")}`;
+          const amount = total * rate;
+          const formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString("en-IN")})`;
+
+          return {
+            ...item,
+            rate,
+            calcText,
+            amount,
+            formulaPart,
+          };
+        });
+      } else {
+        // Fallback if no master items created under this category yet
+        const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
+        const perPersonRate = total > 0 && manualBase > 0 ? Math.round(manualBase / total) : 0;
+        const amount = manualBase > 0 ? manualBase : 0;
+
+        return [
+          {
+            expenseItem: `${selectedTypeName || "Event"} Celebration`,
+            rate: perPersonRate,
+            calcText:
+              total > 0 && perPersonRate > 0
+                ? `${total} × ₹${perPersonRate.toLocaleString("en-IN")}`
+                : `${total} Members`,
+            amount: amount,
+            formulaPart: `${selectedTypeName || "Event"} (Total Active Members × ₹${perPersonRate.toLocaleString("en-IN")})`,
+          },
+        ];
+      }
+    }
+  }, [
+    budgetItemsList,
+    selectedTypeName,
+    isBirthday,
+    office,
+    bdays,
+    total,
+    puffsFactor,
+    form.baseAmount,
+  ]);
 
   const plannedBudget = computedBudgetItems.reduce((acc, curr) => acc + curr.amount, 0);
   const rawPerMember = eligible > 0 ? plannedBudget / eligible : 0;
   const contributionPerMember =
     eligible > 0 ? Math.ceil(rawPerMember / RULES.rounding) * RULES.rounding : 0;
   const expectedCollection = contributionPerMember * eligible;
-  const roundingSurplus = Math.max(0, expectedCollection - plannedBudget);
 
   const dynamicFormulaText = computedBudgetItems
     .map((i) => i.formulaPart)
     .filter(Boolean)
     .join(" + ");
+
+  // Handle event type switch
+  const handleTypeChange = (newTypeId) => {
+    const newType = eventTypes.find((t) => t.eventTypeId === newTypeId);
+    const newTypeName = newType?.eventTypeName || "";
+    const isNewBday = newTypeName.toLowerCase().includes("birthday");
+
+    let updatedName = form.eventName;
+    if (!isEdit) {
+      const monthStr = dayjs(form.eventDate).format("MMMM");
+      updatedName = isNewBday
+        ? `${monthStr} Birthday Celebration`
+        : `${monthStr} ${newTypeName} Celebration`;
+    }
+
+    // Always reset participant selections to ALL active members when switching event type
+    const allActiveIds = activeMembers.map((m) => m.memberId);
+    setSelectedParticipantIds(allActiveIds);
+
+    const offTotal = activeMembers.filter(
+      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+    ).length;
+    const wfhTotal = activeMembers.filter(
+      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+    ).length;
+
+    if (isNewBday) {
+      const targetMonth = dayjs(form.eventDate).month();
+      const celebrantsInMonth = activeMembers.filter(
+        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+      );
+      const offCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length;
+      const wfhCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length;
+      setOfficeBirthdays(offCount);
+      setWfhBirthdays(wfhCount);
+    }
+
+    setTotalMembers(activeMembers.length);
+    setOfficeMembers(offTotal);
+    setWfhMembers(wfhTotal);
+
+    setForm((prev) => ({
+      ...prev,
+      eventTypeId: newTypeId,
+      eventName: updatedName,
+      baseAmount: "", // reset base amount so previous event type adjustments don't carry over
+      participantIds: allActiveIds,
+    }));
+    if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+  };
 
   // Handle date change
   const handleDateChange = (newDate) => {
@@ -368,11 +681,11 @@ export default function EventFormPage() {
     const newMonth = dayjs(newDate).month();
 
     let newEventName = form.eventName;
-    if (
-      !isEdit &&
-      (form.eventName.includes("Birthday Celebration") || !form.eventName.trim())
-    ) {
-      newEventName = `${dayjs(newDate).format("MMMM")} Birthday Celebration`;
+    if (!isEdit) {
+      const monthStr = dayjs(newDate).format("MMMM");
+      newEventName = isBirthday
+        ? `${monthStr} Birthday Celebration`
+        : `${monthStr} ${selectedTypeName || "Event"} Celebration`;
     }
 
     if (oldMonth !== newMonth) {
@@ -405,22 +718,6 @@ export default function EventFormPage() {
       eventDate: { required: true, label: filed },
     };
 
-    if (!isBirthday) {
-      schema.baseAmount = {
-        required: true,
-        type: "numberonly",
-        label: filed,
-        customValidate: (val) => {
-          const num = Number(String(val).replace(/[^0-9]/g, ""));
-          if (val === "" || val === undefined || val === null || num <= 0) {
-            return filed;
-          }
-          return "";
-        },
-      };
-      schema.participantIds = { required: true, label: filed };
-    }
-
     const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
@@ -431,18 +728,18 @@ export default function EventFormPage() {
 
     setSaving(true);
     try {
-      let payload;
+      const finalParticipantIds = isBirthday
+        ? activeMembers.map((m) => m.memberId)
+        : participatingMembers.map((m) => m.memberId);
+      const contributionOverrides = [];
 
       if (isBirthday) {
         const celebrantIds = monthCelebrants.map((m) => m.memberId);
-        const allActiveParticipantIds = activeMembers.map((m) => m.memberId);
-
-        const contributionOverrides = [];
         if (exempt) {
           celebrantIds.forEach((cId) => {
             contributionOverrides.push({ memberId: cId, amount: 0 });
           });
-          allActiveParticipantIds.forEach((mId) => {
+          finalParticipantIds.forEach((mId) => {
             if (!celebrantIds.includes(mId)) {
               contributionOverrides.push({
                 memberId: mId,
@@ -451,50 +748,49 @@ export default function EventFormPage() {
             }
           });
         } else {
-          allActiveParticipantIds.forEach((mId) => {
-            if (!celebrantIds.includes(mId)) {
-              contributionOverrides.push({
-                memberId: mId,
-                amount: contributionPerMember,
-              });
-            }
+          finalParticipantIds.forEach((mId) => {
+            contributionOverrides.push({
+              memberId: mId,
+              amount: contributionPerMember,
+            });
           });
         }
-
-        const celebrantsSummary = monthCelebrants
-          .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
-          .join(", ");
-
-        payload = {
-          eventName: form.eventName.trim(),
-          eventTypeId: form.eventTypeId,
-          eventDate: dayjs(form.eventDate).hour(12).toISOString(),
-          description:
-            form.description?.trim() ||
-            `Birthday celebration (${office} Office, ${wfh} WFH)${celebrantsSummary ? ` for ${celebrantsSummary}` : ""
-            }. Planned Budget: ₹${plannedBudget.toLocaleString(
-              "en-IN"
-            )}, Contribution/member: ₹${contributionPerMember}`,
-          status: form.status || "Planned",
-          baseAmount: plannedBudget,
-          participantIds:
-            allActiveParticipantIds.length > 0
-              ? allActiveParticipantIds
-              : form.participantIds,
-          contributionOverrides: contributionOverrides,
-        };
       } else {
-        payload = {
-          eventName: form.eventName.trim(),
-          eventTypeId: form.eventTypeId,
-          eventDate: dayjs(form.eventDate).hour(12).toISOString(),
-          description: form.description?.trim() || "",
-          status: form.status || "Planned",
-          baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
-          participantIds: form.participantIds || [],
-          contributionOverrides: [],
-        };
+        finalParticipantIds.forEach((mId) => {
+          contributionOverrides.push({
+            memberId: mId,
+            amount: contributionPerMember,
+          });
+        });
       }
+
+      const celebrantsSummary = isBirthday
+        ? monthCelebrants
+            .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
+            .join(", ")
+        : "";
+
+      const defaultDesc = isBirthday
+        ? `Birthday celebration (${office} Office, ${wfh} WFH)${
+            celebrantsSummary ? ` for ${celebrantsSummary}` : ""
+          }. Planned Budget: ₹${plannedBudget.toLocaleString(
+            "en-IN"
+          )}, Contribution/member: ₹${contributionPerMember}`
+        : `${selectedTypeName} celebration for ${total} members. Planned Budget: ₹${plannedBudget.toLocaleString(
+            "en-IN"
+          )}, Contribution/member: ₹${contributionPerMember}`;
+
+      const payload = {
+        eventName: form.eventName.trim(),
+        eventTypeId: form.eventTypeId,
+        eventDate: dayjs(form.eventDate).hour(12).toISOString(),
+        description: form.description?.trim() || defaultDesc,
+        status: form.status || "Planned",
+        baseAmount: plannedBudget,
+        participantIds:
+          finalParticipantIds.length > 0 ? finalParticipantIds : form.participantIds,
+        contributionOverrides: contributionOverrides,
+      };
 
       if (isEdit) {
         await updateEventAsync(id, payload);
@@ -503,16 +799,12 @@ export default function EventFormPage() {
         // Sync dynamic QR code with per-member contribution amount to backend settings before event creation
         try {
           const qrConfig = getPaymentQrConfig();
-          const targetAmount = isBirthday
-            ? contributionPerMember
-            : payload.participantIds?.length > 0
-              ? Math.round(Number(payload.baseAmount) / payload.participantIds.length)
-              : 0;
+          const targetAmount = contributionPerMember > 0 ? contributionPerMember : undefined;
 
           const eventUpiUri = buildUpiPaymentUri({
             upiId: qrConfig.qrUpiId,
             receiverName: qrConfig.qrReceiverName,
-            amount: targetAmount > 0 ? targetAmount : undefined,
+            amount: targetAmount,
             note: `Contribution for ${payload.eventName}`,
           });
 
@@ -528,7 +820,7 @@ export default function EventFormPage() {
           // Dynamic QR sync fallback
         }
 
-        const createdEvent = await createEventAsync(payload);
+        await createEventAsync(payload);
         toast.success("Event created successfully! Notification emails dispatched to contributors.");
       }
 
@@ -546,17 +838,12 @@ export default function EventFormPage() {
     value: t.eventTypeId,
   }));
 
-  const memberOptions = members.map((m) => ({
-    label: m.name,
-    value: m.memberId,
-  }));
-
   if (loading) {
     return (
       <div className="page-shell">
         <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 12 }}>
           <Stack spacing={2} alignItems="center">
-            <CircularProgress sx={{ color: "#4a3f6b" }} />
+            <CircularProgress sx={{ color: "#45386d" }} />
             <Typography variant="body2" color="text.secondary">
               Loading event configuration...
             </Typography>
@@ -574,26 +861,24 @@ export default function EventFormPage() {
           border:
             theme.palette.mode === "dark"
               ? `1px solid ${theme.palette.divider}`
-              : "1px solid rgba(224, 224, 224, 1)",
-          borderRadius: "8px",
+              : "1px solid rgba(74, 63, 107, 0.08)",
+          borderRadius: "14px",
           overflow: "hidden",
-          bgcolor: theme.palette.background.paper,
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#f8f7fc"),
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
         }}
       >
-        {/* Top Header Banner */}
+        {/* Top Header Banner matching exact screenshot */}
         <Box
           sx={{
-            background:
-              theme.palette.mode === "dark"
-                ? "linear-gradient(90deg, #171b2d 0%, #1d2338 100%)"
-                : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+            bgcolor: "#45386d",
             color: "#ffffff",
             px: { xs: 2, sm: 3 },
-            py: 1.2,
+            py: 1.3,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            minHeight: 48,
+            minHeight: 52,
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -607,510 +892,1154 @@ export default function EventFormPage() {
                   "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)" },
                 }}
               >
-                <ArrowBackIcon fontSize="small" />
+                <ArrowBackIcon sx={{ fontSize: "1.25rem" }} />
               </IconButton>
             </Tooltip>
             <Typography
-              variant="subtitle2"
+              variant="subtitle1"
               fontWeight={700}
-              sx={{ fontSize: "0.95rem", letterSpacing: "0.02em", color: "#ffffff" }}
+              sx={{ fontSize: "1.05rem", letterSpacing: "0.01em", color: "#ffffff" }}
             >
               {isEdit ? "Edit Event" : "Add Event"}
             </Typography>
           </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.7,
+                bgcolor: "rgba(255, 255, 255, 0.12)",
+                border: "1px solid rgba(255, 255, 255, 0.22)",
+                borderRadius: "20px",
+                px: 1.5,
+                py: 0.45,
+                color: "#ffffff",
+                fontSize: "0.78rem",
+                fontWeight: 600,
+              }}
+            >
+              <EventIcon sx={{ fontSize: "0.95rem" }} />
+              <span>Event Management</span>
+            </Box>
+            <Box
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                border: "1.5px solid rgba(255, 255, 255, 0.6)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+              }}
+            >
+              <ProfileIcon sx={{ fontSize: "1.1rem" }} />
+            </Box>
+          </Box>
         </Box>
 
-        {/* Form Body Container */}
+        {/* Main Body with Unified 3-Card Layout for ALL Event Types */}
         <Box sx={{ p: { xs: 2, sm: 3 } }}>
-          {/* Birthday Event Setup */}
-          {isBirthday ? (
-            <Grid container spacing={3}>
-              {/* Left Column: Event Configuration Card */}
-              <Grid size={{ xs: 12, md: 7 }}>
-                <Box
-                  sx={{
-                    border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: "14px",
-                    overflow: "hidden",
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
-                    boxShadow: "0 3px 12px rgba(20,60,90,0.06)",
-                  }}
-                >
-                  <Box
-                    sx={{
-                      px: 2.5,
-                      py: 1.6,
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                      bgcolor: (theme) =>
-                        theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                    }}
+          <Grid container spacing={2.5}>
+            {/* Top-Left Card: Event Configuration */}
+            <Grid size={{ xs: 12, lg: 7 }}>
+              <Box
+                sx={{
+                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
+                  border: "1px solid",
+                  borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
+                  borderRadius: "14px",
+                  p: { xs: 2, sm: 2.5 },
+                  boxShadow: "0 4px 18px rgba(74, 63, 107, 0.03)",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                {/* Card Header */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2, mb: 2.5 }}>
+                  <SettingsIcon sx={{ color: "#7c3aed", fontSize: "1.45rem" }} />
+                  <Typography
+                    variant="h6"
+                    fontWeight={800}
+                    sx={{ fontSize: "1.05rem", color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e") }}
                   >
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      Event Configuration
-                    </Typography>
-                  </Box>
+                    Event Configuration
+                  </Typography>
+                </Box>
 
-                  <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <AppSelect
-                          label="Event Type"
-                          value={form.eventTypeId}
-                          onChange={(e) => {
-                            setForm((c) => ({ ...c, eventTypeId: e.target.value }));
-                            if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
-                          }}
-                          options={typeOptions}
-                          error={!!errors.eventTypeId}
-                          helperText={errors.eventTypeId}
-                          required
-                        />
-                      </Grid>
+                {/* Form Grid */}
+                <Grid container spacing={2}>
+                  {/* Row 1: Event Type & Event Name */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppSelect
+                      label="Event Type"
+                      value={form.eventTypeId}
+                      onChange={(e) => handleTypeChange(e.target.value)}
+                      options={typeOptions}
+                      error={!!errors.eventTypeId}
+                      helperText={errors.eventTypeId}
+                      required
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            {isBirthday ? (
+                              <CakeIcon sx={{ color: "#7c3aed", fontSize: "1.1rem", mr: 0.5 }} />
+                            ) : (
+                              <CategoryIcon sx={{ color: "#7c3aed", fontSize: "1.1rem", mr: 0.5 }} />
+                            )}
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
 
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <AppInput
-                          label="Event Name"
-                          placeholder="Enter event name"
-                          required
-                          value={form.eventName}
-                          onChange={(e) => {
-                            setForm((c) => ({ ...c, eventName: e.target.value }));
-                            if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
-                          }}
-                          error={!!errors.eventName}
-                          helperText={errors.eventName}
-                        />
-                      </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label="Event Name"
+                      placeholder="Enter event name"
+                      required
+                      value={form.eventName}
+                      onChange={(e) => {
+                        setForm((c) => ({ ...c, eventName: e.target.value }));
+                        if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
+                      }}
+                      error={!!errors.eventName}
+                      helperText={errors.eventName}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <EventIcon sx={{ color: "#7c3aed", fontSize: "1.1rem", mr: 0.5 }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
 
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <AppDateInput
-                          label="Event Date"
-                          required
-                          value={form.eventDate}
-                          onChange={handleDateChange}
-                          error={!!errors.eventDate}
-                          helperText={errors.eventDate}
-                        />
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <AppInput
-                          label="Total Active Members"
-                          placeholder="Enter count"
-                          type="Text"
-                          value={totalMembers}
-                          onChange={(e) =>
-                            setTotalMembers(Math.max(1, parseInt(e.target.value, 10) || 1))
-                          }
-                        />
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <AppInput
-                          label="Office Birthday Members"
-                          placeholder="Enter count"
-                          type="Text"
-                          value={officeBirthdays}
-                          onChange={(e) =>
-                            setOfficeBirthdays(Math.max(0, parseInt(e.target.value, 10) || 0))
-                          }
-                        />
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <AppInput
-                          label="WFH Birthday Members"
-                          placeholder="Enter count"
-                          type="Text"
-                          value={wfhBirthdays}
-                          onChange={(e) =>
-                            setWfhBirthdays(Math.max(0, parseInt(e.target.value, 10) || 0))
-                          }
-                        />
-                      </Grid>
-                    </Grid>
-
-
-
-                    {/* Celebrants detected for current month */}
-                    {monthCelebrants.length > 0 && (
-                      <Box
-                        sx={{
-                          p: 1.5,
-                          borderRadius: "8px",
-                          bgcolor: (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "rgba(255,255,255,0.03)"
-                              : "rgba(22, 119, 200, 0.04)",
-                          border: "1px solid",
-                          borderColor: "divider",
+                  {/* Row 2: Event Date / Birthday Dates & Total Active Members (Read Only / Auto-calculated) */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    {isBirthday ? (
+                      <AppInput
+                        label="Birthday Dates"
+                        placeholder="Auto calculated"
+                        type="text"
+                        value={
+                          celebrantDatesCsv ||
+                          (form.eventDate
+                            ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
+                            : "Auto calculated")
+                        }
+                        disabled
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <CalendarIcon sx={{ color: "#64748b", fontSize: "1.15rem", mr: 0.5 }} />
+                            </InputAdornment>
+                          ),
                         }}
-                      >
+                      />
+                    ) : (
+                      <AppDateInput
+                        label="Event Date"
+                        required
+                        value={form.eventDate}
+                        onChange={handleDateChange}
+                        error={!!errors.eventDate}
+                        helperText={errors.eventDate}
+                      />
+                    )}
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label="Total Active Members"
+                      placeholder="Auto calculated"
+                      type="text"
+                      value={totalMembers}
+                      disabled
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PeopleIcon sx={{ color: "#64748b", fontSize: "1.15rem", mr: 0.5 }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Row 3: Office Members & WFH Members (Read Only / Auto-calculated) */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label={isBirthday ? "Office Birthday Members" : "Office Members"}
+                      placeholder="Auto calculated"
+                      type="text"
+                      value={isBirthday ? officeBirthdays : officeMembers}
+                      disabled
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <OfficeIcon sx={{ color: "#64748b", fontSize: "1.15rem", mr: 0.5 }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <AppInput
+                      label={isBirthday ? "WFH Birthday Members" : "WFH Members"}
+                      placeholder="Auto calculated"
+                      type="text"
+                      value={isBirthday ? wfhBirthdays : wfhMembers}
+                      disabled
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <WfhIcon sx={{ color: "#64748b", fontSize: "1.15rem", mr: 0.5 }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                </Grid>
+
+                {/* Row 4: Identified Celebrants (for Birthday) or Active Participants (for other Events) */}
+                {isBirthday ? (
+                  monthCelebrants.length > 0 && (
+                    <Box
+                      sx={{
+                        mt: 2.5,
+                        p: 2,
+                        borderRadius: "10px",
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(14, 165, 233, 0.06)"
+                            : "#f8fafd",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(14, 165, 233, 0.2)"
+                            : "#e2e8f0",
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mb: 1.2 }}>
+                        <PeopleIcon sx={{ color: "#0284c7", fontSize: "1.15rem" }} />
                         <Typography
                           variant="caption"
                           fontWeight={700}
-                          color="text.secondary"
-                          sx={{ display: "block", mb: 0.8 }}
+                          sx={{
+                            fontSize: "0.82rem",
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#38bdf8" : "#0f172a",
+                          }}
                         >
                           Identified Celebrants in {dayjs(form.eventDate).format("MMMM")} ({monthCelebrants.length}):
                         </Typography>
-                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                          {monthCelebrants.map((m) => (
+                      </Box>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                        {monthCelebrants.map((m) => {
+                          const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+                          return (
                             <Chip
                               key={m.memberId}
-                              label={`${m.name} (${m.workType || m.memberType || "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
-                                }`}
+                              icon={
+                                isWfh ? (
+                                  <WfhIcon sx={{ fontSize: "0.9rem !important", color: "#9333ea !important" }} />
+                                ) : (
+                                  <OfficeIcon sx={{ fontSize: "0.9rem !important", color: "#0284c7 !important" }} />
+                                )
+                              }
+                              label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${
+                                m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
+                              }`}
                               size="small"
                               sx={{
                                 fontWeight: 600,
-                                fontSize: "0.75rem",
-                                bgcolor:
-                                  (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
-                                    ? "rgba(121, 87, 213, 0.1)"
-                                    : "rgba(22, 119, 200, 0.1)",
-                                color:
-                                  (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
-                                    ? "#7957d5"
-                                    : "#1677c8",
+                                fontSize: "0.76rem",
+                                borderRadius: "6px",
+                                py: 0.5,
+                                bgcolor: isWfh ? "rgba(147, 51, 234, 0.08)" : "rgba(2, 132, 199, 0.08)",
+                                color: isWfh ? "#9333ea" : "#0284c7",
+                                border: "1px solid",
+                                borderColor: isWfh ? "rgba(147, 51, 234, 0.25)" : "rgba(2, 132, 199, 0.25)",
                               }}
                             />
-                          ))}
-                        </Box>
+                          );
+                        })}
                       </Box>
-                    )}
-                  </Box>
-                </Box>
-              </Grid>
+                    </Box>
+                  )
+                ) : (
+                  activeMembers.length > 0 && (
+                    <Box
+                      sx={{
+                        mt: 2.5,
+                        p: 2,
+                        borderRadius: "10px",
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(124, 58, 237, 0.06)"
+                            : "#f8fafd",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(124, 58, 237, 0.2)"
+                            : "#e2e8f0",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: 1,
+                          mb: 1.2,
+                        }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                          <PeopleIcon sx={{ color: "#7c3aed", fontSize: "1.15rem" }} />
+                          <Typography
+                            variant="caption"
+                            fontWeight={700}
+                            sx={{
+                              fontSize: "0.82rem",
+                              color: (theme) =>
+                                theme.palette.mode === "dark" ? "#c4b5fd" : "#0f172a",
+                            }}
+                          >
+                            Participating Members ({participatingMembers.length} of {activeMembers.length}):
+                          </Typography>
+                        </Box>
 
-              {/* Right Column: Calculated Event Summary Card */}
-              <Grid size={{ xs: 12, md: 5 }}>
+                        {excludedMembers.length > 0 && (
+                          <Button
+                            size="small"
+                            variant="text"
+                            startIcon={<ResetIcon sx={{ fontSize: "0.95rem !important" }} />}
+                            onClick={handleSelectAllParticipants}
+                            sx={{
+                              fontSize: "0.74rem",
+                              fontWeight: 700,
+                              textTransform: "none",
+                              py: 0.2,
+                              px: 1,
+                              color: "#7c3aed",
+                              borderRadius: "6px",
+                              "&:hover": {
+                                bgcolor: "rgba(124, 58, 237, 0.08)",
+                              },
+                            }}
+                          >
+                            Select All
+                          </Button>
+                        )}
+                      </Box>
+
+                      {/* Participating Member Chips with Remove Icon */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 1,
+                          maxHeight: 140,
+                          overflowY: "auto",
+                          p: 0.5,
+                        }}
+                      >
+                        {participatingMembers.length === 0 ? (
+                          <Typography
+                            variant="caption"
+                            sx={{ color: "text.secondary", fontStyle: "italic", py: 1 }}
+                          >
+                            No members selected. Click on excluded members below or click "Select All".
+                          </Typography>
+                        ) : (
+                          participatingMembers.map((m) => {
+                            const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+                            return (
+                              <Chip
+                                key={m.memberId}
+                                icon={
+                                  isWfh ? (
+                                    <WfhIcon sx={{ fontSize: "0.9rem !important", color: "#9333ea !important" }} />
+                                  ) : (
+                                    <OfficeIcon sx={{ fontSize: "0.9rem !important", color: "#0284c7 !important" }} />
+                                  )
+                                }
+                                label={`${m.name} (${isWfh ? "WFH" : "Office"})`}
+                                size="small"
+                                onDelete={() => handleRemoveParticipant(m.memberId)}
+                                deleteIcon={
+                                  <CloseRoundedIcon
+                                    sx={{
+                                      fontSize: "0.95rem !important",
+                                      color: isWfh ? "#9333ea !important" : "#0284c7 !important",
+                                      "&:hover": { color: "#ef4444 !important" },
+                                    }}
+                                  />
+                                }
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: "0.76rem",
+                                  borderRadius: "6px",
+                                  py: 0.5,
+                                  bgcolor: isWfh ? "rgba(147, 51, 234, 0.08)" : "rgba(2, 132, 199, 0.08)",
+                                  color: isWfh ? "#9333ea" : "#0284c7",
+                                  border: "1px solid",
+                                  borderColor: isWfh ? "rgba(147, 51, 234, 0.25)" : "rgba(2, 132, 199, 0.25)",
+                                  transition: "all 0.15s ease",
+                                  "&:hover": {
+                                    bgcolor: isWfh ? "rgba(147, 51, 234, 0.14)" : "rgba(2, 132, 199, 0.14)",
+                                  },
+                                  "& .MuiChip-deleteIcon": {
+                                    marginRight: "4px",
+                                  },
+                                }}
+                              />
+                            );
+                          })
+                        )}
+                      </Box>
+
+                      {/* Excluded (Not Attending) Members List - Click to Re-add */}
+                      {excludedMembers.length > 0 && (
+                        <Box
+                          sx={{
+                            mt: 1.5,
+                            pt: 1.2,
+                            borderTop: "1px dashed",
+                            borderColor: (theme) =>
+                              theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "#e2e8f0",
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            fontWeight={700}
+                            sx={{
+                              fontSize: "0.74rem",
+                              color: "#94a3b8",
+                              display: "block",
+                              mb: 0.8,
+                            }}
+                          >
+                            Not Attending ({excludedMembers.length}) — Click to add back:
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 0.8,
+                              maxHeight: 90,
+                              overflowY: "auto",
+                            }}
+                          >
+                            {excludedMembers.map((m) => {
+                              const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+                              return (
+                                <Chip
+                                  key={m.memberId}
+                                  icon={<AddIcon sx={{ fontSize: "0.85rem !important", color: "#64748b !important" }} />}
+                                  label={`${m.name} (${isWfh ? "WFH" : "Office"})`}
+                                  size="small"
+                                  onClick={() => handleAddParticipant(m.memberId)}
+                                  sx={{
+                                    fontWeight: 500,
+                                    fontSize: "0.74rem",
+                                    borderRadius: "6px",
+                                    py: 0.4,
+                                    bgcolor: "rgba(148, 163, 184, 0.1)",
+                                    color: "#64748b",
+                                    border: "1px dashed #cbd5e1",
+                                    cursor: "pointer",
+                                    "&:hover": {
+                                      bgcolor: "rgba(124, 58, 237, 0.12)",
+                                      color: "#7c3aed",
+                                      borderColor: "#7c3aed",
+                                    },
+                                  }}
+                                />
+                              );
+                            })}
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
+                  )
+                )}
+              </Box>
+            </Grid>
+
+            {/* Top-Right Card: Calculated Event Summary */}
+            <Grid size={{ xs: 12, lg: 5 }}>
+              <Box
+                sx={{
+                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
+                  border: "1px solid",
+                  borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
+                  borderRadius: "14px",
+                  p: { xs: 1.5, sm: 2 },
+                  boxShadow: "0 4px 18px rgba(74, 63, 107, 0.03)",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                {/* Card Header */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+                  <BarChartIcon sx={{ color: "#7c3aed", fontSize: "1.25rem" }} />
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={800}
+                    sx={{ fontSize: "0.95rem", color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e") }}
+                  >
+                    Calculated Event Summary
+                  </Typography>
+                </Box>
+
+                {/* 6 Metric Cards Grid (2 cols x 3 rows) */}
+                <Grid container spacing={1.2} sx={{ flex: 1 }}>
+                  {/* 1. Birthday / Total Members */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
+                      sx={{
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(99, 102, 241, 0.12)" : "#f5f3ff",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(99, 102, 241, 0.25)" : "#ede9fe",
+                        borderRadius: "10px",
+                        p: 1.2,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.2,
+                        height: "100%",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          bgcolor: "#6366f1",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <GroupIcon sx={{ fontSize: "1.1rem" }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "#64748b", fontWeight: 600, fontSize: "0.72rem", display: "block" }}
+                        >
+                          {isBirthday ? "Birthday Members" : "Total Members"}
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 800,
+                            color: (theme) => (theme.palette.mode === "dark" ? "#c7d2fe" : "#3730a3"),
+                            lineHeight: 1.1,
+                            mt: 0.1,
+                            fontSize: "1.15rem",
+                          }}
+                        >
+                          {isBirthday ? bdays : total}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+
+                  {/* 2. Office / WFH */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
+                      sx={{
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(14, 165, 233, 0.12)" : "#f0f9ff",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(14, 165, 233, 0.25)" : "#e0f2fe",
+                        borderRadius: "10px",
+                        p: 1.2,
+                        position: "relative",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.2,
+                        height: "100%",
+                      }}
+                    >
+                      <Tooltip title="Breakdown of participants by Work Type (Office vs WFH)">
+                        <InfoIcon
+                          sx={{
+                            position: "absolute",
+                            top: 6,
+                            right: 6,
+                            fontSize: "0.85rem",
+                            color: "#0284c7",
+                            cursor: "pointer",
+                          }}
+                        />
+                      </Tooltip>
+                      <Box
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          bgcolor: "#0ea5e9",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <HomeIcon sx={{ fontSize: "1.1rem" }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "#64748b", fontWeight: 600, fontSize: "0.72rem", display: "block" }}
+                        >
+                          Office / WFH
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 800,
+                            color: (theme) => (theme.palette.mode === "dark" ? "#bae6fd" : "#0369a1"),
+                            lineHeight: 1.1,
+                            mt: 0.1,
+                            fontSize: "1.15rem",
+                          }}
+                        >
+                          {isBirthday ? `${office} / ${wfh}` : `${officeMembers} / ${wfhMembers}`}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+
+                  {/* 3. Eligible Contributors */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
+                      sx={{
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.12)" : "#f0fdf4",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.25)" : "#dcfce7",
+                        borderRadius: "10px",
+                        p: 1.2,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.2,
+                        height: "100%",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          bgcolor: "#16a34a",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <PersonAddIcon sx={{ fontSize: "1.1rem" }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "#64748b", fontWeight: 600, fontSize: "0.72rem", display: "block" }}
+                        >
+                          Eligible Contributors
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 800,
+                            color: (theme) => (theme.palette.mode === "dark" ? "#bbf7d0" : "#15803d"),
+                            lineHeight: 1.1,
+                            mt: 0.1,
+                            fontSize: "1.15rem",
+                          }}
+                        >
+                          {eligible}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+
+                  {/* 4. Planned Budget */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
+                      sx={{
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(217, 119, 6, 0.12)" : "#fffbeb",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(217, 119, 6, 0.25)" : "#fef3c7",
+                        borderRadius: "10px",
+                        p: 1.2,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.2,
+                        height: "100%",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          bgcolor: "#d97706",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <WalletIcon sx={{ fontSize: "1.1rem" }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "#64748b", fontWeight: 600, fontSize: "0.72rem", display: "block" }}
+                        >
+                          Planned Budget
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 800,
+                            color: (theme) => (theme.palette.mode === "dark" ? "#fde68a" : "#b45309"),
+                            lineHeight: 1.1,
+                            mt: 0.1,
+                            fontSize: "1.15rem",
+                          }}
+                        >
+                          ₹{plannedBudget.toLocaleString("en-IN")}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+
+                  {/* 5. Contribution / Member */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
+                      sx={{
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(99, 102, 241, 0.12)" : "#f5f3ff",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(99, 102, 241, 0.25)" : "#ede9fe",
+                        borderRadius: "10px",
+                        p: 1.2,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.2,
+                        height: "100%",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          bgcolor: "#6366f1",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <GroupsIcon sx={{ fontSize: "1.1rem" }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "#64748b", fontWeight: 600, fontSize: "0.72rem", display: "block" }}
+                        >
+                          Contribution / Member
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 800,
+                            color: (theme) => (theme.palette.mode === "dark" ? "#c7d2fe" : "#3730a3"),
+                            lineHeight: 1.1,
+                            mt: 0.1,
+                            fontSize: "1.15rem",
+                          }}
+                        >
+                          ₹{contributionPerMember.toLocaleString("en-IN")}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+
+                  {/* 6. Expected Collection */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
+                      sx={{
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(13, 148, 136, 0.12)" : "#f0fdfa",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(13, 148, 136, 0.25)" : "#ccfbf1",
+                        borderRadius: "10px",
+                        p: 1.2,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.2,
+                        height: "100%",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          bgcolor: "#0d9488",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <PaidIcon sx={{ fontSize: "1.1rem" }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "#64748b", fontWeight: 600, fontSize: "0.72rem", display: "block" }}
+                        >
+                          Expected Collection
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 800,
+                            color: (theme) => (theme.palette.mode === "dark" ? "#99f6e4" : "#0f766e"),
+                            lineHeight: 1.1,
+                            mt: 0.1,
+                            fontSize: "1.15rem",
+                          }}
+                        >
+                          ₹{expectedCollection.toLocaleString("en-IN")}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Box>
+            </Grid>
+
+            {/* Bottom Card: Budget Calculations */}
+            <Grid size={{ xs: 12 }}>
+              <Box
+                sx={{
+                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
+                  border: "1px solid",
+                  borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
+                  borderRadius: "14px",
+                  boxShadow: "0 4px 18px rgba(74, 63, 107, 0.03)",
+                  overflow: "hidden",
+                }}
+              >
+                {/* Top Section */}
                 <Box
                   sx={{
-                    border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: "14px",
-                    overflow: "hidden",
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
-                    boxShadow: "0 3px 12px rgba(20,60,90,0.06)",
-                    height: "100%",
+                    p: { xs: 2, sm: 2.5 },
+                    pb: 1.5,
                     display: "flex",
-                    flexDirection: "column",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 1.5,
                   }}
                 >
-                  <Box
-                    sx={{
-                      px: 2.5,
-                      py: 1.6,
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                      bgcolor: (theme) =>
-                        theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                    }}
-                  >
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      Calculated Event Summary
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+                    <CalculateIcon sx={{ color: "#7c3aed", fontSize: "1.5rem" }} />
+                    <Typography
+                      variant="h6"
+                      fontWeight={800}
+                      sx={{ fontSize: "1.05rem", color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e") }}
+                    >
+                      Budget Calculations
                     </Typography>
                   </Box>
 
+                  {/* Right Summary Pill Badge */}
                   <Box
                     sx={{
-                      p: 2.5,
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.8,
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.2)" : "#ede9fe",
+                      border: "1px solid",
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.4)" : "#ddd6fe",
+                      borderRadius: "20px",
+                      px: 1.8,
+                      py: 0.6,
                     }}
                   >
-                    <MetricLine label="Birthday Members" value={bdays} />
-                    <MetricLine label="Office / WFH" value={`${office} / ${wfh}`} />
-                    <MetricLine label="Eligible Contributors" value={eligible} />
-                    <MetricLine
-                      label="Planned Budget"
-                      value={`₹${plannedBudget.toLocaleString("en-IN")}`}
-                    />
-                    <MetricLine
-                      label="Contribution / Member"
-                      value={`₹${contributionPerMember.toLocaleString("en-IN")}`}
-                      highlight
-                    />
-                    <MetricLine
-                      label="Expected Collection"
-                      value={`₹${expectedCollection.toLocaleString("en-IN")}`}
-                    />
-                   
+                    <GroupsIcon sx={{ color: "#6d28d9", fontSize: "1rem" }} />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#6d28d9"),
+                        fontWeight: 700,
+                        fontSize: "0.8rem",
+                      }}
+                    >
+                      ₹{plannedBudget.toLocaleString("en-IN")} Total Budget • {eligible} Members • ₹{contributionPerMember}/person
+                    </Typography>
                   </Box>
                 </Box>
-              </Grid>
 
-              {/* Bottom Card: Budget Breakdown */}
-              <Grid size={{ xs: 12 }}>
-                <Box
-                  sx={{
-                    border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: "14px",
-                    overflow: "hidden",
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
-                    boxShadow: "0 3px 12px rgba(20,60,90,0.06)",
-                  }}
-                >
+                {/* Formula Banner Box */}
+                <Box sx={{ px: { xs: 2, sm: 2.5 }, pb: 2 }}>
                   <Box
                     sx={{
-                      px: 2.5,
-                      py: 1.6,
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
                       bgcolor: (theme) =>
-                        theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                        theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.08)" : "#f0f4ff",
+                      border: "1px solid",
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.2)" : "#e0e7ff",
+                      borderRadius: "8px",
+                      px: 1.8,
+                      py: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: "0.82rem",
+                        lineHeight: 1.5,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#475569"),
+                        fontWeight: 500,
+                      }}
+                    >
+                      <strong>Calculation:</strong>{" "}
+                      {dynamicFormulaText ? (
+                        <span>{dynamicFormulaText}.</span>
+                      ) : (
+                        <span>Calculation of active budget items.</span>
+                      )}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {/* Table Content */}
+                <Box sx={{ px: { xs: 2, sm: 2.5 }, pb: 2.5 }}>
+                  {/* Header Row */}
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1.4fr 1.6fr 1fr 1fr", sm: "1.8fr 2.2fr 1fr 1.2fr" },
+                      gap: 2,
+                      pb: 1.2,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark" ? "divider" : "#f1f5f9",
+                      fontWeight: 700,
+                      fontSize: "0.82rem",
+                      color: "#64748b",
+                      alignItems: "center",
+                      px: 1,
+                    }}
+                  >
+                    <Box sx={{ textAlign: "left" }}>Expense Item</Box>
+                    <Box sx={{ textAlign: "left" }}>Calculation</Box>
+                    <Box sx={{ textAlign: "left" }}>Rate</Box>
+                    <Box sx={{ textAlign: "right" }}>Amount</Box>
+                  </Box>
+
+                  {/* Table Rows */}
+                  {computedBudgetItems.map((item, idx) => {
+                    const itemStyle = getItemStyle(item.expenseItem);
+                    const isLast = idx === computedBudgetItems.length - 1;
+                    return (
+                      <Box
+                        key={item.budgetCalculationId || item.expenseItem || idx}
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: { xs: "1.4fr 1.6fr 1fr 1fr", sm: "1.8fr 2.2fr 1fr 1.2fr" },
+                          gap: 2,
+                          py: 1.5,
+                          borderBottom: isLast ? "none" : "1px solid",
+                          borderColor: (theme) =>
+                            theme.palette.mode === "dark" ? "divider" : "#f1f5f9",
+                          alignItems: "center",
+                          px: 1,
+                        }}
+                      >
+                        {/* Item with Icon */}
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, textAlign: "left" }}>
+                          <Box
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "50%",
+                              bgcolor: itemStyle.bg,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {itemStyle.icon}
+                          </Box>
+                          <Typography
+                            variant="body2"
+                            fontWeight={700}
+                            sx={{
+                              color: (theme) =>
+                                theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b",
+                              fontSize: "0.88rem",
+                            }}
+                          >
+                            {item.expenseItem}
+                          </Typography>
+                        </Box>
+
+                        {/* Calculation */}
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#94a3b8" : "#475569",
+                            fontSize: "0.85rem",
+                            textAlign: "left",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {item.calcText}
+                        </Typography>
+
+                        {/* Rate */}
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#94a3b8" : "#475569",
+                            fontSize: "0.85rem",
+                            textAlign: "left",
+                            fontWeight: 500,
+                          }}
+                        >
+                          ₹{item.rate.toLocaleString("en-IN")}
+                        </Typography>
+
+                        {/* Amount */}
+                        <Typography
+                          variant="body2"
+                          fontWeight={800}
+                          sx={{
+                            textAlign: "right",
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#f8fafc" : "#1e293b",
+                            fontSize: "0.92rem",
+                          }}
+                        >
+                          ₹{item.amount.toLocaleString("en-IN")}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+
+                  {/* Bottom Full-Width Deep Purple Summary Bar */}
+                  <Box
+                    sx={{
+                      mt: 2,
+                      bgcolor: "#45386d",
+                      borderRadius: "10px",
+                      color: "#ffffff",
+                      px: { xs: 2, sm: 3 },
+                      py: 1.5,
                       display: "flex",
-                      flexDirection: "column",
-                      gap: 0.5,
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 2,
+                      boxShadow: "0 4px 14px rgba(69, 56, 109, 0.25)",
                     }}
                   >
                     <Box
                       sx={{
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "space-between",
                         flexWrap: "wrap",
-                        gap: 1,
+                        gap: { xs: 1.5, sm: 2.5 },
                       }}
                     >
-                      <Typography variant="subtitle1" fontWeight={700}>
-                        Budget Calculations
-                      </Typography>
-                      <Chip
-                        label={`₹${plannedBudget.toLocaleString("en-IN")} Total Budget ÷ ${eligible} Members = ₹${contributionPerMember}/person`}
-                        size="small"
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <GroupsIcon sx={{ color: "#fff", fontSize: "1.35rem" }} />
+                        <Typography variant="body2" sx={{ color: "#ffffff", fontSize: "0.88rem" }}>
+                          Total Contributors:{" "}
+                          <strong style={{ color: "#fff", fontWeight: 800 }}>{eligible}</strong>
+                        </Typography>
+                      </Box>
+                      <Box
                         sx={{
-                          fontWeight: 700,
-                          fontSize: "0.75rem",
-                          bgcolor: (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "rgba(124, 58, 237, 0.15)"
-                              : "rgba(74, 63, 107, 0.08)",
-                          color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
+                          display: { xs: "none", sm: "block" },
+                          width: "1px",
+                          height: 16,
+                          bgcolor: "rgba(255, 255, 255, 0.3)",
                         }}
                       />
-                    </Box>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontSize: "0.78rem",
-                        lineHeight: 1.5,
-                        color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#1e293b"),
-                        fontWeight: 600,
-                        "& strong": {
-                          fontWeight: 800,
-                          color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
-                        },
-                      }}
-                    >
-                      Calculation: {dynamicFormulaText ? (
-                        <span>{dynamicFormulaText}</span>
-                      ) : (
-                        <span>Calculation of active budget items</span>
-                      )}. Total planned budget is divided equally among eligible contributing members.
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ p: 2.5 }}>
-                    {/* Header row */}
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
-                        gap: 2,
-                        pb: 1.2,
-                        borderBottom: "1px solid",
-                        borderColor: "divider",
-                        fontWeight: 700,
-                        fontSize: "0.82rem",
-                        color: "text.secondary",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Box sx={{ textAlign: "left" }}>Expense Item</Box>
-                      <Box sx={{ textAlign: "left" }}>Calculation</Box>
-                      <Box sx={{ textAlign: "right" }}>Rate</Box>
-                      <Box sx={{ textAlign: "right" }}>Amount</Box>
+                      <Typography variant="body2" sx={{ color: "#ffffff", fontSize: "0.88rem" }}>
+                        Contribution per Member:{" "}
+                        <strong style={{ color: "#fff", fontWeight: 800 }}>
+                          ₹{contributionPerMember.toLocaleString("en-IN")}
+                        </strong>
+                      </Typography>
                     </Box>
 
-                    {/* Dynamic Budget Calculation Rows */}
-                    {computedBudgetItems.map((item, idx) => {
-                      const isLast = idx === computedBudgetItems.length - 1;
-                      return (
-                        <Box
-                          key={item.budgetCalculationId || item.expenseItem || idx}
-                          sx={{
-                            display: "grid",
-                            gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
-                            gap: 2,
-                            py: 1.4,
-                            borderBottom: isLast ? "2px solid" : "1px solid",
-                            borderColor: "divider",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Typography variant="body2" fontWeight={600} sx={{ textAlign: "left" }}>
-                            {item.expenseItem}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>
-                            {item.calcText}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
-                            ₹{item.rate.toLocaleString("en-IN")}
-                          </Typography>
-                          <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ textAlign: "right" }}>
-                            ₹{item.amount.toLocaleString("en-IN")}
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-
-                    {/* Total Summary Row under Amount */}
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
-                        gap: 2,
-                        pt: 1.6,
-                        alignItems: "center",
-                      }}
-                    >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+                      <CalculateIcon sx={{ color: "#fff", fontSize: "1.35rem" }} />
                       <Typography
-                        variant="subtitle2"
-                        fontWeight={800}
-                        sx={{
-                          gridColumn: "span 3",
-                          textAlign: "right",
-                          pr: 1,
-                          color: "text.primary",
-                          fontSize: "0.9rem",
-                        }}
+                        variant="body2"
+                        sx={{ color: "#ffffff", fontSize: "0.88rem", fontWeight: 600 }}
                       >
                         Total Amount:
                       </Typography>
                       <Typography
-                        variant="subtitle1"
-                        fontWeight={900}
-                        sx={{
-                          textAlign: "right",
-                          color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
-                          fontSize: "1.1rem",
-                        }}
+                        variant="h5"
+                        sx={{ fontWeight: 900, color: "#ffffff", fontSize: "1.35rem", ml: 0.5 }}
                       >
                         ₹{plannedBudget.toLocaleString("en-IN")}
                       </Typography>
                     </Box>
                   </Box>
                 </Box>
-              </Grid>
+              </Box>
             </Grid>
-          ) : (
-            /* Non-Birthday Event Standard Form */
-            <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <AppSelect
-                  label="Event Category"
-                  value={form.eventTypeId}
-                  onChange={(e) => {
-                    setForm((c) => ({ ...c, eventTypeId: e.target.value }));
-                    if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
-                  }}
-                  options={typeOptions}
-                  error={!!errors.eventTypeId}
-                  helperText={errors.eventTypeId}
-                  required
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <AppInput
-                  label="Event Name"
-                  placeholder="Enter event name"
-                  value={form.eventName}
-                  onChange={(e) => {
-                    setForm((current) => ({ ...current, eventName: e.target.value }));
-                    if (errors.eventName) setErrors((prev) => ({ ...prev, eventName: "" }));
-                  }}
-                  restrictType="letteronly"
-                  maxLength={100}
-                  error={!!errors.eventName}
-                  helperText={errors.eventName}
-                  required
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <AppInput
-                  label="Base Amount"
-                  placeholder="Enter base amount (₹)"
-                  value={formatBaseAmount(form.baseAmount)}
-                  onChange={(e) => {
-                    const rawVal = e.target.value.replace(/[^0-9]/g, "");
-                    setForm((current) => ({ ...current, baseAmount: rawVal }));
-                    if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
-                  }}
-                  maxLength={15}
-                  error={!!errors.baseAmount}
-                  helperText={errors.baseAmount}
-                  required
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <AppDateInput
-                  label="Event Date"
-                  value={form.eventDate}
-                  onChange={(newValue) => {
-                    setForm((current) => ({ ...current, eventDate: newValue }));
-                    if (errors.eventDate) setErrors((prev) => ({ ...prev, eventDate: "" }));
-                  }}
-                  error={!!errors.eventDate}
-                  helperText={errors.eventDate}
-                  required
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <AppMultiSelect
-                  label="Participants"
-                  placeholder="Select members..."
-                  value={form.participantIds}
-                  onChange={(e) => {
-                    setForm((current) => ({ ...current, participantIds: e.target.value }));
-                    if (errors.participantIds) setErrors((prev) => ({ ...prev, participantIds: "" }));
-                  }}
-                  options={memberOptions}
-                  error={!!errors.participantIds}
-                  helperText={errors.participantIds}
-                  required
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <AppTextArea
-                  label="Description"
-                  placeholder="Enter event description..."
-                  minRows={2}
-                  maxRows={4}
-                  value={form.description}
-                  onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
-                />
-              </Grid>
-
-
-            </Grid>
-          )}
+          </Grid>
 
           {/* Bottom Action Footer */}
-          <Divider sx={{ my: 3 }} />
+          <Divider sx={{ my: 3, borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2") }} />
           <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 2 }}>
             <AppButton
               variant="outlined"
               onClick={() => navigate("/events")}
               disabled={saving}
+              sx={{ minWidth: 110, borderRadius: "8px" }}
             >
               {readOnly ? "Back to Events" : "Cancel"}
             </AppButton>
@@ -1121,8 +2050,11 @@ export default function EventFormPage() {
                 onClick={handleSubmit}
                 disabled={saving}
                 sx={{
-                  bgcolor: "#4a3f6b !important",
-                  "&:hover": { bgcolor: "#3b325c !important" },
+                  bgcolor: "#45386d !important",
+                  "&:hover": { bgcolor: "#372c57 !important" },
+                  minWidth: 120,
+                  borderRadius: "8px",
+                  fontWeight: 700,
                 }}
               >
                 {saving ? "Saving..." : isEdit ? "Update" : "Save"}
@@ -1132,34 +2064,5 @@ export default function EventFormPage() {
         </Box>
       </Paper>
     </div>
-  );
-}
-
-function MetricLine({ label, value, highlight, isLast }) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        py: 1.1,
-        borderBottom: isLast ? "none" : "1px solid",
-        borderColor: "divider",
-      }}
-    >
-      <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.88rem" }}>
-        {label}
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: highlight ? 900 : 700,
-          fontSize: highlight ? "1.05rem" : "0.95rem",
-          color: highlight ? "#1677c8" : "text.primary",
-        }}
-      >
-        {value}
-      </Typography>
-    </Box>
   );
 }

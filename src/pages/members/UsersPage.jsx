@@ -18,6 +18,7 @@ import {
   Save as SaveIcon,
   Visibility,
   VisibilityOff,
+  Visibility as ViewIcon,
   PersonAdd as PersonAddIcon,
   ToggleOn as ToggleOnIcon,
   ToggleOff as ToggleOffIcon,
@@ -41,6 +42,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
+import UserDetailsDialog from "../../components/members/UserDetailsDialog";
 import { validateForm } from "../../utils/validation";
 import {
   getUsersAsync,
@@ -128,6 +130,8 @@ export default function UsersPage() {
   const [workTypes, setWorkTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
@@ -312,6 +316,11 @@ export default function UsersPage() {
     setShowConfirm(false);
     setErrors({});
     setDialogOpen(true);
+  }
+
+  function openView(row) {
+    setSelectedUser(row);
+    setViewDialogOpen(true);
   }
 
   function fieldChange(field, value) {
@@ -749,9 +758,18 @@ export default function UsersPage() {
   const columns = [
     {
       label: "Action",
-      sx: { width: 120 },
+      sx: { width: 140 },
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
+          <Tooltip title="View Details">
+            <IconButton
+              size="small"
+              sx={{ p: 0.3 }}
+              onClick={() => openView(row)}
+            >
+              <ViewIcon sx={{ fontSize: "1.05rem", color: actionIconColor }} />
+            </IconButton>
+          </Tooltip>
           <Tooltip title={hasWriteAccess ? "Edit User" : ""}>
             <span>
               <IconButton
@@ -1397,6 +1415,13 @@ export default function UsersPage() {
         ]}
         templateValidations={templateValidations}
         validateRow={validateRow}
+      />
+
+      {/* ── View User Details Dialog ──────────────────────────────────────── */}
+      <UserDetailsDialog
+        open={viewDialogOpen}
+        onClose={() => setViewDialogOpen(false)}
+        user={selectedUser}
       />
     </div>
   );

@@ -49,8 +49,8 @@ export default function AppRoutes() {
         <Route path="/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
         <Route path="/event-types" element={<ProtectedRoute><EventTypesPage /></ProtectedRoute>} />
         <Route path="/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
-        <Route path="/events/add" element={<ProtectedRoute><EventFormPage /></ProtectedRoute>} />
-        <Route path="/events/edit/:id" element={<ProtectedRoute><EventFormPage /></ProtectedRoute>} />
+        <Route path="/events/add" element={<ProtectedRoute><EventFormPage key="add-event" /></ProtectedRoute>} />
+        <Route path="/events/edit/:id" element={<ProtectedRoute><EventFormPage key="edit-event" /></ProtectedRoute>} />
         <Route path="/events/:id" element={<ProtectedRoute><EventDetailsPage /></ProtectedRoute>} />
         <Route path="/contributions" element={<ProtectedRoute><ContributionsPage /></ProtectedRoute>} />
         <Route path="/payment-submission" element={<ProtectedRoute><SubmitPaymentPage /></ProtectedRoute>} />
