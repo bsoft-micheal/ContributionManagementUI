@@ -37,6 +37,7 @@ import { getMembersAsync } from "../../services/memberService";
 import { useAppToast } from "../../components/common/AppToast";
 import AppDataTable from "../../components/common/AppDataTable";
 import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
+import { useAuth } from "../../contexts/AuthContext";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 const C = {
@@ -65,9 +66,7 @@ const DONUT_COLORS = [
 // ─── Format Helpers ───────────────────────────────────────────────────────────
 function fmtAmt(v) {
   const n = Number(v) || 0;
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}k`;
-  return `₹${Math.round(n)}`;
+  return `₹${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ─── SVG Arc Path Generator ───────────────────────────────────────────────────
@@ -656,6 +655,8 @@ export default function DashboardPage() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const toast = useAppToast();
+  const { authState } = useAuth();
+  const isMember = authState?.role?.toLowerCase() === "member";
 
   const [activeTab, setActiveTab] = useState(0);
   const [summary, setSummary] = useState(null);
@@ -873,7 +874,7 @@ export default function DashboardPage() {
     return [
       {
         id: "status-collected",
-        label: "Collected",
+        label: isMember ? "Paid" : "Collected",
         value: totalCollected,
         percent: colPct % 1 === 0 ? colPct.toFixed(0) : colPct.toFixed(1),
         color: C.collected,
@@ -886,7 +887,7 @@ export default function DashboardPage() {
         color: C.pending,
       },
     ];
-  }, [totalCollected, totalPending, totalExpected]);
+  }, [totalCollected, totalPending, totalExpected, isMember]);
 
   const defaultSummary = useMemo(() => {
     const title = donutView === "events"
@@ -902,7 +903,7 @@ export default function DashboardPage() {
   const amountRing = {
     label: "Amount",
     segments: [
-      { label: "Collected", value: totalCollected, color: C.collected, displayValue: fmtAmt(totalCollected) },
+      { label: isMember ? "Paid" : "Collected", value: totalCollected, color: C.collected, displayValue: fmtAmt(totalCollected) },
       { label: "Pending", value: totalPending, color: C.pending, displayValue: fmtAmt(totalPending) },
     ],
   };
@@ -958,7 +959,7 @@ export default function DashboardPage() {
       ),
     },
     {
-      label: "Collected", key: "collectedAmount", align: "right",
+      label: isMember ? "Paid" : "Collected", key: "collectedAmount", align: "right",
       render: (row) => (
         <Typography variant="body2" fontWeight={700} color="success.main">
           ₹{Number(row.collectedAmount).toLocaleString()}
@@ -1064,9 +1065,9 @@ export default function DashboardPage() {
               <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Stack spacing={3}>
 
-                  {/* ① Top Summary Metric Cards (5 Cards Grid) */}
+                  {/* ① Top Summary Metric Cards (5 Cards Grid, Total Collections hidden for Member) */}
                   <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
                       <MetricCard
                         label="TOTAL EXPECTED"
                         value={`₹${totalExpected.toLocaleString()}`}
@@ -1074,15 +1075,17 @@ export default function DashboardPage() {
                         accent="#7c3aed"
                       />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
-                      <MetricCard
-                        label="TOTAL COLLECTIONS"
-                        value={`₹${totalCollected.toLocaleString()}`}
-                        helper="Amount collected (paid)"
-                        accent="success.main"
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                    {!isMember && (
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                        <MetricCard
+                          label="TOTAL COLLECTIONS"
+                          value={`₹${totalCollected.toLocaleString()}`}
+                          helper="Amount collected (paid)"
+                          accent="success.main"
+                        />
+                      </Grid>
+                    )}
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
                       <MetricCard
                         label="TOTAL PENDING"
                         value={`₹${totalPending.toLocaleString()}`}
@@ -1090,14 +1093,14 @@ export default function DashboardPage() {
                         accent="error.main"
                       />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
                       <MetricCard
                         label="TOTAL EVENTS"
                         value={events.length}
                         helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
                       />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
                       <MetricCard
                         label="PENDING PAYMENTS"
                         value={pendingCount}
@@ -1215,7 +1218,7 @@ export default function DashboardPage() {
                               <Stack spacing={2.5}>
                                 {/* Quick stat pills */}
                                 <Stack direction="row" spacing={1.5}>
-                                  <StatPill label="Total Collected" value={`₹${Number(totalCollected).toLocaleString()}`} color={C.collected} />
+                                  <StatPill label={isMember ? "Total Paid" : "Total Collected"} value={`₹${Number(totalCollected).toLocaleString()}`} color={C.collected} />
                                   <StatPill label="Paid Payments" value={`${paidCount} / ${paidCount + pendingCount}`} color={C.paid} />
                                   <StatPill label="Total Events" value={events.length} color="#7c3aed" />
                                 </Stack>
@@ -1304,7 +1307,7 @@ export default function DashboardPage() {
                                                   </Typography>
                                                 </Box>
                                                 <Chip
-                                                  label={item.collected >= item.value && item.value > 0 ? "✓ Settled" : `₹${Number(item.collected).toLocaleString()} Collected`}
+                                                  label={item.collected >= item.value && item.value > 0 ? "✓ Settled" : isMember ? `₹${Number(item.collected).toLocaleString()} Paid` : `₹${Number(item.collected).toLocaleString()} Collected`}
                                                   size="small"
                                                   sx={{
                                                     height: 20,
@@ -1435,7 +1438,7 @@ export default function DashboardPage() {
                         >
                           <Box>
                             <Typography variant="caption" color="#10b981" fontWeight={700} textTransform="uppercase" letterSpacing="0.05em">
-                              Total Collected
+                              {isMember ? "Total Paid" : "Total Collected"}
                             </Typography>
                             <Typography variant="h6" fontWeight={800} color="#10b981" sx={{ mt: 0.5 }}>
                               ₹{tableTotals.collected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1460,7 +1463,7 @@ export default function DashboardPage() {
                         >
                           <Box>
                             <Typography variant="caption" color="#ef4444" fontWeight={700} textTransform="uppercase" letterSpacing="0.05em">
-                              Total Collection Pending
+                              {isMember ? "Total Pending" : "Total Collection Pending"}
                             </Typography>
                             <Typography variant="h6" fontWeight={800} color="#ef4444" sx={{ mt: 0.5 }}>
                               ₹{tableTotals.pending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
