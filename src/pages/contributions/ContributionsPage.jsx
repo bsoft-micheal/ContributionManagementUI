@@ -39,6 +39,7 @@ import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
+import { hasActionPermission } from "../../utils/rightsHelper";
 import PaymentQrReminderDialog from "../../components/contributions/PaymentQrReminderDialog";
 import {
   getPaymentQrConfig,
@@ -63,6 +64,10 @@ export default function ContributionsPage() {
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
+
+  // Granular Action Permissions
+  const canAddContribution = hasActionPermission("Add Contribution", 41, authState?.role).canExecute;
+  const canViewContribution = hasActionPermission("View Contribution", 40, authState?.role).canView;
 
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState("");
@@ -399,6 +404,10 @@ export default function ContributionsPage() {
         const buttonTooltip = isFullyPaid
           ? "Fully Paid"
           : (row.paymentStatus === "Paid" && previousArrears > 0 ? "Pay Previous Arrears" : (hasWriteAccess ? "Record Payment" : ""));
+
+        if (!canAddContribution) {
+          return null;
+        }
 
         return (
           <Box sx={{ display: "flex", gap: 0.3, alignItems: "center" }}>

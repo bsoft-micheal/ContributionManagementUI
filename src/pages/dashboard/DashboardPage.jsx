@@ -220,7 +220,7 @@ function InteractiveDonutChart({
         })}
       </svg>
 
-      {/* Center Details Hub (Exact Match to Reference Mockup) */}
+      {/* Center Details Hub (Amount-only display) */}
       <Box
         sx={{
           position: "absolute",
@@ -251,11 +251,12 @@ function InteractiveDonutChart({
             noWrap
             sx={{
               maxWidth: 114,
-              fontSize: "0.78rem",
+              fontSize: "0.82rem",
               fontWeight: 700,
               color: "#2563eb",
-              lineHeight: 1.2,
+              lineHeight: 1.3,
               letterSpacing: "0.01em",
+              mb: 0.5,
             }}
           >
             {display?.label || display?.title || "Details"}
@@ -265,40 +266,15 @@ function InteractiveDonutChart({
         {/* Amount */}
         <Typography
           sx={{
-            fontSize: "1.32rem",
+            fontSize: "1.36rem",
             fontWeight: 900,
             color: isDark ? "#ffffff" : "#0f172a",
-            lineHeight: 1.15,
-            my: 0.35,
+            lineHeight: 1.2,
             letterSpacing: "-0.02em",
           }}
         >
           ₹{Number(display?.value ?? display?.amount ?? 0).toLocaleString()}
         </Typography>
-
-        {/* Percentage Badge */}
-        <Box
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            px: 1.2,
-            py: 0.2,
-            borderRadius: 99,
-            bgcolor: isDark ? alpha("#3b82f6", 0.2) : "#eff6ff",
-            border: `1px solid ${alpha("#3b82f6", 0.28)}`,
-          }}
-        >
-          <Typography
-            sx={{
-              color: "#2563eb",
-              fontWeight: 800,
-              fontSize: "0.72rem",
-              lineHeight: 1.3,
-            }}
-          >
-            {display?.percent != null ? `${display.percent}%` : `${display?.badge || "0%"}`}
-          </Typography>
-        </Box>
       </Box>
     </Box>
   );
@@ -365,18 +341,6 @@ function RingLegendGroup({ index, label, color, segments, total }) {
                   <Typography variant="body2" fontWeight={800} sx={{ fontSize: "0.85rem" }}>
                     {seg.displayValue ?? seg.value}
                   </Typography>
-                  <Chip
-                    label={`${pct}%`}
-                    size="small"
-                    sx={{
-                      height: 18,
-                      fontSize: "0.65rem",
-                      fontWeight: 900,
-                      bgcolor: alpha(seg.color, 0.12),
-                      color: seg.color,
-                      border: `1px solid ${alpha(seg.color, 0.3)}`,
-                    }}
-                  />
                 </Stack>
               </Stack>
               {/* Progress bar */}
@@ -858,22 +822,13 @@ export default function DashboardPage() {
 
   const chartEvents = events.slice(0, 6);
 
-  const totalCollected = isFilteredByType
-    ? events.reduce((sum, e) => sum + (Number(e.collectedAmount) || 0), 0)
-    : Number(summary?.totalContributions ?? 0);
-
-  const totalPending = isFilteredByType
-    ? events.reduce((sum, e) => sum + (Number(e.pendingAmount) || 0), 0)
-    : Number(summary?.totalPendingAmount ?? 0);
-
-  const pendingCount = isFilteredByType
-    ? events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0)
-    : Number(summary?.pendingPayments ?? 0);
-
-  const paidCount = events.reduce(
-    (s, e) => s + ((e.totalContributionsCount ?? 0) - (e.pendingContributionsCount ?? 0)), 0
-  );
+  const totalCollected = events.reduce((sum, e) => sum + (Number(e.collectedAmount) || 0), 0);
+  const totalPending = events.reduce((sum, e) => sum + (Number(e.pendingAmount) || 0), 0);
   const totalExpected = totalCollected + totalPending;
+
+  const pendingCount = events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0);
+  const totalContributionsCount = events.reduce((sum, e) => sum + (Number(e.totalContributionsCount) || 0), 0);
+  const paidCount = Math.max(0, totalContributionsCount - pendingCount);
   const collectionRate = totalExpected > 0
     ? Math.round((totalCollected / totalExpected) * 100) : 0;
   const paymentRate = (paidCount + pendingCount) > 0
@@ -940,10 +895,8 @@ export default function DashboardPage() {
     return {
       title,
       amount: totalExpected,
-      percent: collectionRate,
-      badge: `${collectionRate}%`,
     };
-  }, [donutView, isFilteredByType, appliedFilters.eventType, totalExpected, collectionRate]);
+  }, [donutView, isFilteredByType, appliedFilters.eventType, totalExpected]);
 
   // Multi-ring chart ring definitions
   const amountRing = {
@@ -1262,9 +1215,9 @@ export default function DashboardPage() {
                               <Stack spacing={2.5}>
                                 {/* Quick stat pills */}
                                 <Stack direction="row" spacing={1.5}>
-                                  <StatPill label="Collection Rate" value={`${collectionRate}%`} color={C.collected} />
-                                  <StatPill label="Payment Rate" value={`${paymentRate}%`} color={C.paid} />
-                                  <StatPill label="Events" value={events.length} color="#7c3aed" />
+                                  <StatPill label="Total Collected" value={`₹${Number(totalCollected).toLocaleString()}`} color={C.collected} />
+                                  <StatPill label="Paid Payments" value={`${paidCount} / ${paidCount + pendingCount}`} color={C.paid} />
+                                  <StatPill label="Total Events" value={events.length} color="#7c3aed" />
                                 </Stack>
 
                                 {donutView === "events" ? (
@@ -1351,7 +1304,7 @@ export default function DashboardPage() {
                                                   </Typography>
                                                 </Box>
                                                 <Chip
-                                                  label={`${item.collectedPct}% Collected`}
+                                                  label={item.collected >= item.value && item.value > 0 ? "✓ Settled" : `₹${Number(item.collected).toLocaleString()} Collected`}
                                                   size="small"
                                                   sx={{
                                                     height: 20,

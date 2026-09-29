@@ -18,6 +18,7 @@ import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
+import { hasActionPermission } from "../../utils/rightsHelper";
 import { getEventsAsync, deleteEventAsync } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
@@ -43,6 +44,13 @@ export default function EventsPage() {
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
+
+  // Granular Action Permissions
+  const canAddEvent = hasActionPermission("Add Event", 31, authState?.role).canExecute;
+  const canEditEvent = hasActionPermission("Edit Event", 32, authState?.role).canExecute;
+  const canDeleteEvent = hasActionPermission("Delete Event", 33, authState?.role).canExecute;
+  const canViewEvent = hasActionPermission("View Event", 30, authState?.role).canView;
+
   const navigate = useNavigate();
   const toast = useAppToast();
   const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
@@ -149,33 +157,35 @@ export default function EventsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-          <Tooltip title="View Details">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() => {
-                setSelectedEvent(row);
-                setViewDialogOpen(true);
-              }}
-            >
-              <ViewIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
-          {hasWriteAccess && (
-            <>
-              <Tooltip title="Edit Event">
-                <IconButton size="small" sx={{ p: 0.3 }}
-                  onClick={() => navigate(`/events/edit/${row.eventId}`)}
-                >
-                  <EditIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Delete Event">
-                <IconButton size="small" sx={{ p: 0.3 }}
-                  onClick={() => handleDeleteRequest(row)}
-                >
-                  <DeleteIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-                </IconButton>
-              </Tooltip>
-            </>
+          {canViewEvent && (
+            <Tooltip title="View Details">
+              <IconButton size="small" sx={{ p: 0.3 }}
+                onClick={() => {
+                  setSelectedEvent(row);
+                  setViewDialogOpen(true);
+                }}
+              >
+                <ViewIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canEditEvent && (
+            <Tooltip title="Edit Event">
+              <IconButton size="small" sx={{ p: 0.3 }}
+                onClick={() => navigate(`/events/edit/${row.eventId}`)}
+              >
+                <EditIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canDeleteEvent && (
+            <Tooltip title="Delete Event">
+              <IconButton size="small" sx={{ p: 0.3 }}
+                onClick={() => handleDeleteRequest(row)}
+              >
+                <DeleteIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+              </IconButton>
+            </Tooltip>
           )}
         </Box>
       )
@@ -213,7 +223,7 @@ export default function EventsPage() {
         columns={columns}
         data={events}
         actions={
-          hasWriteAccess && (
+          canAddEvent && (
             <AppButton
               size="small"
               variant="contained"

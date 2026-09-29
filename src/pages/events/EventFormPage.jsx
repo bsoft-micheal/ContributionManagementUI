@@ -46,6 +46,8 @@ import {
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 import useAccessByLocation from "../../hooks/useAccessByLocation";
+import { useAuth } from "../../contexts/AuthContext";
+import { hasActionPermission } from "../../utils/rightsHelper";
 
 // Standard calculation rules for Birthday events loaded dynamically from backend
 const RULES = {
@@ -93,9 +95,27 @@ export default function EventFormPage() {
   const navigate = useNavigate();
   const theme = useTheme();
   const toast = useAppToast();
+  const { authState } = useAuth();
   const { canEdit, readOnly } = useAccessByLocation();
 
   const isEdit = Boolean(id);
+
+  // Granular Action Permissions
+  const canAddEvent = hasActionPermission("Add Event", 31, authState?.role).canExecute;
+  const canEditEvent = hasActionPermission("Edit Event", 32, authState?.role).canExecute;
+
+  useEffect(() => {
+    if (!isEdit && !canAddEvent) {
+      toast.error("Access Denied: You do not have permission to add events.");
+      navigate("/events");
+      return;
+    }
+    if (isEdit && !canEditEvent) {
+      toast.error("Access Denied: You do not have permission to edit events.");
+      navigate("/events");
+      return;
+    }
+  }, [isEdit, canAddEvent, canEditEvent]);
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
@@ -638,7 +658,7 @@ export default function EventFormPage() {
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 12, sm: 6 }}>
                         <AppSelect
-                          label="Event Category"
+                          label="Event Type"
                           value={form.eventTypeId}
                           onChange={(e) => {
                             setForm((c) => ({ ...c, eventTypeId: e.target.value }));
