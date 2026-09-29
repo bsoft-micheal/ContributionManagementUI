@@ -98,17 +98,26 @@ export function AuthProvider({ children }) {
       const savedRights = localStorage.getItem("projectRightsConfig");
       let rightsMap = savedRights ? JSON.parse(savedRights) : {};
 
-      rightsMap[data.role] = data.rights.map((r, idx) => ({
-        id: idx + 1,
-        featureId: r.featureID ?? r.featureId,
-        module: r.module,
-        subModule: r.subModule,
-        action: r.action || r.Action || "",
-        page: r.page,
-        access: r.access,
-        accessType: r.accessType ?? r.AccessType ?? (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2))
-      }));
+      const processedRights = data.rights.map((r, idx) => {
+        let typeVal = r.accessType ?? r.AccessType;
+        if (typeVal === undefined || typeVal === null || isNaN(Number(typeVal)) || Number(typeVal) === 0) {
+          const str = String(r.access || r.Access || "").toLowerCase().replace(/[\s_-]/g, "");
+          typeVal = (str === "deny" || str === "3") ? 3 : ((str === "readonly" || str === "1") ? 1 : 2);
+        }
+        return {
+          id: idx + 1,
+          featureId: r.featureID ?? r.featureId ?? r.FeatureID ?? r.FeatureId,
+          module: r.module || r.Module || "",
+          subModule: r.subModule || r.SubModule || "",
+          action: r.action || r.Action || "",
+          page: r.page || r.Page || "",
+          access: r.access || r.Access || (Number(typeVal) === 3 ? "deny" : (Number(typeVal) === 1 ? "readOnly" : "readWrite")),
+          accessType: Number(typeVal)
+        };
+      });
 
+      rightsMap[data.role] = processedRights;
+      rightsMap[data.role.toLowerCase()] = processedRights;
       localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
     }
 

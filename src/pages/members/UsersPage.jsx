@@ -53,6 +53,7 @@ import { getRolesAsync } from "../../services/roleService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
+import { hasActionPermission } from "../../utils/rightsHelper";
 
 // ─── Custom Green Switch matching screenshot ───────────────────────────────
 const CustomSwitch = styled(Switch)(({ theme }) => ({
@@ -122,6 +123,14 @@ export default function UsersPage() {
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
+
+  const canViewUsers = hasActionPermission("View Users", 83, authState?.role).canView;
+  const canAddUser = hasActionPermission("Add User", 84, authState?.role).canExecute && hasWriteAccess;
+  const canEditUser = hasActionPermission("Edit User", 85, authState?.role).canExecute && hasWriteAccess;
+  const canDeleteUser = hasActionPermission("Delete User", 86, authState?.role).canExecute && hasWriteAccess;
+  const canImportExcel = hasActionPermission("Import Excel", 87, authState?.role).canExecute && hasWriteAccess;
+  const canExportUsers = hasActionPermission("Export Users", 88, authState?.role).canExecute;
+  const canChangeUserStatus = hasActionPermission("Change User Status", 89, authState?.role).canExecute && hasWriteAccess;
 
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -273,6 +282,7 @@ export default function UsersPage() {
 
   // ── Open dialog ────────────────────────────────────────────────────────────
   function openCreate() {
+    if (!canAddUser) return;
     setForm({
       ...initialForm,
       workType: typeOptions.length > 0 ? typeOptions[0].value : "Office",
@@ -290,6 +300,7 @@ export default function UsersPage() {
   }
 
   function openEdit(row) {
+    if (!canEditUser) return;
     const hasAccess = row.hasMemberProfile !== false;
     setForm({
       userId: row.userId,
@@ -487,6 +498,7 @@ export default function UsersPage() {
 
   // ── Delete ─────────────────────────────────────────────────────────────────
   function handleDeleteRequest(id) {
+    if (!canDeleteUser) return;
     setUserToDelete(id);
     setDeleteConfirmOpen(true);
   }
@@ -506,6 +518,7 @@ export default function UsersPage() {
   }
 
   function handleToggleStatusRequest(row) {
+    if (!canChangeUserStatus) return;
     setUserToToggle(row);
     setStatusConfirmOpen(true);
   }
@@ -752,42 +765,42 @@ export default function UsersPage() {
       sx: { width: 120 },
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title={hasWriteAccess ? "Edit User" : ""}>
+          <Tooltip title={canEditUser ? "Edit User" : ""}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!canEditUser}
                 onClick={() => openEdit(row)}
               >
-                <EditIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? actionIconColor : "#cbd5e1" }} />
+                <EditIcon sx={{ fontSize: "1.05rem", color: canEditUser ? actionIconColor : "#cbd5e1" }} />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete User" : ""}>
+          <Tooltip title={canDeleteUser ? "Delete User" : ""}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!canDeleteUser}
                 onClick={() => handleDeleteRequest(row.userId)}
               >
-                <DeleteIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess ? actionIconColor : "#cbd5e1" }} />
+                <DeleteIcon sx={{ fontSize: "1.05rem", color: canDeleteUser ? actionIconColor : "#cbd5e1" }} />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? (row.isActive ? "Deactivate User" : "Activate User") : ""}>
+          <Tooltip title={canChangeUserStatus ? (row.isActive ? "Deactivate User" : "Activate User") : ""}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!canChangeUserStatus}
                 onClick={() => handleToggleStatusRequest(row)}
               >
                 {row.isActive ? (
-                  <ToggleOnIcon sx={{ fontSize: "1.25rem", color: hasWriteAccess ? "#10b981" : "#cbd5e1" }} />
+                  <ToggleOnIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#10b981" : "#cbd5e1" }} />
                 ) : (
-                  <ToggleOffIcon sx={{ fontSize: "1.25rem", color: hasWriteAccess ? "#ef4444" : "#cbd5e1" }} />
+                  <ToggleOffIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#ef4444" : "#cbd5e1" }} />
                 )}
               </IconButton>
             </span>
@@ -934,12 +947,13 @@ export default function UsersPage() {
         columns={columns}
         data={filteredUsers}
         loading={loading}
+        allowExport={canExportUsers}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             <AppButton
               variant="outlined"
               size="small"
-              disabled={!hasWriteAccess}
+              disabled={!canImportExcel}
               startIcon={<ExcelIcon />}
               onClick={() => setImportDialogOpen(true)}
               sx={{
@@ -958,7 +972,7 @@ export default function UsersPage() {
             <AppButton
               variant="contained"
               size="small"
-              disabled={!hasWriteAccess}
+              disabled={!canAddUser}
               startIcon={<PersonAddIcon />}
               onClick={openCreate}
             >
