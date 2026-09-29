@@ -103,6 +103,7 @@ export function AuthProvider({ children }) {
         featureId: r.featureID ?? r.featureId,
         module: r.module,
         subModule: r.subModule,
+        action: r.action || r.Action || "",
         page: r.page,
         access: r.access,
         accessType: r.accessType ?? r.AccessType ?? (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2))
@@ -147,6 +148,7 @@ export function AuthProvider({ children }) {
         featureId: r.featureID ?? r.featureId,
         module: r.module,
         subModule: r.subModule,
+        action: r.action || r.Action || "",
         page: r.page,
         access: r.access,
         accessType: r.accessType ?? r.AccessType ?? (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2))

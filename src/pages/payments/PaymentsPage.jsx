@@ -12,11 +12,15 @@ import {
 import {
   Visibility as ViewIcon,
   ConfirmationNumberOutlined as TicketIcon,
+  PaymentRounded as PaymentRoundedIcon,
+  FilterList as FilterListIcon,
+  ContentCopy as CopyIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
 
 import AppSelect from "../../components/common/AppSelect";
+import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
@@ -29,7 +33,7 @@ import { getMembersAsync } from "../../services/memberService";
 import { getEventsAsync } from "../../services/eventService";
 import { getStatusesAsync } from "../../services/statusService";
 import { useAuth } from "../../contexts/AuthContext";
-import { getRightsForPage } from "../../utils/rightsHelper";
+import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 import { getImageUrl } from "../../services/apiClient";
 
@@ -49,6 +53,9 @@ export default function PaymentsPage() {
     "committee",
   ].includes(String(authState?.role || authState?.user?.role || "").toLowerCase());
   const hasWriteAccess = isAuthorityRole || (rights?.write !== undefined ? rights.write : true);
+
+  // Granular Action Permissions
+  const canViewPaymentHistory = hasActionPermission("View Payment History", 42, authState?.role).canView;
 
   const [transactions, setTransactions] = useState([]);
   const [membersList, setMembersList] = useState([]);
@@ -266,23 +273,25 @@ export default function PaymentsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-          <Tooltip title="View Details">
-            <IconButton
-              size="small"
-              sx={{ p: 0.3 }}
-              onClick={() => {
-                setSelectedTxn(row);
-                setViewDialogOpen(true);
-              }}
-            >
-              <ViewIcon
-                sx={{
-                  fontSize: "1.05rem",
-                  color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+          {canViewPaymentHistory && (
+            <Tooltip title="View Details">
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                onClick={() => {
+                  setSelectedTxn(row);
+                  setViewDialogOpen(true);
                 }}
-              />
-            </IconButton>
-          </Tooltip>
+              >
+                <ViewIcon
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                  }}
+                />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       ),
     },

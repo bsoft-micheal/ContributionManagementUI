@@ -175,3 +175,80 @@ export function getRightsForPage(pageName, roleName) {
     return { read: false, write: false, deny: true };
   }
 }
+
+/**
+ * Evaluates permission for a specific action (e.g. "Add Event", "Edit Event", "Delete Event")
+ * Checks by featureId first, then by actionName/pageName matching.
+ *
+ * @param {string} actionName - The action name (e.g. "Edit Event", "Delete Event")
+ * @param {number|null} featureId - The featureId of the action (e.g. 31, 32, 33)
+ * @param {string} roleName - The current user's role (e.g. "Organizer")
+ * @returns {{ canView: boolean, canExecute: boolean, isDenied: boolean, readOnly: boolean }}
+ */
+export function hasActionPermission(actionName, featureId, roleName) {
+  if (!roleName) {
+    return { canView: true, canExecute: true, isDenied: false, readOnly: false };
+  }
+
+  const roleLower = String(roleName).toLowerCase();
+  if (roleLower === "admin" || roleLower === "superadmin") {
+    return { canView: true, canExecute: true, isDenied: false, readOnly: false };
+  }
+
+  const savedRights = localStorage.getItem("projectRightsConfig");
+  if (!savedRights) {
+    return { canView: true, canExecute: true, isDenied: false, readOnly: false };
+  }
+
+  try {
+    const rightsMap = JSON.parse(savedRights);
+    const roleRights = rightsMap[roleName] || rightsMap[roleLower];
+    if (!roleRights || !Array.isArray(roleRights)) {
+      return { canView: true, canExecute: true, isDenied: false, readOnly: false };
+    }
+
+    const numericFeatureId = Number(featureId);
+    let matchedRight = null;
+
+    // 1. Try matching by featureId
+    if (numericFeatureId > 0) {
+      matchedRight = roleRights.find(r => Number(r.featureId || r.featureID) === numericFeatureId);
+    }
+
+    // 2. Fallback matching by action / page / subModule name
+    if (!matchedRight && actionName) {
+      const cleanAction = String(actionName).toLowerCase().trim();
+      matchedRight = roleRights.find(r => {
+        const act = String(r.action || r.Action || "").toLowerCase().trim();
+        const pg = String(r.page || r.Page || "").toLowerCase().trim();
+        const sub = String(r.subModule || r.SubModule || "").toLowerCase().trim();
+        return act === cleanAction || pg === cleanAction || sub === cleanAction;
+      });
+    }
+
+    if (!matchedRight) {
+      return { canView: true, canExecute: true, isDenied: false, readOnly: false };
+    }
+
+    let accessType = matchedRight.accessType ?? matchedRight.AccessType;
+    if (accessType === undefined || accessType === null || isNaN(Number(accessType)) || Number(accessType) === 0) {
+      const accessStr = (matchedRight.access || matchedRight.Access || "").toLowerCase();
+      accessType = accessStr === "deny" ? 3 : (accessStr === "readonly" ? 1 : 2);
+    }
+
+    const val = Number(accessType);
+    const isDenied = val === 3;
+    const canExecute = val === 2; // Read/Write
+    const canView = val === 1 || val === 2;
+    const readOnly = val === 1;
+
+    return {
+      canView,
+      canExecute,
+      isDenied,
+      readOnly,
+    };
+  } catch {
+    return { canView: false, canExecute: false, isDenied: true, readOnly: false };
+  }
+}
