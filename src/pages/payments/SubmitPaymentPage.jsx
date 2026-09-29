@@ -25,6 +25,8 @@ import {
   ContentCopy as CopyIcon,
   Delete as DeleteIcon,
   Image as ImageIcon,
+  FactCheckOutlined as StatusUpdateIcon,
+  Save as SaveIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
@@ -43,6 +45,7 @@ import {
   getPaymentTransactionsAsync,
   submitPaymentProofAsync,
   getPaymentContextAsync,
+  verifyPaymentTransactionAsync,
 } from "../../services/paymentService";
 import { getMembersAsync } from "../../services/memberService";
 import { getEventsAsync } from "../../services/eventService";
@@ -91,6 +94,22 @@ export default function SubmitPaymentPage() {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewImageSrc, setPreviewImageSrc] = useState("");
   const [previewImageTitle, setPreviewImageTitle] = useState("");
+
+  // Authority Status Update Modal State
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [statusModalTxn, setStatusModalTxn] = useState(null);
+  const [statusChangeValue, setStatusChangeValue] = useState("");
+  const [auditRemarks, setAuditRemarks] = useState("");
+
+  const isAuthorityRole = [
+    "admin",
+    "superadmin",
+    "organizer",
+    "treasurer",
+    "president",
+    "secretary",
+    "committee",
+  ].includes(String(authState?.role || authState?.user?.role || "").toLowerCase());
 
   // Form State
   const [formData, setFormData] = useState({
@@ -161,6 +180,65 @@ export default function SubmitPaymentPage() {
       toast.error("Failed to load payment submission history");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Dynamic statuses loaded directly from Support Status Master database table
+  const modalStatusOptions = useMemo(() => {
+    const set = new Set();
+    const list = [];
+    (dbStatuses || [])
+      .filter((s) => s.isActive !== false)
+      .forEach((s) => {
+        const name = s.statusName || s.name || s.status_name;
+        if (name && !set.has(name.toLowerCase())) {
+          set.add(name.toLowerCase());
+          list.push({ label: name, value: name });
+        }
+      });
+    if (list.length === 0) {
+      return [
+        { label: "Pending", value: "Pending" },
+        { label: "Verified", value: "Verified" },
+        { label: "Rejected", value: "Rejected" },
+        { label: "Closed", value: "Closed" },
+      ];
+    }
+    return list;
+  }, [dbStatuses]);
+
+  const handleStatusUpdate = async (txn, newStatus, customNotes) => {
+    const target = txn || statusModalTxn;
+    if (!target) return;
+
+    const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "Admin";
+    const noteText = customNotes !== undefined
+      ? customNotes
+      : (auditRemarks || `Status updated to ${newStatus} by ${verifier}.`);
+
+    if (target.transactionId) {
+      try {
+        await verifyPaymentTransactionAsync(target.transactionId, {
+          status: newStatus,
+          verifiedBy: verifier,
+          notes: noteText,
+        });
+
+        toast.success(`Payment status updated to ${newStatus} successfully!`);
+        addNotification({
+          type: "PAYMENT_STATUS_UPDATED",
+          title: "Payment Status Updated",
+          message: `Payment ${target.id} of ₹${Number(target.amount).toLocaleString("en-IN")} status updated to ${newStatus}.`,
+          link: "/payment-submission",
+        });
+
+        setStatusModalOpen(false);
+        setStatusModalTxn(null);
+        setAuditRemarks("");
+        await loadData();
+      } catch {
+        toast.error("Failed to update payment status");
+      }
     }
   };
 
@@ -507,7 +585,7 @@ export default function SubmitPaymentPage() {
       label: "Action",
       key: "action",
       render: (row) => (
-        <Stack direction="row" spacing={0.5}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
           <Tooltip title="View Details">
             <IconButton
               size="small"
@@ -515,11 +593,28 @@ export default function SubmitPaymentPage() {
                 setSelectedTxn(row);
                 setViewDialogOpen(true);
               }}
-              sx={{ color: "primary.main" }}
+              sx={{ color: "primary.main", p: 0.3 }}
             >
               <ViewIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+
+          {isAuthorityRole && (
+            <Tooltip title="Authority Status Update">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setStatusModalTxn(row);
+                  setStatusChangeValue(row.status || modalStatusOptions[0]?.value || "Pending");
+                  setAuditRemarks("");
+                  setStatusModalOpen(true);
+                }}
+                sx={{ color: "#16a34a", p: 0.3 }}
+              >
+                <StatusUpdateIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
 
           {row.status !== "Verified" && (
             <Tooltip title="Raise Support Ticket">
@@ -538,7 +633,7 @@ export default function SubmitPaymentPage() {
                     },
                   });
                 }}
-                sx={{ color: "#ef4444" }}
+                sx={{ color: "#ef4444", p: 0.3 }}
               >
                 <TicketIcon fontSize="small" />
               </IconButton>
@@ -1189,6 +1284,99 @@ export default function SubmitPaymentPage() {
             }}
           />
         </Box>
+      </AppDialog>
+      {/* ── Authority Status Update Modal (From Support Status Master) ── */}
+      <AppDialog
+        open={statusModalOpen}
+        onClose={() => {
+          setStatusModalOpen(false);
+          setStatusModalTxn(null);
+          setAuditRemarks("");
+        }}
+        title="Authority Status Update"
+        maxWidth="sm"
+        actions={
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <AppButton variant="outlined" onClick={() => setStatusModalOpen(false)}>
+              Close
+            </AppButton>
+            <AppButton
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={() =>
+                handleStatusUpdate(
+                  statusModalTxn,
+                  statusChangeValue || statusModalTxn?.status,
+                  auditRemarks
+                )
+              }
+              sx={{
+                bgcolor:
+                  (statusChangeValue || statusModalTxn?.status) === "Closed"
+                    ? "#16a34a !important"
+                    : (statusChangeValue || statusModalTxn?.status) === "Verified"
+                    ? "#0284c7 !important"
+                    : undefined,
+              }}
+            >
+              Save Status ({statusChangeValue || statusModalTxn?.status || "Pending"})
+            </AppButton>
+          </Stack>
+        }
+      >
+        {statusModalTxn && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                borderRadius: "10px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.8,
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="caption"
+                  fontWeight={800}
+                  color="primary.main"
+                  sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.72rem" }}
+                >
+                  Authority Status Update (From Support Status Master)
+                </Typography>
+              </Box>
+
+              <Grid container spacing={2} alignItems="center">
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppSelect
+                    label="Select Status *"
+                    value={statusChangeValue || statusModalTxn?.status || modalStatusOptions[0]?.value || ""}
+                    onChange={(e) => setStatusChangeValue(e.target.value)}
+                    options={modalStatusOptions}
+                    required
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                    Status Preview
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    {renderStatusBadge(statusChangeValue || statusModalTxn?.status)}
+                  </Box>
+                </Grid>
+              </Grid>
+
+              <AppTextArea
+                label="Audit Remarks / Notes"
+                placeholder="Enter remarks or status update notes..."
+                value={auditRemarks}
+                onChange={(e) => setAuditRemarks(e.target.value)}
+                rows={3}
+              />
+            </Paper>
+          </Box>
+        )}
       </AppDialog>
     </div>
   );

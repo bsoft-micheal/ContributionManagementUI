@@ -11,23 +11,12 @@ import {
 } from "@mui/material";
 import {
   Visibility as ViewIcon,
-  CheckCircleOutline as CheckCircleIcon,
-  HighlightOff as CancelIcon,
-  PaymentRounded as PaymentRoundedIcon,
-  FileDownloadOutlined as FileDownloadIcon,
-  ReceiptLongOutlined as ReceiptIcon,
-  FilterList as FilterListIcon,
-  ContentCopy as CopyIcon,
   ConfirmationNumberOutlined as TicketIcon,
-  Save as SaveIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
 
-import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
-import AppDateInput from "../../components/common/AppDateInput";
-import AppTextArea from "../../components/common/AppTextArea";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
@@ -35,7 +24,6 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useNotifications } from "../../contexts/NotificationContext";
 import {
   getPaymentTransactionsAsync,
-  verifyPaymentTransactionAsync,
 } from "../../services/paymentService";
 import { getMembersAsync } from "../../services/memberService";
 import { getEventsAsync } from "../../services/eventService";
@@ -71,8 +59,6 @@ export default function PaymentsPage() {
   // Dialog state
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState(null);
-  const [verificationNotes, setVerificationNotes] = useState("");
-  const [statusChangeValue, setStatusChangeValue] = useState("");
 
   // Filter state
   const [filterMember, setFilterMember] = useState("ALL");
@@ -129,21 +115,6 @@ export default function PaymentsPage() {
     ];
   }, [dbStatuses]);
 
-  // Dynamic statuses loaded directly from Support Status Master database table
-  const modalStatusOptions = useMemo(() => {
-    const set = new Set();
-    const list = [];
-    (dbStatuses || [])
-      .filter((s) => s.isActive !== false)
-      .forEach((s) => {
-        const name = s.statusName || s.name || s.status_name;
-        if (name && !set.has(name.toLowerCase())) {
-          set.add(name.toLowerCase());
-          list.push({ label: name, value: name });
-        }
-      });
-    return list;
-  }, [dbStatuses]);
 
   // Load transactions and master data from backend on mount
   const loadBackendData = async () => {
@@ -203,47 +174,6 @@ export default function PaymentsPage() {
     });
   }, [transactions, appliedMember, appliedEvent, appliedMode, appliedStatus, appliedDate]);
 
-  const handleStatusUpdate = async (txn, newStatus, customNotes) => {
-    const target = txn || selectedTxn;
-    if (!target) return;
-
-    const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "Admin";
-    const noteText = customNotes !== undefined
-      ? customNotes
-      : (verificationNotes || `Status updated to ${newStatus} by ${verifier}.`);
-
-    if (target.transactionId) {
-      try {
-        await verifyPaymentTransactionAsync(target.transactionId, {
-          status: newStatus,
-          verifiedBy: verifier,
-          notes: noteText,
-        });
-
-        toast.success(`Payment status updated to ${newStatus} successfully!`);
-        addNotification({
-          type: "PAYMENT_STATUS_UPDATED",
-          title: "Payment Status Updated",
-          message: `Payment ${target.id} of ₹${Number(target.amount).toLocaleString("en-IN")} status updated to ${newStatus}.`,
-          link: "/payments",
-        });
-
-        await loadBackendData();
-      } catch {
-        toast.error(TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED || "Failed to update payment status");
-      }
-    }
-
-    if (selectedTxn && selectedTxn.id === target.id) {
-      setSelectedTxn((prev) => ({
-        ...prev,
-        status: newStatus,
-        verifiedBy: verifier,
-        verifiedOn: dayjs().format("YYYY-MM-DDTHH:mm:ss"),
-        notes: noteText,
-      }));
-    }
-  };
 
   const renderPaymentModeBadge = (mode) => {
     let color = "#3b82f6";
@@ -342,14 +272,12 @@ export default function PaymentsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-          <Tooltip title="View Details & Update Status">
+          <Tooltip title="View Details">
             <IconButton
               size="small"
               sx={{ p: 0.3 }}
               onClick={() => {
                 setSelectedTxn(row);
-                setStatusChangeValue(row.status || modalStatusOptions[0]?.value || "Pending");
-                setVerificationNotes(row.notes || "");
                 setViewDialogOpen(true);
               }}
             >
@@ -361,29 +289,6 @@ export default function PaymentsPage() {
               />
             </IconButton>
           </Tooltip>
-          {row.status !== "Closed" && (
-            <Tooltip title="Raise Support Ticket">
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                onClick={() => {
-                  navigate("/support-tickets", {
-                    state: {
-                      raiseTicket: true,
-                      transactionId: row.id,
-                      memberName: row.memberName,
-                      relatedEvent: row.eventName,
-                      amount: row.amount,
-                      paymentMode: row.paymentMode,
-                      utr: row.utr,
-                    },
-                  });
-                }}
-              >
-                <TicketIcon sx={{ fontSize: "1.05rem", color: "#ef4444" }} />
-              </IconButton>
-            </Tooltip>
-          )}
         </Box>
       ),
     },
@@ -663,32 +568,6 @@ export default function PaymentsPage() {
                 Raise Support Ticket
               </AppButton>
             )}
-            {hasWriteAccess && selectedTxn && (
-              <AppButton
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={() =>
-                  handleStatusUpdate(
-                    selectedTxn,
-                    statusChangeValue || selectedTxn?.status,
-                    verificationNotes
-                  )
-                }
-                sx={{
-                  bgcolor:
-                    (statusChangeValue || selectedTxn?.status) === "Closed"
-                      ? "#16a34a !important"
-                      : (statusChangeValue || selectedTxn?.status) === "In Progress"
-                      ? "#4f46e5 !important"
-                      : (statusChangeValue || selectedTxn?.status) === "Open"
-                      ? "#0284c7 !important"
-                      : "#4a3f6b !important",
-                  "&:hover": { opacity: 0.9 },
-                }}
-              >
-                Save Status ({statusChangeValue || selectedTxn?.status || ""})
-              </AppButton>
-            )}
           </Stack>
         }
       >
@@ -865,66 +744,7 @@ export default function PaymentsPage() {
                 </Grid>
               )}
 
-              {hasWriteAccess && (
-                <Grid size={{ xs: 12 }}>
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: "10px",
-                      bgcolor: (t) =>
-                        t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "rgba(74,63,107,0.04)",
-                      border: "1px solid",
-                      borderColor: (t) =>
-                        t.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "rgba(74,63,107,0.18)",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 1.8,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <Typography
-                        variant="caption"
-                        fontWeight={800}
-                        color="primary.main"
-                        sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.7rem" }}
-                      >
-                        Authority Status Update (From Support Status Master)
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Authority: <b>{authState?.fullName || authState?.username || "Admin"}</b>
-                      </Typography>
-                    </Box>
 
-                    <Grid container spacing={2} alignItems="center">
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <AppSelect
-                          label="Select Status *"
-                          value={statusChangeValue || selectedTxn?.status || modalStatusOptions[0]?.value || ""}
-                          onChange={(e) => setStatusChangeValue(e.target.value)}
-                          options={modalStatusOptions}
-                          required
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-                          Status Preview
-                        </Typography>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          {renderStatusBadge(statusChangeValue || selectedTxn?.status)}
-                        </Box>
-                      </Grid>
-                    </Grid>
-
-                    <AppTextArea
-                      label="Audit Remarks / Notes"
-                      placeholder="Enter remarks or status update notes..."
-                      value={verificationNotes}
-                      onChange={(e) => setVerificationNotes(e.target.value)}
-                      rows={2}
-                    />
-                  </Box>
-                </Grid>
-              )}
             </Grid>
           </Box>
         )}
