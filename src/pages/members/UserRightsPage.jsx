@@ -86,18 +86,83 @@ export default function UserRightsPage() {
           const str = r.access || r.Access || "readOnly";
           typeVal = str === "deny" ? 3 : (str === "readOnly" ? 1 : 2);
         }
+
+        let moduleVal = (r.module || r.Module || "").trim();
+        let subModuleVal = (r.subModule || r.SubModule || "").trim();
+        let actionVal = (r.action || r.Action || "").trim();
+
+        // Frontend resilience: if action is empty but subModule contains action phrases
+        if (!actionVal && subModuleVal) {
+          const actionPrefixes = ["View", "Add", "Edit", "Delete", "Export", "Import", "Create", "Reply", "Close", "Reset"];
+          const isAction = actionPrefixes.some(p => subModuleVal.startsWith(p));
+          if (isAction) {
+            actionVal = subModuleVal;
+            if (moduleVal.toLowerCase() === "members" || moduleVal.toLowerCase() === "dashboard") {
+              subModuleVal = "";
+            } else if (subModuleVal.includes("Event")) {
+              subModuleVal = "Event";
+            } else if (subModuleVal.includes("Gallery") || subModuleVal.includes("Photo")) {
+              subModuleVal = "Gallery";
+            } else if (subModuleVal.includes("Contribution")) {
+              subModuleVal = "Contribution";
+            } else if (subModuleVal.includes("Payment")) {
+              subModuleVal = "Payment History";
+            } else if (subModuleVal.includes("Calculation")) {
+              subModuleVal = "Calculation";
+            } else if (subModuleVal.includes("Expense")) {
+              subModuleVal = "Expense";
+            } else if (subModuleVal.includes("Role")) {
+              subModuleVal = "Roles";
+            } else if (subModuleVal.includes("Exit")) {
+              subModuleVal = "Exit Process";
+            } else if (subModuleVal.includes("User Rights")) {
+              subModuleVal = "User Rights";
+            } else if (subModuleVal.includes("User")) {
+              subModuleVal = "Users";
+            } else if (subModuleVal.includes("Setting")) {
+              subModuleVal = "Settings";
+            }
+          }
+        }
+
+        // Module fallback if blank
+        if (!moduleVal) {
+          const checkText = `${actionVal} ${subModuleVal}`.toLowerCase();
+          if (checkText.includes("member")) moduleVal = "Members";
+          else if (checkText.includes("event") || checkText.includes("gallery") || checkText.includes("photo") || checkText.includes("calendar")) moduleVal = "Events";
+          else if (checkText.includes("contribution") || checkText.includes("payment") || checkText.includes("calculation") || checkText.includes("expense")) moduleVal = "Finance";
+          else if (checkText.includes("ticket") || checkText.includes("helpdesk")) moduleVal = "Support Ticket";
+          else if (checkText.includes("role") || checkText.includes("user") || checkText.includes("setting") || checkText.includes("exit")) moduleVal = "Tools";
+          else if (checkText.includes("report")) moduleVal = "Reports";
+          else if (checkText.includes("dashboard")) moduleVal = "Dashboard";
+        }
+
+        const pageVal = (actionVal && actionVal.trim() !== "" ? actionVal : (r.page || r.Page || subModuleVal || moduleVal || "")).trim();
+
         return {
           ...r,
           _uid: i + 1,
-          module: r.module || r.Module || "",
-          subModule: r.subModule || r.SubModule || "",
-          page: r.page || r.Page || "",
+          featureID: r.featureID || r.FeatureID || r.featureId || 0,
+          module: moduleVal,
+          subModule: subModuleVal,
+          action: actionVal,
+          page: pageVal,
           accessType: Number(typeVal),
           access: r.access || r.Access || (Number(typeVal) === 3 ? "deny" : (Number(typeVal) === 1 ? "readOnly" : "readWrite")),
           createdBy: r.createdBy || r.CreatedBy || null,
+          createdAt: r.createdAt || r.CreatedAt || r.createdOn || r.CreatedOn,
         };
       });
       setRights(prev => ({ ...prev, [roleName]: normalised }));
+      try {
+        const stored = localStorage.getItem("projectRightsConfig");
+        const parsed = stored ? JSON.parse(stored) : {};
+        parsed[roleName] = normalised;
+        parsed[roleName.toLowerCase()] = normalised;
+        localStorage.setItem("projectRightsConfig", JSON.stringify(parsed));
+      } catch {
+        // ignore cache write error
+      }
     } catch {
       toast.error(`Failed to load rights for ${roleName}`);
     } finally {
@@ -105,7 +170,7 @@ export default function UserRightsPage() {
     }
   }
 
-  // ── Handle radio change: Master row updates all sub-modules, Child row updates itself ──
+  // ── Handle radio change: Master row updates all sub-modules, SubModule updates actions, Action updates itself ──
   const handleAccessChange = (uid, newAccessType) => {
     if (!selectedRoleName) return;
     const numAccessType = Number(newAccessType);
@@ -117,14 +182,19 @@ export default function UserRightsPage() {
       if (!targetRow) return prev;
 
       const targetModule = targetRow.module;
-      const isMasterRow = !targetRow.subModule || targetRow.subModule.trim() === "";
+      const targetSubModule = targetRow.subModule;
+      const isMasterRow = (!targetRow.subModule || targetRow.subModule.trim() === "") && (!targetRow.action || targetRow.action.trim() === "");
+      const isSubModuleMaster = targetRow.subModule && targetRow.subModule.trim() !== "" && (!targetRow.action || targetRow.action.trim() === "");
 
       const updated = currentList.map(r => {
         if (isMasterRow && r.module === targetModule) {
-          // Master row selection: cascade to all sub-modules under this parent module
+          // Master module row selection: cascade to all sub-modules and actions under this module
+          return { ...r, accessType: numAccessType, access: strAccess };
+        } else if (isSubModuleMaster && r.module === targetModule && r.subModule === targetSubModule) {
+          // Sub-module header row: cascade to all actions under this sub-module
           return { ...r, accessType: numAccessType, access: strAccess };
         } else if (r._uid === uid) {
-          // Sub-module row selection: update individual row
+          // Individual action row: update individual row
           return { ...r, accessType: numAccessType, access: strAccess };
         }
         return r;
@@ -155,12 +225,14 @@ export default function UserRightsPage() {
         rights: currentRows.map(r => {
           const typeVal = Number(r.accessType) || (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2));
           const strVal = typeVal === 3 ? "deny" : (typeVal === 1 ? "readOnly" : "readWrite");
+          const pageVal = (r.action && r.action.trim() !== "" ? r.action : (r.page || r.subModule || r.module || "")).trim();
           return {
             role: selectedRoleName,
             featureId: r.featureID || r.featureId || 0,
-            module: r.module || "",
-            subModule: r.subModule || "",
-            page: r.page || "",
+            module: (r.module || "").trim(),
+            subModule: (r.subModule || "").trim(),
+            action: (r.action || "").trim(),
+            page: pageVal,
             accessType: typeVal,
             access: strVal,
           };
@@ -168,6 +240,16 @@ export default function UserRightsPage() {
       };
 
       await saveUserRightsAsync(payload);
+
+      try {
+        const stored = localStorage.getItem("projectRightsConfig");
+        const parsed = stored ? JSON.parse(stored) : {};
+        parsed[selectedRoleName] = currentRows;
+        parsed[selectedRoleName.toLowerCase()] = currentRows;
+        localStorage.setItem("projectRightsConfig", JSON.stringify(parsed));
+      } catch {
+        // ignore cache write error
+      }
 
       toast.success("User rights saved successfully");
 
@@ -208,7 +290,7 @@ export default function UserRightsPage() {
     });
   }, [rights, selectedRoleName, selectedModule]);
 
-  // ── Columns ───────────────────────────────────────────────────────────────
+  // ── Columns: S.no, Module, Sub Module, Action, Rights Accessibility, Current Access, Created On ──
   const columns = [
     {
       label: "S.No",
@@ -239,11 +321,29 @@ export default function UserRightsPage() {
     {
       label: "Sub Module",
       key: "subModule",
-      render: (row) => (
-        <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
-          {row.subModule || "—"}
-        </Typography>
-      ),
+      render: (row) => {
+        const idx = filteredRows.findIndex(r => r._uid === row._uid);
+        const prev = idx > 0 ? filteredRows[idx - 1] : null;
+        const repeated = prev && prev.module === row.module && prev.subModule === row.subModule;
+        const val = row.subModule && row.subModule.trim() !== "" ? row.subModule : "—";
+        return (
+          <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.primary", fontWeight: 500 }}>
+            {repeated ? "" : val}
+          </Typography>
+        );
+      },
+    },
+    {
+      label: "Action",
+      key: "action",
+      render: (row) => {
+        const val = row.action && row.action.trim() !== "" ? row.action : "—";
+        return (
+          <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.primary" }}>
+            {val}
+          </Typography>
+        );
+      },
     },
     {
       label: "Rights Accessibility",

@@ -223,13 +223,7 @@ export default function AppDataTable({
       }
     });
 
-    // Sort unpinned: keep 'Action' first
-    const sortedUnpinned = [
-      ...unpinned.filter(c => c.label === "Action"),
-      ...unpinned.filter(c => c.label !== "Action"),
-    ];
-
-    return [...leftPinned, ...sortedUnpinned, ...rightPinned];
+    return [...leftPinned, ...unpinned, ...rightPinned];
   }, [columns, visibleColumns, pinnedColumns]);
 
   // Compute left offsets for left-pinned columns

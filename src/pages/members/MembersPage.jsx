@@ -41,6 +41,7 @@ import { validateForm } from "../../utils/validation";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 import useAccessByLocation from "../../hooks/useAccessByLocation";
+import { hasActionPermission } from "../../utils/rightsHelper";
 
 const initialForm = {
   name: "",
@@ -56,6 +57,13 @@ export default function MembersPage() {
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
+
+  // Granular Action Permissions
+  const canAddMember = hasActionPermission("Add Member", 26, authState?.role).canExecute;
+  const canEditMember = hasActionPermission("Edit Member", 27, authState?.role).canExecute;
+  const canDeleteMember = hasActionPermission("Delete Member", 28, authState?.role).canExecute;
+  const canImportExcel = hasActionPermission("Import Excel", 29, authState?.role).canExecute;
+  const canViewMember = hasActionPermission("View Member", 25, authState?.role).canView;
 
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -427,17 +435,19 @@ export default function MembersPage() {
       sx: { width: 90 },
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title="View Details">
-            <IconButton size="small" sx={{ p: 0.3 }} onClick={() => {
-              setSelectedMember(row);
-              setViewDialogOpen(true);
-            }}>
-              <ViewIcon sx={{ fontSize: "1.05rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Edit" : ""}>
-            <span>
-              <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => {
+          {canViewMember && (
+            <Tooltip title="View Details">
+              <IconButton size="small" sx={{ p: 0.3 }} onClick={() => {
+                setSelectedMember(row);
+                setViewDialogOpen(true);
+              }}>
+                <ViewIcon sx={{ fontSize: "1.05rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canEditMember && (
+            <Tooltip title="Edit Member">
+              <IconButton size="small" sx={{ p: 0.3 }} onClick={() => {
                 const wt = row.workType || row.memberType || row.type || "";
                 setForm({
                   ...row,
@@ -448,17 +458,17 @@ export default function MembersPage() {
                 setErrors({});
                 setDialogOpen(true);
               }}>
-                <EditIcon sx={{ fontSize: "1.05rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
+                <EditIcon sx={{ fontSize: "1.05rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
               </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete" : ""}>
-            <span>
-              <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => handleDeleteRequest(row.memberId)}>
-                <DeleteIcon sx={{ fontSize: "1.05rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1") }} />
+            </Tooltip>
+          )}
+          {canDeleteMember && (
+            <Tooltip title="Delete Member">
+              <IconButton size="small" sx={{ p: 0.3 }} onClick={() => handleDeleteRequest(row.memberId)}>
+                <DeleteIcon sx={{ fontSize: "1.05rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
               </IconButton>
-            </span>
-          </Tooltip>
+            </Tooltip>
+          )}
         </Box>
       ),
     },
@@ -531,36 +541,38 @@ export default function MembersPage() {
         loading={loading}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppButton
-              variant="outlined"
-              size="small"
-              disabled={!hasWriteAccess}
-              startIcon={<ExcelIcon />}
-              onClick={() => setImportDialogOpen(true)}
-              sx={{
-                borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(74, 63, 107, 0.3)",
-                color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                "&:hover": {
-                  borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.04)",
-                },
-              }}
-            >
-              Import Excel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              size="small"
-              disabled={!hasWriteAccess}
-              startIcon={<PersonAddIcon />}
-              onClick={() => {
-                setForm(initialForm);
-                setErrors({});
-                setDialogOpen(true);
-              }}
-            >
-              Add
-            </AppButton>
+            {canImportExcel && (
+              <AppButton
+                variant="outlined"
+                size="small"
+                startIcon={<ExcelIcon />}
+                onClick={() => setImportDialogOpen(true)}
+                sx={{
+                  borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(74, 63, 107, 0.3)",
+                  color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  "&:hover": {
+                    borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.04)",
+                  },
+                }}
+              >
+                Import Excel
+              </AppButton>
+            )}
+            {canAddMember && (
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<PersonAddIcon />}
+                onClick={() => {
+                  setForm(initialForm);
+                  setErrors({});
+                  setDialogOpen(true);
+                }}
+              >
+                Add
+              </AppButton>
+            )}
           </Stack>
         }
         filterPanel={

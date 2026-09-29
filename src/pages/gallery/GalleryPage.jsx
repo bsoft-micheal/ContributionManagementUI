@@ -29,7 +29,7 @@ import { formatGridDate, formatViewDate } from "../../utils/dateHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
-import { getRightsForPage } from "../../utils/rightsHelper";
+import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
@@ -104,6 +104,12 @@ export default function GalleryPage() {
   const { authState } = useAuth();
   const rights = getRightsForPage("Gallery", authState?.role);
   const hasWriteAccess = rights?.write !== undefined ? rights.write : true;
+
+  // Granular Action Permissions
+  const canAddPhoto = hasActionPermission("Add Photo", 36, authState?.role).canExecute;
+  const canEditPhoto = hasActionPermission("Edit Photo", 37, authState?.role).canExecute;
+  const canDeletePhoto = hasActionPermission("Delete Photo", 38, authState?.role).canExecute;
+  const canViewGallery = hasActionPermission("View Gallery", 35, authState?.role).canView;
   const toast = useAppToast();
   const fileInputRef = useRef(null);
 
@@ -642,73 +648,59 @@ export default function GalleryPage() {
     {
       label: "Action",
       render: (row) => (
-        <Box sx={{ display: "flex", gap: 0.5 }}>
-          <Tooltip title="View Details">
-            <IconButton
-              size="small"
-              sx={{ p: 0.3 }}
-              onClick={() => {
-                setSelectedPhoto(row);
-                setActiveViewImageIndex(0);
-                setViewDialogOpen(true);
-              }}
-            >
-              <ViewIcon
-                sx={{
-                  fontSize: "1.05rem",
-                  color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
-                }}
-              />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Edit" : ""}>
-            <span>
+        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+          {canViewGallery && (
+            <Tooltip title="View Details">
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                onClick={() => {
+                  setSelectedPhoto(row);
+                  setActiveViewImageIndex(0);
+                  setViewDialogOpen(true);
+                }}
+              >
+                <ViewIcon
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                  }}
+                />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canEditPhoto && (
+            <Tooltip title="Edit">
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
                 onClick={() => handleEditPhoto(row)}
               >
                 <EditIcon
                   sx={{
                     fontSize: "1.05rem",
-                    color: (theme) =>
-                      hasWriteAccess
-                        ? theme.palette.mode === "dark"
-                          ? "#ffffff"
-                          : "#4a3f6b"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
                   }}
                 />
               </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete" : ""}>
-            <span>
+            </Tooltip>
+          )}
+          {canDeletePhoto && (
+            <Tooltip title="Delete">
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
                 onClick={() => handleDeleteRequest(row)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.05rem",
-                    color: (theme) =>
-                      hasWriteAccess
-                        ? theme.palette.mode === "dark"
-                          ? "#ffffff"
-                          : "#4a3f6b"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
                   }}
                 />
               </IconButton>
-            </span>
-          </Tooltip>
+            </Tooltip>
+          )}
         </Box>
       ),
     },
@@ -791,22 +783,23 @@ export default function GalleryPage() {
         data={filteredPhotos}
         loading={loading}
         actions={
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppButton
-              variant="contained"
-              size="small"
-              disabled={!hasWriteAccess}
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setEditingPhoto(null);
-                setForm(initialForm);
-                setErrors({});
-                setDialogOpen(true);
-              }}
-            >
-              Add
-            </AppButton>
-          </Stack>
+          canAddPhoto && (
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  setEditingPhoto(null);
+                  setForm(initialForm);
+                  setErrors({});
+                  setDialogOpen(true);
+                }}
+              >
+                Add
+              </AppButton>
+            </Stack>
+          )
         }
         filterPanel={
           <Grid container spacing={2} alignItems="center">
