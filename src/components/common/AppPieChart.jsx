@@ -58,6 +58,7 @@ export default function AppPieChart({
   labelKey = "label",
   maxSlices = 7,
   innerRadiusRatio = 0.58,
+  showPercentage = false,
 }) {
   const theme = useTheme();
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -249,19 +250,21 @@ export default function AppPieChart({
               >
                 ₹{activeSlice.value.toLocaleString()}
               </Typography>
-              <Chip
-                size="small"
-                label={`${activeSlice.percentage}%`}
-                sx={{
-                  mt: 0.5,
-                  height: 18,
-                  fontSize: "0.68rem",
-                  fontWeight: 800,
-                  bgcolor: `${activeSlice.color}22`,
-                  color: activeSlice.color,
-                  border: `1px solid ${activeSlice.color}55`,
-                }}
-              />
+              {showPercentage && (
+                <Chip
+                  size="small"
+                  label={`${activeSlice.percentage}%`}
+                  sx={{
+                    mt: 0.5,
+                    height: 18,
+                    fontSize: "0.68rem",
+                    fontWeight: 800,
+                    bgcolor: `${activeSlice.color}22`,
+                    color: activeSlice.color,
+                    border: `1px solid ${activeSlice.color}55`,
+                  }}
+                />
+              )}
             </>
           ) : (
             <>
@@ -330,7 +333,7 @@ export default function AppPieChart({
               onMouseLeave={() => setHoveredIndex(null)}
               sx={{
                 display: "grid",
-                gridTemplateColumns: "16px 1fr auto auto",
+                gridTemplateColumns: showPercentage ? "16px 1fr auto auto" : "16px 1fr auto",
                 alignItems: "center",
                 gap: 1.5,
                 p: 0.75,
@@ -391,19 +394,21 @@ export default function AppPieChart({
               </Typography>
 
               {/* Percentage Badge */}
-              <Chip
-                size="small"
-                label={`${slice.percentage}%`}
-                sx={{
-                  height: 20,
-                  fontSize: "0.7rem",
-                  fontWeight: 700,
-                  bgcolor: `${slice.color}18`,
-                  color: slice.color,
-                  border: `1px solid ${slice.color}40`,
-                  "& .MuiChip-label": { px: 0.75 },
-                }}
-              />
+              {showPercentage && (
+                <Chip
+                  size="small"
+                  label={`${slice.percentage}%`}
+                  sx={{
+                    height: 20,
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    bgcolor: `${slice.color}18`,
+                    color: slice.color,
+                    border: `1px solid ${slice.color}40`,
+                    "& .MuiChip-label": { px: 0.75 },
+                  }}
+                />
+              )}
             </Box>
           );
         })}
