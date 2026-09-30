@@ -16,6 +16,8 @@ import {
   Tooltip,
   Typography,
   Alert,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
@@ -26,6 +28,9 @@ import SaveIcon from "@mui/icons-material/Save";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import LockResetIcon from "@mui/icons-material/LockReset";
+import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
+import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
+import SwitchRoleDialog from "../members/SwitchRoleDialog";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../contexts/AuthContext";
@@ -116,6 +121,27 @@ export default function AppLayout() {
   ]);
 
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileMenuAnchor, setProfileMenuAnchor] = useState(null);
+  const [switchRoleDialogOpen, setSwitchRoleDialogOpen] = useState(false);
+
+  const userAssignedRoles = React.useMemo(() => {
+    const set = new Set();
+    if (Array.isArray(authState?.roles) && authState.roles.length > 0) {
+      authState.roles.forEach((r) => r && set.add(r));
+    }
+    if (Array.isArray(authState?.primaryRoles)) {
+      authState.primaryRoles.forEach((r) => r && set.add(r));
+    }
+    if (Array.isArray(authState?.secondaryRoles)) {
+      authState.secondaryRoles.forEach((r) => r && set.add(r));
+    }
+    if (authState?.role) set.add(authState.role);
+    if (authState?.roleName) set.add(authState.roleName);
+    return Array.from(set);
+  }, [authState]);
+
+  const hasMultipleRoles = userAssignedRoles.length > 1;
+
   const [profileForm, setProfileForm] = useState({
     fullName: "",
     email: "",
@@ -543,11 +569,11 @@ export default function AppLayout() {
         {/* User info row */}
         <Box
           onMouseEnter={handleItemMouseEnter}
-          onClick={() => setProfileDialogOpen(true)}
+          onClick={(e) => setProfileMenuAnchor(e.currentTarget)}
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: 1.2,
+            gap: 0.6,
             px: 1,
             py: 0.8,
             mb: 0.5,
@@ -560,7 +586,7 @@ export default function AppLayout() {
           <Avatar src={getImageUrl(authState?.profileImage)} sx={{ width: 34, height: 34, bgcolor: SIDEBAR.active, fontSize: "0.85rem", fontWeight: 800 }}>
             {(authState?.fullName ?? "A")[0].toUpperCase()}
           </Avatar>
-          <Box sx={{ overflow: "hidden", flexGrow: 1, minWidth: 0 }}>
+          <Box sx={{ overflow: "hidden", flexGrow: 1, minWidth: 0, mr: 0.5 }}>
             <Typography variant="body2" fontWeight={800} sx={{ color: theme.palette.mode === "dark" ? "#e7ebf7" : "#ffffff", fontSize: "0.82rem" }} noWrap>
               {authState?.fullName?.split(" ")[0] ?? "User"}
             </Typography>
@@ -568,16 +594,34 @@ export default function AppLayout() {
               {authState?.role}
             </Typography>
           </Box>
+          <Tooltip title="Switch Role">
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSwitchRoleDialogOpen(true);
+              }}
+              sx={{
+                color: SIDEBAR.text,
+                p: 0.6,
+                borderRadius: "6px",
+                "&:hover": { bgcolor: SIDEBAR.hover, color: "#10b981" },
+                transition: "all 0.2s ease",
+              }}
+            >
+              <SwapHorizRoundedIcon sx={{ fontSize: "1.15rem" }} />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Log Out">
             <IconButton
               size="small"
               onClick={(e) => {
-                e.stopPropagation(); // Prevent opening profile modal!
+                e.stopPropagation(); // Prevent opening profile menu!
                 handleLogout();
               }}
               sx={{
                 color: SIDEBAR.text,
-                p: 0.8,
+                p: 0.6,
                 borderRadius: "6px",
                 "&:hover": { bgcolor: SIDEBAR.logoutHover, color: "#f87171" },
                 transition: "all 0.2s ease",
@@ -595,7 +639,7 @@ export default function AppLayout() {
               }}
               sx={{
                 color: SIDEBAR.text,
-                p: 0.8,
+                p: 0.6,
                 borderRadius: "6px",
                 "&:hover": { bgcolor: SIDEBAR.hover, color: theme.palette.mode === "dark" ? "#e7ebf7" : "#ffffff" },
                 transition: "all 0.2s ease",
@@ -608,6 +652,96 @@ export default function AppLayout() {
             <NotificationBell />
           </Box>
         </Box>
+
+        {/* Profile Menu Popup */}
+        <Menu
+          anchorEl={profileMenuAnchor}
+          open={Boolean(profileMenuAnchor)}
+          onClose={() => setProfileMenuAnchor(null)}
+          anchorOrigin={{
+            vertical: "top",
+            horizontal: "left",
+          }}
+          transformOrigin={{
+            vertical: "bottom",
+            horizontal: "left",
+          }}
+          PaperProps={{
+            sx: {
+              minWidth: 200,
+              borderRadius: "12px",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+              border: (theme) =>
+                `1px solid ${
+                  theme.palette.mode === "dark"
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(74, 63, 107, 0.12)"
+                }`,
+              py: 0.8,
+            },
+          }}
+        >
+          <MenuItem
+            onClick={() => {
+              setProfileMenuAnchor(null);
+              setProfileDialogOpen(true);
+            }}
+            sx={{ fontSize: "0.85rem", fontWeight: 600, py: 1, gap: 1.5 }}
+          >
+            <AccountCircleOutlinedIcon sx={{ fontSize: "1.15rem", color: "#7c3aed" }} />
+            <span>My Profile</span>
+          </MenuItem>
+
+          {hasMultipleRoles && (
+            <MenuItem
+              onClick={() => {
+                setProfileMenuAnchor(null);
+                setSwitchRoleDialogOpen(true);
+              }}
+              sx={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                py: 1,
+                gap: 1.5,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                <SwapHorizRoundedIcon sx={{ fontSize: "1.15rem", color: "#10b981" }} />
+                <span>Switch Role</span>
+              </Box>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, ml: 1 }}>
+                ↔
+              </Typography>
+            </MenuItem>
+          )}
+
+          <MenuItem
+            onClick={() => {
+              setProfileMenuAnchor(null);
+              setProfileDialogOpen(true);
+            }}
+            sx={{ fontSize: "0.85rem", fontWeight: 600, py: 1, gap: 1.5 }}
+          >
+            <LockResetIcon sx={{ fontSize: "1.15rem", color: "#3b82f6" }} />
+            <span>Change Password</span>
+          </MenuItem>
+
+          <Divider sx={{ my: 0.5 }} />
+
+          <MenuItem
+            onClick={() => {
+              setProfileMenuAnchor(null);
+              handleLogout();
+            }}
+            sx={{ fontSize: "0.85rem", fontWeight: 600, py: 1, gap: 1.5, color: "#ef4444" }}
+          >
+            <LogoutRoundedIcon sx={{ fontSize: "1.15rem", color: "#ef4444" }} />
+            <span>Logout</span>
+          </MenuItem>
+        </Menu>
       </Box>
     </Box>
   );
@@ -873,6 +1007,11 @@ export default function AppLayout() {
           </Box>
         </Box>
       </AppDialog>
+
+      <SwitchRoleDialog
+        open={switchRoleDialogOpen}
+        onClose={() => setSwitchRoleDialogOpen(false)}
+      />
 
 
 

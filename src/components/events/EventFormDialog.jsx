@@ -142,13 +142,15 @@ export default function EventFormDialog({
   const puffsFactor = office > 0 ? office : 0;
 
   const computedBudgetItems = useMemo(() => {
-    const items = budgetItemsList.filter(
-      (b) =>
-        b.isActive !== false &&
-        (!b.category ||
-          b.category.toLowerCase() === "birthday" ||
-          (selectedType && b.category.toLowerCase() === selectedType.eventTypeName?.toLowerCase()))
-    );
+    const typeNameLower = (selectedType?.eventTypeName || "").toLowerCase().trim();
+    const items = budgetItemsList.filter((b) => {
+      if (b.isActive === false) return false;
+      if (form.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === form.eventTypeId.toLowerCase()) {
+        return true;
+      }
+      const cat = (b.category || "").toLowerCase().trim();
+      return typeNameLower ? cat === typeNameLower : false;
+    });
 
     return items.map((item) => {
       const name = (item.expenseItem || "").toLowerCase();

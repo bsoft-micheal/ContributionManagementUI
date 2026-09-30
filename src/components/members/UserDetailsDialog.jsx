@@ -95,22 +95,39 @@ export default function UserDetailsDialog({ open, onClose, user }) {
               variant="caption"
               sx={{ fontWeight: 800, color: "text.secondary", fontSize: "0.7rem", display: "block" }}
             >
-              Role
+              Role(s)
             </Typography>
-            <Box sx={{ mt: 0.4 }}>
-              <Chip
-                label={user.roleName || "--"}
-                size="small"
-                sx={{
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark" ? roleStyle.darkBg : roleStyle.bg,
-                  color: (theme) =>
-                    theme.palette.mode === "dark" ? roleStyle.darkColor : roleStyle.color,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  borderRadius: "4px",
-                }}
-              />
+            <Box sx={{ mt: 0.4, display: "flex", flexWrap: "wrap", gap: 0.6, alignItems: "center" }}>
+              {(() => {
+                const assignedRoles = (Array.isArray(user.roles) && user.roles.length > 0)
+                  ? user.roles
+                  : (user.roleName ? [user.roleName] : ["Member"]);
+
+                return assignedRoles.map((r, idx) => {
+                  const style = getRoleStyle(r);
+                  const isPrimary = Boolean(
+                    user.primaryRoles?.includes(r) ||
+                    (!user.primaryRoles?.length && idx === 0)
+                  );
+                  return (
+                    <Chip
+                      key={`${r}-${idx}`}
+                      label={`${r}${isPrimary && assignedRoles.length > 1 ? " (Primary)" : ""}`}
+                      size="small"
+                      sx={{
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? style.darkBg : style.bg,
+                        color: (theme) =>
+                          theme.palette.mode === "dark" ? style.darkColor : style.color,
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        borderRadius: "4px",
+                        border: isPrimary ? "1px solid rgba(124, 58, 237, 0.35)" : "none",
+                      }}
+                    />
+                  );
+                });
+              })()}
             </Box>
           </Box>
         </Grid>
