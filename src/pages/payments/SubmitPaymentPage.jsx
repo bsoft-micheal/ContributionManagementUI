@@ -53,6 +53,7 @@ import { getStatusesAsync } from "../../services/statusService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getPaymentModesAsync } from "../../services/paymentModeService";
 import { getImageUrl } from "../../services/apiClient";
+import SubmitPaymentModal from "../../components/payments/SubmitPaymentModal";
 
 const getModeColor = (name) => {
   const lower = String(name || "").toLowerCase().replace(/[\s\-_/]+/g, "");
@@ -232,6 +233,13 @@ export default function SubmitPaymentPage() {
           link: "/payment-submission",
         });
 
+        // Notify other modules (e.g. Contributions Ledger) in real time
+        window.dispatchEvent(
+          new CustomEvent("contribution_updated", {
+            detail: { action: "verify", status: newStatus, target },
+          })
+        );
+
         setStatusModalOpen(false);
         setStatusModalTxn(null);
         setAuditRemarks("");
@@ -248,6 +256,27 @@ export default function SubmitPaymentPage() {
       setFormModalOpen(true);
     }
   }, []);
+
+  // Auto-link member ID from membersList if not already set
+  useEffect(() => {
+    if (membersList.length > 0 && !formData.memberId) {
+      const userFullName = authState?.fullName || authState?.user?.fullName || "";
+      if (userFullName) {
+        const found = membersList.find(
+          (m) =>
+            (m.name && m.name.toLowerCase() === userFullName.toLowerCase()) ||
+            (m.memberName && m.memberName.toLowerCase() === userFullName.toLowerCase())
+        );
+        if (found) {
+          setFormData((prev) => ({
+            ...prev,
+            memberId: found.id || found.memberId || prev.memberId,
+            memberName: found.name || found.memberName || prev.memberName,
+          }));
+        }
+      }
+    }
+  }, [membersList, authState?.fullName, authState?.user?.fullName]);
 
   // Auto-fill and match Event Category, Event Name, Member Name when opened via URL params
   useEffect(() => {
@@ -305,12 +334,14 @@ export default function SubmitPaymentPage() {
 
   // Sync Member/Event context dynamically from backend API when form opens or selection changes
   useEffect(() => {
-    if (formModalOpen) {
+    if (formModalOpen && (formData.eventId || formData.eventName || formData.memberId || formData.memberName)) {
       const loadContext = async () => {
         try {
           const res = await getPaymentContextAsync({
             eventId: formData.eventId || undefined,
             memberId: formData.memberId || undefined,
+            eventName: formData.eventName || undefined,
+            memberName: formData.memberName || undefined,
           });
 
           const matchedEvent = (eventsList || []).find(
@@ -320,36 +351,37 @@ export default function SubmitPaymentPage() {
           if (res) {
             const currentEvDue = Number(res.currentEventDue ?? res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? 0);
             const prevArrears = Number(res.previousArrears ?? res.arrears ?? 0);
-            const total = Number((currentEvDue + prevArrears).toFixed(2));
+            const total = Number((res.totalDue ?? (currentEvDue + prevArrears)).toFixed(2));
+            const baseAmt = Number(res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? currentEvDue);
 
-            if (total > 0 || currentEvDue > 0 || prevArrears > 0) {
-              setDuesSummary({
-                currentEventDue: currentEvDue,
-                previousArrears: prevArrears,
-                totalDue: total,
-              });
-              if (!paymentScope) setPaymentScope("AllOutstanding");
-            }
+            setDuesSummary({
+              currentEventDue: currentEvDue,
+              previousArrears: prevArrears,
+              totalDue: total > 0 ? total : currentEvDue,
+              status: res.status || (currentEvDue === 0 && baseAmt > 0 ? "Paid" : "Pending"),
+              baseAmount: baseAmt,
+            });
+            if (!paymentScope) setPaymentScope("AllOutstanding");
 
             setFormData((prev) => ({
               ...prev,
               eventName: res.eventName || prev.eventName,
               memberName: res.memberName || prev.memberName || authState?.fullName || "",
-              amount: res.amount ? String(res.amount) : total > 0 ? String(total) : prev.amount,
+              amount: res.amount ? String(res.amount) : total > 0 ? String(total) : currentEvDue > 0 ? String(currentEvDue) : prev.amount,
             }));
           } else if (matchedEvent) {
             const currentEvDue = Number(matchedEvent.amount || matchedEvent.contributionAmount || 0);
-            if (currentEvDue > 0) {
-              setDuesSummary({
-                currentEventDue: currentEvDue,
-                previousArrears: 0,
-                totalDue: currentEvDue,
-              });
-              setFormData((prev) => ({
-                ...prev,
-                amount: prev.amount || String(currentEvDue),
-              }));
-            }
+            setDuesSummary({
+              currentEventDue: currentEvDue,
+              previousArrears: 0,
+              totalDue: currentEvDue,
+              status: "Pending",
+              baseAmount: currentEvDue,
+            });
+            setFormData((prev) => ({
+              ...prev,
+              amount: prev.amount || String(currentEvDue),
+            }));
           }
         } catch {
           // Silent fallback
@@ -357,7 +389,7 @@ export default function SubmitPaymentPage() {
       };
       loadContext();
     }
-  }, [formModalOpen, formData.eventId, formData.memberId, formData.eventName, eventsList]);
+  }, [formModalOpen, formData.eventId, formData.memberId, formData.eventName, formData.memberName, eventsList]);
 
   const categoryOptions = useMemo(() => {
     const list = [{ label: "Select Event Category", value: "" }];
@@ -492,10 +524,14 @@ export default function SubmitPaymentPage() {
     if (!formData.eventCategory.trim()) errs.eventCategory = "Event Category is required";
     if (!formData.eventName.trim()) errs.eventName = "Event Name is required";
     if (!formData.amount || Number(formData.amount) <= 0) errs.amount = "Valid amount is required";
-    if (!formData.utr.trim()) {
-      errs.utr = "UPI / Reference Number is required";
-    } else if (formData.utr.trim().length < 6) {
-      errs.utr = "UTR must be at least 6 characters";
+    
+    const isCash = String(formData.paymentMode || "").toLowerCase().includes("cash");
+    if (!isCash) {
+      if (!formData.utr.trim()) {
+        errs.utr = "UPI / Reference Number is required";
+      } else if (formData.utr.trim().length < 6) {
+        errs.utr = "UTR must be at least 6 characters";
+      }
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -510,6 +546,9 @@ export default function SubmitPaymentPage() {
 
     try {
       setSubmitting(true);
+      const isCash = String(formData.paymentMode || "").toLowerCase().includes("cash");
+      const finalUtr = formData.utr.trim() || (isCash ? "CASH" : "-");
+
       const payload = {
         eventId: formData.eventId || undefined,
         memberId: formData.memberId || undefined,
@@ -517,7 +556,7 @@ export default function SubmitPaymentPage() {
         eventName: formData.eventName.trim(),
         amount: Number(formData.amount),
         paymentMode: formData.paymentMode,
-        utr: formData.utr.trim(),
+        utr: finalUtr,
         paymentDate: formData.paymentDate
           ? formData.paymentDate.toISOString()
           : new Date().toISOString(),
@@ -526,14 +565,21 @@ export default function SubmitPaymentPage() {
       };
 
       const res = await submitPaymentProofAsync(payload);
-      toast.success("Payment submission recorded successfully!");
+      toast.success("Payment submission recorded and synchronized with Contribution ledger successfully!");
 
       addNotification({
         type: "PAYMENT_PENDING",
         title: "New Payment Submission",
-        message: `Member ${formData.memberName} submitted payment of ₹${formData.amount} (${formData.paymentMode}, UTR: ${formData.utr}). Status: Pending verification.`,
+        message: `Member ${formData.memberName} submitted payment of ₹${formData.amount} (${formData.paymentMode}, UTR: ${finalUtr}). Status: Pending verification.`,
         link: "/payments",
       });
+
+      // Synchronize with Contribution module in real-time
+      window.dispatchEvent(
+        new CustomEvent("contribution_updated", {
+          detail: { action: "submit", payload, result: res },
+        })
+      );
 
       setFormModalOpen(false);
       setFormData({
@@ -814,352 +860,15 @@ export default function SubmitPaymentPage() {
         }
       />
 
-      {/* ── New Payment Submission Modal Form ── */}
-      <AppDialog
+      {/* ── Submit Payment Details Modal Form ── */}
+      <SubmitPaymentModal
         open={formModalOpen}
         onClose={() => setFormModalOpen(false)}
-        title="Submit Payment Details"
-        maxWidth="md"
-        actions={
-          <Stack direction="row" spacing={1.5}>
-            <AppButton variant="outlined" onClick={() => setFormModalOpen(false)}>
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              onClick={handleSubmitProof}
-              disabled={submitting}
-              sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}
-            >
-              {submitting ? "Submitting..." : "Submit Payment Details"}
-            </AppButton>
-          </Stack>
-        }
-      >
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 0.5 }}>
-          {/* Dynamic Member Dues Summary Banner (Only shown when dues data is loaded from API/Event) */}
-          {duesSummary && (duesSummary.totalDue > 0 || duesSummary.currentEventDue > 0 || duesSummary.previousArrears > 0) && (
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: "12px",
-                bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "rgba(74, 63, 107, 0.03)"),
-                border: "1px solid",
-                borderColor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "rgba(74, 63, 107, 0.15)"),
-              }}
-            >
-              <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ display: "block", textTransform: "uppercase", letterSpacing: "0.05em", mb: 0.8, fontSize: "0.68rem" }}>
-                Member Dues Summary
-              </Typography>
-              <Grid container spacing={1} textAlign="center">
-                <Grid size={{ xs: 4 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem", display: "block" }}>Current Event</Typography>
-                  <Typography variant="body2" fontWeight={800} color={duesSummary.currentEventDue > 0 ? "error.main" : "success.main"}>
-                    ₹{(duesSummary.currentEventDue || 0).toLocaleString()}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 4 }} sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem", display: "block" }}>Previous Arrears</Typography>
-                  <Typography variant="body2" fontWeight={800} color={duesSummary.previousArrears > 0 ? "error.main" : "text.secondary"}>
-                    ₹{(duesSummary.previousArrears || 0).toLocaleString()}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 4 }} sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem", display: "block" }}>Total Due</Typography>
-                  <Typography variant="body2" fontWeight={900} color="primary.main">
-                    ₹{(duesSummary.totalDue || 0).toLocaleString()}
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Box>
-          )}
-
-          {/* Row 1: Event Category & Event Name */}
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppSelect
-                label="Event Category"
-                value={formData.eventCategory}
-                onChange={(e) => {
-                  const newCategory = e.target.value;
-                  setFormData((prev) => ({
-                    ...prev,
-                    eventCategory: newCategory,
-                    eventName: "",
-                    eventId: "",
-                  }));
-                  if (errors.eventCategory) setErrors((prev) => ({ ...prev, eventCategory: "" }));
-                }}
-                options={categoryOptions}
-                placeholder="Select Event Category"
-                error={!!errors.eventCategory}
-                helperText={errors.eventCategory}
-                required
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppSelect
-                label="Event Name"
-                value={formData.eventName}
-                onChange={(e) => {
-                  const selectedName = e.target.value;
-                  const matchedEvent = (eventsList || []).find(
-                    (ev) => (ev.title || ev.name || ev.eventName) === selectedName
-                  );
-                  const matchedCategory = matchedEvent
-                    ? matchedEvent.eventTypeName || matchedEvent.categoryName || matchedEvent.eventType || matchedEvent.category || formData.eventCategory
-                    : formData.eventCategory;
-
-                  setFormData((prev) => ({
-                    ...prev,
-                    eventName: selectedName,
-                    eventId: matchedEvent ? (matchedEvent.id || matchedEvent.eventId || "") : prev.eventId,
-                    eventCategory: matchedCategory || prev.eventCategory,
-                  }));
-                  if (errors.eventName) setErrors((prev) => ({ ...prev, eventName: "" }));
-                }}
-                options={filteredEventOptions}
-                placeholder="Select Event Name"
-                error={!!errors.eventName}
-                helperText={errors.eventName}
-                required
-              />
-            </Grid>
-          </Grid>
-
-          {/* Row 2: Member Name & Payment For (or Amount) */}
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppInput
-                label="Contributor / Member Name"
-                value={formData.memberName}
-                onChange={(e) => setFormData((prev) => ({ ...prev, memberName: e.target.value }))}
-                placeholder="Your full name"
-                error={!!errors.memberName}
-                helperText={errors.memberName}
-                required
-              />
-            </Grid>
-            {duesSummary && (duesSummary.currentEventDue > 0 || duesSummary.previousArrears > 0) ? (
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <AppSelect
-                  label="Payment For *"
-                  placeholder="Select payment scope"
-                  value={paymentScope}
-                  onChange={(e) => handlePaymentScopeChange(e.target.value)}
-                  options={[
-                    ...(duesSummary.currentEventDue > 0 ? [{ label: `Current Event Only (₹${duesSummary.currentEventDue.toLocaleString()})`, value: "CurrentEvent" }] : []),
-                    ...(duesSummary.previousArrears > 0 ? [{ label: `Previous Arrears Only (₹${duesSummary.previousArrears.toLocaleString()})`, value: "PreviousArrears" }] : []),
-                    ...((duesSummary.currentEventDue > 0 && duesSummary.previousArrears > 0) ? [{ label: `All Outstanding (₹${duesSummary.totalDue.toLocaleString()})`, value: "AllOutstanding" }] : []),
-                  ]}
-                  required
-                />
-              </Grid>
-            ) : (
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <AppInput
-                  label="Contribution Amount (₹)"
-                  type="number"
-                  value={formData.amount}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, amount: e.target.value }))}
-                  placeholder="0.00"
-                  error={!!errors.amount}
-                  helperText={errors.amount}
-                  required
-                />
-              </Grid>
-            )}
-          </Grid>
-
-          {/* Conditional Rows 3 & 4 based on Dues Summary */}
-          {duesSummary && (duesSummary.currentEventDue > 0 || duesSummary.previousArrears > 0) ? (
-            <>
-              {/* Row 3: Amount & Date */}
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppInput
-                    label="Contribution Amount (₹)"
-                    type="number"
-                    value={formData.amount}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, amount: e.target.value }))}
-                    placeholder="0.00"
-                    error={!!errors.amount}
-                    helperText={errors.amount || "Auto-calculated based on payment scope."}
-                    required
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppDateInput
-                    label="Payment Date"
-                    value={formData.paymentDate}
-                    onChange={(newVal) => setFormData((prev) => ({ ...prev, paymentDate: newVal }))}
-                    required
-                  />
-                </Grid>
-              </Grid>
-
-              {/* Row 4: UTR & Payment Method Dropdown */}
-              <Grid container spacing={2} alignItems="flex-start">
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppInput
-                    label="UPI Reference"
-                    value={formData.utr}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, utr: e.target.value }))}
-                    placeholder="e.g. 426189345612"
-                    maxLength={20}
-                    error={!!errors.utr}
-                    helperText={errors.utr || "Find 12-digit number in payment app receipt"}
-                    required
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppSelect
-                    label="Payment Method"
-                    value={formData.paymentMode}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, paymentMode: e.target.value }))}
-                    options={dynamicPaymentModes.map((m) => ({ label: m.label, value: m.value }))}
-                    placeholder="Select Payment Method"
-                    required
-                  />
-                </Grid>
-              </Grid>
-            </>
-          ) : (
-            <>
-              {/* Row 3: Date & Payment Method */}
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppDateInput
-                    label="Payment Date"
-                    value={formData.paymentDate}
-                    onChange={(newVal) => setFormData((prev) => ({ ...prev, paymentDate: newVal }))}
-                    required
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppSelect
-                    label="Payment Method"
-                    value={formData.paymentMode}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, paymentMode: e.target.value }))}
-                    options={dynamicPaymentModes.map((m) => ({ label: m.label, value: m.value }))}
-                    placeholder="Select Payment Method"
-                    required
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppInput
-                    label="UPI Reference"
-                    value={formData.utr}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, utr: e.target.value }))}
-                    placeholder="e.g. 426189345612"
-                    maxLength={20}
-                    error={!!errors.utr}
-                    helperText={errors.utr || "Find 12-digit number in payment app receipt"}
-                    required
-                  />
-                </Grid>
-              </Grid>
-            </>
-          )}
-
-          {/* Row 5: Screenshot Upload with Live Image Preview Thumbnail */}
-          <Box>
-            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.8, display: "block" }}>
-              Payment Screenshot / Receipt Slip (Optional)
-            </Typography>
-            {formData.screenshot ? (
-              <Paper
-                variant="outlined"
-                sx={{
-                  p: 1.5,
-                  borderRadius: "10px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc"),
-                  borderColor: "#6366f1",
-                }}
-              >
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <Box
-                    component="img"
-                    src={formData.screenshot}
-                    alt="Payment Receipt Preview"
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      objectFit: "cover",
-                      borderRadius: "8px",
-                      border: "1px solid",
-                      borderColor: "divider",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                    }}
-                  />
-                  <Box>
-                    <Typography variant="body2" fontWeight={600} sx={{ color: "#4f46e5" }}>
-                      Receipt Image Attached
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Preview available before submission
-                    </Typography>
-                  </Box>
-                </Stack>
-                <Stack direction="row" spacing={1}>
-                  <AppButton
-                    variant="outlined"
-                    size="small"
-                    component="label"
-                    startIcon={<UploadIcon />}
-                  >
-                    Change
-                    <input type="file" accept="image/*" hidden onChange={handleScreenshotUpload} />
-                  </AppButton>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => setFormData((prev) => ({ ...prev, screenshot: "" }))}
-                    title="Remove Screenshot"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
-              </Paper>
-            ) : (
-              <Paper
-                variant="outlined"
-                component="label"
-                sx={{
-                  p: 2,
-                  borderRadius: "10px",
-                  borderStyle: "dashed",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 1.5,
-                  cursor: "pointer",
-                  bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc"),
-                  "&:hover": { bgcolor: "rgba(99, 102, 241, 0.04)" },
-                }}
-              >
-                <input type="file" accept="image/*" hidden onChange={handleScreenshotUpload} />
-                <UploadIcon sx={{ color: "#6366f1" }} />
-                <Typography variant="body2" color="text.secondary">
-                  Click to upload payment screenshot or receipt slip (PNG, JPG)
-                </Typography>
-              </Paper>
-            )}
-          </Box>
-
-          {/* Row 6: Additional Notes */}
-          <AppTextArea
-            label="Additional Notes (Optional)"
-            value={formData.notes}
-            onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-            placeholder="e.g. Paid via GPay account"
-            rows={2}
-          />
-        </Box>
-      </AppDialog>
+        onSuccess={() => loadData()}
+        initialEventId={eventIdParam}
+        initialMemberId={memberIdParam}
+        initialAmount={amountParam}
+      />
 
       {/* ── View Transaction Details Dialog ── */}
       <AppDialog

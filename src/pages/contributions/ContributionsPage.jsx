@@ -19,7 +19,9 @@ import {
   Save as SaveIcon,
   QrCodeScanner as QrCodeIcon,
   FilterList as FilterListIcon,
+  PaymentRounded as PaymentIcon,
 } from "@mui/icons-material";
+import SubmitPaymentModal from "../../components/payments/SubmitPaymentModal";
 
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
@@ -86,6 +88,33 @@ export default function ContributionsPage() {
   const toast = useAppToast();
   const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
 
+  // Submit Payment Details Modal State
+  const [submitPaymentModalOpen, setSubmitPaymentModalOpen] = useState(false);
+  const [paymentModalContext, setPaymentModalContext] = useState({
+    eventId: "",
+    eventName: "",
+    eventCategory: "",
+    memberId: "",
+    memberName: "",
+    amount: "",
+    arrearBreakdown: [],
+  });
+
+  const handleOpenSubmitPaymentModal = (row) => {
+    const evId = row?.eventId || selectedEventId || "";
+    const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(evId));
+    setPaymentModalContext({
+      eventId: evId,
+      eventName: row?.eventName || activeEv?.eventName || activeEv?.title || activeEv?.name || "",
+      eventCategory: row?.categoryName || activeEv?.eventTypeName || activeEv?.categoryName || "",
+      memberId: row?.memberId || "",
+      memberName: row?.memberName || "",
+      amount: row ? (row.paymentStatus === "Paid" ? "" : (row.amount || "")) : "",
+      arrearBreakdown: row?.previousUnpaidItems || [],
+    });
+    setSubmitPaymentModalOpen(true);
+  };
+
   useEffect(() => {
     async function loadEvents() {
       try {
@@ -118,6 +147,23 @@ export default function ContributionsPage() {
     loadEvents();
   }, []);
 
+  const reloadAllContributions = async () => {
+    try {
+      const allData = await getContributionsAsync();
+      setAllContributions(allData);
+    } catch {
+      // fallback
+    }
+  };
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      reloadAllContributions();
+    };
+    window.addEventListener("contribution_updated", handleUpdate);
+    return () => window.removeEventListener("contribution_updated", handleUpdate);
+  }, []);
+
   const getContributionOutstanding = (c) => {
     if (!c) return 0;
     if (c.paymentStatus === "Paid") return 0;
@@ -136,19 +182,20 @@ export default function ContributionsPage() {
 
         let enrichedData = data.map(c => {
           // Calculate Arrears: sum of unpaid contributions for this member in other events
-          const previousUnpaid = allContributions
-            .filter(prev =>
+          const previousUnpaidItems = allContributions.filter(
+            prev =>
               prev.memberId === c.memberId &&
               prev.eventId !== c.eventId &&
               prev.paymentStatus !== "Paid"
-            )
-            .reduce((sum, prev) => sum + (prev.amount || 0), 0);
+          );
+          const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (prev.amount || 0), 0);
 
           const currentOutstanding = getContributionOutstanding(c);
 
           return {
             ...c,
             previousUnpaid,
+            previousUnpaidItems,
             totalAccumulated: currentOutstanding + previousUnpaid
           };
         });
@@ -367,25 +414,32 @@ export default function ContributionsPage() {
       toast.success(TOAST_MESSAGES.CONTRIBUTIONS.SAVED_SUCCESS || TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       setDialogOpen(false);
 
+      window.dispatchEvent(
+        new CustomEvent("contribution_updated", {
+          detail: { source: "contributions_page", payment },
+        })
+      );
+
       // Reload global and event contributions to update all outstanding balances
       const allData = await getContributionsAsync();
       setAllContributions(allData);
 
       const eventData = await getContributionsByEventAsync(selectedEventId);
       let enriched = eventData.map(c => {
-        const previousUnpaid = allData
-          .filter(prev =>
+        const previousUnpaidItems = allData.filter(
+          prev =>
             prev.memberId === c.memberId &&
             prev.eventId !== c.eventId &&
             prev.paymentStatus !== "Paid"
-          )
-          .reduce((sum, prev) => sum + (prev.amount || 0), 0);
+        );
+        const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (prev.amount || 0), 0);
 
         const currentOutstanding = getContributionOutstanding(c);
 
         return {
           ...c,
           previousUnpaid,
+          previousUnpaidItems,
           totalAccumulated: currentOutstanding + previousUnpaid
         };
       });
@@ -417,64 +471,34 @@ export default function ContributionsPage() {
     {
       label: "Action",
       render: (row) => {
-        const currentDue = row.paymentStatus === "Paid" ? 0 : (row.amount || 0);
-        const previousArrears = row.previousUnpaid || 0;
-        const totalDue = currentDue + previousArrears;
-
-        const isFullyPaid = row.paymentStatus === "Paid" && previousArrears <= 0;
-        const isButtonDisabled = isFullyPaid || !hasWriteAccess;
-        const buttonTooltip = isFullyPaid
-          ? "Fully Paid"
-          : (row.paymentStatus === "Paid" && previousArrears > 0 ? "Pay Previous Arrears" : (hasWriteAccess ? "Record Payment" : ""));
-
         if (!canAddContribution) {
           return null;
         }
 
         return (
-          <Box sx={{ display: "flex", gap: 0.3, alignItems: "center" }}>
-            <Tooltip title={buttonTooltip}>
-              <span>
-                <IconButton
-                  size="small"
-                  disabled={isButtonDisabled}
-                  onClick={() => {
-                    let defaultScope = "CurrentEvent";
-                    if (row.paymentStatus === "Paid" && previousArrears > 0) {
-                      defaultScope = "PreviousArrears";
-                    } else if (currentDue > 0 && previousArrears > 0) {
-                      defaultScope = "AllOutstanding";
-                    }
-
-                    const initAmt = defaultScope === "PreviousArrears" ? previousArrears : (defaultScope === "AllOutstanding" ? totalDue : currentDue);
-                    const defaultMode = modeOptions.length > 0 ? modeOptions[0].value : (paymentModes[0]?.paymentModeName || "");
-
-                    setPayment({
-                      eventId: row.eventId,
-                      memberId: row.memberId,
-                      amount: String(initAmt),
-                      paymentMode: defaultMode,
-                      paymentDate: dayjs(),
-                      cashAmount: "",
-                      upiAmount: "",
-                      paymentScope: defaultScope,
-                      currentEventDue: currentDue,
-                      previousArrears: previousArrears,
-                      totalDue: totalDue,
-                    });
-                    setErrors({});
-                    setDialogOpen(true);
-                  }}
-                  sx={{ p: 0.3, color: isButtonDisabled ? "#cbd5e1" : actionIconColor }}
-                >
-                  <PaymentsIcon sx={{ fontSize: "1.1rem" }} />
-                </IconButton>
-              </span>
+          <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+            <Tooltip title="Submit Payment Details">
+              <IconButton
+                size="small"
+                onClick={() => handleOpenSubmitPaymentModal(row)}
+                sx={{
+                  p: 0.4,
+                  color: "#4a3f6b",
+                  bgcolor: "rgba(74, 63, 107, 0.08)",
+                  borderRadius: "6px",
+                  "&:hover": {
+                    bgcolor: "rgba(74, 63, 107, 0.18)",
+                    color: "#3b325c",
+                  },
+                }}
+              >
+                <PaymentIcon sx={{ fontSize: "1.15rem" }} />
+              </IconButton>
             </Tooltip>
           </Box>
-      );
-    }
-  },
+        );
+      },
+    },
     { label: "Member", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
     {
       label: "Status",
@@ -510,13 +534,44 @@ export default function ContributionsPage() {
       label: "Arrears",
       key: "previousUnpaid",
       align: "right",
-      render: (row) => (
-        <Tooltip title="Outstanding from previous cycles">
-          <Typography variant="body2" color="error.main" fontWeight={row.previousUnpaid > 0 ? 800 : 400}>
-            ₹{(row.previousUnpaid || 0).toLocaleString()}
-          </Typography>
-        </Tooltip>
-      )
+      render: (row) => {
+        const arrearsList = row.previousUnpaidItems || [];
+        const hasArrears = row.previousUnpaid > 0 && arrearsList.length > 0;
+        const tooltipContent = hasArrears ? (
+          <Box sx={{ p: 0.5, minWidth: 160 }}>
+            <Typography variant="caption" fontWeight={800} sx={{ display: "block", color: "#f87171", mb: 0.5, borderBottom: "1px solid rgba(255,255,255,0.2)", pb: 0.3 }}>
+              Unpaid Previous Events:
+            </Typography>
+            {arrearsList.map((item, idx) => (
+              <Box key={idx} sx={{ display: "flex", justifyContent: "space-between", gap: 1.5, fontSize: "0.72rem", py: 0.2 }}>
+                <span style={{ color: "#e2e8f0" }}>• {item.eventName || "Event"}</span>
+                <span style={{ fontWeight: 800, color: "#fff" }}>₹{Number(item.amount || 0).toLocaleString()}</span>
+              </Box>
+            ))}
+            <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.2)", mt: 0.5, pt: 0.3, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "0.75rem", color: "#fca5a5" }}>
+              <span>Total Arrears:</span>
+              <span>₹{(row.previousUnpaid || 0).toLocaleString()}</span>
+            </Box>
+          </Box>
+        ) : (row.previousUnpaid > 0 ? `Total Arrears: ₹${(row.previousUnpaid || 0).toLocaleString()}` : "No previous arrears");
+
+        return (
+          <Tooltip title={tooltipContent} arrow enterDelay={150}>
+            <Typography
+              variant="body2"
+              color={row.previousUnpaid > 0 ? "error.main" : "text.secondary"}
+              fontWeight={row.previousUnpaid > 0 ? 800 : 400}
+              sx={{
+                cursor: row.previousUnpaid > 0 ? "help" : "default",
+                textDecoration: row.previousUnpaid > 0 ? "underline dotted" : "none",
+                display: "inline-block",
+              }}
+            >
+              ₹{(row.previousUnpaid || 0).toLocaleString()}
+            </Typography>
+          </Tooltip>
+        );
+      },
     },
     {
       label: "Total Due",
@@ -664,6 +719,21 @@ export default function ContributionsPage() {
               </Box>
             </Grid>
           </Grid>
+        }
+        actions={
+          canAddContribution && (
+            <AppButton
+              variant="contained"
+              startIcon={<PaymentIcon />}
+              onClick={() => handleOpenSubmitPaymentModal(null)}
+              sx={{
+                bgcolor: "#4a3f6b !important",
+                "&:hover": { bgcolor: "#3b325c !important" },
+              }}
+            >
+              Submit Payment
+            </AppButton>
+          )
         }
       />
 
@@ -970,6 +1040,22 @@ export default function ContributionsPage() {
         contribution={selectedContributionForQr}
         event={events.find((e) => e.eventId === selectedContributionForQr?.eventId)}
         member={members.find((m) => m.memberId === selectedContributionForQr?.memberId)}
+      />
+
+      {/* ── Submit Payment Details Modal ── */}
+      <SubmitPaymentModal
+        open={submitPaymentModalOpen}
+        onClose={() => setSubmitPaymentModalOpen(false)}
+        initialEventId={paymentModalContext.eventId || selectedEventId}
+        initialEventName={paymentModalContext.eventName}
+        initialEventCategory={paymentModalContext.eventCategory}
+        initialMemberId={paymentModalContext.memberId}
+        initialMemberName={paymentModalContext.memberName}
+        initialAmount={paymentModalContext.amount}
+        initialArrearBreakdown={paymentModalContext.arrearBreakdown}
+        onSuccess={() => {
+          reloadAllContributions();
+        }}
       />
     </div>
   );
