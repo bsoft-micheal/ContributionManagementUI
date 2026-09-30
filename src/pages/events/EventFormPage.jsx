@@ -59,6 +59,7 @@ import {
 } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
+import { getUsersAsync } from "../../services/userService";
 import { getBudgetCalculationsAsync } from "../../services/budgetCalculationService";
 import { updateSystemSettings } from "../../services/settingsService";
 import {
@@ -207,9 +208,23 @@ export default function EventFormPage() {
   const [members, setMembers] = useState([]);
   const [budgetItemsList, setBudgetItemsList] = useState([]);
 
+  const isMemberActive = (m) => {
+    const active =
+      m.isActive === true ||
+      m.isActive === 1 ||
+      String(m.isActive).toLowerCase() === "true" ||
+      m.status === "Active" ||
+      m.isActive === undefined;
+    const exited =
+      m.isExited === true ||
+      m.isExited === 1 ||
+      String(m.isExited).toLowerCase() === "true";
+    return active && !exited;
+  };
+
   // Active members count
   const activeMembers = useMemo(
-    () => members.filter((m) => m.isActive && !m.isExited),
+    () => members.filter(isMemberActive),
     [members]
   );
 
@@ -233,7 +248,7 @@ export default function EventFormPage() {
   // Configuration counts states
   const [officeBirthdays, setOfficeBirthdays] = useState(0);
   const [wfhBirthdays, setWfhBirthdays] = useState(0);
-  const [totalMembers, setTotalMembers] = useState(totalActiveCount || 66);
+  const [totalMembers, setTotalMembers] = useState(totalActiveCount || 0);
   const [officeMembers, setOfficeMembers] = useState(totalOfficeCount || 0);
   const [wfhMembers, setWfhMembers] = useState(totalWfhCount || 0);
   const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
@@ -244,17 +259,52 @@ export default function EventFormPage() {
     async function initData() {
       setLoading(true);
       try {
-        const [typesData, membersData, budgetData] = await Promise.all([
+        const [typesData, membersData, budgetData, usersData] = await Promise.all([
           getEventTypesAsync(),
-          getMembersAsync(),
+          getMembersAsync().catch(() => []),
           getBudgetCalculationsAsync().catch(() => []),
+          getUsersAsync().catch(() => []),
         ]);
 
         if (!isMounted) return;
 
-        const activeMems = (membersData || []).filter((m) => m.isActive && !m.isExited);
+        // Combine members and users from User Management to guarantee complete active user list
+        const combinedMembers = Array.isArray(membersData) ? [...membersData] : [];
+        const existingIds = new Set(
+          combinedMembers.map((m) => String(m.memberId || m.id || m.userId).toLowerCase()).filter(Boolean)
+        );
+        const existingNames = new Set(
+          combinedMembers.map((m) => (m.name || m.fullName || "").toLowerCase().trim()).filter(Boolean)
+        );
+
+        if (Array.isArray(usersData)) {
+          usersData.forEach((u) => {
+            const uid = String(u.userId || u.id || "").toLowerCase();
+            const uname = (u.fullName || u.name || "").toLowerCase().trim();
+            if (uid && !existingIds.has(uid) && (!uname || !existingNames.has(uname))) {
+              existingIds.add(uid);
+              combinedMembers.push({
+                memberId: u.userId || u.id,
+                id: u.userId || u.id,
+                name: u.fullName || u.name,
+                fullName: u.fullName || u.name,
+                email: u.email,
+                phone: u.phone,
+                workType: u.workType || "Office",
+                dateOfBirth: u.dateOfBirth,
+                joiningDate: u.joiningDate,
+                gender: u.gender,
+                isActive: u.isActive !== false,
+                isExited: Boolean(u.isExited),
+                roleName: u.roleName || "Member",
+              });
+            }
+          });
+        }
+
+        const activeMems = combinedMembers.filter(isMemberActive);
         setEventTypes(typesData || []);
-        setMembers(membersData || []);
+        setMembers(combinedMembers);
 
         const activeBudgetItems = Array.isArray(budgetData)
           ? budgetData.filter((b) => b.isActive !== false)
@@ -780,6 +830,9 @@ export default function EventFormPage() {
           "en-IN"
         )}, Contribution/member: ₹${contributionPerMember}`;
 
+      const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
+      const effectiveBase = plannedBudget > 0 ? plannedBudget : manualBase;
+
       const payload = {
         eventName: form.eventName.trim(),
         eventTypeId: form.eventTypeId,
@@ -787,7 +840,7 @@ export default function EventFormPage() {
         eventDates: isBirthday ? (celebrantDatesCsv || null) : null,
         description: form.description?.trim() || defaultDesc,
         status: form.status || "Planned",
-        baseAmount: plannedBudget,
+        baseAmount: effectiveBase,
         participantIds:
           finalParticipantIds.length > 0 ? finalParticipantIds : form.participantIds,
         contributionOverrides: contributionOverrides,
@@ -827,7 +880,14 @@ export default function EventFormPage() {
 
       navigate("/events");
     } catch (error) {
-      const errMsg = error.response?.data?.message || error.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED;
+      let errMsg = error.response?.data?.message;
+      if (!errMsg && error.response?.data?.errors) {
+        const errValues = Object.values(error.response.data.errors);
+        errMsg = Array.isArray(errValues) ? errValues.flat().join(", ") : String(error.response.data.errors);
+      }
+      if (!errMsg) {
+        errMsg = error.response?.data?.title || error.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED;
+      }
       toast.error(errMsg);
     } finally {
       setSaving(false);
