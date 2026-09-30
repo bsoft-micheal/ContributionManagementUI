@@ -90,16 +90,20 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
 
   // Filter all members to only active, non-exited accounts
   const rawMembers = members && members.length > 0 ? members : internalMembers;
-  const allMembers = rawMembers.filter(
-    (m) => m.isActive !== false && !m.isExited && !m.isDeleted
+  const allMembers = (rawMembers || []).filter(
+    (m) => m && m.isActive !== false && !m.isExited && !m.isDeleted
   );
 
-  const totalExpected = event.totalExpectedAmount || 0;
-  const totalPaid = contributions
+  if (!open || !event) {
+    return null;
+  }
+
+  const totalExpected = event?.totalExpectedAmount || 0;
+  const totalPaid = (contributions || [])
     .filter((c) => c.paymentStatus === "Paid")
     .reduce((sum, c) => sum + (c.amount || 0), 0);
   const totalUnpaid = totalExpected - totalPaid;
-  const unpaidList = contributions.filter((c) => c.paymentStatus !== "Paid");
+  const unpaidList = (contributions || []).filter((c) => c.paymentStatus !== "Paid");
 
   const isBirthday = Boolean(
     event?.eventTypeName?.toLowerCase().includes("birthday") ||
@@ -137,10 +141,10 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
 
   // Compile birthday members & DOB table data (strictly deduplicated)
   const getTableCelebrants = () => {
-    if (!isBirthday) return [];
+    if (!isBirthday || !event) return [];
 
-    const parsedList = parseCelebrantsFromDescription(event.description);
-    const eventMonth = dayjs(event.eventDate).month();
+    const parsedList = parseCelebrantsFromDescription(event?.description);
+    const eventMonth = event?.eventDate ? dayjs(event.eventDate).month() : 0;
     const map = new Map();
 
     const getDedupeKey = (id, name, dob) => {
@@ -242,7 +246,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
 
   // Overview summary text for description
   const getOverviewText = () => {
-    if (!event.description) return "";
+    if (!event?.description) return "";
     const match = event.description.match(/^(Birthday celebration.*?)\s*for.*?\.\s*(Planned Budget.*)$/i);
     if (match) {
       return `${match[1]} • ${match[2]}`;
@@ -252,7 +256,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
 
   const overviewText = isBirthday && tableCelebrants.length > 0
     ? getOverviewText()
-    : event.description;
+    : (event?.description || "");
 
   return (
     <>
@@ -317,7 +321,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
               Event Identity
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
-              {event.eventName}
+              {event?.eventName || ""}
             </Typography>
           </Box>
         </Grid>
@@ -336,7 +340,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
               Category
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
-              {event.eventTypeName || "Custom Event"}
+              {event?.eventTypeName || "Custom Event"}
             </Typography>
           </Box>
         </Grid>
@@ -355,7 +359,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
               Date
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
-              {formatViewDate(event.eventDate)}
+              {formatViewDate(event?.eventDate)}
             </Typography>
           </Box>
         </Grid>
@@ -374,7 +378,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
               Created By
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
-              {event.createdByName || event.createdBy || "--"}
+              {event?.createdByName || event?.createdBy || "--"}
             </Typography>
           </Box>
         </Grid>
@@ -393,7 +397,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
               Created On
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
-              {formatViewDate(event.createdAt || event.createdOn)}
+              {formatViewDate(event?.createdAt || event?.createdOn)}
             </Typography>
           </Box>
         </Grid>
