@@ -64,8 +64,8 @@ export default function ExitProcessPage() {
       });
 
       setExitCandidates(candidates);
-    } catch {
-      toast.error(TOAST_MESSAGES.MEMBERS.LOAD_ERROR || "Failed to load exit candidates");
+    } catch (err) {
+      toast.error(err, TOAST_MESSAGES.MEMBERS.LOAD_ERROR || "Failed to load exit candidates");
     } finally {
       setLoading(false);
     }
@@ -89,7 +89,7 @@ export default function ExitProcessPage() {
       toast.success(TOAST_MESSAGES.MEMBERS.EXIT_PROCESS_SUCCESS || TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       loadExitData();
     } catch (error) {
-      toast.error(TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      toast.error(error, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 
@@ -115,7 +115,7 @@ export default function ExitProcessPage() {
       align: "right",
       render: (row) => (
         <Typography variant="body2" fontWeight={900} color={row.pendingAmount > 0 ? "error.main" : "success.main"}>
-          ₹{row.pendingAmount}
+          ₹{Number(row.pendingAmount || 0).toLocaleString("en-IN")}
         </Typography>
       )
     },

@@ -22,6 +22,7 @@ import {
   FilterList as FilterListIcon,
   Download as DownloadIcon,
 } from "@mui/icons-material";
+import { useLocation } from "react-router-dom";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
@@ -111,6 +112,7 @@ export default function GalleryPage() {
   const canDeletePhoto = hasActionPermission("Delete Photo", 38, authState?.role).canExecute;
   const canViewGallery = hasActionPermission("View Gallery", 35, authState?.role).canView;
   const toast = useAppToast();
+  const location = useLocation();
   const fileInputRef = useRef(null);
 
   const [photos, setPhotos] = useState([]);
@@ -273,10 +275,46 @@ export default function GalleryPage() {
     fetchLookupData();
   }, []);
 
+  // Detect navigation from Events Page (Add Photos or View Photos action)
+  useEffect(() => {
+    if (location.state?.openAddPhoto) {
+      const { eventName, category, eventDate } = location.state;
+      setEditingPhoto(null);
+      setForm({
+        title: eventName ? `${eventName} Photos` : "",
+        eventName: eventName || "",
+        category: category || "",
+        takenDate: eventDate ? dayjs(eventDate) : dayjs(),
+        imageUrl: "",
+        imageUrls: [],
+        description: "",
+      });
+      setErrors({});
+      setDialogOpen(true);
+      window.history.replaceState({}, document.title);
+    } else if (location.state?.filterEvent || location.state?.viewEventPhotos) {
+      const targetEvent = location.state.filterEvent || location.state.eventName;
+      const targetCategory = location.state.filterCategory || location.state.category;
+      if (targetEvent) {
+        setFilterEvent(targetEvent);
+        setAppliedEvent(targetEvent);
+      }
+      if (targetCategory) {
+        setFilterCategory(targetCategory);
+        setAppliedCategory(targetCategory);
+      }
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   // Dynamically derive event options from DB events + existing photos
   const eventOptions = useMemo(() => {
     const list = [{ label: "All Events", value: "ALL" }];
     const unique = new Set();
+    if (filterEvent && filterEvent !== "ALL") {
+      unique.add(filterEvent);
+      list.push({ label: filterEvent, value: filterEvent });
+    }
     eventsList.forEach((e) => {
       const name = e.name || e.eventName;
       if (name && !unique.has(name)) {
@@ -291,11 +329,14 @@ export default function GalleryPage() {
       }
     });
     return list;
-  }, [eventsList, photos]);
+  }, [eventsList, photos, filterEvent]);
 
   // Dynamically derive category options from DB event_types table and recorded photos
   const categoryOptions = useMemo(() => {
     const set = new Set();
+    if (filterCategory && filterCategory !== "ALL") {
+      set.add(filterCategory);
+    }
     eventTypesList.forEach((et) => {
       if (et.eventTypeName) set.add(et.eventTypeName);
     });
@@ -307,12 +348,16 @@ export default function GalleryPage() {
       { label: "All Categories", value: "ALL" },
       ...items.map((c) => ({ label: c, value: c })),
     ];
-  }, [eventTypesList, photos]);
+  }, [eventTypesList, photos, filterCategory]);
 
   // Event Type options for the Add / Edit Photos modal (from DB event types)
   const modalEventTypeOptions = useMemo(() => {
     const set = new Set();
     const list = [];
+    if (form.category) {
+      set.add(form.category);
+      list.push({ label: form.category, value: form.category });
+    }
     (eventTypesList || []).forEach((et) => {
       const name = et.eventTypeName || et.name;
       if (name && !set.has(name)) {
@@ -321,16 +366,19 @@ export default function GalleryPage() {
       }
     });
     return list;
-  }, [eventTypesList]);
+  }, [eventTypesList, form.category]);
 
   // Events filtered strictly by the selected Event Type for the Add / Edit Photos modal
   const modalEventOptions = useMemo(() => {
-    if (!form.category) return [];
     const set = new Set();
     const list = [];
+    if (form.eventName) {
+      set.add(form.eventName);
+      list.push({ label: form.eventName, value: form.eventName });
+    }
     (eventsList || []).forEach((e) => {
       const typeName = (e.eventTypeName || e.categoryName || "").trim().toLowerCase();
-      if (typeName === form.category.trim().toLowerCase()) {
+      if (!form.category || typeName === form.category.trim().toLowerCase()) {
         const name = e.name || e.eventName;
         if (name && !set.has(name)) {
           set.add(name);
@@ -339,7 +387,7 @@ export default function GalleryPage() {
       }
     });
     return list;
-  }, [eventsList, form.category]);
+  }, [eventsList, form.category, form.eventName]);
 
   // Filtered photos
   const filteredPhotos = useMemo(() => {
@@ -570,8 +618,8 @@ export default function GalleryPage() {
       }
       toast.success(TOAST_MESSAGES.GALLERY.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchPhotosFromDb();
-    } catch {
-      toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+    } catch (err) {
+      toast.error(err, TOAST_MESSAGES.GENERAL.DELETE_FAILED);
     } finally {
       setDeleteConfirmOpen(false);
       setPhotoToDelete(null);

@@ -3,6 +3,28 @@ import { Snackbar, Alert, AlertTitle, Slide, Box, Typography } from "@mui/materi
 
 const ToastContext = createContext();
 
+export const extractErrorMessage = (err, fallback = "An unexpected error occurred.") => {
+  if (!err) return fallback;
+  if (typeof err === "string") return err;
+  if (typeof err === "object") {
+    // Axios / Backend JSON responses
+    if (err.response?.data) {
+      const data = err.response.data;
+      if (typeof data === "string") return data;
+      if (data.message) return data.message;
+      if (data.title) return data.title;
+      if (data.detail) return data.detail;
+      if (data.error) return data.error;
+      if (data.errors && typeof data.errors === "object") {
+        const errorList = Object.values(data.errors).flat();
+        if (errorList.length > 0) return errorList.join(", ");
+      }
+    }
+    if (err.message) return err.message;
+  }
+  return String(err || fallback);
+};
+
 /**
  * Hook to trigger MUI-styled toast notifications
  * Provides methods: toast.success(), toast.error(), toast.warning(), toast.info()
@@ -14,7 +36,7 @@ export const useAppToast = () => {
   }
   return {
     success: (msg) => context.showToast(msg, "success"),
-    error: (msg) => context.showToast(msg, "error"),
+    error: (msg, fallback) => context.showToast(extractErrorMessage(msg, fallback), "error"),
     warning: (msg) => context.showToast(msg, "warning"),
     warn: (msg) => context.showToast(msg, "warning"),
     info: (msg) => context.showToast(msg, "info")
@@ -31,7 +53,8 @@ export const ToastProvider = ({ children }) => {
   const [severity, setSeverity] = useState("success");
 
   const showToast = (msg, type = "success") => {
-    setMessage(msg);
+    const finalMsg = type === "error" ? extractErrorMessage(msg) : (typeof msg === "string" ? msg : String(msg ?? ""));
+    setMessage(finalMsg);
     setSeverity(type);
     setOpen(true);
   };
@@ -54,7 +77,7 @@ export const ToastProvider = ({ children }) => {
       {children}
       <Snackbar
         open={open}
-        autoHideDuration={3000}
+        autoHideDuration={severity === "error" ? 5000 : 3000}
         onClose={handleClose}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
         TransitionComponent={SlideTransition}

@@ -22,6 +22,7 @@ import CakeRoundedIcon from "@mui/icons-material/CakeRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import CelebrationRoundedIcon from "@mui/icons-material/CelebrationRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { formatViewDate } from "../../utils/dateHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -30,7 +31,10 @@ import apiClient from "../../services/apiClient";
 import { getMembersAsync } from "../../services/memberService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getEventByIdAsync } from "../../services/eventService";
-import { getContributionsByEventAsync } from "../../services/contributionService";
+import {
+  getContributionsAsync,
+  getContributionsByEventAsync,
+} from "../../services/contributionService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import EventFormDialog from "../../components/events/EventFormDialog";
@@ -141,6 +145,14 @@ export default function CalendarPage() {
   const [events, setEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
+  const [contributions, setContributions] = useState([]);
+
+  // Strictly filter to active, non-exited, non-deleted member accounts
+  const activeMembers = useMemo(() => {
+    return (members || []).filter(
+      (m) => m.isActive !== false && !m.isExited && !m.isDeleted
+    );
+  }, [members]);
 
   // Modals for Create and View
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -155,14 +167,30 @@ export default function CalendarPage() {
         month: filters.month === 0 ? null : filters.month,
         year: filters.year === 0 ? null : filters.year,
       };
-      const { data: resData } = await apiClient.get("/events/getAllEventAsync", {
-        params: apiParams,
-      });
+      const [{ data: resData }, contribsData] = await Promise.all([
+        apiClient.get("/events/getAllEventAsync", {
+          params: apiParams,
+        }),
+        getContributionsAsync().catch(() => []),
+      ]);
       const data = resData && resData.data !== undefined ? resData.data : resData;
-      setEvents(Array.isArray(data) ? data : []);
+      setEvents(Array.isArray(data) ? data.filter((e) => !e.isDeleted) : []);
+      setContributions(Array.isArray(contribsData) ? contribsData : []);
     } catch {
       toast.error("Failed to load calendar events.");
     }
+  };
+
+  const handleEventDeleted = (deletedEventId) => {
+    setEvents((prev) => prev.filter((e) => e.eventId !== deletedEventId));
+    setDetailedEventsMap((prev) => {
+      const copy = { ...prev };
+      delete copy[deletedEventId];
+      return copy;
+    });
+    setViewDialogOpen(false);
+    setSelectedEvent(null);
+    loadCalendarData();
   };
 
   useEffect(() => {
@@ -187,7 +215,7 @@ export default function CalendarPage() {
 
   // Filter events by Category and Search Text
   const filteredEvents = useMemo(() => {
-    let list = events;
+    let list = (events || []).filter((e) => !e.isDeleted);
 
     if (categoryFilter !== "ALL") {
       const filterLower = categoryFilter.toLowerCase();
@@ -223,7 +251,7 @@ export default function CalendarPage() {
     if (!isBirthday) return [];
 
     const eventMonth = dayjs(eventItem.eventDate).month();
-    const activeMembersInMonth = members.filter((m) => {
+    const activeMembersInMonth = activeMembers.filter((m) => {
       const dob = parseMemberDob(m.dateOfBirth);
       return dob && dob.month() === eventMonth;
     });
@@ -234,7 +262,7 @@ export default function CalendarPage() {
     let matchedCelebrants = [];
 
     if (participantIds.length > 0) {
-      const pMembers = members.filter(
+      const pMembers = activeMembers.filter(
         (m) => participantIds.includes(m.memberId) && parseMemberDob(m.dateOfBirth)
       );
       const monthMatches = pMembers.filter(
@@ -246,7 +274,7 @@ export default function CalendarPage() {
     const textToSearch = `${eventItem.eventName || ""} ${
       eventItem.description || ""
     }`.toLowerCase();
-    const nameMatches = members.filter((m) => {
+    const nameMatches = activeMembers.filter((m) => {
       if (!m.name || !m.dateOfBirth) return false;
       const lowerName = m.name.toLowerCase().trim();
       if (textToSearch.includes(lowerName)) return true;
@@ -376,6 +404,62 @@ export default function CalendarPage() {
       ? "All Months"
       : dayjs().month(filters.month - 1).format("MMMM");
 
+  // Helper to determine if an event or member has pending payment (strictly based on unpaid amount > 0)
+  const isItemPaymentPending = (item) => {
+    // 1. Identify the event associated with this item
+    let targetEvent = item.eventItem;
+
+    if (!targetEvent) {
+      if (item.colorType?.toLowerCase().includes("birthday")) {
+        const itemMonth = item.celebrant
+          ? parseMemberDob(item.celebrant.dateOfBirth)?.month()
+          : (filters.month === 0 ? dayjs().month() : filters.month - 1);
+
+        targetEvent = events.find((e) => {
+          const isBday =
+            e.eventTypeName?.toLowerCase().includes("birthday") ||
+            e.eventName?.toLowerCase().includes("birthday");
+          if (!isBday) return false;
+          return dayjs(e.eventDate).month() === itemMonth;
+        });
+      }
+    }
+
+    // 2. If no event exists yet, there is no unpaid balance
+    if (!targetEvent) return false;
+
+    // 3. Compute total expected, total paid, and unpaid amount for this event
+    const totalExpected = Number(targetEvent.totalExpectedAmount) || 0;
+    let totalPaid = Number(targetEvent.totalPaidAmount) || 0;
+
+    // Check contributions matching this specific event
+    const eventContribs = contributions.filter(
+      (c) => String(c.eventId) === String(targetEvent.eventId)
+    );
+
+    if (eventContribs.length > 0) {
+      const paidFromContribs = eventContribs
+        .filter(
+          (c) =>
+            c.paymentStatus === "Paid" ||
+            c.paymentStatus === "Verified" ||
+            c.paymentStatus === "Completed"
+        )
+        .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+      totalPaid = Math.max(totalPaid, paidFromContribs);
+    }
+
+    const unpaidAmount = Math.max(0, totalExpected - totalPaid);
+
+    // If unpaid amount is 0, remove Payment Pending!
+    if (unpaidAmount <= 0) {
+      return false;
+    }
+
+    // Only if unpaid amount is strictly greater than 0, return true
+    return unpaidAmount > 0;
+  };
+
   // Get items for a particular day on the grid
   const getDayItems = (day) => {
     const dayStr = day.format("YYYY-MM-DD");
@@ -468,8 +552,8 @@ export default function CalendarPage() {
       return "upcoming";
     };
 
-    // 1. From members list based on DOB
-    for (const mem of members) {
+    // 1. From activeMembers list based on DOB
+    for (const mem of activeMembers) {
       const dob = parseMemberDob(mem.dateOfBirth);
       if (!dob) continue;
 
@@ -523,7 +607,7 @@ export default function CalendarPage() {
     // Sort chronologically by day of month (1st to 31st)
     list.sort((a, b) => a.dayOfMonth - b.dayOfMonth);
     return list;
-  }, [members, filteredEvents, filters]);
+  }, [activeMembers, filteredEvents, filters]);
 
   // Check if current view is Birthday vs another category (e.g. Farewell)
   const isBirthdayView =
@@ -576,10 +660,28 @@ export default function CalendarPage() {
       ).trim();
       if (!memName && !memId) return;
 
+      // Strictly ACTIVE accounts only!
+      // Check if this member is inactive, exited, or deleted in the master members directory
+      const matchedMaster = (members || []).find(
+        (m) =>
+          (memId && String(m.memberId) === String(memId)) ||
+          (m.name && m.name.toLowerCase().trim() === memName.toLowerCase())
+      );
+
+      if (matchedMaster) {
+        if (matchedMaster.isActive === false || matchedMaster.isExited || matchedMaster.isDeleted) {
+          return;
+        }
+      } else {
+        if (memberObj.isActive === false || memberObj.isExited || memberObj.isDeleted) {
+          return;
+        }
+      }
+
       const dedupeKey = memId ? `id:${memId}` : memName.toLowerCase();
       if (!map.has(dedupeKey)) {
-        // Find in full members array to get latest type/details
-        const fullMem = members.find(
+        // Find in active members array to get latest type/details
+        const fullMem = activeMembers.find(
           (m) =>
             (memId && String(m.memberId) === String(memId)) ||
             (m.name && m.name.toLowerCase().trim() === memName.toLowerCase())
@@ -604,7 +706,7 @@ export default function CalendarPage() {
           if (typeof p === "object" && p !== null) {
             addParticipant(p, detailed);
           } else if (typeof p === "number" || typeof p === "string") {
-            const m = members.find((mem) => String(mem.memberId) === String(p));
+            const m = activeMembers.find((mem) => String(mem.memberId) === String(p));
             if (m) addParticipant(m, detailed);
           }
         }
@@ -613,7 +715,7 @@ export default function CalendarPage() {
       // 2. From detailed.participantIds array
       if (Array.isArray(detailed.participantIds) && detailed.participantIds.length > 0) {
         for (const pId of detailed.participantIds) {
-          const m = members.find((mem) => String(mem.memberId) === String(pId));
+          const m = activeMembers.find((mem) => String(mem.memberId) === String(pId));
           if (m) addParticipant(m, detailed);
         }
       }
@@ -621,7 +723,7 @@ export default function CalendarPage() {
       // 3. From contributions (all members who contributed to this event)
       if (Array.isArray(detailed.contributions) && detailed.contributions.length > 0) {
         for (const c of detailed.contributions) {
-          const m = members.find((mem) => String(mem.memberId) === String(c.memberId));
+          const m = activeMembers.find((mem) => String(mem.memberId) === String(c.memberId));
           if (m) {
             addParticipant(m, detailed);
           } else if (c.memberName || c.name) {
@@ -632,7 +734,7 @@ export default function CalendarPage() {
 
       // 4. Any name matches from description or eventName (e.g. "Farewell for Michael")
       const textToScan = `${detailed.eventName || ""} ${detailed.description || ""}`.toLowerCase();
-      for (const m of members) {
+      for (const m of activeMembers) {
         if (!m.name) continue;
         const lowerName = m.name.toLowerCase().trim();
         if (textToScan.includes(lowerName)) {
@@ -642,7 +744,7 @@ export default function CalendarPage() {
     }
 
     return Array.from(map.values());
-  }, [isBirthdayView, filteredEvents, detailedEventsMap, members, categoryFilter]);
+  }, [isBirthdayView, filteredEvents, detailedEventsMap, members, activeMembers, categoryFilter]);
 
 
 
@@ -1080,6 +1182,7 @@ export default function CalendarPage() {
                             const isBirthdayItem = item.colorType?.toLowerCase().includes("birthday");
                             const isTodayDay = day.isSame(dayjs(), "day");
                             const isPastDay = day.isBefore(dayjs().startOf("day"), "day");
+                            const isPaymentPending = isItemPaymentPending(item);
 
                             let statusText = item.categoryLabel;
                             if (isBirthdayItem) {
@@ -1091,7 +1194,7 @@ export default function CalendarPage() {
                             return (
                               <Tooltip
                                 key={item.key}
-                                title={`${item.displayName} • ${statusText}`}
+                                title={`${item.displayName} • ${statusText}${isPaymentPending ? " • Payment Pending" : ""}`}
                                 arrow
                                 placement="top"
                               >
@@ -1107,13 +1210,13 @@ export default function CalendarPage() {
                                     }
                                   }}
                                   sx={{
-                                    p: "2.5px 5px",
-                                    borderRadius: "5px",
+                                    p: "4px 6px",
+                                    borderRadius: "8px",
                                     bgcolor: (theme) =>
                                       isBirthdayItem && isTodayDay
                                         ? theme.palette.mode === "dark"
-                                          ? "rgba(236, 72, 153, 0.22)"
-                                          : "rgba(236, 72, 153, 0.12)"
+                                          ? "rgba(236, 72, 153, 0.2)"
+                                          : "rgba(236, 72, 153, 0.08)"
                                         : theme.palette.mode === "dark"
                                         ? typeInfo.darkBg
                                         : typeInfo.bg,
@@ -1126,88 +1229,161 @@ export default function CalendarPage() {
                                         ? "0 2px 8px rgba(236, 72, 153, 0.25)"
                                         : "none",
                                     cursor: "pointer",
-                                    transition:
-                                      "transform 0.12s ease, box-shadow 0.12s ease",
+                                    transition: "transform 0.12s ease, box-shadow 0.12s ease",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 0.35,
                                     "&:hover": {
                                       transform: "translateY(-1px)",
-                                      boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+                                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                                       borderColor: isBirthdayItem && isTodayDay ? "#ec4899" : typeInfo.color,
                                     },
                                   }}
                                 >
-                                  {/* Line 1: Icon + Name */}
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.4,
-                                    }}
-                                  >
-                                    <Typography
-                                      component="span"
-                                      sx={{ fontSize: "0.7rem", lineHeight: 1 }}
-                                    >
-                                      {isBirthdayItem && isTodayDay ? "🎂" : typeInfo.emoji}
-                                    </Typography>
-                                    <Typography
+                                  {/* Top Row: Avatar Box + (Name & Status Pill) */}
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
+                                    {/* Avatar Box */}
+                                    <Box
                                       sx={{
-                                        fontSize: "0.7rem",
-                                        fontWeight: 700,
-                                        color: (theme) =>
-                                          theme.palette.mode === "dark"
-                                            ? typeInfo.darkText
-                                            : typeInfo.text,
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        lineHeight: 1.2,
+                                        width: 24,
+                                        height: 24,
+                                        minWidth: 24,
+                                        borderRadius: "6px",
+                                        bgcolor: (theme) =>
+                                          isBirthdayItem && isTodayDay
+                                            ? "rgba(236, 72, 153, 0.22)"
+                                            : "rgba(14, 165, 233, 0.14)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.8rem",
+                                        lineHeight: 1,
+                                        flexShrink: 0,
                                       }}
                                     >
-                                      {item.displayName}
-                                    </Typography>
-                                    {isBirthdayItem && isTodayDay && (
-                                      <Typography
-                                        component="span"
-                                        sx={{
-                                          fontSize: "0.68rem",
-                                          display: "inline-block",
-                                          animation: "bouncePopper 1.5s infinite ease-in-out",
-                                        }}
-                                      >
-                                        🎉
-                                      </Typography>
-                                    )}
+                                      {isBirthdayItem && isTodayDay ? "🎂" : isBirthdayItem ? "🎂" : typeInfo.emoji}
+                                    </Box>
+
+                                    {/* Name & Status Pill */}
+                                    <Box sx={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 0.15 }}>
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
+                                        <Typography
+                                          sx={{
+                                            fontSize: "0.74rem",
+                                            fontWeight: 800,
+                                            color: (theme) =>
+                                              theme.palette.mode === "dark"
+                                                ? typeInfo.darkText
+                                                : "#312e81",
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            lineHeight: 1.15,
+                                          }}
+                                        >
+                                          {item.displayName}
+                                        </Typography>
+                                        {isBirthdayItem && isTodayDay && (
+                                          <Typography
+                                            component="span"
+                                            sx={{
+                                              fontSize: "0.68rem",
+                                              display: "inline-block",
+                                              animation: "bouncePopper 1.5s infinite ease-in-out",
+                                            }}
+                                          >
+                                            🎉
+                                          </Typography>
+                                        )}
+                                      </Box>
+
+                                      {/* Status Pill */}
+                                      <Box sx={{ display: "inline-flex" }}>
+                                        <Box
+                                          sx={{
+                                            bgcolor: (theme) =>
+                                              isBirthdayItem && isTodayDay
+                                                ? "rgba(236, 72, 153, 0.15)"
+                                                : isBirthdayItem && isPastDay
+                                                ? "rgba(34, 197, 94, 0.15)"
+                                                : "rgba(124, 58, 237, 0.1)",
+                                            color: (theme) =>
+                                              isBirthdayItem && isTodayDay
+                                                ? "#db2777"
+                                                : isBirthdayItem && isPastDay
+                                                ? "#16a34a"
+                                                : "#7c3aed",
+                                            border: (theme) =>
+                                              isBirthdayItem && isTodayDay
+                                                ? "1px solid rgba(236, 72, 153, 0.3)"
+                                                : isBirthdayItem && isPastDay
+                                                ? "1px solid rgba(34, 197, 94, 0.25)"
+                                                : "1px solid rgba(124, 58, 237, 0.2)",
+                                            borderRadius: "10px",
+                                            px: 0.6,
+                                            py: "1px",
+                                            fontSize: "0.62rem",
+                                            fontWeight: 700,
+                                            lineHeight: 1.1,
+                                            whiteSpace: "nowrap",
+                                          }}
+                                        >
+                                          {isBirthdayItem
+                                            ? isTodayDay
+                                              ? "Today 🎉"
+                                              : isPastDay
+                                              ? "Completed ✓"
+                                              : "Upcoming"
+                                            : item.categoryLabel}
+                                        </Box>
+                                      </Box>
+                                    </Box>
                                   </Box>
 
-                                  {/* Line 2: Category & Status label */}
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.3, pl: "1rem", mt: 0.1 }}>
-                                    <Typography
+                                  {/* Bottom Row: Payment Pending Badge */}
+                                  {isPaymentPending && (
+                                    <Box
                                       sx={{
-                                        fontSize: "0.6rem",
-                                        fontWeight: isBirthdayItem && isTodayDay ? 800 : 600,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.35,
+                                        bgcolor: (theme) =>
+                                          theme.palette.mode === "dark"
+                                            ? "rgba(245, 158, 11, 0.2)"
+                                            : "#fef3c7",
                                         color: (theme) =>
-                                          isBirthdayItem && isTodayDay
-                                            ? "#db2777"
-                                            : isBirthdayItem && isPastDay
-                                            ? "#16a34a"
-                                            : theme.palette.mode === "dark"
-                                            ? "rgba(255,255,255,0.65)"
-                                            : "text.secondary",
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        lineHeight: 1.1,
+                                          theme.palette.mode === "dark" ? "#fde68a" : "#d97706",
+                                        border: (theme) =>
+                                          theme.palette.mode === "dark"
+                                            ? "1px solid rgba(245, 158, 11, 0.35)"
+                                            : "1px solid #fde68a",
+                                        borderRadius: "6px",
+                                        px: 0.6,
+                                        py: "2px",
+                                        mt: 0.1,
                                       }}
                                     >
-                                      {isBirthdayItem
-                                        ? isTodayDay
-                                          ? "Today 🎉"
-                                          : isPastDay
-                                          ? "Completed ✓"
-                                          : "Upcoming"
-                                        : item.categoryLabel}
-                                    </Typography>
-                                  </Box>
+                                      <WarningAmberRoundedIcon
+                                        sx={{
+                                          fontSize: "0.74rem",
+                                          color: (theme) =>
+                                            theme.palette.mode === "dark" ? "#fbbf24" : "#d97706",
+                                          flexShrink: 0,
+                                        }}
+                                      />
+                                      <Typography
+                                        sx={{
+                                          fontSize: "0.62rem",
+                                          fontWeight: 700,
+                                          color: "inherit",
+                                          lineHeight: 1.1,
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        Payment Pending
+                                      </Typography>
+                                    </Box>
+                                  )}
                                 </Box>
                               </Tooltip>
                             );
@@ -1738,6 +1914,50 @@ export default function CalendarPage() {
                                   />
                                 </Tooltip>
                               )}
+
+                              {/* Payment Pending Badge in Sidebar */}
+                              {isItemPaymentPending({ celebrant: mem, memberId: mem.memberId, colorType: "Birthday" }) && (
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.3,
+                                    bgcolor: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? "rgba(245, 158, 11, 0.2)"
+                                        : "#fef3c7",
+                                    color: (theme) =>
+                                      theme.palette.mode === "dark" ? "#fde68a" : "#d97706",
+                                    border: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? "1px solid rgba(245, 158, 11, 0.35)"
+                                        : "1px solid #fde68a",
+                                    borderRadius: "5px",
+                                    px: 0.6,
+                                    py: "1.5px",
+                                  }}
+                                >
+                                  <WarningAmberRoundedIcon
+                                    sx={{
+                                      fontSize: "0.7rem",
+                                      color: (theme) =>
+                                        theme.palette.mode === "dark" ? "#fbbf24" : "#d97706",
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <Typography
+                                    sx={{
+                                      fontSize: "0.6rem",
+                                      fontWeight: 700,
+                                      color: "inherit",
+                                      lineHeight: 1.1,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    Payment Pending
+                                  </Typography>
+                                </Box>
+                              )}
                             </Box>
                           </Paper>
                         );
@@ -1757,7 +1977,7 @@ export default function CalendarPage() {
         onClose={() => setDialogOpen(false)}
         event={selectedEvent}
         eventTypes={eventTypes}
-        members={members}
+        members={activeMembers}
         onSaveSuccess={loadCalendarData}
       />
 
@@ -1766,7 +1986,8 @@ export default function CalendarPage() {
         open={viewDialogOpen}
         onClose={() => setViewDialogOpen(false)}
         event={selectedEvent}
-        members={members}
+        members={activeMembers}
+        onDeleteSuccess={handleEventDeleted}
       />
 
       {/* Big Celebratory Birthday Pop-up Modal */}

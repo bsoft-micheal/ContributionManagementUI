@@ -61,7 +61,7 @@ export default function EventDetailsPage() {
 
   const columns = [
     { label: "Member Name", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
-    { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{row.amount}</Typography> },
+    { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{Number(row.amount || 0).toLocaleString("en-IN")}</Typography> },
     {
       label: "Status",
       key: "paymentStatus",
@@ -97,7 +97,7 @@ export default function EventDetailsPage() {
       <PageHeader
         eyebrow={eventDetails.eventTypeName}
         title={eventDetails.eventName}
-        description={`${eventDetails.description} Scheduled for ${formatViewDate(eventDetails.eventDate)}.`}
+        description={`${eventDetails.description} Scheduled for ${eventDetails.eventDates || formatViewDate(eventDetails.eventDate)}.`}
         actions={
           <AppButton
             variant="text"
@@ -115,10 +115,10 @@ export default function EventDetailsPage() {
           <MetricCard label="Total Members" value={eventDetails.participantCount} helper="Members assigned to this event." />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-          <MetricCard label="Expected Amount" value={`₹${eventDetails.totalExpectedAmount}`} helper="Projected amount." />
+          <MetricCard label="Expected Amount" value={`₹${Number(eventDetails.totalExpectedAmount || 0).toLocaleString("en-IN")}`} helper="Projected amount." />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-          <MetricCard label="Received Amount" value={`₹${eventDetails.totalPaidAmount}`} helper="Confirmed amount." accent="#16a34a" />
+          <MetricCard label="Received Amount" value={`₹${Number(eventDetails.totalPaidAmount || 0).toLocaleString("en-IN")}`} helper="Confirmed amount." accent="#16a34a" />
         </Grid>
       </Grid>
 

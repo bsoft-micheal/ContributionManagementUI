@@ -518,8 +518,8 @@ export default function UsersPage() {
       await deleteUserAsync(userToDelete);
       toast.success("Deleted successfully");
       loadData();
-    } catch {
-      toast.error("Failed to delete");
+    } catch (err) {
+      toast.error(err, "Failed to delete");
     } finally {
       setDeleteConfirmOpen(false);
       setUserToDelete(null);
