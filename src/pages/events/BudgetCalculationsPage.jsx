@@ -112,11 +112,20 @@ export default function BudgetCalculationsPage() {
   // Filtered rows based on applied Event Type filter
   const filteredItems = useMemo(() => {
     if (appliedCategory === "ALL") return items;
+    const appliedLower = appliedCategory.toLowerCase();
+    const matchedType = eventTypes.find(
+      (t) => t.eventTypeName.toLowerCase() === appliedLower
+    );
+    const targetTypeId = matchedType?.eventTypeId;
+
     return items.filter((item) => {
-      const cat = item.category || "Birthday";
-      return cat.toLowerCase() === appliedCategory.toLowerCase();
+      if (targetTypeId && item.eventTypeId && item.eventTypeId.toLowerCase() === targetTypeId.toLowerCase()) {
+        return true;
+      }
+      const cat = item.category || "";
+      return cat.toLowerCase() === appliedLower;
     });
-  }, [items, appliedCategory]);
+  }, [items, appliedCategory, eventTypes]);
 
   async function handleSubmit() {
     const fieldRequired = "This field is required";
@@ -150,9 +159,15 @@ export default function BudgetCalculationsPage() {
     try {
       const selectedCategory =
         form.category?.trim() || eventTypes[0]?.eventTypeName || "Birthday";
+      const matchedType = eventTypes.find(
+        (t) =>
+          (form.eventTypeId && t.eventTypeId === form.eventTypeId) ||
+          t.eventTypeName.toLowerCase() === selectedCategory.toLowerCase()
+      );
       const payload = {
         ...form,
-        category: selectedCategory,
+        category: matchedType ? matchedType.eventTypeName : selectedCategory,
+        eventTypeId: matchedType ? matchedType.eventTypeId : form.eventTypeId || null,
         expenseItem: form.expenseItem.trim(),
         rate: Number(String(form.rate).replace(/[^0-9]/g, "") || 0),
         isActive: form.isActive !== undefined ? form.isActive : true,
@@ -227,9 +242,15 @@ export default function BudgetCalculationsPage() {
                 sx={{ p: 0.3 }}
                 disabled={!hasWriteAccess}
                 onClick={() => {
+                  const matched = eventTypes.find(
+                    (t) =>
+                      (row.eventTypeId && t.eventTypeId === row.eventTypeId) ||
+                      (row.category && t.eventTypeName.toLowerCase() === row.category.toLowerCase())
+                  );
                   setForm({
                     ...row,
-                    category: row.category || "Birthday",
+                    category: matched?.eventTypeName || row.category || "",
+                    eventTypeId: matched?.eventTypeId || row.eventTypeId || "",
                   });
                   setErrors({});
                   setDialogOpen(true);
@@ -332,7 +353,7 @@ export default function BudgetCalculationsPage() {
             color: (theme) => (theme.palette.mode === "dark" ? "#e2e8f0" : "#334155"),
           }}
         >
-          {row.category || "Birthday"}
+          {row.category || "--"}
         </Typography>
       ),
     },
@@ -455,9 +476,17 @@ export default function BudgetCalculationsPage() {
             disabled={!hasWriteAccess}
             startIcon={<AddIcon />}
             onClick={() => {
+              const defaultCat =
+                filterCategory && filterCategory !== "ALL"
+                  ? filterCategory
+                  : eventTypes[0]?.eventTypeName || "Birthday";
+              const matchedType = eventTypes.find(
+                (t) => t.eventTypeName.toLowerCase() === defaultCat.toLowerCase()
+              );
               setForm({
                 ...initialForm,
-                category: eventTypes[0]?.eventTypeName || "Birthday",
+                category: defaultCat,
+                eventTypeId: matchedType?.eventTypeId || "",
               });
               setErrors({});
               setDialogOpen(true);
@@ -502,7 +531,15 @@ export default function BudgetCalculationsPage() {
             options={formCategoryOptions}
             value={form.category}
             onChange={(e) => {
-              setForm((f) => ({ ...f, category: e.target.value }));
+              const val = e.target.value;
+              const matched = eventTypes.find(
+                (t) => t.eventTypeName.toLowerCase() === val.toLowerCase()
+              );
+              setForm((f) => ({
+                ...f,
+                category: val,
+                eventTypeId: matched?.eventTypeId || "",
+              }));
               if (errors.category) {
                 setErrors((prev) => ({ ...prev, category: "" }));
               }

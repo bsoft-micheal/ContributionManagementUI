@@ -312,8 +312,8 @@ export default function EventFormPage() {
             status: detailedEvent.status || "Planned",
             baseAmount:
               detailedEvent.baseAmount !== undefined &&
-              detailedEvent.baseAmount !== null &&
-              Number(detailedEvent.baseAmount) > 0
+                detailedEvent.baseAmount !== null &&
+                Number(detailedEvent.baseAmount) > 0
                 ? String(detailedEvent.baseAmount)
                 : "",
             participantIds: pIds,
@@ -509,12 +509,14 @@ export default function EventFormPage() {
   const computedBudgetItems = useMemo(() => {
     const typeNameLower = (selectedTypeName || "").toLowerCase().trim();
 
-    // 1. Filter active master items matching the selected Event Type Category
+    // 1. Filter active master items matching the selected Event Type — match by EventTypeId or event type name
     let categoryItems = budgetItemsList.filter((b) => {
       if (b.isActive === false) return false;
+      if (form.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === form.eventTypeId.toLowerCase()) {
+        return true;
+      }
       const cat = (b.category || "").toLowerCase().trim();
-      if (!cat) return isBirthday; // Unassigned items default to birthday if birthday
-      return cat === typeNameLower || (isBirthday && cat.includes("birthday"));
+      return cat === typeNameLower;
     });
 
     if (isBirthday) {
@@ -540,9 +542,8 @@ export default function EventFormPage() {
           formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
         } else {
           if (puffsFactor > 0) {
-            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${
-              puffsFactor > 1 ? ` × ${puffsFactor}` : ""
-            }`;
+            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""
+              }`;
             amount = total * rate * puffsFactor;
           } else {
             calcText = "WFH only → Not provided";
@@ -766,19 +767,18 @@ export default function EventFormPage() {
 
       const celebrantsSummary = isBirthday
         ? monthCelebrants
-            .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
-            .join(", ")
+          .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
+          .join(", ")
         : "";
 
       const defaultDesc = isBirthday
-        ? `Birthday celebration (${office} Office, ${wfh} WFH)${
-            celebrantsSummary ? ` for ${celebrantsSummary}` : ""
-          }. Planned Budget: ₹${plannedBudget.toLocaleString(
-            "en-IN"
-          )}, Contribution/member: ₹${contributionPerMember}`
+        ? `Birthday celebration (${office} Office, ${wfh} WFH)${celebrantsSummary ? ` for ${celebrantsSummary}` : ""
+        }. Planned Budget: ₹${plannedBudget.toLocaleString(
+          "en-IN"
+        )}, Contribution/member: ₹${contributionPerMember}`
         : `${selectedTypeName} celebration for ${total} members. Planned Budget: ₹${plannedBudget.toLocaleString(
-            "en-IN"
-          )}, Contribution/member: ₹${contributionPerMember}`;
+          "en-IN"
+        )}, Contribution/member: ₹${contributionPerMember}`;
 
       const payload = {
         eventName: form.eventName.trim(),
@@ -1095,9 +1095,8 @@ export default function EventFormPage() {
                           return (
                             <Chip
                               key={m.memberId}
-                              label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${
-                                m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
-                              }`}
+                              label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
+                                }`}
                               size="small"
                               sx={{
                                 fontWeight: 600,
@@ -1695,6 +1694,188 @@ export default function EventFormPage() {
               </Box>
             </Grid>
           </Grid>
+
+          {/* Auto-Expense Preview Banner — shown only in create mode, updates on event type change */}
+          {!isEdit && (() => {
+            const typeNameLower = (selectedTypeName || "").toLowerCase().trim();
+            const autoExpenseItems = budgetItemsList.filter((b) => {
+              if (b.isActive === false) return false;
+              if (form.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === form.eventTypeId.toLowerCase()) {
+                return true;
+              }
+              const cat = (b.category || "").toLowerCase().trim();
+              return cat === typeNameLower;
+            });
+            if (!typeNameLower || autoExpenseItems.length === 0) return null;
+            return (
+              <Box
+                sx={{
+                  mt: 2.5,
+                  p: { xs: 2, sm: 2.5 },
+                  borderRadius: "14px",
+                  background: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(69, 56, 109, 0.12) 100%)"
+                      : "linear-gradient(135deg, rgba(69, 56, 109, 0.05) 0%, rgba(124, 58, 237, 0.04) 100%)",
+                  border: "1.5px dashed rgba(124, 58, 237, 0.4)",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                {/* Left accent bar */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: 4,
+                    height: "100%",
+                    background: "linear-gradient(180deg, #7c3aed 0%, #45386d 100%)",
+                    borderRadius: "14px 0 0 14px",
+                  }}
+                />
+
+                <Box sx={{ pl: 1.5 }}>
+                  {/* Header row */}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2, flexWrap: "wrap" }}>
+                    <Box
+                      sx={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: "8px",
+                        bgcolor: "rgba(124, 58, 237, 0.12)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <ReceiptIcon sx={{ fontSize: "1.05rem", color: "#7c3aed" }} />
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        fontWeight={800}
+                        sx={{
+                          fontSize: "0.95rem",
+                          color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4c1d95"),
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        Auto-Expense Preview
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.76rem",
+                          color: (theme) => (theme.palette.mode === "dark" ? "#a78bfa" : "#6d28d9"),
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        Saving this <strong>{selectedTypeName}</strong> event will auto-create:
+                      </Typography>
+                    </Box>
+
+                    {/* Count badge */}
+                    <Box
+                      sx={{
+                        ml: "auto",
+                        bgcolor: "rgba(124, 58, 237, 0.12)",
+                        border: "1px solid rgba(124, 58, 237, 0.3)",
+                        borderRadius: "20px",
+                        px: 1.5,
+                        py: 0.3,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#7c3aed" }}>
+                        {autoExpenseItems.length} expense{autoExpenseItems.length !== 1 ? "s" : ""} will be created
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Expense item cards grid */}
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)", lg: "repeat(4, 1fr)" },
+                      gap: 1,
+                      mb: 1.5,
+                    }}
+                  >
+                    {autoExpenseItems.map((item, idx) => (
+                      <Box
+                        key={item.budgetCalculationId || idx}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          px: 1.4,
+                          py: 0.85,
+                          borderRadius: "8px",
+                          bgcolor: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(124, 58, 237, 0.1)"
+                              : "rgba(255, 255, 255, 0.85)",
+                          border: "1px solid",
+                          borderColor: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(124, 58, 237, 0.22)"
+                              : "rgba(124, 58, 237, 0.18)",
+                          boxShadow: "0 1px 4px rgba(124, 58, 237, 0.06)",
+                        }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, overflow: "hidden" }}>
+                          <Box
+                            sx={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: "50%",
+                              bgcolor: "#7c3aed",
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Typography
+                            sx={{
+                              fontSize: "0.82rem",
+                              fontWeight: 600,
+                              color: (theme) => (theme.palette.mode === "dark" ? "#e2d9f3" : "#1e1a2e"),
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.expenseItem}
+                          </Typography>
+                        </Box>
+                        <Typography
+                          sx={{
+                            fontSize: "0.82rem",
+                            fontWeight: 800,
+                            color: "#7c3aed",
+                            ml: 1,
+                            flexShrink: 0,
+                          }}
+                        >
+                          ₹{Number(item.rate).toLocaleString("en-IN")}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+
+                  {/* Footer note */}
+                  <Typography
+                    sx={{
+                      fontSize: "0.74rem",
+                      color: "text.secondary",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    * Expenses are created with status <strong>"Pending"</strong> and can be managed under Finance → Manage Expenses.
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })()}
 
           {/* Bottom Action Footer */}
           <Divider sx={{ my: 3, borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2") }} />
