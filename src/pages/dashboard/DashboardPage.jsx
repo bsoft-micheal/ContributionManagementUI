@@ -41,6 +41,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
 import MemberPaymentQuickAccess from "../../components/dashboard/MemberPaymentQuickAccess";
 import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 const C = {
@@ -659,6 +660,7 @@ export default function DashboardPage() {
   const isDark = theme.palette.mode === "dark";
   const toast = useAppToast();
   const { authState } = useAuth();
+  const navigate = useNavigate();
   const isMember = authState?.role?.toLowerCase() === "member";
 
   const [activeTab, setActiveTab] = useState(0);
@@ -1036,12 +1038,6 @@ export default function DashboardPage() {
                 fontWeight: 700, minHeight: 48, textTransform: "none", fontSize: "0.88rem",
                 "&.Mui-selected": { color: "primary.main" }
               }} />
-            <Tab id="tab-dashboard" icon={<GridViewIcon sx={{ fontSize: 18 }} />}
-              iconPosition="start" label="Dashboard"
-              sx={{
-                fontWeight: 700, minHeight: 48, textTransform: "none", fontSize: "0.88rem",
-                "&.Mui-selected": { color: "primary.main" }
-              }} />
           </Tabs>
         </Box>
 
@@ -1109,7 +1105,7 @@ export default function DashboardPage() {
                         label="TOTAL EVENTS"
                         value={events.length}
                         helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
-                        onClick={() => setActiveTab(1)}
+                        onClick={() => navigate("/events")}
                         actionText="View Events →"
                       />
                     </Grid>

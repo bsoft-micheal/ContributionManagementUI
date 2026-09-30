@@ -60,10 +60,6 @@ export function getFeatureIdForPath(path) {
  * Resolves permissions for a given featureId and roleName.
  */
 export function getRightsForFeatureId(featureId, roleName) {
-  if (!roleName) {
-    return { read: true, write: true, deny: false };
-  }
-
   const savedRights = localStorage.getItem("projectRightsConfig");
   if (!savedRights) {
     return { read: true, write: true, deny: false };
@@ -71,8 +67,8 @@ export function getRightsForFeatureId(featureId, roleName) {
 
   try {
     const rightsMap = JSON.parse(savedRights);
-    const roleLower = String(roleName).toLowerCase();
-    const roleRights = rightsMap[roleName] || rightsMap[roleLower];
+    const roleLower = roleName ? String(roleName).toLowerCase() : "";
+    const roleRights = rightsMap["current"] || (roleName && (rightsMap[roleName] || rightsMap[roleLower]));
     if (!roleRights || !Array.isArray(roleRights)) {
       return { read: true, write: true, deny: false };
     }

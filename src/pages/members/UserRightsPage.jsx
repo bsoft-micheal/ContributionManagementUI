@@ -287,14 +287,17 @@ export default function UserRightsPage() {
 
     setSaving(true);
     try {
-      // Build request payload: every Rights item explicitly contains `role: selectedRoleName`
+      const selectedRoleObj = roles.find(r => r.roleName === selectedRoleName);
+      // Build request payload: every Rights item explicitly contains `roleId` and `role: selectedRoleName`
       const payload = {
+        roleId: selectedRoleObj?.roleId || undefined,
         roleName: selectedRoleName,
         rights: currentRows.map(r => {
           const typeVal = Number(r.accessType) || (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2));
           const strVal = typeVal === 3 ? "deny" : (typeVal === 1 ? "readOnly" : "readWrite");
           const pageVal = (r.action && r.action.trim() !== "" ? r.action : (r.page || r.subModule || r.module || "")).trim();
           return {
+            roleId: selectedRoleObj?.roleId || r.roleId || undefined,
             role: selectedRoleName,
             featureId: r.featureID || r.featureId || 0,
             module: (r.module || "").trim(),
@@ -376,27 +379,20 @@ export default function UserRightsPage() {
     {
       label: "Module",
       key: "module",
-      render: (row) => {
-        const idx = filteredRows.findIndex(r => r._uid === row._uid);
-        const repeated = idx > 0 && filteredRows[idx - 1].module === row.module;
-        return (
-          <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.8rem" }}>
-            {repeated ? "" : row.module}
-          </Typography>
-        );
-      },
+      render: (row) => (
+        <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.8rem" }}>
+          {row.module || "—"}
+        </Typography>
+      ),
     },
     {
       label: "Sub Module",
       key: "subModule",
       render: (row) => {
-        const idx = filteredRows.findIndex(r => r._uid === row._uid);
-        const prev = idx > 0 ? filteredRows[idx - 1] : null;
-        const repeated = prev && prev.module === row.module && prev.subModule === row.subModule;
         const val = row.subModule && row.subModule.trim() !== "" ? row.subModule : "—";
         return (
           <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.primary", fontWeight: 500 }}>
-            {repeated ? "" : val}
+            {val}
           </Typography>
         );
       },

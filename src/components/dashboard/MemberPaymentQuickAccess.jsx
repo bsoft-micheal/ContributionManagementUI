@@ -32,11 +32,14 @@ import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import CloseIcon from "@mui/icons-material/Close";
 import PhoneIcon from "@mui/icons-material/Phone";
 import EmailIcon from "@mui/icons-material/Email";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import AppSelect from "../common/AppSelect";
 import dayjs from "dayjs";
-import apiClient from "../../services/apiClient";
 import { getContributionsAsync } from "../../services/contributionService";
 import { getMembersAsync } from "../../services/memberService";
+import { getExpensesAsync } from "../../services/expenseService";
+import { getDashboardSummaryAsync } from "../../services/dashboardService";
+import { useAuth } from "../../contexts/AuthContext";
 import { useAppToast } from "../common/AppToast";
 
 export default function MemberPaymentQuickAccess({
@@ -50,13 +53,14 @@ export default function MemberPaymentQuickAccess({
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const toast = useAppToast();
+  const { authState } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [contributions, setContributions] = useState([]);
-  const [reportPendingDues, setReportPendingDues] = useState([]);
-  const [reportEvents, setReportEvents] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [fallbackEvents, setFallbackEvents] = useState([]);
   const [membersMap, setMembersMap] = useState(new Map());
-  const [statusFilter, setStatusFilter] = useState(initialStatus); // "all" | "pending" | "paid"
+  const [statusFilter, setStatusFilter] = useState(initialStatus); // "all" | "pending" | "paid" | "expense"
   const [search, setSearch] = useState("");
   const [selectedEventId, setSelectedEventId] = useState("ALL");
   const [page, setPage] = useState(0);
@@ -66,7 +70,7 @@ export default function MemberPaymentQuickAccess({
   const targetYear = appliedFilters?.year ? Number(appliedFilters.year) : 0;
   const eventTypeFilter = appliedFilters?.eventType || "ALL";
 
-  // Readable period label (e.g. "September 2026")
+  // Readable period label (e.g. "October 2026")
   const periodLabel = useMemo(() => {
     if (targetMonth > 0 && targetYear > 0) {
       return `${dayjs().month(targetMonth - 1).format("MMMM")} ${targetYear}`;
@@ -94,32 +98,38 @@ export default function MemberPaymentQuickAccess({
     async function loadData() {
       setLoading(true);
       try {
-        const reportParams = {
-          month: targetMonth > 0 ? targetMonth : null,
-          year: targetYear > 0 ? targetYear : null,
-        };
-
-        const [reportRes, contribRes, membersRes] = await Promise.all([
-          apiClient.get("/reports/getSummaryReportAsync", { params: reportParams }).catch(() => ({ data: null })),
+        const promises = [
           getContributionsAsync().catch(() => []),
           getMembersAsync().catch(() => []),
-        ]);
+          getExpensesAsync().catch(() => []),
+        ];
+
+        // If events prop is empty and we have a target month/year, fetch dashboard summary to get the month events
+        if ((!events || events.length === 0) && (targetMonth > 0 || targetYear > 0)) {
+          promises.push(
+            getDashboardSummaryAsync({
+              month: targetMonth > 0 ? targetMonth : null,
+              year: targetYear > 0 ? targetYear : null,
+            }).catch(() => null)
+          );
+        }
+
+        const [contribRes, membersRes, expensesRes, dashRes] = await Promise.all(promises);
 
         if (cancelled) return;
 
-        const reportData = (reportRes?.data && reportRes.data.data !== undefined)
-          ? reportRes.data.data
-          : reportRes?.data;
-
-        const rawReportPending = Array.isArray(reportData?.pendingDues) ? reportData.pendingDues : [];
-        const rawReportEvents = Array.isArray(reportData?.eventCollections) ? reportData.eventCollections : [];
-
         const rawContribs = Array.isArray(contribRes) ? contribRes : (contribRes?.data ?? []);
         const rawMembers = Array.isArray(membersRes) ? membersRes : (membersRes?.data ?? []);
+        const rawExpenses = Array.isArray(expensesRes) ? expensesRes : (expensesRes?.data ?? []);
 
-        setReportPendingDues(rawReportPending);
-        setReportEvents(rawReportEvents);
         setContributions(rawContribs);
+        setExpenses(rawExpenses);
+
+        if (dashRes) {
+          const dashData = dashRes?.data || dashRes;
+          const uEvents = Array.isArray(dashData?.upcomingEvents) ? dashData.upcomingEvents : [];
+          setFallbackEvents(uEvents);
+        }
 
         const map = new Map();
         rawMembers.forEach((m) => {
@@ -131,7 +141,7 @@ export default function MemberPaymentQuickAccess({
         setMembersMap(map);
       } catch (err) {
         if (!cancelled) {
-          toast.error("Failed to load member payment records for selected month");
+          toast.error("Failed to load member payment and expense records");
         }
       } finally {
         if (!cancelled) {
@@ -149,125 +159,125 @@ export default function MemberPaymentQuickAccess({
     };
   }, [targetMonth, targetYear, eventTypeFilter]);
 
-  // Combined list of events for the selected month/year
-  const combinedEvents = useMemo(() => {
-    const list = [...(events || [])];
-    const seen = new Set(
-      list.map((e) => String(e.eventId || e.EventId || "").toLowerCase()).filter(Boolean)
+  // Events for the selected month/year
+  const monthEvents = useMemo(() => {
+    if (Array.isArray(events) && events.length > 0) {
+      return events;
+    }
+    return fallbackEvents;
+  }, [events, fallbackEvents]);
+
+  // Set of event IDs for the selected month/year
+  const monthEventIdSet = useMemo(() => {
+    return new Set(
+      monthEvents.map((e) => String(e.eventId || e.EventId || "").toLowerCase()).filter(Boolean)
     );
-    (reportEvents || []).forEach((re) => {
-      const id = String(re.eventId || re.EventId || "").toLowerCase();
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        list.push(re);
+  }, [monthEvents]);
+
+  // Event info lookup by strictly event ID
+  const eventInfoMap = useMemo(() => {
+    const map = new Map();
+    monthEvents.forEach((e) => {
+      const id = String(e.eventId || e.EventId || "").toLowerCase();
+      if (id) {
+        map.set(id, {
+          eventId: e.eventId || e.EventId,
+          eventName: e.eventName || e.EventName || "--",
+          categoryName: e.eventTypeName || e.CategoryName || e.categoryName || "--",
+          eventDate: e.eventDate || e.EventDate,
+        });
       }
     });
-    return list;
-  }, [events, reportEvents]);
+    return map;
+  }, [monthEvents]);
 
   // Combined and scoped contributions
   const scopedItems = useMemo(() => {
-    const monthEventIdSet = new Set(
-      combinedEvents.map((e) => String(e.eventId || e.EventId || "").toLowerCase()).filter(Boolean)
-    );
-    const monthEventNameSet = new Set(
-      combinedEvents.map((e) => String(e.eventName || e.EventName || "").trim().toLowerCase()).filter(Boolean)
-    );
-
-    // Event info lookup by ID or name
-    const eventInfoMap = new Map();
-    combinedEvents.forEach((e) => {
-      const id = String(e.eventId || e.EventId || "").toLowerCase();
-      const name = String(e.eventName || e.EventName || "").trim().toLowerCase();
-      const info = {
-        eventId: e.eventId || e.EventId,
-        eventName: e.eventName || e.EventName,
-        categoryName: e.eventTypeName || e.CategoryName || e.categoryName || "--",
-      };
-      if (id) eventInfoMap.set(id, info);
-      if (name) eventInfoMap.set(name, info);
-    });
-
     const isMonthScoped = targetMonth > 0 || targetYear > 0;
-    const itemMap = new Map();
+    const isFilteredByType = Boolean(eventTypeFilter && eventTypeFilter !== "ALL");
+    const isMemberRole = isMember || String(authState?.role || "").toLowerCase() === "member";
+    const userEmail = String(authState?.email || "").toLowerCase().trim();
+    const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
 
-    // 1. Process contributions from getContributionsAsync
+    const list = [];
+    const seenContributionIds = new Set();
+
     contributions.forEach((c) => {
-      const cEventId = String(c.eventId || c.EventId || "").toLowerCase();
-      const cEventName = String(c.eventName || c.EventName || "").trim().toLowerCase();
+      const cId = String(c.contributionId || c.ContributionId || "");
+      if (cId) {
+        const lowerCId = cId.toLowerCase();
+        if (seenContributionIds.has(lowerCId)) return;
+        seenContributionIds.add(lowerCId);
+      }
 
-      // If scoped by month and month events exist, only include matching events
-      if (isMonthScoped && combinedEvents.length > 0) {
-        const matchesId = cEventId && monthEventIdSet.has(cEventId);
-        const matchesName = cEventName && monthEventNameSet.has(cEventName);
-        if (!matchesId && !matchesName) {
+      const cEventId = String(c.eventId || c.EventId || "").toLowerCase();
+
+      // If month/year is selected, strictly match event ID belonging to that month
+      if (isMonthScoped) {
+        if (!cEventId || !monthEventIdSet.has(cEventId)) {
           return;
         }
       }
 
-      const mId = String(c.MemberId || c.memberId || "").toLowerCase();
-      const memberInfo = membersMap.get(mId);
-      const isPaid = c.paymentStatus === 2 || String(c.paymentStatus).toLowerCase() === "paid";
-      const matchedEvt = eventInfoMap.get(cEventId) || eventInfoMap.get(cEventName);
+      const eventInfo = eventInfoMap.get(cEventId);
+      const categoryName = c.categoryName || c.CategoryName || eventInfo?.categoryName || "--";
 
-      const id = String(c.contributionId || c.ContributionId || `${mId}-${cEventId || cEventName}`);
-      itemMap.set(id, {
-        ...c,
-        id,
+      // Event Type category filter if specified
+      if (isFilteredByType) {
+        if (categoryName.toLowerCase() !== eventTypeFilter.toLowerCase()) {
+          return;
+        }
+      }
+
+      const mId = String(c.memberId || c.MemberId || "").toLowerCase();
+      const memberInfo = membersMap.get(mId);
+
+      // If Member role, only show own contributions
+      if (isMemberRole) {
+        const matchesMemberId = currentMemberId && mId === currentMemberId;
+        const matchesEmail = userEmail && (
+          String(memberInfo?.email || c.email || "").toLowerCase().trim() === userEmail
+        );
+        const matchesName = authState?.user?.fullName && (
+          String(c.memberName || memberInfo?.name || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim()
+        );
+        if (!matchesMemberId && !matchesEmail && !matchesName) {
+          return;
+        }
+      }
+
+      const isPaid = c.paymentStatus === 2 || String(c.paymentStatus).toLowerCase() === "paid" || String(c.paymentStatus).toLowerCase() === "completed";
+      const amount = Number(c.amount || c.Amount) || 0;
+
+      list.push({
+        id: cId || `${mId}-${cEventId}`,
         contributionId: c.contributionId || c.ContributionId,
-        eventId: c.eventId || c.EventId || matchedEvt?.eventId,
+        eventId: c.eventId || c.EventId || eventInfo?.eventId,
         memberId: c.memberId || c.MemberId,
         memberName: c.memberName || c.MemberName || memberInfo?.name || "Unknown Member",
         memberPhone: memberInfo?.phone || memberInfo?.phoneNumber || c.phone || "--",
         memberEmail: memberInfo?.email || c.email || "--",
-        eventName: c.eventName || c.EventName || matchedEvt?.eventName || "--",
-        categoryName: c.categoryName || c.CategoryName || matchedEvt?.categoryName || "--",
-        amount: Number(c.amount || c.Amount) || 0,
+        eventName: c.eventName || c.EventName || eventInfo?.eventName || "--",
+        categoryName,
+        amount,
         isPaid,
         paymentDate: c.paymentDate || c.PaymentDate,
         paymentMode: c.paymentMode ?? c.PaymentMode,
       });
     });
 
-    // 2. Ensure every pendingDue from getSummaryReportAsync for this month is included
-    (reportPendingDues || []).forEach((p) => {
-      const pId = String(p.contributionId || p.ContributionId || `${p.memberId}-${p.eventName}`);
-      const existing = itemMap.get(pId);
-      if (!existing) {
-        const mId = String(p.memberId || p.MemberId || "").toLowerCase();
-        const memberInfo = membersMap.get(mId);
-        const pEventName = String(p.eventName || p.EventName || "").trim().toLowerCase();
-        const matchedEvt = eventInfoMap.get(pEventName);
-
-        itemMap.set(pId, {
-          id: pId,
-          contributionId: p.contributionId || p.ContributionId,
-          eventId: matchedEvt?.eventId || null,
-          memberId: p.memberId || p.MemberId,
-          memberName: p.memberName || p.MemberName || memberInfo?.name || "Unknown Member",
-          memberPhone: memberInfo?.phone || memberInfo?.phoneNumber || p.phone || "--",
-          memberEmail: memberInfo?.email || "--",
-          eventName: p.eventName || p.EventName || matchedEvt?.eventName || "--",
-          categoryName: matchedEvt?.categoryName || "--",
-          amount: Number(p.amount || p.Amount) || 0,
-          isPaid: false,
-          paymentDate: null,
-          paymentMode: null,
-        });
-      }
-    });
-
-    let items = Array.from(itemMap.values());
-
-    // Event Type category filter if specified
-    if (eventTypeFilter && eventTypeFilter !== "ALL") {
-      items = items.filter(
-        (i) => (i.categoryName || "").toLowerCase() === eventTypeFilter.toLowerCase()
-      );
-    }
-
-    return items;
-  }, [contributions, reportPendingDues, combinedEvents, membersMap, targetMonth, targetYear, eventTypeFilter]);
+    return list;
+  }, [
+    contributions,
+    monthEventIdSet,
+    eventInfoMap,
+    membersMap,
+    targetMonth,
+    targetYear,
+    eventTypeFilter,
+    isMember,
+    authState,
+  ]);
 
   // Items scoped to selected event (if an event is chosen)
   const eventScopedItems = useMemo(() => {
@@ -303,7 +313,7 @@ export default function MemberPaymentQuickAccess({
   const eventOptions = useMemo(() => {
     const opts = [{ label: "All Events", value: "ALL" }];
     const seen = new Set();
-    combinedEvents.forEach((e) => {
+    monthEvents.forEach((e) => {
       const id = String(e.eventId || e.EventId || "");
       if (id && !seen.has(id.toLowerCase())) {
         seen.add(id.toLowerCase());
@@ -312,7 +322,63 @@ export default function MemberPaymentQuickAccess({
       }
     });
     return opts;
-  }, [combinedEvents]);
+  }, [monthEvents]);
+
+  // Filter expenses strictly against the selected event (or month's events)
+  const eventScopedExpenses = useMemo(() => {
+    // If a specific event is selected, filter strictly against that event's name
+    if (selectedEventId !== "ALL") {
+      const selectedEvent = monthEvents.find(
+        (e) => String(e.eventId || e.EventId || "").toLowerCase() === String(selectedEventId).toLowerCase()
+      );
+      const selectedName = (selectedEvent?.eventName || selectedEvent?.EventName || "").trim().toLowerCase();
+      if (!selectedName) return [];
+      return expenses.filter(
+        (exp) => (exp.eventName || "").trim().toLowerCase() === selectedName
+      );
+    }
+
+    // All events mode: match events belonging to the active month or month date
+    const monthEventNames = new Set(
+      monthEvents.map((e) => (e.eventName || e.EventName || "").trim().toLowerCase()).filter(Boolean)
+    );
+    const isMonthScoped = targetMonth > 0 || targetYear > 0;
+
+    return expenses.filter((exp) => {
+      const expEvtName = (exp.eventName || "").trim().toLowerCase();
+      if (monthEventNames.has(expEvtName)) return true;
+
+      if (isMonthScoped && exp.expenseDate) {
+        const d = dayjs(exp.expenseDate);
+        if (targetMonth > 0 && d.month() + 1 !== targetMonth) return false;
+        if (targetYear > 0 && d.year() !== targetYear) return false;
+        return true;
+      }
+
+      return !isMonthScoped;
+    });
+  }, [expenses, selectedEventId, monthEvents, targetMonth, targetYear]);
+
+  const expenseTotal = useMemo(() => {
+    return eventScopedExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+  }, [eventScopedExpenses]);
+
+  // Filtered expenses by Search within the selected event
+  const filteredExpenses = useMemo(() => {
+    return eventScopedExpenses.filter((item) => {
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const cat = (item.category || "").toLowerCase();
+        const evt = (item.eventName || "").toLowerCase();
+        const desc = (item.description || "").toLowerCase();
+        const sub = (item.submittedBy || "").toLowerCase();
+        if (!cat.includes(q) && !evt.includes(q) && !desc.includes(q) && !sub.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [eventScopedExpenses, search]);
 
   // Filtered by Status and Search within the selected event
   const filteredItems = useMemo(() => {
@@ -337,8 +403,36 @@ export default function MemberPaymentQuickAccess({
     });
   }, [eventScopedItems, statusFilter, search]);
 
+  const activeCount = statusFilter === "expense" ? filteredExpenses.length : filteredItems.length;
+
   // Handlers
   const handleExportCsv = () => {
+    if (statusFilter === "expense") {
+      if (filteredExpenses.length === 0) {
+        toast.info("No expense records to export");
+        return;
+      }
+      const headers = ["Category", "Event", "Amount", "Expense Date", "Submitted By", "Description"];
+      const rows = filteredExpenses.map((i) => [
+        `"${(i.category || "").replace(/"/g, '""')}"`,
+        `"${(i.eventName || "").replace(/"/g, '""')}"`,
+        Number(i.amount) || 0,
+        i.expenseDate ? dayjs(i.expenseDate).format("YYYY-MM-DD") : "",
+        `"${(i.submittedBy || "").replace(/"/g, '""')}"`,
+        `"${(i.description || "").replace(/"/g, '""')}"`,
+      ]);
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `event_expenses_${periodLabel.replace(/\s+/g, "_")}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Expense CSV export downloaded");
+      return;
+    }
+
     if (filteredItems.length === 0) {
       toast.info("No records to export");
       return;
@@ -411,7 +505,7 @@ export default function MemberPaymentQuickAccess({
                 }}
               />
               <Chip
-                label={`${filteredItems.length} records`}
+                label={`${activeCount} records`}
                 size="small"
                 sx={{
                   fontWeight: 700,
@@ -421,7 +515,7 @@ export default function MemberPaymentQuickAccess({
               />
             </Stack>
             <Typography variant="caption" color="text.secondary">
-              Quick access breakdown for {periodLabel} — showing who has paid and who is pending.
+              Quick access breakdown for {periodLabel} — showing who has paid, pending dues, and event expenses.
             </Typography>
           </Box>
 
@@ -445,8 +539,8 @@ export default function MemberPaymentQuickAccess({
 
         {/* Status Filter Pills Banner */}
         <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
-          {/* All */}
-          <Grid size={{ xs: 12, sm: 4 }}>
+          {/* Total Expected Amount */}
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Paper
               onClick={() => { setStatusFilter("all"); setPage(0); }}
               elevation={0}
@@ -464,21 +558,21 @@ export default function MemberPaymentQuickAccess({
               }}
             >
               <Typography variant="caption" color="text.secondary" fontWeight={700} textTransform="uppercase">
-                All Members
+                Total Expected Amount
               </Typography>
               <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900}>
-                  {stats.totalCount}
-                </Typography>
-                <Typography variant="body2" fontWeight={800} color="text.secondary">
+                <Typography variant="h6" fontWeight={900} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a" }}>
                   ₹{stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Typography>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  {stats.totalCount} Members
                 </Typography>
               </Stack>
             </Paper>
           </Grid>
 
           {/* Pending / Unpaid */}
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Paper
               onClick={() => { setStatusFilter("pending"); setPage(0); }}
               elevation={0}
@@ -502,18 +596,18 @@ export default function MemberPaymentQuickAccess({
                 <HourglassEmptyIcon sx={{ fontSize: 16, color: "error.main" }} />
               </Stack>
               <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} color="error.main">
-                  {stats.pendingCount}
-                </Typography>
-                <Typography variant="body2" fontWeight={800} color="error.main">
+                <Typography variant="h6" fontWeight={900} color="error.main" sx={{ fontFamily: '"Outfit", sans-serif' }}>
                   ₹{stats.pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Typography>
+                <Typography variant="caption" fontWeight={700} color="error.main">
+                  {stats.pendingCount} Members
                 </Typography>
               </Stack>
             </Paper>
           </Grid>
 
           {/* Paid */}
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Paper
               onClick={() => { setStatusFilter("paid"); setPage(0); }}
               elevation={0}
@@ -537,11 +631,46 @@ export default function MemberPaymentQuickAccess({
                 <CheckCircleIcon sx={{ fontSize: 16, color: "success.main" }} />
               </Stack>
               <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} color="success.main">
-                  {stats.paidCount}
-                </Typography>
-                <Typography variant="body2" fontWeight={800} color="success.main">
+                <Typography variant="h6" fontWeight={900} color="success.main" sx={{ fontFamily: '"Outfit", sans-serif' }}>
                   ₹{stats.paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Typography>
+                <Typography variant="caption" fontWeight={700} color="success.main">
+                  {stats.paidCount} Members
+                </Typography>
+              </Stack>
+            </Paper>
+          </Grid>
+
+          {/* Expense Amount */}
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Paper
+              onClick={() => { setStatusFilter("expense"); setPage(0); }}
+              elevation={0}
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                cursor: "pointer",
+                border: "1.5px solid",
+                borderColor: statusFilter === "expense" ? "#f59e0b" : isDark ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.2)",
+                bgcolor: statusFilter === "expense"
+                  ? isDark ? "rgba(245,158,11,0.18)" : "rgba(245,158,11,0.08)"
+                  : isDark ? "rgba(245,158,11,0.04)" : "rgba(245,158,11,0.03)",
+                transition: "all 0.2s ease",
+                "&:hover": { borderColor: "#f59e0b" },
+              }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="caption" color="warning.main" fontWeight={700} textTransform="uppercase">
+                  Expense Amount
+                </Typography>
+                <ReceiptLongRoundedIcon sx={{ fontSize: 16, color: "warning.main" }} />
+              </Stack>
+              <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
+                <Typography variant="h6" fontWeight={900} color="warning.main" sx={{ fontFamily: '"Outfit", sans-serif' }}>
+                  ₹{expenseTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Typography>
+                <Typography variant="caption" fontWeight={700} color="warning.main">
+                  {eventScopedExpenses.length} Expenses
                 </Typography>
               </Stack>
             </Paper>
@@ -552,7 +681,7 @@ export default function MemberPaymentQuickAccess({
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
           <TextField
             size="small"
-            placeholder="Search member, phone, or event…"
+            placeholder={statusFilter === "expense" ? "Search expense category, event, or description…" : "Search member, phone, or event…"}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             sx={{ flex: 1 }}
@@ -584,10 +713,10 @@ export default function MemberPaymentQuickAccess({
           <Stack alignItems="center" justifyContent="center" sx={{ py: 10 }}>
             <CircularProgress size={36} />
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-              Loading member statuses…
+              Loading records…
             </Typography>
           </Stack>
-        ) : filteredItems.length === 0 ? (
+        ) : activeCount === 0 ? (
           <Box
             sx={{
               py: 8,
@@ -598,10 +727,131 @@ export default function MemberPaymentQuickAccess({
             }}
           >
             <Typography variant="body2" fontWeight={600}>
-              No members found matching the selected criteria.
+              {statusFilter === "expense"
+                ? "No expenses found matching the selected criteria."
+                : "No members found matching the selected criteria."}
             </Typography>
           </Box>
+        ) : statusFilter === "expense" ? (
+          /* Expense Table */
+          <>
+            <TableContainer
+              component={Paper}
+              elevation={0}
+              sx={{
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 2,
+                flex: 1,
+                maxHeight: isDrawer ? "calc(100vh - 360px)" : 460,
+                overflowY: "auto",
+              }}
+            >
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Expense / Category</TableCell>
+                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Event</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Amount</TableCell>
+                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Expense Details</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredExpenses
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((item, idx) => {
+                      const avatarBg = getAvatarBg(item.category || item.eventName || "Expense");
+                      const initial = (item.category || "E").charAt(0).toUpperCase();
+
+                      return (
+                        <TableRow
+                          key={item.expenseId || idx}
+                          hover
+                          sx={{
+                            "&:hover": {
+                              bgcolor: isDark ? "rgba(255,255,255,0.03)" : "rgba(245,158,11,0.03)",
+                            },
+                          }}
+                        >
+                          {/* Expense / Category */}
+                          <TableCell>
+                            <Stack direction="row" alignItems="center" spacing={1.25}>
+                              <Avatar
+                                sx={{
+                                  width: 32,
+                                  height: 32,
+                                  fontSize: "0.8rem",
+                                  fontWeight: 800,
+                                  bgcolor: avatarBg,
+                                  color: "#ffffff",
+                                }}
+                              >
+                                {initial}
+                              </Avatar>
+                              <Box>
+                                <Typography variant="body2" fontWeight={700} color="text.primary">
+                                  {item.category || "General Expense"}
+                                </Typography>
+                                {item.description && (
+                                  <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 220, display: "block" }}>
+                                    {item.description}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Stack>
+                          </TableCell>
+
+                          {/* Event */}
+                          <TableCell>
+                            <Typography variant="body2" fontWeight={600} color="text.primary" noWrap sx={{ maxWidth: 220 }}>
+                              {item.eventName || "--"}
+                            </Typography>
+                          </TableCell>
+
+                          {/* Amount */}
+                          <TableCell align="right">
+                            <Typography
+                              variant="subtitle2"
+                              fontWeight={800}
+                              sx={{
+                                fontFamily: '"Outfit", sans-serif',
+                                color: "warning.main",
+                              }}
+                            >
+                              ₹{(Number(item.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Typography>
+                          </TableCell>
+
+                          {/* Details */}
+                          <TableCell>
+                            <Typography variant="caption" color="text.secondary">
+                              {item.expenseDate ? dayjs(item.expenseDate).format("DD MMM YYYY") : "--"}
+                              {item.submittedBy ? ` • ${item.submittedBy}` : ""}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* Pagination */}
+            <TablePagination
+              component="div"
+              count={filteredExpenses.length}
+              page={page}
+              onPageChange={(_, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              sx={{ borderTop: `1px solid ${theme.palette.divider}`, mt: 1 }}
+            />
+          </>
         ) : (
+          /* Member Payments Table */
           <>
             <TableContainer
               component={Paper}

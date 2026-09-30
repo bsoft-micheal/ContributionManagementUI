@@ -118,6 +118,13 @@ export function AuthProvider({ children }) {
 
       rightsMap[data.role] = processedRights;
       rightsMap[data.role.toLowerCase()] = processedRights;
+      if (Array.isArray(data.roles)) {
+        data.roles.forEach(r => {
+          rightsMap[r] = processedRights;
+          rightsMap[r.toLowerCase()] = processedRights;
+        });
+      }
+      rightsMap["current"] = processedRights;
       localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
     }
 
@@ -152,7 +159,7 @@ export function AuthProvider({ children }) {
       const savedRights = localStorage.getItem("projectRightsConfig");
       let rightsMap = savedRights ? JSON.parse(savedRights) : {};
 
-      rightsMap[data.role] = data.rights.map((r, idx) => ({
+      const processed = data.rights.map((r, idx) => ({
         id: idx + 1,
         featureId: r.featureID ?? r.featureId,
         module: r.module,
@@ -162,6 +169,16 @@ export function AuthProvider({ children }) {
         access: r.access,
         accessType: r.accessType ?? r.AccessType ?? (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2))
       }));
+
+      rightsMap[data.role] = processed;
+      rightsMap[data.role.toLowerCase()] = processed;
+      if (Array.isArray(data.roles)) {
+        data.roles.forEach(r => {
+          rightsMap[r] = processed;
+          rightsMap[r.toLowerCase()] = processed;
+        });
+      }
+      rightsMap["current"] = processed;
 
       localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
     }
