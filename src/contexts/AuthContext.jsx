@@ -199,6 +199,71 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const switchRole = async (targetRole) => {
+    let payload = {};
+    if (typeof targetRole === "object" && targetRole !== null) {
+      payload = {
+        roleId: targetRole.roleId || targetRole.RoleId || null,
+        roleName: targetRole.roleName || targetRole.RoleName || null,
+        userId: targetRole.userId || targetRole.UserId || null,
+      };
+    } else if (typeof targetRole === "string") {
+      if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(targetRole)) {
+        payload = { roleId: targetRole };
+      } else {
+        payload = { roleName: targetRole };
+      }
+    }
+
+    const { data: resData } = await apiClient.post("/auth/switchRoleAsync", payload);
+    const data = (resData && resData.data !== undefined) ? resData.data : resData;
+
+    if (data.rights && data.role) {
+      const savedRights = localStorage.getItem("projectRightsConfig");
+      let rightsMap = savedRights ? JSON.parse(savedRights) : {};
+
+      const processedRights = data.rights.map((r, idx) => {
+        let typeVal = r.accessType ?? r.AccessType;
+        if (typeVal === undefined || typeVal === null || isNaN(Number(typeVal)) || Number(typeVal) === 0) {
+          const str = String(r.access || r.Access || "").toLowerCase().replace(/[\s_-]/g, "");
+          typeVal = (str === "deny" || str === "3") ? 3 : ((str === "readonly" || str === "1") ? 1 : 2);
+        }
+        return {
+          id: idx + 1,
+          featureId: r.featureID ?? r.featureId ?? r.FeatureID ?? r.FeatureId,
+          module: r.module || r.Module || "",
+          subModule: r.subModule || r.SubModule || "",
+          action: r.action || r.Action || "",
+          page: r.page || r.Page || "",
+          access: r.access || r.Access || (Number(typeVal) === 3 ? "deny" : (Number(typeVal) === 1 ? "readOnly" : "readWrite")),
+          accessType: Number(typeVal)
+        };
+      });
+
+      rightsMap[data.role] = processedRights;
+      rightsMap[data.role.toLowerCase()] = processedRights;
+      if (Array.isArray(data.roles)) {
+        data.roles.forEach((r) => {
+          rightsMap[r] = processedRights;
+          rightsMap[r.toLowerCase()] = processedRights;
+        });
+      }
+      rightsMap["current"] = processedRights;
+      localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
+    }
+
+    if (data.token) {
+      sessionStorage.setItem("teamContributionAuth", JSON.stringify(data));
+      if (localStorage.getItem("teamContributionRememberMe") === "true") {
+        localStorage.setItem("teamContributionAuth", JSON.stringify(data));
+      }
+      apiClient.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+    }
+
+    setAuthState(data);
+    return data;
+  };
+
   const logout = async () => {
     try {
       if (authState?.token) {
@@ -292,6 +357,7 @@ export function AuthProvider({ children }) {
         authState,
         login,
         verifyTwoFactor,
+        switchRole,
         logout,
         updateProfile,
         fetchProfile,

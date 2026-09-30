@@ -10,6 +10,10 @@ import {
   Stack,
   Alert,
   Switch,
+  Select,
+  MenuItem,
+  Checkbox,
+  ListItemText,
 } from "@mui/material";
 import { useTheme, styled } from "@mui/material/styles";
 import {
@@ -24,6 +28,7 @@ import {
   ToggleOff as ToggleOffIcon,
   Description as ExcelIcon,
   FilterList as FilterListIcon,
+  SwapHoriz as SwapHorizIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
@@ -43,6 +48,7 @@ import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import UserDetailsDialog from "../../components/members/UserDetailsDialog";
+import SwitchRoleDialog from "../../components/members/SwitchRoleDialog";
 import { validateForm } from "../../utils/validation";
 import {
   getUsersAsync,
@@ -56,6 +62,179 @@ import { getWorkTypesAsync } from "../../services/workTypeService";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission } from "../../utils/rightsHelper";
+
+// ─── Multi-Role Select with Removable Chips ────────────────────────────────
+function AppMultiRoleSelect({
+  label,
+  placeholder,
+  value = [],
+  onChange,
+  options = [],
+  disabledOptions = [],
+  error,
+  helperText,
+  required,
+}) {
+  const theme = useTheme();
+
+  const handleSelectChange = (event) => {
+    const selected =
+      typeof event.target.value === "string"
+        ? event.target.value.split(",")
+        : event.target.value;
+    onChange(selected);
+  };
+
+  const handleDelete = (roleToDelete) => {
+    onChange(value.filter((r) => r !== roleToDelete));
+  };
+
+  return (
+    <Box sx={{ width: "100%" }}>
+      <Typography
+        variant="caption"
+        sx={{
+          fontWeight: 700,
+          color: error ? "error.main" : "text.secondary",
+          fontSize: "0.8rem",
+          display: "block",
+          mb: 0.6,
+        }}
+      >
+        {label} {required && <span style={{ color: "#ef4444" }}>*</span>}
+      </Typography>
+      <Select
+        multiple
+        fullWidth
+        displayEmpty
+        value={value}
+        onChange={handleSelectChange}
+        error={Boolean(error)}
+        renderValue={(selected) => {
+          if (!selected || selected.length === 0) {
+            return (
+              <Typography
+                variant="body2"
+                sx={{ color: "text.disabled", fontSize: "0.85rem" }}
+              >
+                {placeholder || "Select roles…"}
+              </Typography>
+            );
+          }
+          return (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, py: 0.3 }}>
+              {selected.map((val) => (
+                <Chip
+                  key={val}
+                  label={val}
+                  size="small"
+                  onDelete={(e) => {
+                    e.stopPropagation();
+                    handleDelete(val);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  sx={{
+                    height: 24,
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(124, 58, 237, 0.25)"
+                        : "rgba(124, 58, 237, 0.12)",
+                    color: (theme) =>
+                      theme.palette.mode === "dark" ? "#c4b5fd" : "#6d28d9",
+                    "& .MuiChip-deleteIcon": {
+                      fontSize: "0.95rem",
+                      color: "inherit",
+                      "&:hover": {
+                        color: "#ef4444",
+                      },
+                    },
+                  }}
+                />
+              ))}
+            </Box>
+          );
+        }}
+        sx={{
+          minHeight: 44,
+          borderRadius: "8px",
+          bgcolor: (theme) =>
+            theme.palette.mode === "dark"
+              ? "rgba(255, 255, 255, 0.04)"
+              : "#ffffff",
+          "& .MuiOutlinedInput-notchedOutline": {
+            borderColor: (theme) =>
+              error
+                ? theme.palette.error.main
+                : theme.palette.mode === "dark"
+                ? "rgba(255, 255, 255, 0.15)"
+                : "rgba(74, 63, 107, 0.2)",
+          },
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: error ? theme.palette.error.main : "#7c3aed",
+          },
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: error ? theme.palette.error.main : "#7c3aed",
+            borderWidth: "1.5px",
+          },
+        }}
+      >
+        {options.map((opt) => {
+          const isDisabled = disabledOptions.includes(opt.value);
+          return (
+            <MenuItem
+              key={opt.value}
+              value={opt.value}
+              disabled={isDisabled}
+              sx={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                opacity: isDisabled ? 0.45 : 1,
+              }}
+            >
+              <Checkbox
+                checked={value.includes(opt.value)}
+                size="small"
+                sx={{
+                  mr: 1,
+                  p: 0.3,
+                  color: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.4)"
+                      : "rgba(74,63,107,0.3)",
+                  "&.Mui-checked": { color: "#7c3aed" },
+                }}
+              />
+              <ListItemText primary={opt.label} />
+              {isDisabled && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: "text.disabled", ml: 1, fontSize: "0.7rem" }}
+                >
+                  (Selected in other field)
+                </Typography>
+              )}
+            </MenuItem>
+          );
+        })}
+      </Select>
+      {helperText && (
+        <Typography
+          variant="caption"
+          sx={{
+            color: error ? "error.main" : "text.secondary",
+            mt: 0.5,
+            display: "block",
+            fontSize: "0.75rem",
+          }}
+        >
+          {helperText}
+        </Typography>
+      )}
+    </Box>
+  );
+}
 
 // ─── Custom Green Switch matching screenshot ───────────────────────────────
 const CustomSwitch = styled(Switch)(({ theme }) => ({
@@ -114,7 +293,10 @@ const initialForm = {
   dateOfBirth: dayjs().subtract(18, "year"),
   joiningDate: dayjs(),
   createMemberProfile: false, // Enable User Access (OFF by default)
+  enableMultipleRoles: false, // Enable Multiple Roles (OFF by default)
   roleName: "",
+  primaryRoles: [],
+  secondaryRoles: [],
   newPassword: "",
   confirmPassword: "",
   isActive: true,
@@ -146,6 +328,8 @@ export default function UsersPage() {
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
   const [userToToggle, setUserToToggle] = useState(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [roleSwitchDialogOpen, setRoleSwitchDialogOpen] = useState(false);
+  const [selectedUserForRoleSwitch, setSelectedUserForRoleSwitch] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -292,8 +476,11 @@ export default function UsersPage() {
       workType: typeOptions.length > 0 ? typeOptions[0].value : "Office",
       gender: "Male",
       createMemberProfile: false,
-      username: "",
+      enableMultipleRoles: false,
       roleName: "",
+      primaryRoles: [],
+      secondaryRoles: [],
+      username: "",
       newPassword: "",
       confirmPassword: "",
     });
@@ -306,6 +493,21 @@ export default function UsersPage() {
   function openEdit(row) {
     if (!canEditUser) return;
     const hasAccess = row.hasMemberProfile !== false;
+    const hasMultiple = Boolean(
+      row.enableMultipleRoles ||
+      (row.roles && row.roles.length > 1) ||
+      (row.secondaryRoles && row.secondaryRoles.length > 0)
+    );
+    let pRoles = Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0
+      ? [...row.primaryRoles]
+      : (row.roleName ? [row.roleName] : []);
+    let sRoles = Array.isArray(row.secondaryRoles) ? [...row.secondaryRoles] : [];
+
+    if (hasMultiple && pRoles.length === 0 && row.roles && row.roles.length > 0) {
+      pRoles = [row.roles[0]];
+      sRoles = row.roles.slice(1);
+    }
+
     setForm({
       userId: row.userId,
       fullName: row.fullName || row.FullName || "",
@@ -317,7 +519,10 @@ export default function UsersPage() {
       dateOfBirth: row.dateOfBirth ? dayjs(row.dateOfBirth) : dayjs().subtract(18, "year"),
       joiningDate: row.joiningDate ? dayjs(row.joiningDate) : dayjs(),
       createMemberProfile: hasAccess,
-      roleName: row.roleName ?? "",
+      enableMultipleRoles: hasMultiple,
+      roleName: row.roleName ?? (pRoles[0] || ""),
+      primaryRoles: pRoles,
+      secondaryRoles: sRoles,
       newPassword: "",
       confirmPassword: "",
       isActive: row.isActive ?? true,
@@ -327,6 +532,37 @@ export default function UsersPage() {
     setShowConfirm(false);
     setErrors({});
     setDialogOpen(true);
+  }
+
+  function handleToggleMultipleRoles(checked) {
+    setForm((prev) => {
+      let pRoles = Array.isArray(prev.primaryRoles) ? [...prev.primaryRoles] : [];
+      let sRoles = Array.isArray(prev.secondaryRoles) ? [...prev.secondaryRoles] : [];
+      if (checked) {
+        if (pRoles.length === 0 && prev.roleName) {
+          pRoles = [prev.roleName];
+        }
+      } else {
+        const singleRole = pRoles.length > 0 ? pRoles[0] : (prev.roleName || "");
+        return {
+          ...prev,
+          enableMultipleRoles: false,
+          roleName: singleRole,
+        };
+      }
+      return {
+        ...prev,
+        enableMultipleRoles: checked,
+        primaryRoles: pRoles,
+        secondaryRoles: sRoles,
+      };
+    });
+    setErrors((prev) => ({
+      ...prev,
+      primaryRoles: "",
+      secondaryRoles: "",
+      roleName: "",
+    }));
   }
 
   function openView(row) {
@@ -346,7 +582,6 @@ export default function UsersPage() {
     const filed = "This field is required";
     const schema = {
       fullName: { required: true, type: "letteronly", min: 2, max: 100, label: filed },
-      roleName: { required: true, label: filed },
       email: { required: true, email: true, label: filed },
       phone: { required: true, type: "numberonly", min: 10, max: 10, label: filed },
       gender: { required: true, label: filed },
@@ -354,6 +589,10 @@ export default function UsersPage() {
       dateOfBirth: { required: true, label: filed },
       joiningDate: { required: true, label: filed },
     };
+
+    if (!form.enableMultipleRoles) {
+      schema.roleName = { required: true, label: filed };
+    }
 
     if (form.createMemberProfile) {
       schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: filed };
@@ -367,6 +606,21 @@ export default function UsersPage() {
     }
 
     const e = validateForm(form, schema);
+
+    if (form.enableMultipleRoles) {
+      if (!form.primaryRoles || form.primaryRoles.length === 0) {
+        e.primaryRoles = "At least one Primary Role is required";
+      }
+      if (!form.secondaryRoles || form.secondaryRoles.length === 0) {
+        e.secondaryRoles = "At least one Secondary Role is required";
+      }
+      if (form.primaryRoles && form.secondaryRoles) {
+        const overlap = form.primaryRoles.filter((r) => form.secondaryRoles.includes(r));
+        if (overlap.length > 0) {
+          e.secondaryRoles = "Same role cannot be selected in both Primary and Secondary";
+        }
+      }
+    }
 
     if (form.createMemberProfile) {
       if (form.newPassword && form.confirmPassword && form.newPassword !== form.confirmPassword) {
@@ -459,6 +713,14 @@ export default function UsersPage() {
 
     setSaving(true);
     try {
+      const isMultiple = Boolean(form.enableMultipleRoles);
+      const primaryRolesList = isMultiple ? (form.primaryRoles || []) : (form.roleName ? [form.roleName] : []);
+      const secondaryRolesList = isMultiple ? (form.secondaryRoles || []) : [];
+      const combinedRoles = isMultiple
+        ? [...new Set([...primaryRolesList, ...secondaryRolesList])]
+        : (form.roleName ? [form.roleName] : ["Member"]);
+      const mainRoleName = primaryRolesList.length > 0 ? primaryRolesList[0] : (form.roleName || "Member");
+
       const payload = {
         fullName: form.fullName.trim(),
         username: resolvedUsername,
@@ -470,8 +732,12 @@ export default function UsersPage() {
         joiningDate: form.joiningDate ? (dayjs.isDayjs(form.joiningDate) ? form.joiningDate.toISOString() : form.joiningDate) : null,
         createMemberProfile: isAccess,
         enableUserAccess: isAccess,
+        enableMultipleRoles: isMultiple,
         memberUsername: isAccess ? resolvedUsername : null,
-        roleName: isAccess ? form.roleName : (form.roleName || "Member"),
+        roleName: mainRoleName,
+        roles: combinedRoles,
+        primaryRoles: primaryRolesList,
+        secondaryRoles: secondaryRolesList,
         password: isAccess && form.newPassword ? form.newPassword.trim() : undefined,
         isActive: form.isActive,
       };
@@ -771,60 +1037,62 @@ export default function UsersPage() {
   const columns = [
     {
       label: "Action",
-      sx: { width: 140 },
-      render: (row) => (
-        <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title="View Details">
-            <IconButton
-              size="small"
-              sx={{ p: 0.3 }}
-              onClick={() => openView(row)}
-            >
-              <ViewIcon sx={{ fontSize: "1.05rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Edit User" : ""}>
-            <span>
+      sx: { width: 145 },
+      render: (row) => {
+        return (
+          <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
+            <Tooltip title="View Details">
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!canEditUser}
-                onClick={() => openEdit(row)}
+                onClick={() => openView(row)}
               >
-                <EditIcon sx={{ fontSize: "1.05rem", color: canEditUser ? actionIconColor : "#cbd5e1" }} />
+                <ViewIcon sx={{ fontSize: "1.05rem", color: actionIconColor }} />
               </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={canDeleteUser ? "Delete User" : ""}>
-            <span>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canDeleteUser}
-                onClick={() => handleDeleteRequest(row.userId)}
-              >
-                <DeleteIcon sx={{ fontSize: "1.05rem", color: canDeleteUser ? actionIconColor : "#cbd5e1" }} />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={canChangeUserStatus ? (row.isActive ? "Deactivate User" : "Activate User") : ""}>
-            <span>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canChangeUserStatus}
-                onClick={() => handleToggleStatusRequest(row)}
-              >
-                {row.isActive ? (
-                  <ToggleOnIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#10b981" : "#cbd5e1" }} />
-                ) : (
-                  <ToggleOffIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#ef4444" : "#cbd5e1" }} />
-                )}
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      ),
+            </Tooltip>
+            <Tooltip title={hasWriteAccess ? "Edit User" : ""}>
+              <span>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canEditUser}
+                  onClick={() => openEdit(row)}
+                >
+                  <EditIcon sx={{ fontSize: "1.05rem", color: canEditUser ? actionIconColor : "#cbd5e1" }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={canDeleteUser ? "Delete User" : ""}>
+              <span>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canDeleteUser}
+                  onClick={() => handleDeleteRequest(row.userId)}
+                >
+                  <DeleteIcon sx={{ fontSize: "1.05rem", color: canDeleteUser ? actionIconColor : "#cbd5e1" }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={canChangeUserStatus ? (row.isActive ? "Deactivate User" : "Activate User") : ""}>
+              <span>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canChangeUserStatus}
+                  onClick={() => handleToggleStatusRequest(row)}
+                >
+                  {row.isActive ? (
+                    <ToggleOnIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#10b981" : "#cbd5e1" }} />
+                  ) : (
+                    <ToggleOffIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#ef4444" : "#cbd5e1" }} />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        );
+      },
     },
     {
       label: "Full Name",
@@ -846,23 +1114,137 @@ export default function UsersPage() {
     },
     { label: "Email", key: "email" },
     {
-      label: "Role",
+      label: "Member Role(s)",
       key: "roleName",
       render: (row) => {
-        const style = getRoleStyle(row.roleName);
+        const assignedRoles = (Array.isArray(row.roles) && row.roles.length > 0)
+          ? row.roles
+          : (row.roleName ? [row.roleName] : ["Member"]);
+
         return (
-          <Chip
-            label={row.roleName ?? "—"}
-            size="small"
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>
+            {assignedRoles.map((r, idx) => {
+              const style = getRoleStyle(r);
+              const isPrimary = Boolean(
+                row.primaryRoles?.includes(r) ||
+                (!row.primaryRoles?.length && idx === 0)
+              );
+              return (
+                <React.Fragment key={`${r}-${idx}`}>
+                  <Chip
+                    label={r}
+                    size="small"
+                    sx={{
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark" ? style.darkBg : style.bg,
+                      color: (theme) =>
+                        theme.palette.mode === "dark" ? style.darkColor : style.color,
+                      fontWeight: 700,
+                      fontSize: "0.72rem",
+                      height: 22,
+                      borderRadius: "4px",
+                      border: isPrimary ? "1px solid rgba(124, 58, 237, 0.35)" : "none",
+                    }}
+                  />
+                  {idx < assignedRoles.length - 1 && (
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.disabled", fontWeight: 700, mx: 0.2 }}
+                    >
+                      |
+                    </Typography>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </Box>
+        );
+      },
+    },
+    {
+      label: "Is Primary",
+      key: "isPrimary",
+      render: (row) => {
+        const isPrimary = row.isPrimary !== false;
+        return isPrimary ? (
+          <Typography
+            variant="caption"
+            fontWeight={800}
             sx={{
-              bgcolor: (theme) => (theme.palette.mode === "dark" ? style.darkBg : style.bg),
-              color: (theme) => (theme.palette.mode === "dark" ? style.darkColor : style.color),
-              fontWeight: 700,
-              fontSize: "0.72rem",
-              height: 22,
+              color: "#16a34a",
+              bgcolor: "rgba(22,163,74,0.1)",
+              px: 1.2,
+              py: 0.3,
               borderRadius: "4px",
+              fontSize: "0.7rem",
+              letterSpacing: "0.03em",
+              display: "inline-block",
             }}
-          />
+          >
+            Yes
+          </Typography>
+        ) : (
+          <Typography
+            variant="caption"
+            fontWeight={800}
+            sx={{
+              color: "#64748b",
+              bgcolor: "rgba(100,116,139,0.1)",
+              px: 1.2,
+              py: 0.3,
+              borderRadius: "4px",
+              fontSize: "0.7rem",
+              letterSpacing: "0.03em",
+              display: "inline-block",
+            }}
+          >
+            No
+          </Typography>
+        );
+      },
+    },
+    {
+      label: "Is Secondary",
+      key: "isSecondary",
+      render: (row) => {
+        const hasSecondary = Boolean(
+          row.isSecondary ||
+          (Array.isArray(row.secondaryRoles) && row.secondaryRoles.length > 0)
+        );
+        return hasSecondary ? (
+          <Typography
+            variant="caption"
+            fontWeight={800}
+            sx={{
+              color: "#16a34a",
+              bgcolor: "rgba(22,163,74,0.1)",
+              px: 1.2,
+              py: 0.3,
+              borderRadius: "4px",
+              fontSize: "0.7rem",
+              letterSpacing: "0.03em",
+              display: "inline-block",
+            }}
+          >
+            Yes
+          </Typography>
+        ) : (
+          <Typography
+            variant="caption"
+            fontWeight={800}
+            sx={{
+              color: "#64748b",
+              bgcolor: "rgba(100,116,139,0.1)",
+              px: 1.2,
+              py: 0.3,
+              borderRadius: "4px",
+              fontSize: "0.7rem",
+              letterSpacing: "0.03em",
+              display: "inline-block",
+            }}
+          >
+            No
+          </Typography>
         );
       },
     },
@@ -1146,8 +1528,8 @@ export default function UsersPage() {
         }
       >
         <Grid container spacing={2.5}>
-          {/* Row 1: Full Name & Member Role */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          {/* Row 1: Full Name (& Member Role if single role) */}
+          <Grid size={{ xs: 12, md: form.enableMultipleRoles ? 12 : 6 }}>
             <AppInput
               label="Full Name"
               placeholder="Enter full name"
@@ -1160,20 +1542,55 @@ export default function UsersPage() {
               required
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppSelect
-              label="Member Role"
-              placeholder="Select role…"
-              value={form.roleName}
-              onChange={(e) => fieldChange("roleName", e.target.value)}
-              options={userRolesList}
-              error={!!errors.roleName}
-              helperText={errors.roleName}
-              required
-            />
-          </Grid>
 
-          {/* Row 2: Email & Phone Number */}
+          {!form.enableMultipleRoles && (
+            <Grid size={{ xs: 12, md: 6 }}>
+              <AppSelect
+                label="Member Role"
+                placeholder="Select role…"
+                value={form.roleName}
+                onChange={(e) => fieldChange("roleName", e.target.value)}
+                options={userRolesList}
+                error={!!errors.roleName}
+                helperText={errors.roleName}
+                required
+              />
+            </Grid>
+          )}
+
+          {/* Row 2 (When Enable Multiple Roles = ON): Primary Role * & Secondary Role * */}
+          {form.enableMultipleRoles && (
+            <>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <AppMultiRoleSelect
+                  label="Primary Role"
+                  placeholder="Select primary role(s)…"
+                  value={form.primaryRoles}
+                  onChange={(val) => fieldChange("primaryRoles", val)}
+                  options={userRolesList}
+                  disabledOptions={form.secondaryRoles}
+                  error={!!errors.primaryRoles}
+                  helperText={errors.primaryRoles}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <AppMultiRoleSelect
+                  label="Secondary Role"
+                  placeholder="Select secondary role(s)…"
+                  value={form.secondaryRoles}
+                  onChange={(val) => fieldChange("secondaryRoles", val)}
+                  options={userRolesList}
+                  disabledOptions={form.primaryRoles}
+                  error={!!errors.secondaryRoles}
+                  helperText={errors.secondaryRoles}
+                  required
+                />
+              </Grid>
+            </>
+          )}
+
+          {/* Row: Email & Phone Number */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppInput
               label="Email"
@@ -1200,7 +1617,7 @@ export default function UsersPage() {
             />
           </Grid>
 
-          {/* Row 3: Gender & Work Type */}
+          {/* Row: Gender & Work Type */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppSelect
               label="Gender"
@@ -1226,7 +1643,7 @@ export default function UsersPage() {
             />
           </Grid>
 
-          {/* Row 4: Date of Birth & Joining Date */}
+          {/* Row: Date of Birth & Joining Date */}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppDateInput
               label="Date of Birth"
@@ -1248,8 +1665,8 @@ export default function UsersPage() {
             />
           </Grid>
 
-          {/* Row 5: Enable User Access Card */}
-          <Grid size={{ xs: 12 }}>
+          {/* Bottom Switches: Enable User Access & Enable Multiple Roles in the same row */}
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 p: 1.75,
@@ -1287,11 +1704,49 @@ export default function UsersPage() {
               />
             </Box>
           </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box
+              sx={{
+                p: 1.75,
+                px: 2.5,
+                borderRadius: "10px",
+                border: "1px solid",
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.1)"
+                    : "rgba(74, 63, 107, 0.14)",
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.03)"
+                    : "#f8f7fc",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                minHeight: 52,
+              }}
+            >
+              <Typography
+                variant="subtitle1"
+                fontWeight={700}
+                sx={{
+                  color: (theme) =>
+                    theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+                  fontSize: "0.95rem",
+                }}
+              >
+                Enable Multiple Roles
+              </Typography>
+              <CustomSwitch
+                checked={Boolean(form.enableMultipleRoles)}
+                onChange={(e) => handleToggleMultipleRoles(e.target.checked)}
+              />
+            </Box>
+          </Grid>
 
           {/* ── Conditional User Access Fields ── */}
           {form.createMemberProfile && (
             <>
-              {/* Row 6: Username */}
+              {/* Username */}
               <Grid size={{ xs: 12, md: 6 }}>
                 <AppInput
                   label="Username"
@@ -1307,7 +1762,7 @@ export default function UsersPage() {
               </Grid>
               <Grid size={{ xs: 12, md: 6 }} sx={{ display: { xs: "none", md: "block" } }} />
 
-              {/* Row 7: Password & Confirm Password */}
+              {/* Password & Confirm Password */}
               <Grid size={{ xs: 12, md: 6 }}>
                 <AppInput
                   label={form.userId ? "New Password (leave blank to keep current)" : "Password"}
@@ -1390,6 +1845,19 @@ export default function UsersPage() {
           )}
         </Grid>
       </AppDialog>
+
+      {/* ── Switch Role Dialog for Table Action ───────────────────────────── */}
+      <SwitchRoleDialog
+        open={roleSwitchDialogOpen}
+        onClose={() => {
+          setRoleSwitchDialogOpen(false);
+          setSelectedUserForRoleSwitch(null);
+        }}
+        targetUser={selectedUserForRoleSwitch}
+        onSuccess={() => {
+          loadData();
+        }}
+      />
 
       {/* ── Delete Confirm ────────────────────────────────────────────────── */}
       <AppConfirmDialog

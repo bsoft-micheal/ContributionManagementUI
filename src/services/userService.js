@@ -43,3 +43,7 @@ export const getProfileAsync = async () => {
 export const updateProfileAsync = async (data) => {
   return await putApi("/users/updateProfileAsync", data);
 };
+
+export const switchRoleAsync = async (data) => {
+  return await postApi("/users/switchRoleAsync", data);
+};
