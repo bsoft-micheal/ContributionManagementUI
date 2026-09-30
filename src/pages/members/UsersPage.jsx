@@ -795,15 +795,15 @@ export default function UsersPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this user is referenced in contributions, events, or transactions" : (hasWriteAccess ? "Delete User" : "")}>
+          <Tooltip title={canDeleteUser ? "Delete User" : ""}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
+                disabled={!canDeleteUser}
                 onClick={() => handleDeleteRequest(row.userId)}
               >
-                <DeleteIcon sx={{ fontSize: "1.05rem", color: hasWriteAccess && !(row.isReferred || row.IsReferred) ? actionIconColor : "#cbd5e1" }} />
+                <DeleteIcon sx={{ fontSize: "1.05rem", color: canDeleteUser ? actionIconColor : "#cbd5e1" }} />
               </IconButton>
             </span>
           </Tooltip>

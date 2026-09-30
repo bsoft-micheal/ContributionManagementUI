@@ -182,15 +182,12 @@ export default function EventsPage() {
             </Tooltip>
           )}
           {canDeleteEvent && (
-            <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this event has recorded payments, expenses, or photos" : "Delete Event"}>
-              <span>
-                <IconButton size="small" sx={{ p: 0.3 }}
-                  disabled={Boolean(row.isReferred || row.IsReferred)}
-                  onClick={() => handleDeleteRequest(row)}
-                >
-                  <DeleteIcon sx={{ fontSize: "1.1rem", color: !(row.isReferred || row.IsReferred) ? actionIconColor : "#cbd5e1" }} />
-                </IconButton>
-              </span>
+            <Tooltip title="Delete Event">
+              <IconButton size="small" sx={{ p: 0.3 }}
+                onClick={() => handleDeleteRequest(row)}
+              >
+                <DeleteIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+              </IconButton>
             </Tooltip>
           )}
           <Tooltip title="Add Photos">
@@ -243,7 +240,12 @@ export default function EventsPage() {
       label: "Valuation",
       key: "totalExpectedAmount",
       align: "right",
-      render: (row) => <Typography variant="body2" fontWeight={700}>₹{Number(row.totalExpectedAmount || 0).toLocaleString("en-IN")}</Typography>
+      render: (row) => {
+        const val = Number(row.totalExpectedAmount) > 0
+          ? Number(row.totalExpectedAmount)
+          : Number(row.baseAmount || 0);
+        return <Typography variant="body2" fontWeight={700}>₹{val.toLocaleString("en-IN")}</Typography>;
+      }
     },
     {
       label: "Created By",
@@ -350,7 +352,7 @@ export default function EventsPage() {
               <Box sx={{ display: "flex", alignItems: "center", gap: 3, justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, fontSize: "0.65rem" }}>Expected Amount</Typography>
-                  <Typography variant="body2" fontWeight={800} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }} display="block">₹{events.reduce((sum, e) => sum + (Number(e.totalExpectedAmount) || 0), 0).toLocaleString("en-IN")}</Typography>
+                  <Typography variant="body2" fontWeight={800} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }} display="block">₹{events.reduce((sum, e) => sum + (Number(e.totalExpectedAmount) > 0 ? Number(e.totalExpectedAmount) : (Number(e.baseAmount) || 0)), 0).toLocaleString("en-IN")}</Typography>
                 </Box>
               </Box>
             </Grid>

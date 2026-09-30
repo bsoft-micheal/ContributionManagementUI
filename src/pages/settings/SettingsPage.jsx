@@ -629,23 +629,49 @@ export default function SettingsPage() {
         if (data && typeof data === "object") {
           const localSaved = localStorage.getItem("cm_system_settings");
           let localMode = "generated";
-          let localCategoryTemplates = DEFAULT_CATEGORY_TEMPLATES;
-          let localSelectedCategoryId = "all";
-          let localEnableMonthlyEmail = true;
-          let localEnableReminderEmail = true;
-          let localReminderIntervalDays = "10";
-          let localMaxReminders = "3";
+          let backendCategoryTemplates = null;
+          if (data.categoryTemplates) {
+            try {
+              backendCategoryTemplates = typeof data.categoryTemplates === "string"
+                ? JSON.parse(data.categoryTemplates)
+                : data.categoryTemplates;
+            } catch (e) { }
+          }
+
+          let localCategoryTemplates =
+            backendCategoryTemplates && typeof backendCategoryTemplates === "object" && Object.keys(backendCategoryTemplates).length > 0
+              ? { ...DEFAULT_CATEGORY_TEMPLATES, ...backendCategoryTemplates }
+              : DEFAULT_CATEGORY_TEMPLATES;
+
+          let localSelectedCategoryId = data.selectedTemplateCategoryId || "all";
+          let localEnableMonthlyEmail = data.enableMonthlyEmail !== undefined ? data.enableMonthlyEmail : true;
+          let localEnableReminderEmail = data.enableReminderEmail !== undefined ? data.enableReminderEmail : true;
+          let localReminderIntervalDays = data.reminderIntervalDays ? String(data.reminderIntervalDays) : "10";
+          let localMaxReminders = data.maxReminders ? String(data.maxReminders) : "3";
           let localBirthdayMembersExempt = undefined;
+
           try {
             if (localSaved) {
               const parsed = JSON.parse(localSaved);
               if (parsed.qrMode) localMode = parsed.qrMode;
-              if (parsed.categoryTemplates) localCategoryTemplates = parsed.categoryTemplates;
-              if (parsed.selectedTemplateCategoryId) localSelectedCategoryId = parsed.selectedTemplateCategoryId;
-              if (parsed.enableMonthlyEmail !== undefined) localEnableMonthlyEmail = parsed.enableMonthlyEmail;
-              if (parsed.enableReminderEmail !== undefined) localEnableReminderEmail = parsed.enableReminderEmail;
-              if (parsed.reminderIntervalDays) localReminderIntervalDays = String(parsed.reminderIntervalDays);
-              if (parsed.maxReminders) localMaxReminders = String(parsed.maxReminders);
+              if (!backendCategoryTemplates && parsed.categoryTemplates) {
+                localCategoryTemplates = { ...DEFAULT_CATEGORY_TEMPLATES, ...parsed.categoryTemplates };
+              }
+              if (!data.selectedTemplateCategoryId && parsed.selectedTemplateCategoryId) {
+                localSelectedCategoryId = parsed.selectedTemplateCategoryId;
+              }
+              if (data.enableMonthlyEmail === undefined && parsed.enableMonthlyEmail !== undefined) {
+                localEnableMonthlyEmail = parsed.enableMonthlyEmail;
+              }
+              if (data.enableReminderEmail === undefined && parsed.enableReminderEmail !== undefined) {
+                localEnableReminderEmail = parsed.enableReminderEmail;
+              }
+              if (!data.reminderIntervalDays && parsed.reminderIntervalDays) {
+                localReminderIntervalDays = String(parsed.reminderIntervalDays);
+              }
+              if (!data.maxReminders && parsed.maxReminders) {
+                localMaxReminders = String(parsed.maxReminders);
+              }
               if (parsed.birthdayMembersExempt !== undefined) localBirthdayMembersExempt = parsed.birthdayMembersExempt;
             }
           } catch (e) { }
@@ -835,6 +861,12 @@ export default function SettingsPage() {
       }
 
       updatedCategoryTemplates[selectedCategoryId] = currentEntry;
+
+      const foundCat = categoriesList.find((c) => String(c.eventTypeId) === String(selectedCategoryId));
+      const catName = foundCat?.eventTypeName?.toLowerCase().trim();
+      if (catName) {
+        updatedCategoryTemplates[catName] = currentEntry;
+      }
 
       let defaultSub = settings.emailSubject;
       let defaultDesc = settings.emailDescription;
