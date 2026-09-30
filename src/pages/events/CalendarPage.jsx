@@ -147,6 +147,13 @@ export default function CalendarPage() {
   const [members, setMembers] = useState([]);
   const [contributions, setContributions] = useState([]);
 
+  // Strictly filter to active, non-exited, non-deleted member accounts
+  const activeMembers = useMemo(() => {
+    return (members || []).filter(
+      (m) => m.isActive !== false && !m.isExited && !m.isDeleted
+    );
+  }, [members]);
+
   // Modals for Create and View
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -167,11 +174,23 @@ export default function CalendarPage() {
         getContributionsAsync().catch(() => []),
       ]);
       const data = resData && resData.data !== undefined ? resData.data : resData;
-      setEvents(Array.isArray(data) ? data : []);
+      setEvents(Array.isArray(data) ? data.filter((e) => !e.isDeleted) : []);
       setContributions(Array.isArray(contribsData) ? contribsData : []);
     } catch {
       toast.error("Failed to load calendar events.");
     }
+  };
+
+  const handleEventDeleted = (deletedEventId) => {
+    setEvents((prev) => prev.filter((e) => e.eventId !== deletedEventId));
+    setDetailedEventsMap((prev) => {
+      const copy = { ...prev };
+      delete copy[deletedEventId];
+      return copy;
+    });
+    setViewDialogOpen(false);
+    setSelectedEvent(null);
+    loadCalendarData();
   };
 
   useEffect(() => {
@@ -196,7 +215,7 @@ export default function CalendarPage() {
 
   // Filter events by Category and Search Text
   const filteredEvents = useMemo(() => {
-    let list = events;
+    let list = (events || []).filter((e) => !e.isDeleted);
 
     if (categoryFilter !== "ALL") {
       const filterLower = categoryFilter.toLowerCase();
@@ -232,7 +251,7 @@ export default function CalendarPage() {
     if (!isBirthday) return [];
 
     const eventMonth = dayjs(eventItem.eventDate).month();
-    const activeMembersInMonth = members.filter((m) => {
+    const activeMembersInMonth = activeMembers.filter((m) => {
       const dob = parseMemberDob(m.dateOfBirth);
       return dob && dob.month() === eventMonth;
     });
@@ -243,7 +262,7 @@ export default function CalendarPage() {
     let matchedCelebrants = [];
 
     if (participantIds.length > 0) {
-      const pMembers = members.filter(
+      const pMembers = activeMembers.filter(
         (m) => participantIds.includes(m.memberId) && parseMemberDob(m.dateOfBirth)
       );
       const monthMatches = pMembers.filter(
@@ -255,7 +274,7 @@ export default function CalendarPage() {
     const textToSearch = `${eventItem.eventName || ""} ${
       eventItem.description || ""
     }`.toLowerCase();
-    const nameMatches = members.filter((m) => {
+    const nameMatches = activeMembers.filter((m) => {
       if (!m.name || !m.dateOfBirth) return false;
       const lowerName = m.name.toLowerCase().trim();
       if (textToSearch.includes(lowerName)) return true;
@@ -502,35 +521,6 @@ export default function CalendarPage() {
       }
     }
 
-    // Also include any members with DOB on this day if category is ALL or Birthday
-    if (categoryFilter === "ALL" || isBirthdayView) {
-      for (const mem of members) {
-        const dob = parseMemberDob(mem.dateOfBirth);
-        if (!dob) continue;
-        if (dob.month() === dayMonth && dob.date() === dayDate) {
-          if (!handledCelebrantIds.has(mem.memberId)) {
-            handledCelebrantIds.add(mem.memberId);
-            const matchedBdayEvent = events.find(
-              (e) =>
-                (e.eventTypeName?.toLowerCase().includes("birthday") ||
-                  e.eventName?.toLowerCase().includes("birthday")) &&
-                (dayjs(e.eventDate).month() === dayMonth ||
-                  (e.participants || []).some((p) => (p.memberId || p.id) === mem.memberId))
-            );
-
-            items.push({
-              key: `bday-${mem.memberId}`,
-              eventItem: matchedBdayEvent || null,
-              celebrant: mem,
-              displayName: mem.name || mem.memberName,
-              categoryLabel: "Birthday",
-              colorType: "Birthday",
-            });
-          }
-        }
-      }
-    }
-
     return items;
   };
 
@@ -562,8 +552,8 @@ export default function CalendarPage() {
       return "upcoming";
     };
 
-    // 1. From members list based on DOB
-    for (const mem of members) {
+    // 1. From activeMembers list based on DOB
+    for (const mem of activeMembers) {
       const dob = parseMemberDob(mem.dateOfBirth);
       if (!dob) continue;
 
@@ -617,7 +607,7 @@ export default function CalendarPage() {
     // Sort chronologically by day of month (1st to 31st)
     list.sort((a, b) => a.dayOfMonth - b.dayOfMonth);
     return list;
-  }, [members, filteredEvents, filters]);
+  }, [activeMembers, filteredEvents, filters]);
 
   // Check if current view is Birthday vs another category (e.g. Farewell)
   const isBirthdayView =
@@ -670,10 +660,28 @@ export default function CalendarPage() {
       ).trim();
       if (!memName && !memId) return;
 
+      // Strictly ACTIVE accounts only!
+      // Check if this member is inactive, exited, or deleted in the master members directory
+      const matchedMaster = (members || []).find(
+        (m) =>
+          (memId && String(m.memberId) === String(memId)) ||
+          (m.name && m.name.toLowerCase().trim() === memName.toLowerCase())
+      );
+
+      if (matchedMaster) {
+        if (matchedMaster.isActive === false || matchedMaster.isExited || matchedMaster.isDeleted) {
+          return;
+        }
+      } else {
+        if (memberObj.isActive === false || memberObj.isExited || memberObj.isDeleted) {
+          return;
+        }
+      }
+
       const dedupeKey = memId ? `id:${memId}` : memName.toLowerCase();
       if (!map.has(dedupeKey)) {
-        // Find in full members array to get latest type/details
-        const fullMem = members.find(
+        // Find in active members array to get latest type/details
+        const fullMem = activeMembers.find(
           (m) =>
             (memId && String(m.memberId) === String(memId)) ||
             (m.name && m.name.toLowerCase().trim() === memName.toLowerCase())
@@ -698,7 +706,7 @@ export default function CalendarPage() {
           if (typeof p === "object" && p !== null) {
             addParticipant(p, detailed);
           } else if (typeof p === "number" || typeof p === "string") {
-            const m = members.find((mem) => String(mem.memberId) === String(p));
+            const m = activeMembers.find((mem) => String(mem.memberId) === String(p));
             if (m) addParticipant(m, detailed);
           }
         }
@@ -707,7 +715,7 @@ export default function CalendarPage() {
       // 2. From detailed.participantIds array
       if (Array.isArray(detailed.participantIds) && detailed.participantIds.length > 0) {
         for (const pId of detailed.participantIds) {
-          const m = members.find((mem) => String(mem.memberId) === String(pId));
+          const m = activeMembers.find((mem) => String(mem.memberId) === String(pId));
           if (m) addParticipant(m, detailed);
         }
       }
@@ -715,7 +723,7 @@ export default function CalendarPage() {
       // 3. From contributions (all members who contributed to this event)
       if (Array.isArray(detailed.contributions) && detailed.contributions.length > 0) {
         for (const c of detailed.contributions) {
-          const m = members.find((mem) => String(mem.memberId) === String(c.memberId));
+          const m = activeMembers.find((mem) => String(mem.memberId) === String(c.memberId));
           if (m) {
             addParticipant(m, detailed);
           } else if (c.memberName || c.name) {
@@ -726,7 +734,7 @@ export default function CalendarPage() {
 
       // 4. Any name matches from description or eventName (e.g. "Farewell for Michael")
       const textToScan = `${detailed.eventName || ""} ${detailed.description || ""}`.toLowerCase();
-      for (const m of members) {
+      for (const m of activeMembers) {
         if (!m.name) continue;
         const lowerName = m.name.toLowerCase().trim();
         if (textToScan.includes(lowerName)) {
@@ -736,7 +744,7 @@ export default function CalendarPage() {
     }
 
     return Array.from(map.values());
-  }, [isBirthdayView, filteredEvents, detailedEventsMap, members, categoryFilter]);
+  }, [isBirthdayView, filteredEvents, detailedEventsMap, members, activeMembers, categoryFilter]);
 
 
 
@@ -1969,7 +1977,7 @@ export default function CalendarPage() {
         onClose={() => setDialogOpen(false)}
         event={selectedEvent}
         eventTypes={eventTypes}
-        members={members}
+        members={activeMembers}
         onSaveSuccess={loadCalendarData}
       />
 
@@ -1978,7 +1986,8 @@ export default function CalendarPage() {
         open={viewDialogOpen}
         onClose={() => setViewDialogOpen(false)}
         event={selectedEvent}
-        members={members}
+        members={activeMembers}
+        onDeleteSuccess={handleEventDeleted}
       />
 
       {/* Big Celebratory Birthday Pop-up Modal */}

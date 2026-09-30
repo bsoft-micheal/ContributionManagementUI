@@ -10,19 +10,52 @@ import {
   TableRow,
   Chip,
 } from "@mui/material";
+import { Delete as DeleteIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatViewDate } from "../../utils/dateHelper";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
+import AppConfirmDialog from "../common/AppConfirmDialog";
 import { useAppToast } from "../common/AppToast";
+import { useAuth } from "../../contexts/AuthContext";
+import { hasActionPermission } from "../../utils/rightsHelper";
+import { deleteEventAsync } from "../../services/eventService";
 import { getContributionsByEventAsync } from "../../services/contributionService";
 import { getMembersAsync } from "../../services/memberService";
+import { COMMON_STRINGS, TOAST_MESSAGES } from "../../constants";
 
-export default function EventDetailsDialog({ open, onClose, event, members = [] }) {
+export default function EventDetailsDialog({ open, onClose, event, members = [], onDeleteSuccess }) {
   const toast = useAppToast();
+  const { authState } = useAuth();
   const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [internalMembers, setInternalMembers] = useState([]);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const canDeleteEvent = Boolean(
+    hasActionPermission("Delete Event", 33, authState?.role).canExecute ||
+    authState?.role?.toLowerCase() === "admin" ||
+    authState?.role?.toLowerCase() === "organizer"
+  );
+
+  const handleConfirmDelete = async () => {
+    if (!event?.eventId) return;
+    setDeleting(true);
+    try {
+      await deleteEventAsync(event.eventId);
+      toast.success(TOAST_MESSAGES?.EVENTS?.DELETED_SUCCESS || "Event deleted successfully");
+      setDeleteConfirmOpen(false);
+      onClose();
+      if (onDeleteSuccess) {
+        onDeleteSuccess(event.eventId);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || TOAST_MESSAGES?.GENERAL?.DELETE_FAILED || "Failed to delete event");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Fetch contributions for this event
   useEffect(() => {
@@ -55,9 +88,11 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
     }
   }, [open, members]);
 
-  if (!event) return null;
-
-  const allMembers = members && members.length > 0 ? members : internalMembers;
+  // Filter all members to only active, non-exited accounts
+  const rawMembers = members && members.length > 0 ? members : internalMembers;
+  const allMembers = rawMembers.filter(
+    (m) => m.isActive !== false && !m.isExited && !m.isDeleted
+  );
 
   const totalExpected = event.totalExpectedAmount || 0;
   const totalPaid = contributions
@@ -220,27 +255,51 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
     : event.description;
 
   return (
-    <AppDialog
+    <>
+      <AppDialog
       open={open}
       onClose={onClose}
       title="Event Details"
       maxWidth="md"
       actions={
-        <AppButton
-          variant="outlined"
-          color="inherit"
-          onClick={onClose}
-          sx={{
-            borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "rgba(74, 63, 107, 0.4)",
-            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-            "&:hover": {
-              borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
-            }
-          }}
-        >
-          Close
-        </AppButton>
+        <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+          <Box>
+            {canDeleteEvent && event?.eventId && (
+              <AppButton
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon sx={{ fontSize: "1.1rem" }} />}
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={deleting}
+                sx={{
+                  borderColor: "#ef4444",
+                  color: "#ef4444",
+                  "&:hover": {
+                    borderColor: "#dc2626",
+                    bgcolor: "rgba(239, 68, 68, 0.08)",
+                  },
+                }}
+              >
+                Delete Event
+              </AppButton>
+            )}
+          </Box>
+          <AppButton
+            variant="outlined"
+            color="inherit"
+            onClick={onClose}
+            sx={{
+              borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "rgba(74, 63, 107, 0.4)",
+              color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+              "&:hover": {
+                borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
+              }
+            }}
+          >
+            Close
+          </AppButton>
+        </Box>
       }
     >
       <Grid container spacing={3}>
@@ -576,5 +635,16 @@ export default function EventDetailsDialog({ open, onClose, event, members = [] 
         )}
       </Grid>
     </AppDialog>
+
+    <AppConfirmDialog
+      open={deleteConfirmOpen}
+      onClose={() => setDeleteConfirmOpen(false)}
+      onConfirm={handleConfirmDelete}
+      title={COMMON_STRINGS?.DIALOGS?.CONFIRM_TITLE || "Confirm Delete"}
+      content={COMMON_STRINGS?.DIALOGS?.DELETE_CONFIRM_MSG || "Are you sure you want to delete this event?"}
+      confirmText="Delete"
+      confirmColor="error"
+    />
+  </>
   );
 }
