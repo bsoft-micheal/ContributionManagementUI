@@ -31,6 +31,7 @@ import {
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
+import { useLocation } from "react-router-dom";
 import { formatGridDate, formatViewDate } from "../../utils/dateHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
@@ -114,6 +115,7 @@ const initialForm = {
 };
 
 export default function ExpensePage() {
+  const location = useLocation();
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
@@ -218,6 +220,45 @@ export default function ExpensePage() {
     fetchExpensesFromDb();
     fetchLookupData();
   }, []);
+
+  // Handle navigation from EventsPage (Add Expense or View Expense for specific event)
+  useEffect(() => {
+    if (location.state) {
+      if (location.state.filterEvent) {
+        setFilterEvent(location.state.filterEvent);
+        setAppliedEvent(location.state.filterEvent);
+      }
+      if (location.state.filterCategory) {
+        setFilterCategory(location.state.filterCategory);
+        setAppliedCategory(location.state.filterCategory);
+      }
+      if (location.state.openAddExpense) {
+        if (location.state.eventName) {
+          setFilterEvent(location.state.eventName);
+          setAppliedEvent(location.state.eventName);
+        }
+        if (location.state.category) {
+          setFilterCategory(location.state.category);
+          setAppliedCategory(location.state.category);
+        }
+        const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
+        const matched = membersList.find((m) => {
+          const mName = (m.name || m.memberName || "").trim().toLowerCase();
+          return mName === currentUserName.trim().toLowerCase();
+        });
+        setEditingExpense(null);
+        setFormImageError(false);
+        setForm({
+          ...initialForm,
+          eventName: location.state.eventName || "",
+          category: location.state.category || "",
+          submittedBy: matched ? (matched.name || matched.memberName) : currentUserName,
+        });
+        setErrors({});
+        setDialogOpen(true);
+      }
+    }
+  }, [location.state, membersList, authState]);
 
   // Filter panel status options (including "All Statuses")
   const statusOptions = useMemo(() => {

@@ -168,8 +168,8 @@ function AppMultiRoleSelect({
               error
                 ? theme.palette.error.main
                 : theme.palette.mode === "dark"
-                ? "rgba(255, 255, 255, 0.15)"
-                : "rgba(74, 63, 107, 0.2)",
+                  ? "rgba(255, 255, 255, 0.15)"
+                  : "rgba(74, 63, 107, 0.2)",
           },
           "&:hover .MuiOutlinedInput-notchedOutline": {
             borderColor: error ? theme.palette.error.main : "#7c3aed",
@@ -1114,7 +1114,7 @@ export default function UsersPage() {
     },
     { label: "Email", key: "email" },
     {
-      label: "Member Role(s)",
+      label: "User Role",
       key: "roleName",
       render: (row) => {
         const assignedRoles = (Array.isArray(row.roles) && row.roles.length > 0)
