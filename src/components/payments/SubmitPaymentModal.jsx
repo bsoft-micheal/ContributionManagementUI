@@ -116,12 +116,13 @@ export default function SubmitPaymentModal({
   const [paymentScope, setPaymentScope] = useState("");
   const [copiedUpi, setCopiedUpi] = useState(false);
 
-  // Multi-Mode Split State (Add Row feature)
-  const [isMultiSplit, setIsMultiSplit] = useState(false);
+  // Multi-Mode Split is exclusively used
+  const [isMultiSplit, setIsMultiSplit] = useState(true);
   const [splitRows, setSplitRows] = useState([
     { id: 1, mode: "GPay", amount: "", utr: "" },
     { id: 2, mode: "Cash", amount: "", utr: "" },
   ]);
+  const [activeQrModal, setActiveQrModal] = useState(null);
 
   const allocatedSplitSum = useMemo(() => {
     return Math.round(splitRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0) * 100) / 100;
@@ -167,18 +168,34 @@ export default function SubmitPaymentModal({
     if (!cfg?.isConfigured && formData.eventName) {
       cfg = getPaymentQrConfig(formData.eventName);
     }
-    if (!cfg?.isConfigured && duesSummary?.qrUpiId) {
-      cfg = {
-        eventType: resolvedCategory || "Event",
-        receiverName: duesSummary?.qrReceiverName || "Contribution Management",
-        upiId: duesSummary.qrUpiId,
-        qrMode: duesSummary?.qrImage ? "uploaded" : "generated",
-        qrImage: duesSummary?.qrImage || null,
-        isConfigured: true,
-      };
-    }
-    return cfg;
+    const upiId = cfg?.upiId || duesSummary?.qrUpiId || "danielrobertanto604@okicici";
+    const receiverName = cfg?.receiverName || duesSummary?.qrReceiverName || "Contribution Management";
+    const qrImage = cfg?.qrImage || duesSummary?.qrImage || null;
+    const qrMode = qrImage ? "uploaded" : (cfg?.qrMode || "generated");
+
+    return {
+      eventType: resolvedCategory || formData.eventName || "Contribution",
+      receiverName,
+      upiId,
+      qrReceiverName: receiverName,
+      qrUpiId: upiId,
+      qrMode,
+      qrImage,
+      isConfigured: true,
+    };
   }, [resolvedCategory, formData.eventName, duesSummary]);
+
+  const activeRowQrData = useMemo(() => {
+    if (!activeQrModal) return null;
+    const rowAmt = Number(activeQrModal.amount) || Number(formData.amount) || 0;
+    const modeLabel = activeQrModal.mode || "UPI";
+    return generateDynamicPaymentQr({
+      amount: rowAmt,
+      note: `${formData.eventName || "Contribution"} - ${formData.memberName || "Member"} (${modeLabel})`,
+      customConfig: qrConfig?.isConfigured ? qrConfig : undefined,
+      eventType: resolvedCategory,
+    });
+  }, [activeQrModal, formData.eventName, formData.memberName, qrConfig, resolvedCategory]);
 
   const qrData = useMemo(() => {
     if (!supportsQr) return null;
@@ -292,6 +309,7 @@ export default function SubmitPaymentModal({
         }
       });
     if (formData.paymentMode && !set.has(formData.paymentMode.toLowerCase())) {
+      set.add(formData.paymentMode.toLowerCase());
       list.push({
         label: formData.paymentMode,
         value: formData.paymentMode,
@@ -299,6 +317,7 @@ export default function SubmitPaymentModal({
       });
     }
     if (!set.has("split")) {
+      set.add("split");
       list.push({
         label: "Split / Multi-Mode (Add Rows)",
         value: "Split",
@@ -309,11 +328,6 @@ export default function SubmitPaymentModal({
     return list;
   }, [dbPaymentModes, formData.paymentMode]);
 
-  useEffect(() => {
-    if (formData.paymentMode === "Split") {
-      setIsMultiSplit(true);
-    }
-  }, [formData.paymentMode]);
 
   useEffect(() => {
     if (dynamicPaymentModes.length > 0) {
@@ -632,15 +646,28 @@ export default function SubmitPaymentModal({
       ? "GPay"
       : "Cash";
 
+    const newId = Date.now() + Math.random();
+    const rowAmt = remaining > 0 ? String(remaining) : "";
+
     setSplitRows((prev) => [
       ...prev,
       {
-        id: Date.now() + Math.random(),
+        id: newId,
         mode: nextMode,
-        amount: remaining > 0 ? String(remaining) : "",
+        amount: rowAmt,
         utr: "",
       },
     ]);
+
+    const isDigital = !nextMode.toLowerCase().includes("cash") && nextMode.toLowerCase() !== "none";
+    if (isDigital) {
+      setActiveQrModal({
+        open: true,
+        rowId: newId,
+        mode: nextMode,
+        amount: rowAmt,
+      });
+    }
   };
 
   const handleRemoveSplitRow = (id) => {
@@ -655,6 +682,20 @@ export default function SubmitPaymentModal({
     setSplitRows((prev) =>
       prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
     );
+
+    if (field === "mode") {
+      const lower = String(value || "").toLowerCase();
+      const isDigital = !lower.includes("cash") && lower !== "none";
+      if (isDigital) {
+        const row = splitRows.find((r) => r.id === id);
+        setActiveQrModal({
+          open: true,
+          rowId: id,
+          mode: value,
+          amount: row?.amount || "",
+        });
+      }
+    }
   };
 
   const handleQuickSplitEvenly = () => {
@@ -740,11 +781,12 @@ export default function SubmitPaymentModal({
         upiTotal = splitRows
           .filter((r) => !String(r.mode || "").toLowerCase().includes("cash"))
           .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-        finalMode = `Split (${splitRows.map((r) => `${r.mode}: ₹${r.amount}`).join(", ")})`;
-        finalUtr = splitRows
+        finalMode = "Split";
+        const combinedUtrs = splitRows
           .filter((r) => r.utr && r.utr.trim())
           .map((r) => `${r.mode}: ${r.utr.trim()}`)
-          .join("; ") || "SPLIT";
+          .join("; ");
+        finalUtr = combinedUtrs ? (combinedUtrs.length > 95 ? combinedUtrs.slice(0, 92) + "..." : combinedUtrs) : "SPLIT";
       } else {
         const isCash = String(formData.paymentMode || "").toLowerCase().includes("cash");
         finalUtr = formData.utr.trim() || (isCash ? "CASH" : "-");
@@ -785,7 +827,7 @@ export default function SubmitPaymentModal({
         type: "PAYMENT_PENDING",
         title: "New Payment Submission",
         message: `Member ${formData.memberName} submitted payment of ₹${formData.amount} (${finalMode}, UTR: ${finalUtr}). Status: Pending verification.`,
-        link: "/payment-submission",
+        link: "/payments",
       });
 
       // Synchronize with Contribution module in real-time
@@ -1082,18 +1124,28 @@ export default function SubmitPaymentModal({
           </Box>
         )}
 
-        {/* Row 3: Amount & Payment Method with Multi-Mode Toggle */}
+        {/* Row 3: Amount with Multi-Mode Split indicator */}
         <Grid container spacing={2} alignItems="center">
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
-              label="Contribution Amount (₹)"
+              label="Contribution Amount (₹) *"
               type="number"
               value={formData.amount}
               onChange={(e) => {
                 const val = e.target.value;
                 setFormData((prev) => ({ ...prev, amount: val }));
-                if (isMultiSplit && splitRows.length === 1) {
+                const num = Number(val) || 0;
+                if (splitRows.length === 1) {
                   setSplitRows([{ ...splitRows[0], amount: val }]);
+                } else if (splitRows.length > 1 && num > 0) {
+                  const baseShare = Math.floor((num / splitRows.length) * 100) / 100;
+                  const remainder = Math.round((num - baseShare * splitRows.length) * 100) / 100;
+                  setSplitRows((rows) =>
+                    rows.map((r, i) => ({
+                      ...r,
+                      amount: i === 0 ? String((baseShare + remainder).toFixed(2)) : String(baseShare.toFixed(2)),
+                    }))
+                  );
                 }
               }}
               placeholder="0.00"
@@ -1103,58 +1155,32 @@ export default function SubmitPaymentModal({
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
-            <Box sx={{ display: "flex", flexDirection: "column" }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-                <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.7rem", color: (theme) => theme.palette.mode === "dark" ? "#fff" : "text.secondary" }}>
-                  Payment Method *
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: "10px",
+                border: "1.5px dashed",
+                borderColor: (t) => t.palette.mode === "dark" ? "rgba(129, 140, 248, 0.3)" : "rgba(74, 63, 107, 0.25)",
+                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74, 63, 107, 0.03)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem" }}>
+                  Payment Method
                 </Typography>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      size="small"
-                      checked={isMultiSplit}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setIsMultiSplit(checked);
-                        if (checked) {
-                          setFormData((prev) => ({ ...prev, paymentMode: "Split" }));
-                          const curSum = splitRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-                          if (curSum === 0 && Number(formData.amount) > 0) {
-                            const half = Math.floor((Number(formData.amount) / 2) * 100) / 100;
-                            const rest = Math.round((Number(formData.amount) - half) * 100) / 100;
-                            setSplitRows([
-                              { id: 1, mode: "GPay", amount: String(half), utr: "" },
-                              { id: 2, mode: "Cash", amount: String(rest), utr: "" },
-                            ]);
-                          }
-                        } else {
-                          const firstMode = dynamicPaymentModes.find((m) => m.value !== "Split")?.value || "GPay";
-                          setFormData((prev) => ({ ...prev, paymentMode: firstMode }));
-                        }
-                      }}
-                      sx={{ mr: -1 }}
-                    />
-                  }
-                  label={
-                    <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem", color: isMultiSplit ? "secondary.main" : "text.secondary" }}>
-                      Split / Add Rows
-                    </Typography>
-                  }
-                  sx={{ m: 0 }}
-                />
+                <Typography variant="subtitle2" fontWeight={800} color="secondary.main">
+                  Multi-Mode Split Payment
+                </Typography>
               </Box>
-              <AppSelect
-                value={formData.paymentMode}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFormData((prev) => ({ ...prev, paymentMode: val }));
-                  if (val === "Split") {
-                    setIsMultiSplit(true);
-                  }
-                }}
-                options={dynamicPaymentModes.map((m) => ({ label: m.label, value: m.value }))}
-                placeholder="Select Payment Method"
-                required
+              <Chip
+                size="small"
+                label={`${splitRows.length} Mode${splitRows.length > 1 ? "s" : ""} (Add Rows)`}
+                color="secondary"
+                variant="outlined"
+                sx={{ fontWeight: 800, fontSize: "0.7rem" }}
               />
             </Box>
           </Grid>
@@ -1288,7 +1314,7 @@ export default function SubmitPaymentModal({
                           required
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 3.5 }}>
+                      <Grid size={{ xs: 12, sm: 2.5 }}>
                         <AppInput
                           label="Amount (₹) *"
                           type="number"
@@ -1299,15 +1325,55 @@ export default function SubmitPaymentModal({
                           required
                         />
                       </Grid>
-                      <Grid size={{ xs: 10, sm: 4 }}>
-                        <AppInput
-                          label={isRowCash ? "Cash Note (Optional)" : "UTR / Ref # *"}
-                          placeholder={isRowCash ? "Handover note" : "12-digit UTR ref"}
-                          value={row.utr}
-                          onChange={(e) => handleSplitRowChange(row.id, "utr", e.target.value)}
-                          size="small"
-                          required={!isRowCash}
-                        />
+                      <Grid size={{ xs: 10, sm: 5 }}>
+                        <Box sx={{ display: "flex", gap: 0.8, alignItems: "flex-end" }}>
+                          <Box sx={{ flex: 1 }}>
+                            <AppInput
+                              label={isRowCash ? "Cash Note (Optional)" : "UTR / Ref # *"}
+                              placeholder={isRowCash ? "Handover note" : "12-digit UTR ref"}
+                              value={row.utr}
+                              onChange={(e) => handleSplitRowChange(row.id, "utr", e.target.value)}
+                              size="small"
+                              required={!isRowCash}
+                            />
+                          </Box>
+                          {!isRowCash && (
+                            <Tooltip title={`Open QR Scanner for ${row.mode} (₹${row.amount || 0})`}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  setActiveQrModal({
+                                    open: true,
+                                    rowId: row.id,
+                                    mode: row.mode,
+                                    amount: row.amount,
+                                  });
+                                }}
+                                startIcon={<QrCodeIcon sx={{ fontSize: 15 }} />}
+                                sx={{
+                                  height: 38,
+                                  mb: "2px",
+                                  borderRadius: "8px",
+                                  fontSize: "0.72rem",
+                                  fontWeight: 800,
+                                  textTransform: "none",
+                                  borderColor: getModeColor(row.mode),
+                                  color: getModeColor(row.mode),
+                                  bgcolor: `${getModeColor(row.mode)}12`,
+                                  "&:hover": {
+                                    borderColor: getModeColor(row.mode),
+                                    bgcolor: `${getModeColor(row.mode)}22`,
+                                  },
+                                  whiteSpace: "nowrap",
+                                  px: 1.2,
+                                }}
+                              >
+                                Scan
+                              </Button>
+                            </Tooltip>
+                          )}
+                        </Box>
                       </Grid>
                       <Grid size={{ xs: 2, sm: 1 }} sx={{ textAlign: "center", pt: { sm: 2 } }}>
                         <Tooltip title={splitRows.length > 1 ? "Remove this row" : "At least 1 row required"}>
@@ -1334,181 +1400,7 @@ export default function SubmitPaymentModal({
           </Paper>
         )}
 
-        {/* Live Payment QR Code Scanner Card (Displays when digital / UPI mode is selected) */}
-        {supportsQr && (
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2,
-              borderRadius: "14px",
-              bgcolor: (t) =>
-                t.palette.mode === "dark" ? "rgba(74, 63, 107, 0.2)" : "#faf5ff",
-              border: "1.5px solid",
-              borderColor: (t) =>
-                t.palette.mode === "dark" ? "rgba(168, 85, 247, 0.3)" : "#e9d5ff",
-              boxShadow: "0 4px 20px -2px rgba(124, 58, 237, 0.08)",
-            }}
-          >
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Box
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "8px",
-                    bgcolor: "#7c3aed",
-                    color: "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <QrCodeIcon sx={{ fontSize: 18 }} />
-                </Box>
-                <Typography variant="subtitle2" fontWeight={800} sx={{ color: (t) => t.palette.mode === "dark" ? "#fff" : "#4a3f6b" }}>
-                  Scan QR Code to Pay with {formData.paymentMode || "UPI"}
-                </Typography>
-              </Stack>
-              {resolvedCategory && (
-                <Chip
-                  label={resolvedCategory}
-                  size="small"
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: "0.72rem",
-                    bgcolor: "rgba(124, 58, 237, 0.12)",
-                    color: "#7c3aed",
-                  }}
-                />
-              )}
-            </Box>
 
-            {qrData && qrData.isConfigured ? (
-              <Grid container spacing={2} alignItems="center">
-                <Grid size={{ xs: 12, sm: 5 }} sx={{ display: "flex", justifyContent: "center" }}>
-                  <Box
-                    sx={{
-                      p: 1.2,
-                      borderRadius: "12px",
-                      bgcolor: "#ffffff",
-                      border: "2px solid #7c3aed",
-                      boxShadow: "0 6px 16px rgba(124, 58, 237, 0.18)",
-                      display: "inline-flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Box
-                      component="img"
-                      src={qrData.qrImageUrl}
-                      alt="UPI Payment QR Code"
-                      sx={{
-                        width: 155,
-                        height: 155,
-                        objectFit: "contain",
-                        display: "block",
-                      }}
-                    />
-                    <Typography variant="caption" fontWeight={800} sx={{ color: "#7c3aed", mt: 0.5, fontSize: "0.68rem" }}>
-                      {formData.paymentMode || "UPI"} QR
-                    </Typography>
-                  </Box>
-                </Grid>
-
-                <Grid size={{ xs: 12, sm: 7 }}>
-                  <Stack spacing={1.2}>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem", display: "block" }}>
-                        Payee / Receiver Name
-                      </Typography>
-                      <Typography variant="body1" fontWeight={800} sx={{ color: (t) => t.palette.mode === "dark" ? "#fff" : "#1e1b4b" }}>
-                        {qrData.receiverName || "Contribution Management"}
-                      </Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem", display: "block" }}>
-                        Payee UPI ID
-                      </Typography>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.3 }}>
-                        <Typography
-                          variant="body2"
-                          fontWeight={800}
-                          sx={{
-                            fontFamily: "monospace",
-                            bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "#f3e8ff",
-                            px: 1,
-                            py: 0.4,
-                            borderRadius: "6px",
-                            color: "#7c3aed",
-                            fontSize: "0.85rem",
-                          }}
-                        >
-                          {qrData.upiId}
-                        </Typography>
-                        <Tooltip title={copiedUpi ? "Copied!" : "Copy UPI ID"}>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleCopyUpi(qrData.upiId)}
-                            sx={{ color: copiedUpi ? "success.main" : "#7c3aed", p: 0.4 }}
-                          >
-                            {copiedUpi ? <CheckIcon fontSize="small" /> : <CopyIcon fontSize="small" />}
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem", display: "block" }}>
-                        Amount to Scan & Pay
-                      </Typography>
-                      <Typography variant="h6" fontWeight={900} color="primary.main">
-                        ₹{Number(formData.amount || 0).toLocaleString("en-IN")}
-                      </Typography>
-                    </Box>
-
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem", fontStyle: "italic" }}>
-                      💡 Scan using {formData.paymentMode || "GPay"} or any UPI app, complete the transfer, and paste the 12-digit UTR reference below.
-                    </Typography>
-                  </Stack>
-                </Grid>
-              </Grid>
-            ) : (
-              <Box sx={{ p: 1.5, textAlign: "center", bgcolor: "rgba(0,0,0,0.02)", borderRadius: "8px" }}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
-                  ℹ️ No custom QR configured for <strong>{resolvedCategory || "this event"}</strong>. You can configure it in <em>Settings &gt; Payment QR Settings</em> or enter your UPI reference below.
-                </Typography>
-              </Box>
-            )}
-          </Paper>
-        )}
-
-        {/* Row 4: UPI Reference / UTR (Only when NOT in Multi-Mode Split) */}
-        {!isMultiSplit && (
-          <AppInput
-            label={
-              String(formData.paymentMode || "").toLowerCase().includes("cash")
-                ? "Receipt / Handover Note (Optional for Cash)"
-                : "UPI Reference / Transaction UTR *"
-            }
-            value={formData.utr}
-            onChange={(e) => setFormData((prev) => ({ ...prev, utr: e.target.value }))}
-            placeholder={
-              String(formData.paymentMode || "").toLowerCase().includes("cash")
-                ? "e.g. Handed cash directly to organizer"
-                : "e.g. 426189345612 (12-digit number from payment app)"
-            }
-            maxLength={30}
-            error={!!errors.utr}
-            helperText={
-              errors.utr ||
-              (String(formData.paymentMode || "").toLowerCase().includes("cash")
-                ? "Optional memo for cash payments"
-                : "Find in GPay / PhonePe / Paytm receipt")
-            }
-            required={!String(formData.paymentMode || "").toLowerCase().includes("cash")}
-          />
-        )}
 
         {/* Row 5: Screenshot Upload with Live Image Preview Thumbnail */}
         <Box>
@@ -1607,6 +1499,109 @@ export default function SubmitPaymentModal({
           rows={2}
         />
       </Box>
+
+      {/* ── Active Row QR Code Scanner Modal (Opens on GPay/PhonePe/UPI selection) ── */}
+      <AppDialog
+        open={Boolean(activeQrModal?.open)}
+        onClose={() => setActiveQrModal(null)}
+        title={`Scan to Pay via ${activeQrModal?.mode || "UPI"}`}
+        maxWidth="xs"
+      >
+        <Box sx={{ p: 2, textAlign: "center" }}>
+          {activeRowQrData?.qrImageUrl ? (
+            <Box
+              sx={{
+                display: "inline-block",
+                p: 1.5,
+                bgcolor: "#fff",
+                borderRadius: "14px",
+                border: `2.5px solid ${getModeColor(activeQrModal?.mode)}`,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                mb: 1.5,
+              }}
+            >
+              <Box
+                component="img"
+                src={activeRowQrData.qrImageUrl}
+                alt="Payment QR Code"
+                sx={{ width: 210, height: 210, objectFit: "contain", display: "block" }}
+              />
+              <Chip
+                label={`Pay with ${activeQrModal?.mode || "UPI"}`}
+                size="small"
+                sx={{
+                  mt: 0.8,
+                  fontWeight: 800,
+                  bgcolor: `${getModeColor(activeQrModal?.mode)}15`,
+                  color: getModeColor(activeQrModal?.mode),
+                }}
+              />
+            </Box>
+          ) : (
+            <Box sx={{ py: 3, color: "text.secondary" }}>
+              <Typography variant="body2">Generating QR Code...</Typography>
+            </Box>
+          )}
+
+          <Typography variant="h5" fontWeight={900} sx={{ color: "primary.main", mb: 0.5 }}>
+            ₹{Number(activeQrModal?.amount || formData.amount || 0).toLocaleString("en-IN")}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+            {formData.eventName || "Contribution"} • {formData.memberName || "Member"}
+          </Typography>
+
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.5,
+              borderRadius: "10px",
+              bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc"),
+              mb: 2,
+            }}
+          >
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
+              <Typography variant="caption" color="text.secondary">
+                Payee:
+              </Typography>
+              <Typography variant="caption" fontWeight={800}>
+                {activeRowQrData?.receiverName || "Contribution Management"}
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Typography variant="caption" color="text.secondary">
+                UPI ID:
+              </Typography>
+              <Stack direction="row" spacing={0.5} alignItems="center">
+                <Typography variant="caption" fontWeight={800} sx={{ fontFamily: "monospace", color: "#7c3aed" }}>
+                  {activeRowQrData?.upiId || "danielrobertanto604@okicici"}
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => handleCopyUpi(activeRowQrData?.upiId || "danielrobertanto604@okicici")}
+                  sx={{ p: 0.2 }}
+                >
+                  {copiedUpi ? <CheckIcon sx={{ fontSize: 14, color: "success.main" }} /> : <CopyIcon sx={{ fontSize: 14 }} />}
+                </IconButton>
+              </Stack>
+            </Box>
+          </Paper>
+
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={() => setActiveQrModal(null)}
+            sx={{
+              bgcolor: `${getModeColor(activeQrModal?.mode)} !important`,
+              fontWeight: 800,
+              py: 1,
+              borderRadius: "10px",
+              textTransform: "none",
+            }}
+          >
+            I Have Paid • Enter UTR Reference
+          </Button>
+        </Box>
+      </AppDialog>
     </AppDialog>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Dialog,
@@ -9,7 +10,9 @@ import {
   Stack,
   Typography,
   IconButton,
-  Tooltip
+  Tooltip,
+  Chip,
+  Paper,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
@@ -20,8 +23,11 @@ import {
   QrCodeScanner as QrCodeIcon,
   FilterList as FilterListIcon,
   PaymentRounded as PaymentIcon,
+  FactCheckOutlined as StatusUpdateIcon,
+  ConfirmationNumberOutlined as TicketIcon,
 } from "@mui/icons-material";
 import SubmitPaymentModal from "../../components/payments/SubmitPaymentModal";
+import AppTextArea from "../../components/common/AppTextArea";
 
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
@@ -34,12 +40,15 @@ import { getEventsAsync } from "../../services/eventService";
 import { getMembersAsync } from "../../services/memberService";
 import { getRolesAsync } from "../../services/roleService";
 import { getPaymentModesAsync } from "../../services/paymentModeService";
+import { getStatusesAsync } from "../../services/statusService";
+import { getPaymentTransactionsAsync, verifyPaymentTransactionAsync } from "../../services/paymentService";
 import AppDataTable from "../../components/common/AppDataTable";
 
 import AppDialog from "../../components/common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
+import { useNotifications } from "../../contexts/NotificationContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission } from "../../utils/rightsHelper";
 import PaymentQrReminderDialog from "../../components/contributions/PaymentQrReminderDialog";
@@ -63,7 +72,9 @@ const initialPayment = {
 
 export default function ContributionsPage() {
   const theme = useTheme();
+  const navigate = useNavigate();
   const { authState } = useAuth();
+  const { addNotification } = useNotifications();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
 
@@ -71,6 +82,16 @@ export default function ContributionsPage() {
   const canAddContribution = hasActionPermission("Add Contribution", 41, authState?.role).canExecute;
   const canViewContribution = hasActionPermission("View Contribution", 40, authState?.role).canView;
   const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
+  const isAuthorityRole = ["admin", "manager"].includes(String(authState?.role || "").toLowerCase());
+
+  // Authority Status Update state
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [statusModalRow, setStatusModalRow] = useState(null);
+  const [statusChangeValue, setStatusChangeValue] = useState("Paid");
+  const [auditRemarks, setAuditRemarks] = useState("");
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [dbStatuses, setDbStatuses] = useState([]);
+  const [transactions, setTransactions] = useState([]);
 
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState("");
@@ -138,6 +159,17 @@ export default function ContributionsPage() {
           setAllContributions(allData);
         } catch {
           setAllContributions([]);
+        }
+
+        try {
+          const [stRes, txRes] = await Promise.all([
+            getStatusesAsync().catch(() => []),
+            getPaymentTransactionsAsync().catch(() => []),
+          ]);
+          if (Array.isArray(stRes)) setDbStatuses(stRes);
+          if (Array.isArray(txRes)) setTransactions(txRes);
+        } catch {
+          // fallback
         }
       } catch {
         toast.error("Failed to load events and contributions data.");
@@ -467,34 +499,215 @@ export default function ContributionsPage() {
 
   const eventOptions = events.map(e => ({ label: e.eventName, value: e.eventId }));
 
+  const modalStatusOptions = useMemo(() => {
+    const set = new Set();
+    const list = [];
+    (dbStatuses || [])
+      .filter((s) => s.isActive !== false)
+      .forEach((s) => {
+        const name = s.statusName || s.name || s.status_name;
+        if (name && !set.has(name.toLowerCase())) {
+          set.add(name.toLowerCase());
+          list.push({ label: name, value: name });
+        }
+      });
+    if (list.length === 0) {
+      return [
+        { label: "Paid", value: "Paid" },
+        { label: "Pending", value: "Pending" },
+        { label: "Verified", value: "Verified" },
+        { label: "Rejected", value: "Rejected" },
+        { label: "Closed", value: "Closed" },
+      ];
+    }
+    if (!set.has("paid")) list.unshift({ label: "Paid", value: "Paid" });
+    if (!set.has("pending")) list.push({ label: "Pending", value: "Pending" });
+    return list;
+  }, [dbStatuses]);
+
+  const renderStatusBadge = (status) => {
+    let color = "#b45309";
+    let bg = "rgba(234,179,8,0.12)";
+
+    const st = String(status || "").toLowerCase().trim();
+
+    if (st === "paid" || st === "verified" || st === "closed") {
+      color = "#16a34a";
+      bg = "rgba(22,163,74,0.12)";
+    } else if (st === "in progress") {
+      color = "#6366f1";
+      bg = "rgba(99,102,241,0.12)";
+    } else if (st === "open") {
+      color = "#0284c7";
+      bg = "rgba(2,132,199,0.12)";
+    } else if (st === "failed" || st === "rejected") {
+      color = "#dc2626";
+      bg = "rgba(220,38,38,0.12)";
+    }
+
+    return (
+      <Chip
+        label={status || "Pending"}
+        size="small"
+        sx={{
+          bgcolor: bg,
+          color: color,
+          fontWeight: 800,
+          fontSize: "0.72rem",
+          height: 22,
+          borderRadius: "6px",
+        }}
+      />
+    );
+  };
+
+  const handleStatusUpdate = async (row, newStatus, customNotes) => {
+    const target = row || statusModalRow;
+    if (!target) return;
+
+    const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "Admin";
+    const noteText = customNotes !== undefined
+      ? customNotes
+      : (auditRemarks || `Status updated to ${newStatus} by ${verifier}.`);
+
+    try {
+      setStatusSaving(true);
+
+      const matchedTxn = (transactions || []).find(
+        (t) =>
+          (String(t.eventId) === String(target.eventId) || String(t.eventName).toLowerCase() === String(target.eventName || "").toLowerCase()) &&
+          (String(t.userId) === String(target.memberId) || String(t.memberName).toLowerCase() === String(target.memberName || "").toLowerCase())
+      );
+
+      if (matchedTxn && (matchedTxn.transactionId || matchedTxn.id)) {
+        await verifyPaymentTransactionAsync(matchedTxn.transactionId || matchedTxn.id, {
+          status: newStatus,
+          verifiedBy: verifier,
+          notes: noteText,
+        });
+      } else if (newStatus.toLowerCase() === "paid" || newStatus.toLowerCase() === "verified") {
+        await recordPaymentAsync({
+          eventId: target.eventId,
+          memberId: target.memberId,
+          amount: Number(target.amount || target.totalAccumulated || 0),
+          paymentMode: target.paymentMode && target.paymentMode !== "None" ? target.paymentMode : "Cash",
+          paymentDate: new Date().toISOString(),
+          notes: noteText,
+        });
+      }
+
+      toast.success(`Contribution status updated to ${newStatus} successfully!`);
+      if (addNotification) {
+        addNotification({
+          type: "PAYMENT_STATUS_UPDATED",
+          title: "Contribution Status Updated",
+          message: `${target.memberName}'s contribution status updated to ${newStatus}.`,
+          link: "/contributions",
+        });
+      }
+
+      window.dispatchEvent(
+        new CustomEvent("contribution_updated", {
+          detail: { action: "verify", status: newStatus, target },
+        })
+      );
+
+      setStatusModalOpen(false);
+      setStatusModalRow(null);
+      setAuditRemarks("");
+      await reloadAllContributions();
+      if (selectedEventId) {
+        const freshData = await getContributionsByEventAsync(selectedEventId);
+        let enriched = freshData.map((c) => {
+          const previousUnpaidItems = (allContributions || []).filter(
+            (prev) => prev.memberId === c.memberId && prev.eventId !== c.eventId && prev.paymentStatus !== "Paid"
+          );
+          const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (prev.amount || 0), 0);
+          const currentOutstanding = getContributionOutstanding(c);
+          return {
+            ...c,
+            previousUnpaid,
+            previousUnpaidItems,
+            totalAccumulated: currentOutstanding + previousUnpaid,
+          };
+        });
+        setContributions(enriched);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update contribution status");
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
   const columns = [
     {
       label: "Action",
       render: (row) => {
-        if (!canAddContribution) {
-          return null;
-        }
-
         return (
-          <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-            <Tooltip title="Submit Payment Details">
-              <IconButton
-                size="small"
-                onClick={() => handleOpenSubmitPaymentModal(row)}
-                sx={{
-                  p: 0.4,
-                  color: "#4a3f6b",
-                  bgcolor: "rgba(74, 63, 107, 0.08)",
-                  borderRadius: "6px",
-                  "&:hover": {
-                    bgcolor: "rgba(74, 63, 107, 0.18)",
-                    color: "#3b325c",
-                  },
-                }}
-              >
-                <PaymentIcon sx={{ fontSize: "1.15rem" }} />
-              </IconButton>
-            </Tooltip>
+          <Box sx={{ display: "flex", gap: 0.6, alignItems: "center" }}>
+            {canAddContribution && (
+              <Tooltip title="Submit Payment Details">
+                <IconButton
+                  size="small"
+                  onClick={() => handleOpenSubmitPaymentModal(row)}
+                  sx={{
+                    p: 0.4,
+                    color: "#4a3f6b",
+                    bgcolor: "rgba(74, 63, 107, 0.08)",
+                    borderRadius: "6px",
+                    "&:hover": {
+                      bgcolor: "rgba(74, 63, 107, 0.18)",
+                      color: "#3b325c",
+                    },
+                  }}
+                >
+                  <PaymentIcon sx={{ fontSize: "1.15rem" }} />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {isAuthorityRole && (
+              <Tooltip title="Authority Status Update">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setStatusModalRow(row);
+                    setStatusChangeValue(row.paymentStatus || "Paid");
+                    setAuditRemarks("");
+                    setStatusModalOpen(true);
+                  }}
+                  sx={{ color: "#16a34a", p: 0.4 }}
+                >
+                  <StatusUpdateIcon sx={{ fontSize: "1.15rem" }} />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {row.paymentStatus !== "Paid" && (
+              <Tooltip title="Raise Support Ticket">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    const activeEvent = events.find((e) => String(e.eventId) === String(row.eventId || selectedEventId));
+                    navigate("/support-tickets", {
+                      state: {
+                        raiseTicket: true,
+                        memberName: row.memberName,
+                        relatedEvent: row.eventName || activeEvent?.eventName || activeEvent?.title || "",
+                        amount: row.amount || row.totalAccumulated,
+                        paymentMode: row.paymentMode,
+                        status: row.paymentStatus,
+                        contributionId: row.contributionId,
+                      },
+                    });
+                  }}
+                  sx={{ color: "#ef4444", p: 0.4 }}
+                >
+                  <TicketIcon sx={{ fontSize: "1.15rem" }} />
+                </IconButton>
+              </Tooltip>
+            )}
           </Box>
         );
       },
@@ -1057,6 +1270,105 @@ export default function ContributionsPage() {
           reloadAllContributions();
         }}
       />
+
+      {/* ── Authority Status Update Modal (From Support Status Master) ── */}
+      <AppDialog
+        open={statusModalOpen}
+        onClose={() => {
+          setStatusModalOpen(false);
+          setStatusModalRow(null);
+          setAuditRemarks("");
+        }}
+        title="Authority Status Update"
+        maxWidth="sm"
+        actions={
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <AppButton variant="outlined" onClick={() => setStatusModalOpen(false)}>
+              Close
+            </AppButton>
+            <AppButton
+              variant="contained"
+              startIcon={<SaveIcon />}
+              loading={statusSaving}
+              onClick={() =>
+                handleStatusUpdate(
+                  statusModalRow,
+                  statusChangeValue || statusModalRow?.paymentStatus,
+                  auditRemarks
+                )
+              }
+              sx={{
+                bgcolor:
+                  (statusChangeValue || statusModalRow?.paymentStatus) === "Closed" ||
+                    (statusChangeValue || statusModalRow?.paymentStatus) === "Paid"
+                    ? "#16a34a !important"
+                    : (statusChangeValue || statusModalRow?.paymentStatus) === "Verified"
+                      ? "#0284c7 !important"
+                      : undefined,
+              }}
+            >
+              Save
+            </AppButton>
+          </Stack>
+        }
+      >
+        {statusModalRow && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                borderRadius: "10px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.8,
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="caption"
+                  fontWeight={800}
+                  color="primary.main"
+                  sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.72rem" }}
+                >
+                  Authority Status Update • {statusModalRow.memberName}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.78rem" }}>
+                  Event: <strong>{statusModalRow.eventName || events.find((e) => e.eventId === statusModalRow.eventId)?.eventName || "Current Event"}</strong> • Amount: <strong>₹{Number(statusModalRow.amount || 0).toLocaleString("en-IN")}</strong>
+                </Typography>
+              </Box>
+
+              <Grid container spacing={2} alignItems="center">
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppSelect
+                    label="Select Status *"
+                    value={statusChangeValue || statusModalRow?.paymentStatus || "Paid"}
+                    onChange={(e) => setStatusChangeValue(e.target.value)}
+                    options={modalStatusOptions}
+                    required
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                    Status Preview
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    {renderStatusBadge(statusChangeValue || statusModalRow?.paymentStatus)}
+                  </Box>
+                </Grid>
+              </Grid>
+
+              <AppTextArea
+                label="Audit Remarks / Notes"
+                placeholder="Enter remarks or status update notes..."
+                value={auditRemarks}
+                onChange={(e) => setAuditRemarks(e.target.value)}
+                rows={3}
+              />
+            </Paper>
+          </Box>
+        )}
+      </AppDialog>
     </div>
   );
 }

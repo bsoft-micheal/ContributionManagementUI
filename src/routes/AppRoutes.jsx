@@ -28,7 +28,6 @@ import GalleryPage from "../pages/gallery/GalleryPage";
 import BudgetCalculationsPage from "../pages/events/BudgetCalculationsPage";
 import TypesPage from "../pages/support/TypesPage";
 import StatusPage from "../pages/support/StatusPage";
-import SubmitPaymentPage from "../pages/payments/SubmitPaymentPage";
 
 export default function AppRoutes() {
   return (
@@ -53,8 +52,8 @@ export default function AppRoutes() {
         <Route path="/events/edit/:id" element={<ProtectedRoute><EventFormPage key="edit-event" /></ProtectedRoute>} />
         <Route path="/events/:id" element={<ProtectedRoute><EventDetailsPage /></ProtectedRoute>} />
         <Route path="/contributions" element={<ProtectedRoute><ContributionsPage /></ProtectedRoute>} />
-        <Route path="/payment-submission" element={<ProtectedRoute><SubmitPaymentPage /></ProtectedRoute>} />
-        <Route path="/confirm-payment" element={<ProtectedRoute><SubmitPaymentPage /></ProtectedRoute>} />
+        <Route path="/payment-submission" element={<Navigate to="/payments" replace />} />
+        <Route path="/confirm-payment" element={<Navigate to="/payments" replace />} />
         <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
         <Route path="/expense" element={<ProtectedRoute><ExpensePage /></ProtectedRoute>} />
         <Route path="/gallery" element={<ProtectedRoute><GalleryPage /></ProtectedRoute>} />

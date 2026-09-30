@@ -37,7 +37,7 @@ export function getFeatureIdForPath(path) {
   if (normalizedPath === "/calendar") return 5;
   if (normalizedPath === "/gallery") return 6;
   if (normalizedPath === "/contributions" || normalizedPath === "/my-contributions") return 8;
-  if (normalizedPath === "/payment-submission" || normalizedPath === "/confirm-payment") return 24;
+  if (normalizedPath === "/payment-submission" || normalizedPath === "/confirm-payment") return 9;
   if (normalizedPath === "/payments") return 9;
   if (normalizedPath === "/contribution-calculation") return 10;
   if (normalizedPath === "/expense") return 11;

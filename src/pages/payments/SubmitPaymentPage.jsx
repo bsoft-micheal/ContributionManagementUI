@@ -675,47 +675,6 @@ export default function SubmitPaymentPage() {
               <ViewIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-
-          {isAuthorityRole && (
-            <Tooltip title="Authority Status Update">
-              <IconButton
-                size="small"
-                onClick={() => {
-                  setStatusModalTxn(row);
-                  setStatusChangeValue(row.status || modalStatusOptions[0]?.value || "Pending");
-                  setAuditRemarks("");
-                  setStatusModalOpen(true);
-                }}
-                sx={{ color: "#16a34a", p: 0.3 }}
-              >
-                <StatusUpdateIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-
-          {row.status !== "Verified" && (
-            <Tooltip title="Raise Support Ticket">
-              <IconButton
-                size="small"
-                onClick={() => {
-                  navigate("/support-tickets", {
-                    state: {
-                      raiseTicket: true,
-                      transactionId: row.id,
-                      memberName: row.memberName,
-                      relatedEvent: row.eventName,
-                      amount: row.amount,
-                      paymentMode: row.paymentMode,
-                      utr: row.utr,
-                    },
-                  });
-                }}
-                sx={{ color: "#ef4444", p: 0.3 }}
-              >
-                <TicketIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
         </Stack>
       ),
     },

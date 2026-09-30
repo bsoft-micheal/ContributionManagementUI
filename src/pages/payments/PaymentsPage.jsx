@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box,
   Grid,
@@ -8,6 +8,7 @@ import {
   Tooltip,
   Stack,
   Divider,
+  Chip,
 } from "@mui/material";
 import {
   Visibility as ViewIcon,
@@ -15,9 +16,12 @@ import {
   PaymentRounded as PaymentRoundedIcon,
   FilterList as FilterListIcon,
   ContentCopy as CopyIcon,
+  Add as AddIcon,
+  Image as ImageIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
+import SubmitPaymentModal from "../../components/payments/SubmitPaymentModal";
 
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
@@ -63,6 +67,12 @@ export default function PaymentsPage() {
   const [eventsList, setEventsList] = useState([]);
   const [dbStatuses, setDbStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [searchParams] = useSearchParams();
+  const [submitModalOpen, setSubmitModalOpen] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewImageSrc, setPreviewImageSrc] = useState("");
+  const [previewImageTitle, setPreviewImageTitle] = useState("");
 
   // Dialog state
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -169,6 +179,11 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     loadBackendData();
+    const handleUpdate = () => {
+      loadBackendData();
+    };
+    window.addEventListener("contribution_updated", handleUpdate);
+    return () => window.removeEventListener("contribution_updated", handleUpdate);
   }, []);
 
   const filteredTransactions = useMemo(() => {
@@ -405,6 +420,39 @@ export default function PaymentsPage() {
       key: "createdOn",
       render: (row) => formatGridDate(row.createdOn || row.CreatedOn || row.createdAt || row.CreatedAt),
     },
+    {
+      label: "Attachment",
+      key: "screenshot",
+      render: (row) =>
+        row.screenshot ? (
+          <Tooltip title="View Attachment Screenshot">
+            <Chip
+              icon={<ImageIcon sx={{ fontSize: "0.85rem !important", color: "#4a3f6b !important" }} />}
+              label="View Image"
+              size="small"
+              clickable
+              onClick={() => {
+                setPreviewImageSrc(getImageUrl(row.screenshot));
+                setPreviewImageTitle(`Attachment Proof - ${row.id}`);
+                setPreviewModalOpen(true);
+              }}
+              sx={{
+                bgcolor: "rgba(74,63,107,0.12)",
+                color: "#4a3f6b",
+                fontWeight: 700,
+                fontSize: "0.72rem",
+                height: 22,
+                cursor: "pointer",
+                "&:hover": { bgcolor: "rgba(74,63,107,0.2)" },
+              }}
+            />
+          </Tooltip>
+        ) : (
+          <Typography variant="body2" sx={{ fontSize: "0.78rem", color: "text.disabled" }}>
+            --
+          </Typography>
+        ),
+    },
   ];
 
   return (
@@ -414,6 +462,15 @@ export default function PaymentsPage() {
         columns={columns}
         data={filteredTransactions}
         loading={loading}
+        actions={
+          <AppButton
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setSubmitModalOpen(true)}
+          >
+            Submit Payment
+          </AppButton>
+        }
         filterPanel={
           <Grid container spacing={2} alignItems="center">
             <Grid
@@ -763,6 +820,44 @@ export default function PaymentsPage() {
             </Grid>
           </Box>
         )}
+      </AppDialog>
+
+      {/* ── Submit Payment Modal Form ── */}
+      <SubmitPaymentModal
+        open={submitModalOpen}
+        onClose={() => setSubmitModalOpen(false)}
+        onSuccess={() => loadBackendData()}
+        initialEventId={searchParams.get("eventId")}
+        initialMemberId={searchParams.get("memberId")}
+        initialAmount={searchParams.get("amount")}
+      />
+
+      {/* ── Image Attachment Preview Modal ── */}
+      <AppDialog
+        open={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        title={previewImageTitle || "Attachment Proof"}
+        maxWidth="md"
+        actions={
+          <AppButton variant="outlined" onClick={() => setPreviewModalOpen(false)}>
+            Close
+          </AppButton>
+        }
+      >
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 1 }}>
+          <Box
+            component="img"
+            src={previewImageSrc}
+            alt="Attachment Screenshot"
+            sx={{
+              maxWidth: "100%",
+              maxHeight: "70vh",
+              objectFit: "contain",
+              borderRadius: "8px",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            }}
+          />
+        </Box>
       </AppDialog>
     </div>
   );
