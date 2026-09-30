@@ -7,7 +7,17 @@ import {
   Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, FilterList as FilterListIcon, AddPhotoAlternate as AddPhotoAlternateIcon, PhotoLibrary as PhotoLibraryIcon } from "@mui/icons-material";
+import {
+  Visibility as ViewIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Add as AddIcon,
+  FilterList as FilterListIcon,
+  AddPhotoAlternate as AddPhotoAlternateIcon,
+  PhotoLibrary as PhotoLibraryIcon,
+  PostAdd as PostAddIcon,
+  ReceiptLong as ReceiptLongIcon,
+} from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -26,6 +36,7 @@ import { getUsersAsync } from "../../services/userService";
 import AppDataTable from "../../components/common/AppDataTable";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
 import EventPhotoDetailsDialog from "../../components/events/EventPhotoDetailsDialog";
+import EventExpensesDialog from "../../components/events/EventExpensesDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
@@ -42,6 +53,8 @@ export default function EventsPage() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [photoDetailsDialogOpen, setPhotoDetailsDialogOpen] = useState(false);
   const [photoEvent, setPhotoEvent] = useState(null);
+  const [expenseDetailsDialogOpen, setExpenseDetailsDialogOpen] = useState(false);
+  const [expenseEvent, setExpenseEvent] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const { authState } = useAuth();
@@ -158,8 +171,9 @@ export default function EventsPage() {
   const columns = [
     {
       label: "Action",
+      sx: { width: 235, minWidth: 235 },
       render: (row) => (
-        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+        <Box sx={{ display: "flex", gap: 0.4, alignItems: "center" }}>
           {canViewEvent && (
             <Tooltip title="View Details">
               <IconButton size="small" sx={{ p: 0.3 }}
@@ -215,6 +229,33 @@ export default function EventsPage() {
               }}
             >
               <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Add Expense">
+            <IconButton size="small" sx={{ p: 0.3 }}
+              onClick={() =>
+                navigate("/expense", {
+                  state: {
+                    openAddExpense: true,
+                    eventName: row.eventName,
+                    category: row.eventTypeName,
+                    eventDate: row.eventDate,
+                    eventId: row.eventId,
+                  },
+                })
+              }
+            >
+              <PostAddIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="View Expense">
+            <IconButton size="small" sx={{ p: 0.3 }}
+              onClick={() => {
+                setExpenseEvent(row);
+                setExpenseDetailsDialogOpen(true);
+              }}
+            >
+              <ReceiptLongIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
             </IconButton>
           </Tooltip>
         </Box>
@@ -386,6 +427,15 @@ export default function EventsPage() {
             },
           });
         }}
+      />
+
+      <EventExpensesDialog
+        open={expenseDetailsDialogOpen}
+        onClose={() => {
+          setExpenseDetailsDialogOpen(false);
+          setExpenseEvent(null);
+        }}
+        event={expenseEvent}
       />
 
       <AppConfirmDialog
