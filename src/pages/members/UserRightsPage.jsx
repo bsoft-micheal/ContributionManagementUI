@@ -24,6 +24,44 @@ const ACCESS_OPTIONS = [
   { value: 3, label: "Deny", color: "#ef4444", stringVal: "deny" },
 ];
 
+const CANONICAL_MODULE_ORDER = [
+  "Dashboard",
+  "Users",
+  "Events",
+  "Finance",
+  "Support Ticket",
+  "Tools",
+  "Reports"
+];
+
+const CANONICAL_SUBMODULE_ORDER = {
+  Finance: [
+    "",
+    "Contribution",
+    "Payment Submission",
+    "Payment History",
+    "Calculation",
+    "Expense"
+  ],
+  Events: [
+    "",
+    "Event",
+    "Calendar",
+    "Gallery"
+  ],
+  Tools: [
+    "",
+    "Roles",
+    "User Rights",
+    "Event Types",
+    "Budget Calculations",
+    "Types",
+    "Status",
+    "Exit Process",
+    "Settings"
+  ]
+};
+
 export default function UserRightsPage() {
   const [roles, setRoles] = useState([]);
   const [selectedRoleName, setSelectedRoleName] = useState("");
@@ -105,6 +143,8 @@ export default function UserRightsPage() {
               subModuleVal = "Gallery";
             } else if (subModuleVal.includes("Contribution")) {
               subModuleVal = "Contribution";
+            } else if (subModuleVal.includes("Payment Submission") || subModuleVal.includes("Submit Payment")) {
+              subModuleVal = "Payment Submission";
             } else if (subModuleVal.includes("Payment")) {
               subModuleVal = "Payment History";
             } else if (subModuleVal.includes("Calculation")) {
@@ -141,7 +181,6 @@ export default function UserRightsPage() {
 
         return {
           ...r,
-          _uid: i + 1,
           featureID: r.featureID || r.FeatureID || r.featureId || 0,
           module: moduleVal,
           subModule: subModuleVal,
@@ -153,12 +192,41 @@ export default function UserRightsPage() {
           createdAt: r.createdAt || r.CreatedAt || r.createdOn || r.CreatedOn,
         };
       });
-      setRights(prev => ({ ...prev, [roleName]: normalised }));
+
+      // Sort rows hierarchically to match canonical navigation order
+      const sorted = [...normalised].sort((a, b) => {
+        const modA = a.module || "";
+        const modB = b.module || "";
+        const idxA = CANONICAL_MODULE_ORDER.indexOf(modA);
+        const idxB = CANONICAL_MODULE_ORDER.indexOf(modB);
+        const effA = idxA >= 0 ? idxA : 999;
+        const effB = idxB >= 0 ? idxB : 999;
+        if (effA !== effB) return effA - effB;
+
+        const subOrder = CANONICAL_SUBMODULE_ORDER[modA] || [];
+        const subA = a.subModule || "";
+        const subB = b.subModule || "";
+        const sIdxA = subOrder.indexOf(subA);
+        const sIdxB = subOrder.indexOf(subB);
+        const effSubA = sIdxA >= 0 ? sIdxA : 999;
+        const effSubB = sIdxB >= 0 ? sIdxB : 999;
+        if (effSubA !== effSubB) return effSubA - effSubB;
+
+        // Sub-module header row (empty action) comes before its actions
+        if (!a.action && b.action) return -1;
+        if (a.action && !b.action) return 1;
+
+        return (a.featureID || 0) - (b.featureID || 0);
+      });
+
+      const finalRows = sorted.map((r, i) => ({ ...r, _uid: i + 1 }));
+
+      setRights(prev => ({ ...prev, [roleName]: finalRows }));
       try {
         const stored = localStorage.getItem("projectRightsConfig");
         const parsed = stored ? JSON.parse(stored) : {};
-        parsed[roleName] = normalised;
-        parsed[roleName.toLowerCase()] = normalised;
+        parsed[roleName] = finalRows;
+        parsed[roleName.toLowerCase()] = finalRows;
         localStorage.setItem("projectRightsConfig", JSON.stringify(parsed));
       } catch {
         // ignore cache write error
@@ -219,14 +287,17 @@ export default function UserRightsPage() {
 
     setSaving(true);
     try {
-      // Build request payload: every Rights item explicitly contains `role: selectedRoleName`
+      const selectedRoleObj = roles.find(r => r.roleName === selectedRoleName);
+      // Build request payload: every Rights item explicitly contains `roleId` and `role: selectedRoleName`
       const payload = {
+        roleId: selectedRoleObj?.roleId || undefined,
         roleName: selectedRoleName,
         rights: currentRows.map(r => {
           const typeVal = Number(r.accessType) || (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2));
           const strVal = typeVal === 3 ? "deny" : (typeVal === 1 ? "readOnly" : "readWrite");
           const pageVal = (r.action && r.action.trim() !== "" ? r.action : (r.page || r.subModule || r.module || "")).trim();
           return {
+            roleId: selectedRoleObj?.roleId || r.roleId || undefined,
             role: selectedRoleName,
             featureId: r.featureID || r.featureId || 0,
             module: (r.module || "").trim(),
@@ -308,27 +379,20 @@ export default function UserRightsPage() {
     {
       label: "Module",
       key: "module",
-      render: (row) => {
-        const idx = filteredRows.findIndex(r => r._uid === row._uid);
-        const repeated = idx > 0 && filteredRows[idx - 1].module === row.module;
-        return (
-          <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.8rem" }}>
-            {repeated ? "" : row.module}
-          </Typography>
-        );
-      },
+      render: (row) => (
+        <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.8rem" }}>
+          {row.module || "—"}
+        </Typography>
+      ),
     },
     {
       label: "Sub Module",
       key: "subModule",
       render: (row) => {
-        const idx = filteredRows.findIndex(r => r._uid === row._uid);
-        const prev = idx > 0 ? filteredRows[idx - 1] : null;
-        const repeated = prev && prev.module === row.module && prev.subModule === row.subModule;
         const val = row.subModule && row.subModule.trim() !== "" ? row.subModule : "—";
         return (
           <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.primary", fontWeight: 500 }}>
-            {repeated ? "" : val}
+            {val}
           </Typography>
         );
       },

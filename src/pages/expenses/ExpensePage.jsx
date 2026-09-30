@@ -36,7 +36,7 @@ import { formatGridDate, formatViewDate } from "../../utils/dateHelper";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
-import { getRightsForPage } from "../../utils/rightsHelper";
+import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
 import { getImageUrl } from "../../services/apiClient";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -119,6 +119,14 @@ export default function ExpensePage() {
   const hasWriteAccess = canEdit;
   const toast = useAppToast();
   const fileInputRef = useRef(null);
+
+  // Granular Action Permissions configured via User Rights
+  const canViewExpense = hasActionPermission("View Expense", null, authState?.role).canView;
+  const canAddExpense = hasActionPermission("Add Expense", null, authState?.role).canExecute && hasWriteAccess;
+  const canEditExpense = hasActionPermission("Edit Expense", null, authState?.role).canExecute && hasWriteAccess;
+  const canDeleteExpense = hasActionPermission("Delete Expense", null, authState?.role).canExecute && hasWriteAccess;
+  const canVerifyExpense = hasActionPermission("Verify Expense", null, authState?.role).canExecute && hasWriteAccess;
+  const canExportExpense = hasActionPermission("Export Expense", null, authState?.role).canExecute;
 
   const [expenses, setExpenses] = useState([]);
   const [eventsList, setEventsList] = useState([]);
@@ -367,6 +375,10 @@ export default function ExpensePage() {
   };
 
   const handleEditExpense = (row) => {
+    if (!canEditExpense) {
+      toast.error("You do not have permission to edit expenses.");
+      return;
+    }
     setEditingExpense(row);
     setFormImageError(false);
     const rawFile = row.fileName || row.fileUrl || "";
@@ -391,11 +403,19 @@ export default function ExpensePage() {
   };
 
   const handleDeleteRequest = (row) => {
+    if (!canDeleteExpense) {
+      toast.error("You do not have permission to delete expenses.");
+      return;
+    }
     setExpenseToDelete(row);
     setDeleteConfirmOpen(true);
   };
 
   const handleConfirmDelete = async () => {
+    if (!canDeleteExpense) {
+      toast.error("You do not have permission to delete expenses.");
+      return;
+    }
     if (!expenseToDelete) return;
     const expenseId = expenseToDelete.expenseId || expenseToDelete.id;
 
@@ -478,6 +498,14 @@ export default function ExpensePage() {
   };
 
   const handleSaveExpense = async () => {
+    if (editingExpense && !canEditExpense) {
+      toast.error("You do not have permission to edit expenses.");
+      return;
+    }
+    if (!editingExpense && !canAddExpense) {
+      toast.error("You do not have permission to add expenses.");
+      return;
+    }
     const newErrors = {};
     if (!form.eventName) newErrors.eventName = "Event is required";
     if (!form.category) newErrors.category = "Event Type is required";
@@ -528,6 +556,10 @@ export default function ExpensePage() {
   };
 
   const handleOpenStatusDialog = (row) => {
+    if (!canVerifyExpense) {
+      toast.error("You do not have permission to verify expenses.");
+      return;
+    }
     setStatusExpense(row);
     setNewStatus(row.status || "Pending");
     const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "Admin";
@@ -537,6 +569,10 @@ export default function ExpensePage() {
   };
 
   const handleUpdateExpenseStatus = async () => {
+    if (!canVerifyExpense) {
+      toast.error("You do not have permission to verify expenses.");
+      return;
+    }
     if (!statusExpense) return;
     const expenseId = statusExpense.expenseId || statusExpense.id;
     try {
@@ -579,36 +615,43 @@ export default function ExpensePage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5 }}>
-          <Tooltip title="View Details">
-            <IconButton
-              size="small"
-              sx={{ p: 0.3 }}
-              onClick={() => {
-                setSelectedExpense(row);
-                setViewDialogOpen(true);
-              }}
-            >
-              <ViewIcon
-                sx={{
-                  fontSize: "1.05rem",
-                  color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
-                }}
-              />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Verify" : ""}>
+          <Tooltip title={canViewExpense ? "View Details" : "Access Denied"}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!canViewExpense}
+                onClick={() => {
+                  if (!canViewExpense) return;
+                  setSelectedExpense(row);
+                  setViewDialogOpen(true);
+                }}
+              >
+                <ViewIcon
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) =>
+                      canViewExpense
+                        ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")
+                        : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1"),
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={canVerifyExpense ? "Verify" : (hasWriteAccess ? "Access Denied" : "")}>
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!canVerifyExpense}
                 onClick={() => handleOpenStatusDialog(row)}
               >
                 <StatusActionIcon
                   sx={{
                     fontSize: "1.05rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      canVerifyExpense
                         ? theme.palette.mode === "dark"
                           ? "#38bdf8"
                           : "#0284c7"
@@ -620,19 +663,19 @@ export default function ExpensePage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Edit" : ""}>
+          <Tooltip title={canEditExpense ? "Edit" : (hasWriteAccess ? "Access Denied" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!canEditExpense}
                 onClick={() => handleEditExpense(row)}
               >
                 <EditIcon
                   sx={{
                     fontSize: "1.05rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      canEditExpense
                         ? theme.palette.mode === "dark"
                           ? "#ffffff"
                           : "#4a3f6b"
@@ -644,22 +687,22 @@ export default function ExpensePage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? "Delete" : ""}>
+          <Tooltip title={canDeleteExpense ? "Delete" : (hasWriteAccess ? "Access Denied" : "")}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess}
+                disabled={!canDeleteExpense}
                 onClick={() => handleDeleteRequest(row)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.05rem",
                     color: (theme) =>
-                      hasWriteAccess
+                      canDeleteExpense
                         ? theme.palette.mode === "dark"
-                          ? "#ffffff"
-                          : "#4a3f6b"
+                          ? "#ef4444"
+                          : "#dc2626"
                         : theme.palette.mode === "dark"
                           ? "rgba(255,255,255,0.3)"
                           : "#cbd5e1",
@@ -777,14 +820,19 @@ export default function ExpensePage() {
         columns={columns}
         data={filteredExpenses}
         loading={loading}
+        allowExport={canExportExpense}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             <AppButton
               variant="contained"
               size="small"
-              disabled={!hasWriteAccess}
+              disabled={!canAddExpense}
               startIcon={<AddIcon />}
               onClick={() => {
+                if (!canAddExpense) {
+                  toast.error("You do not have permission to add expenses.");
+                  return;
+                }
                 const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
                 const matched = membersList.find((m) => {
                   const mName = (m.name || m.memberName || "").trim().toLowerCase();
