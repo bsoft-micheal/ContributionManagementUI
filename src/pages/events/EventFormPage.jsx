@@ -49,6 +49,7 @@ import dayjs from "dayjs";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
+import AppTextArea from "../../components/common/AppTextArea";
 import AppButton from "../../components/common/AppButton";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
@@ -59,6 +60,7 @@ import {
 } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
+import { getUsersAsync } from "../../services/userService";
 import { getBudgetCalculationsAsync } from "../../services/budgetCalculationService";
 import { updateSystemSettings } from "../../services/settingsService";
 import {
@@ -244,17 +246,26 @@ export default function EventFormPage() {
     async function initData() {
       setLoading(true);
       try {
-        const [typesData, membersData, budgetData] = await Promise.all([
+        const [typesData, usersData, budgetData] = await Promise.all([
           getEventTypesAsync(),
-          getMembersAsync(),
+          getUsersAsync().catch(() => getMembersAsync()),
           getBudgetCalculationsAsync().catch(() => []),
         ]);
 
         if (!isMounted) return;
 
-        const activeMems = (membersData || []).filter((m) => m.isActive && !m.isExited);
+        const normalizedMembers = (usersData || []).map((u) => ({
+          ...u,
+          memberId: u.memberId || u.userId || u.id,
+          name: u.name || u.fullName || u.username,
+          workType: u.workType || u.memberType || "Office",
+          isActive: u.isActive !== false && !u.isDeleted,
+          isExited: Boolean(u.isExited),
+        }));
+
+        const activeMems = normalizedMembers.filter((m) => m.isActive && !m.isExited);
         setEventTypes(typesData || []);
-        setMembers(membersData || []);
+        setMembers(normalizedMembers);
 
         const activeBudgetItems = Array.isArray(budgetData)
           ? budgetData.filter((b) => b.isActive !== false)
@@ -563,8 +574,23 @@ export default function EventFormPage() {
         };
       });
     } else {
-      // 2. Non-Birthday Event Types: Use items created in Master for this Category
-      if (categoryItems.length > 0) {
+      // 2. Non-Birthday Event Types: Use Base Amount split (or master items if Base Amount is 0)
+      const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
+      if (manualBase > 0) {
+        const perPersonRate = eligible > 0 ? Math.ceil(manualBase / eligible) : 0;
+        return [
+          {
+            expenseItem: `${selectedTypeName || "Event"} Base Amount`,
+            rate: perPersonRate,
+            calcText:
+              eligible > 0
+                ? `₹${manualBase.toLocaleString("en-IN")} ÷ ${eligible} Members`
+                : `₹${manualBase.toLocaleString("en-IN")}`,
+            amount: manualBase,
+            formulaPart: `Base Amount (₹${manualBase.toLocaleString("en-IN")}) split among ${eligible} participating members`,
+          },
+        ];
+      } else if (categoryItems.length > 0) {
         return categoryItems.map((item) => {
           const rate = Number(item.rate) || 0;
           const calcText = `${total} × ₹${rate.toLocaleString("en-IN")}`;
@@ -580,21 +606,13 @@ export default function EventFormPage() {
           };
         });
       } else {
-        // Fallback if no master items created under this category yet
-        const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
-        const perPersonRate = total > 0 && manualBase > 0 ? Math.round(manualBase / total) : 0;
-        const amount = manualBase > 0 ? manualBase : 0;
-
         return [
           {
             expenseItem: `${selectedTypeName || "Event"} Celebration`,
-            rate: perPersonRate,
-            calcText:
-              total > 0 && perPersonRate > 0
-                ? `${total} × ₹${perPersonRate.toLocaleString("en-IN")}`
-                : `${total} Members`,
-            amount: amount,
-            formulaPart: `${selectedTypeName || "Event"} (Total Active Members × ₹${perPersonRate.toLocaleString("en-IN")})`,
+            rate: 0,
+            calcText: "Enter Base Amount",
+            amount: 0,
+            formulaPart: `Base Amount: ₹0`,
           },
         ];
       }
@@ -606,6 +624,7 @@ export default function EventFormPage() {
     office,
     bdays,
     total,
+    eligible,
     puffsFactor,
     form.baseAmount,
   ]);
@@ -669,7 +688,7 @@ export default function EventFormPage() {
       ...prev,
       eventTypeId: newTypeId,
       eventName: updatedName,
-      baseAmount: "", // reset base amount so previous event type adjustments don't carry over
+      baseAmount: !isNewBday && newType?.baseAmount > 0 ? String(newType.baseAmount) : "",
       participantIds: allActiveIds,
     }));
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
@@ -720,6 +739,13 @@ export default function EventFormPage() {
     };
 
     const newErrors = validateForm(form, schema);
+
+    if (!isBirthday) {
+      const cleanBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
+      if (cleanBase <= 0) {
+        newErrors.baseAmount = "Base amount must be greater than 0";
+      }
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -1313,6 +1339,73 @@ export default function EventFormPage() {
                     </Box>
                   )
                 )}
+
+                {/* Non-Birthday Event: Base Amount & Description */}
+                {!isBirthday && (
+                  <Box sx={{ mt: 2.5 }}>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <AppInput
+                          label="Base Amount"
+                          placeholder="Enter base amount (₹)"
+                          fullWidth
+                          value={formatBaseAmount(form.baseAmount)}
+                          onChange={(e) => {
+                            const rawVal = e.target.value.replace(/[^0-9]/g, "");
+                            setForm((f) => ({ ...f, baseAmount: rawVal }));
+                            if (errors.baseAmount) {
+                              setErrors((prev) => ({ ...prev, baseAmount: "" }));
+                            }
+                          }}
+                          startAdornment={
+                            <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
+                              ₹
+                            </Typography>
+                          }
+                          error={!!errors.baseAmount}
+                          helperText={errors.baseAmount}
+                          required
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <AppTextArea
+                          label="Description"
+                          placeholder="Enter optional description..."
+                          value={form.description}
+                          onChange={(e) => {
+                            if (e.target.value.length <= 500) {
+                              setForm((f) => ({ ...f, description: e.target.value }));
+                            }
+                          }}
+                          maxLength={500}
+                          rows={3}
+                          fullWidth
+                          helperText={`${form.description?.length || 0}/500 characters`}
+                        />
+                      </Grid>
+                    </Grid>
+                  </Box>
+                )}
+
+                {/* Birthday Event: Optional Description */}
+                {isBirthday && (
+                  <Box sx={{ mt: 2.5 }}>
+                    <AppTextArea
+                      label="Description"
+                      placeholder="Enter optional description..."
+                      value={form.description}
+                      onChange={(e) => {
+                        if (e.target.value.length <= 500) {
+                          setForm((f) => ({ ...f, description: e.target.value }));
+                        }
+                      }}
+                      maxLength={500}
+                      rows={3}
+                      fullWidth
+                      helperText={`${form.description?.length || 0}/500 characters`}
+                    />
+                  </Box>
+                )}
               </Box>
             </Grid>
 
@@ -1695,8 +1788,8 @@ export default function EventFormPage() {
             </Grid>
           </Grid>
 
-          {/* Auto-Expense Preview Banner — shown only in create mode, updates on event type change */}
-          {!isEdit && (() => {
+          {/* Auto-Expense Preview Banner — shown only in create mode for birthday events */}
+          {!isEdit && isBirthday && (() => {
             const typeNameLower = (selectedTypeName || "").toLowerCase().trim();
             const autoExpenseItems = budgetItemsList.filter((b) => {
               if (b.isActive === false) return false;

@@ -83,3 +83,17 @@ export function parseMemberDob(val) {
   }
   return null;
 }
+
+/**
+ * Format createdBy field to avoid raw UUID / GUID strings in tables and views.
+ * @param {string} val
+ * @param {string} [placeholder="--"]
+ * @returns {string}
+ */
+export function formatCreatedBy(val, placeholder = "--") {
+  if (!val) return placeholder;
+  const str = String(val).trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  return isUuid ? placeholder : str;
+}
+
