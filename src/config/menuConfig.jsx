@@ -19,70 +19,68 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import RuleRoundedIcon from "@mui/icons-material/RuleRounded";
 
-import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
+import { MENU_FEATURE_IDS } from "../constants";
 
 export const navigationItems = [
   {
-    featureId: 1,
+    featureId: MENU_FEATURE_IDS.DASHBOARD,
     label: "Dashboard",
     path: "/",
     icon: <DashboardRoundedIcon fontSize="small" />
   },
   {
-    featureId: 2,
+    featureId: MENU_FEATURE_IDS.USERS_MODULE,
     label: "Users",
     path: "/users",
     icon: <ManageAccountsRoundedIcon fontSize="small" />
   },
   {
-    featureId: 3,
+    featureId: MENU_FEATURE_IDS.EVENTS_MODULE,
     label: "Events",
     id: "events",
     icon: <EventRoundedIcon fontSize="small" />,
     children: [
-      { featureId: 4, label: "Event", path: "/events", icon: <EventRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 5, label: "Calendar", path: "/calendar", icon: <CalendarMonthRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 6, label: "Gallery", path: "/gallery", icon: <CollectionsRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.EVENT_PAGE, label: "Event", path: "/events", icon: <EventRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.CALENDAR, label: "Calendar", path: "/calendar", icon: <CalendarMonthRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.GALLERY, label: "Gallery", path: "/gallery", icon: <CollectionsRoundedIcon sx={{ fontSize: "1rem" }} /> },
     ]
   },
   {
-    featureId: 7,
+    featureId: MENU_FEATURE_IDS.FINANCE_MODULE,
     label: "Finance",
     id: "finance",
     icon: <AccountBalanceRoundedIcon fontSize="small" />,
     children: [
-      { featureId: 8, label: "Contribution", path: "/contributions", icon: <SavingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 9, label: "Payment History", path: "/payments", icon: <ReceiptLongRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 10, label: "Calculation", path: "/contribution-calculation", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 11, label: "Expense", path: "/expense", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 24, label: "Payment Submission", path: "/payment-submission", icon: <PaymentsRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.CONTRIBUTION, label: "Contribution", path: "/contributions", icon: <SavingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.PAYMENT_HISTORY, label: "Payment History", path: "/payments", icon: <ReceiptLongRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.CALCULATION, label: "Calculation", path: "/contribution-calculation", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.EXPENSE, label: "Expense", path: "/expense", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: "1rem" }} /> },
     ]
   },
   {
-    featureId: 12,
+    featureId: MENU_FEATURE_IDS.SUPPORT_TICKET,
     label: "Support Ticket",
     path: "/support-tickets",
     icon: <ConfirmationNumberRoundedIcon fontSize="small" />
   },
   {
-    featureId: 13,
+    featureId: MENU_FEATURE_IDS.TOOLS_MODULE,
     label: "Tools",
     id: "tools",
     icon: <BuildRoundedIcon fontSize="small" />,
     children: [
-      { featureId: 14, label: "Users", path: "/users", icon: <ManageAccountsRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 15, label: "Roles", path: "/roles", icon: <BadgeRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 16, label: "User Rights", path: "/user-rights", icon: <AdminPanelSettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 17, label: "Event Types", path: "/event-types", icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 18, label: "Budget Calculations", path: "/budget-calculations", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 19, label: "Types", path: "/types", icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 20, label: "Status", path: "/status", icon: <RuleRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 21, label: "Exit Process", path: "/exit-process", icon: <PersonRemoveRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 22, label: "Settings", path: "/settings", icon: <SettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.ROLES, label: "Roles", path: "/roles", icon: <BadgeRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.USER_RIGHTS, label: "User Rights", path: "/user-rights", icon: <AdminPanelSettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.EVENT_TYPES, label: "Event Types", path: "/event-types", icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.BUDGET_CALCULATION, label: "Budget Calculations", path: "/budget-calculations", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.TYPES, label: "Types", path: "/types", icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.STATUS, label: "Status", path: "/status", icon: <RuleRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.EXIT_PROCESS, label: "Exit Process", path: "/exit-process", icon: <PersonRemoveRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.SETTINGS, label: "Settings", path: "/settings", icon: <SettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
     ]
   },
   {
-    featureId: 23,
+    featureId: MENU_FEATURE_IDS.REPORTS,
     label: "Reports",
     path: "/reports",
     icon: <AssessmentRoundedIcon fontSize="small" />

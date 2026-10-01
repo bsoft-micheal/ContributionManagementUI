@@ -107,10 +107,10 @@ export default function GalleryPage() {
   const hasWriteAccess = rights?.write !== undefined ? rights.write : true;
 
   // Granular Action Permissions
-  const canAddPhoto = hasActionPermission("Add Photo", 36, authState?.role).canExecute;
-  const canEditPhoto = hasActionPermission("Edit Photo", 37, authState?.role).canExecute;
-  const canDeletePhoto = hasActionPermission("Delete Photo", 38, authState?.role).canExecute;
-  const canViewGallery = hasActionPermission("View Gallery", 35, authState?.role).canView;
+  const canAddPhoto = hasActionPermission("Add Photo", 37, authState?.role).canExecute;
+  const canEditPhoto = hasActionPermission("Edit Photo", 38, authState?.role).canExecute;
+  const canDeletePhoto = hasActionPermission("Delete Photo", 39, authState?.role).canExecute;
+  const canViewGallery = hasActionPermission("View Gallery", 36, authState?.role).canView;
   const toast = useAppToast();
   const location = useLocation();
   const fileInputRef = useRef(null);

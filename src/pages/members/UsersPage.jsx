@@ -59,7 +59,7 @@ import {
 } from "../../services/userService";
 import { getRolesAsync } from "../../services/roleService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
-import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { TOAST_MESSAGES, COMMON_STRINGS, MENU_FEATURE_IDS } from "../../constants";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission } from "../../utils/rightsHelper";
 
@@ -305,16 +305,15 @@ const initialForm = {
 export default function UsersPage() {
   const theme = useTheme();
   const { authState } = useAuth();
-  const { canEdit } = useAccessByLocation();
-  const hasWriteAccess = canEdit;
+  const activeRole = authState?.role || authState?.roleName;
 
-  const canViewUsers = hasActionPermission("View Users", 83, authState?.role).canView;
-  const canAddUser = hasActionPermission("Add User", 84, authState?.role).canExecute && hasWriteAccess;
-  const canEditUser = hasActionPermission("Edit User", 85, authState?.role).canExecute && hasWriteAccess;
-  const canDeleteUser = hasActionPermission("Delete User", 86, authState?.role).canExecute && hasWriteAccess;
-  const canImportExcel = hasActionPermission("Import Excel", 87, authState?.role).canExecute && hasWriteAccess;
-  const canExportUsers = hasActionPermission("Export Users", 88, authState?.role).canExecute;
-  const canChangeUserStatus = hasActionPermission("Change User Status", 89, authState?.role).canExecute && hasWriteAccess;
+  const canViewUsers = hasActionPermission("View User", MENU_FEATURE_IDS.USERS_VIEW, activeRole).canView;
+  const canAddUser = hasActionPermission("Add User", MENU_FEATURE_IDS.USERS_ADD, activeRole).canExecute;
+  const canEditUser = hasActionPermission("Edit User", MENU_FEATURE_IDS.USERS_EDIT, activeRole).canExecute;
+  const canDeleteUser = hasActionPermission("Delete User", MENU_FEATURE_IDS.USERS_DELETE, activeRole).canExecute;
+  const canImportExcel = hasActionPermission("Import Excel", MENU_FEATURE_IDS.USERS_IMPORT_EXCEL, activeRole).canExecute;
+  const canExportUsers = hasActionPermission("Export Users", MENU_FEATURE_IDS.USERS_EXPORT, activeRole).canExecute;
+  const canChangeUserStatus = hasActionPermission("Change User Status", MENU_FEATURE_IDS.USERS_UPDATE, activeRole).canExecute;
 
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -1041,16 +1040,19 @@ export default function UsersPage() {
       render: (row) => {
         return (
           <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-            <Tooltip title="View Details">
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                onClick={() => openView(row)}
-              >
-                <ViewIcon sx={{ fontSize: "1.05rem", color: actionIconColor }} />
-              </IconButton>
+            <Tooltip title={canViewUsers ? "View Details" : ""}>
+              <span>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canViewUsers}
+                  onClick={() => openView(row)}
+                >
+                  <ViewIcon sx={{ fontSize: "1.05rem", color: canViewUsers ? actionIconColor : "#cbd5e1" }} />
+                </IconButton>
+              </span>
             </Tooltip>
-            <Tooltip title={hasWriteAccess ? "Edit User" : ""}>
+            <Tooltip title={canEditUser ? "Edit User" : ""}>
               <span>
                 <IconButton
                   size="small"

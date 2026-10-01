@@ -77,13 +77,13 @@ export default function SupportTicketsPage() {
   const hasWriteAccess = canEdit;
 
   // Action-level feature IDs from navigation_menus (parent_id=12):
-  // 55=View, 56=Add, 57=Edit, 58=Delete, 59=Verify, 60=Export Support Ticket
-  const canViewTicket = hasActionPermission("View Support Ticket", 55, authState?.role).canView;
-  const canAddTicket = hasActionPermission("Add Support Ticket", 56, authState?.role).canExecute && hasWriteAccess;
-  const canEditTicket = hasActionPermission("Edit Support Ticket", 57, authState?.role).canExecute && hasWriteAccess;
-  const canDeleteTicket = hasActionPermission("Delete Support Ticket", 58, authState?.role).canExecute && hasWriteAccess;
-  const canVerifyTicket = hasActionPermission("Verify Support Ticket", 59, authState?.role).canExecute && hasWriteAccess;
-  const canExportTicket = hasActionPermission("Export Support Ticket", 60, authState?.role).canExecute;
+  // 49=Add support, 50=View details, 51=Verify, 52=Edit, 53=Delete
+  const canViewTicket = hasActionPermission("View details", 50, authState?.role).canView;
+  const canAddTicket = hasActionPermission("Add support", 49, authState?.role).canExecute && hasWriteAccess;
+  const canEditTicket = hasActionPermission("Edit", 52, authState?.role).canExecute && hasWriteAccess;
+  const canDeleteTicket = hasActionPermission("Delete", 53, authState?.role).canExecute && hasWriteAccess;
+  const canVerifyTicket = hasActionPermission("Verify", 51, authState?.role).canExecute && hasWriteAccess;
+  const canExportTicket = hasActionPermission("Export Support Ticket", 50, authState?.role).canExecute;
 
   const toast = useAppToast();
   const location = useLocation();

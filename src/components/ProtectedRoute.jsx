@@ -10,13 +10,15 @@ export default function ProtectedRoute({ children, roles = [] }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
+  const activeRole = authState?.role || authState?.roleName;
+
   // 1. Hardcoded role checks if specified
-  if (roles.length > 0 && !roles.includes(authState?.role)) {
+  if (roles.length > 0 && !roles.some(r => r.toLowerCase() === String(activeRole || "").toLowerCase())) {
     return <Navigate to="/" replace />;
   }
 
   // 2. Dynamic rights mapping checks from configurator
-  const rights = getRightsForPath(location.pathname, authState?.role);
+  const rights = getRightsForPath(location.pathname, activeRole);
   if (rights.deny) {
     // If root route "/" itself is denied, redirecting to "/" causes an infinite redirect loop (blank screen).
     // In that scenario, fallback to a safe path or login.
