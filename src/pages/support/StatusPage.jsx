@@ -12,6 +12,7 @@ import {
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -50,8 +51,8 @@ const initialStatusForm = {
 
 export default function StatusPage() {
   const { authState } = useAuth();
-  const rights = getRightsForPage("Status", authState?.role);
-  const hasWriteAccess = rights.write;
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
   const toast = useAppToast();
 
   // ==================== Status State ====================

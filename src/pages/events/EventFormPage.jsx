@@ -184,8 +184,8 @@ export default function EventFormPage() {
   const isEdit = Boolean(id);
 
   // Granular Action Permissions
-  const canAddEvent = hasActionPermission("Add Event", 31, authState?.role).canExecute;
-  const canEditEvent = hasActionPermission("Edit Event", 32, authState?.role).canExecute;
+  const canAddEvent = hasActionPermission("Add Event", 31, authState?.role).canExecute && canEdit;
+  const canEditEvent = hasActionPermission("Edit Event", 32, authState?.role).canExecute && canEdit;
 
   useEffect(() => {
     if (!isEdit && !canAddEvent) {
@@ -209,9 +209,23 @@ export default function EventFormPage() {
   const [members, setMembers] = useState([]);
   const [budgetItemsList, setBudgetItemsList] = useState([]);
 
+  const isMemberActive = (m) => {
+    const active =
+      m.isActive === true ||
+      m.isActive === 1 ||
+      String(m.isActive).toLowerCase() === "true" ||
+      m.status === "Active" ||
+      m.isActive === undefined;
+    const exited =
+      m.isExited === true ||
+      m.isExited === 1 ||
+      String(m.isExited).toLowerCase() === "true";
+    return active && !exited;
+  };
+
   // Active members count
   const activeMembers = useMemo(
-    () => members.filter((m) => m.isActive && !m.isExited),
+    () => members.filter(isMemberActive),
     [members]
   );
 
@@ -235,7 +249,7 @@ export default function EventFormPage() {
   // Configuration counts states
   const [officeBirthdays, setOfficeBirthdays] = useState(0);
   const [wfhBirthdays, setWfhBirthdays] = useState(0);
-  const [totalMembers, setTotalMembers] = useState(totalActiveCount || 66);
+  const [totalMembers, setTotalMembers] = useState(totalActiveCount || 0);
   const [officeMembers, setOfficeMembers] = useState(totalOfficeCount || 0);
   const [wfhMembers, setWfhMembers] = useState(totalWfhCount || 0);
   const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
@@ -250,6 +264,7 @@ export default function EventFormPage() {
           getEventTypesAsync(),
           getUsersAsync().catch(() => getMembersAsync()),
           getBudgetCalculationsAsync().catch(() => []),
+          getUsersAsync().catch(() => []),
         ]);
 
         if (!isMounted) return;
@@ -806,6 +821,9 @@ export default function EventFormPage() {
           "en-IN"
         )}, Contribution/member: ₹${contributionPerMember}`;
 
+      const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
+      const effectiveBase = plannedBudget > 0 ? plannedBudget : manualBase;
+
       const payload = {
         eventName: form.eventName.trim(),
         eventTypeId: form.eventTypeId,
@@ -813,7 +831,7 @@ export default function EventFormPage() {
         eventDates: isBirthday ? (celebrantDatesCsv || null) : null,
         description: form.description?.trim() || defaultDesc,
         status: form.status || "Planned",
-        baseAmount: plannedBudget,
+        baseAmount: effectiveBase,
         participantIds:
           finalParticipantIds.length > 0 ? finalParticipantIds : form.participantIds,
         contributionOverrides: contributionOverrides,
@@ -853,7 +871,14 @@ export default function EventFormPage() {
 
       navigate("/events");
     } catch (error) {
-      const errMsg = error.response?.data?.message || error.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED;
+      let errMsg = error.response?.data?.message;
+      if (!errMsg && error.response?.data?.errors) {
+        const errValues = Object.values(error.response.data.errors);
+        errMsg = Array.isArray(errValues) ? errValues.flat().join(", ") : String(error.response.data.errors);
+      }
+      if (!errMsg) {
+        errMsg = error.response?.data?.title || error.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED;
+      }
       toast.error(errMsg);
     } finally {
       setSaving(false);

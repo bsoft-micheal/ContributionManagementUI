@@ -6,7 +6,8 @@ export default function AppTextArea({
   onChange,
   fullWidth = true,
   placeholder,
-  minRows = 3,
+  minRows,
+  rows,
   error = false,
   helperText = "",
   required = false,
@@ -18,6 +19,8 @@ export default function AppTextArea({
       : label
       ? `Enter ${label.replace(/[*:]/g, "").trim().toLowerCase()}...`
       : "Enter description...";
+
+  const effectiveMinRows = rows ? undefined : (minRows ?? 3);
 
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
@@ -46,7 +49,8 @@ export default function AppTextArea({
         value={value}
         onChange={onChange}
         multiline
-        minRows={minRows}
+        minRows={effectiveMinRows}
+        rows={rows}
         fullWidth={fullWidth}
         placeholder={effectivePlaceholder}
         variant="outlined"

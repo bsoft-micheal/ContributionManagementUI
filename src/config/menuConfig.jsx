@@ -52,10 +52,10 @@ export const navigationItems = [
     icon: <AccountBalanceRoundedIcon fontSize="small" />,
     children: [
       { featureId: 8, label: "Contribution", path: "/contributions", icon: <SavingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: 24, label: "Payment Submission", path: "/payment-submission", icon: <PaymentsRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 9, label: "Payment History", path: "/payments", icon: <ReceiptLongRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 10, label: "Calculation", path: "/contribution-calculation", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 11, label: "Expense", path: "/expense", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: 24, label: "Payment Submission", path: "/payment-submission", icon: <PaymentsRoundedIcon sx={{ fontSize: "1rem" }} /> },
     ]
   },
   {
@@ -70,6 +70,7 @@ export const navigationItems = [
     id: "tools",
     icon: <BuildRoundedIcon fontSize="small" />,
     children: [
+      { featureId: 14, label: "Users", path: "/users", icon: <ManageAccountsRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 15, label: "Roles", path: "/roles", icon: <BadgeRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 16, label: "User Rights", path: "/user-rights", icon: <AdminPanelSettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: 17, label: "Event Types", path: "/event-types", icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
