@@ -25,6 +25,7 @@ import {
   PaymentRounded as PaymentIcon,
   FactCheckOutlined as StatusUpdateIcon,
   ConfirmationNumberOutlined as TicketIcon,
+  SupportAgent as SupportAgentIcon,
 } from "@mui/icons-material";
 import SubmitPaymentModal from "../../components/payments/SubmitPaymentModal";
 import AppTextArea from "../../components/common/AppTextArea";
@@ -43,6 +44,7 @@ import { getPaymentModesAsync } from "../../services/paymentModeService";
 import { getStatusesAsync } from "../../services/statusService";
 import { getPaymentTransactionsAsync, verifyPaymentTransactionAsync, createPaymentTransactionAsync } from "../../services/paymentService";
 import AppDataTable from "../../components/common/AppDataTable";
+import { getImageUrl } from "../../services/apiClient";
 
 import AppDialog from "../../components/common/AppDialog";
 import { validateForm } from "../../utils/validation";
@@ -79,8 +81,10 @@ export default function ContributionsPage() {
   const hasWriteAccess = canEdit;
 
   // Granular Action Permissions
-  const canAddContribution = hasActionPermission("Submit Payemnt details", 41, authState?.role).canExecute;
-  const canViewContribution = hasActionPermission("View Contribution", 8, authState?.role).canView;
+  const permCheck = hasActionPermission("Submit Payment details", 42, authState?.role);
+  const canAddContribution = permCheck.canExecute !== false;
+  const canViewContribution = hasActionPermission("View Contribution", 41, authState?.role).canView;
+  const canVerifySupportTicket = hasActionPermission("Verify support Ticket", 58, authState?.role).canView !== false;
   const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
   const isAuthorityRole = !isMemberRole || hasWriteAccess || [
     "admin",
@@ -104,6 +108,8 @@ export default function ContributionsPage() {
   const [statusSaving, setStatusSaving] = useState(false);
   const [dbStatuses, setDbStatuses] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [verifiedKeys, setVerifiedKeys] = useState(() => new Set());
+  const [previewImageSrc, setPreviewImageSrc] = useState(null);
 
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState("");
@@ -136,14 +142,25 @@ export default function ContributionsPage() {
   const handleOpenSubmitPaymentModal = (row) => {
     const evId = row?.eventId || selectedEventId || "";
     const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(evId));
+    const isPaidRow = row ? (isContributionPaid(row) || String(row?.paymentStatus || row?.status || "").toLowerCase() === "paid") : false;
+    const submitted = row ? (isPaidRow || hasSubmittedPayment(row)) : false;
+    const currentEvDue = (isPaidRow || submitted) ? 0 : Number(row?.amount || activeEv?.amount || 0);
+    const prevArrears = (isPaidRow || (submitted && (row?.paymentScope === "AllOutstanding" || !row?.paymentScope))) ? 0 : Number(row?.previousUnpaid || 0);
+    const totalDue = (isPaidRow || submitted) ? 0 : (currentEvDue + prevArrears);
+
     setPaymentModalContext({
       eventId: evId,
       eventName: row?.eventName || activeEv?.eventName || activeEv?.title || activeEv?.name || "",
       eventCategory: row?.categoryName || activeEv?.eventTypeName || activeEv?.categoryName || "",
       memberId: row?.memberId || "",
       memberName: row?.memberName || "",
-      amount: row ? (row.paymentStatus === "Paid" ? "" : (row.amount || "")) : "",
-      arrearBreakdown: row?.previousUnpaidItems || [],
+      amount: totalDue > 0 ? totalDue : 0,
+      currentEventDue: currentEvDue,
+      previousArrears: prevArrears,
+      totalDue: totalDue,
+      isSubmitted: submitted,
+      paymentStatus: isPaidRow ? "Paid" : (row?.paymentStatus || "Pending"),
+      arrearBreakdown: prevArrears === 0 ? [] : (row?.previousUnpaidItems || []),
     });
     setSubmitPaymentModalOpen(true);
   };
@@ -216,17 +233,28 @@ export default function ContributionsPage() {
       const s = c.trim().toLowerCase();
       return s === "paid" || s === "verified" || s === "closed" || s === "completed";
     }
-    if (c.paymentStatus === 2 || c.PaymentStatus === 2 || c.paymentStatus === "2" || c.PaymentStatus === "2") return true;
-    if (c.isPaid === true) return true;
     const status = String(c.paymentStatus || c.PaymentStatus || c.status || c.statusName || "").trim().toLowerCase();
-    if (status === "paid" || status === "verified" || status === "closed" || status === "completed" || status.includes("paid") || status.includes("verif")) return true;
-    if (c.paymentDate && (c.paymentMode && c.paymentMode !== "None")) return true;
+    if (status === "paid" || status === "verified" || status === "closed" || status === "completed") {
+      return true;
+    }
+    const key = `${c.memberId}_${c.eventId}`;
+    const isVerifiedByAuthority = verifiedKeys.has(key) || c.isVerified === true || Boolean(c.verifiedBy);
+    return isVerifiedByAuthority;
+  };
+
+  const hasSubmittedPayment = (c) => {
+    if (!c) return false;
+    if (isContributionPaid(c)) return true;
+    const status = String(c.paymentStatus || c.PaymentStatus || c.status || c.statusName || "").trim().toLowerCase();
+    if (status === "pending" || status === "in progress" || c.paymentDate || (c.paymentMode && c.paymentMode !== "None")) {
+      return true;
+    }
     return false;
   };
 
   const getContributionOutstanding = (c) => {
     if (!c) return 0;
-    if (isContributionPaid(c)) return 0;
+    if (hasSubmittedPayment(c)) return 0;
     return Number(c.amount || 0);
   };
 
@@ -248,15 +276,19 @@ export default function ContributionsPage() {
               prev.eventId !== c.eventId &&
               !isContributionPaid(prev)
           );
-          const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
+          const scope = String(c.paymentScope || c.scope || "").toLowerCase();
+          const clearsArrears = scope === "alloutstanding" || scope === "previousarrears" || scope.includes("all") || scope.includes("arrear");
+          const isArrearsCleared = hasSubmittedPayment(c) && (clearsArrears || !c.paymentScope);
+
+          const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
+          const previousUnpaid = isArrearsCleared ? 0 : rawPreviousUnpaid;
           const currentOutstanding = getContributionOutstanding(c);
-          const isPaid = isContributionPaid(c);
 
           return {
             ...c,
             previousUnpaid,
-            previousUnpaidItems,
-            totalAccumulated: isPaid ? previousUnpaid : (currentOutstanding + previousUnpaid)
+            previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
+            totalAccumulated: currentOutstanding + previousUnpaid
           };
         });
 
@@ -606,6 +638,9 @@ export default function ContributionsPage() {
       ? customNotes
       : (auditRemarks || `Status updated to ${newStatus} by ${verifier}.`);
 
+    const targetKey = `${target.memberId}_${target.eventId}`;
+    setVerifiedKeys((prev) => new Set(prev).add(targetKey));
+
     const isMarkingPaid = ["paid", "verified", "closed", "completed"].includes(String(newStatus).toLowerCase());
 
     // Optimistically update the current table row immediately
@@ -702,14 +737,19 @@ export default function ContributionsPage() {
           const previousUnpaidItems = allList.filter(
             (prev) => prev.memberId === c.memberId && prev.eventId !== c.eventId && !isContributionPaid(prev)
           );
-          const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
+          const scope = String(c.paymentScope || c.scope || "").toLowerCase();
+          const clearsArrears = scope === "alloutstanding" || scope === "previousarrears" || scope.includes("all") || scope.includes("arrear");
+          const isArrearsCleared = hasSubmittedPayment(c) && (clearsArrears || !c.paymentScope);
+
+          const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
+          const previousUnpaid = isArrearsCleared ? 0 : rawPreviousUnpaid;
           const currentOutstanding = getContributionOutstanding(c);
-          const isPaid = isContributionPaid(c);
+
           return {
             ...c,
             previousUnpaid,
-            previousUnpaidItems,
-            totalAccumulated: isPaid ? previousUnpaid : (currentOutstanding + previousUnpaid),
+            previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
+            totalAccumulated: currentOutstanding + previousUnpaid,
           };
         });
 
@@ -736,21 +776,22 @@ export default function ContributionsPage() {
     {
       label: "Action",
       render: (row) => {
+        const isPaidRow = isContributionPaid(row) || String(row?.paymentStatus || row?.status || "").toLowerCase() === "paid";
         return (
           <Box sx={{ display: "flex", gap: 0.6, alignItems: "center" }}>
             {canAddContribution && (
-              <Tooltip title="Submit Payment Details">
+              <Tooltip title={isPaidRow ? "Payment Fully Cleared (Settled)" : "Submit Payment Details"}>
                 <IconButton
                   size="small"
                   onClick={() => handleOpenSubmitPaymentModal(row)}
                   sx={{
                     p: 0.4,
-                    color: "#4a3f6b",
-                    bgcolor: "rgba(74, 63, 107, 0.08)",
+                    color: isPaidRow ? "#16a34a" : "#4a3f6b",
+                    bgcolor: isPaidRow ? "rgba(22, 163, 74, 0.12)" : "rgba(74, 63, 107, 0.08)",
                     borderRadius: "6px",
                     "&:hover": {
-                      bgcolor: "rgba(74, 63, 107, 0.18)",
-                      color: "#3b325c",
+                      bgcolor: isPaidRow ? "rgba(22, 163, 74, 0.22)" : "rgba(74, 63, 107, 0.18)",
+                      color: isPaidRow ? "#15803d" : "#3b325c",
                     },
                   }}
                 >
@@ -785,36 +826,67 @@ export default function ContributionsPage() {
               </Tooltip>
             )}
 
-            {row.paymentStatus !== "Paid" && (
-              <Tooltip title="Raise Support Ticket">
+            {/* Raise Support Ticket Icon */}
+            <Tooltip title="Raise Support Ticket">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  const activeEvent = events.find((e) => String(e.eventId) === String(row.eventId || selectedEventId));
+                  navigate("/support-tickets", {
+                    state: {
+                      raiseTicket: true,
+                      memberName: row.memberName,
+                      relatedEvent: row.eventName || activeEvent?.eventName || activeEvent?.title || "",
+                      amount: row.amount || row.totalAccumulated,
+                      paymentMode: row.paymentMode,
+                      status: row.paymentStatus,
+                      contributionId: row.contributionId,
+                    },
+                  });
+                }}
+                sx={{
+                  p: 0.4,
+                  color: "#ef4444",
+                  bgcolor: "rgba(239, 68, 68, 0.08)",
+                  borderRadius: "6px",
+                  "&:hover": {
+                    bgcolor: "rgba(239, 68, 68, 0.18)",
+                    color: "#dc2626",
+                  },
+                }}
+              >
+                <TicketIcon sx={{ fontSize: "1.15rem" }} />
+              </IconButton>
+            </Tooltip>
+
+            {/* Verify Support Ticket Icon */}
+            {canVerifySupportTicket && (
+              <Tooltip title="Verify Support Ticket">
                 <IconButton
                   size="small"
                   onClick={() => {
                     const activeEvent = events.find((e) => String(e.eventId) === String(row.eventId || selectedEventId));
                     navigate("/support-tickets", {
                       state: {
-                        raiseTicket: true,
+                        verifyTicket: true,
                         memberName: row.memberName,
                         relatedEvent: row.eventName || activeEvent?.eventName || activeEvent?.title || "",
-                        amount: row.amount || row.totalAccumulated,
-                        paymentMode: row.paymentMode,
-                        status: row.paymentStatus,
                         contributionId: row.contributionId,
                       },
                     });
                   }}
                   sx={{
                     p: 0.4,
-                    color: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.08)",
+                    color: "#0284c7",
+                    bgcolor: "rgba(2, 132, 199, 0.1)",
                     borderRadius: "6px",
                     "&:hover": {
-                      bgcolor: "rgba(239, 68, 68, 0.18)",
-                      color: "#dc2626",
+                      bgcolor: "rgba(2, 132, 199, 0.22)",
+                      color: "#0369a1",
                     },
                   }}
                 >
-                  <TicketIcon sx={{ fontSize: "1.15rem" }} />
+                  <SupportAgentIcon sx={{ fontSize: "1.15rem" }} />
                 </IconButton>
               </Tooltip>
             )}
@@ -827,16 +899,36 @@ export default function ContributionsPage() {
       label: "Status",
       key: "paymentStatus",
       render: (row) => {
-        const isPaid = isContributionPaid(row);
-        const displayStatus = isPaid ? "Paid" : (row.paymentStatus || "Pending");
+        const key = `${row.memberId}_${row.eventId}`;
+        const isVerifiedByAuthority = verifiedKeys.has(key) || row.isVerified === true || Boolean(row.verifiedBy);
+        const rawStatus = String(row.paymentStatus || row.PaymentStatus || row.status || "Pending").trim();
+        const lower = rawStatus.toLowerCase();
+        
+        const isPaid = isContributionPaid(row) || lower === "paid" || lower === "verified" || lower === "closed" || lower === "completed";
+        const isVerified = isVerifiedByAuthority || lower === "verified";
+
+        let displayStatus = "Pending";
+        if (isVerified) {
+          displayStatus = "Verified";
+        } else if (isPaid) {
+          displayStatus = "Paid";
+        }
+
+        const color = (isPaid || isVerified) ? "#16a34a" : "#b45309";
+        const bg = (isPaid || isVerified) ? "rgba(22,163,74,0.08)" : "rgba(234,179,8,0.12)";
+
         return (
           <Typography
-            variant="caption" fontWeight={800}
+            variant="caption"
+            fontWeight={800}
             sx={{
-              color: isPaid ? "#16a34a" : "#dc2626",
-              bgcolor: isPaid ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)",
-              px: 1.2, py: 0.3, borderRadius: "3px",
-              fontSize: "0.7rem", letterSpacing: "0.04em"
+              color,
+              bgcolor: bg,
+              px: 1.2,
+              py: 0.3,
+              borderRadius: "3px",
+              fontSize: "0.7rem",
+              letterSpacing: "0.04em",
             }}
           >
             {displayStatus}
@@ -849,15 +941,15 @@ export default function ContributionsPage() {
       key: "amount",
       align: "right",
       render: (row) => {
-        const isPaid = isContributionPaid(row);
-        const currentDue = isPaid ? 0 : (Number(row.amount) || 0);
+        const submitted = hasSubmittedPayment(row);
+        const remainingAmount = submitted ? 0 : Number(row.amount || row.baseAmount || row.contributionAmount || 0);
         return (
           <Typography
             variant="body2"
             fontWeight={700}
-            color={isPaid ? "text.secondary" : "inherit"}
+            color={submitted ? "text.secondary" : "inherit"}
           >
-            ₹{currentDue.toLocaleString()}
+            ₹{remainingAmount.toLocaleString()}
           </Typography>
         );
       }
@@ -910,8 +1002,8 @@ export default function ContributionsPage() {
       key: "totalAccumulated",
       align: "right",
       render: (row) => {
-        const isPaid = isContributionPaid(row);
-        const due = isPaid ? (row.previousUnpaid || 0) : (row.totalAccumulated ?? ((Number(row.amount) || 0) + (row.previousUnpaid || 0)));
+        const currentDue = getContributionOutstanding(row);
+        const due = row.totalAccumulated ?? (currentDue + (row.previousUnpaid || 0));
         return (
           <Typography
             variant="body2"
@@ -981,7 +1073,7 @@ export default function ContributionsPage() {
         data={contributions}
         filterPanel={
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <Grid size={{ xs: 12 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
               <Box sx={{ minWidth: 220 }}>
                 <AppSelect
                   label="Selected Event"
@@ -1042,40 +1134,7 @@ export default function ContributionsPage() {
                 Clear Filter
               </AppButton>
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Box sx={{ display: "flex", gap: 3, alignItems: "center", justifyContent: { xs: "flex-start", md: "flex-end" } }}>
-                <Box>
-                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", fontSize: "0.65rem" }}>
-                    Total Income
-                  </Typography>
-                  <Typography variant="body1" fontWeight={900} color="success.main" sx={{ lineHeight: 1 }}>
-                    ₹{contributions.filter(c => isContributionPaid(c)).reduce((sum, c) => sum + (Number(c.amount) || 0), 0).toLocaleString()}
-                  </Typography>
-                </Box>
-                <Box sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)", pl: 3 }}>
-                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", fontSize: "0.65rem" }}>
-                    Total Members
-                  </Typography>
-                  <Typography variant="body2" fontWeight={800} sx={{ lineHeight: 1 }}>{contributions.length} Members</Typography>
-                </Box>
-              </Box>
-            </Grid>
           </Grid>
-        }
-        actions={
-          canAddContribution && (
-            <AppButton
-              variant="contained"
-              startIcon={<PaymentIcon />}
-              onClick={() => handleOpenSubmitPaymentModal(null)}
-              sx={{
-                bgcolor: "#4a3f6b !important",
-                "&:hover": { bgcolor: "#3b325c !important" },
-              }}
-            >
-              Submit Payment
-            </AppButton>
-          )
         }
       />
 
@@ -1394,6 +1453,11 @@ export default function ContributionsPage() {
         initialMemberId={paymentModalContext.memberId}
         initialMemberName={paymentModalContext.memberName}
         initialAmount={paymentModalContext.amount}
+        initialCurrentDue={paymentModalContext.currentEventDue}
+        initialPreviousArrears={paymentModalContext.previousArrears}
+        initialTotalDue={paymentModalContext.totalDue}
+        initialIsSubmitted={paymentModalContext.isSubmitted}
+        initialStatus={paymentModalContext.paymentStatus}
         initialArrearBreakdown={paymentModalContext.arrearBreakdown}
         onSuccess={async () => {
           const freshAll = await reloadAllContributions();
@@ -1437,7 +1501,7 @@ export default function ContributionsPage() {
           setAuditRemarks("");
         }}
         title="Authority Status Update"
-        maxWidth="sm"
+        maxWidth="md"
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             <AppButton variant="outlined" onClick={() => setStatusModalOpen(false)}>
@@ -1495,6 +1559,167 @@ export default function ContributionsPage() {
                 </Typography>
               </Box>
 
+              {/* Submitted Payment Details Summary Card */}
+              {(() => {
+                const matchedTx = (transactions || []).find(
+                  (t) =>
+                    (String(t.eventId) === String(statusModalRow?.eventId) || String(t.eventName).toLowerCase() === String(statusModalRow?.eventName || "").toLowerCase()) &&
+                    (String(t.userId) === String(statusModalRow?.memberId) || String(t.memberName).toLowerCase() === String(statusModalRow?.memberName || "").toLowerCase())
+                );
+                const paidAmt = Number(statusModalRow?.amount || statusModalRow?.paidAmount || matchedTx?.amount || 0);
+                const modeStr = statusModalRow?.paymentMode || matchedTx?.paymentMode || "Cash";
+                const utrVal = statusModalRow?.utrNumber || statusModalRow?.referenceNo || statusModalRow?.utr || matchedTx?.utr || matchedTx?.transactionRef || matchedTx?.referenceNo || "--";
+                const dateVal = statusModalRow?.paymentDate || matchedTx?.paymentDate || matchedTx?.createdOn;
+                const dateDisplay = dateVal ? dayjs(dateVal).format("DD/MM/YYYY hh:mm A") : "Today";
+                const scopeVal = statusModalRow?.paymentScope || matchedTx?.paymentScope || (paidAmt > 100 ? "All Outstanding" : "Current Event");
+                const notesVal = statusModalRow?.notes || matchedTx?.notes || "";
+                const createdByVal = statusModalRow?.createdBy || statusModalRow?.recordedBy || matchedTx?.createdBy || matchedTx?.memberName || "Member";
+                const cashAmt = matchedTx?.cashAmount || statusModalRow?.cashAmount;
+                const upiAmt = matchedTx?.upiAmount || statusModalRow?.upiAmount;
+                const rawImgs = statusModalRow?.screenshots || matchedTx?.screenshots || statusModalRow?.screenshot || matchedTx?.screenshot;
+                const proofImgs = Array.isArray(rawImgs) ? rawImgs : (rawImgs ? [rawImgs] : []);
+
+                return (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: "10px",
+                      bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "rgba(74, 63, 107, 0.03)"),
+                      border: "1px solid",
+                      borderColor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "rgba(74, 63, 107, 0.16)"),
+                    }}
+                  >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, pb: 1, borderBottom: "1px dashed rgba(120,120,120,0.2)" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <PaymentsIcon sx={{ fontSize: "1.2rem", color: "primary.main" }} />
+                        <Typography variant="caption" fontWeight={800} color="primary.main" sx={{ textTransform: "uppercase", fontSize: "0.72rem", letterSpacing: "0.06em" }}>
+                          Submitted Payment Audit Details
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={scopeVal}
+                        size="small"
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: "0.68rem",
+                          bgcolor: "rgba(99,102,241,0.1)",
+                          color: "#6366f1",
+                          borderRadius: "4px",
+                        }}
+                      />
+                    </Box>
+
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
+                          Total Received Amount
+                        </Typography>
+                        <Typography variant="subtitle2" fontWeight={900} color="success.main" sx={{ fontSize: "1rem" }}>
+                          ₹{paidAmt.toLocaleString("en-IN")}
+                        </Typography>
+                      </Grid>
+
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
+                          Payment Method
+                        </Typography>
+                        <Chip
+                          label={modeStr}
+                          size="small"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: "0.7rem",
+                            bgcolor: modeStr.toLowerCase().includes("cash") ? "rgba(22,163,74,0.1)" : "rgba(37,99,235,0.1)",
+                            color: modeStr.toLowerCase().includes("cash") ? "#16a34a" : "#2563eb",
+                            mt: 0.2,
+                          }}
+                        />
+                        {(cashAmt > 0 || upiAmt > 0) && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", mt: 0.4 }}>
+                            Cash: ₹{Number(cashAmt || 0).toLocaleString()} | UPI: ₹{Number(upiAmt || 0).toLocaleString()}
+                          </Typography>
+                        )}
+                      </Grid>
+
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
+                          Submitted Date & Time
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.78rem", mt: 0.3 }}>
+                          {dateDisplay}
+                        </Typography>
+                      </Grid>
+
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
+                          Ref / UTR Number
+                        </Typography>
+                        <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ fontSize: "0.78rem", mt: 0.3, letterSpacing: "0.02em", wordBreak: "break-all" }}>
+                          {utrVal}
+                        </Typography>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 12 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
+                          Member / Submitted By
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.78rem" }}>
+                          {statusModalRow.memberName} {createdByVal && createdByVal !== statusModalRow.memberName ? `(Recorded by ${createdByVal})` : ""}
+                        </Typography>
+                      </Grid>
+
+                      {proofImgs.length > 0 && (
+                        <Grid size={{ xs: 12, sm: 12 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", bgcolor: "rgba(37,99,235,0.04)", border: "1px dashed rgba(37,99,235,0.2)", borderRadius: "6px", p: 1, mt: 0.5 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+                              <Stack direction="row" spacing={1}>
+                                {proofImgs.map((imgItem, imgIdx) => (
+                                  <Box
+                                    key={imgIdx}
+                                    component="img"
+                                    src={getImageUrl(imgItem)}
+                                    alt={`Payment Proof ${imgIdx + 1}`}
+                                    sx={{
+                                      width: 44,
+                                      height: 44,
+                                      borderRadius: "4px",
+                                      objectFit: "cover",
+                                      border: "1px solid rgba(0,0,0,0.1)",
+                                      cursor: "pointer",
+                                      transition: "transform 0.15s",
+                                      "&:hover": { transform: "scale(1.08)" }
+                                    }}
+                                    onClick={() => setPreviewImageSrc(getImageUrl(imgItem))}
+                                  />
+                                ))}
+                              </Stack>
+                              <Box>
+                                <Typography variant="caption" fontWeight={800} color="primary.main" sx={{ display: "block", fontSize: "0.72rem" }}>
+                                  {proofImgs.length} Payment Receipt Image(s) Attached
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.68rem" }}>
+                                  Click any thumbnail to inspect full resolution screenshot
+                                </Typography>
+                              </Box>
+                            </Box>
+                            <AppButton
+                              size="small"
+                              variant="outlined"
+                              startIcon={<ViewIcon />}
+                              onClick={() => setPreviewImageSrc(getImageUrl(proofImgs[0]))}
+                              sx={{ fontSize: "0.7rem", py: 0.2 }}
+                            >
+                              View ({proofImgs.length})
+                            </AppButton>
+                          </Box>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </Paper>
+                );
+              })()}
+
               <Grid container spacing={2} alignItems="center">
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <AppSelect
@@ -1523,6 +1748,25 @@ export default function ContributionsPage() {
                 rows={3}
               />
             </Paper>
+          </Box>
+        )}
+      </AppDialog>
+
+      {/* ── Payment Proof Screenshot Lightbox Preview ── */}
+      <AppDialog
+        open={Boolean(previewImageSrc)}
+        onClose={() => setPreviewImageSrc(null)}
+        title="Payment Submission Proof / Receipt"
+        maxWidth="md"
+      >
+        {previewImageSrc && (
+          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 1 }}>
+            <Box
+              component="img"
+              src={previewImageSrc}
+              alt="Payment Proof Full Receipt"
+              sx={{ maxWidth: "100%", maxHeight: "75vh", borderRadius: "8px", boxShadow: "0 8px 24px rgba(0,0,0,0.15)", objectFit: "contain" }}
+            />
           </Box>
         )}
       </AppDialog>

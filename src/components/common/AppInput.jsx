@@ -82,6 +82,13 @@ export default function AppInput({
             "& input, & textarea, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
               py: size === "small" ? 0.8 : 1.2,
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
+              "&[type=number]": {
+                MozAppearance: "textfield",
+              },
+              "&[type=number]::-webkit-outer-spin-button, &[type=number]::-webkit-inner-spin-button": {
+                WebkitAppearance: "none",
+                margin: 0,
+              },
               "&::placeholder, &::-webkit-input-placeholder": {
                 color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
                 opacity: 1,
