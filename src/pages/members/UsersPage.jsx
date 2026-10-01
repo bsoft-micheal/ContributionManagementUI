@@ -186,6 +186,17 @@ export default function UsersPage() {
     ];
   }, [roles]);
 
+  const getRoleNameById = (id) => {
+    if (!id) return "";
+    const match = roles.find(
+      (r) =>
+        String(r.roleId).toLowerCase() === String(id).toLowerCase() ||
+        String(r.id || "").toLowerCase() === String(id).toLowerCase() ||
+        r.roleName?.toLowerCase() === String(id).toLowerCase()
+    );
+    return match ? match.roleName : id;
+  };
+
   const typeOptions = useMemo(() => {
     if (workTypes && workTypes.length > 0) {
       return workTypes
@@ -268,11 +279,26 @@ export default function UsersPage() {
 
   const filteredUsers = useMemo(() => {
     let result = users;
-    if (appliedRole) result = result.filter((u) => u.roleName === appliedRole);
+    if (appliedRole) {
+      const matchedRoleObj = roles.find(
+        (r) => r.roleName === appliedRole || String(r.roleId).toLowerCase() === String(appliedRole).toLowerCase()
+      );
+      const matchedRoleId = matchedRoleObj ? String(matchedRoleObj.roleId).toLowerCase() : null;
+      result = result.filter((u) => {
+        const uRoleId = u.roleId ? String(u.roleId).toLowerCase() : null;
+        const uRoleIds = (u.roleIds || []).map((id) => String(id).toLowerCase());
+        const uRoleName = u.roleName || getRoleNameById(u.roleId);
+        return (
+          uRoleName === appliedRole ||
+          uRoleId === appliedRole.toLowerCase() ||
+          (matchedRoleId && (uRoleId === matchedRoleId || uRoleIds.includes(matchedRoleId)))
+        );
+      });
+    }
     if (appliedStatus !== "")
       result = result.filter((u) => String(u.isActive) === appliedStatus);
     return result;
-  }, [users, appliedRole, appliedStatus]);
+  }, [users, roles, appliedRole, appliedStatus]);
 
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -335,16 +361,27 @@ export default function UsersPage() {
     let pRole = "";
     let sRole = "";
 
-    if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0) {
+    if (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0) {
+      pRole = getRoleNameById(row.primaryRoleIds[0]);
+    } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0) {
       pRole = row.primaryRoles[0];
+    } else if (row.roleId) {
+      pRole = getRoleNameById(row.roleId);
     } else if (row.roleName) {
       pRole = row.roleName;
+    } else if (Array.isArray(row.roleIds) && row.roleIds.length > 0) {
+      pRole = getRoleNameById(row.roleIds[0]);
     } else if (Array.isArray(row.roles) && row.roles.length > 0) {
       pRole = row.roles[0];
     }
 
-    if (Array.isArray(row.secondaryRoles) && row.secondaryRoles.length > 0) {
+    if (Array.isArray(row.secondaryRoleIds) && row.secondaryRoleIds.length > 0) {
+      sRole = getRoleNameById(row.secondaryRoleIds[0]);
+    } else if (Array.isArray(row.secondaryRoles) && row.secondaryRoles.length > 0) {
       sRole = row.secondaryRoles[0];
+    } else if (Array.isArray(row.roleIds) && row.roleIds.length > 1) {
+      const otherId = row.roleIds.find((id) => getRoleNameById(id) !== pRole) || row.roleIds[1];
+      sRole = getRoleNameById(otherId);
     } else if (Array.isArray(row.roles) && row.roles.length > 1) {
       sRole = row.roles.find((r) => r !== pRole) || row.roles[1];
     } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 1) {
@@ -359,7 +396,7 @@ export default function UsersPage() {
       sRole = alternate;
     }
 
-    const singleRole = row.roleName || pRole || (userRolesList[0]?.value || "Member");
+    const singleRole = pRole || (row.roleId ? getRoleNameById(row.roleId) : "") || row.roleName || (userRolesList[0]?.value || "Member");
 
     setForm({
       userId: row.userId,
@@ -977,19 +1014,32 @@ export default function UsersPage() {
     { label: "Email", key: "email" },
     {
       label: "User Role",
-      key: "roleName",
+      key: "roleId",
       render: (row) => {
-        const assignedRoles = (Array.isArray(row.roles) && row.roles.length > 0)
-          ? row.roles
-          : (row.roleName ? [row.roleName] : ["Member"]);
+        let assignedRoleNames = [];
+        if (Array.isArray(row.roleIds) && row.roleIds.length > 0) {
+          assignedRoleNames = row.roleIds.map((id) => getRoleNameById(id)).filter(Boolean);
+        } else if (row.roleId) {
+          assignedRoleNames = [getRoleNameById(row.roleId)];
+        } else if (Array.isArray(row.roles) && row.roles.length > 0) {
+          assignedRoleNames = row.roles;
+        } else if (row.roleName) {
+          assignedRoleNames = [row.roleName];
+        } else {
+          assignedRoleNames = ["Member"];
+        }
+
+        const primaryRoleName = (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0)
+          ? getRoleNameById(row.primaryRoleIds[0])
+          : (row.roleId ? getRoleNameById(row.roleId) : null);
 
         return (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>
-            {assignedRoles.map((r, idx) => {
+            {assignedRoleNames.map((r, idx) => {
               const style = getRoleStyle(r);
               const isPrimary = Boolean(
-                row.primaryRoles?.includes(r) ||
-                (!row.primaryRoles?.length && idx === 0)
+                (primaryRoleName && r === primaryRoleName) ||
+                (!primaryRoleName && idx === 0)
               );
               return (
                 <React.Fragment key={`${r}-${idx}`}>
@@ -1008,7 +1058,7 @@ export default function UsersPage() {
                       border: isPrimary ? "1px solid rgba(124, 58, 237, 0.35)" : "none",
                     }}
                   />
-                  {idx < assignedRoles.length - 1 && (
+                  {idx < assignedRoleNames.length - 1 && (
                     <Typography
                       variant="caption"
                       sx={{ color: "text.disabled", fontWeight: 700, mx: 0.2 }}

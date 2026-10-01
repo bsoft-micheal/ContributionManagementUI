@@ -60,6 +60,7 @@ import AppSwitch from "../../components/common/AppSwitch";
 import AppButton from "../../components/common/AppButton";
 import AppTextArea from "../../components/common/AppTextArea";
 import AppDataTable from "../../components/common/AppDataTable";
+import MfaSettings from "../../components/common/MfaSettings";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
@@ -1434,7 +1435,6 @@ export default function SettingsPage() {
                   <MfaSettings
                     embedded
                     title=""
-                    onDevicesChange={(devs) => setMfaDevicesCount(devs.length)}
                   />
                 </Stack>
 
