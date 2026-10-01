@@ -160,40 +160,115 @@ export default function ContributionsPage() {
     return base > 0 ? base : 0;
   };
 
+  const isSameText = (a, b) => {
+    if (!a || !b) return false;
+    const s1 = String(a).trim().toLowerCase();
+    const s2 = String(b).trim().toLowerCase();
+    return Boolean(s1 && s2 && s1 === s2);
+  };
+
+  const isMatchingEventName = (name1, name2) => {
+    if (!name1 || !name2) return false;
+    const s1 = String(name1).trim().toLowerCase();
+    const s2 = String(name2).trim().toLowerCase();
+    if (!s1 || !s2) return false;
+    return s1 === s2 || s1.startsWith(s2) || s2.startsWith(s1);
+  };
+
+  const findContributionTransaction = (c, tList = transactions, fallbackEvId = selectedEventId) => {
+    if (!c || !Array.isArray(tList) || tList.length === 0) return null;
+    const targetMemberId = c.memberId || c.userId;
+    const targetMemberName = c.memberName;
+    const targetEventId = c.eventId || fallbackEvId;
+    const targetEventName = c.eventName || (events || []).find(e => String(e.eventId || e.id) === String(targetEventId))?.eventName;
+
+    return tList.find((t) => {
+      // Member match: must match either ID or Name
+      const tMemberId = t.userId || t.memberId;
+      const tMemberName = t.memberName;
+      const memberMatch = isSameText(targetMemberId, tMemberId) || isSameText(targetMemberName, tMemberName);
+      if (!memberMatch) return false;
+
+      // Event match: MUST strictly match Event ID or Event Name (NEVER cross-match across different events!)
+      const tEventId = t.eventId;
+      const tEventName = t.eventName;
+      const idMatch = isSameText(targetEventId, tEventId);
+      const nameMatch = isMatchingEventName(targetEventName, tEventName);
+      return idMatch || nameMatch;
+    }) || null;
+  };
+
+  const hasContributionPayment = (c, tx = null) => {
+    if (!c) return false;
+    const matchedTx = tx !== null ? tx : findContributionTransaction(c);
+
+    // Direct contribution payment indicators
+    const mode = String(c.paymentMode || "").trim().toLowerCase();
+    const hasValidMode = Boolean(mode && mode !== "none" && mode !== "-");
+    const hasDate = Boolean(c.paymentDate);
+    if (hasDate && hasValidMode) return true;
+    if (mode === "split" || mode.includes("split")) return true;
+
+    // Amounts paid
+    const cash = Number(c.cashAmount) || 0;
+    const upi = Number(c.upiAmount) || 0;
+    if (cash > 0 || upi > 0) return true;
+
+    // Transaction strictly for THIS event with positive amount & non-rejected status
+    if (matchedTx) {
+      const txStatus = String(matchedTx.status || "").trim().toLowerCase();
+      if (txStatus !== "rejected") {
+        const amt = Number(matchedTx.amount) || 0;
+        if (amt > 0 || txStatus === "verified" || txStatus === "paid" || txStatus === "pending") {
+          return true;
+        }
+      }
+    }
+
+    // Backend status indicating paid or verified
+    const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
+    if (rawStatus === "paid" || rawStatus === "verified" || rawStatus === "closed" || rawStatus === "completed") {
+      return true;
+    }
+
+    return false;
+  };
+
+  const isContributionVerified = (c, tx = null) => {
+    if (!c) return false;
+    const matchedTx = tx !== null ? tx : findContributionTransaction(c);
+
+    // CRITICAL: A member who has NOT paid can NEVER be shown as Verified!
+    if (!hasContributionPayment(c, matchedTx)) {
+      return false;
+    }
+
+    const key = `${c.memberId}_${c.eventId}`;
+    const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
+    const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
+
+    return Boolean(
+      verifiedKeys.has(key) ||
+      c.isVerified === true ||
+      (c.verifiedBy && String(c.verifiedBy).trim() !== "") ||
+      (matchedTx?.verifiedBy && String(matchedTx.verifiedBy).trim() !== "") ||
+      txStatus === "verified" ||
+      rawStatus === "verified"
+    );
+  };
+
   const isContributionPaid = (c) => {
     if (!c) return false;
     if (typeof c === "string") {
       const s = c.trim().toLowerCase();
       return s === "paid" || s === "verified" || s === "closed" || s === "completed";
     }
-    const status = String(c.paymentStatus || c.PaymentStatus || c.status || c.statusName || "").trim().toLowerCase();
-    if (status === "paid" || status === "verified" || status === "closed" || status === "completed") {
-      return true;
-    }
-    const key = `${c.memberId}_${c.eventId}`;
-    const isVerifiedByAuthority = verifiedKeys.has(key) || c.isVerified === true || Boolean(c.verifiedBy);
-    return isVerifiedByAuthority;
+    return hasContributionPayment(c);
   };
 
   const hasSubmittedPayment = (c) => {
     if (!c) return false;
-    if (isContributionPaid(c)) return true;
-    const status = String(c.paymentStatus || c.PaymentStatus || c.status || c.statusName || "").trim().toLowerCase();
-    if (status === "in progress" || status === "under verification" || status === "submitted") {
-      return true;
-    }
-    if (c.paymentDate && c.paymentMode && c.paymentMode !== "None") {
-      return true;
-    }
-    const matchedTx = (transactions || []).find(
-      (t) =>
-        (String(t.eventId) === String(c.eventId || selectedEventId) || String(t.eventName).toLowerCase() === String(c.eventName || "").toLowerCase()) &&
-        (String(t.userId) === String(c.memberId) || String(t.memberName).toLowerCase() === String(c.memberName || "").toLowerCase())
-    );
-    if (matchedTx && matchedTx.status) {
-      return true;
-    }
-    return false;
+    return hasContributionPayment(c);
   };
 
   const getContributionOutstanding = (c, activeEv) => {
@@ -322,15 +397,8 @@ export default function ContributionsPage() {
               prev.eventId !== c.eventId &&
               !isContributionPaid(prev)
           );
-          const matchedTx = (transactions || []).find(
-            (t) =>
-              (String(t.eventId) === String(c.eventId || selectedEventId) || String(t.eventName).toLowerCase() === String(c.eventName || "").toLowerCase()) &&
-              (String(t.userId) === String(c.memberId) || String(t.memberName).toLowerCase() === String(c.memberName || "").toLowerCase())
-          );
-          const memberAnyTx = (transactions || []).find(
-            (t) => String(t.userId) === String(c.memberId) || String(t.memberName).toLowerCase() === String(c.memberName || "").toLowerCase()
-          );
-          const scope = String(c.paymentScope || c.scope || matchedTx?.notes || memberAnyTx?.notes || "").toLowerCase();
+          const matchedTx = findContributionTransaction(c, transactions, selectedEventId);
+          const scope = String(c.paymentScope || c.scope || matchedTx?.notes || "").toLowerCase();
           const clearsArrears = scope.includes("alloutstanding") || scope.includes("all outstanding") || scope.includes("scope: all") || scope.includes("arrear") || (!c.paymentScope && (hasSubmittedPayment(c) || isContributionPaid(c)));
           const isArrearsCleared = (hasSubmittedPayment(c) || isContributionPaid(c)) && clearsArrears;
 
@@ -367,7 +435,20 @@ export default function ContributionsPage() {
     }
 
     loadContributions();
-  }, [selectedEventId, allContributions, events]);
+  }, [selectedEventId, allContributions, events, transactions]);
+
+  useEffect(() => {
+    const handleContributionUpdated = async () => {
+      try {
+        const txRes = await getPaymentTransactionsAsync();
+        if (Array.isArray(txRes)) setTransactions(txRes);
+      } catch {}
+      await reloadAllContributions();
+    };
+
+    window.addEventListener("contribution_updated", handleContributionUpdated);
+    return () => window.removeEventListener("contribution_updated", handleContributionUpdated);
+  }, []);
 
   const handleAmountChange = (val) => {
     setPayment((prev) => {
@@ -727,11 +808,7 @@ export default function ContributionsPage() {
     try {
       setStatusSaving(true);
 
-      const matchedTxn = (transactions || []).find(
-        (t) =>
-          (String(t.eventId) === String(target.eventId) || String(t.eventName).toLowerCase() === String(target.eventName || "").toLowerCase()) &&
-          (String(t.userId) === String(target.memberId) || String(t.memberName).toLowerCase() === String(target.memberName || "").toLowerCase())
-      );
+      const matchedTxn = findContributionTransaction(target);
 
       if (matchedTxn && (matchedTxn.transactionId || matchedTxn.id)) {
         await verifyPaymentTransactionAsync(matchedTxn.transactionId || matchedTxn.id, {
@@ -962,23 +1039,16 @@ export default function ContributionsPage() {
       label: "Status",
       key: "paymentStatus",
       render: (row) => {
-        const key = `${row.memberId}_${row.eventId}`;
-        const isVerifiedByAuthority = verifiedKeys.has(key) || row.isVerified === true || Boolean(row.verifiedBy);
-        const rawStatus = String(row.paymentStatus || row.PaymentStatus || row.status || "Pending").trim();
-        const lower = rawStatus.toLowerCase();
-        
-        const isPaid = isContributionPaid(row) || lower === "paid" || lower === "verified" || lower === "closed" || lower === "completed";
-        const isVerified = isVerifiedByAuthority || lower === "verified";
+        const matchedTx = findContributionTransaction(row);
+        const isVerified = isContributionVerified(row, matchedTx);
 
         let displayStatus = "Pending";
         if (isVerified) {
           displayStatus = "Verified";
-        } else if (isPaid) {
-          displayStatus = "Paid";
         }
 
-        const color = (isPaid || isVerified) ? "#16a34a" : "#b45309";
-        const bg = (isPaid || isVerified) ? "rgba(22,163,74,0.08)" : "rgba(234,179,8,0.12)";
+        const color = isVerified ? "#16a34a" : "#b45309";
+        const bg = isVerified ? "rgba(22,163,74,0.08)" : "rgba(234,179,8,0.12)";
 
         return (
           <Typography
@@ -1004,18 +1074,17 @@ export default function ContributionsPage() {
       key: "amount",
       align: "right",
       render: (row) => {
-        const isPaid = isContributionPaid(row);
+        const isPaid = isContributionPaid(row) || hasSubmittedPayment(row);
         const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId));
         const eventAmount = getMemberEventAmount(row, activeEv);
-        const submitted = hasSubmittedPayment(row);
-        const displayAmount = (isPaid || submitted) ? 0 : eventAmount;
+        const displayAmount = isPaid ? 0 : eventAmount;
 
         return (
           <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.8, justifyContent: "flex-end" }}>
             <Typography
               variant="body2"
               fontWeight={700}
-              color={isPaid ? "success.main" : submitted ? "warning.main" : "inherit"}
+              color={isPaid ? "success.main" : "inherit"}
             >
               ₹{displayAmount.toLocaleString()}
             </Typography>
@@ -1030,20 +1099,6 @@ export default function ContributionsPage() {
                   bgcolor: "rgba(22, 163, 74, 0.12)",
                   color: "#16a34a",
                   border: "1px solid rgba(22, 163, 74, 0.3)",
-                }}
-              />
-            )}
-            {submitted && !isPaid && (
-              <Chip
-                label="Verifying"
-                size="small"
-                sx={{
-                  height: 18,
-                  fontSize: "0.62rem",
-                  fontWeight: 800,
-                  bgcolor: "rgba(234, 179, 8, 0.12)",
-                  color: "#ca8a04",
-                  border: "1px solid rgba(234, 179, 8, 0.3)",
                 }}
               />
             )}
@@ -1123,12 +1178,8 @@ export default function ContributionsPage() {
       label: "Mode",
       key: "paymentMode",
       render: (row) => {
-        const matchedTx = (transactions || []).find(
-          (t) =>
-            (String(t.eventId) === String(row.eventId || selectedEventId) || String(t.eventName).toLowerCase() === String(row.eventName || "").toLowerCase()) &&
-            (String(t.userId) === String(row.memberId) || String(t.memberName).toLowerCase() === String(row.memberName || "").toLowerCase())
-        );
-        const resolvedMode = (row.paymentMode && row.paymentMode !== "None") ? row.paymentMode : (matchedTx?.paymentMode || "None");
+        const matchedTx = findContributionTransaction(row);
+        const resolvedMode = (row.paymentMode && row.paymentMode !== "None" && row.paymentMode !== "-") ? row.paymentMode : (matchedTx?.paymentMode || "-");
         const isSplit = resolvedMode === "Split" || String(resolvedMode).toLowerCase().includes("split");
 
         if (isSplit) {
@@ -1181,19 +1232,13 @@ export default function ContributionsPage() {
       label: "Verification Status",
       key: "verificationStatus",
       render: (row) => {
-        const key = `${row.memberId}_${row.eventId}`;
-        const isVerifiedByAuthority = verifiedKeys.has(key) || row.isVerified === true || Boolean(row.verifiedBy);
-        const matchedTx = (transactions || []).find(
-          (t) =>
-            (String(t.eventId) === String(row.eventId || selectedEventId) || String(t.eventName).toLowerCase() === String(row.eventName || "").toLowerCase()) &&
-            (String(t.userId) === String(row.memberId) || String(t.memberName).toLowerCase() === String(row.memberName || "").toLowerCase())
-        );
+        const matchedTx = findContributionTransaction(row);
+        const hasPayment = hasContributionPayment(row, matchedTx);
+        const isVerified = isContributionVerified(row, matchedTx);
         const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
-        const rowStatus = String(row.paymentStatus || row.PaymentStatus || row.status || row.statusName || "").trim().toLowerCase();
-        const isPaid = isContributionPaid(row) || rowStatus === "paid" || rowStatus === "verified" || rowStatus === "closed" || rowStatus === "completed";
-        const isVerified = isVerifiedByAuthority || txStatus === "verified" || rowStatus === "verified" || isPaid;
-        const isRejected = txStatus === "rejected";
-        const isPending = !isVerified && !isRejected && (hasSubmittedPayment(row) || txStatus === "pending" || Boolean(matchedTx));
+        const rawStatus = String(row.statusName || row.status || row.paymentStatus || row.PaymentStatus || "").trim().toLowerCase();
+        const isRejected = !isVerified && hasPayment && (txStatus === "rejected" || rawStatus === "rejected");
+        const isPending = !isVerified && !isRejected && hasPayment;
 
         if (isVerified) {
           const verifier = matchedTx?.verifiedBy || row.verifiedBy || "Organizer";
@@ -1238,8 +1283,8 @@ export default function ContributionsPage() {
         }
 
         if (isPending) {
-          const mode = matchedTx?.paymentMode || row.paymentMode || "Payment";
-          const utr = matchedTx?.utr || "-";
+          const mode = matchedTx?.paymentMode || (row.paymentMode && row.paymentMode !== "None" ? row.paymentMode : "Payment");
+          const utr = matchedTx?.utr || row.referenceNo || "-";
           const tooltip = `Payment submitted (${mode}, UTR: ${utr}). Awaiting Organizer verification.`;
           return (
             <Tooltip title={tooltip}>
@@ -1792,11 +1837,7 @@ export default function ContributionsPage() {
 
               {/* Submitted Payment Details Summary Card */}
               {(() => {
-                const matchedTx = (transactions || []).find(
-                  (t) =>
-                    (String(t.eventId) === String(statusModalRow?.eventId) || String(t.eventName).toLowerCase() === String(statusModalRow?.eventName || "").toLowerCase()) &&
-                    (String(t.userId) === String(statusModalRow?.memberId) || String(t.memberName).toLowerCase() === String(statusModalRow?.memberName || "").toLowerCase())
-                );
+                const matchedTx = findContributionTransaction(statusModalRow);
                 const paidAmt = Number(statusModalRow?.amount || statusModalRow?.paidAmount || matchedTx?.amount || 0);
                 const modeStr = statusModalRow?.paymentMode || matchedTx?.paymentMode || "Cash";
                 const utrVal = statusModalRow?.utrNumber || statusModalRow?.referenceNo || statusModalRow?.utr || matchedTx?.utr || matchedTx?.transactionRef || matchedTx?.referenceNo || "--";
