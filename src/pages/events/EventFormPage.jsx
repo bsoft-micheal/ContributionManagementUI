@@ -12,6 +12,14 @@ import {
   CircularProgress,
   InputAdornment,
   Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  ListItemText,
+  OutlinedInput,
+  FormHelperText,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
@@ -42,6 +50,8 @@ import {
   CloseRounded as CloseRoundedIcon,
   AddRounded as AddIcon,
   RestartAltRounded as ResetIcon,
+  LayersRounded as MultiIcon,
+  AutoAwesomeRounded as SparklesIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import dayjs from "dayjs";
@@ -62,7 +72,10 @@ import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
 import { getUsersAsync } from "../../services/userService";
 import { getBudgetCalculationsAsync } from "../../services/budgetCalculationService";
-import { updateSystemSettings } from "../../services/settingsService";
+import {
+  getSystemSettingsAsync,
+  updateSystemSettings,
+} from "../../services/settingsService";
 import {
   getPaymentQrConfig,
   buildUpiPaymentUri,
@@ -93,6 +106,7 @@ const formatBaseAmount = (value) => {
 const initialForm = {
   eventName: "",
   eventTypeId: "",
+  eventTypeIds: [],
   eventDate: dayjs(),
   description: "",
   status: "Planned",
@@ -113,6 +127,24 @@ const getDefaultBirthdayExempt = () => {
     // Setting read error ignored
   }
   return true;
+};
+
+const getAllowMultipleEventsSetting = () => {
+  try {
+    const saved = localStorage.getItem("cm_system_settings");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.allowedMultipleEvent !== undefined) {
+        return Boolean(parsed.allowedMultipleEvent);
+      }
+      if (parsed.allowMultipleEvents !== undefined) {
+        return Boolean(parsed.allowMultipleEvents);
+      }
+    }
+  } catch {
+    // Setting read error ignored
+  }
+  return false;
 };
 
 // Helper for row icon styling in budget breakdown table
@@ -208,6 +240,7 @@ export default function EventFormPage() {
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
   const [budgetItemsList, setBudgetItemsList] = useState([]);
+  const [allowMultipleEvents, setAllowMultipleEvents] = useState(getAllowMultipleEventsSetting);
 
   const isMemberActive = (m) => {
     const active =
@@ -260,11 +293,11 @@ export default function EventFormPage() {
     async function initData() {
       setLoading(true);
       try {
-        const [typesData, usersData, budgetData] = await Promise.all([
+        const [typesData, usersData, budgetData, settingsData] = await Promise.all([
           getEventTypesAsync(),
           getUsersAsync().catch(() => getMembersAsync()),
           getBudgetCalculationsAsync().catch(() => []),
-          getUsersAsync().catch(() => []),
+          getSystemSettingsAsync().catch(() => null),
         ]);
 
         if (!isMounted) return;
@@ -281,6 +314,17 @@ export default function EventFormPage() {
         const activeMems = normalizedMembers.filter((m) => m.isActive && !m.isExited);
         setEventTypes(typesData || []);
         setMembers(normalizedMembers);
+
+        // Update allowMultipleEvents from backend setting if returned
+        let isMultipleAllowed = getAllowMultipleEventsSetting();
+        if (settingsData) {
+          if (settingsData.allowedMultipleEvent !== undefined) {
+            isMultipleAllowed = Boolean(settingsData.allowedMultipleEvent);
+          } else if (settingsData.allowMultipleEvents !== undefined) {
+            isMultipleAllowed = Boolean(settingsData.allowMultipleEvents);
+          }
+        }
+        setAllowMultipleEvents(isMultipleAllowed);
 
         const activeBudgetItems = Array.isArray(budgetData)
           ? budgetData.filter((b) => b.isActive !== false)
@@ -329,10 +373,19 @@ export default function EventFormPage() {
           setTotalMembers(activeMems.length);
           setExempt(true);
 
+          const eventTypeIdsList = detailedEvent.eventTypeIds && detailedEvent.eventTypeIds.length > 0
+            ? detailedEvent.eventTypeIds
+            : detailedEvent.eventTypeId
+              ? [detailedEvent.eventTypeId]
+              : defaultTypeId
+                ? [defaultTypeId]
+                : [];
+
           setForm({
             eventId: detailedEvent.eventId || id,
             eventName: detailedEvent.eventName || "",
             eventTypeId: detailedEvent.eventTypeId || defaultTypeId,
+            eventTypeIds: eventTypeIdsList,
             eventDate: currentEventDate,
             description: detailedEvent.description || "",
             status: detailedEvent.status || "Planned",
@@ -371,6 +424,7 @@ export default function EventFormPage() {
               ? `${defaultDate.format("MMMM")} Birthday Celebration`
               : `${defaultDate.format("MMMM")} ${initialTypeName} Celebration`,
             eventTypeId: defaultTypeId,
+            eventTypeIds: defaultTypeId ? [defaultTypeId] : [],
             eventDate: defaultDate,
             description: "",
             baseAmount: "",
@@ -390,10 +444,23 @@ export default function EventFormPage() {
     };
   }, [id, location.pathname, location.key]);
 
-  const selectedType = eventTypes.find((t) => t.eventTypeId === form.eventTypeId);
-  const selectedTypeName = selectedType?.eventTypeName || "";
-  const isBirthday = Boolean(
-    selectedTypeName && selectedTypeName.toLowerCase().includes("birthday")
+  // Selected event types list
+  const selectedTypes = useMemo(() => {
+    if (allowMultipleEvents && form.eventTypeIds && form.eventTypeIds.length > 0) {
+      return eventTypes.filter((t) => form.eventTypeIds.includes(t.eventTypeId));
+    }
+    const single = eventTypes.find((t) => t.eventTypeId === form.eventTypeId);
+    return single ? [single] : [];
+  }, [allowMultipleEvents, form.eventTypeIds, form.eventTypeId, eventTypes]);
+
+  const selectedTypeNames = useMemo(
+    () => selectedTypes.map((t) => t.eventTypeName),
+    [selectedTypes]
+  );
+
+  const isBirthday = useMemo(
+    () => selectedTypes.some((t) => t.eventTypeName?.toLowerCase().includes("birthday")),
+    [selectedTypes]
   );
 
   // Selected participants for non-birthday events (allows deselecting members)
@@ -531,111 +598,127 @@ export default function EventFormPage() {
   const eligible = isBirthday ? Math.max(0, total - (exempt ? bdays : 0)) : nonBdayTotal;
   const puffsFactor = office > 0 ? office : 0;
 
-  // Compute budget calculation items dynamically based on selected Event Type / Category from Master
+  // Compute budget calculation items dynamically based on selected Event Types from Master
   const computedBudgetItems = useMemo(() => {
-    const typeNameLower = (selectedTypeName || "").toLowerCase().trim();
+    const items = [];
 
-    // 1. Filter active master items matching the selected Event Type — match by EventTypeId or event type name
-    let categoryItems = budgetItemsList.filter((b) => {
-      if (b.isActive === false) return false;
-      if (form.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === form.eventTypeId.toLowerCase()) {
-        return true;
-      }
-      const cat = (b.category || "").toLowerCase().trim();
-      return cat === typeNameLower;
-    });
+    selectedTypes.forEach((type) => {
+      const typeName = type?.eventTypeName || "";
+      const typeNameLower = typeName.toLowerCase().trim();
+      const isThisBday = typeNameLower.includes("birthday");
 
-    if (isBirthday) {
-      return categoryItems.map((item) => {
-        const name = (item.expenseItem || "").toLowerCase();
-        const rate = Number(item.rate) || 0;
-        let calcText = "";
-        let amount = 0;
-        let formulaPart = "";
-
-        if (name.includes("cake")) {
-          calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
-          amount = office * rate;
-          formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
-        } else if (
-          name.includes("gift") ||
-          name.includes("present") ||
-          name.includes("voucher") ||
-          name.includes("memento")
-        ) {
-          calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
-          amount = bdays * rate;
-          formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
-        } else {
-          if (puffsFactor > 0) {
-            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""
-              }`;
-            amount = total * rate * puffsFactor;
-          } else {
-            calcText = "WFH only → Not provided";
-            amount = 0;
-          }
-          formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
-            "en-IN"
-          )})`;
+      // 1. Filter active master items matching this Event Type
+      const categoryItems = budgetItemsList.filter((b) => {
+        if (b.isActive === false) return false;
+        if (type.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === type.eventTypeId.toLowerCase()) {
+          return true;
         }
-
-        return {
-          ...item,
-          rate,
-          calcText,
-          amount,
-          formulaPart,
-        };
+        const cat = (b.category || "").toLowerCase().trim();
+        return cat === typeNameLower;
       });
-    } else {
-      // 2. Non-Birthday Event Types: Use Base Amount split (or master items if Base Amount is 0)
-      const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
-      if (manualBase > 0) {
-        const perPersonRate = eligible > 0 ? Math.ceil(manualBase / eligible) : 0;
-        return [
-          {
-            expenseItem: `${selectedTypeName || "Event"} Base Amount`,
-            rate: perPersonRate,
-            calcText:
-              eligible > 0
-                ? `₹${manualBase.toLocaleString("en-IN")} ÷ ${eligible} Members`
-                : `₹${manualBase.toLocaleString("en-IN")}`,
-            amount: manualBase,
-            formulaPart: `Base Amount (₹${manualBase.toLocaleString("en-IN")}) split among ${eligible} participating members`,
-          },
-        ];
-      } else if (categoryItems.length > 0) {
-        return categoryItems.map((item) => {
-          const rate = Number(item.rate) || 0;
-          const calcText = `${total} × ₹${rate.toLocaleString("en-IN")}`;
-          const amount = total * rate;
-          const formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString("en-IN")})`;
 
-          return {
+      if (isThisBday) {
+        categoryItems.forEach((item) => {
+          const name = (item.expenseItem || "").toLowerCase();
+          const rate = Number(item.rate) || 0;
+          let calcText = "";
+          let amount = 0;
+          let formulaPart = "";
+
+          if (name.includes("cake")) {
+            calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
+            amount = office * rate;
+            formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+          } else if (
+            name.includes("gift") ||
+            name.includes("present") ||
+            name.includes("voucher") ||
+            name.includes("memento")
+          ) {
+            calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
+            amount = bdays * rate;
+            formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+          } else {
+            if (puffsFactor > 0) {
+              calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${
+                puffsFactor > 1 ? ` × ${puffsFactor}` : ""
+              }`;
+              amount = total * rate * puffsFactor;
+            } else {
+              calcText = "WFH only → Not provided";
+              amount = 0;
+            }
+            formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
+              "en-IN"
+            )})`;
+          }
+
+          items.push({
             ...item,
+            category: "Birthday",
             rate,
             calcText,
             amount,
             formulaPart,
-          };
+          });
         });
       } else {
-        return [
-          {
-            expenseItem: `${selectedTypeName || "Event"} Celebration`,
-            rate: 0,
-            calcText: "Enter Base Amount",
-            amount: 0,
-            formulaPart: `Base Amount: ₹0`,
-          },
-        ];
+        // Non-Birthday Event Type
+        if (categoryItems.length > 0) {
+          categoryItems.forEach((item) => {
+            const rate = Number(item.rate) || 0;
+            const calcText = `${total} × ₹${rate.toLocaleString("en-IN")}`;
+            const amount = total * rate;
+            const formulaPart = `${item.expenseItem} (${typeName}: Total Members × ₹${rate.toLocaleString(
+              "en-IN"
+            )})`;
+
+            items.push({
+              ...item,
+              category: typeName,
+              rate,
+              calcText,
+              amount,
+              formulaPart,
+            });
+          });
+        } else {
+          // Fallback to baseAmount if configured or form.baseAmount
+          const typeBase = Number(type.baseAmount) || 0;
+          const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
+          const effectiveBase = typeBase > 0 ? typeBase : manualBase;
+
+          if (effectiveBase > 0) {
+            const perPersonRate = eligible > 0 ? Math.ceil(effectiveBase / eligible) : 0;
+            items.push({
+              expenseItem: `${typeName} Base Amount`,
+              category: typeName,
+              rate: perPersonRate,
+              calcText:
+                eligible > 0
+                  ? `₹${effectiveBase.toLocaleString("en-IN")} ÷ ${eligible} Members`
+                  : `₹${effectiveBase.toLocaleString("en-IN")}`,
+              amount: effectiveBase,
+              formulaPart: `${typeName} Base (₹${effectiveBase.toLocaleString("en-IN")})`,
+            });
+          } else {
+            items.push({
+              expenseItem: `${typeName} Celebration`,
+              category: typeName,
+              rate: 0,
+              calcText: "Enter Base Amount",
+              amount: 0,
+              formulaPart: `${typeName}: ₹0`,
+            });
+          }
+        }
       }
-    }
+    });
+
+    return items;
   }, [
+    selectedTypes,
     budgetItemsList,
-    selectedTypeName,
-    isBirthday,
     office,
     bdays,
     total,
@@ -655,7 +738,7 @@ export default function EventFormPage() {
     .filter(Boolean)
     .join(" + ");
 
-  // Handle event type switch
+  // Handle single event type switch
   const handleTypeChange = (newTypeId) => {
     const newType = eventTypes.find((t) => t.eventTypeId === newTypeId);
     const newTypeName = newType?.eventTypeName || "";
@@ -669,7 +752,6 @@ export default function EventFormPage() {
         : `${monthStr} ${newTypeName} Celebration`;
     }
 
-    // Always reset participant selections to ALL active members when switching event type
     const allActiveIds = activeMembers.map((m) => m.memberId);
     setSelectedParticipantIds(allActiveIds);
 
@@ -702,10 +784,73 @@ export default function EventFormPage() {
     setForm((prev) => ({
       ...prev,
       eventTypeId: newTypeId,
+      eventTypeIds: newTypeId ? [newTypeId] : [],
       eventName: updatedName,
       baseAmount: !isNewBday && newType?.baseAmount > 0 ? String(newType.baseAmount) : "",
       participantIds: allActiveIds,
     }));
+    if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+  };
+
+  // Handle multiple event types selection
+  const handleMultiTypeChange = (newTypeIds) => {
+    const selectedTypesList = eventTypes.filter((t) => newTypeIds.includes(t.eventTypeId));
+    const hasBday = selectedTypesList.some((t) =>
+      t.eventTypeName?.toLowerCase().includes("birthday")
+    );
+
+    let updatedName = form.eventName;
+    if (!isEdit) {
+      const monthStr = dayjs(form.eventDate).format("MMMM");
+      if (selectedTypesList.length === 0) {
+        updatedName = `${monthStr} Celebration`;
+      } else if (selectedTypesList.length === 1) {
+        updatedName = hasBday
+          ? `${monthStr} Birthday Celebration`
+          : `${monthStr} ${selectedTypesList[0].eventTypeName} Celebration`;
+      } else {
+        const names = selectedTypesList.map((t) => t.eventTypeName);
+        updatedName = `${monthStr} ${names.join(" & ")} Celebration`;
+      }
+    }
+
+    const allActiveIds = activeMembers.map((m) => m.memberId);
+    setSelectedParticipantIds(allActiveIds);
+
+    const offTotal = activeMembers.filter(
+      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+    ).length;
+    const wfhTotal = activeMembers.filter(
+      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+    ).length;
+
+    if (hasBday) {
+      const targetMonth = dayjs(form.eventDate).month();
+      const celebrantsInMonth = activeMembers.filter(
+        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+      );
+      const offCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length;
+      const wfhCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length;
+      setOfficeBirthdays(offCount);
+      setWfhBirthdays(wfhCount);
+    }
+
+    setTotalMembers(activeMembers.length);
+    setOfficeMembers(offTotal);
+    setWfhMembers(wfhTotal);
+
+    setForm((prev) => ({
+      ...prev,
+      eventTypeId: newTypeIds[0] || "",
+      eventTypeIds: newTypeIds,
+      eventName: updatedName,
+      participantIds: allActiveIds,
+    }));
+
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
   };
 
@@ -718,9 +863,13 @@ export default function EventFormPage() {
     let newEventName = form.eventName;
     if (!isEdit) {
       const monthStr = dayjs(newDate).format("MMMM");
-      newEventName = isBirthday
-        ? `${monthStr} Birthday Celebration`
-        : `${monthStr} ${selectedTypeName || "Event"} Celebration`;
+      if (selectedTypes.length <= 1) {
+        newEventName = isBirthday
+          ? `${monthStr} Birthday Celebration`
+          : `${monthStr} ${selectedTypeNames[0] || "Event"} Celebration`;
+      } else {
+        newEventName = `${monthStr} ${selectedTypeNames.join(" & ")} Celebration`;
+      }
     }
 
     if (oldMonth !== newMonth) {
@@ -749,13 +898,22 @@ export default function EventFormPage() {
     const filed = "This field is required";
     const schema = {
       eventName: { required: true, min: 3, max: 100, label: filed },
-      eventTypeId: { required: true, label: filed },
       eventDate: { required: true, label: filed },
     };
 
     const newErrors = validateForm(form, schema);
 
-    if (!isBirthday) {
+    if (allowMultipleEvents) {
+      if (!form.eventTypeIds || form.eventTypeIds.length === 0) {
+        newErrors.eventTypeId = "Please select at least one event type";
+      }
+    } else {
+      if (!form.eventTypeId) {
+        newErrors.eventTypeId = filed;
+      }
+    }
+
+    if (!isBirthday && computedBudgetItems.length === 1 && computedBudgetItems[0].amount === 0) {
       const cleanBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
       if (cleanBase <= 0) {
         newErrors.baseAmount = "Base amount must be greater than 0";
@@ -808,25 +966,30 @@ export default function EventFormPage() {
 
       const celebrantsSummary = isBirthday
         ? monthCelebrants
-          .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
-          .join(", ")
+            .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
+            .join(", ")
         : "";
 
       const defaultDesc = isBirthday
-        ? `Birthday celebration (${office} Office, ${wfh} WFH)${celebrantsSummary ? ` for ${celebrantsSummary}` : ""
-        }. Planned Budget: ₹${plannedBudget.toLocaleString(
-          "en-IN"
-        )}, Contribution/member: ₹${contributionPerMember}`
-        : `${selectedTypeName} celebration for ${total} members. Planned Budget: ₹${plannedBudget.toLocaleString(
-          "en-IN"
-        )}, Contribution/member: ₹${contributionPerMember}`;
+        ? `Birthday celebration (${office} Office, ${wfh} WFH)${
+            celebrantsSummary ? ` for ${celebrantsSummary}` : ""
+          }. Planned Budget: ₹${plannedBudget.toLocaleString(
+            "en-IN"
+          )}, Contribution/member: ₹${contributionPerMember}`
+        : `${selectedTypeNames.join(" & ") || "Event"} celebration for ${total} members. Planned Budget: ₹${plannedBudget.toLocaleString(
+            "en-IN"
+          )}, Contribution/member: ₹${contributionPerMember}`;
 
-      const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
-      const effectiveBase = plannedBudget > 0 ? plannedBudget : manualBase;
+      const finalTypeIds = allowMultipleEvents && form.eventTypeIds?.length > 0
+        ? form.eventTypeIds
+        : form.eventTypeId
+          ? [form.eventTypeId]
+          : [];
 
       const payload = {
         eventName: form.eventName.trim(),
-        eventTypeId: form.eventTypeId,
+        eventTypeId: finalTypeIds[0] || form.eventTypeId,
+        eventTypeIds: finalTypeIds,
         eventDate: dayjs(form.eventDate).hour(12).toISOString(),
         eventDates: isBirthday ? (celebrantDatesCsv || null) : null,
         description: form.description?.trim() || defaultDesc,
@@ -920,7 +1083,7 @@ export default function EventFormPage() {
           boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
         }}
       >
-        {/* Top Header Banner matching exact screenshot */}
+        {/* Top Header Banner */}
         <Box
           sx={{
             bgcolor: "#45386d",
@@ -929,6 +1092,7 @@ export default function EventFormPage() {
             py: 1.4,
             display: "flex",
             alignItems: "center",
+            justifyContent: "space-between",
             minHeight: 52,
           }}
         >
@@ -954,6 +1118,21 @@ export default function EventFormPage() {
               {isEdit ? "Edit Event" : "Add Event"}
             </Typography>
           </Box>
+
+          {allowMultipleEvents && (
+            <Chip
+              icon={<MultiIcon sx={{ fontSize: "0.85rem !important", color: "#ffffff !important" }} />}
+              label={`Multiple Events Mode (${selectedTypes.length} Selected)`}
+              size="small"
+              sx={{
+                bgcolor: "rgba(255, 255, 255, 0.15)",
+                color: "#ffffff",
+                fontWeight: 700,
+                fontSize: "0.75rem",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+              }}
+            />
+          )}
         </Box>
 
         {/* Main Body with Unified 3-Card Layout for ALL Event Types */}
@@ -975,31 +1154,203 @@ export default function EventFormPage() {
                 }}
               >
                 {/* Card Header */}
-                <Typography
-                  variant="h6"
-                  fontWeight={800}
-                  sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
-                    mb: 2.5,
-                  }}
-                >
-                  Event Configuration
-                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
+                  <Typography
+                    variant="h6"
+                    fontWeight={800}
+                    sx={{
+                      fontSize: "1.05rem",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
+                    }}
+                  >
+                    Event Configuration
+                  </Typography>
+                  {isBirthday && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(124, 58, 237, 0.1)"
+                            : "#f5f3ff",
+                        px: 1.5,
+                        py: 0.4,
+                        borderRadius: "20px",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(124, 58, 237, 0.2)"
+                            : "#ede9fe",
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: "0.76rem",
+                          fontWeight: 600,
+                          color: (theme) =>
+                            theme.palette.mode === "dark" ? "#c4b5fd" : "#6d28d9",
+                        }}
+                      >
+                        Birthday Members Exempt:
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: "0.76rem",
+                          fontWeight: 800,
+                          color: exempt ? "#10b981" : "#ef4444",
+                        }}
+                      >
+                        {exempt ? "Yes" : "No"}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
 
                 {/* Form Grid */}
                 <Grid container spacing={2}>
-                  {/* Row 1: Event Type & Event Name */}
+                  {/* Row 1: Event Type(s) & Event Name */}
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppSelect
-                      label="Event Type"
-                      value={form.eventTypeId}
-                      onChange={(e) => handleTypeChange(e.target.value)}
-                      options={typeOptions}
-                      error={!!errors.eventTypeId}
-                      helperText={errors.eventTypeId}
-                      required
-                    />
+                    {allowMultipleEvents ? (
+                      <FormControl fullWidth size="small" error={!!errors.eventTypeId}>
+                        <InputLabel
+                          id="event-types-multi-label"
+                          sx={{
+                            fontSize: "0.85rem",
+                            fontWeight: 600,
+                            color: "text.secondary",
+                            "&.Mui-focused": { color: "#7c3aed" },
+                          }}
+                        >
+                          Event Types *
+                        </InputLabel>
+                        <Select
+                          labelId="event-types-multi-label"
+                          multiple
+                          value={
+                            form.eventTypeIds && form.eventTypeIds.length > 0
+                              ? form.eventTypeIds
+                              : form.eventTypeId
+                                ? [form.eventTypeId]
+                                : []
+                          }
+                          onChange={(e) => {
+                            const val =
+                              typeof e.target.value === "string"
+                                ? e.target.value.split(",")
+                                : e.target.value;
+                            handleMultiTypeChange(val);
+                          }}
+                          input={<OutlinedInput label="Event Types *" />}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6 }}>
+                              {selected.map((val) => {
+                                const typeObj = eventTypes.find((t) => t.eventTypeId === val);
+                                const label = typeObj?.eventTypeName || val;
+                                return (
+                                  <Chip
+                                    key={val}
+                                    label={label}
+                                    size="small"
+                                    onDelete={(e) => {
+                                      e.stopPropagation();
+                                      const remaining = (form.eventTypeIds || []).filter(
+                                        (id) => id !== val
+                                      );
+                                      handleMultiTypeChange(remaining);
+                                    }}
+                                    sx={{
+                                      height: 24,
+                                      fontSize: "0.75rem",
+                                      fontWeight: 700,
+                                      bgcolor: (theme) =>
+                                        theme.palette.mode === "dark"
+                                          ? "rgba(124, 58, 237, 0.2)"
+                                          : "#f5f3ff",
+                                      color: (theme) =>
+                                        theme.palette.mode === "dark" ? "#c4b5fd" : "#6d28d9",
+                                      border: "1px solid",
+                                      borderColor: (theme) =>
+                                        theme.palette.mode === "dark"
+                                          ? "rgba(124, 58, 237, 0.4)"
+                                          : "#ddd6fe",
+                                      "& .MuiChip-deleteIcon": {
+                                        color: "#7c3aed",
+                                        fontSize: "14px",
+                                        "&:hover": { color: "#ef4444" },
+                                      },
+                                    }}
+                                  />
+                                );
+                              })}
+                            </Box>
+                          )}
+                          sx={{
+                            borderRadius: "8px",
+                            minHeight: 40,
+                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#7c3aed",
+                            },
+                          }}
+                        >
+                          {eventTypes.map((type) => {
+                            const isSelected = (form.eventTypeIds || []).includes(type.eventTypeId);
+                            return (
+                              <MenuItem
+                                key={type.eventTypeId}
+                                value={type.eventTypeId}
+                                sx={{
+                                  py: 0.8,
+                                  px: 1.5,
+                                  fontSize: "0.85rem",
+                                  fontWeight: isSelected ? 700 : 500,
+                                  bgcolor: isSelected
+                                    ? "rgba(124, 58, 237, 0.08) !important"
+                                    : "transparent",
+                                  "&:hover": { bgcolor: "rgba(124, 58, 237, 0.04)" },
+                                }}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  size="small"
+                                  sx={{
+                                    p: 0.5,
+                                    mr: 1,
+                                    color: "#94a3b8",
+                                    "&.Mui-checked": { color: "#7c3aed" },
+                                  }}
+                                />
+                                <ListItemText
+                                  primary={type.eventTypeName}
+                                  primaryTypographyProps={{
+                                    fontSize: "0.85rem",
+                                    fontWeight: isSelected ? 700 : 500,
+                                  }}
+                                />
+                              </MenuItem>
+                            );
+                          })}
+                        </Select>
+                        {errors.eventTypeId && (
+                          <FormHelperText sx={{ color: "#ef4444", fontSize: "0.75rem", mt: 0.5 }}>
+                            {errors.eventTypeId}
+                          </FormHelperText>
+                        )}
+                      </FormControl>
+                    ) : (
+                      <AppSelect
+                        label="Event Type"
+                        value={form.eventTypeId}
+                        onChange={(e) => handleTypeChange(e.target.value)}
+                        options={typeOptions}
+                        error={!!errors.eventTypeId}
+                        helperText={errors.eventTypeId}
+                        required
+                      />
+                    )}
                   </Grid>
 
                   <Grid size={{ xs: 12, sm: 6 }}>
@@ -1019,7 +1370,7 @@ export default function EventFormPage() {
 
                   {/* Row 2: Event Date & Total Active Members (Read Only / Auto-calculated) */}
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    {isBirthday ? (
+                    {isBirthday && selectedTypes.length === 1 ? (
                       <AppInput
                         label="Event Date"
                         required
@@ -1146,8 +1497,9 @@ export default function EventFormPage() {
                           return (
                             <Chip
                               key={m.memberId}
-                              label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
-                                }`}
+                              label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${
+                                m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
+                              }`}
                               size="small"
                               sx={{
                                 fontWeight: 600,
@@ -1158,7 +1510,9 @@ export default function EventFormPage() {
                                 bgcolor: isWfh ? "#ede9fe" : "#e0f2fe",
                                 color: isWfh ? "#7c3aed" : "#0284c7",
                                 border: "1px solid",
-                                borderColor: isWfh ? "rgba(124, 58, 237, 0.25)" : "rgba(2, 132, 199, 0.25)",
+                                borderColor: isWfh
+                                  ? "rgba(124, 58, 237, 0.25)"
+                                  : "rgba(2, 132, 199, 0.25)",
                               }}
                             />
                           );
@@ -1279,19 +1633,13 @@ export default function EventFormPage() {
                                 sx={{
                                   fontWeight: 600,
                                   fontSize: "0.76rem",
-                                  borderRadius: "6px",
+                                  borderRadius: "16px",
                                   py: 0.5,
-                                  bgcolor: isWfh ? "rgba(147, 51, 234, 0.08)" : "rgba(2, 132, 199, 0.08)",
-                                  color: isWfh ? "#9333ea" : "#0284c7",
+                                  px: 0.5,
+                                  bgcolor: isWfh ? "#f5f3ff" : "#f0f9ff",
+                                  color: isWfh ? "#7c3aed" : "#0369a1",
                                   border: "1px solid",
-                                  borderColor: isWfh ? "rgba(147, 51, 234, 0.25)" : "rgba(2, 132, 199, 0.25)",
-                                  transition: "all 0.15s ease",
-                                  "&:hover": {
-                                    bgcolor: isWfh ? "rgba(147, 51, 234, 0.14)" : "rgba(2, 132, 199, 0.14)",
-                                  },
-                                  "& .MuiChip-deleteIcon": {
-                                    marginRight: "4px",
-                                  },
+                                  borderColor: isWfh ? "#ddd6fe" : "#bae6fd",
                                 }}
                               />
                             );
@@ -1299,28 +1647,20 @@ export default function EventFormPage() {
                         )}
                       </Box>
 
-                      {/* Excluded (Not Attending) Members List - Click to Re-add */}
+                      {/* Excluded Members (Click to add back) */}
                       {excludedMembers.length > 0 && (
-                        <Box
-                          sx={{
-                            mt: 1.5,
-                            pt: 1.2,
-                            borderTop: "1px dashed",
-                            borderColor: (theme) =>
-                              theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "#e2e8f0",
-                          }}
-                        >
+                        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px dashed #cbd5e1" }}>
                           <Typography
                             variant="caption"
-                            fontWeight={700}
                             sx={{
                               fontSize: "0.74rem",
-                              color: "#94a3b8",
+                              color: "#64748b",
+                              fontWeight: 600,
                               display: "block",
                               mb: 0.8,
                             }}
                           >
-                            Not Attending ({excludedMembers.length}) — Click to add back:
+                            Excluded Members ({excludedMembers.length}) — Click to add back:
                           </Typography>
                           <Box
                             sx={{
@@ -1365,8 +1705,8 @@ export default function EventFormPage() {
                   )
                 )}
 
-                {/* Non-Birthday Event: Base Amount & Description */}
-                {!isBirthday && (
+                {/* Non-Birthday Event or Fallback: Base Amount */}
+                {!isBirthday && computedBudgetItems.length === 1 && computedBudgetItems[0].amount === 0 && (
                   <Box sx={{ mt: 2.5 }}>
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 12, md: 6 }}>
@@ -1392,45 +1732,27 @@ export default function EventFormPage() {
                           required
                         />
                       </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <AppTextArea
-                          label="Description"
-                          placeholder="Enter optional description..."
-                          value={form.description}
-                          onChange={(e) => {
-                            if (e.target.value.length <= 500) {
-                              setForm((f) => ({ ...f, description: e.target.value }));
-                            }
-                          }}
-                          maxLength={500}
-                          rows={3}
-                          fullWidth
-                          helperText={`${form.description?.length || 0}/500 characters`}
-                        />
-                      </Grid>
                     </Grid>
                   </Box>
                 )}
 
-                {/* Birthday Event: Optional Description */}
-                {isBirthday && (
-                  <Box sx={{ mt: 2.5 }}>
-                    <AppTextArea
-                      label="Description"
-                      placeholder="Enter optional description..."
-                      value={form.description}
-                      onChange={(e) => {
-                        if (e.target.value.length <= 500) {
-                          setForm((f) => ({ ...f, description: e.target.value }));
-                        }
-                      }}
-                      maxLength={500}
-                      rows={3}
-                      fullWidth
-                      helperText={`${form.description?.length || 0}/500 characters`}
-                    />
-                  </Box>
-                )}
+                {/* Optional Description */}
+                <Box sx={{ mt: 2.5 }}>
+                  <AppTextArea
+                    label="Description"
+                    placeholder="Enter optional description..."
+                    value={form.description}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 500) {
+                        setForm((f) => ({ ...f, description: e.target.value }));
+                      }
+                    }}
+                    maxLength={500}
+                    rows={3}
+                    fullWidth
+                    helperText={`${form.description?.length || 0}/500 characters`}
+                  />
+                </Box>
               </Box>
             </Grid>
 
@@ -1463,9 +1785,9 @@ export default function EventFormPage() {
                   Calculated Event Summary
                 </Typography>
 
-                {/* 6-Row Vertical Metric List matching exact screenshot */}
+                {/* 6-Row Vertical Metric List */}
                 <Box sx={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-around" }}>
-                  {/* Row 1: Birthday Members */}
+                  {/* Row 1: Birthday Members / Total Members */}
                   <Box
                     sx={{
                       display: "flex",
@@ -1636,7 +1958,10 @@ export default function EventFormPage() {
                   <Typography
                     variant="h6"
                     fontWeight={800}
-                    sx={{ fontSize: "1.05rem", color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e") }}
+                    sx={{
+                      fontSize: "1.05rem",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
+                    }}
                   >
                     Budget Calculations
                   </Typography>
@@ -1721,18 +2046,34 @@ export default function EventFormPage() {
                         alignItems: "center",
                       }}
                     >
-                      {/* Expense Item (Plain Clean Text) */}
-                      <Typography
-                        variant="body2"
-                        fontWeight={600}
-                        sx={{
-                          color: (theme) =>
-                            theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b",
-                          fontSize: "0.86rem",
-                        }}
-                      >
-                        {item.expenseItem}
-                      </Typography>
+                      {/* Expense Item with Category Tag */}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          sx={{
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b",
+                            fontSize: "0.86rem",
+                          }}
+                        >
+                          {item.expenseItem}
+                        </Typography>
+                        {selectedTypes.length > 1 && item.category && (
+                          <Chip
+                            label={item.category}
+                            size="small"
+                            sx={{
+                              height: 20,
+                              fontSize: "0.7rem",
+                              fontWeight: 700,
+                              bgcolor: "rgba(124, 58, 237, 0.08)",
+                              color: "#7c3aed",
+                              border: "1px solid rgba(124, 58, 237, 0.2)",
+                            }}
+                          />
+                        )}
+                      </Box>
 
                       {/* Calculation */}
                       <Typography
@@ -1778,7 +2119,7 @@ export default function EventFormPage() {
                     </Box>
                   ))}
 
-                  {/* Total Amount Right-Aligned Footer matching exact screenshot */}
+                  {/* Total Amount Right-Aligned Footer */}
                   <Box
                     sx={{
                       display: "flex",
@@ -1812,8 +2153,6 @@ export default function EventFormPage() {
               </Box>
             </Grid>
           </Grid>
-
-
 
           {/* Bottom Action Footer */}
           <Divider sx={{ my: 3, borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2") }} />

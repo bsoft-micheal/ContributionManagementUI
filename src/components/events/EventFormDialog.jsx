@@ -67,6 +67,24 @@ const getDefaultBirthdayExempt = () => {
   return true;
 };
 
+const getAllowMultipleEventsSetting = () => {
+  try {
+    const saved = localStorage.getItem("cm_system_settings");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.allowedMultipleEvent !== undefined) {
+        return Boolean(parsed.allowedMultipleEvent);
+      }
+      if (parsed.allowMultipleEvents !== undefined) {
+        return Boolean(parsed.allowMultipleEvents);
+      }
+    }
+  } catch (e) {
+    // Setting read error ignored
+  }
+  return false;
+};
+
 export default function EventFormDialog({
   open,
   onClose,
@@ -79,6 +97,7 @@ export default function EventFormDialog({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [allowMultipleEvents, setAllowMultipleEvents] = useState(getAllowMultipleEventsSetting);
 
   const [budgetItemsList, setBudgetItemsList] = useState([]);
   const [budgetRates, setBudgetRates] = useState(RULES);
