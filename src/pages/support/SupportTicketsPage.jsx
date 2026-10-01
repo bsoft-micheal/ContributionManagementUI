@@ -89,6 +89,10 @@ export default function SupportTicketsPage() {
   const location = useLocation();
   const { addNotification } = useNotifications();
 
+  const userRole = String(authState?.role || authState?.user?.roleName || "").trim().toLowerCase();
+  const isMemberRole = userRole === "member";
+  const isNameLocked = isMemberRole || Boolean(location.state?.raiseTicket) || Boolean(location.state?.memberName);
+
   const getLoggedInMember = () => {
     const rawName = (
       authState?.fullName ||
@@ -285,28 +289,48 @@ export default function SupportTicketsPage() {
   useEffect(() => {
     fetchTicketsFromDb();
     fetchLookupData();
+  }, []);
 
+  useEffect(() => {
     if (location.state?.raiseTicket) {
       setEditingTicket(null);
       const relEvent = location.state.relatedEvent || "";
       const matchedEvent = (eventsList || []).find(
         (ev) => (ev.eventName || ev.name || ev.title) === relEvent
       );
-      const derivedType = matchedEvent?.eventTypeName || matchedEvent?.categoryName || matchedEvent?.eventType || "";
+      const derivedType = location.state.eventType || matchedEvent?.eventTypeName || matchedEvent?.categoryName || matchedEvent?.eventType || "";
+
+      const loggedIn = getLoggedInMember();
+      const memberName = location.state.memberName || loggedIn.name || authState?.fullName || "";
+      const memberId = location.state.memberId || loggedIn.id || "";
 
       setForm({
         ...initialForm,
-        memberName: location.state.memberName || authState?.fullName || "",
+        memberName,
+        memberId,
         eventType: derivedType,
         relatedEvent: relEvent,
         ticketType: "Payment Issue",
-        subject: `Payment Issue - Transaction ${location.state.transactionId || ""}`,
-        description: `Payment transaction ${location.state.transactionId || ""} for amount ₹${location.state.amount || ""} via ${location.state.paymentMode || ""} (UTR: ${location.state.utr || ""}) is currently pending verification. Please verify and resolve the issue.`,
+        subject: `Payment Issue - ${relEvent || "Contribution"}`,
+        description: "",
         priority: "High",
       });
       setDialogOpen(true);
     }
-  }, [location.state]);
+  }, [location.state, eventsList]);
+
+  // Reactive fallback: sync Event Type when eventsList loads or relatedEvent changes
+  useEffect(() => {
+    if (form.relatedEvent && !form.eventType && eventsList.length > 0) {
+      const matched = eventsList.find(
+        (ev) => (ev.eventName || ev.name || ev.title) === form.relatedEvent
+      );
+      const derivedType = matched?.eventTypeName || matched?.categoryName || matched?.eventType || "";
+      if (derivedType) {
+        setForm((prev) => ({ ...prev, eventType: derivedType }));
+      }
+    }
+  }, [eventsList, form.relatedEvent, form.eventType]);
 
   // Dynamically derive member options from DB members
   const memberOptions = useMemo(() => {
@@ -317,7 +341,7 @@ export default function SupportTicketsPage() {
       if (name && !unique.has(name)) {
         unique.add(name);
         list.push({
-          label: `${name}${m.roleName ? ` (${m.roleName})` : ""}`,
+          label: name,
           value: name,
         });
       }
@@ -995,13 +1019,20 @@ export default function SupportTicketsPage() {
                 const firstTicketType = dbTicketTypes.find((t) => t.isActive !== false)?.typeName || "";
                 const firstStatus = dbStatuses.find((s) => s.isActive !== false)?.statusName || "";
                 const loggedIn = getLoggedInMember();
+                const defaultEvent = eventsList.length > 0 ? eventsList[0] : null;
+                const defaultEventName = defaultEvent ? (defaultEvent.eventName || defaultEvent.name || defaultEvent.title || "") : "";
+                const defaultEventType = defaultEvent ? (defaultEvent.eventTypeName || defaultEvent.categoryName || defaultEvent.eventType || "") : "";
+
                 setEditingTicket(null);
                 setForm({
                   ...initialForm,
-                  memberName: loggedIn.name,
-                  memberId: loggedIn.id,
-                  ticketType: firstTicketType,
+                  memberName: loggedIn.name || authState?.fullName || "",
+                  memberId: loggedIn.id || "",
+                  relatedEvent: defaultEventName,
+                  eventType: defaultEventType,
+                  ticketType: firstTicketType || "Payment Issue",
                   status: firstStatus,
+                  description: "",
                 });
                 setErrors({});
                 setDialogOpen(true);
@@ -1141,6 +1172,7 @@ export default function SupportTicketsPage() {
               label="Member Name"
               placeholder="Select Member"
               value={form.memberName}
+              disabled={isNameLocked}
               onChange={(e) => {
                 const selectedName = e.target.value;
                 const matched = membersList.find((m) => (m.name || m.memberName) === selectedName);
@@ -1165,16 +1197,20 @@ export default function SupportTicketsPage() {
               onChange={(e) => {
                 const selectedType = e.target.value;
                 setForm((c) => {
-                  const currentEvent = (eventsList || []).find(
+                  const matchingEvents = (eventsList || []).filter(
+                    (ev) => (ev.eventTypeName || ev.categoryName || ev.eventType || "").trim().toLowerCase() === selectedType.trim().toLowerCase()
+                  );
+                  const currentMatches = matchingEvents.some(
                     (ev) => (ev.eventName || ev.name || ev.title) === c.relatedEvent
                   );
-                  const currentEvType = (currentEvent?.eventTypeName || currentEvent?.categoryName || currentEvent?.eventType || "").trim().toLowerCase();
-                  const matches = selectedType && currentEvType === selectedType.trim().toLowerCase();
+                  const newRelatedEvent = currentMatches
+                    ? c.relatedEvent
+                    : (matchingEvents.length === 1 ? (matchingEvents[0].eventName || matchingEvents[0].name || matchingEvents[0].title) : "");
 
                   return {
                     ...c,
                     eventType: selectedType,
-                    relatedEvent: matches ? c.relatedEvent : "",
+                    relatedEvent: newRelatedEvent,
                   };
                 });
               }}

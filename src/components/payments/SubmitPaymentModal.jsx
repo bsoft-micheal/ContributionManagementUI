@@ -520,11 +520,22 @@ export default function SubmitPaymentModal({
             const isPaidStatus = String(res.status || initialStatus || "").toLowerCase() === "paid" || String(res.status || initialStatus || "").toLowerCase() === "verified" || String(res.status || initialStatus || "").toLowerCase() === "completed";
             const isSubmittedProps = initialIsSubmitted || (initialCurrentDue === 0 && initialPreviousArrears === 0) || isPaidStatus;
 
+            const fallbackEvAmt = () => {
+              if (matchedEvent) {
+                const base = Number(matchedEvent.baseAmount || matchedEvent.totalExpectedAmount || 0);
+                const count = Number(matchedEvent.participantCount || matchedEvent.participants?.length || 0);
+                if (count > 0 && base > 0) return Math.round(base / count);
+                if (base > 0) return base;
+              }
+              return 0;
+            };
+            const resolvedFallback = fallbackEvAmt();
+
             const currentEvDue = isPaidStatus
               ? 0
               : (isSubmittedProps
-                ? (initialCurrentDue ?? 0)
-                : Number(res.currentEventDue ?? res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? 0));
+                ? (initialCurrentDue ?? (resolvedFallback > 0 ? resolvedFallback : 0))
+                : Number(res.currentEventDue || res.amount || matchedEvent?.amount || matchedEvent?.contributionAmount || resolvedFallback || 0));
 
             const prevArrears = isPaidStatus
               ? 0
@@ -534,7 +545,7 @@ export default function SubmitPaymentModal({
 
             const total = isPaidStatus ? 0 : Number((res.totalDue ?? (currentEvDue + prevArrears)).toFixed(2));
             const baseAmt = Number(
-              res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? currentEvDue
+              res.amount || matchedEvent?.amount || matchedEvent?.contributionAmount || (currentEvDue > 0 ? currentEvDue : resolvedFallback)
             );
 
             const breakdown = (res.arrearBreakdown && res.arrearBreakdown.length > 0)
@@ -561,10 +572,13 @@ export default function SubmitPaymentModal({
                 ? String(total)
                 : currentEvDue > 0
                 ? String(currentEvDue)
-                : prev.amount,
+                : (resolvedFallback > 0 ? String(resolvedFallback) : prev.amount),
             }));
           } else if (matchedEvent) {
-            const currentEvDue = Number(matchedEvent.amount || matchedEvent.contributionAmount || 0);
+            const base = Number(matchedEvent.baseAmount || matchedEvent.totalExpectedAmount || 0);
+            const count = Number(matchedEvent.participantCount || matchedEvent.participants?.length || 0);
+            const fallbackAmt = (count > 0 && base > 0) ? Math.round(base / count) : (base > 0 ? base : 0);
+            const currentEvDue = Number(matchedEvent.amount || matchedEvent.contributionAmount || 0) || fallbackAmt;
             setDuesSummary({
               currentEventDue: currentEvDue,
               previousArrears: 0,

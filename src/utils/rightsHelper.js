@@ -12,6 +12,7 @@ function getParentPageFeatureId(actionFeatureId) {
   if (id >= 41 && id <= 43) return 8;   // Contribution
   if (id >= 44 && id <= 48) return 11;  // Expense
   if ((id >= 49 && id <= 53) || id === 58) return 12;  // Support Ticket
+  if (id === 59 || id === 60 || id === 82) return 23; // Reports
   return null;
 }
 
@@ -246,20 +247,25 @@ export function hasActionPermission(actionName, featureId, roleName) {
   const numericFeatureId = Number(featureId);
   let matchedRight = null;
 
-  // 1. Try matching by exact action featureId
-  if (numericFeatureId > 0) {
+  // 1. Try matching by exact action featureId (unless legacy 42 was passed with submit)
+  if (numericFeatureId > 0 && !(numericFeatureId === 42 && actionName && String(actionName).toLowerCase().includes("submit"))) {
     matchedRight = roleRights.find(r => Number(r.featureId || r.featureID || r.FeatureID || r.FeatureId) === numericFeatureId);
   }
 
-  // 2. Fallback matching by action / page / subModule name only if numeric featureId was not specified
-  if (!matchedRight && !numericFeatureId && actionName) {
+  // 2. Fallback / alias matching by action name
+  if (!matchedRight && actionName) {
     const cleanAction = String(actionName).toLowerCase().trim();
+    const targetAction = cleanAction.includes("submit") ? "submit"
+      : cleanAction.includes("authority update") || cleanAction === "status update" ? "update"
+      : cleanAction.includes("raise support") ? "support"
+      : cleanAction;
+
     matchedRight = roleRights.find(r => {
       const act = String(r.action || r.Action || "").toLowerCase().trim();
       const pg = String(r.page || r.Page || "").toLowerCase().trim();
       const sub = String(r.subModule || r.SubModule || "").toLowerCase().trim();
 
-      return act === cleanAction || pg === cleanAction || sub === cleanAction;
+      return act === cleanAction || act === targetAction || pg === cleanAction || sub === cleanAction;
     });
   }
 

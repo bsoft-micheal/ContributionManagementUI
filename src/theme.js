@@ -219,11 +219,20 @@ export function createAppTheme(mode = "light") {
               },
               "&.Mui-disabled": {
                 backgroundColor: mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
-                "& .MuiOutlinedInput-input, & input": {
+                "& .MuiOutlinedInput-input:not(.MuiSelect-nativeInput), & input:not(.MuiSelect-nativeInput)": {
                   color: mode === "dark" ? "#ffffff !important" : "#0f172a !important",
                   WebkitTextFillColor: mode === "dark" ? "#ffffff !important" : "#0f172a !important",
                   fontWeight: "700 !important",
                   opacity: "1 !important",
+                },
+                "& .MuiSelect-nativeInput": {
+                  opacity: "0 !important",
+                  visibility: "hidden !important",
+                  position: "absolute !important",
+                  width: "0px !important",
+                  height: "0px !important",
+                  pointerEvents: "none !important",
+                  clip: "rect(0 0 0 0) !important",
                 },
               },
             },
@@ -234,6 +243,15 @@ export function createAppTheme(mode = "light") {
         styleOverrides: {
           outlined: {
             borderRadius: 12,
+          },
+          nativeInput: {
+            opacity: "0 !important",
+            visibility: "hidden !important",
+            position: "absolute !important",
+            width: "0px !important",
+            height: "0px !important",
+            pointerEvents: "none !important",
+            clip: "rect(0 0 0 0) !important",
           },
         },
       },

@@ -38,7 +38,7 @@ import { getEventsAsync } from "../../services/eventService";
 import { getStatusesAsync } from "../../services/statusService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
-import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { TOAST_MESSAGES, COMMON_STRINGS, MENU_FEATURE_IDS } from "../../constants";
 import { getImageUrl } from "../../services/apiClient";
 
 export default function PaymentsPage() {
@@ -60,7 +60,7 @@ export default function PaymentsPage() {
 
   // Granular Action Permissions
   const canViewPaymentHistory = hasActionPermission("View Payment History", 43, authState?.role).canView;
-  const canSubmitPayment = (hasActionPermission("Submit Payment details", 42, authState?.role).canExecute !== false) && hasWriteAccess;
+  const canSubmitPayment = (hasActionPermission("Submit", MENU_FEATURE_IDS.CONTRIBUTION_SUBMIT, authState?.role).canExecute !== false) && hasWriteAccess;
   const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
 
   const [transactions, setTransactions] = useState([]);

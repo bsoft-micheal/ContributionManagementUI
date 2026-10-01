@@ -60,7 +60,7 @@ import {
   getQrCodeApiUrl,
   generateQrPngDataUrl,
 } from "../../utils/upiQrHelper";
-import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { TOAST_MESSAGES, COMMON_STRINGS, MENU_FEATURE_IDS } from "../../constants";
 
 const initialPayment = {
   eventId: "",
@@ -80,25 +80,34 @@ export default function ContributionsPage() {
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
 
-  // Granular Action Permissions
-  const permCheck = hasActionPermission("Submit Payment details", 42, authState?.role);
-  const canAddContribution = permCheck.canExecute !== false;
-  const canViewContribution = hasActionPermission("View Contribution", 41, authState?.role).canView;
-  const canVerifySupportTicket = hasActionPermission("Verify support Ticket", 58, authState?.role).canView !== false;
+  // Granular Action Permissions (aligned with User Rights Master & menuConstants)
+  const canAddContribution = hasActionPermission(
+    "Submit",
+    MENU_FEATURE_IDS.CONTRIBUTION_SUBMIT,
+    authState?.role
+  ).canExecute !== false;
+
+  const canUpdateContribution = hasActionPermission(
+    "Update",
+    MENU_FEATURE_IDS.CONTRIBUTION_AUTHORITY_UPDATE,
+    authState?.role
+  ).canExecute;
+
+  const canRaiseSupportTicket = hasActionPermission(
+    "Support",
+    MENU_FEATURE_IDS.CONTRIBUTION_RAISE_SUPPORT,
+    authState?.role
+  ).canExecute !== false;
+
+  const canVerifySupportTicket = hasActionPermission(
+    "Verify support Ticket",
+    MENU_FEATURE_IDS.CONTRIBUTION_VERIFY_SUPPORT,
+    authState?.role
+  ).canExecute;
+
+  const canViewContribution = hasActionPermission("View Contribution", MENU_FEATURE_IDS.CONTRIBUTION_SUBMIT, authState?.role).canView;
   const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
-  const isAuthorityRole = !isMemberRole || hasWriteAccess || [
-    "admin",
-    "superadmin",
-    "organizer",
-    "treasurer",
-    "president",
-    "secretary",
-    "committee",
-    "manager",
-    "staff",
-    "lead",
-    "user",
-  ].includes(String(authState?.role || authState?.user?.role || "").toLowerCase());
+  const isAuthorityRole = canUpdateContribution;
 
   // Authority Status Update state
   const [statusModalOpen, setStatusModalOpen] = useState(false);
@@ -139,14 +148,71 @@ export default function ContributionsPage() {
     arrearBreakdown: [],
   });
 
+  const getMemberEventAmount = (c, activeEv) => {
+    const directAmt = Number(c?.amount || 0);
+    if (directAmt > 0) return directAmt;
+    if (!activeEv) return 0;
+    const base = Number(activeEv.baseAmount || activeEv.totalExpectedAmount || 0);
+    const count = Number(activeEv.participantCount || (activeEv.participants && activeEv.participants.length) || 0);
+    if (count > 0 && base > 0) {
+      return Math.round(base / count);
+    }
+    return base > 0 ? base : 0;
+  };
+
+  const isContributionPaid = (c) => {
+    if (!c) return false;
+    if (typeof c === "string") {
+      const s = c.trim().toLowerCase();
+      return s === "paid" || s === "verified" || s === "closed" || s === "completed";
+    }
+    const status = String(c.paymentStatus || c.PaymentStatus || c.status || c.statusName || "").trim().toLowerCase();
+    if (status === "paid" || status === "verified" || status === "closed" || status === "completed") {
+      return true;
+    }
+    const key = `${c.memberId}_${c.eventId}`;
+    const isVerifiedByAuthority = verifiedKeys.has(key) || c.isVerified === true || Boolean(c.verifiedBy);
+    return isVerifiedByAuthority;
+  };
+
+  const hasSubmittedPayment = (c) => {
+    if (!c) return false;
+    if (isContributionPaid(c)) return true;
+    const status = String(c.paymentStatus || c.PaymentStatus || c.status || c.statusName || "").trim().toLowerCase();
+    if (status === "in progress" || status === "under verification" || status === "submitted") {
+      return true;
+    }
+    if (c.paymentDate && c.paymentMode && c.paymentMode !== "None") {
+      return true;
+    }
+    const matchedTx = (transactions || []).find(
+      (t) =>
+        (String(t.eventId) === String(c.eventId || selectedEventId) || String(t.eventName).toLowerCase() === String(c.eventName || "").toLowerCase()) &&
+        (String(t.userId) === String(c.memberId) || String(t.memberName).toLowerCase() === String(c.memberName || "").toLowerCase())
+    );
+    if (matchedTx && matchedTx.status) {
+      return true;
+    }
+    return false;
+  };
+
+  const getContributionOutstanding = (c, activeEv) => {
+    if (!c) return 0;
+    if (isContributionPaid(c)) return 0;
+    const isSubmitted = hasSubmittedPayment(c);
+    if (isSubmitted) return 0;
+    return getMemberEventAmount(c, activeEv);
+  };
+
   const handleOpenSubmitPaymentModal = (row) => {
     const evId = row?.eventId || selectedEventId || "";
     const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(evId));
     const isPaidRow = row ? (isContributionPaid(row) || String(row?.paymentStatus || row?.status || "").toLowerCase() === "paid") : false;
     const submitted = row ? (isPaidRow || hasSubmittedPayment(row)) : false;
-    const currentEvDue = (isPaidRow || submitted) ? 0 : Number(row?.amount || activeEv?.amount || 0);
-    const prevArrears = (isPaidRow || (submitted && (row?.paymentScope === "AllOutstanding" || !row?.paymentScope))) ? 0 : Number(row?.previousUnpaid || 0);
-    const totalDue = (isPaidRow || submitted) ? 0 : (currentEvDue + prevArrears);
+    const resolvedEvAmt = row ? getMemberEventAmount(row, activeEv) : Number(activeEv?.baseAmount || 0);
+    const currentEvDue = isPaidRow ? 0 : resolvedEvAmt;
+    const prevArrears = isPaidRow ? 0 : Number(row?.previousUnpaid || 0);
+    const totalDue = isPaidRow ? 0 : (currentEvDue + prevArrears);
 
     setPaymentModalContext({
       eventId: evId,
@@ -154,7 +220,7 @@ export default function ContributionsPage() {
       eventCategory: row?.categoryName || activeEv?.eventTypeName || activeEv?.categoryName || "",
       memberId: row?.memberId || "",
       memberName: row?.memberName || "",
-      amount: totalDue > 0 ? totalDue : 0,
+      amount: totalDue > 0 ? totalDue : (resolvedEvAmt > 0 ? resolvedEvAmt : 0),
       currentEventDue: currentEvDue,
       previousArrears: prevArrears,
       totalDue: totalDue,
@@ -220,43 +286,16 @@ export default function ContributionsPage() {
   };
 
   useEffect(() => {
-    const handleUpdate = () => {
+    const handleUpdate = async () => {
+      try {
+        const txRes = await getPaymentTransactionsAsync();
+        if (Array.isArray(txRes)) setTransactions(txRes);
+      } catch {}
       reloadAllContributions();
     };
     window.addEventListener("contribution_updated", handleUpdate);
     return () => window.removeEventListener("contribution_updated", handleUpdate);
   }, []);
-
-  const isContributionPaid = (c) => {
-    if (!c) return false;
-    if (typeof c === "string") {
-      const s = c.trim().toLowerCase();
-      return s === "paid" || s === "verified" || s === "closed" || s === "completed";
-    }
-    const status = String(c.paymentStatus || c.PaymentStatus || c.status || c.statusName || "").trim().toLowerCase();
-    if (status === "paid" || status === "verified" || status === "closed" || status === "completed") {
-      return true;
-    }
-    const key = `${c.memberId}_${c.eventId}`;
-    const isVerifiedByAuthority = verifiedKeys.has(key) || c.isVerified === true || Boolean(c.verifiedBy);
-    return isVerifiedByAuthority;
-  };
-
-  const hasSubmittedPayment = (c) => {
-    if (!c) return false;
-    if (isContributionPaid(c)) return true;
-    const status = String(c.paymentStatus || c.PaymentStatus || c.status || c.statusName || "").trim().toLowerCase();
-    if (status === "pending" || status === "in progress" || c.paymentDate || (c.paymentMode && c.paymentMode !== "None")) {
-      return true;
-    }
-    return false;
-  };
-
-  const getContributionOutstanding = (c) => {
-    if (!c) return 0;
-    if (hasSubmittedPayment(c)) return 0;
-    return Number(c.amount || 0);
-  };
 
   useEffect(() => {
     if (!selectedEventId) {
@@ -267,8 +306,15 @@ export default function ContributionsPage() {
     async function loadContributions() {
       try {
         const data = await getContributionsByEventAsync(selectedEventId);
+        const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(selectedEventId));
 
         let enrichedData = data.map(c => {
+          const resolvedAmount = getMemberEventAmount(c, activeEv);
+          const currentContribution = {
+            ...c,
+            amount: resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0),
+          };
+
           // Calculate Arrears: sum of unpaid contributions for this member in other events
           const previousUnpaidItems = allContributions.filter(
             prev =>
@@ -276,16 +322,28 @@ export default function ContributionsPage() {
               prev.eventId !== c.eventId &&
               !isContributionPaid(prev)
           );
-          const scope = String(c.paymentScope || c.scope || "").toLowerCase();
-          const clearsArrears = scope === "alloutstanding" || scope === "previousarrears" || scope.includes("all") || scope.includes("arrear");
-          const isArrearsCleared = hasSubmittedPayment(c) && (clearsArrears || !c.paymentScope);
+          const matchedTx = (transactions || []).find(
+            (t) =>
+              (String(t.eventId) === String(c.eventId || selectedEventId) || String(t.eventName).toLowerCase() === String(c.eventName || "").toLowerCase()) &&
+              (String(t.userId) === String(c.memberId) || String(t.memberName).toLowerCase() === String(c.memberName || "").toLowerCase())
+          );
+          const memberAnyTx = (transactions || []).find(
+            (t) => String(t.userId) === String(c.memberId) || String(t.memberName).toLowerCase() === String(c.memberName || "").toLowerCase()
+          );
+          const scope = String(c.paymentScope || c.scope || matchedTx?.notes || memberAnyTx?.notes || "").toLowerCase();
+          const clearsArrears = scope.includes("alloutstanding") || scope.includes("all outstanding") || scope.includes("scope: all") || scope.includes("arrear") || (!c.paymentScope && (hasSubmittedPayment(c) || isContributionPaid(c)));
+          const isArrearsCleared = (hasSubmittedPayment(c) || isContributionPaid(c)) && clearsArrears;
 
-          const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
+          const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => {
+            const prevEv = (events || []).find((e) => String(e.eventId || e.id) === String(prev.eventId));
+            const prevAmt = getMemberEventAmount(prev, prevEv);
+            return sum + (prevAmt > 0 ? prevAmt : (Number(prev.amount) || 0));
+          }, 0);
           const previousUnpaid = isArrearsCleared ? 0 : rawPreviousUnpaid;
-          const currentOutstanding = getContributionOutstanding(c);
+          const currentOutstanding = getContributionOutstanding(currentContribution, activeEv);
 
           return {
-            ...c,
+            ...currentContribution,
             previousUnpaid,
             previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
             totalAccumulated: currentOutstanding + previousUnpaid
@@ -309,7 +367,7 @@ export default function ContributionsPage() {
     }
 
     loadContributions();
-  }, [selectedEventId, allContributions]);
+  }, [selectedEventId, allContributions, events]);
 
   const handleAmountChange = (val) => {
     setPayment((prev) => {
@@ -800,7 +858,7 @@ export default function ContributionsPage() {
               </Tooltip>
             )}
 
-            {isAuthorityRole && (
+            {canUpdateContribution && (
               <Tooltip title="Authority Status Update">
                 <IconButton
                   size="small"
@@ -827,37 +885,42 @@ export default function ContributionsPage() {
             )}
 
             {/* Raise Support Ticket Icon */}
-            <Tooltip title="Raise Support Ticket">
-              <IconButton
-                size="small"
-                onClick={() => {
-                  const activeEvent = events.find((e) => String(e.eventId) === String(row.eventId || selectedEventId));
-                  navigate("/support-tickets", {
-                    state: {
-                      raiseTicket: true,
-                      memberName: row.memberName,
-                      relatedEvent: row.eventName || activeEvent?.eventName || activeEvent?.title || "",
-                      amount: row.amount || row.totalAccumulated,
-                      paymentMode: row.paymentMode,
-                      status: row.paymentStatus,
-                      contributionId: row.contributionId,
+            {canRaiseSupportTicket && (
+              <Tooltip title="Raise Support Ticket">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    const activeEvent = events.find((e) => String(e.eventId) === String(row.eventId || selectedEventId));
+                    navigate("/support-tickets", {
+                      state: {
+                        raiseTicket: true,
+                        memberName: row.memberName,
+                        memberId: row.memberId,
+                        eventId: row.eventId || selectedEventId,
+                        relatedEvent: row.eventName || activeEvent?.eventName || activeEvent?.title || "",
+                        eventType: row.categoryName || activeEvent?.eventTypeName || activeEvent?.categoryName || activeEvent?.eventType || "",
+                        amount: row.amount || row.totalAccumulated,
+                        paymentMode: row.paymentMode,
+                        status: row.paymentStatus,
+                        contributionId: row.contributionId,
+                      },
+                    });
+                  }}
+                  sx={{
+                    p: 0.4,
+                    color: "#ef4444",
+                    bgcolor: "rgba(239, 68, 68, 0.08)",
+                    borderRadius: "6px",
+                    "&:hover": {
+                      bgcolor: "rgba(239, 68, 68, 0.18)",
+                      color: "#dc2626",
                     },
-                  });
-                }}
-                sx={{
-                  p: 0.4,
-                  color: "#ef4444",
-                  bgcolor: "rgba(239, 68, 68, 0.08)",
-                  borderRadius: "6px",
-                  "&:hover": {
-                    bgcolor: "rgba(239, 68, 68, 0.18)",
-                    color: "#dc2626",
-                  },
-                }}
-              >
-                <TicketIcon sx={{ fontSize: "1.15rem" }} />
-              </IconButton>
-            </Tooltip>
+                  }}
+                >
+                  <TicketIcon sx={{ fontSize: "1.15rem" }} />
+                </IconButton>
+              </Tooltip>
+            )}
 
             {/* Verify Support Ticket Icon */}
             {canVerifySupportTicket && (
@@ -941,16 +1004,50 @@ export default function ContributionsPage() {
       key: "amount",
       align: "right",
       render: (row) => {
+        const isPaid = isContributionPaid(row);
+        const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId));
+        const eventAmount = getMemberEventAmount(row, activeEv);
         const submitted = hasSubmittedPayment(row);
-        const remainingAmount = submitted ? 0 : Number(row.amount || row.baseAmount || row.contributionAmount || 0);
+        const displayAmount = (isPaid || submitted) ? 0 : eventAmount;
+
         return (
-          <Typography
-            variant="body2"
-            fontWeight={700}
-            color={submitted ? "text.secondary" : "inherit"}
-          >
-            ₹{remainingAmount.toLocaleString()}
-          </Typography>
+          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.8, justifyContent: "flex-end" }}>
+            <Typography
+              variant="body2"
+              fontWeight={700}
+              color={isPaid ? "success.main" : submitted ? "warning.main" : "inherit"}
+            >
+              ₹{displayAmount.toLocaleString()}
+            </Typography>
+            {isPaid && (
+              <Chip
+                label="Paid"
+                size="small"
+                sx={{
+                  height: 18,
+                  fontSize: "0.62rem",
+                  fontWeight: 800,
+                  bgcolor: "rgba(22, 163, 74, 0.12)",
+                  color: "#16a34a",
+                  border: "1px solid rgba(22, 163, 74, 0.3)",
+                }}
+              />
+            )}
+            {submitted && !isPaid && (
+              <Chip
+                label="Verifying"
+                size="small"
+                sx={{
+                  height: 18,
+                  fontSize: "0.62rem",
+                  fontWeight: 800,
+                  bgcolor: "rgba(234, 179, 8, 0.12)",
+                  color: "#ca8a04",
+                  border: "1px solid rgba(234, 179, 8, 0.3)",
+                }}
+              />
+            )}
+          </Box>
         );
       }
     },
@@ -959,8 +1056,11 @@ export default function ContributionsPage() {
       key: "previousUnpaid",
       align: "right",
       render: (row) => {
+        const isPaid = isContributionPaid(row);
+        const submitted = hasSubmittedPayment(row);
+        const displayArrears = (isPaid || submitted) ? 0 : (row.previousUnpaid || 0);
         const arrearsList = row.previousUnpaidItems || [];
-        const hasArrears = row.previousUnpaid > 0 && arrearsList.length > 0;
+        const hasArrears = displayArrears > 0 && arrearsList.length > 0;
         const tooltipContent = hasArrears ? (
           <Box sx={{ p: 0.5, minWidth: 160 }}>
             <Typography variant="caption" fontWeight={800} sx={{ display: "block", color: "#f87171", mb: 0.5, borderBottom: "1px solid rgba(255,255,255,0.2)", pb: 0.3 }}>
@@ -974,24 +1074,24 @@ export default function ContributionsPage() {
             ))}
             <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.2)", mt: 0.5, pt: 0.3, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "0.75rem", color: "#fca5a5" }}>
               <span>Total Arrears:</span>
-              <span>₹{(row.previousUnpaid || 0).toLocaleString()}</span>
+              <span>₹{displayArrears.toLocaleString()}</span>
             </Box>
           </Box>
-        ) : (row.previousUnpaid > 0 ? `Total Arrears: ₹${(row.previousUnpaid || 0).toLocaleString()}` : "No previous arrears");
+        ) : (displayArrears > 0 ? `Total Arrears: ₹${displayArrears.toLocaleString()}` : "No previous arrears");
 
         return (
           <Tooltip title={tooltipContent} arrow enterDelay={150}>
             <Typography
               variant="body2"
-              color={row.previousUnpaid > 0 ? "error.main" : "text.secondary"}
-              fontWeight={row.previousUnpaid > 0 ? 800 : 400}
+              color={displayArrears > 0 ? "error.main" : "text.secondary"}
+              fontWeight={displayArrears > 0 ? 800 : 400}
               sx={{
-                cursor: row.previousUnpaid > 0 ? "help" : "default",
-                textDecoration: row.previousUnpaid > 0 ? "underline dotted" : "none",
+                cursor: displayArrears > 0 ? "help" : "default",
+                textDecoration: displayArrears > 0 ? "underline dotted" : "none",
                 display: "inline-block",
               }}
             >
-              ₹{(row.previousUnpaid || 0).toLocaleString()}
+              ₹{displayArrears.toLocaleString()}
             </Typography>
           </Tooltip>
         );
@@ -1002,8 +1102,12 @@ export default function ContributionsPage() {
       key: "totalAccumulated",
       align: "right",
       render: (row) => {
-        const currentDue = getContributionOutstanding(row);
-        const due = row.totalAccumulated ?? (currentDue + (row.previousUnpaid || 0));
+        const isPaid = isContributionPaid(row);
+        const submitted = hasSubmittedPayment(row);
+        const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId));
+        const currentDue = (isPaid || submitted) ? 0 : getContributionOutstanding(row, activeEv);
+        const prevArrears = (isPaid || submitted) ? 0 : (row.previousUnpaid || 0);
+        const due = currentDue + prevArrears;
         return (
           <Typography
             variant="body2"
@@ -1019,10 +1123,20 @@ export default function ContributionsPage() {
       label: "Mode",
       key: "paymentMode",
       render: (row) => {
-        if (row.paymentMode === "Split") {
-          const cashInfo = row.cashAmount ? `₹${Number(row.cashAmount).toLocaleString()} Cash` : "";
-          const upiInfo = row.upiAmount ? `₹${Number(row.upiAmount).toLocaleString()} UPI` : "";
-          const splitLabel = cashInfo && upiInfo ? `Split (${cashInfo} + ${upiInfo})` : "Split (Cash + UPI)";
+        const matchedTx = (transactions || []).find(
+          (t) =>
+            (String(t.eventId) === String(row.eventId || selectedEventId) || String(t.eventName).toLowerCase() === String(row.eventName || "").toLowerCase()) &&
+            (String(t.userId) === String(row.memberId) || String(t.memberName).toLowerCase() === String(row.memberName || "").toLowerCase())
+        );
+        const resolvedMode = (row.paymentMode && row.paymentMode !== "None") ? row.paymentMode : (matchedTx?.paymentMode || "None");
+        const isSplit = resolvedMode === "Split" || String(resolvedMode).toLowerCase().includes("split");
+
+        if (isSplit) {
+          const cashAmount = row.cashAmount || matchedTx?.cashAmount;
+          const upiAmount = row.upiAmount || matchedTx?.upiAmount;
+          const cashInfo = cashAmount ? `₹${Number(cashAmount).toLocaleString()} Cash` : "";
+          const upiInfo = upiAmount ? `₹${Number(upiAmount).toLocaleString()} UPI` : "";
+          const splitLabel = cashInfo && upiInfo ? `Split (${cashInfo} + ${upiInfo})` : "Split";
           const tooltipText = cashInfo && upiInfo ? `Split Payment: ${cashInfo} and ${upiInfo}` : "Split Payment (Partial Cash + Partial UPI)";
 
           return (
@@ -1046,7 +1160,7 @@ export default function ContributionsPage() {
             </Tooltip>
           );
         }
-        return row.paymentMode || "-";
+        return resolvedMode !== "None" ? resolvedMode : "-";
       },
     },
     {
@@ -1062,6 +1176,106 @@ export default function ContributionsPage() {
       label: "Created On",
       key: "createdAt",
       render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
+    },
+    {
+      label: "Verification Status",
+      key: "verificationStatus",
+      render: (row) => {
+        const key = `${row.memberId}_${row.eventId}`;
+        const isVerifiedByAuthority = verifiedKeys.has(key) || row.isVerified === true || Boolean(row.verifiedBy);
+        const matchedTx = (transactions || []).find(
+          (t) =>
+            (String(t.eventId) === String(row.eventId || selectedEventId) || String(t.eventName).toLowerCase() === String(row.eventName || "").toLowerCase()) &&
+            (String(t.userId) === String(row.memberId) || String(t.memberName).toLowerCase() === String(row.memberName || "").toLowerCase())
+        );
+        const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
+        const rowStatus = String(row.paymentStatus || row.PaymentStatus || row.status || row.statusName || "").trim().toLowerCase();
+        const isPaid = isContributionPaid(row) || rowStatus === "paid" || rowStatus === "verified" || rowStatus === "closed" || rowStatus === "completed";
+        const isVerified = isVerifiedByAuthority || txStatus === "verified" || rowStatus === "verified" || isPaid;
+        const isRejected = txStatus === "rejected";
+        const isPending = !isVerified && !isRejected && (hasSubmittedPayment(row) || txStatus === "pending" || Boolean(matchedTx));
+
+        if (isVerified) {
+          const verifier = matchedTx?.verifiedBy || row.verifiedBy || "Organizer";
+          const verifyDate = matchedTx?.verifiedOn || row.modifiedOn || row.paymentDate;
+          const tooltip = `Verified by ${verifier}${verifyDate ? ` on ${dayjs(verifyDate).format("DD/MM/YYYY hh:mm A")}` : ""}`;
+          return (
+            <Tooltip title={tooltip}>
+              <Chip
+                label="Verified"
+                size="small"
+                sx={{
+                  height: 22,
+                  fontSize: "0.68rem",
+                  fontWeight: 800,
+                  bgcolor: "rgba(22, 163, 74, 0.12)",
+                  color: "#16a34a",
+                  border: "1px solid rgba(22, 163, 74, 0.3)",
+                }}
+              />
+            </Tooltip>
+          );
+        }
+
+        if (isRejected) {
+          const reason = matchedTx?.notes || "Verification rejected by organizer";
+          return (
+            <Tooltip title={`Rejected: ${reason}`}>
+              <Chip
+                label="Rejected"
+                size="small"
+                sx={{
+                  height: 22,
+                  fontSize: "0.68rem",
+                  fontWeight: 800,
+                  bgcolor: "rgba(239, 68, 68, 0.12)",
+                  color: "#ef4444",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                }}
+              />
+            </Tooltip>
+          );
+        }
+
+        if (isPending) {
+          const mode = matchedTx?.paymentMode || row.paymentMode || "Payment";
+          const utr = matchedTx?.utr || "-";
+          const tooltip = `Payment submitted (${mode}, UTR: ${utr}). Awaiting Organizer verification.`;
+          return (
+            <Tooltip title={tooltip}>
+              <Chip
+                label="Pending Verification"
+                size="small"
+                sx={{
+                  height: 22,
+                  fontSize: "0.68rem",
+                  fontWeight: 800,
+                  bgcolor: "rgba(234, 179, 8, 0.12)",
+                  color: "#ca8a04",
+                  border: "1px solid rgba(234, 179, 8, 0.3)",
+                }}
+              />
+            </Tooltip>
+          );
+        }
+
+        return (
+          <Tooltip title="No payment submission yet for this event">
+            <Chip
+              label="Not Submitted"
+              size="small"
+              sx={{
+                height: 22,
+                fontSize: "0.68rem",
+                fontWeight: 700,
+                bgcolor: "rgba(100, 116, 139, 0.08)",
+                color: "#64748b",
+                border: "1px solid rgba(100, 116, 139, 0.2)",
+              }}
+            />
+          </Tooltip>
+        );
+      },
     },
   ];
 
@@ -1460,22 +1674,39 @@ export default function ContributionsPage() {
         initialStatus={paymentModalContext.paymentStatus}
         initialArrearBreakdown={paymentModalContext.arrearBreakdown}
         onSuccess={async () => {
+          try {
+            const txRes = await getPaymentTransactionsAsync();
+            if (Array.isArray(txRes)) setTransactions(txRes);
+          } catch {}
           const freshAll = await reloadAllContributions();
           if (selectedEventId) {
             const freshData = await getContributionsByEventAsync(selectedEventId);
+            const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(selectedEventId));
             const allList = (freshAll && freshAll.length > 0) ? freshAll : [];
             let enriched = freshData.map((c) => {
-              const previousUnpaidItems = allList.filter(
+              const resolvedAmount = getMemberEventAmount(c, activeEv);
+              const currentContribution = {
+                ...c,
+                amount: resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0),
+              };
+              const isSubmitted = hasSubmittedPayment(c);
+              const isPaid = isContributionPaid(c);
+              const isCleared = isSubmitted || isPaid;
+
+              const previousUnpaidItems = isCleared ? [] : allList.filter(
                 (prev) => prev.memberId === c.memberId && prev.eventId !== c.eventId && !isContributionPaid(prev)
               );
-              const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
-              const currentOutstanding = getContributionOutstanding(c);
-              const isPaid = isContributionPaid(c);
+              const previousUnpaid = isCleared ? 0 : previousUnpaidItems.reduce((sum, prev) => {
+                const prevEv = (events || []).find((e) => String(e.eventId || e.id) === String(prev.eventId));
+                const prevAmt = getMemberEventAmount(prev, prevEv);
+                return sum + (prevAmt > 0 ? prevAmt : (Number(prev.amount) || 0));
+              }, 0);
+              const currentOutstanding = isCleared ? 0 : getContributionOutstanding(currentContribution, activeEv);
               return {
-                ...c,
+                ...currentContribution,
                 previousUnpaid,
                 previousUnpaidItems,
-                totalAccumulated: isPaid ? previousUnpaid : (currentOutstanding + previousUnpaid),
+                totalAccumulated: isCleared ? 0 : (currentOutstanding + previousUnpaid),
               };
             });
             if (isMemberRole) {

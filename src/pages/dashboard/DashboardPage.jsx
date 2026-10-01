@@ -13,8 +13,6 @@ import {
   InputAdornment,
   Paper,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -26,6 +24,8 @@ import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import EventIcon from "@mui/icons-material/Event";
 import SearchIcon from "@mui/icons-material/Search";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import dayjs from "dayjs";
@@ -532,97 +532,86 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, loa
   const isDark = theme.palette.mode === "dark";
 
   return (
-    <Box sx={{
-      px: { xs: 2, md: 3 }, py: 2,
-      display: "flex", flexWrap: "wrap", gap: 2, alignItems: "flex-end",
-      borderBottom: `1px solid ${theme.palette.divider}`,
-      background: isDark
-        ? alpha(theme.palette.primary.main, 0.04)
-        : alpha(theme.palette.primary.main, 0.025),
-    }}>
-      <Box sx={{ minWidth: 170 }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 2,
+        alignItems: "flex-end",
+      }}
+    >
+      <Box sx={{ width: { xs: "100%", sm: 160 } }}>
         <AppSelect
           label="Month"
           value={pending.month}
           onChange={(e) => onChange("month", Number(e.target.value))}
           options={MONTH_OPTIONS}
+          size="small"
         />
       </Box>
-      <Box sx={{ minWidth: 145 }}>
+      <Box sx={{ width: { xs: "100%", sm: 130 } }}>
         <AppSelect
           label="Year"
           value={pending.year}
           onChange={(e) => onChange("year", Number(e.target.value))}
           options={YEAR_OPTIONS}
+          size="small"
         />
       </Box>
-      <Box sx={{ minWidth: 190 }}>
+      <Box sx={{ width: { xs: "100%", sm: 200 } }}>
         <AppSelect
           label="Event Type"
           value={pending.eventType || "ALL"}
           onChange={(e) => onChange("eventType", e.target.value)}
           options={eventTypeOptions}
+          size="small"
         />
       </Box>
 
-      {/* Filter Button (Pill button with FilterList icon - matching reference image) */}
-      <Button
-        variant="contained"
-        onClick={onFilter}
-        disabled={loading}
-        startIcon={<FilterListIcon sx={{ fontSize: 19 }} />}
-        sx={{
-          height: 40,
-          px: 3,
-          borderRadius: "20px",
-          bgcolor: isDark ? "#483b7a" : "#302657",
-          color: "#ffffff",
-          fontWeight: 800,
-          fontSize: "0.85rem",
-          textTransform: "none",
-          boxShadow: isDark
-            ? "0 3px 12px rgba(0,0,0,0.4)"
-            : "0 2px 10px rgba(48, 38, 87, 0.28)",
-          "&:hover": {
-            bgcolor: isDark ? "#594996" : "#241d45",
-            boxShadow: "0 4px 14px rgba(48, 38, 87, 0.4)",
-          },
-          "&:active": {
-            transform: "scale(0.98)",
-          },
-        }}
-      >
-        Filter
-      </Button>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+        <AppButton
+          variant="contained"
+          size="small"
+          onClick={onFilter}
+          disabled={loading}
+          startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
+          sx={{
+            height: 34,
+            minHeight: 34,
+            px: 2.5,
+            borderRadius: "8px",
+            fontWeight: 700,
+            fontSize: "0.82rem",
+          }}
+        >
+          Filter
+        </AppButton>
 
-      {/* Clear Filter Button (Pill button with Red/Coral border - clearly visible as in reference image) */}
-      <Button
-        variant="outlined"
-        onClick={onClear}
-        disabled={loading}
-        sx={{
-          height: 40,
-          px: 2.5,
-          borderRadius: "20px",
-          color: "#ef4444",
-          bgcolor: isDark ? "rgba(239, 68, 68, 0.08)" : "#ffffff",
-          border: "1.5px solid #f87171",
-          fontWeight: 800,
-          fontSize: "0.82rem",
-          textTransform: "none",
-          boxShadow: isDark ? "none" : "0 1px 4px rgba(239, 68, 68, 0.08)",
-          "&:hover": {
-            border: "1.5px solid #ef4444",
-            bgcolor: isDark ? "rgba(239, 68, 68, 0.16)" : "rgba(239, 68, 68, 0.06)",
-            color: "#dc2626",
-          },
-          "&:active": {
-            transform: "scale(0.98)",
-          },
-        }}
-      >
-        Clear Filter
-      </Button>
+        <AppButton
+          variant="outlined"
+          size="small"
+          onClick={onClear}
+          disabled={loading}
+          startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
+          sx={{
+            height: 34,
+            minHeight: 34,
+            px: 2,
+            borderRadius: "8px",
+            color: "#ef4444",
+            border: `1.5px solid ${isDark ? "rgba(239, 68, 68, 0.45)" : "rgba(239, 68, 68, 0.35)"}`,
+            fontWeight: 700,
+            fontSize: "0.82rem",
+            "&:hover": {
+              border: "1.5px solid #ef4444",
+              bgcolor: isDark ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.05)",
+              color: "#dc2626",
+            },
+          }}
+        >
+          Clear Filter
+        </AppButton>
+      </Box>
     </Box>
   );
 }
@@ -630,23 +619,30 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, loa
 // ─── Summary Stat Pill ────────────────────────────────────────────────────────
 
 function StatPill({ label, value, color }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   return (
     <Box sx={{
-      px: 2, py: 1.5, borderRadius: 2.5,
-      border: `1px solid ${alpha(color, 0.28)}`,
-      bgcolor: alpha(color, 0.08),
-      flex: 1, textAlign: "center",
-      transition: "all 0.2s ease",
+      px: { xs: 1.5, sm: 2 },
+      py: 1.5,
+      borderRadius: 2,
+      border: `1px solid ${alpha(color, isDark ? 0.35 : 0.22)}`,
+      bgcolor: alpha(color, isDark ? 0.12 : 0.05),
+      flex: 1,
+      textAlign: "center",
+      transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
       "&:hover": {
-        bgcolor: alpha(color, 0.13),
-        transform: "translateY(-1px)",
+        bgcolor: alpha(color, isDark ? 0.18 : 0.09),
+        transform: "translateY(-2px)",
+        boxShadow: `0 4px 12px ${alpha(color, 0.15)}`,
       },
     }}>
-      <Typography sx={{ fontSize: "1.25rem", fontWeight: 900, color, lineHeight: 1.1 }}>
+      <Typography sx={{ fontSize: { xs: "1.1rem", sm: "1.3rem" }, fontWeight: 900, color, lineHeight: 1.1 }}>
         {value}
       </Typography>
       <Typography variant="caption" color="text.secondary" fontWeight={700}
-        sx={{ fontSize: "0.68rem", letterSpacing: "0.04em", mt: 0.4, display: "block" }}>
+        sx={{ fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.05em", mt: 0.5, display: "block" }}>
         {label}
       </Typography>
     </Box>
@@ -663,7 +659,6 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const isMember = authState?.role?.toLowerCase() === "member";
 
-  const [activeTab, setActiveTab] = useState(0);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -1009,39 +1004,20 @@ export default function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="page-shell">
-      <Card sx={{ overflow: "hidden" }}>
-
-        {/* ── Tab Header ──────────────────────────────────────────────────── */}
-        <Box sx={{
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          px: { xs: 2, md: 3 }, pt: 0.5,
-          background: isDark
-            ? alpha(theme.palette.primary.main, 0.05)
-            : alpha(theme.palette.primary.main, 0.03),
-        }}>
-          <Tabs
-            value={activeTab}
-            onChange={(_, v) => setActiveTab(v)}
-            TabIndicatorProps={{
-              style: {
-                background: theme.palette.mode === "dark"
-                  ? "linear-gradient(90deg, #7b6faa 0%, #a78bfa 100%)"
-                  : "linear-gradient(90deg, #4a3f6b 0%, #2d2550 100%)",
-                height: 3, borderRadius: "3px 3px 0 0",
-              },
-            }}
-            sx={{ minHeight: 48 }}
-          >
-            <Tab id="tab-charts" icon={<DonutLargeIcon sx={{ fontSize: 18 }} />}
-              iconPosition="start" label="Charts"
-              sx={{
-                fontWeight: 700, minHeight: 48, textTransform: "none", fontSize: "0.88rem",
-                "&.Mui-selected": { color: "primary.main" }
-              }} />
-          </Tabs>
-        </Box>
-
-        {/* ── Filter Bar ──────────────────────────────────────────────────── */}
+      {/* ── Top Filter Bar ────────────────────────────────────────────────── */}
+      <Card
+        sx={{
+          p: { xs: 2, sm: 2.25 },
+          px: { xs: 2, sm: 3 },
+          borderRadius: 3,
+          overflow: "visible",
+          bgcolor: isDark ? "background.paper" : "#ffffff",
+          border: `1px solid ${theme.palette.divider}`,
+          boxShadow: isDark
+            ? "0 4px 20px rgba(0,0,0,0.25)"
+            : "0 2px 12px rgba(0,0,0,0.03)",
+        }}
+      >
         <FilterBar
           pending={pendingFilters}
           onChange={handleFilterChange}
@@ -1050,21 +1026,20 @@ export default function DashboardPage() {
           eventTypeOptions={eventTypeOptions}
           loading={loading}
         />
+      </Card>
 
-        {/* ── Content ─────────────────────────────────────────────────────── */}
-        {loading ? (
-          <Stack alignItems="center" justifyContent="center" sx={{ py: 14 }}>
+      {/* ── Content ─────────────────────────────────────────────────────── */}
+      {loading ? (
+        <Card sx={{ p: { xs: 3, md: 5 }, borderRadius: 3, display: "grid", placeItems: "center" }}>
+          <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
             <CircularProgress size={46} />
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
               Loading dashboard…
             </Typography>
           </Stack>
-        ) : (
-          <>
-            {/* ════════════════════ CHARTS TAB ════════════════════ */}
-            {activeTab === 0 && (
-              <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                <Stack spacing={3}>
+        </Card>
+      ) : (
+        <Stack spacing={3}>
 
                   {/* ① Top Summary Metric Cards (4 Cards Grid, Total Collections hidden for Member) */}
                   <Grid container spacing={2}>
@@ -1105,8 +1080,6 @@ export default function DashboardPage() {
                         label="TOTAL EVENTS"
                         value={events.length}
                         helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
-                        onClick={() => navigate("/events")}
-                        actionText="View Events →"
                       />
                     </Grid>
                   </Grid>
@@ -1384,18 +1357,11 @@ export default function DashboardPage() {
                       </Typography>
                     </Box>
                   )}
-                </Stack>
-              </CardContent>
-            )}
-
-            {/* ════════════════════ DASHBOARD TAB ════════════════════ */}
-            {activeTab === 1 && (
-              <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                <CollapsibleSection
-                  title="Events for Selected Period"
-                  count={events.length}
-                  defaultOpen
-                >
+                  <CollapsibleSection
+                    title="Events for Selected Period"
+                    count={events.length}
+                    defaultOpen
+                  >
                   <Stack spacing={2}>
                     <Grid container spacing={2} sx={{ mb: 1 }}>
                       <Grid size={{ xs: 12, sm: 4 }}>
@@ -1530,11 +1496,8 @@ export default function DashboardPage() {
                     <AppDataTable columns={columns} data={filteredEvents} loading={false} />
                   </Stack>
                 </CollapsibleSection>
-              </CardContent>
+              </Stack>
             )}
-          </>
-        )}
-      </Card>
 
       {/* Quick Access Slide-Over Drawer */}
       <Drawer

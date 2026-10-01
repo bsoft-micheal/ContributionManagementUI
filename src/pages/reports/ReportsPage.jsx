@@ -1,16 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
-  Grid,
-  Stack,
-  Typography,
+  Box, Card, CardContent, Chip, CircularProgress, Grid, Stack, Typography,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
+  Paper, IconButton, TextField, InputAdornment, Avatar, LinearProgress,
+  Tooltip, ButtonBase, Divider,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, alpha } from "@mui/material/styles";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
 import apiClient from "../../services/apiClient";
@@ -20,821 +17,1361 @@ import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppPieChart from "../../components/common/AppPieChart";
 import { useAppToast } from "../../components/common/AppToast";
-import { PieChart as PieChartIcon, BarChart as BarChartIcon, FilterList as FilterListIcon } from "@mui/icons-material";
+import {
+  PieChart as PieChartIcon,
+  BarChart as BarChartIcon,
+  FilterList as FilterListIcon,
+  TrendingUp,
+  AccountBalanceWallet,
+  HourglassEmpty,
+  CheckCircle,
+  People,
+  Event as EventIcon,
+  Warning,
+  Close as CloseIcon,
+  ReceiptLong as ReceiptLongIcon,
+  Search as SearchIcon,
+  FileDownload as FileDownloadIcon,
+  RestartAlt as RestartAltIcon,
+  Assessment as AssessmentIcon,
+} from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
-import useAccessByLocation from "../../hooks/useAccessByLocation";
-import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
+import { hasActionPermission } from "../../utils/rightsHelper";
 
+/* ─── Horizontal Bar Chart ─── */
 function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const maxValue = Math.max(...items.map((item) => Number(item[valueKey]) || 0), 1);
-
   return (
-    <Stack spacing={1.5}>
-      {items.map((item) => {
+    <Stack spacing={1.5} sx={{ py: 1 }}>
+      {items.map((item, idx) => {
         const value = Number(item[valueKey]) || 0;
-        const width = `${Math.max(8, (value / maxValue) * 100)}%`;
-
+        const pct = Math.max(4, Math.min(100, (value / maxValue) * 100));
         return (
           <Box
-            key={item[labelKey]}
+            key={item[labelKey] + idx}
             sx={{
               display: "grid",
-              gridTemplateColumns: "140px 1fr 100px",
+              gridTemplateColumns: { xs: "110px 1fr 90px", sm: "160px 1fr 100px" },
               alignItems: "center",
               gap: 2,
+              p: 0.75,
+              borderRadius: "8px",
+              transition: "background 0.2s",
               "&:hover": {
+                bgcolor: isDark ? "rgba(255,255,255,0.03)" : "rgba(124,58,237,0.04)",
                 "& .bar-fill": { filter: "brightness(1.15)" },
-                "& .bar-label": { color: "primary.main" }
-              }
+              },
             }}
           >
-            <Typography
-              className="bar-label"
-              variant="body2"
-              fontWeight={700}
-              sx={{ fontSize: "0.82rem", transition: "color 0.2s ease", color: "text.primary" }}
-              noWrap
-            >
+            <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.82rem", color: "text.primary" }} noWrap>
               {item[labelKey]}
             </Typography>
-            <Box
-              sx={{
-                height: 10,
-                borderRadius: 999,
-                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.05)",
-                overflow: "hidden",
-                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.03)" : "none"
-              }}
-            >
+            <Box sx={{ height: 10, borderRadius: 999, bgcolor: isDark ? "rgba(255,255,255,0.07)" : "rgba(124,58,237,0.08)", overflow: "hidden" }}>
               <Box
                 className="bar-fill"
                 sx={{
                   height: "100%",
-                  width,
+                  width: `${pct}%`,
                   borderRadius: 999,
-                  background: theme.palette.mode === "dark"
-                    ? "linear-gradient(90deg, #a78bfa 0%, #818cf8 100%)"
-                    : "linear-gradient(90deg, #7c3aed 0%, #4f46e5 100%)",
-                  transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease",
+                  background: "linear-gradient(90deg, #7c3aed 0%, #3b82f6 100%)",
+                  transition: "width 0.6s cubic-bezier(0.4,0,0.2,1), filter 0.2s",
                 }}
               />
             </Box>
-            <Typography
-              variant="subtitle2"
-              fontWeight={800}
-              color="text.primary"
-              sx={{ minWidth: 84, textAlign: "right", fontFamily: '"Outfit", sans-serif', fontSize: "0.85rem" }}
-            >
+            <Typography variant="body2" fontWeight={800} sx={{ textAlign: "right", fontFamily: '"Outfit", sans-serif', fontSize: "0.85rem", fontVariantNumeric: "tabular-nums" }}>
               {"\u20B9"}{value.toLocaleString()}
             </Typography>
           </Box>
         );
       })}
-
       {items.length === 0 && (
-        <Box sx={{ py: 3, textAlign: "center" }}>
-          <Typography variant="body2" color="text.secondary">
-            No chart data available.
-          </Typography>
+        <Box sx={{ py: 6, textAlign: "center" }}>
+          <Typography variant="body2" color="text.secondary">No chart data available for this metric.</Typography>
         </Box>
       )}
     </Stack>
   );
 }
 
-function SummaryChip({ label, value, color = "primary" }) {
+/* ─── Premium KPI Stat Card ─── */
+function StatCard({ label, value, icon: Icon, color = "primary", subLabel, helper }) {
   const theme = useTheme();
-  
-  const colorsMap = {
+  const isDark = theme.palette.mode === "dark";
+  const colorMap = {
     primary: {
-      bg: theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.12)" : "rgba(124, 58, 237, 0.06)",
-      border: theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.25)" : "rgba(124, 58, 237, 0.15)",
-      text: theme.palette.mode === "dark" ? "#a78bfa" : "#6d28d9",
+      accent: "#7c3aed",
+      gradient: "linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(99, 102, 241, 0.04) 100%)",
+      glow: "rgba(124, 58, 237, 0.25)",
+      badgeBg: isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)",
+      text: isDark ? "#c4b5fd" : "#6d28d9",
+    },
+    info: {
+      accent: "#3b82f6",
+      gradient: "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(14, 165, 233, 0.04) 100%)",
+      glow: "rgba(59, 130, 246, 0.25)",
+      badgeBg: isDark ? "rgba(59, 130, 246, 0.2)" : "rgba(59, 130, 246, 0.1)",
+      text: isDark ? "#93c5fd" : "#1d4ed8",
     },
     success: {
-      bg: theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.12)" : "rgba(22, 163, 74, 0.06)",
-      border: theme.palette.mode === "dark" ? "rgba(22, 163, 74, 0.25)" : "rgba(22, 163, 74, 0.15)",
-      text: theme.palette.mode === "dark" ? "#4ade80" : "#15803d",
+      accent: "#10b981",
+      gradient: "linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.04) 100%)",
+      glow: "rgba(16, 185, 129, 0.25)",
+      badgeBg: isDark ? "rgba(16, 185, 129, 0.2)" : "rgba(16, 185, 129, 0.1)",
+      text: isDark ? "#6ee7b7" : "#047857",
     },
     error: {
-      bg: theme.palette.mode === "dark" ? "rgba(220, 38, 38, 0.12)" : "rgba(220, 38, 38, 0.06)",
-      border: theme.palette.mode === "dark" ? "rgba(220, 38, 38, 0.25)" : "rgba(220, 38, 38, 0.15)",
-      text: theme.palette.mode === "dark" ? "#f87171" : "#b91c1c",
+      accent: "#ef4444",
+      gradient: "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.04) 100%)",
+      glow: "rgba(239, 68, 68, 0.25)",
+      badgeBg: isDark ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
+      text: isDark ? "#fca5a5" : "#b91c1c",
     },
     warning: {
-      bg: theme.palette.mode === "dark" ? "rgba(217, 119, 6, 0.12)" : "rgba(217, 119, 6, 0.06)",
-      border: theme.palette.mode === "dark" ? "rgba(217, 119, 6, 0.25)" : "rgba(217, 119, 6, 0.15)",
-      text: theme.palette.mode === "dark" ? "#fbbf24" : "#d97706",
-    }
+      accent: "#f59e0b",
+      gradient: "linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.04) 100%)",
+      glow: "rgba(245, 158, 11, 0.25)",
+      badgeBg: isDark ? "rgba(245, 158, 11, 0.2)" : "rgba(245, 158, 11, 0.1)",
+      text: isDark ? "#fcd34d" : "#b45309",
+    },
   };
-
-  const style = colorsMap[color] || colorsMap.primary;
+  const c = colorMap[color] || colorMap.primary;
 
   return (
-    <Chip
-      label={
-        <span>
-          {label}: <strong style={{ marginLeft: "4px" }}>{value}</strong>
-        </span>
-      }
+    <Card
       sx={{
-        fontWeight: 600,
-        fontSize: "0.78rem",
-        bgcolor: style.bg,
-        borderColor: style.border,
-        color: style.text,
-        borderWidth: "1.5px",
-        px: 0.5,
-        height: 28,
-        borderRadius: "8px",
-        "& .MuiChip-label": { px: 1 }
+        height: "100%",
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: "14px",
+        bgcolor: isDark ? "rgba(255, 255, 255, 0.02)" : "#ffffff",
+        background: isDark ? undefined : c.gradient,
+        border: "1px solid",
+        borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
+        boxShadow: isDark
+          ? "0 4px 20px -2px rgba(0,0,0,0.4)"
+          : "0 4px 16px -2px rgba(0,0,0,0.04)",
+        transition: "transform 0.22s ease, box-shadow 0.22s ease",
+        "&:hover": {
+          transform: "translateY(-3px)",
+          boxShadow: isDark
+            ? `0 12px 28px -4px rgba(0,0,0,0.6), 0 0 0 1px ${c.glow}`
+            : `0 12px 24px -4px ${c.glow}, 0 0 0 1px ${c.accent}`,
+        },
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 3,
+          background: `linear-gradient(90deg, ${c.accent} 0%, transparent 100%)`,
+        },
       }}
-      variant="outlined"
-    />
+    >
+      <CardContent sx={{ p: "18px 20px !important" }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 700,
+                color: "text.secondary",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                fontSize: "0.68rem",
+                display: "block",
+              }}
+            >
+              {label}
+            </Typography>
+            <Typography
+              variant="h4"
+              sx={{
+                fontFamily: '"Outfit", sans-serif',
+                fontWeight: 800,
+                color: c.text,
+                mt: 0.6,
+                fontSize: { xs: "1.45rem", sm: "1.65rem" },
+                lineHeight: 1.1,
+                letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
+              }}
+              noWrap
+            >
+              {value}
+            </Typography>
+            {(subLabel || helper) && (
+              <Typography
+                variant="caption"
+                sx={{
+                  display: "block",
+                  color: "text.secondary",
+                  fontSize: "0.72rem",
+                  mt: 0.5,
+                  fontWeight: 500,
+                }}
+              >
+                {subLabel || helper}
+              </Typography>
+            )}
+          </Box>
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: "12px",
+              bgcolor: c.badgeBg,
+              color: c.accent,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              boxShadow: `0 2px 8px ${c.glow}`,
+            }}
+          >
+            <Icon sx={{ fontSize: 22 }} />
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
   );
 }
 
+/* ─── Modern Segmented Nav Tab ─── */
+function SegmentedTab({ label, icon: Icon, isActive, onClick }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <ButtonBase
+      onClick={onClick}
+      sx={{
+        px: 2,
+        height: 34,
+        borderRadius: "8px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 0.8,
+        fontSize: "0.82rem",
+        fontWeight: isActive ? 700 : 600,
+        color: isActive ? "#ffffff" : "text.secondary",
+        bgcolor: isActive
+          ? theme.palette.primary.main
+          : "transparent",
+        boxShadow: isActive
+          ? "0 2px 8px rgba(124, 58, 237, 0.35)"
+          : "none",
+        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+        "&:hover": {
+          color: isActive ? "#ffffff" : "text.primary",
+          bgcolor: isActive
+            ? theme.palette.primary.main
+            : isDark
+            ? "rgba(255, 255, 255, 0.06)"
+            : "rgba(124, 58, 237, 0.08)",
+        },
+      }}
+    >
+      {Icon && <Icon sx={{ fontSize: 17 }} />}
+      {label}
+    </ButtonBase>
+  );
+}
+
+/* ═══════════════════════ MAIN PAGE ═══════════════════════ */
 export default function ReportsPage({ mode = "event" }) {
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const navigate = useNavigate();
   const { authState } = useAuth();
-  const { canEdit } = useAccessByLocation();
-  const canExportReports = hasActionPermission("Export Reports", 82, authState?.role).canExecute;
-  const hasWriteAccess = canExportReports && canEdit;
-
+  const canExport = hasActionPermission("Export Reports", 60, authState?.role).canView !== false;
   const toast = useAppToast();
-  const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  const [report, setReport]       = useState(null);
+  const [loading, setLoading]     = useState(true);
   const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
-  const [filterYear, setFilterYear] = useState(dayjs().year());
-  const [filters, setFilters] = useState({ month: dayjs().month() + 1, year: dayjs().year() });
+  const [filterYear, setFilterYear]   = useState(dayjs().year());
+  const [filters, setFilters]     = useState({ month: dayjs().month() + 1, year: dayjs().year() });
   const [chartType, setChartType] = useState("pie");
-  const [metric, setMetric] = useState("paid");
+  const [metric, setMetric]       = useState("paid");
+
+  /* Modal state for member event breakdown */
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [dialogFilter, setDialogFilter]     = useState("all");
+  const [dialogSearch, setDialogSearch]     = useState("");
+  const [memberContributions, setMemberContributions] = useState([]);
+  const [modalLoading, setModalLoading]     = useState(false);
+
+  const openBreakdownModal = async (member, filter = "all") => {
+    setSelectedMember(member);
+    setDialogFilter(filter);
+    setDialogSearch("");
+
+    // If member already has events from backend reports summary:
+    if (member.events && member.events.length > 0) {
+      setMemberContributions(member.events);
+      return;
+    }
+
+    // Fallback: Fetch all contributions and filter by member
+    setModalLoading(true);
+    try {
+      const { data: res } = await apiClient.get("/contributions/getAllContributionAsync");
+      const allContribs = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      const memberEventsList = allContribs
+        .filter((c) => {
+          const cMemberId = c.memberId || c.userId || c.MemberId || c.UserId;
+          const cMemberName = c.memberName || c.MemberName;
+          return cMemberId === member.memberId || (cMemberName && cMemberName.trim().toLowerCase() === member.memberName?.trim().toLowerCase());
+        })
+        .map((c) => {
+          const isPaid = c.paymentStatus === 1 || c.paymentStatus === "Paid" || Boolean(c.paymentDate);
+          return {
+            contributionId: c.contributionId || c.ContributionId,
+            eventId: c.eventId || c.EventId,
+            eventName: c.eventName || c.EventName || "Event",
+            categoryName: c.categoryName || c.CategoryName || "General",
+            eventDate: c.paymentDate || c.createdAt || c.createdOn || c.CreatedOn,
+            expectedAmount: c.amount || c.Amount || 0,
+            paidAmount: isPaid ? (c.amount || c.Amount || 0) : 0,
+            pendingAmount: isPaid ? 0 : (c.amount || c.Amount || 0),
+            paymentStatus: isPaid ? "Paid" : "Pending",
+            paymentDate: c.paymentDate || c.PaymentDate,
+            paymentMode: c.paymentMode === 1 ? "Cash" : (c.paymentMode === 2 ? "UPI" : (c.paymentMode === 3 ? "Split" : (c.paymentMode || "—"))),
+          };
+        });
+      setMemberContributions(memberEventsList);
+    } catch {
+      const pDues = (report?.pendingDues || [])
+        .filter((d) => (d.memberId || d.MemberId) === member.memberId)
+        .map((d) => ({
+          contributionId: d.contributionId || d.ContributionId,
+          eventName: d.eventName || d.EventName,
+          categoryName: "Contribution",
+          eventDate: d.eventDate || d.EventDate,
+          expectedAmount: d.amount || d.Amount,
+          paidAmount: 0,
+          pendingAmount: d.amount || d.Amount,
+          paymentStatus: "Pending",
+          paymentMode: null,
+          paymentDate: null,
+        }));
+      setMemberContributions(pDues);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const memberEvents = useMemo(() => {
+    let list = memberContributions || [];
+    if (dialogFilter === "paid") {
+      list = list.filter((e) => (e.paymentStatus || "").toLowerCase() === "paid");
+    } else if (dialogFilter === "pending") {
+      list = list.filter((e) => (e.paymentStatus || "").toLowerCase() !== "paid");
+    }
+    if (dialogSearch.trim()) {
+      const q = dialogSearch.toLowerCase();
+      list = list.filter((e) =>
+        (e.eventName || "").toLowerCase().includes(q) ||
+        (e.categoryName || "").toLowerCase().includes(q) ||
+        (e.paymentMode || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [memberContributions, dialogFilter, dialogSearch]);
+
+  const handleExportMemberEvents = () => {
+    if (!selectedMember) return;
+    try {
+      const sheetData = memberEvents.map((e) => ({
+        "Member": selectedMember.memberName,
+        "Event Name": e.eventName,
+        "Category": e.categoryName || "General",
+        "Event Date": formatGridDate(e.eventDate || e.EventDate),
+        "Expected Amount": e.expectedAmount ?? e.amount,
+        "Paid Amount": e.paidAmount ?? 0,
+        "Pending Amount": e.pendingAmount ?? 0,
+        "Status": e.paymentStatus,
+        "Payment Mode": e.paymentMode || "—",
+        "Payment Date": e.paymentDate ? formatGridDate(e.paymentDate) : "—",
+      }));
+      exportSheets(`${selectedMember.memberName.replace(/\s+/g, "_")}_events.xlsx`, [
+        { name: "Events", data: sheetData },
+      ]);
+      toast.success("Member events exported successfully!");
+    } catch {
+      toast.error("Failed to export events.");
+    }
+  };
 
   useEffect(() => {
-    async function loadReports() {
+    async function load() {
       setLoading(true);
       try {
-        const apiParams = {
-          month: filters.month === 0 ? null : filters.month,
-          year: filters.year === 0 ? null : filters.year,
-        };
-        const { data: resData } = await apiClient.get("/reports/getSummaryReportAsync", { params: apiParams });
-        const data = (resData && resData.data !== undefined) ? resData.data : resData;
-        setReport(data);
-      } catch (err) {
+        const params = { month: filters.month === 0 ? null : filters.month, year: filters.year === 0 ? null : filters.year };
+        const { data: res } = await apiClient.get("/reports/getSummaryReportAsync", { params });
+        setReport(res?.data !== undefined ? res.data : res);
+      } catch {
         toast.error("Failed to load reports. Please try again.");
       } finally {
         setLoading(false);
       }
     }
-
-    loadReports();
+    load();
   }, [filters]);
 
+  /* Options */
   const monthOptions = [
     { label: "All Months", value: 0 },
-    ...Array.from({ length: 12 }, (_, i) => ({
-      label: dayjs().month(i).format("MMMM"),
-      value: i + 1,
-    }))
+    ...Array.from({ length: 12 }, (_, i) => ({ label: dayjs().month(i).format("MMMM"), value: i + 1 })),
   ];
-
-  const currentYear = dayjs().year();
+  const yr = dayjs().year();
   const yearOptions = [
     { label: "All Years", value: 0 },
-    ...Array.from({ length: 11 }, (_, i) => {
-      const y = currentYear - 5 + i;
-      return { label: String(y), value: y };
-    })
+    ...Array.from({ length: 11 }, (_, i) => { const y = yr - 5 + i; return { label: String(y), value: y }; }),
   ];
 
-  // 1. Event Collections Columns
+  /* Rupee formatter */
+  const INR = (n) => "\u20B9" + Number(n || 0).toLocaleString();
+
+  /* ── Column Definitions ── */
   const eventColumns = [
-    { label: "Event", key: "eventName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.eventName}</Typography> },
-    { label: "Type", key: "eventTypeName", render: (row) => <Typography variant="body2" color="text.secondary">{row.eventTypeName || "General"}</Typography> },
-    { label: "Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
-    { label: "Expected", key: "expectedAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800}>{"\u20B9"}{Number(row.expectedAmount).toLocaleString()}</Typography> },
-    { label: "Paid", key: "paidAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="success.main">{"\u20B9"}{Number(row.paidAmount).toLocaleString()}</Typography> },
-    { label: "Pending", key: "pendingAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="error.main">{"\u20B9"}{Number(row.pendingAmount).toLocaleString()}</Typography> },
-    {
-      label: "Rate",
-      key: "collectionRate",
-      align: "center",
-      render: (row) => {
-        const rate = row.collectionRate ?? (row.expectedAmount > 0 ? Math.round((row.paidAmount / row.expectedAmount) * 100) : 0);
-        return (
-          <Chip
-            size="small"
-            label={`${rate}%`}
-            color={rate >= 100 ? "success" : rate >= 50 ? "primary" : "warning"}
-            sx={{ fontWeight: 700, fontSize: "0.72rem", height: 22 }}
-          />
-        );
-      }
-    },
-    {
-      label: "Created By",
-      key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
-    },
-    {
-      label: "Created On",
-      key: "createdAt",
-      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
-    },
+    { label: "Event", key: "eventName", render: (r) => <Typography variant="body2" fontWeight={700}>{r.eventName}</Typography> },
+    { label: "Type",  key: "eventTypeName", render: (r) => <Typography variant="body2" color="text.secondary">{r.eventTypeName || "General"}</Typography> },
+    { label: "Date",  key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
+    { label: "Expected", key: "expectedAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700}>{INR(r.expectedAmount)}</Typography> },
+    { label: "Paid",     key: "paidAmount",     align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="success.main">{INR(r.paidAmount)}</Typography> },
+    { label: "Pending",  key: "pendingAmount",  align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR(r.pendingAmount)}</Typography> },
   ];
 
-  // 2. Member Contributions Columns
   const memberColumns = [
-    { label: "Member", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
-    { label: "Expected", key: "totalExpectedAmount", align: "right", render: (row) => `\u20B9${Number(row.totalExpectedAmount).toLocaleString()}` },
-    { label: "Paid", key: "totalPaidAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="success.main">{"\u20B9"}{Number(row.totalPaidAmount).toLocaleString()}</Typography> },
-    { label: "Pending", key: "totalPendingAmount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="error.main">{"\u20B9"}{(row.totalExpectedAmount - row.totalPaidAmount).toLocaleString()}</Typography> },
-    { label: "Paid Events", key: "paidEventsCount", align: "center", render: (row) => <Typography variant="body2" fontWeight={600}>{row.paidEventsCount}</Typography> },
-    { label: "Pending Events", key: "pendingEventsCount", align: "center", render: (row) => <Typography variant="body2" fontWeight={600} color={row.pendingEventsCount > 0 ? "error.main" : "text.secondary"}>{row.pendingEventsCount}</Typography> },
     {
-      label: "Status",
-      key: "completionRate",
+      label: "Member",
+      key: "memberName",
+      render: (r) => (
+        <Typography
+          variant="body2"
+          fontWeight={700}
+          sx={{ cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }}
+          onClick={() => openBreakdownModal(r, "all")}
+        >
+          {r.memberName}
+        </Typography>
+      ),
+    },
+    { label: "Expected",      key: "totalExpectedAmount", align: "right", render: (r) => INR(r.totalExpectedAmount) },
+    { label: "Paid",          key: "totalPaidAmount",     align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="success.main">{INR(r.totalPaidAmount)}</Typography> },
+    { label: "Pending",       key: "totalPendingAmount",  align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0))}</Typography> },
+    {
+      label: "Paid Events",
+      key: "paidEventsCount",
       align: "center",
-      render: (row) => {
-        const rate = row.totalExpectedAmount > 0 ? Math.round((row.totalPaidAmount / row.totalExpectedAmount) * 100) : 0;
-        return (
-          <Chip
-            size="small"
-            label={rate >= 100 ? "All Paid" : `${rate}% Paid`}
-            color={rate >= 100 ? "success" : "warning"}
-            variant={rate >= 100 ? "filled" : "outlined"}
-            sx={{ fontWeight: 700, fontSize: "0.72rem", height: 22 }}
-          />
-        );
-      }
+      render: (r) => (
+        <Chip
+          size="small"
+          label={r.paidEventsCount}
+          color={r.paidEventsCount > 0 ? "success" : "default"}
+          variant={r.paidEventsCount > 0 ? "filled" : "outlined"}
+          onClick={() => openBreakdownModal(r, "paid")}
+          sx={{ fontWeight: 700, fontSize: "0.75rem", cursor: "pointer", minWidth: 36, height: 24 }}
+        />
+      ),
     },
     {
-      label: "Created By",
-      key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
+      label: "Pending Events",
+      key: "pendingEventsCount",
+      align: "center",
+      render: (r) => (
+        <Chip
+          size="small"
+          label={r.pendingEventsCount}
+          color={r.pendingEventsCount > 0 ? "error" : "default"}
+          variant={r.pendingEventsCount > 0 ? "filled" : "outlined"}
+          onClick={() => openBreakdownModal(r, "pending")}
+          sx={{ fontWeight: 700, fontSize: "0.75rem", cursor: "pointer", minWidth: 36, height: 24 }}
+        />
+      ),
     },
     {
-      label: "Created On",
-      key: "createdAt",
-      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
+      label: "Action",
+      key: "action",
+      align: "center",
+      render: (r) => (
+        <AppButton
+          size="small"
+          variant="outlined"
+          startIcon={<ReceiptLongIcon sx={{ fontSize: 16 }} />}
+          onClick={() => openBreakdownModal(r, "all")}
+          sx={{ fontSize: "0.72rem", py: 0.3, px: 1.2, height: 28, textTransform: "none", fontWeight: 700 }}
+        >
+          View Events
+        </AppButton>
+      ),
     },
   ];
 
-  // 3. Pending Dues Columns
   const pendingColumns = [
-    { label: "Member Name", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
-    { label: "Phone", key: "phone", render: (row) => <Typography variant="body2" color="text.secondary">{row.phone || "—"}</Typography> },
-    { label: "Event Name", key: "eventName", render: (row) => <Typography variant="body2" fontWeight={600}>{row.eventName}</Typography> },
-    { label: "Event Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
-    { label: "Pending Due", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={800} color="error.main">{"\u20B9"}{Number(row.amount).toLocaleString()}</Typography> },
+    { label: "Member",     key: "memberName", render: (r) => <Typography variant="body2" fontWeight={700}>{r.memberName}</Typography> },
+    { label: "Phone",      key: "phone",      render: (r) => <Typography variant="body2" color="text.secondary">{r.phone || "\u2014"}</Typography> },
+    { label: "Event",      key: "eventName",  render: (r) => <Typography variant="body2" fontWeight={600}>{r.eventName}</Typography> },
+    { label: "Event Date", key: "eventDate",  render: (r) => formatGridDate(r.eventDate) },
+    { label: "Due Amount", key: "amount",     align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR(r.amount)}</Typography> },
     {
-      label: "Aging Category",
-      key: "agingCategory",
-      align: "center",
-      render: (row) => {
-        const category = row.agingCategory || (row.daysOverdue > 30 ? "Critical (> 30d)" : row.daysOverdue >= 15 ? "Moderate (15-30d)" : "Recent (< 15d)");
-        const isCritical = category.includes("Critical");
-        const isModerate = category.includes("Moderate");
-        return (
-          <Chip
-            size="small"
-            label={category}
-            color={isCritical ? "error" : isModerate ? "warning" : "info"}
-            sx={{ fontWeight: 700, fontSize: "0.72rem", height: 22 }}
-          />
-        );
-      }
-    },
-    {
-      label: "Created By",
-      key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
-    },
-    {
-      label: "Created On",
-      key: "createdAt",
-      render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
+      label: "Aging", key: "agingCategory", align: "center",
+      render: (r) => {
+        const cat = r.agingCategory || (r.daysOverdue > 30 ? "Critical" : r.daysOverdue >= 15 ? "Moderate" : "Recent");
+        return <Chip size="small" label={cat} color={cat === "Critical" ? "error" : cat === "Moderate" ? "warning" : "info"} sx={{ fontWeight: 700, fontSize: "0.72rem", height: 22 }} />;
+      },
     },
   ];
 
-  // Chart Data calculation per mode
+  /* ── Chart Data ── */
   const chartData = useMemo(() => {
     if (mode === "member") {
-      return (report?.memberContributionHistory ?? [])
-        .map((item) => {
-          const val =
-            metric === "paid"
-              ? Number(item.totalPaidAmount) || 0
-              : metric === "pending"
-              ? Math.max(0, (Number(item.totalExpectedAmount) || 0) - (Number(item.totalPaidAmount) || 0))
-              : Number(item.totalExpectedAmount) || 0;
-          return { label: item.memberName, value: val };
-        })
-        .filter((item) => item.value > 0);
+      return (report?.memberContributionHistory ?? []).map((item) => {
+        const val = metric === "paid"
+          ? Number(item.totalPaidAmount) || 0
+          : metric === "pending"
+          ? Math.max(0, (Number(item.totalExpectedAmount) || 0) - (Number(item.totalPaidAmount) || 0))
+          : Number(item.totalExpectedAmount) || 0;
+        return { label: item.memberName, value: val };
+      }).filter((i) => i.value > 0);
     }
-
     if (mode === "pending") {
-      if (metric === "member") {
-        // Group pending dues by member
-        const map = {};
-        (report?.pendingDues ?? []).forEach(d => {
-          map[d.memberName] = (map[d.memberName] || 0) + Number(d.amount);
-        });
-        return Object.entries(map).map(([k, v]) => ({ label: k, value: v }));
-      }
-      // Group pending dues by event
       const map = {};
-      (report?.pendingDues ?? []).forEach(d => {
-        map[d.eventName] = (map[d.eventName] || 0) + Number(d.amount);
+      (report?.pendingDues ?? []).forEach((d) => {
+        const key = metric === "member" ? d.memberName : d.eventName;
+        map[key] = (map[key] || 0) + Number(d.amount);
       });
       return Object.entries(map).map(([k, v]) => ({ label: k, value: v }));
     }
-
-    // Default: Event Collections
-    return (report?.eventCollections ?? [])
-      .map((item) => {
-        const val =
-          metric === "paid"
-            ? Number(item.paidAmount) || 0
-            : metric === "pending"
-            ? Number(item.pendingAmount) || 0
-            : Number(item.expectedAmount) || 0;
-        return { label: item.eventName, value: val };
-      })
-      .filter((item) => item.value > 0);
+    return (report?.eventCollections ?? []).map((item) => {
+      const val = metric === "paid" ? Number(item.paidAmount) || 0 : metric === "pending" ? Number(item.pendingAmount) || 0 : Number(item.expectedAmount) || 0;
+      return { label: item.eventName, value: val };
+    }).filter((i) => i.value > 0);
   }, [mode, report, metric]);
 
-  const pageTitle = {
-    event: "Event Collections",
-    member: "Member Contributions",
-    pending: "Pending Dues & Defaulters",
-  }[mode] || "Event Collections";
+  /* ── KPI Cards & Efficiency Metrics ── */
+  const efficiencyMetrics = useMemo(() => {
+    let exp = 0;
+    let paid = 0;
+    let count = 0;
+    if (mode === "member") {
+      const mb = report?.memberContributionHistory ?? [];
+      count = mb.length;
+      exp = mb.reduce((s, m) => s + Number(m.totalExpectedAmount || 0), 0);
+      paid = mb.reduce((s, m) => s + Number(m.totalPaidAmount || 0), 0);
+    } else {
+      const ev = report?.eventCollections ?? [];
+      count = ev.length;
+      exp = ev.reduce((s, e) => s + Number(e.expectedAmount || 0), 0);
+      paid = ev.reduce((s, e) => s + Number(e.paidAmount || 0), 0);
+    }
+    const pend = Math.max(0, exp - paid);
+    const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 1000) / 10) : 0;
+    return { expected: exp, paid, pending: pend, rate, count };
+  }, [mode, report]);
 
-  const exportCurrentView = () => {
-    if (!hasWriteAccess) return;
+  const kpiCards = useMemo(() => {
+    if (mode === "event") {
+      const ev = report?.eventCollections ?? [];
+      const exp  = ev.reduce((s, e) => s + Number(e.expectedAmount || 0), 0);
+      const paid = ev.reduce((s, e) => s + Number(e.paidAmount || 0), 0);
+      const pend = ev.reduce((s, e) => s + Number(e.pendingAmount || 0), 0);
+      const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
+      return [
+        { label: "Total Events",    value: ev.length, icon: EventIcon,           color: "primary", helper: `${ev.length} active collection events` },
+        { label: "Total Expected",  value: INR(exp),  icon: AccountBalanceWallet, color: "info",    helper: "Projected target collections" },
+        { label: "Total Collected", value: INR(paid), icon: CheckCircle,          color: "success", helper: `${rate}% completion rate` },
+        { label: "Total Pending",   value: INR(pend), icon: HourglassEmpty,       color: "error",   helper: `${Math.max(0, 100 - rate)}% outstanding dues` },
+      ];
+    }
+    if (mode === "member") {
+      const mb = report?.memberContributionHistory ?? [];
+      const exp  = mb.reduce((s, m) => s + Number(m.totalExpectedAmount || 0), 0);
+      const paid = mb.reduce((s, m) => s + Number(m.totalPaidAmount || 0), 0);
+      const pend = exp - paid;
+      const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
+      return [
+        { label: "Total Members",  value: mb.length,  icon: People,              color: "primary", helper: `${mb.length} contributing members` },
+        { label: "Total Expected", value: INR(exp),   icon: AccountBalanceWallet, color: "info",    helper: "Total expected member dues" },
+        { label: "Total Collected",value: INR(paid),  icon: CheckCircle,         color: "success", helper: `${rate}% dues cleared` },
+        { label: "Total Pending",  value: INR(pend),  icon: HourglassEmpty,       color: "error",   helper: `${Math.max(0, 100 - rate)}% remaining dues` },
+      ];
+    }
+    if (mode === "pending") {
+      const du    = report?.pendingDues ?? [];
+      const total = du.reduce((s, d) => s + Number(d.amount || 0), 0);
+      const uniq  = new Set(du.map((d) => d.memberId)).size;
+      const crit  = du.filter((d) => d.daysOverdue > 30).length;
+      const mod   = du.filter((d) => d.daysOverdue >= 15 && d.daysOverdue <= 30).length;
+      return [
+        { label: "Total Pending Dues",    value: INR(total), icon: AccountBalanceWallet, color: "error",   helper: "Total uncollected amount" },
+        { label: "Pending Records",       value: du.length,  icon: Warning,             color: "warning", helper: "Unpaid line items" },
+        { label: "Unique Defaulters",     value: uniq,       icon: People,              color: "error",   helper: "Members with overdue payments" },
+        { label: "Critical (>30 days)",   value: crit,       icon: HourglassEmpty,      color: "error",   helper: "Over 30 days overdue" },
+        { label: "Moderate (15-30 days)", value: mod,        icon: TrendingUp,          color: "warning", helper: "15 to 30 days overdue" },
+      ];
+    }
+    return [];
+  }, [mode, report]);
 
+  const pageTitle = { event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections";
+
+  const metricOptions = mode === "pending"
+    ? [{ label: "By Event", key: "event" }, { label: "By Member", key: "member" }]
+    : [{ label: "Paid", key: "paid" }, { label: "Expected", key: "expected" }, { label: "Pending", key: "pending" }];
+
+  const navTabs = [
+    { label: "Event Collections",   path: "/reports/event-collection-audit", modeKey: "event",  icon: EventIcon },
+    { label: "Member Contributions",path: "/reports/member-velocity",         modeKey: "member", icon: People },
+  ];
+
+  const handleExport = () => {
+    if (!canExport) return;
     try {
       exportSheets("team-contribution-reports.xlsx", [
-        { name: "Event Collections", data: report?.eventCollections ?? [] },
-        { name: "Member Contributions", data: report?.memberContributionHistory ?? [] },
-        { name: "Pending Dues", data: report?.pendingDues ?? [] },
+        { name: "Event Collections",   data: report?.eventCollections ?? [] },
+        { name: "Member Contributions",data: report?.memberContributionHistory ?? [] },
       ]);
-      toast.success("Reports exported to Excel successfully!");
+      toast.success("Reports exported successfully!");
     } catch {
-      toast.error("Failed to export reports to Excel");
+      toast.error("Failed to export reports.");
     }
   };
 
-  const navTabs = [
-    { label: "Event Collections", path: "/reports/event-collection-audit", modeKey: "event" },
-    { label: "Member Contributions", path: "/reports/member-velocity", modeKey: "member" },
-    { label: "Pending Dues", path: "/reports/pending-dues", modeKey: "pending" },
-  ];
+  const periodLabel = filters.month === 0
+    ? `All Months, ${filters.year}`
+    : `${dayjs().month(filters.month - 1).format("MMMM")} ${filters.year}`;
 
   return (
     <div className="page-shell">
-      <Card sx={{ overflow: "hidden" }}>
+      <Card
+        sx={{
+          overflow: "hidden",
+          borderRadius: "16px",
+          border: "1px solid",
+          borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
+          boxShadow: isDark
+            ? "0 4px 24px -2px rgba(0, 0, 0, 0.5)"
+            : "0 4px 20px -2px rgba(0, 0, 0, 0.04)",
+        }}
+      >
+
+        {/* ── Executive Header Banner ── */}
         <Box
           sx={{
-            px: { xs: 2, md: 3 },
-            py: 1.5,
-            background: theme.palette.mode === "dark"
-              ? "linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(79, 70, 229, 0.02) 100%)"
-              : "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(79,70,229,0.10) 100%)",
-            borderBottom: `1px solid ${theme.palette.divider}`,
+            p: { xs: 2, md: 3 },
+            pb: { xs: 2, md: 2.5 },
+            background: isDark
+              ? "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(30, 26, 46, 0.6) 100%)"
+              : "linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(248, 250, 252, 0.95) 100%)",
+            borderBottom: "1px solid " + theme.palette.divider,
           }}
         >
-          <Stack spacing={1.5}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
-              <Box>
-                <Typography fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', color: "text.primary", fontSize: "1.2rem" }}>
-                  {pageTitle}
-                </Typography>
-              </Box>
-              <AppButton
-                size="small"
-                variant="contained"
-                disabled={!hasWriteAccess}
-                onClick={exportCurrentView}
+          {/* Top Row: Title, Period Badge & Export Action */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: { xs: "flex-start", sm: "center" },
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2,
+              mb: 2.5,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: "12px",
+                  background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 4px 14px rgba(124, 58, 237, 0.35)",
+                  flexShrink: 0,
+                }}
               >
-                Export Excel
-              </AppButton>
-            </Box>
-
-            {/* 5-Tab Pill Navigation */}
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", pt: 0.5 }}>
-              {navTabs.map((tab) => {
-                const isActive = mode === tab.modeKey || (!mode && tab.modeKey === "event");
-                return (
-                  <Box
-                    key={tab.path}
-                    onClick={() => navigate(tab.path)}
+                <AssessmentIcon sx={{ fontSize: 24 }} />
+              </Box>
+              <Box>
+                <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                  <Typography
+                    variant="h5"
+                    fontWeight={800}
                     sx={{
-                      px: 1.8,
-                      py: 0.6,
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontSize: "0.82rem",
-                      fontWeight: isActive ? 700 : 600,
-                      bgcolor: isActive ? "primary.main" : theme.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.06)",
-                      color: isActive ? "#ffffff" : "text.secondary",
-                      border: isActive ? "1px solid transparent" : `1px solid ${theme.palette.divider}`,
-                      transition: "all 0.2s ease",
-                      "&:hover": {
-                        bgcolor: isActive ? "primary.dark" : theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(74,63,107,0.12)",
-                        color: isActive ? "#ffffff" : "text.primary",
-                      },
+                      fontFamily: '"Outfit", sans-serif',
+                      color: "text.primary",
+                      lineHeight: 1.2,
                     }}
                   >
-                    {tab.label}
-                  </Box>
-                );
-              })}
+                    {pageTitle}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={periodLabel}
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "0.72rem",
+                      bgcolor: isDark ? "rgba(124,58,237,0.2)" : "rgba(124,58,237,0.1)",
+                      color: "primary.main",
+                      borderRadius: "6px",
+                      height: 22,
+                    }}
+                  />
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.78rem" }}>
+                  Financial overview, velocity audit & collection analytics
+                </Typography>
+              </Box>
             </Box>
 
-            {/* Filter Bar and Summary KPIs */}
-            <Grid container spacing={2} alignItems="center">
-              <Grid size={{ xs: 12, sm: 6, md: 2.2 }}>
+            <AppButton
+              size="small"
+              variant="contained"
+              disabled={!canExport}
+              onClick={handleExport}
+              startIcon={<FileDownloadIcon sx={{ fontSize: 18 }} />}
+              sx={{
+                fontWeight: 700,
+                px: 2,
+                py: 0.8,
+                borderRadius: "8px",
+                boxShadow: "0 4px 14px rgba(124, 58, 237, 0.25)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Export Excel
+            </AppButton>
+          </Box>
+
+          {/* Bottom Row: Unified Glass Toolbar (Navigation Tabs + Inline Filters) */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 2,
+              p: 1.25,
+              borderRadius: "12px",
+              bgcolor: isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.85)",
+              border: "1px solid",
+              borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.06)",
+              backdropFilter: "blur(12px)",
+            }}
+          >
+            {/* Left: Navigation Segmented Track */}
+            <Box
+              sx={{
+                display: "inline-flex",
+                p: "3px",
+                borderRadius: "10px",
+                bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(124, 58, 237, 0.05)",
+                border: "1px solid",
+                borderColor: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(124, 58, 237, 0.1)",
+                gap: 0.5,
+              }}
+            >
+              {navTabs.map((tab) => (
+                <SegmentedTab
+                  key={tab.path}
+                  label={tab.label}
+                  icon={tab.icon}
+                  isActive={mode === tab.modeKey || (!mode && tab.modeKey === "event")}
+                  onClick={() => navigate(tab.path)}
+                />
+              ))}
+            </Box>
+
+            {/* Right: Inline Filter Controls */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "flex-end",
+                flexWrap: "wrap",
+                gap: 1.2,
+              }}
+            >
+              <Box sx={{ width: { xs: "100%", sm: 155 } }}>
                 <AppSelect
                   label="Month"
-                  placeholder="Select Month"
                   value={filterMonth}
-                  onChange={(event) => setFilterMonth(Number(event.target.value))}
+                  onChange={(e) => setFilterMonth(Number(e.target.value))}
                   options={monthOptions}
-                  required
                 />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 1.8 }}>
+              </Box>
+              <Box sx={{ width: { xs: "100%", sm: 120 } }}>
                 <AppSelect
                   label="Year"
-                  placeholder="Select Year"
                   value={filterYear}
-                  onChange={(event) => setFilterYear(Number(event.target.value))}
+                  onChange={(e) => setFilterYear(Number(e.target.value))}
                   options={yearOptions}
-                  required
                 />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }} sx={{ display: "flex", gap: 1.5, alignItems: "center", mt: { xs: 0, md: 2.2 } }}>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <AppButton
                   variant="contained"
                   size="small"
-                  startIcon={<FilterListIcon />}
-                  onClick={() => {
-                    setFilters({ month: filterMonth, year: filterYear });
-                  }}
+                  startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
+                  onClick={() => setFilters({ month: filterMonth, year: filterYear })}
                   sx={{
-                    height: 38,
+                    height: 34,
+                    minHeight: 34,
                     fontWeight: 700,
-                    fontSize: "0.75rem",
                     px: 2,
+                    borderRadius: "8px",
                   }}
                 >
                   Filter
                 </AppButton>
-                <AppButton
-                  variant="outlined"
-                  size="small"
-                  onClick={() => {
-                    const defaultMonth = dayjs().month() + 1;
-                    const defaultYear = dayjs().year();
-                    setFilterMonth(defaultMonth);
-                    setFilterYear(defaultYear);
-                    setFilters({ month: defaultMonth, year: defaultYear });
-                  }}
-                  sx={{
-                    color: "#ef4444",
-                    borderColor: "rgba(239, 68, 68, 0.4)",
-                    height: 38,
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    px: 2,
-                    "&:hover": {
-                      borderColor: "#ef4444",
-                      bgcolor: "rgba(239, 68, 68, 0.05)"
-                    }
-                  }}
-                >
-                  Clear Filter
-                </AppButton>
-              </Grid>
-              <Grid size={{ xs: 12, md: 5 }}>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent={{ xs: "flex-start", md: "flex-end" }} sx={{ mt: { xs: 1, md: 2.5 } }}>
-                  {mode === "event" && (
-                    <>
-                      <SummaryChip label="Expected" value={`₹${Number(report?.eventCollections?.reduce((sum, row) => sum + row.expectedAmount, 0) ?? 0).toLocaleString()}`} />
-                      <SummaryChip label="Paid" value={`₹${Number(report?.eventCollections?.reduce((sum, row) => sum + row.paidAmount, 0) ?? 0).toLocaleString()}`} color="success" />
-                      <SummaryChip label="Pending" value={`₹${Number(report?.eventCollections?.reduce((sum, row) => sum + row.pendingAmount, 0) ?? 0).toLocaleString()}`} color="error" />
-                    </>
-                  )}
-                  {mode === "member" && (
-                    <>
-                      <SummaryChip label="Members" value={report?.memberContributionHistory?.length ?? 0} />
-                      <SummaryChip label="Total Expected" value={`₹${Number(report?.memberContributionHistory?.reduce((sum, row) => sum + row.totalExpectedAmount, 0) ?? 0).toLocaleString()}`} />
-                      <SummaryChip label="Total Paid" value={`₹${Number(report?.memberContributionHistory?.reduce((sum, row) => sum + row.totalPaidAmount, 0) ?? 0).toLocaleString()}`} color="success" />
-                    </>
-                  )}
-                  {mode === "pending" && (
-                    <>
-                      <SummaryChip label="Total Outstanding Dues" value={`₹${Number(report?.pendingDues?.reduce((sum, row) => sum + row.amount, 0) ?? 0).toLocaleString()}`} color="error" />
-                      <SummaryChip label="Pending Records" value={report?.pendingDues?.length ?? 0} color="warning" />
-                      <SummaryChip label="Defaulters" value={new Set(report?.pendingDues?.map(p => p.memberId)).size} color="error" />
-                    </>
-                  )}
-                </Stack>
-              </Grid>
-            </Grid>
-          </Stack>
+                <Tooltip title="Clear filters and reset to current month and year">
+                  <AppButton
+                    variant="outlined"
+                    size="small"
+                    startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
+                    onClick={() => {
+                      const m = dayjs().month() + 1;
+                      const y = dayjs().year();
+                      setFilterMonth(m);
+                      setFilterYear(y);
+                      setFilters({ month: m, year: y });
+                    }}
+                    sx={{
+                      height: 34,
+                      minHeight: 34,
+                      fontWeight: 700,
+                      px: 1.8,
+                      borderRadius: "8px",
+                      color: "#ef4444",
+                      borderColor: "rgba(239, 68, 68, 0.4)",
+                      "&:hover": {
+                        borderColor: "#ef4444",
+                        color: "#ef4444",
+                        bgcolor: "rgba(239, 68, 68, 0.06)",
+                      },
+                    }}
+                  >
+                    Clear
+                  </AppButton>
+                </Tooltip>
+              </Box>
+            </Box>
+          </Box>
         </Box>
 
+        {/* ── Main Content Area ── */}
         <CardContent sx={{ p: { xs: 2, md: 3 } }}>
           {loading ? (
-            <Stack alignItems="center" sx={{ py: 8 }}>
-              <CircularProgress />
+            <Stack alignItems="center" justifyContent="center" sx={{ py: 12 }}>
+              <CircularProgress size={42} thickness={4} />
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontWeight: 600 }}>
+                Loading report analytics...
+              </Typography>
             </Stack>
           ) : (
             <Stack spacing={3}>
+
+              {/* KPI Cards Grid */}
+              <Grid container spacing={2}>
+                {kpiCards.map((card) => (
+                  <Grid key={card.label} size={{ xs: 12, sm: 6, lg: Math.max(3, Math.floor(12 / kpiCards.length)) }}>
+                    <StatCard {...card} />
+                  </Grid>
+                ))}
+              </Grid>
+
+              {/* Chart + Summary Widgets Grid */}
               <Grid container spacing={2.5}>
+
+                {/* Left: Visual Breakdown Panel */}
                 <Grid size={{ xs: 12, lg: 8 }}>
                   <Card
                     sx={{
                       height: "100%",
-                      bgcolor: theme.palette.mode === "dark" ? "background.default" : "var(--app-surface-alt)",
-                      borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "var(--app-border)"
+                      borderRadius: "14px",
+                      bgcolor: isDark ? "background.default" : "var(--app-surface-alt)",
+                      border: "1px solid",
+                      borderColor: isDark ? "rgba(255,255,255,0.06)" : "var(--app-border)",
+                      boxShadow: isDark ? "none" : "0 2px 12px rgba(0,0,0,0.02)",
                     }}
                   >
-                    <CardContent>
-                      <Stack spacing={2.5}>
+                    <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+                      <Stack spacing={2}>
+                        {/* Header: Title + Metric Pills + Chart View Switcher */}
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                            <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1.05rem", color: "text.primary" }}>
-                              Visualization
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <PieChartIcon sx={{ fontSize: 20, color: "primary.main" }} />
+                            <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1rem" }}>
+                              Visual Breakdown
                             </Typography>
-
-                            {/* Metric Selector based on active report mode */}
-                            <Stack direction="row" spacing={0.5} sx={{ ml: { xs: 0, sm: 1 } }}>
-                              {(mode === "event" || mode === "member") && (
-                                [
-                                  { label: "Paid", key: "paid" },
-                                  { label: "Expected", key: "expected" },
-                                  { label: "Pending", key: "pending" },
-                                ].map((m) => (
-                                  <Chip
-                                    key={m.key}
-                                    size="small"
-                                    label={m.label}
-                                    onClick={() => setMetric(m.key)}
-                                    color={metric === m.key ? "primary" : "default"}
-                                    variant={metric === m.key ? "filled" : "outlined"}
-                                    sx={{ height: 24, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}
-                                  />
-                                ))
-                              )}
-
-                              {mode === "pending" && (
-                                [
-                                  { label: "By Event", key: "event" },
-                                  { label: "By Member", key: "member" },
-                                ].map((m) => (
-                                  <Chip
-                                    key={m.key}
-                                    size="small"
-                                    label={m.label}
-                                    onClick={() => setMetric(m.key)}
-                                    color={(metric === m.key || (metric !== "event" && metric !== "member" && m.key === "event")) ? "primary" : "default"}
-                                    variant={(metric === m.key || (metric !== "event" && metric !== "member" && m.key === "event")) ? "filled" : "outlined"}
-                                    sx={{ height: 24, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}
-                                  />
-                                ))
-                              )}
-                            </Stack>
+                            <Chip
+                              size="small"
+                              label={`${chartData.length} ${chartData.length === 1 ? "entry" : "entries"}`}
+                              sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(124,58,237,0.08)", color: "text.secondary" }}
+                            />
                           </Box>
 
-                          {/* View Toggle: Pie Chart vs Bar Chart */}
-                          <Stack
-                            direction="row"
-                            spacing={0.5}
-                            sx={{
-                              bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.06)",
-                              p: 0.5,
-                              borderRadius: "8px",
-                            }}
-                          >
+                          <Box sx={{ display: "flex", gap: 1.2, alignItems: "center", flexWrap: "wrap" }}>
+                            {/* Metric Selector Pills */}
                             <Box
-                              onClick={() => setChartType("pie")}
                               sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 0.5,
-                                px: 1.2,
-                                py: 0.4,
-                                borderRadius: "6px",
-                                cursor: "pointer",
-                                fontSize: "0.75rem",
-                                fontWeight: 700,
-                                bgcolor: chartType === "pie" ? "primary.main" : "transparent",
-                                color: chartType === "pie" ? "#ffffff" : "text.secondary",
-                                transition: "all 0.2s ease",
-                                "&:hover": { color: chartType === "pie" ? "#ffffff" : "text.primary" },
+                                display: "inline-flex",
+                                p: 0.3,
+                                borderRadius: "8px",
+                                bgcolor: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(124, 58, 237, 0.06)",
+                                gap: 0.3,
                               }}
                             >
-                              <PieChartIcon sx={{ fontSize: 16 }} />
-                              Pie Chart
+                              {metricOptions.map((m) => {
+                                const isSel = metric === m.key;
+                                return (
+                                  <ButtonBase
+                                    key={m.key}
+                                    onClick={() => setMetric(m.key)}
+                                    sx={{
+                                      px: 1.2,
+                                      py: 0.4,
+                                      borderRadius: "6px",
+                                      fontSize: "0.72rem",
+                                      fontWeight: 700,
+                                      color: isSel ? "#fff" : "text.secondary",
+                                      bgcolor: isSel ? "primary.main" : "transparent",
+                                      transition: "all 0.18s ease",
+                                      "&:hover": { color: isSel ? "#fff" : "text.primary" },
+                                    }}
+                                  >
+                                    {m.label}
+                                  </ButtonBase>
+                                );
+                              })}
                             </Box>
+
+                            {/* Chart View Toggle (Pie vs Bar) */}
                             <Box
-                              onClick={() => setChartType("bar")}
                               sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 0.5,
-                                px: 1.2,
-                                py: 0.4,
-                                borderRadius: "6px",
-                                cursor: "pointer",
-                                fontSize: "0.75rem",
-                                fontWeight: 700,
-                                bgcolor: chartType === "bar" ? "primary.main" : "transparent",
-                                color: chartType === "bar" ? "#ffffff" : "text.secondary",
-                                transition: "all 0.2s ease",
-                                "&:hover": { color: chartType === "bar" ? "#ffffff" : "text.primary" },
+                                display: "inline-flex",
+                                p: 0.3,
+                                borderRadius: "8px",
+                                bgcolor: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(124, 58, 237, 0.06)",
+                                gap: 0.3,
                               }}
                             >
-                              <BarChartIcon sx={{ fontSize: 16 }} />
-                              Bar Chart
+                              {[
+                                { key: "pie", label: "Donut", Ic: PieChartIcon },
+                                { key: "bar", label: "Bar", Ic: BarChartIcon },
+                              ].map(({ key, label, Ic }) => {
+                                const isSel = chartType === key;
+                                return (
+                                  <ButtonBase
+                                    key={key}
+                                    onClick={() => setChartType(key)}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 0.5,
+                                      px: 1,
+                                      py: 0.4,
+                                      borderRadius: "6px",
+                                      fontSize: "0.72rem",
+                                      fontWeight: 700,
+                                      color: isSel ? "#fff" : "text.secondary",
+                                      bgcolor: isSel ? "primary.main" : "transparent",
+                                      transition: "all 0.18s ease",
+                                    }}
+                                  >
+                                    <Ic sx={{ fontSize: 14 }} />
+                                    {label}
+                                  </ButtonBase>
+                                );
+                              })}
                             </Box>
-                          </Stack>
+                          </Box>
                         </Box>
 
-                        {chartData.length === 0 ? (
-                          <Box sx={{ py: 6, textAlign: "center" }}>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                              No chart data to visualize for this selection.
-                            </Typography>
-                          </Box>
-                        ) : chartType === "pie" ? (
-                          <AppPieChart items={chartData} />
-                        ) : (
-                          <SimpleBarChart items={chartData} />
-                        )}
+                        <Divider sx={{ borderColor: theme.palette.divider }} />
+
+                        {/* Chart Render Canvas */}
+                        <Box sx={{ minHeight: 310, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                          {chartData.length === 0 ? (
+                            <Box sx={{ py: 8, textAlign: "center" }}>
+                              <Typography variant="body2" color="text.secondary" fontWeight={500}>
+                                No contribution records found for the selected filter.
+                              </Typography>
+                            </Box>
+                          ) : chartType === "pie" ? (
+                            <AppPieChart items={chartData} />
+                          ) : (
+                            <SimpleBarChart items={chartData} />
+                          )}
+                        </Box>
                       </Stack>
                     </CardContent>
                   </Card>
                 </Grid>
 
-                {/* At a Glance KPI Card */}
+                {/* Right: Performance Summary & Efficiency Panel */}
                 <Grid size={{ xs: 12, lg: 4 }}>
                   <Card
                     sx={{
                       height: "100%",
-                      bgcolor: theme.palette.mode === "dark" ? "background.default" : "var(--app-surface-alt)",
-                      borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "var(--app-border)"
+                      borderRadius: "14px",
+                      bgcolor: isDark ? "background.default" : "var(--app-surface-alt)",
+                      border: "1px solid",
+                      borderColor: isDark ? "rgba(255,255,255,0.06)" : "var(--app-border)",
+                      boxShadow: isDark ? "none" : "0 2px 12px rgba(0,0,0,0.02)",
                     }}
                   >
-                    <CardContent>
-                      <Stack spacing={2}>
-                        <Box>
-                          <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1.05rem", color: "text.primary" }}>
-                            At a Glance
+                    <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+                      {/* Card Header */}
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <TrendingUp sx={{ fontSize: 20, color: "success.main" }} />
+                          <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1rem" }}>
+                            Collection Performance
                           </Typography>
                         </Box>
-                        <Box sx={{ width: "100%" }}>
-                          <Stack spacing={1.5} sx={{ mt: 1 }}>
-                            {mode === "event" && [
-                              { label: "Event Collections", value: report?.eventCollections?.length ?? 0 },
-                              { label: "Fully Collected Events", value: report?.eventCollections?.filter(e => e.pendingAmount === 0).length ?? 0 },
-                              { label: "Events with Pending Dues", value: report?.eventCollections?.filter(e => e.pendingAmount > 0).length ?? 0 },
-                              { label: "Average Collection Rate", value: `${report?.eventCollections?.length ? Math.round(report.eventCollections.reduce((s, e) => s + (e.collectionRate || 0), 0) / report.eventCollections.length) : 0}%` },
-                            ].map((row) => (
-                              <Box
-                                key={row.label}
-                                sx={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  py: 1,
-                                  borderBottom: "1px solid",
-                                  borderColor: "divider",
-                                  "&:last-child": { borderBottom: "none" }
-                                }}
-                              >
-                                <Typography variant="body2" fontWeight={600} color="text.secondary">
-                                  {row.label}
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  fontWeight={800}
-                                  sx={{
-                                    bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.05)",
-                                    px: 1.5,
-                                    py: 0.25,
-                                    borderRadius: "6px",
-                                    fontFamily: '"Outfit", sans-serif'
-                                  }}
-                                >
-                                  {row.value}
-                                </Typography>
-                              </Box>
-                            ))}
+                        <Chip
+                          size="small"
+                          label={`${efficiencyMetrics.rate}% Cleared`}
+                          color={efficiencyMetrics.rate >= 80 ? "success" : efficiencyMetrics.rate >= 40 ? "warning" : "error"}
+                          sx={{ fontWeight: 800, fontSize: "0.72rem", height: 22 }}
+                        />
+                      </Box>
 
-                            {mode === "member" && [
-                              { label: "Active Contributors", value: report?.memberContributionHistory?.length ?? 0 },
-                              { label: "100% Cleared Members", value: report?.memberContributionHistory?.filter(m => m.pendingEventsCount === 0).length ?? 0 },
-                              { label: "Members with Pending Dues", value: report?.memberContributionHistory?.filter(m => m.pendingEventsCount > 0).length ?? 0 },
-                              { label: "Collection Efficiency", value: `${report?.financialSummary?.collectionEfficiencyPercent ?? 0}%` },
-                            ].map((row) => (
-                              <Box
-                                key={row.label}
-                                sx={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  py: 1,
-                                  borderBottom: "1px solid",
-                                  borderColor: "divider",
-                                  "&:last-child": { borderBottom: "none" }
-                                }}
-                              >
-                                <Typography variant="body2" fontWeight={600} color="text.secondary">
-                                  {row.label}
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  fontWeight={800}
-                                  sx={{
-                                    bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.05)",
-                                    px: 1.5,
-                                    py: 0.25,
-                                    borderRadius: "6px",
-                                    fontFamily: '"Outfit", sans-serif'
-                                  }}
-                                >
-                                  {row.value}
-                                </Typography>
-                              </Box>
-                            ))}
-
-                            {mode === "pending" && [
-                              { label: "Total Overdue Amount", value: `₹${Number(report?.financialSummary?.totalPendingDues ?? 0).toLocaleString()}` },
-                              { label: "Unique Defaulters", value: report?.financialSummary?.defaultersCount ?? 0 },
-                              { label: "Critical Dues (> 30 Days)", value: report?.pendingDues?.filter(p => p.daysOverdue > 30).length ?? 0 },
-                              { label: "Moderate Dues (15-30 Days)", value: report?.pendingDues?.filter(p => p.daysOverdue >= 15 && p.daysOverdue <= 30).length ?? 0 },
-                            ].map((row) => (
-                              <Box
-                                key={row.label}
-                                sx={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  py: 1,
-                                  borderBottom: "1px solid",
-                                  borderColor: "divider",
-                                  "&:last-child": { borderBottom: "none" }
-                                }}
-                              >
-                                <Typography variant="body2" fontWeight={600} color="text.secondary">
-                                  {row.label}
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  fontWeight={800}
-                                  sx={{
-                                    bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.05)",
-                                    px: 1.5,
-                                    py: 0.25,
-                                    borderRadius: "6px",
-                                    fontFamily: '"Outfit", sans-serif'
-                                  }}
-                                >
-                                  {row.value}
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Stack>
+                      {/* Collection Progress Section */}
+                      <Box
+                        sx={{
+                          p: 2,
+                          mb: 2,
+                          borderRadius: "10px",
+                          bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#ffffff",
+                          border: "1px solid " + (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"),
+                        }}
+                      >
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                          <Typography variant="caption" fontWeight={700} color="text.secondary">
+                            Collection Efficiency
+                          </Typography>
+                          <Typography variant="caption" fontWeight={800} sx={{ color: efficiencyMetrics.rate >= 80 ? "success.main" : "text.primary" }}>
+                            {efficiencyMetrics.rate}% of Target
+                          </Typography>
                         </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={Math.min(100, efficiencyMetrics.rate)}
+                          sx={{
+                            height: 8,
+                            borderRadius: 4,
+                            bgcolor: isDark ? "rgba(255,255,255,0.08)" : "rgba(239, 68, 68, 0.12)",
+                            "& .MuiLinearProgress-bar": {
+                              borderRadius: 4,
+                              background: "linear-gradient(90deg, #10b981 0%, #059669 100%)",
+                            },
+                          }}
+                        />
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 1.5, fontSize: "0.72rem" }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
+                            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#10b981" }} />
+                            <Typography variant="caption" color="text.secondary">
+                              Collected: <strong style={{ color: "#10b981" }}>{INR(efficiencyMetrics.paid)}</strong>
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
+                            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#ef4444" }} />
+                            <Typography variant="caption" color="text.secondary">
+                              Pending: <strong style={{ color: "#ef4444" }}>{INR(efficiencyMetrics.pending)}</strong>
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      {/* Summary Metrics List */}
+                      <Stack spacing={0}>
+                        {kpiCards.map((card, idx) => (
+                          <Box
+                            key={card.label}
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              py: 1.25,
+                              px: 1,
+                              borderRadius: "6px",
+                              borderBottom: idx < kpiCards.length - 1 ? "1px solid " + theme.palette.divider : "none",
+                              "&:hover": { bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)" },
+                            }}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <card.icon sx={{ fontSize: 16, color: "text.secondary" }} />
+                              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ fontSize: "0.82rem" }}>
+                                {card.label}
+                              </Typography>
+                            </Box>
+                            <Typography
+                              variant="body2"
+                              fontWeight={800}
+                              sx={{
+                                bgcolor: isDark ? "rgba(255,255,255,0.05)" : "rgba(124,58,237,0.06)",
+                                px: 1.2,
+                                py: 0.25,
+                                borderRadius: "6px",
+                                fontFamily: '"Outfit", sans-serif',
+                                fontSize: "0.82rem",
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {card.value}
+                            </Typography>
+                          </Box>
+                        ))}
                       </Stack>
+
+
                     </CardContent>
                   </Card>
                 </Grid>
               </Grid>
 
-              {/* Data Table per active report mode */}
-              {(mode === "event" || !mode) && (
-                <AppDataTable title="Event Collections" columns={eventColumns} data={report?.eventCollections ?? []} loading={false} />
-              )}
+              {/* Data Tables Section */}
+              <Box sx={{ mt: 1 }}>
+                {(mode === "event" || !mode) && (
+                  <AppDataTable title="Event Collections" columns={eventColumns} data={report?.eventCollections ?? []} loading={false} />
+                )}
+                {mode === "member" && (
+                  <AppDataTable title="Member Contributions" columns={memberColumns} data={report?.memberContributionHistory ?? []} loading={false} />
+                )}
+                {mode === "pending" && (
+                  <AppDataTable title="Pending Dues & Defaulters" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
+                )}
+              </Box>
 
-              {mode === "member" && (
-                <AppDataTable title="Member Contributions" columns={memberColumns} data={report?.memberContributionHistory ?? []} loading={false} />
-              )}
-
-              {mode === "pending" && (
-                <AppDataTable title="Pending Dues & Defaulters" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
-              )}
             </Stack>
           )}
         </CardContent>
       </Card>
+
+      {/* ── Member Event Breakdown Modal ── */}
+      <Dialog
+        open={Boolean(selectedMember)}
+        onClose={() => setSelectedMember(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "16px",
+            bgcolor: isDark ? "background.paper" : "#ffffff",
+            backgroundImage: "none",
+            boxShadow: 24,
+          },
+        }}
+      >
+        {selectedMember && (
+          <>
+            <DialogTitle sx={{ p: 2.5, pb: 1.5, borderBottom: "1px solid " + theme.palette.divider }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: "primary.main",
+                      color: "#fff",
+                      fontWeight: 800,
+                      width: 44,
+                      height: 44,
+                      fontSize: "1.1rem",
+                    }}
+                  >
+                    {selectedMember.memberName?.charAt(0)?.toUpperCase() || "M"}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                      {selectedMember.memberName}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Event contribution breakdown & payment audit
+                    </Typography>
+                  </Box>
+                </Box>
+                <IconButton size="small" onClick={() => setSelectedMember(null)} sx={{ color: "text.secondary" }}>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+
+              {/* KPI Strip */}
+              <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mt: 2 }}>
+                <Chip
+                  icon={<AccountBalanceWallet sx={{ fontSize: "16px !important" }} />}
+                  label={`Expected: ${INR(selectedMember.totalExpectedAmount)}`}
+                  sx={{ fontWeight: 700, fontSize: "0.8rem", bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(79,70,229,0.08)", color: "text.primary" }}
+                />
+                <Chip
+                  icon={<CheckCircle sx={{ fontSize: "16px !important", color: "success.main" }} />}
+                  label={`Paid: ${INR(selectedMember.totalPaidAmount)} (${selectedMember.paidEventsCount} events)`}
+                  color="success"
+                  variant="outlined"
+                  sx={{ fontWeight: 700, fontSize: "0.8rem" }}
+                />
+                <Chip
+                  icon={<HourglassEmpty sx={{ fontSize: "16px !important", color: "error.main" }} />}
+                  label={`Pending: ${INR((selectedMember.totalExpectedAmount || 0) - (selectedMember.totalPaidAmount || 0))} (${selectedMember.pendingEventsCount} events)`}
+                  color="error"
+                  variant="outlined"
+                  sx={{ fontWeight: 700, fontSize: "0.8rem" }}
+                />
+              </Box>
+            </DialogTitle>
+
+            <DialogContent sx={{ p: 2.5 }}>
+              {/* Toolbar: Filter Pills + Search + Export */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  {[
+                    { key: "all", label: `All Events (${memberContributions.length})` },
+                    { key: "paid", label: `Paid (${memberContributions.filter(e => (e.paymentStatus || "").toLowerCase() === "paid").length || selectedMember.paidEventsCount || 0})` },
+                    { key: "pending", label: `Pending (${memberContributions.filter(e => (e.paymentStatus || "").toLowerCase() !== "paid").length || selectedMember.pendingEventsCount || 0})` },
+                  ].map((tab) => (
+                    <Chip
+                      key={tab.key}
+                      label={tab.label}
+                      clickable
+                      color={dialogFilter === tab.key ? "primary" : "default"}
+                      variant={dialogFilter === tab.key ? "filled" : "outlined"}
+                      onClick={() => setDialogFilter(tab.key)}
+                      sx={{ fontWeight: 700, fontSize: "0.75rem", height: 28 }}
+                    />
+                  ))}
+                </Box>
+
+                <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                  <TextField
+                    size="small"
+                    placeholder="Search event..."
+                    value={dialogSearch}
+                    onChange={(e) => setDialogSearch(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                        </InputAdornment>
+                      ),
+                      sx: { height: 32, fontSize: "0.8rem", borderRadius: "8px" },
+                    }}
+                  />
+                  <AppButton
+                    size="small"
+                    variant="outlined"
+                    startIcon={<FileDownloadIcon sx={{ fontSize: 16 }} />}
+                    onClick={handleExportMemberEvents}
+                    sx={{ height: 32, fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap" }}
+                  >
+                    Export
+                  </AppButton>
+                </Box>
+              </Box>
+
+              {/* Events Table or Loading */}
+              {modalLoading ? (
+                <Box sx={{ py: 6, display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+                  <CircularProgress size={30} />
+                  <Typography variant="caption" color="text.secondary">Loading event payment history...</Typography>
+                </Box>
+              ) : (
+                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: "10px", maxHeight: 420, overflow: "auto" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: isDark ? "rgba(255,255,255,0.03)" : "rgba(248,250,252,0.95)" }}>
+                        <TableCell sx={{ fontWeight: 800, fontSize: "0.75rem" }}>Event Name</TableCell>
+                        <TableCell sx={{ fontWeight: 800, fontSize: "0.75rem" }}>Event Date</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800, fontSize: "0.75rem" }}>Expected</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800, fontSize: "0.75rem" }}>Paid</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 800, fontSize: "0.75rem" }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 800, fontSize: "0.75rem" }}>Payment Details</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {memberEvents.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                            No events found matching current criteria.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        memberEvents.map((evt, idx) => {
+                          const isPaid = (evt.paymentStatus || "").toLowerCase() === "paid";
+                          return (
+                            <TableRow key={evt.contributionId || evt.eventId || idx} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
+                              <TableCell>
+                                <Typography variant="body2" fontWeight={700}>
+                                  {evt.eventName}
+                                </Typography>
+                                {evt.categoryName && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    {evt.categoryName}
+                                  </Typography>
+                                )}
+                              </TableCell>
+                              <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary", whiteSpace: "nowrap" }}>
+                                {formatGridDate(evt.eventDate || evt.EventDate)}
+                              </TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 700, fontSize: "0.85rem" }}>
+                                {INR(evt.expectedAmount ?? evt.amount)}
+                              </TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 700, fontSize: "0.85rem", color: isPaid ? "success.main" : "text.secondary" }}>
+                                {INR(evt.paidAmount ?? (isPaid ? evt.amount : 0))}
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip
+                                  size="small"
+                                  icon={isPaid ? <CheckCircle sx={{ fontSize: "14px !important" }} /> : <HourglassEmpty sx={{ fontSize: "14px !important" }} />}
+                                  label={isPaid ? "Paid" : "Pending"}
+                                  color={isPaid ? "success" : "error"}
+                                  variant={isPaid ? "filled" : "outlined"}
+                                  sx={{ fontWeight: 700, fontSize: "0.72rem", height: 22 }}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ fontSize: "0.8rem" }}>
+                                {isPaid ? (
+                                  <Stack direction="row" spacing={0.8} alignItems="center">
+                                    <Typography variant="caption" fontWeight={700} sx={{ px: 0.8, py: 0.2, bgcolor: isDark ? "rgba(255,255,255,0.08)" : "rgba(16,185,129,0.1)", color: "success.main", borderRadius: "4px" }}>
+                                      {evt.paymentMode || "Paid"}
+                                    </Typography>
+                                    {evt.paymentDate && (
+                                      <Typography variant="caption" color="text.secondary">
+                                        on {formatGridDate(evt.paymentDate)}
+                                      </Typography>
+                                    )}
+                                  </Stack>
+                                ) : (
+                                  <Typography variant="caption" color="text.disabled">
+                                    Awaiting payment
+                                  </Typography>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </DialogContent>
+
+            <DialogActions sx={{ p: 2, px: 2.5, borderTop: "1px solid " + theme.palette.divider, justifyContent: "space-between" }}>
+              <Typography variant="caption" color="text.secondary">
+                Showing {memberEvents.length} of {memberContributions.length} events
+              </Typography>
+              <AppButton size="small" variant="contained" onClick={() => setSelectedMember(null)}>
+                Close
+              </AppButton>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </div>
   );
 }
