@@ -497,7 +497,15 @@ export default function ContributionsPage() {
     }
   }
 
-  const eventOptions = events.map(e => ({ label: e.eventName, value: e.eventId }));
+  const eventOptions = useMemo(() => {
+    return events.map((e) => {
+      const dateStr = e.eventDate ? dayjs(e.eventDate).format("DD/MM/YYYY") : "";
+      return {
+        label: dateStr ? `${e.eventName || "Unnamed Event"} (${dateStr})` : (e.eventName || "Unnamed Event"),
+        value: e.eventId,
+      };
+    });
+  }, [events]);
 
   const modalStatusOptions = useMemo(() => {
     const set = new Set();
@@ -861,7 +869,9 @@ export default function ContributionsPage() {
                   placeholder="Select an event"
                   value={filterEventId}
                   onChange={(event) => {
-                    setFilterEventId(event.target.value);
+                    const val = event.target.value;
+                    setFilterEventId(val);
+                    setSelectedEventId(val);
                   }}
                   options={eventOptions}
                   required

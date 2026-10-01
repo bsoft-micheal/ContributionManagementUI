@@ -381,6 +381,29 @@ export default function EventFormPage() {
                 ? [defaultTypeId]
                 : [];
 
+          const isEditBday = (detailedEvent.eventTypeName || "").toLowerCase().includes("birthday") ||
+            (typesData || []).some(
+              (t) => eventTypeIdsList.includes(t.eventTypeId) && t.eventTypeName?.toLowerCase().includes("birthday")
+            );
+
+          let initialBaseAmount = "";
+          if (!isEditBday) {
+            if (detailedEvent.contributions && detailedEvent.contributions.length > 0 && detailedEvent.contributions[0].amount > 0) {
+              initialBaseAmount = String(detailedEvent.contributions[0].amount);
+            } else if (
+              detailedEvent.baseAmount !== undefined &&
+              detailedEvent.baseAmount !== null &&
+              Number(detailedEvent.baseAmount) > 0
+            ) {
+              const pCount = pIds.length || 1;
+              initialBaseAmount = String(
+                pCount > 1 && detailedEvent.baseAmount > 1000
+                  ? Math.round(detailedEvent.baseAmount / pCount)
+                  : detailedEvent.baseAmount
+              );
+            }
+          }
+
           setForm({
             eventId: detailedEvent.eventId || id,
             eventName: detailedEvent.eventName || "",
@@ -389,12 +412,7 @@ export default function EventFormPage() {
             eventDate: currentEventDate,
             description: detailedEvent.description || "",
             status: detailedEvent.status || "Planned",
-            baseAmount:
-              detailedEvent.baseAmount !== undefined &&
-                detailedEvent.baseAmount !== null &&
-                Number(detailedEvent.baseAmount) > 0
-                ? String(detailedEvent.baseAmount)
-                : "",
+            baseAmount: initialBaseAmount,
             participantIds: pIds,
           });
         } else {
@@ -419,6 +437,23 @@ export default function EventFormPage() {
           const initialTypeName = bdayType?.eventTypeName || typesData?.[0]?.eventTypeName || "Event";
           const isInitialBday = initialTypeName.toLowerCase().includes("birthday");
 
+          let defaultContribAmount = "";
+          if (!isInitialBday) {
+            const selectedInitialType = (typesData || []).find((t) => t.eventTypeId === defaultTypeId);
+            if (Number(selectedInitialType?.baseAmount) > 0) {
+              defaultContribAmount = String(selectedInitialType.baseAmount);
+            } else {
+              const matchingBudgetItem = activeBudgetItems.find(
+                (b) =>
+                  (defaultTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === defaultTypeId.toLowerCase()) ||
+                  (b.category && b.category.toLowerCase().trim() === initialTypeName.toLowerCase().trim())
+              );
+              if (matchingBudgetItem && Number(matchingBudgetItem.rate) > 0) {
+                defaultContribAmount = String(matchingBudgetItem.rate);
+              }
+            }
+          }
+
           setForm({
             eventName: isInitialBday
               ? `${defaultDate.format("MMMM")} Birthday Celebration`
@@ -427,7 +462,7 @@ export default function EventFormPage() {
             eventTypeIds: defaultTypeId ? [defaultTypeId] : [],
             eventDate: defaultDate,
             description: "",
-            baseAmount: "",
+            baseAmount: defaultContribAmount,
             participantIds: activeMems.map((m) => m.memberId),
           });
         }
@@ -664,9 +699,14 @@ export default function EventFormPage() {
         });
       } else {
         // Non-Birthday Event Type
+        const manualRate = Number(String(form.baseAmount).replace(/[^0-9.]/g, "")) || 0;
+
         if (categoryItems.length > 0) {
           categoryItems.forEach((item) => {
-            const rate = Number(item.rate) || 0;
+            const masterRate = Number(item.rate) || 0;
+            const typeBase = Number(type.baseAmount) || 0;
+            const defaultRate = typeBase > 0 ? typeBase : masterRate;
+            const rate = manualRate > 0 ? manualRate : defaultRate;
             const calcText = `${total} × ₹${rate.toLocaleString("en-IN")}`;
             const amount = total * rate;
             const formulaPart = `${item.expenseItem} (${typeName}: Total Members × ₹${rate.toLocaleString(
@@ -683,30 +723,26 @@ export default function EventFormPage() {
             });
           });
         } else {
-          // Fallback to baseAmount if configured or form.baseAmount
+          // Fallback if no master budget item configured for this event type
           const typeBase = Number(type.baseAmount) || 0;
-          const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
-          const effectiveBase = typeBase > 0 ? typeBase : manualBase;
+          const rate = manualRate > 0 ? manualRate : typeBase;
 
-          if (effectiveBase > 0) {
-            const perPersonRate = eligible > 0 ? Math.ceil(effectiveBase / eligible) : 0;
+          if (rate > 0) {
+            const amount = total * rate;
             items.push({
-              expenseItem: `${typeName} Base Amount`,
+              expenseItem: `${typeName} Celebration`,
               category: typeName,
-              rate: perPersonRate,
-              calcText:
-                eligible > 0
-                  ? `₹${effectiveBase.toLocaleString("en-IN")} ÷ ${eligible} Members`
-                  : `₹${effectiveBase.toLocaleString("en-IN")}`,
-              amount: effectiveBase,
-              formulaPart: `${typeName} Base (₹${effectiveBase.toLocaleString("en-IN")})`,
+              rate,
+              calcText: `${total} × ₹${rate.toLocaleString("en-IN")}`,
+              amount,
+              formulaPart: `${typeName} (Total Members × ₹${rate.toLocaleString("en-IN")})`,
             });
           } else {
             items.push({
               expenseItem: `${typeName} Celebration`,
               category: typeName,
               rate: 0,
-              calcText: "Enter Base Amount",
+              calcText: "Enter Contribution Amount",
               amount: 0,
               formulaPart: `${typeName}: ₹0`,
             });
@@ -781,15 +817,33 @@ export default function EventFormPage() {
     setOfficeMembers(offTotal);
     setWfhMembers(wfhTotal);
 
+    let defaultContrib = "";
+    if (!isNewBday) {
+      if (Number(newType?.baseAmount) > 0) {
+        defaultContrib = String(newType.baseAmount);
+      } else {
+        const matchingBudget = budgetItemsList.find(
+          (b) =>
+            b.isActive !== false &&
+            ((newTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === newTypeId.toLowerCase()) ||
+              (b.category && b.category.toLowerCase().trim() === newTypeName.toLowerCase().trim()))
+        );
+        if (matchingBudget && Number(matchingBudget.rate) > 0) {
+          defaultContrib = String(matchingBudget.rate);
+        }
+      }
+    }
+
     setForm((prev) => ({
       ...prev,
       eventTypeId: newTypeId,
       eventTypeIds: newTypeId ? [newTypeId] : [],
       eventName: updatedName,
-      baseAmount: !isNewBday && newType?.baseAmount > 0 ? String(newType.baseAmount) : "",
+      baseAmount: defaultContrib,
       participantIds: allActiveIds,
     }));
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+    if (errors.baseAmount) setErrors((p) => ({ ...p, baseAmount: "" }));
   };
 
   // Handle multiple event types selection
@@ -843,15 +897,40 @@ export default function EventFormPage() {
     setOfficeMembers(offTotal);
     setWfhMembers(wfhTotal);
 
+    let defaultContrib = "";
+    if (!hasBday && selectedTypesList.length > 0) {
+      let sumRates = 0;
+      selectedTypesList.forEach((t) => {
+        if (Number(t.baseAmount) > 0) {
+          sumRates += Number(t.baseAmount);
+        } else {
+          const matchingBudget = budgetItemsList.find(
+            (b) =>
+              b.isActive !== false &&
+              ((t.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === t.eventTypeId.toLowerCase()) ||
+                (b.category && b.category.toLowerCase().trim() === (t.eventTypeName || "").toLowerCase().trim()))
+          );
+          if (matchingBudget && Number(matchingBudget.rate) > 0) {
+            sumRates += Number(matchingBudget.rate);
+          }
+        }
+      });
+      if (sumRates > 0) {
+        defaultContrib = String(sumRates);
+      }
+    }
+
     setForm((prev) => ({
       ...prev,
       eventTypeId: newTypeIds[0] || "",
       eventTypeIds: newTypeIds,
       eventName: updatedName,
+      baseAmount: defaultContrib,
       participantIds: allActiveIds,
     }));
 
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+    if (errors.baseAmount) setErrors((p) => ({ ...p, baseAmount: "" }));
   };
 
   // Handle date change
@@ -913,10 +992,10 @@ export default function EventFormPage() {
       }
     }
 
-    if (!isBirthday && computedBudgetItems.length === 1 && computedBudgetItems[0].amount === 0) {
+    if (!isBirthday) {
       const cleanBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
-      if (cleanBase <= 0) {
-        newErrors.baseAmount = "Base amount must be greater than 0";
+      if (cleanBase <= 0 && contributionPerMember <= 0) {
+        newErrors.baseAmount = "Contribution amount is required";
       }
     }
 
@@ -994,7 +1073,7 @@ export default function EventFormPage() {
         eventDates: isBirthday ? (celebrantDatesCsv || null) : null,
         description: form.description?.trim() || defaultDesc,
         status: form.status || "Planned",
-        baseAmount: effectiveBase,
+        baseAmount: plannedBudget > 0 ? plannedBudget : (Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0) * (finalParticipantIds.length || 1),
         participantIds:
           finalParticipantIds.length > 0 ? finalParticipantIds : form.participantIds,
         contributionOverrides: contributionOverrides,
@@ -1457,6 +1536,33 @@ export default function EventFormPage() {
                       disabled
                     />
                   </Grid>
+
+                  {/* Row 4: Contribution Amount for non-Birthday events */}
+                  {!isBirthday && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <AppInput
+                        label="Contribution Amount"
+                        placeholder="Enter contribution amount (₹)"
+                        required
+                        fullWidth
+                        value={formatBaseAmount(form.baseAmount)}
+                        onChange={(e) => {
+                          const rawVal = e.target.value.replace(/[^0-9]/g, "");
+                          setForm((f) => ({ ...f, baseAmount: rawVal }));
+                          if (errors.baseAmount) {
+                            setErrors((prev) => ({ ...prev, baseAmount: "" }));
+                          }
+                        }}
+                        startAdornment={
+                          <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
+                            ₹
+                          </Typography>
+                        }
+                        error={!!errors.baseAmount}
+                        helperText={errors.baseAmount}
+                      />
+                    </Grid>
+                  )}
                 </Grid>
 
                 {/* Row 4: Identified Celebrants (for Birthday) or Active Participants (for other Events) */}
@@ -1705,36 +1811,6 @@ export default function EventFormPage() {
                   )
                 )}
 
-                {/* Non-Birthday Event or Fallback: Base Amount */}
-                {!isBirthday && computedBudgetItems.length === 1 && computedBudgetItems[0].amount === 0 && (
-                  <Box sx={{ mt: 2.5 }}>
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 12, md: 6 }}>
-                        <AppInput
-                          label="Base Amount"
-                          placeholder="Enter base amount (₹)"
-                          fullWidth
-                          value={formatBaseAmount(form.baseAmount)}
-                          onChange={(e) => {
-                            const rawVal = e.target.value.replace(/[^0-9]/g, "");
-                            setForm((f) => ({ ...f, baseAmount: rawVal }));
-                            if (errors.baseAmount) {
-                              setErrors((prev) => ({ ...prev, baseAmount: "" }));
-                            }
-                          }}
-                          startAdornment={
-                            <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
-                              ₹
-                            </Typography>
-                          }
-                          error={!!errors.baseAmount}
-                          helperText={errors.baseAmount}
-                          required
-                        />
-                      </Grid>
-                    </Grid>
-                  </Box>
-                )}
 
                 {/* Optional Description */}
                 <Box sx={{ mt: 2.5 }}>
