@@ -11,16 +11,14 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { getRolesAsync, createRoleAsync, updateRoleAsync, deleteRoleAsync } from "../../services/roleService";
-import { validateForm } from "../../utils/validation";
-import { formatGridDate } from "../../utils/dateHelper";
-import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
 
 const initialForm = { roleName: "" };
 
 export default function RolesPage() {
   const { authState } = useAuth();
-  const rights = getRightsForPage("Roles", authState?.role);
-  const hasWriteAccess = rights.write;
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
 
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);

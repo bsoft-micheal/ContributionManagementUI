@@ -43,7 +43,7 @@ export default function LoginPage() {
         const path = location.state.from.pathname;
         const search = location.state.from.search || "";
         const hash = location.state.from.hash || "";
-        const targetPath = path === "/confirm-payment" ? "/payment-submission" : path;
+        const targetPath = (path === "/confirm-payment" || path === "/payment-submission") ? "/payments" : path;
         return `${targetPath}${search}${hash}`;
       }
     }

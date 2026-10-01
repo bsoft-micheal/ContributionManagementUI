@@ -264,9 +264,14 @@ export function generateDynamicPaymentQr({ amount, note, customConfig, eventType
   });
 
   const isUploadedMode = config.qrMode === "uploaded" && config.qrImage;
-  const qrImageUrl = isUploadedMode
-    ? config.qrImage
-    : getQrCodeApiUrl(upiUri, 300);
+  let qrImageUrl = isUploadedMode ? config.qrImage : "";
+  if (!qrImageUrl && upiUri) {
+    try {
+      qrImageUrl = generateQrPngDataUrl(upiUri, 300, 2);
+    } catch {
+      qrImageUrl = getQrCodeApiUrl(upiUri, 300);
+    }
+  }
 
   return {
     upiUri,

@@ -62,9 +62,9 @@ export default function EventsPage() {
   const hasWriteAccess = canEdit;
 
   // Granular Action Permissions
-  const canAddEvent = hasActionPermission("Add Event", 31, authState?.role).canExecute;
-  const canEditEvent = hasActionPermission("Edit Event", 32, authState?.role).canExecute;
-  const canDeleteEvent = hasActionPermission("Delete Event", 33, authState?.role).canExecute;
+  const canAddEvent = hasActionPermission("Add Event", 31, authState?.role).canExecute && hasWriteAccess;
+  const canEditEvent = hasActionPermission("Edit Event", 32, authState?.role).canExecute && hasWriteAccess;
+  const canDeleteEvent = hasActionPermission("Delete Event", 33, authState?.role).canExecute && hasWriteAccess;
   const canViewEvent = hasActionPermission("View Event", 30, authState?.role).canView;
 
   const navigate = useNavigate();
@@ -79,8 +79,41 @@ export default function EventsPage() {
         getMembersAsync(),
         getUsersAsync().catch(() => []),
       ]);
+      const combinedMembers = Array.isArray(membersData) ? [...membersData] : [];
+      const existingIds = new Set(
+        combinedMembers.map((m) => String(m.memberId || m.id || m.userId).toLowerCase()).filter(Boolean)
+      );
+      const existingNames = new Set(
+        combinedMembers.map((m) => (m.name || m.fullName || "").toLowerCase().trim()).filter(Boolean)
+      );
+
+      if (Array.isArray(usersData)) {
+        usersData.forEach((u) => {
+          const uid = String(u.userId || u.id || "").toLowerCase();
+          const uname = (u.fullName || u.name || "").toLowerCase().trim();
+          if (uid && !existingIds.has(uid) && (!uname || !existingNames.has(uname))) {
+            existingIds.add(uid);
+            combinedMembers.push({
+              memberId: u.userId || u.id,
+              id: u.userId || u.id,
+              name: u.fullName || u.name,
+              fullName: u.fullName || u.name,
+              email: u.email,
+              phone: u.phone,
+              workType: u.workType || "Office",
+              dateOfBirth: u.dateOfBirth,
+              joiningDate: u.joiningDate,
+              gender: u.gender,
+              isActive: u.isActive !== false,
+              isExited: Boolean(u.isExited),
+              roleName: u.roleName || "Member",
+            });
+          }
+        });
+      }
+
       setEventTypes(types || []);
-      setMembers(membersData || []);
+      setMembers(combinedMembers);
       setUsers(usersData || []);
 
       const userMap = {};

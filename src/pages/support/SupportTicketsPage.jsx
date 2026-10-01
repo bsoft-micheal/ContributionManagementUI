@@ -79,10 +79,10 @@ export default function SupportTicketsPage() {
   // Action-level feature IDs from navigation_menus (parent_id=12):
   // 55=View, 56=Add, 57=Edit, 58=Delete, 59=Verify, 60=Export Support Ticket
   const canViewTicket = hasActionPermission("View Support Ticket", 55, authState?.role).canView;
-  const canAddTicket = hasActionPermission("Add Support Ticket", 56, authState?.role).canExecute;
-  const canEditTicket = hasActionPermission("Edit Support Ticket", 57, authState?.role).canExecute;
-  const canDeleteTicket = hasActionPermission("Delete Support Ticket", 58, authState?.role).canExecute;
-  const canVerifyTicket = hasActionPermission("Verify Support Ticket", 59, authState?.role).canExecute;
+  const canAddTicket = hasActionPermission("Add Support Ticket", 56, authState?.role).canExecute && hasWriteAccess;
+  const canEditTicket = hasActionPermission("Edit Support Ticket", 57, authState?.role).canExecute && hasWriteAccess;
+  const canDeleteTicket = hasActionPermission("Delete Support Ticket", 58, authState?.role).canExecute && hasWriteAccess;
+  const canVerifyTicket = hasActionPermission("Verify Support Ticket", 59, authState?.role).canExecute && hasWriteAccess;
   const canExportTicket = hasActionPermission("Export Support Ticket", 60, authState?.role).canExecute;
 
   const toast = useAppToast();
@@ -377,8 +377,8 @@ export default function SupportTicketsPage() {
   const ticketTypeOptions = useMemo(() => {
     const list = Array.isArray(dbTicketTypes)
       ? dbTicketTypes
-          .filter((t) => t.typeName && t.isActive !== false)
-          .map((t) => ({ label: t.typeName, value: t.typeName }))
+        .filter((t) => t.typeName && t.isActive !== false)
+        .map((t) => ({ label: t.typeName, value: t.typeName }))
       : [];
 
     return [
@@ -391,8 +391,8 @@ export default function SupportTicketsPage() {
   const statusOptions = useMemo(() => {
     const list = Array.isArray(dbStatuses)
       ? dbStatuses
-          .filter((s) => s.statusName && s.isActive !== false)
-          .map((s) => ({ label: s.statusName, value: s.statusName }))
+        .filter((s) => s.statusName && s.isActive !== false)
+        .map((s) => ({ label: s.statusName, value: s.statusName }))
       : [];
 
     return [
@@ -405,8 +405,8 @@ export default function SupportTicketsPage() {
   const priorityOptions = useMemo(() => {
     const list = Array.isArray(dbPriorities)
       ? dbPriorities
-          .filter((p) => p.priorityName && p.isActive !== false)
-          .map((p) => ({ label: p.priorityName, value: p.priorityName }))
+        .filter((p) => p.priorityName && p.isActive !== false)
+        .map((p) => ({ label: p.priorityName, value: p.priorityName }))
       : [];
 
     return [
@@ -414,10 +414,10 @@ export default function SupportTicketsPage() {
       ...(list.length > 0
         ? list
         : [
-            { label: "High", value: "High" },
-            { label: "Medium", value: "Medium" },
-            { label: "Low", value: "Low" },
-          ]),
+          { label: "High", value: "High" },
+          { label: "Medium", value: "Medium" },
+          { label: "Low", value: "Low" },
+        ]),
     ];
   }, [dbPriorities]);
 
@@ -1684,14 +1684,14 @@ export default function SupportTicketsPage() {
                           replyTicket.status === "Resolved" || replyTicket.status === "Closed"
                             ? "rgba(22, 163, 74, 0.12)"
                             : replyTicket.status === "In Progress"
-                            ? "rgba(2, 132, 199, 0.12)"
-                            : "rgba(234, 179, 8, 0.15)",
+                              ? "rgba(2, 132, 199, 0.12)"
+                              : "rgba(234, 179, 8, 0.15)",
                         color:
                           replyTicket.status === "Resolved" || replyTicket.status === "Closed"
                             ? "#16a34a"
                             : replyTicket.status === "In Progress"
-                            ? "#0284c7"
-                            : "#d97706",
+                              ? "#0284c7"
+                              : "#d97706",
                       }}
                     />
                   </Box>

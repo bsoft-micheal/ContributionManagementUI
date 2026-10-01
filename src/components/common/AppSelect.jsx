@@ -23,6 +23,13 @@ export default function AppSelect({
       ? `Select ${label.replace(/[*:]/g, "").trim()}...`
       : "Select an option...";
 
+  const hasEmptyOption = options.some((o) => o.value === "");
+  const hasValueOption =
+    value === "" ||
+    value === undefined ||
+    value === null ||
+    options.some((o) => String(o.value) === String(value));
+
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
       {label && (
@@ -135,9 +142,16 @@ export default function AppSelect({
         helperText={helperText}
         {...props}
       >
-        <MenuItem value="" sx={{ display: "none" }}>
-          {effectivePlaceholder}
-        </MenuItem>
+        {!hasEmptyOption && (
+          <MenuItem value="" sx={{ display: "none" }}>
+            {effectivePlaceholder}
+          </MenuItem>
+        )}
+        {!hasValueOption && (
+          <MenuItem value={value} sx={{ display: "none" }}>
+            {value}
+          </MenuItem>
+        )}
         {options.map((option) => (
           <MenuItem
             key={option.value}

@@ -115,9 +115,23 @@ export default function EventFormDialog({
     selectedType && selectedType.eventTypeName?.toLowerCase().includes("birthday")
   );
 
+  const isMemberActive = (m) => {
+    const active =
+      m.isActive === true ||
+      m.isActive === 1 ||
+      String(m.isActive).toLowerCase() === "true" ||
+      m.status === "Active" ||
+      m.isActive === undefined;
+    const exited =
+      m.isExited === true ||
+      m.isExited === 1 ||
+      String(m.isExited).toLowerCase() === "true";
+    return active && !exited;
+  };
+
   // Active members count
   const activeMembers = useMemo(
-    () => members.filter((m) => m.isActive && !m.isExited),
+    () => members.filter(isMemberActive),
     [members]
   );
 
@@ -449,7 +463,7 @@ export default function EventFormDialog({
             }. Planned Budget: ₹${plannedBudget.toLocaleString(
               "en-IN"
             )}, Contribution/member: ₹${contributionPerMember}`,
-          baseAmount: plannedBudget,
+          baseAmount: plannedBudget > 0 ? plannedBudget : Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
           participantIds:
             allActiveParticipantIds.length > 0
               ? allActiveParticipantIds
@@ -508,7 +522,15 @@ export default function EventFormDialog({
       }
       onClose();
     } catch (error) {
-      toast.error("Failed to save event");
+      let errMsg = error.response?.data?.message;
+      if (!errMsg && error.response?.data?.errors) {
+        const errValues = Object.values(error.response.data.errors);
+        errMsg = Array.isArray(errValues) ? errValues.flat().join(", ") : String(error.response.data.errors);
+      }
+      if (!errMsg) {
+        errMsg = error.response?.data?.title || error.message || "Failed to save event";
+      }
+      toast.error(errMsg);
     } finally {
       setSaving(false);
     }
