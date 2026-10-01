@@ -67,6 +67,24 @@ const getDefaultBirthdayExempt = () => {
   return true;
 };
 
+const getAllowMultipleEventsSetting = () => {
+  try {
+    const saved = localStorage.getItem("cm_system_settings");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.allowedMultipleEvent !== undefined) {
+        return Boolean(parsed.allowedMultipleEvent);
+      }
+      if (parsed.allowMultipleEvents !== undefined) {
+        return Boolean(parsed.allowMultipleEvents);
+      }
+    }
+  } catch (e) {
+    // Setting read error ignored
+  }
+  return false;
+};
+
 export default function EventFormDialog({
   open,
   onClose,
@@ -79,6 +97,7 @@ export default function EventFormDialog({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [allowMultipleEvents, setAllowMultipleEvents] = useState(getAllowMultipleEventsSetting);
 
   const [budgetItemsList, setBudgetItemsList] = useState([]);
   const [budgetRates, setBudgetRates] = useState(RULES);
@@ -452,9 +471,17 @@ export default function EventFormDialog({
           contributionOverrides: contributionOverrides,
         };
       } else {
+        const perMemberAmount = Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0);
+        const pIds = form.participantIds || [];
+        const totalBudget = perMemberAmount * (pIds.length || 1);
+        const overrides = pIds.map((mId) => ({
+          memberId: mId,
+          amount: perMemberAmount,
+        }));
         payload = {
           ...form,
-          baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
+          baseAmount: totalBudget,
+          contributionOverrides: overrides,
           eventDate: dayjs(form.eventDate).hour(12).toISOString(),
           eventDates: null,
         };
@@ -998,8 +1025,16 @@ export default function EventFormDialog({
               label="Event Category"
               value={form.eventTypeId}
               onChange={(e) => {
-                setForm((c) => ({ ...c, eventTypeId: e.target.value }));
+                const selected = eventTypes.find((t) => t.eventTypeId === e.target.value);
+                const isBday = selected?.eventTypeName?.toLowerCase().includes("birthday");
+                const defAmt = !isBday && Number(selected?.baseAmount) > 0 ? String(selected.baseAmount) : "";
+                setForm((c) => ({
+                  ...c,
+                  eventTypeId: e.target.value,
+                  baseAmount: defAmt || c.baseAmount,
+                }));
                 if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+                if (errors.baseAmount) setErrors((p) => ({ ...p, baseAmount: "" }));
               }}
               options={typeOptions}
               error={!!errors.eventTypeId}
@@ -1026,8 +1061,8 @@ export default function EventFormDialog({
           {!isBirthday && (
             <Grid size={{ xs: 12, md: 6 }}>
               <AppInput
-                label="Base Amount"
-                placeholder="Enter base amount (₹)"
+                label="Contribution Amount"
+                placeholder="Enter contribution amount (₹)"
                 value={formatBaseAmount(form.baseAmount)}
                 onChange={(e) => {
                   const rawVal = e.target.value.replace(/[^0-9]/g, "");

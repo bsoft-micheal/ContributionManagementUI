@@ -63,178 +63,7 @@ import { TOAST_MESSAGES, COMMON_STRINGS, MENU_FEATURE_IDS } from "../../constant
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission } from "../../utils/rightsHelper";
 
-// ─── Multi-Role Select with Removable Chips ────────────────────────────────
-function AppMultiRoleSelect({
-  label,
-  placeholder,
-  value = [],
-  onChange,
-  options = [],
-  disabledOptions = [],
-  error,
-  helperText,
-  required,
-}) {
-  const theme = useTheme();
 
-  const handleSelectChange = (event) => {
-    const selected =
-      typeof event.target.value === "string"
-        ? event.target.value.split(",")
-        : event.target.value;
-    onChange(selected);
-  };
-
-  const handleDelete = (roleToDelete) => {
-    onChange(value.filter((r) => r !== roleToDelete));
-  };
-
-  return (
-    <Box sx={{ width: "100%" }}>
-      <Typography
-        variant="caption"
-        sx={{
-          fontWeight: 700,
-          color: error ? "error.main" : "text.secondary",
-          fontSize: "0.8rem",
-          display: "block",
-          mb: 0.6,
-        }}
-      >
-        {label} {required && <span style={{ color: "#ef4444" }}>*</span>}
-      </Typography>
-      <Select
-        multiple
-        fullWidth
-        displayEmpty
-        value={value}
-        onChange={handleSelectChange}
-        error={Boolean(error)}
-        renderValue={(selected) => {
-          if (!selected || selected.length === 0) {
-            return (
-              <Typography
-                variant="body2"
-                sx={{ color: "text.disabled", fontSize: "0.85rem" }}
-              >
-                {placeholder || "Select roles…"}
-              </Typography>
-            );
-          }
-          return (
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, py: 0.3 }}>
-              {selected.map((val) => (
-                <Chip
-                  key={val}
-                  label={val}
-                  size="small"
-                  onDelete={(e) => {
-                    e.stopPropagation();
-                    handleDelete(val);
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  sx={{
-                    height: 24,
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(124, 58, 237, 0.25)"
-                        : "rgba(124, 58, 237, 0.12)",
-                    color: (theme) =>
-                      theme.palette.mode === "dark" ? "#c4b5fd" : "#6d28d9",
-                    "& .MuiChip-deleteIcon": {
-                      fontSize: "0.95rem",
-                      color: "inherit",
-                      "&:hover": {
-                        color: "#ef4444",
-                      },
-                    },
-                  }}
-                />
-              ))}
-            </Box>
-          );
-        }}
-        sx={{
-          minHeight: 44,
-          borderRadius: "8px",
-          bgcolor: (theme) =>
-            theme.palette.mode === "dark"
-              ? "rgba(255, 255, 255, 0.04)"
-              : "#ffffff",
-          "& .MuiOutlinedInput-notchedOutline": {
-            borderColor: (theme) =>
-              error
-                ? theme.palette.error.main
-                : theme.palette.mode === "dark"
-                  ? "rgba(255, 255, 255, 0.15)"
-                  : "rgba(74, 63, 107, 0.2)",
-          },
-          "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: error ? theme.palette.error.main : "#7c3aed",
-          },
-          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-            borderColor: error ? theme.palette.error.main : "#7c3aed",
-            borderWidth: "1.5px",
-          },
-        }}
-      >
-        {options.map((opt) => {
-          const isDisabled = disabledOptions.includes(opt.value);
-          return (
-            <MenuItem
-              key={opt.value}
-              value={opt.value}
-              disabled={isDisabled}
-              sx={{
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                opacity: isDisabled ? 0.45 : 1,
-              }}
-            >
-              <Checkbox
-                checked={value.includes(opt.value)}
-                size="small"
-                sx={{
-                  mr: 1,
-                  p: 0.3,
-                  color: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.4)"
-                      : "rgba(74,63,107,0.3)",
-                  "&.Mui-checked": { color: "#7c3aed" },
-                }}
-              />
-              <ListItemText primary={opt.label} />
-              {isDisabled && (
-                <Typography
-                  variant="caption"
-                  sx={{ color: "text.disabled", ml: 1, fontSize: "0.7rem" }}
-                >
-                  (Selected in other field)
-                </Typography>
-              )}
-            </MenuItem>
-          );
-        })}
-      </Select>
-      {helperText && (
-        <Typography
-          variant="caption"
-          sx={{
-            color: error ? "error.main" : "text.secondary",
-            mt: 0.5,
-            display: "block",
-            fontSize: "0.75rem",
-          }}
-        >
-          {helperText}
-        </Typography>
-      )}
-    </Box>
-  );
-}
 
 // ─── Custom Green Switch matching screenshot ───────────────────────────────
 const CustomSwitch = styled(Switch)(({ theme }) => ({
@@ -295,8 +124,8 @@ const initialForm = {
   createMemberProfile: false, // Enable User Access (OFF by default)
   enableMultipleRoles: false, // Enable Multiple Roles (OFF by default)
   roleName: "",
-  primaryRoles: [],
-  secondaryRoles: [],
+  primaryRole: "",
+  secondaryRole: "",
   newPassword: "",
   confirmPassword: "",
   isActive: true,
@@ -355,6 +184,17 @@ export default function UsersPage() {
       { label: "Member", value: "Member" },
     ];
   }, [roles]);
+
+  const getRoleNameById = (id) => {
+    if (!id) return "";
+    const match = roles.find(
+      (r) =>
+        String(r.roleId).toLowerCase() === String(id).toLowerCase() ||
+        String(r.id || "").toLowerCase() === String(id).toLowerCase() ||
+        r.roleName?.toLowerCase() === String(id).toLowerCase()
+    );
+    return match ? match.roleName : id;
+  };
 
   const typeOptions = useMemo(() => {
     if (workTypes && workTypes.length > 0) {
@@ -438,11 +278,26 @@ export default function UsersPage() {
 
   const filteredUsers = useMemo(() => {
     let result = users;
-    if (appliedRole) result = result.filter((u) => u.roleName === appliedRole);
+    if (appliedRole) {
+      const matchedRoleObj = roles.find(
+        (r) => r.roleName === appliedRole || String(r.roleId).toLowerCase() === String(appliedRole).toLowerCase()
+      );
+      const matchedRoleId = matchedRoleObj ? String(matchedRoleObj.roleId).toLowerCase() : null;
+      result = result.filter((u) => {
+        const uRoleId = u.roleId ? String(u.roleId).toLowerCase() : null;
+        const uRoleIds = (u.roleIds || []).map((id) => String(id).toLowerCase());
+        const uRoleName = u.roleName || getRoleNameById(u.roleId);
+        return (
+          uRoleName === appliedRole ||
+          uRoleId === appliedRole.toLowerCase() ||
+          (matchedRoleId && (uRoleId === matchedRoleId || uRoleIds.includes(matchedRoleId)))
+        );
+      });
+    }
     if (appliedStatus !== "")
       result = result.filter((u) => String(u.isActive) === appliedStatus);
     return result;
-  }, [users, appliedRole, appliedStatus]);
+  }, [users, roles, appliedRole, appliedStatus]);
 
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -470,15 +325,19 @@ export default function UsersPage() {
   // ── Open dialog ────────────────────────────────────────────────────────────
   function openCreate() {
     if (!canAddUser) return;
+    const defaultMemberRole = userRolesList.find((r) => r.label?.toLowerCase() === "member")?.value || (userRolesList[0]?.value || "Member");
+    const defaultAdminRole = userRolesList.find((r) => r.label?.toLowerCase() === "admin")?.value || (userRolesList[0]?.value || "Admin");
+    const defaultSecondary = userRolesList.find((r) => r.value !== defaultAdminRole)?.value || defaultMemberRole;
+
     setForm({
       ...initialForm,
       workType: typeOptions.length > 0 ? typeOptions[0].value : "Office",
       gender: "Male",
       createMemberProfile: false,
       enableMultipleRoles: false,
-      roleName: "",
-      primaryRoles: [],
-      secondaryRoles: [],
+      roleName: defaultMemberRole,
+      primaryRole: defaultAdminRole,
+      secondaryRole: defaultSecondary,
       username: "",
       newPassword: "",
       confirmPassword: "",
@@ -497,15 +356,46 @@ export default function UsersPage() {
       (row.roles && row.roles.length > 1) ||
       (row.secondaryRoles && row.secondaryRoles.length > 0)
     );
-    let pRoles = Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0
-      ? [...row.primaryRoles]
-      : (row.roleName ? [row.roleName] : []);
-    let sRoles = Array.isArray(row.secondaryRoles) ? [...row.secondaryRoles] : [];
 
-    if (hasMultiple && pRoles.length === 0 && row.roles && row.roles.length > 0) {
-      pRoles = [row.roles[0]];
-      sRoles = row.roles.slice(1);
+    let pRole = "";
+    let sRole = "";
+
+    if (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0) {
+      pRole = getRoleNameById(row.primaryRoleIds[0]);
+    } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0) {
+      pRole = row.primaryRoles[0];
+    } else if (row.roleId) {
+      pRole = getRoleNameById(row.roleId);
+    } else if (row.roleName) {
+      pRole = row.roleName;
+    } else if (Array.isArray(row.roleIds) && row.roleIds.length > 0) {
+      pRole = getRoleNameById(row.roleIds[0]);
+    } else if (Array.isArray(row.roles) && row.roles.length > 0) {
+      pRole = row.roles[0];
     }
+
+    if (Array.isArray(row.secondaryRoleIds) && row.secondaryRoleIds.length > 0) {
+      sRole = getRoleNameById(row.secondaryRoleIds[0]);
+    } else if (Array.isArray(row.secondaryRoles) && row.secondaryRoles.length > 0) {
+      sRole = row.secondaryRoles[0];
+    } else if (Array.isArray(row.roleIds) && row.roleIds.length > 1) {
+      const otherId = row.roleIds.find((id) => getRoleNameById(id) !== pRole) || row.roleIds[1];
+      sRole = getRoleNameById(otherId);
+    } else if (Array.isArray(row.roles) && row.roles.length > 1) {
+      sRole = row.roles.find((r) => r !== pRole) || row.roles[1];
+    } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 1) {
+      sRole = row.primaryRoles.find((r) => r !== pRole) || row.primaryRoles[1];
+    }
+
+    if (!pRole && userRolesList.length > 0) {
+      pRole = userRolesList[0].value;
+    }
+    if (pRole === sRole) {
+      const alternate = userRolesList.find((r) => r.value !== pRole)?.value || "";
+      sRole = alternate;
+    }
+
+    const singleRole = pRole || (row.roleId ? getRoleNameById(row.roleId) : "") || row.roleName || (userRolesList[0]?.value || "Member");
 
     setForm({
       userId: row.userId,
@@ -519,9 +409,9 @@ export default function UsersPage() {
       joiningDate: row.joiningDate ? dayjs(row.joiningDate) : dayjs(),
       createMemberProfile: hasAccess,
       enableMultipleRoles: hasMultiple,
-      roleName: row.roleName ?? (pRoles[0] || ""),
-      primaryRoles: pRoles,
-      secondaryRoles: sRoles,
+      roleName: singleRole,
+      primaryRole: pRole,
+      secondaryRole: sRole,
       newPassword: "",
       confirmPassword: "",
       isActive: row.isActive ?? true,
@@ -535,31 +425,32 @@ export default function UsersPage() {
 
   function handleToggleMultipleRoles(checked) {
     setForm((prev) => {
-      let pRoles = Array.isArray(prev.primaryRoles) ? [...prev.primaryRoles] : [];
-      let sRoles = Array.isArray(prev.secondaryRoles) ? [...prev.secondaryRoles] : [];
       if (checked) {
-        if (pRoles.length === 0 && prev.roleName) {
-          pRoles = [prev.roleName];
+        const pRole = prev.primaryRole || prev.roleName || userRolesList[0]?.value || "Admin";
+        let sRole = prev.secondaryRole;
+        if (!sRole || sRole === pRole) {
+          const alternate = userRolesList.find((r) => r.value !== pRole)?.value || "Member";
+          sRole = alternate;
         }
+        return {
+          ...prev,
+          enableMultipleRoles: true,
+          primaryRole: pRole,
+          secondaryRole: sRole,
+        };
       } else {
-        const singleRole = pRoles.length > 0 ? pRoles[0] : (prev.roleName || "");
+        const singleRole = prev.primaryRole || prev.roleName || (userRolesList[0]?.value || "Member");
         return {
           ...prev,
           enableMultipleRoles: false,
           roleName: singleRole,
         };
       }
-      return {
-        ...prev,
-        enableMultipleRoles: checked,
-        primaryRoles: pRoles,
-        secondaryRoles: sRoles,
-      };
     });
     setErrors((prev) => ({
       ...prev,
-      primaryRoles: "",
-      secondaryRoles: "",
+      primaryRole: "",
+      secondaryRole: "",
       roleName: "",
     }));
   }
@@ -607,17 +498,14 @@ export default function UsersPage() {
     const e = validateForm(form, schema);
 
     if (form.enableMultipleRoles) {
-      if (!form.primaryRoles || form.primaryRoles.length === 0) {
-        e.primaryRoles = "At least one Primary Role is required";
+      if (!form.primaryRole) {
+        e.primaryRole = "Primary Role is required";
       }
-      if (!form.secondaryRoles || form.secondaryRoles.length === 0) {
-        e.secondaryRoles = "At least one Secondary Role is required";
+      if (!form.secondaryRole) {
+        e.secondaryRole = "Secondary Role is required";
       }
-      if (form.primaryRoles && form.secondaryRoles) {
-        const overlap = form.primaryRoles.filter((r) => form.secondaryRoles.includes(r));
-        if (overlap.length > 0) {
-          e.secondaryRoles = "Same role cannot be selected in both Primary and Secondary";
-        }
+      if (form.primaryRole && form.secondaryRole && form.primaryRole === form.secondaryRole) {
+        e.secondaryRole = "Secondary Role must be different from Primary Role";
       }
     }
 
@@ -713,8 +601,12 @@ export default function UsersPage() {
     setSaving(true);
     try {
       const isMultiple = Boolean(form.enableMultipleRoles);
-      const primaryRolesList = isMultiple ? (form.primaryRoles || []) : (form.roleName ? [form.roleName] : []);
-      const secondaryRolesList = isMultiple ? (form.secondaryRoles || []) : [];
+      const primaryRolesList = isMultiple
+        ? (form.primaryRole ? [form.primaryRole] : [])
+        : (form.roleName ? [form.roleName] : []);
+      const secondaryRolesList = isMultiple
+        ? (form.secondaryRole && form.secondaryRole !== form.primaryRole ? [form.secondaryRole] : [])
+        : [];
       const combinedRoles = isMultiple
         ? [...new Set([...primaryRolesList, ...secondaryRolesList])]
         : (form.roleName ? [form.roleName] : ["Member"]);
@@ -744,6 +636,13 @@ export default function UsersPage() {
       if (form.userId) {
         await updateUserAsync(form.userId, payload);
         toast.success("Saved successfully");
+        if (authState && (authState.userId === form.userId || authState.email?.toLowerCase() === form.email.trim().toLowerCase())) {
+          try {
+            await switchRole(mainRoleName);
+          } catch {
+            // Ignore switch role error if any
+          }
+        }
       } else {
         await createUserAsync(payload);
         toast.success("Saved successfully");
@@ -1117,19 +1016,32 @@ export default function UsersPage() {
     { label: "Email", key: "email" },
     {
       label: "User Role",
-      key: "roleName",
+      key: "roleId",
       render: (row) => {
-        const assignedRoles = (Array.isArray(row.roles) && row.roles.length > 0)
-          ? row.roles
-          : (row.roleName ? [row.roleName] : ["Member"]);
+        let assignedRoleNames = [];
+        if (Array.isArray(row.roleIds) && row.roleIds.length > 0) {
+          assignedRoleNames = row.roleIds.map((id) => getRoleNameById(id)).filter(Boolean);
+        } else if (row.roleId) {
+          assignedRoleNames = [getRoleNameById(row.roleId)];
+        } else if (Array.isArray(row.roles) && row.roles.length > 0) {
+          assignedRoleNames = row.roles;
+        } else if (row.roleName) {
+          assignedRoleNames = [row.roleName];
+        } else {
+          assignedRoleNames = ["Member"];
+        }
+
+        const primaryRoleName = (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0)
+          ? getRoleNameById(row.primaryRoleIds[0])
+          : (row.roleId ? getRoleNameById(row.roleId) : null);
 
         return (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>
-            {assignedRoles.map((r, idx) => {
+            {assignedRoleNames.map((r, idx) => {
               const style = getRoleStyle(r);
               const isPrimary = Boolean(
-                row.primaryRoles?.includes(r) ||
-                (!row.primaryRoles?.length && idx === 0)
+                (primaryRoleName && r === primaryRoleName) ||
+                (!primaryRoleName && idx === 0)
               );
               return (
                 <React.Fragment key={`${r}-${idx}`}>
@@ -1148,7 +1060,7 @@ export default function UsersPage() {
                       border: isPrimary ? "1px solid rgba(124, 58, 237, 0.35)" : "none",
                     }}
                   />
-                  {idx < assignedRoles.length - 1 && (
+                  {idx < assignedRoleNames.length - 1 && (
                     <Typography
                       variant="caption"
                       sx={{ color: "text.disabled", fontWeight: 700, mx: 0.2 }}
@@ -1548,7 +1460,7 @@ export default function UsersPage() {
           {!form.enableMultipleRoles && (
             <Grid size={{ xs: 12, md: 6 }}>
               <AppSelect
-                label="Member Role"
+                label="User Role"
                 placeholder="Select role…"
                 value={form.roleName}
                 onChange={(e) => fieldChange("roleName", e.target.value)}
@@ -1560,32 +1472,42 @@ export default function UsersPage() {
             </Grid>
           )}
 
-          {/* Row 2 (When Enable Multiple Roles = ON): Primary Role * & Secondary Role * */}
+          {/* Row 2 (When Enable Multiple Roles = ON): Primary Role * & Secondary Role * (1 role each, max 2 roles) */}
           {form.enableMultipleRoles && (
             <>
               <Grid size={{ xs: 12, md: 6 }}>
-                <AppMultiRoleSelect
+                <AppSelect
                   label="Primary Role"
-                  placeholder="Select primary role(s)…"
-                  value={form.primaryRoles}
-                  onChange={(val) => fieldChange("primaryRoles", val)}
-                  options={userRolesList}
-                  disabledOptions={form.secondaryRoles}
-                  error={!!errors.primaryRoles}
-                  helperText={errors.primaryRoles}
+                  placeholder="Select primary role…"
+                  value={form.primaryRole}
+                  onChange={(e) => {
+                    const newPrimary = e.target.value;
+                    fieldChange("primaryRole", newPrimary);
+                    if (form.secondaryRole === newPrimary) {
+                      fieldChange("secondaryRole", "");
+                    }
+                  }}
+                  options={userRolesList.map((r) => ({
+                    ...r,
+                    disabled: r.value === form.secondaryRole,
+                  }))}
+                  error={!!errors.primaryRole}
+                  helperText={errors.primaryRole}
                   required
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
-                <AppMultiRoleSelect
+                <AppSelect
                   label="Secondary Role"
-                  placeholder="Select secondary role(s)…"
-                  value={form.secondaryRoles}
-                  onChange={(val) => fieldChange("secondaryRoles", val)}
-                  options={userRolesList}
-                  disabledOptions={form.primaryRoles}
-                  error={!!errors.secondaryRoles}
-                  helperText={errors.secondaryRoles}
+                  placeholder="Select secondary role…"
+                  value={form.secondaryRole}
+                  onChange={(e) => fieldChange("secondaryRole", e.target.value)}
+                  options={userRolesList.map((r) => ({
+                    ...r,
+                    disabled: r.value === form.primaryRole,
+                  }))}
+                  error={!!errors.secondaryRole}
+                  helperText={errors.secondaryRole}
                   required
                 />
               </Grid>
