@@ -216,8 +216,8 @@ export default function EventFormPage() {
   const isEdit = Boolean(id);
 
   // Granular Action Permissions
-  const canAddEvent = hasActionPermission("Add Event", 31, authState?.role).canExecute && canEdit;
-  const canEditEvent = hasActionPermission("Edit Event", 32, authState?.role).canExecute && canEdit;
+  const canAddEvent = hasActionPermission("Add Event", 32, authState?.role).canExecute && canEdit;
+  const canEditEvent = hasActionPermission("Edit Event", 33, authState?.role).canExecute && canEdit;
 
   useEffect(() => {
     if (!isEdit && !canAddEvent) {

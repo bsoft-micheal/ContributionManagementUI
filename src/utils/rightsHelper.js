@@ -5,22 +5,12 @@ import { navigationItems } from "../config/menuConfig";
  */
 function getParentPageFeatureId(actionFeatureId) {
   const id = Number(actionFeatureId);
-  if (id >= 25 && id <= 29) return 2;   // Users
-  if (id >= 30 && id <= 34) return 4;   // Event
-  if (id >= 35 && id <= 39) return 6;   // Gallery
-  if (id >= 40 && id <= 41) return 8;   // Contribution
-  if (id >= 42 && id <= 43) return 9;   // Payment History
-  if (id >= 44 && id <= 45) return 10;  // Calculation
-  if (id >= 46 && id <= 51) return 11;  // Expense
-  if (id >= 52 && id <= 54) return 24;  // Payment Submission
-  if (id >= 55 && id <= 60) return 12;  // Support Ticket
-  if (id >= 61 && id <= 65) return 18;  // Budget Calculation
-  if (id >= 66 && id <= 70) return 19;  // Types
-  if (id >= 71 && id <= 75) return 20;  // Status
-  if (id >= 76 && id <= 78) return 21;  // Exit Process
-  if (id >= 79 && id <= 80) return 22;  // Settings
-  if (id >= 81 && id <= 82) return 23;  // Reports
-  if (id >= 83 && id <= 89) return 2;   // Users
+  if (id >= 24 && id <= 30) return 2;   // Users
+  if (id >= 31 && id <= 35) return 4;   // Event
+  if (id >= 36 && id <= 40) return 6;   // Gallery
+  if (id >= 41 && id <= 43) return 8;   // Contribution
+  if (id >= 44 && id <= 48) return 11;  // Expense
+  if (id >= 49 && id <= 53) return 12;  // Support Ticket
   return null;
 }
 
@@ -49,20 +39,34 @@ function getParentFeatureIdFromActionName(actionName) {
 }
 
 /**
- * Extract active role rights from localStorage with unified priority:
- * 1. rightsMap["current"]
- * 2. rightsMap[roleName]
- * 3. rightsMap[roleName.toLowerCase()]
+ * Extract active role rights from localStorage with unified priority and case resilience:
+ * 1. Exact or case-insensitive match for roleName in rightsMap
+ * 2. Fallback to rightsMap["current"]
  */
 function getActiveRoleRights(roleName) {
   const savedRights = localStorage.getItem("projectRightsConfig");
   if (!savedRights) return null;
   try {
     const rightsMap = JSON.parse(savedRights);
-    const roleLower = roleName ? String(roleName).toLowerCase() : "";
-    const roleRights = rightsMap["current"] || (roleName && (rightsMap[roleName] || rightsMap[roleLower]));
-    if (Array.isArray(roleRights) && roleRights.length > 0) {
-      return roleRights;
+    const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
+    const cleanName = String(resolvedName).trim();
+    const roleLower = cleanName.toLowerCase();
+
+    if (cleanName) {
+      if (rightsMap[cleanName] && Array.isArray(rightsMap[cleanName]) && rightsMap[cleanName].length > 0) {
+        return rightsMap[cleanName];
+      }
+      if (rightsMap[roleLower] && Array.isArray(rightsMap[roleLower]) && rightsMap[roleLower].length > 0) {
+        return rightsMap[roleLower];
+      }
+      const matchingKey = Object.keys(rightsMap).find(k => k.toLowerCase().trim() === roleLower);
+      if (matchingKey && Array.isArray(rightsMap[matchingKey]) && rightsMap[matchingKey].length > 0) {
+        return rightsMap[matchingKey];
+      }
+    }
+
+    if (rightsMap["current"] && Array.isArray(rightsMap["current"]) && rightsMap["current"].length > 0) {
+      return rightsMap["current"];
     }
     return null;
   } catch {
@@ -128,9 +132,10 @@ export function getFeatureIdForPath(path) {
  * Resolves permissions for a given featureId and roleName.
  */
 export function getRightsForFeatureId(featureId, roleName) {
-  const roleLower = roleName ? String(roleName).toLowerCase() : "";
+  const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
+  const roleLower = String(resolvedName).trim().toLowerCase();
   const isAdminOrOrg = roleLower === "admin" || roleLower === "organizer";
-  const roleRights = getActiveRoleRights(roleName);
+  const roleRights = getActiveRoleRights(resolvedName);
 
   if (!roleRights) {
     return { read: true, write: isAdminOrOrg, deny: false };
@@ -166,11 +171,12 @@ export function getRightsForFeatureId(featureId, roleName) {
  * Resolves permissions for a URL path by finding its featureId and evaluating rights.
  */
 export function getRightsForPath(path, roleName) {
+  const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
   const featureId = getFeatureIdForPath(path);
   if (featureId) {
-    return getRightsForFeatureId(featureId, roleName);
+    return getRightsForFeatureId(featureId, resolvedName);
   }
-  return getRightsForPage(path, roleName);
+  return getRightsForPage(path, resolvedName);
 }
 
 export function getRightsForPage(pageName, roleName) {
@@ -227,52 +233,36 @@ export function getRightsForPage(pageName, roleName) {
  * @returns {{ canView: boolean, canExecute: boolean, isDenied: boolean, readOnly: boolean }}
  */
 export function hasActionPermission(actionName, featureId, roleName) {
-  const roleRights = getActiveRoleRights(roleName);
-  const roleLower = roleName ? String(roleName).toLowerCase() : "";
+  const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
+  const roleLower = String(resolvedName).trim().toLowerCase();
   const isAdminOrOrg = roleLower === "admin" || roleLower === "organizer";
+  const roleRights = getActiveRoleRights(resolvedName);
 
   if (!roleRights) {
-    return { canView: true, canExecute: isAdminOrOrg, isDenied: false, readOnly: !isAdminOrOrg };
+    return { canView: true, canExecute: false, isDenied: false, readOnly: true };
   }
 
   const numericFeatureId = Number(featureId);
   let matchedRight = null;
 
-  // 1. Try matching by action featureId
+  // 1. Try matching by exact action featureId
   if (numericFeatureId > 0) {
     matchedRight = roleRights.find(r => Number(r.featureId || r.featureID || r.FeatureID || r.FeatureId) === numericFeatureId);
   }
 
-  // 2. Fallback matching by action / page / subModule / normalized combination name
-  if (!matchedRight && actionName) {
+  // 2. Fallback matching by action / page / subModule name only if numeric featureId was not specified
+  if (!matchedRight && !numericFeatureId && actionName) {
     const cleanAction = String(actionName).toLowerCase().trim();
     matchedRight = roleRights.find(r => {
       const act = String(r.action || r.Action || "").toLowerCase().trim();
       const pg = String(r.page || r.Page || "").toLowerCase().trim();
       const sub = String(r.subModule || r.SubModule || "").toLowerCase().trim();
-      const mod = String(r.module || r.Module || "").toLowerCase().trim();
 
-      if (act === cleanAction || pg === cleanAction || sub === cleanAction) return true;
-      if (act && sub && `${act} ${sub}`.toLowerCase() === cleanAction) return true;
-      if (act && mod && `${act} ${mod}`.toLowerCase() === cleanAction) return true;
-      if (act && cleanAction.startsWith(act) && (cleanAction.includes(sub) || cleanAction.includes(mod))) return true;
-      return false;
+      return act === cleanAction || pg === cleanAction || sub === cleanAction;
     });
   }
 
-  // 3. Parent Page Fallback if action featureId or name wasn't explicitly found
   if (!matchedRight) {
-    let parentPageFeatureId = numericFeatureId > 0 ? getParentPageFeatureId(numericFeatureId) : null;
-    if (!parentPageFeatureId && actionName) {
-      parentPageFeatureId = getParentFeatureIdFromActionName(actionName);
-    }
-    if (parentPageFeatureId) {
-      matchedRight = roleRights.find(r => Number(r.featureId || r.featureID || r.FeatureID || r.FeatureId) === parentPageFeatureId);
-    }
-  }
-
-  if (!matchedRight) {
-    // If unmapped, enforce strict protection (read allowed, write execution forbidden)
     return { canView: true, canExecute: false, isDenied: false, readOnly: true };
   }
 

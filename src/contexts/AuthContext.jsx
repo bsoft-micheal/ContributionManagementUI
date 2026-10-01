@@ -351,6 +351,73 @@ export function AuthProvider({ children }) {
     return data;
   }
 
+  const refreshRights = async (roleName) => {
+    const targetRole = roleName || authState?.role || authState?.roleName;
+    if (!targetRole) return;
+
+    try {
+      const { data: resData } = await apiClient.get(`/user-rights/getUserRightAsyncByRole/${targetRole}`);
+      const serverRights = (resData && resData.data !== undefined) ? resData.data : resData;
+      const rows = Array.isArray(serverRights) ? serverRights : [];
+
+      const processed = rows.map((r, idx) => {
+        let typeVal = r.accessType ?? r.AccessType;
+        if (typeVal === undefined || typeVal === null || isNaN(Number(typeVal)) || Number(typeVal) === 0) {
+          const str = String(r.access || r.Access || "").toLowerCase().replace(/[\s_-]/g, "");
+          typeVal = (str === "deny" || str === "3") ? 3 : ((str === "readonly" || str === "1") ? 1 : 2);
+        }
+        return {
+          id: idx + 1,
+          featureId: r.featureID ?? r.featureId ?? r.FeatureID ?? r.FeatureId,
+          module: r.module || r.Module || "",
+          subModule: r.subModule || r.SubModule || "",
+          action: r.action || r.Action || "",
+          page: r.page || r.Page || "",
+          access: r.access || r.Access || (Number(typeVal) === 3 ? "deny" : (Number(typeVal) === 1 ? "readOnly" : "readWrite")),
+          accessType: Number(typeVal)
+        };
+      });
+
+      const savedRights = localStorage.getItem("projectRightsConfig");
+      let rightsMap = savedRights ? JSON.parse(savedRights) : {};
+      rightsMap[targetRole] = processed;
+      rightsMap[targetRole.toLowerCase()] = processed;
+      const activeRole = authState?.role || authState?.roleName;
+      if (activeRole && targetRole.toLowerCase() === activeRole.toLowerCase()) {
+        rightsMap["current"] = processed;
+      }
+      localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
+
+      setAuthState((prev) => {
+        if (!prev) return prev;
+        const updated = { ...prev, rights: processed, _updatedAt: Date.now() };
+        sessionStorage.setItem("teamContributionAuth", JSON.stringify(updated));
+        if (localStorage.getItem("teamContributionRememberMe") === "true") {
+          localStorage.setItem("teamContributionAuth", JSON.stringify(updated));
+        }
+        return updated;
+      });
+    } catch {
+      // ignore background refresh error
+    }
+  };
+
+  useEffect(() => {
+    const handleRightsUpdated = (e) => {
+      const roleToRefresh = e?.detail?.roleName || authState?.role || authState?.roleName;
+      if (roleToRefresh) {
+        refreshRights(roleToRefresh);
+      }
+    };
+
+    window.addEventListener("rightsUpdated", handleRightsUpdated);
+    window.addEventListener("storage", handleRightsUpdated);
+    return () => {
+      window.removeEventListener("rightsUpdated", handleRightsUpdated);
+      window.removeEventListener("storage", handleRightsUpdated);
+    };
+  }, [authState?.role, authState?.roleName]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -361,6 +428,7 @@ export function AuthProvider({ children }) {
         logout,
         updateProfile,
         fetchProfile,
+        refreshRights,
         isAuthenticated: Boolean(authState?.token),
       }}
     >

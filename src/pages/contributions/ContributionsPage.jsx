@@ -79,8 +79,8 @@ export default function ContributionsPage() {
   const hasWriteAccess = canEdit;
 
   // Granular Action Permissions
-  const canAddContribution = hasActionPermission("Add Contribution", 41, authState?.role).canExecute;
-  const canViewContribution = hasActionPermission("View Contribution", 40, authState?.role).canView;
+  const canAddContribution = hasActionPermission("Submit Payemnt details", 41, authState?.role).canExecute;
+  const canViewContribution = hasActionPermission("View Contribution", 8, authState?.role).canView;
   const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
   const isAuthorityRole = !isMemberRole || hasWriteAccess || [
     "admin",

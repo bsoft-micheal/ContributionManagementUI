@@ -123,12 +123,12 @@ export default function ExpensePage() {
   const fileInputRef = useRef(null);
 
   // Granular Action Permissions configured via User Rights
-  const canViewExpense = hasActionPermission("View Expense", 46, authState?.role).canView;
-  const canAddExpense = hasActionPermission("Add Expense", 47, authState?.role).canExecute && hasWriteAccess;
-  const canEditExpense = hasActionPermission("Edit Expense", 48, authState?.role).canExecute && hasWriteAccess;
-  const canDeleteExpense = hasActionPermission("Delete Expense", 49, authState?.role).canExecute && hasWriteAccess;
-  const canVerifyExpense = hasActionPermission("Verify Expense", 50, authState?.role).canExecute && hasWriteAccess;
-  const canExportExpense = hasActionPermission("Export Expense", 51, authState?.role).canExecute;
+  const canViewExpense = hasActionPermission("View details", 44, authState?.role).canView;
+  const canAddExpense = hasActionPermission("Add Expense", 48, authState?.role).canExecute && hasWriteAccess;
+  const canEditExpense = hasActionPermission("Edit", 46, authState?.role).canExecute && hasWriteAccess;
+  const canDeleteExpense = hasActionPermission("Delete", 47, authState?.role).canExecute && hasWriteAccess;
+  const canVerifyExpense = hasActionPermission("Verify", 45, authState?.role).canExecute && hasWriteAccess;
+  const canExportExpense = hasActionPermission("Export Expense", 48, authState?.role).canExecute;
 
   const [expenses, setExpenses] = useState([]);
   const [eventsList, setEventsList] = useState([]);

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Avatar,
   Box,
@@ -141,6 +141,19 @@ export default function AppLayout() {
   }, [authState]);
 
   const hasMultipleRoles = userAssignedRoles.length > 1;
+  const [, setRightsVersion] = useState(0);
+
+  useEffect(() => {
+    const handleRightsUpdate = () => {
+      setRightsVersion((prev) => prev + 1);
+    };
+    window.addEventListener("rightsUpdated", handleRightsUpdate);
+    window.addEventListener("storage", handleRightsUpdate);
+    return () => {
+      window.removeEventListener("rightsUpdated", handleRightsUpdate);
+      window.removeEventListener("storage", handleRightsUpdate);
+    };
+  }, []);
 
   const [profileForm, setProfileForm] = useState({
     fullName: "",
@@ -400,17 +413,18 @@ export default function AppLayout() {
   };
 
   const renderNavItem = (item) => {
-    if (item.adminOnly && authState?.role !== "Admin") return null;
+    const activeRole = authState?.role || authState?.roleName;
+    if (item.adminOnly && String(activeRole || "").toLowerCase() !== "admin") return null;
 
     if (item.path) {
-      const rights = getRightsForPath(item.path, authState?.role);
+      const rights = getRightsForPath(item.path, activeRole);
       if (rights.deny) return null;
     }
 
     if (item.children) {
       const visibleChildren = item.children.filter((child) => {
-        if (child.adminOnly && authState?.role !== "Admin") return false;
-        const rights = getRightsForPath(child.path, authState?.role);
+        if (child.adminOnly && String(activeRole || "").toLowerCase() !== "admin") return false;
+        const rights = getRightsForPath(child.path, activeRole);
         return !rights.deny;
       });
       if (visibleChildren.length === 0) return null;
