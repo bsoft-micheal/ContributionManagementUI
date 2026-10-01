@@ -142,6 +142,7 @@ export default function AppSelect({
           <MenuItem
             key={option.value}
             value={option.value}
+            disabled={Boolean(option.disabled)}
             sx={{ fontSize: "0.85rem", py: 1 }}
           >
             {option.label}

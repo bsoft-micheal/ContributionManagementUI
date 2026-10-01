@@ -119,6 +119,7 @@ const initialSettings = {
   orgName: "Unit 1A Residents Association",
   birthdayMembersExempt: true,
   allowedMultipleEvent: false,
+  allowMultipleEvents: false,
   enableEmailNotif: true,
   notifNewMember: true,
   notifPaymentConfirm: true,
@@ -167,7 +168,15 @@ export default function SettingsPage() {
           allowedMultipleEvent:
             parsed.allowedMultipleEvent !== undefined
               ? Boolean(parsed.allowedMultipleEvent)
-              : false,
+              : parsed.allowMultipleEvents !== undefined
+                ? Boolean(parsed.allowMultipleEvents)
+                : false,
+          allowMultipleEvents:
+            parsed.allowedMultipleEvent !== undefined
+              ? Boolean(parsed.allowedMultipleEvent)
+              : parsed.allowMultipleEvents !== undefined
+                ? Boolean(parsed.allowMultipleEvents)
+                : false,
         };
       } catch (e) {
         return initialSettings;
@@ -673,6 +682,7 @@ export default function SettingsPage() {
               }
               if (parsed.birthdayMembersExempt !== undefined) localBirthdayMembersExempt = parsed.birthdayMembersExempt;
               if (parsed.allowedMultipleEvent !== undefined) localAllowedMultipleEvent = parsed.allowedMultipleEvent;
+              if (parsed.allowMultipleEvents !== undefined && localAllowedMultipleEvent === undefined) localAllowedMultipleEvent = parsed.allowMultipleEvents;
             }
           } catch (e) { }
 
@@ -685,10 +695,12 @@ export default function SettingsPage() {
 
           const resolvedAllowedMultipleEvent =
             data.allowedMultipleEvent !== undefined
-              ? data.allowedMultipleEvent
-              : localAllowedMultipleEvent !== undefined
-                ? localAllowedMultipleEvent
-                : false;
+              ? Boolean(data.allowedMultipleEvent)
+              : data.allowMultipleEvents !== undefined
+                ? Boolean(data.allowMultipleEvents)
+                : localAllowedMultipleEvent !== undefined
+                  ? Boolean(localAllowedMultipleEvent)
+                  : false;
 
           const isPlaceholderUpi =
             !data.qrUpiId ||
@@ -707,6 +719,7 @@ export default function SettingsPage() {
             ...data,
             birthdayMembersExempt: resolvedBirthdayMembersExempt,
             allowedMultipleEvent: resolvedAllowedMultipleEvent,
+            allowMultipleEvents: resolvedAllowedMultipleEvent,
             qrUpiId: cleanUpiId,
             qrReceiverName: cleanReceiver,
             qrMode: localMode,
@@ -784,13 +797,25 @@ export default function SettingsPage() {
 
   // Immediate toggle and persistence for Allow Multiple Events setting
   const handleAllowedMultipleEventToggle = async (checked) => {
-    const updated = { ...settings, allowedMultipleEvent: checked };
+    const updated = {
+      ...settings,
+      allowedMultipleEvent: checked,
+      allowMultipleEvents: checked,
+    };
     setSettings(updated);
 
     try {
       const saved = localStorage.getItem("cm_system_settings");
       const parsed = saved ? JSON.parse(saved) : {};
-      localStorage.setItem("cm_system_settings", JSON.stringify({ ...parsed, ...updated, allowedMultipleEvent: checked }));
+      localStorage.setItem(
+        "cm_system_settings",
+        JSON.stringify({
+          ...parsed,
+          ...updated,
+          allowedMultipleEvent: checked,
+          allowMultipleEvents: checked,
+        })
+      );
     } catch (e) { }
 
     try {
