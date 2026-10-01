@@ -41,7 +41,7 @@ import { getMembersAsync } from "../../services/memberService";
 import { getRolesAsync } from "../../services/roleService";
 import { getPaymentModesAsync } from "../../services/paymentModeService";
 import { getStatusesAsync } from "../../services/statusService";
-import { getPaymentTransactionsAsync, verifyPaymentTransactionAsync } from "../../services/paymentService";
+import { getPaymentTransactionsAsync, verifyPaymentTransactionAsync, createPaymentTransactionAsync } from "../../services/paymentService";
 import AppDataTable from "../../components/common/AppDataTable";
 
 import AppDialog from "../../components/common/AppDialog";
@@ -82,7 +82,19 @@ export default function ContributionsPage() {
   const canAddContribution = hasActionPermission("Add Contribution", 41, authState?.role).canExecute;
   const canViewContribution = hasActionPermission("View Contribution", 40, authState?.role).canView;
   const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
-  const isAuthorityRole = ["admin", "manager"].includes(String(authState?.role || "").toLowerCase());
+  const isAuthorityRole = !isMemberRole || hasWriteAccess || [
+    "admin",
+    "superadmin",
+    "organizer",
+    "treasurer",
+    "president",
+    "secretary",
+    "committee",
+    "manager",
+    "staff",
+    "lead",
+    "user",
+  ].includes(String(authState?.role || authState?.user?.role || "").toLowerCase());
 
   // Authority Status Update state
   const [statusModalOpen, setStatusModalOpen] = useState(false);
@@ -182,9 +194,11 @@ export default function ContributionsPage() {
   const reloadAllContributions = async () => {
     try {
       const allData = await getContributionsAsync();
-      setAllContributions(allData);
+      const list = Array.isArray(allData) ? allData : [];
+      setAllContributions(list);
+      return list;
     } catch {
-      // fallback
+      return [];
     }
   };
 
@@ -196,10 +210,24 @@ export default function ContributionsPage() {
     return () => window.removeEventListener("contribution_updated", handleUpdate);
   }, []);
 
+  const isContributionPaid = (c) => {
+    if (!c) return false;
+    if (typeof c === "string") {
+      const s = c.trim().toLowerCase();
+      return s === "paid" || s === "verified" || s === "closed" || s === "completed";
+    }
+    if (c.paymentStatus === 2 || c.PaymentStatus === 2 || c.paymentStatus === "2" || c.PaymentStatus === "2") return true;
+    if (c.isPaid === true) return true;
+    const status = String(c.paymentStatus || c.PaymentStatus || c.status || c.statusName || "").trim().toLowerCase();
+    if (status === "paid" || status === "verified" || status === "closed" || status === "completed" || status.includes("paid") || status.includes("verif")) return true;
+    if (c.paymentDate && (c.paymentMode && c.paymentMode !== "None")) return true;
+    return false;
+  };
+
   const getContributionOutstanding = (c) => {
     if (!c) return 0;
-    if (c.paymentStatus === "Paid") return 0;
-    return c.amount || 0;
+    if (isContributionPaid(c)) return 0;
+    return Number(c.amount || 0);
   };
 
   useEffect(() => {
@@ -218,17 +246,17 @@ export default function ContributionsPage() {
             prev =>
               prev.memberId === c.memberId &&
               prev.eventId !== c.eventId &&
-              prev.paymentStatus !== "Paid"
+              !isContributionPaid(prev)
           );
-          const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (prev.amount || 0), 0);
-
+          const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
           const currentOutstanding = getContributionOutstanding(c);
+          const isPaid = isContributionPaid(c);
 
           return {
             ...c,
             previousUnpaid,
             previousUnpaidItems,
-            totalAccumulated: currentOutstanding + previousUnpaid
+            totalAccumulated: isPaid ? previousUnpaid : (currentOutstanding + previousUnpaid)
           };
         });
 
@@ -462,17 +490,17 @@ export default function ContributionsPage() {
           prev =>
             prev.memberId === c.memberId &&
             prev.eventId !== c.eventId &&
-            prev.paymentStatus !== "Paid"
+            !isContributionPaid(prev)
         );
-        const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (prev.amount || 0), 0);
-
+        const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
         const currentOutstanding = getContributionOutstanding(c);
+        const isPaid = isContributionPaid(c);
 
         return {
           ...c,
           previousUnpaid,
           previousUnpaidItems,
-          totalAccumulated: currentOutstanding + previousUnpaid
+          totalAccumulated: isPaid ? previousUnpaid : (currentOutstanding + previousUnpaid)
         };
       });
 
@@ -578,6 +606,31 @@ export default function ContributionsPage() {
       ? customNotes
       : (auditRemarks || `Status updated to ${newStatus} by ${verifier}.`);
 
+    const isMarkingPaid = ["paid", "verified", "closed", "completed"].includes(String(newStatus).toLowerCase());
+
+    // Optimistically update the current table row immediately
+    setContributions((prev) =>
+      prev.map((c) => {
+        if (
+          (target.contributionId && c.contributionId === target.contributionId) ||
+          (String(c.memberId).toLowerCase() === String(target.memberId).toLowerCase() &&
+            String(c.eventId).toLowerCase() === String(target.eventId).toLowerCase())
+        ) {
+          const updatedStatus = isMarkingPaid ? "Paid" : newStatus;
+          const isPaid = isMarkingPaid;
+          const arrears = c.previousUnpaid || 0;
+          return {
+            ...c,
+            paymentStatus: updatedStatus,
+            paymentDate: isPaid ? (c.paymentDate || new Date().toISOString()) : c.paymentDate,
+            paymentMode: c.paymentMode && c.paymentMode !== "None" ? c.paymentMode : (isPaid ? "Cash" : c.paymentMode),
+            totalAccumulated: isPaid ? arrears : (Number(c.amount || 0) + arrears),
+          };
+        }
+        return c;
+      })
+    );
+
     try {
       setStatusSaving(true);
 
@@ -593,7 +646,7 @@ export default function ContributionsPage() {
           verifiedBy: verifier,
           notes: noteText,
         });
-      } else if (newStatus.toLowerCase() === "paid" || newStatus.toLowerCase() === "verified") {
+      } else if (isMarkingPaid) {
         await recordPaymentAsync({
           eventId: target.eventId,
           memberId: target.memberId,
@@ -601,6 +654,18 @@ export default function ContributionsPage() {
           paymentMode: target.paymentMode && target.paymentMode !== "None" ? target.paymentMode : "Cash",
           paymentDate: new Date().toISOString(),
           notes: noteText,
+        });
+      } else {
+        await createPaymentTransactionAsync({
+          eventId: target.eventId,
+          userId: target.memberId,
+          memberName: target.memberName,
+          eventName: target.eventName || events.find((e) => e.eventId === target.eventId)?.eventName || "Contribution",
+          amount: Number(target.amount || target.totalAccumulated || 0),
+          paymentMode: target.paymentMode && target.paymentMode !== "None" ? target.paymentMode : "Cash",
+          status: newStatus,
+          notes: noteText,
+          paymentDate: new Date().toISOString(),
         });
       }
 
@@ -623,22 +688,41 @@ export default function ContributionsPage() {
       setStatusModalOpen(false);
       setStatusModalRow(null);
       setAuditRemarks("");
-      await reloadAllContributions();
+
+      try {
+        const txRes = await getPaymentTransactionsAsync();
+        if (Array.isArray(txRes)) setTransactions(txRes);
+      } catch {}
+
+      const freshAll = await reloadAllContributions();
       if (selectedEventId) {
         const freshData = await getContributionsByEventAsync(selectedEventId);
+        const allList = (freshAll && freshAll.length > 0) ? freshAll : (allContributions || []);
         let enriched = freshData.map((c) => {
-          const previousUnpaidItems = (allContributions || []).filter(
-            (prev) => prev.memberId === c.memberId && prev.eventId !== c.eventId && prev.paymentStatus !== "Paid"
+          const previousUnpaidItems = allList.filter(
+            (prev) => prev.memberId === c.memberId && prev.eventId !== c.eventId && !isContributionPaid(prev)
           );
-          const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (prev.amount || 0), 0);
+          const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
           const currentOutstanding = getContributionOutstanding(c);
+          const isPaid = isContributionPaid(c);
           return {
             ...c,
             previousUnpaid,
             previousUnpaidItems,
-            totalAccumulated: currentOutstanding + previousUnpaid,
+            totalAccumulated: isPaid ? previousUnpaid : (currentOutstanding + previousUnpaid),
           };
         });
+
+        if (isMemberRole) {
+          const userEmail = String(authState?.email || "").toLowerCase().trim();
+          const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
+          enriched = enriched.filter(c =>
+            (currentMemberId && String(c.memberId).toLowerCase() === currentMemberId) ||
+            (userEmail && String(c.email || c.memberEmail || "").toLowerCase().trim() === userEmail) ||
+            (authState?.user?.fullName && String(c.memberName || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim())
+          );
+        }
+
         setContributions(enriched);
       }
     } catch (err) {
@@ -685,7 +769,16 @@ export default function ContributionsPage() {
                     setAuditRemarks("");
                     setStatusModalOpen(true);
                   }}
-                  sx={{ color: "#16a34a", p: 0.4 }}
+                  sx={{
+                    p: 0.4,
+                    color: "#16a34a",
+                    bgcolor: "rgba(22, 163, 74, 0.08)",
+                    borderRadius: "6px",
+                    "&:hover": {
+                      bgcolor: "rgba(22, 163, 74, 0.18)",
+                      color: "#15803d",
+                    },
+                  }}
                 >
                   <StatusUpdateIcon sx={{ fontSize: "1.15rem" }} />
                 </IconButton>
@@ -710,7 +803,16 @@ export default function ContributionsPage() {
                       },
                     });
                   }}
-                  sx={{ color: "#ef4444", p: 0.4 }}
+                  sx={{
+                    p: 0.4,
+                    color: "#ef4444",
+                    bgcolor: "rgba(239, 68, 68, 0.08)",
+                    borderRadius: "6px",
+                    "&:hover": {
+                      bgcolor: "rgba(239, 68, 68, 0.18)",
+                      color: "#dc2626",
+                    },
+                  }}
                 >
                   <TicketIcon sx={{ fontSize: "1.15rem" }} />
                 </IconButton>
@@ -724,28 +826,37 @@ export default function ContributionsPage() {
     {
       label: "Status",
       key: "paymentStatus",
-      render: (row) => (
-        <Typography
-          variant="caption" fontWeight={800}
-          sx={{
-            color: row.paymentStatus === "Paid" ? "#16a34a" : "#dc2626",
-            bgcolor: row.paymentStatus === "Paid" ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)",
-            px: 1.2, py: 0.3, borderRadius: "3px",
-            fontSize: "0.7rem", letterSpacing: "0.04em"
-          }}
-        >
-          {row.paymentStatus}
-        </Typography>
-      )
+      render: (row) => {
+        const isPaid = isContributionPaid(row);
+        const displayStatus = isPaid ? "Paid" : (row.paymentStatus || "Pending");
+        return (
+          <Typography
+            variant="caption" fontWeight={800}
+            sx={{
+              color: isPaid ? "#16a34a" : "#dc2626",
+              bgcolor: isPaid ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)",
+              px: 1.2, py: 0.3, borderRadius: "3px",
+              fontSize: "0.7rem", letterSpacing: "0.04em"
+            }}
+          >
+            {displayStatus}
+          </Typography>
+        );
+      }
     },
     {
       label: "Amount",
       key: "amount",
       align: "right",
       render: (row) => {
-        const currentDue = row.paymentStatus === "Paid" ? 0 : (row.amount || 0);
+        const isPaid = isContributionPaid(row);
+        const currentDue = isPaid ? 0 : (Number(row.amount) || 0);
         return (
-          <Typography variant="body2" fontWeight={700} color={row.paymentStatus === "Paid" ? "text.secondary" : "inherit"}>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            color={isPaid ? "text.secondary" : "inherit"}
+          >
             ₹{currentDue.toLocaleString()}
           </Typography>
         );
@@ -798,11 +909,19 @@ export default function ContributionsPage() {
       label: "Total Due",
       key: "totalAccumulated",
       align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={900} color={theme.palette.mode === "dark" ? "#ffffff" : "primary.main"}>
-          ₹{(row.totalAccumulated || 0).toLocaleString()}
-        </Typography>
-      )
+      render: (row) => {
+        const isPaid = isContributionPaid(row);
+        const due = isPaid ? (row.previousUnpaid || 0) : (row.totalAccumulated ?? ((Number(row.amount) || 0) + (row.previousUnpaid || 0)));
+        return (
+          <Typography
+            variant="body2"
+            fontWeight={900}
+            color={due > 0 ? (theme.palette.mode === "dark" ? "#ffffff" : "primary.main") : "text.secondary"}
+          >
+            ₹{due.toLocaleString()}
+          </Typography>
+        );
+      }
     },
     {
       label: "Mode",
@@ -930,7 +1049,7 @@ export default function ContributionsPage() {
                     Total Income
                   </Typography>
                   <Typography variant="body1" fontWeight={900} color="success.main" sx={{ lineHeight: 1 }}>
-                    ₹{contributions.filter(c => c.paymentStatus === "Paid").reduce((sum, c) => sum + (c.amount || 0), 0).toLocaleString()}
+                    ₹{contributions.filter(c => isContributionPaid(c)).reduce((sum, c) => sum + (Number(c.amount) || 0), 0).toLocaleString()}
                   </Typography>
                 </Box>
                 <Box sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)", pl: 3 }}>
@@ -1276,8 +1395,36 @@ export default function ContributionsPage() {
         initialMemberName={paymentModalContext.memberName}
         initialAmount={paymentModalContext.amount}
         initialArrearBreakdown={paymentModalContext.arrearBreakdown}
-        onSuccess={() => {
-          reloadAllContributions();
+        onSuccess={async () => {
+          const freshAll = await reloadAllContributions();
+          if (selectedEventId) {
+            const freshData = await getContributionsByEventAsync(selectedEventId);
+            const allList = (freshAll && freshAll.length > 0) ? freshAll : [];
+            let enriched = freshData.map((c) => {
+              const previousUnpaidItems = allList.filter(
+                (prev) => prev.memberId === c.memberId && prev.eventId !== c.eventId && !isContributionPaid(prev)
+              );
+              const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
+              const currentOutstanding = getContributionOutstanding(c);
+              const isPaid = isContributionPaid(c);
+              return {
+                ...c,
+                previousUnpaid,
+                previousUnpaidItems,
+                totalAccumulated: isPaid ? previousUnpaid : (currentOutstanding + previousUnpaid),
+              };
+            });
+            if (isMemberRole) {
+              const userEmail = String(authState?.email || "").toLowerCase().trim();
+              const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
+              enriched = enriched.filter(c =>
+                (currentMemberId && String(c.memberId).toLowerCase() === currentMemberId) ||
+                (userEmail && String(c.email || c.memberEmail || "").toLowerCase().trim() === userEmail) ||
+                (authState?.user?.fullName && String(c.memberName || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim())
+              );
+            }
+            setContributions(enriched);
+          }
         }}
       />
 

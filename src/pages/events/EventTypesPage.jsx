@@ -17,17 +17,9 @@ import { formatGridDate, formatCreatedBy } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 
-const formatBaseAmount = (value) => {
-  if (value === undefined || value === null || value === "") return "";
-  const cleanVal = String(value).replace(/[^0-9]/g, "");
-  if (!cleanVal) return "";
-  return Number(cleanVal).toLocaleString("en-US");
-};
-
 const initialForm = {
   eventTypeName: "",
   isActive: true,
-  baseAmount: "",
   hasTenureRule: false,
   tenureThresholdYears: 1,
   newEntrantSharePercentage: 50,
@@ -70,22 +62,7 @@ export default function EventTypesPage() {
   async function handleSubmit() {
     const requiredLabel = COMMON_STRINGS.VALIDATION.REQUIRED_FIELD;
     const schema = {
-      eventTypeName: { required: true, type: "letteronly", min: 2, max: 50, label: requiredLabel },
-      baseAmount: { 
-        required: true, 
-        type: "numberonly", 
-        label: requiredLabel,
-        customValidate: (val) => {
-          const num = Number(String(val).replace(/[^0-9]/g, ""));
-          if (val === "" || val === undefined || val === null || num <= 0) {
-            return requiredLabel;
-          }
-          if (num > 1000000) {
-            return COMMON_STRINGS.VALIDATION.MAX_AMOUNT_EXCEEDED("1,000,000");
-          }
-          return "";
-        }
-      }
+      eventTypeName: { required: true, type: "letteronly", min: 2, max: 50, label: requiredLabel }
     };
     const newErrors = validateForm(form, schema);
 
@@ -98,7 +75,6 @@ export default function EventTypesPage() {
     try {
       const payload = {
         ...form,
-        baseAmount: Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
         hasTenureRule: Boolean(form.hasTenureRule),
         tenureThresholdYears: Number(form.tenureThresholdYears) || 1,
         newEntrantSharePercentage: Number(form.newEntrantSharePercentage) || 50,
@@ -221,12 +197,6 @@ export default function EventTypesPage() {
     },
     { label: "Category Name", key: "eventTypeName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.eventTypeName}</Typography> },
     {
-      label: "Base Amount",
-      key: "baseAmount",
-      align: "right",
-      render: (row) => <Typography variant="body2" fontWeight={700}>₹{(row.baseAmount ?? 0).toLocaleString()}</Typography>
-    },
-    {
       label: "Calculation Rule",
       key: "hasTenureRule",
       render: (row) => {
@@ -332,23 +302,6 @@ export default function EventTypesPage() {
             maxLength={50}
             error={!!errors.eventTypeName}
             helperText={errors.eventTypeName}
-            required
-          />
-          <AppInput
-            label="Base Amount"
-            placeholder="Enter base amount (₹)"
-            fullWidth
-            value={formatBaseAmount(form.baseAmount)}
-            onChange={(e) => {
-              const rawVal = e.target.value.replace(/[^0-9]/g, "");
-              setForm(f => ({ ...f, baseAmount: rawVal === "" ? "" : Number(rawVal) }));
-              if (errors.baseAmount) {
-                setErrors(prev => ({ ...prev, baseAmount: "" }));
-              }
-            }}
-            maxLength={15}
-            error={!!errors.baseAmount}
-            helperText={errors.baseAmount}
             required
           />
 

@@ -437,23 +437,6 @@ export default function EventFormPage() {
           const initialTypeName = bdayType?.eventTypeName || typesData?.[0]?.eventTypeName || "Event";
           const isInitialBday = initialTypeName.toLowerCase().includes("birthday");
 
-          let defaultContribAmount = "";
-          if (!isInitialBday) {
-            const selectedInitialType = (typesData || []).find((t) => t.eventTypeId === defaultTypeId);
-            if (Number(selectedInitialType?.baseAmount) > 0) {
-              defaultContribAmount = String(selectedInitialType.baseAmount);
-            } else {
-              const matchingBudgetItem = activeBudgetItems.find(
-                (b) =>
-                  (defaultTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === defaultTypeId.toLowerCase()) ||
-                  (b.category && b.category.toLowerCase().trim() === initialTypeName.toLowerCase().trim())
-              );
-              if (matchingBudgetItem && Number(matchingBudgetItem.rate) > 0) {
-                defaultContribAmount = String(matchingBudgetItem.rate);
-              }
-            }
-          }
-
           setForm({
             eventName: isInitialBday
               ? `${defaultDate.format("MMMM")} Birthday Celebration`
@@ -462,7 +445,7 @@ export default function EventFormPage() {
             eventTypeIds: defaultTypeId ? [defaultTypeId] : [],
             eventDate: defaultDate,
             description: "",
-            baseAmount: defaultContribAmount,
+            baseAmount: "",
             participantIds: activeMems.map((m) => m.memberId),
           });
         }
@@ -700,18 +683,15 @@ export default function EventFormPage() {
       } else {
         // Non-Birthday Event Type
         const manualRate = Number(String(form.baseAmount).replace(/[^0-9.]/g, "")) || 0;
+        const rate = manualRate;
 
         if (categoryItems.length > 0) {
           categoryItems.forEach((item) => {
-            const masterRate = Number(item.rate) || 0;
-            const typeBase = Number(type.baseAmount) || 0;
-            const defaultRate = typeBase > 0 ? typeBase : masterRate;
-            const rate = manualRate > 0 ? manualRate : defaultRate;
-            const calcText = `${total} × ₹${rate.toLocaleString("en-IN")}`;
+            const calcText = rate > 0 ? `${total} × ₹${rate.toLocaleString("en-IN")}` : "Enter Contribution Amount";
             const amount = total * rate;
-            const formulaPart = `${item.expenseItem} (${typeName}: Total Members × ₹${rate.toLocaleString(
-              "en-IN"
-            )})`;
+            const formulaPart = rate > 0
+              ? `${item.expenseItem} (${typeName}: Total Members × ₹${rate.toLocaleString("en-IN")})`
+              : `${typeName}: ₹0`;
 
             items.push({
               ...item,
@@ -723,10 +703,6 @@ export default function EventFormPage() {
             });
           });
         } else {
-          // Fallback if no master budget item configured for this event type
-          const typeBase = Number(type.baseAmount) || 0;
-          const rate = manualRate > 0 ? manualRate : typeBase;
-
           if (rate > 0) {
             const amount = total * rate;
             items.push({
@@ -817,29 +793,12 @@ export default function EventFormPage() {
     setOfficeMembers(offTotal);
     setWfhMembers(wfhTotal);
 
-    let defaultContrib = "";
-    if (!isNewBday) {
-      if (Number(newType?.baseAmount) > 0) {
-        defaultContrib = String(newType.baseAmount);
-      } else {
-        const matchingBudget = budgetItemsList.find(
-          (b) =>
-            b.isActive !== false &&
-            ((newTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === newTypeId.toLowerCase()) ||
-              (b.category && b.category.toLowerCase().trim() === newTypeName.toLowerCase().trim()))
-        );
-        if (matchingBudget && Number(matchingBudget.rate) > 0) {
-          defaultContrib = String(matchingBudget.rate);
-        }
-      }
-    }
-
     setForm((prev) => ({
       ...prev,
       eventTypeId: newTypeId,
       eventTypeIds: newTypeId ? [newTypeId] : [],
       eventName: updatedName,
-      baseAmount: defaultContrib,
+      baseAmount: prev.baseAmount || "",
       participantIds: allActiveIds,
     }));
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
@@ -897,35 +856,12 @@ export default function EventFormPage() {
     setOfficeMembers(offTotal);
     setWfhMembers(wfhTotal);
 
-    let defaultContrib = "";
-    if (!hasBday && selectedTypesList.length > 0) {
-      let sumRates = 0;
-      selectedTypesList.forEach((t) => {
-        if (Number(t.baseAmount) > 0) {
-          sumRates += Number(t.baseAmount);
-        } else {
-          const matchingBudget = budgetItemsList.find(
-            (b) =>
-              b.isActive !== false &&
-              ((t.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === t.eventTypeId.toLowerCase()) ||
-                (b.category && b.category.toLowerCase().trim() === (t.eventTypeName || "").toLowerCase().trim()))
-          );
-          if (matchingBudget && Number(matchingBudget.rate) > 0) {
-            sumRates += Number(matchingBudget.rate);
-          }
-        }
-      });
-      if (sumRates > 0) {
-        defaultContrib = String(sumRates);
-      }
-    }
-
     setForm((prev) => ({
       ...prev,
       eventTypeId: newTypeIds[0] || "",
       eventTypeIds: newTypeIds,
       eventName: updatedName,
-      baseAmount: defaultContrib,
+      baseAmount: prev.baseAmount || "",
       participantIds: allActiveIds,
     }));
 
