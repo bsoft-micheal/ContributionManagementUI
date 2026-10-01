@@ -22,34 +22,34 @@ export const DEFAULT_CATEGORY_TEMPLATES = {
   all: {
     initialSubject: "Contribution Notice - {categoryName}",
     initialDescription:
-      "Dear {memberName},\n\nThis is a notification regarding your contribution for {categoryName} of {amount}, due by {dueDate}.\n\nPlease scan the attached dynamic UPI QR code or click the payment link to pay:\n{paymentLink}\n\n{qrCode}\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a notification regarding your contribution for {categoryName} of {amount}, due by {dueDate}.\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you,\n{orgName}",
     reminderSubject: "Payment Reminder: Pending Contribution for {categoryName}",
     reminderDescription:
-      "Dear {memberName},\n\nThis is a friendly reminder that your contribution of {amount} for {categoryName} is still pending.\nDue Date: {dueDate}\n\nPlease complete your payment at your earliest convenience using UPI:\n{paymentLink}\n\n{qrCode}\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a friendly reminder that your contribution of {amount} for {categoryName} is still pending.\nDue Date: {dueDate}\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you,\n{orgName}",
   },
   birthday: {
     initialSubject: "Birthday Celebration Contribution - {categoryName}",
     initialDescription:
-      "Dear {memberName},\n\nWe have upcoming birthdays this month in our team! Your planned contribution for {categoryName} is {amount}, due by {dueDate}.\n\nPlease scan the dynamic UPI QR code below or tap the payment link to contribute:\n{paymentLink}\n\n{qrCode}\n\nWarm regards,\n{orgName}",
+      "Dear {memberName},\n\nWe have upcoming birthdays this month in our team! Your planned contribution for {categoryName} is {amount}, due by {dueDate}.\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nWarm regards,\n{orgName}",
     reminderSubject: "Gentle Reminder: Birthday Contribution Pending ({categoryName})",
     reminderDescription:
-      "Dear {memberName},\n\nJust a quick follow-up regarding your pending birthday contribution of {amount} for {categoryName}.\nDue Date: {dueDate}\n\nPlease scan the QR code below or use the payment link:\n{paymentLink}\n\n{qrCode}\n\nThank you for celebrating our colleagues with us!\n{orgName}",
+      "Dear {memberName},\n\nJust a quick follow-up regarding your pending birthday contribution of {amount} for {categoryName}.\nDue Date: {dueDate}\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you for celebrating our colleagues with us!\n{orgName}",
   },
   "team dinner": {
     initialSubject: "Team Dinner Contribution - {categoryName}",
     initialDescription:
-      "Dear {memberName},\n\nWe are looking forward to our upcoming Team Dinner! Your contribution amount is {amount}, due on or before {dueDate}.\n\nPlease use the payment link or scan the dynamic UPI QR code:\n{paymentLink}\n\n{qrCode}\n\nBest regards,\n{orgName}",
+      "Dear {memberName},\n\nWe are looking forward to our upcoming Team Dinner! Your contribution amount is {amount}, due on or before {dueDate}.\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nBest regards,\n{orgName}",
     reminderSubject: "Reminder: Team Dinner Contribution ({categoryName})",
     reminderDescription:
-      "Dear {memberName},\n\nThis is a reminder that your Team Dinner contribution of {amount} is currently pending.\nDue Date: {dueDate}\n\nPlease settle this via UPI so we can finalize bookings:\n{paymentLink}\n\n{qrCode}\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a reminder that your Team Dinner contribution of {amount} is currently pending.\nDue Date: {dueDate}\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you,\n{orgName}",
   },
   farewell: {
     initialSubject: "Farewell Gathering Contribution - {categoryName}",
     initialDescription:
-      "Dear {memberName},\n\nWe are organizing a farewell gathering for our colleagues. Your contribution for {categoryName} is {amount}, due by {dueDate}.\n\nPay via UPI link or scan the QR code:\n{paymentLink}\n\n{qrCode}\n\nWarm regards,\n{orgName}",
+      "Dear {memberName},\n\nWe are organizing a farewell gathering for our colleagues. Your contribution for {categoryName} is {amount}, due by {dueDate}.\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nWarm regards,\n{orgName}",
     reminderSubject: "Reminder: Farewell Contribution Pending ({categoryName})",
     reminderDescription:
-      "Dear {memberName},\n\nThis is a quick reminder regarding your pending farewell contribution of {amount}.\nDue Date: {dueDate}\n\nPlease scan the dynamic UPI QR code or use the payment link:\n{paymentLink}\n\n{qrCode}\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a quick reminder regarding your pending farewell contribution of {amount}.\nDue Date: {dueDate}\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you,\n{orgName}",
   },
 };
 
