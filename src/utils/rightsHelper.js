@@ -7,6 +7,7 @@ function getParentPageFeatureId(actionFeatureId) {
   const id = Number(actionFeatureId);
   if (id >= 24 && id <= 30) return 2;   // Users
   if (id >= 31 && id <= 35) return 4;   // Event
+  if (id >= 54 && id <= 57) return 4;   // Event (Add Photos, View Photos, Add Expense, View Expense)
   if (id >= 36 && id <= 40) return 6;   // Gallery
   if (id >= 41 && id <= 43) return 8;   // Contribution
   if (id >= 44 && id <= 48) return 11;  // Expense
