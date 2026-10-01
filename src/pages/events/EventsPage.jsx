@@ -17,6 +17,7 @@ import {
   PhotoLibrary as PhotoLibraryIcon,
   PostAdd as PostAddIcon,
   ReceiptLong as ReceiptLongIcon,
+  NotificationsActive as NotificationsActiveIcon,
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -29,7 +30,7 @@ import AppButton from "../../components/common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission } from "../../utils/rightsHelper";
-import { getEventsAsync, deleteEventAsync } from "../../services/eventService";
+import { getEventsAsync, deleteEventAsync, sendRemindersForEventAsync } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
 import { getUsersAsync } from "../../services/userService";
@@ -201,10 +202,19 @@ export default function EventsPage() {
     }
   };
 
+  const handleSendEventReminders = async (eventItem) => {
+    try {
+      await sendRemindersForEventAsync(eventItem.eventId);
+      toast.success(`Reminder emails enqueued for '${eventItem.eventName}' via Hangfire!`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to trigger reminder emails.");
+    }
+  };
+
   const columns = [
     {
       label: "Action",
-      sx: { width: 235, minWidth: 235 },
+      sx: { width: 265, minWidth: 265 },
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.4, alignItems: "center" }}>
           {canViewEvent && (
@@ -237,6 +247,13 @@ export default function EventsPage() {
               </IconButton>
             </Tooltip>
           )}
+          <Tooltip title="Send Reminders (Hangfire)">
+            <IconButton size="small" sx={{ p: 0.3 }}
+              onClick={() => handleSendEventReminders(row)}
+            >
+              <NotificationsActiveIcon sx={{ fontSize: "1.1rem", color: "#f59e0b" }} />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Add Photos">
             <IconButton size="small" sx={{ p: 0.3 }}
               onClick={() =>

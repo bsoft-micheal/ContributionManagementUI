@@ -10,13 +10,15 @@ import {
 import { useParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { formatViewDate, formatGridDate } from "../../utils/dateHelper";
-import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
+import { ArrowBack as ArrowBackIcon, NotificationsActive as NotificationsActiveIcon, Send as SendIcon } from "@mui/icons-material";
+import { Tooltip, IconButton } from "@mui/material";
 import MetricCard from "../../components/MetricCard";
 import apiClient from "../../services/apiClient";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppButton from "../../components/common/AppButton";
 import PageHeader from "../../components/PageHeader";
 import { useAppToast } from "../../components/common/AppToast";
+import { sendRemindersForEventAsync, sendReminderForContributionAsync } from "../../services/contributionService";
 
 export default function EventDetailsPage() {
   const { id } = useParams();
@@ -24,6 +26,7 @@ export default function EventDetailsPage() {
   const toast = useAppToast();
   const [eventDetails, setEventDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sendingBulk, setSendingBulk] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -41,6 +44,27 @@ export default function EventDetailsPage() {
 
     loadData();
   }, [id]);
+
+  const handleSendBulkReminders = async () => {
+    try {
+      setSendingBulk(true);
+      await sendRemindersForEventAsync(id);
+      toast.success("Hangfire reminder emails dispatched for all unpaid participants!");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to dispatch reminder emails.");
+    } finally {
+      setSendingBulk(false);
+    }
+  };
+
+  const handleSendSingleReminder = async (contribution) => {
+    try {
+      await sendReminderForContributionAsync(contribution.contributionId);
+      toast.success(`Reminder enqueued for ${contribution.memberName}!`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || `Failed to send reminder for ${contribution.memberName}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -60,6 +84,25 @@ export default function EventDetailsPage() {
   }
 
   const columns = [
+    {
+      label: "Action",
+      sx: { width: 90, minWidth: 90 },
+      render: (row) => (
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          {row.paymentStatus !== "Paid" && (
+            <Tooltip title={`Send Reminder to ${row.memberName}`}>
+              <IconButton
+                size="small"
+                sx={{ p: 0.4, color: "#f59e0b" }}
+                onClick={() => handleSendSingleReminder(row)}
+              >
+                <SendIcon sx={{ fontSize: "1rem" }} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+      ),
+    },
     { label: "Member Name", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
     { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{Number(row.amount || 0).toLocaleString("en-IN")}</Typography> },
     {
@@ -99,14 +142,29 @@ export default function EventDetailsPage() {
         title={eventDetails.eventName}
         description={`${eventDetails.description} Scheduled for ${eventDetails.eventDates || formatViewDate(eventDetails.eventDate)}.`}
         actions={
-          <AppButton
-            variant="text"
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(-1)}
-            sx={{ color: "text.secondary" }}
-          >
-            Back to List
-          </AppButton>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <AppButton
+              variant="contained"
+              startIcon={<NotificationsActiveIcon />}
+              disabled={sendingBulk}
+              onClick={handleSendBulkReminders}
+              sx={{
+                bgcolor: "#0284c7 !important",
+                "&:hover": { bgcolor: "#0369a1 !important" },
+                fontWeight: 700,
+              }}
+            >
+              {sendingBulk ? "Sending..." : "Send Reminders"}
+            </AppButton>
+            <AppButton
+              variant="text"
+              startIcon={<ArrowBackIcon />}
+              onClick={() => navigate(-1)}
+              sx={{ color: "text.secondary" }}
+            >
+              Back to List
+            </AppButton>
+          </Box>
         }
       />
 

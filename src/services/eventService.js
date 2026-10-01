@@ -27,3 +27,10 @@ export const deleteEventAsync = async (id) => {
 export const getEventByIdAsync = async (id) => {
   return await getApi(`/events/getEventAsyncById/${id}`);
 };
+
+export const sendEventRemindersAsync = async (eventId) => {
+  return await postApi(`/events/sendRemindersAsync/${eventId}`);
+};
+
+export const sendRemindersForEventAsync = sendEventRemindersAsync;
+
