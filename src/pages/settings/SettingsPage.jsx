@@ -1314,62 +1314,6 @@ export default function SettingsPage() {
                         </Typography>
                       </Box>
                     </Box>
-
-                    {/* Allow Multiple Events */}
-                    <Box>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary">
-                        Allow Multiple Events
-                      </Typography>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
-                        <Switch
-                          checked={
-                            settings.allowedMultipleEvent !== undefined
-                              ? settings.allowedMultipleEvent
-                              : false
-                          }
-                          onChange={(e) => handleAllowedMultipleEventToggle(e.target.checked)}
-                          sx={{
-                            width: 44,
-                            height: 24,
-                            padding: 0,
-                            "& .MuiSwitch-switchBase": {
-                              padding: 0,
-                              margin: "2px",
-                              transitionDuration: "200ms",
-                              "&.Mui-checked": {
-                                transform: "translateX(20px)",
-                                color: "#fff",
-                                "& + .MuiSwitch-track": {
-                                  backgroundColor: "#1677c8",
-                                  opacity: 1,
-                                  border: 0,
-                                },
-                              },
-                            },
-                            "& .MuiSwitch-thumb": {
-                              width: 20,
-                              height: 20,
-                              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                            },
-                            "& .MuiSwitch-track": {
-                              borderRadius: 24 / 2,
-                              backgroundColor: (t) =>
-                                t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
-                              opacity: 1,
-                            },
-                          }}
-                        />
-                        <Typography
-                          variant="body2"
-                          fontWeight={700}
-                          color={
-                            settings.allowedMultipleEvent ? "#1677c8" : "text.secondary"
-                          }
-                        >
-                          {settings.allowedMultipleEvent ? "Enabled" : "Disabled"}
-                        </Typography>
-                      </Box>
-                    </Box>
                   </Box>
 
                   <Divider sx={{ my: 1.5 }} />
@@ -1900,40 +1844,24 @@ export default function SettingsPage() {
                         {liveBody || `Dear Daniel,\n\nThis is a notification regarding your ${currentCategoryLabel} contribution of ₹500.\n\nDue Date: ${previewDueDate}\n\nThank You,\n${settings.orgName || "Unit 1A"}`}
                       </Typography>
 
-                      {/* QR Code Container */}
-                      <Box
-                        sx={{
-                          p: 1.5,
-                          borderRadius: "10px",
-                          bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                          border: (t) => `1px solid ${t.palette.divider}`,
-                          textAlign: "center",
-                          my: 2,
-                        }}
-                      >
-                        <Typography variant="caption" fontWeight={750} sx={{ display: "block", color: "text.secondary", mb: 1, fontSize: "0.7rem" }}>
-                          Live Dynamic Payment QR:
-                        </Typography>
-                        <Box
-                          component="img"
-                          src={dynamicQrUrl}
-                          alt="Live QR Code Preview"
+                      {/* Portal Redirect Button */}
+                      <Box sx={{ textAlign: "center", my: 2.5 }}>
+                        <AppButton
+                          variant="contained"
+                          fullWidth
                           sx={{
-                            width: 125,
-                            height: 125,
-                            borderRadius: "8px",
-                            border: "1.5px solid #0284c7",
-                            p: 0.4,
-                            bgcolor: "#fff",
-                            display: "block",
-                            margin: "0 auto",
-                            objectFit: "contain",
-                            boxShadow: "0 2px 8px rgba(2, 132, 199, 0.15)",
+                            bgcolor: "#4a3f6b !important",
+                            "&:hover": { bgcolor: "#2d2550 !important" },
+                            py: 1.2,
+                            fontWeight: 700,
+                            fontSize: "0.82rem",
+                            textTransform: "none",
+                            borderRadius: "10px",
+                            boxShadow: "0 4px 12px rgba(74, 63, 107, 0.25)",
                           }}
-                        />
-                        <Typography variant="caption" sx={{ display: "block", color: "text.secondary", fontSize: "0.66rem", mt: 0.8 }}>
-                          Scan using Google Pay, PhonePe, or Paytm
-                        </Typography>
+                        >
+                          Go to Contribution Page &amp; Pay
+                        </AppButton>
                       </Box>
 
 
