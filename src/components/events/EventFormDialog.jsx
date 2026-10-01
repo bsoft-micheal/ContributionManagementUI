@@ -1001,22 +1001,24 @@ export default function EventFormDialog({
               required
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppInput
-              label="Base Amount"
-              placeholder="Enter base amount (₹)"
-              value={formatBaseAmount(form.baseAmount)}
-              onChange={(e) => {
-                const rawVal = e.target.value.replace(/[^0-9]/g, "");
-                setForm((current) => ({ ...current, baseAmount: rawVal }));
-                if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
-              }}
-              maxLength={15}
-              error={!!errors.baseAmount}
-              helperText={errors.baseAmount}
-              required
-            />
-          </Grid>
+          {!isBirthday && (
+            <Grid size={{ xs: 12, md: 6 }}>
+              <AppInput
+                label="Base Amount"
+                placeholder="Enter base amount (₹)"
+                value={formatBaseAmount(form.baseAmount)}
+                onChange={(e) => {
+                  const rawVal = e.target.value.replace(/[^0-9]/g, "");
+                  setForm((current) => ({ ...current, baseAmount: rawVal }));
+                  if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
+                }}
+                maxLength={15}
+                error={!!errors.baseAmount}
+                helperText={errors.baseAmount}
+                required
+              />
+            </Grid>
+          )}
           <Grid size={{ xs: 12, md: 6 }}>
             <AppDateInput
               label="Event Date"

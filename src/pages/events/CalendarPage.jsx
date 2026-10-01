@@ -29,6 +29,7 @@ import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import apiClient from "../../services/apiClient";
 import { getMembersAsync } from "../../services/memberService";
+import { getUsersAsync } from "../../services/userService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getEventByIdAsync } from "../../services/eventService";
 import {
@@ -200,12 +201,20 @@ export default function CalendarPage() {
   useEffect(() => {
     async function loadEventTypesAndMembers() {
       try {
-        const [types, mems] = await Promise.all([
+        const [types, rawMems] = await Promise.all([
           getEventTypesAsync(),
-          getMembersAsync(),
+          getUsersAsync().catch(() => getMembersAsync()),
         ]);
+        const normalized = (rawMems || []).map((u) => ({
+          ...u,
+          memberId: u.memberId || u.userId || u.id,
+          name: u.name || u.fullName || u.username,
+          workType: u.workType || u.memberType || "Office",
+          isActive: u.isActive !== false && !u.isDeleted,
+          isExited: Boolean(u.isExited),
+        }));
         setEventTypes(types || []);
-        setMembers(mems || []);
+        setMembers(normalized);
       } catch {
         toast.error("Failed to load event types and members.");
       }

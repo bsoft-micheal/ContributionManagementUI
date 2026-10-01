@@ -49,6 +49,7 @@ import dayjs from "dayjs";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
+import AppTextArea from "../../components/common/AppTextArea";
 import AppButton from "../../components/common/AppButton";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
@@ -59,6 +60,7 @@ import {
 } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
+import { getUsersAsync } from "../../services/userService";
 import { getBudgetCalculationsAsync } from "../../services/budgetCalculationService";
 import { updateSystemSettings } from "../../services/settingsService";
 import {
@@ -244,17 +246,26 @@ export default function EventFormPage() {
     async function initData() {
       setLoading(true);
       try {
-        const [typesData, membersData, budgetData] = await Promise.all([
+        const [typesData, usersData, budgetData] = await Promise.all([
           getEventTypesAsync(),
-          getMembersAsync(),
+          getUsersAsync().catch(() => getMembersAsync()),
           getBudgetCalculationsAsync().catch(() => []),
         ]);
 
         if (!isMounted) return;
 
-        const activeMems = (membersData || []).filter((m) => m.isActive && !m.isExited);
+        const normalizedMembers = (usersData || []).map((u) => ({
+          ...u,
+          memberId: u.memberId || u.userId || u.id,
+          name: u.name || u.fullName || u.username,
+          workType: u.workType || u.memberType || "Office",
+          isActive: u.isActive !== false && !u.isDeleted,
+          isExited: Boolean(u.isExited),
+        }));
+
+        const activeMems = normalizedMembers.filter((m) => m.isActive && !m.isExited);
         setEventTypes(typesData || []);
-        setMembers(membersData || []);
+        setMembers(normalizedMembers);
 
         const activeBudgetItems = Array.isArray(budgetData)
           ? budgetData.filter((b) => b.isActive !== false)
@@ -563,8 +574,23 @@ export default function EventFormPage() {
         };
       });
     } else {
-      // 2. Non-Birthday Event Types: Use items created in Master for this Category
-      if (categoryItems.length > 0) {
+      // 2. Non-Birthday Event Types: Use Base Amount split (or master items if Base Amount is 0)
+      const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
+      if (manualBase > 0) {
+        const perPersonRate = eligible > 0 ? Math.ceil(manualBase / eligible) : 0;
+        return [
+          {
+            expenseItem: `${selectedTypeName || "Event"} Base Amount`,
+            rate: perPersonRate,
+            calcText:
+              eligible > 0
+                ? `₹${manualBase.toLocaleString("en-IN")} ÷ ${eligible} Members`
+                : `₹${manualBase.toLocaleString("en-IN")}`,
+            amount: manualBase,
+            formulaPart: `Base Amount (₹${manualBase.toLocaleString("en-IN")}) split among ${eligible} participating members`,
+          },
+        ];
+      } else if (categoryItems.length > 0) {
         return categoryItems.map((item) => {
           const rate = Number(item.rate) || 0;
           const calcText = `${total} × ₹${rate.toLocaleString("en-IN")}`;
@@ -580,21 +606,13 @@ export default function EventFormPage() {
           };
         });
       } else {
-        // Fallback if no master items created under this category yet
-        const manualBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
-        const perPersonRate = total > 0 && manualBase > 0 ? Math.round(manualBase / total) : 0;
-        const amount = manualBase > 0 ? manualBase : 0;
-
         return [
           {
             expenseItem: `${selectedTypeName || "Event"} Celebration`,
-            rate: perPersonRate,
-            calcText:
-              total > 0 && perPersonRate > 0
-                ? `${total} × ₹${perPersonRate.toLocaleString("en-IN")}`
-                : `${total} Members`,
-            amount: amount,
-            formulaPart: `${selectedTypeName || "Event"} (Total Active Members × ₹${perPersonRate.toLocaleString("en-IN")})`,
+            rate: 0,
+            calcText: "Enter Base Amount",
+            amount: 0,
+            formulaPart: `Base Amount: ₹0`,
           },
         ];
       }
@@ -606,6 +624,7 @@ export default function EventFormPage() {
     office,
     bdays,
     total,
+    eligible,
     puffsFactor,
     form.baseAmount,
   ]);
@@ -669,7 +688,7 @@ export default function EventFormPage() {
       ...prev,
       eventTypeId: newTypeId,
       eventName: updatedName,
-      baseAmount: "", // reset base amount so previous event type adjustments don't carry over
+      baseAmount: !isNewBday && newType?.baseAmount > 0 ? String(newType.baseAmount) : "",
       participantIds: allActiveIds,
     }));
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
@@ -720,6 +739,13 @@ export default function EventFormPage() {
     };
 
     const newErrors = validateForm(form, schema);
+
+    if (!isBirthday) {
+      const cleanBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
+      if (cleanBase <= 0) {
+        newErrors.baseAmount = "Base amount must be greater than 0";
+      }
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -1313,6 +1339,73 @@ export default function EventFormPage() {
                     </Box>
                   )
                 )}
+
+                {/* Non-Birthday Event: Base Amount & Description */}
+                {!isBirthday && (
+                  <Box sx={{ mt: 2.5 }}>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <AppInput
+                          label="Base Amount"
+                          placeholder="Enter base amount (₹)"
+                          fullWidth
+                          value={formatBaseAmount(form.baseAmount)}
+                          onChange={(e) => {
+                            const rawVal = e.target.value.replace(/[^0-9]/g, "");
+                            setForm((f) => ({ ...f, baseAmount: rawVal }));
+                            if (errors.baseAmount) {
+                              setErrors((prev) => ({ ...prev, baseAmount: "" }));
+                            }
+                          }}
+                          startAdornment={
+                            <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
+                              ₹
+                            </Typography>
+                          }
+                          error={!!errors.baseAmount}
+                          helperText={errors.baseAmount}
+                          required
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <AppTextArea
+                          label="Description"
+                          placeholder="Enter optional description..."
+                          value={form.description}
+                          onChange={(e) => {
+                            if (e.target.value.length <= 500) {
+                              setForm((f) => ({ ...f, description: e.target.value }));
+                            }
+                          }}
+                          maxLength={500}
+                          rows={3}
+                          fullWidth
+                          helperText={`${form.description?.length || 0}/500 characters`}
+                        />
+                      </Grid>
+                    </Grid>
+                  </Box>
+                )}
+
+                {/* Birthday Event: Optional Description */}
+                {isBirthday && (
+                  <Box sx={{ mt: 2.5 }}>
+                    <AppTextArea
+                      label="Description"
+                      placeholder="Enter optional description..."
+                      value={form.description}
+                      onChange={(e) => {
+                        if (e.target.value.length <= 500) {
+                          setForm((f) => ({ ...f, description: e.target.value }));
+                        }
+                      }}
+                      maxLength={500}
+                      rows={3}
+                      fullWidth
+                      helperText={`${form.description?.length || 0}/500 characters`}
+                    />
+                  </Box>
+                )}
               </Box>
             </Grid>
 
@@ -1695,187 +1788,7 @@ export default function EventFormPage() {
             </Grid>
           </Grid>
 
-          {/* Auto-Expense Preview Banner — shown only in create mode, updates on event type change */}
-          {!isEdit && (() => {
-            const typeNameLower = (selectedTypeName || "").toLowerCase().trim();
-            const autoExpenseItems = budgetItemsList.filter((b) => {
-              if (b.isActive === false) return false;
-              if (form.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === form.eventTypeId.toLowerCase()) {
-                return true;
-              }
-              const cat = (b.category || "").toLowerCase().trim();
-              return cat === typeNameLower;
-            });
-            if (!typeNameLower || autoExpenseItems.length === 0) return null;
-            return (
-              <Box
-                sx={{
-                  mt: 2.5,
-                  p: { xs: 2, sm: 2.5 },
-                  borderRadius: "14px",
-                  background: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(69, 56, 109, 0.12) 100%)"
-                      : "linear-gradient(135deg, rgba(69, 56, 109, 0.05) 0%, rgba(124, 58, 237, 0.04) 100%)",
-                  border: "1.5px dashed rgba(124, 58, 237, 0.4)",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                {/* Left accent bar */}
-                <Box
-                  sx={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: 4,
-                    height: "100%",
-                    background: "linear-gradient(180deg, #7c3aed 0%, #45386d 100%)",
-                    borderRadius: "14px 0 0 14px",
-                  }}
-                />
 
-                <Box sx={{ pl: 1.5 }}>
-                  {/* Header row */}
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2, flexWrap: "wrap" }}>
-                    <Box
-                      sx={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: "8px",
-                        bgcolor: "rgba(124, 58, 237, 0.12)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <ReceiptIcon sx={{ fontSize: "1.05rem", color: "#7c3aed" }} />
-                    </Box>
-
-                    <Box>
-                      <Typography
-                        fontWeight={800}
-                        sx={{
-                          fontSize: "0.95rem",
-                          color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4c1d95"),
-                          lineHeight: 1.2,
-                        }}
-                      >
-                        Auto-Expense Preview
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: "0.76rem",
-                          color: (theme) => (theme.palette.mode === "dark" ? "#a78bfa" : "#6d28d9"),
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        Saving this <strong>{selectedTypeName}</strong> event will auto-create:
-                      </Typography>
-                    </Box>
-
-                    {/* Count badge */}
-                    <Box
-                      sx={{
-                        ml: "auto",
-                        bgcolor: "rgba(124, 58, 237, 0.12)",
-                        border: "1px solid rgba(124, 58, 237, 0.3)",
-                        borderRadius: "20px",
-                        px: 1.5,
-                        py: 0.3,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#7c3aed" }}>
-                        {autoExpenseItems.length} expense{autoExpenseItems.length !== 1 ? "s" : ""} will be created
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  {/* Expense item cards grid */}
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)", lg: "repeat(4, 1fr)" },
-                      gap: 1,
-                      mb: 1.5,
-                    }}
-                  >
-                    {autoExpenseItems.map((item, idx) => (
-                      <Box
-                        key={item.budgetCalculationId || idx}
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          px: 1.4,
-                          py: 0.85,
-                          borderRadius: "8px",
-                          bgcolor: (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "rgba(124, 58, 237, 0.1)"
-                              : "rgba(255, 255, 255, 0.85)",
-                          border: "1px solid",
-                          borderColor: (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "rgba(124, 58, 237, 0.22)"
-                              : "rgba(124, 58, 237, 0.18)",
-                          boxShadow: "0 1px 4px rgba(124, 58, 237, 0.06)",
-                        }}
-                      >
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, overflow: "hidden" }}>
-                          <Box
-                            sx={{
-                              width: 7,
-                              height: 7,
-                              borderRadius: "50%",
-                              bgcolor: "#7c3aed",
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Typography
-                            sx={{
-                              fontSize: "0.82rem",
-                              fontWeight: 600,
-                              color: (theme) => (theme.palette.mode === "dark" ? "#e2d9f3" : "#1e1a2e"),
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {item.expenseItem}
-                          </Typography>
-                        </Box>
-                        <Typography
-                          sx={{
-                            fontSize: "0.82rem",
-                            fontWeight: 800,
-                            color: "#7c3aed",
-                            ml: 1,
-                            flexShrink: 0,
-                          }}
-                        >
-                          ₹{Number(item.rate).toLocaleString("en-IN")}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
-
-                  {/* Footer note */}
-                  <Typography
-                    sx={{
-                      fontSize: "0.74rem",
-                      color: "text.secondary",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    * Expenses are created with status <strong>"Pending"</strong> and can be managed under Finance → Manage Expenses.
-                  </Typography>
-                </Box>
-              </Box>
-            );
-          })()}
 
           {/* Bottom Action Footer */}
           <Divider sx={{ my: 3, borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2") }} />

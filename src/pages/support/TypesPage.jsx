@@ -7,6 +7,10 @@ import {
   Delete as DeleteIcon,
   ToggleOn as ToggleOnIcon,
   ToggleOff as ToggleOffIcon,
+  ConfirmationNumberRounded as ConfirmationNumberRoundedIcon,
+  WorkRounded as WorkRoundedIcon,
+  FlagRounded as FlagRoundedIcon,
+  CreditCardRounded as CreditCardRoundedIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
@@ -67,8 +71,31 @@ const initialPaymentModeForm = {
   isActive: true,
 };
 
+const COLLECTION_TABS = [
+  {
+    id: "ticketTypes",
+    label: "Ticket Types",
+    icon: <ConfirmationNumberRoundedIcon sx={{ fontSize: "1.2rem" }} />,
+  },
+  {
+    id: "workTypes",
+    label: "Work Types",
+    icon: <WorkRoundedIcon sx={{ fontSize: "1.2rem" }} />,
+  },
+  {
+    id: "priorities",
+    label: "Priorities",
+    icon: <FlagRoundedIcon sx={{ fontSize: "1.2rem" }} />,
+  },
+  {
+    id: "paymentModes",
+    label: "Payment Modes",
+    icon: <CreditCardRoundedIcon sx={{ fontSize: "1.2rem" }} />,
+  },
+];
 
 export default function TypesPage() {
+  const [activeTab, setActiveTab] = useState("ticketTypes");
   const { authState } = useAuth();
   const rights = getRightsForPage("Types", authState?.role) || getRightsForPage("Ticket Types", authState?.role);
   const hasWriteAccess = rights?.write ?? (authState?.role === "Admin" || authState?.role === "Organizer");
@@ -1080,98 +1107,201 @@ export default function TypesPage() {
 
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 3.5, pb: 4 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5, pb: 4 }}>
+      {/* Top Header */}
+      <Typography
+        variant="h5"
+        fontWeight={900}
+        sx={{
+          color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e1b4b"),
+          fontSize: "1.45rem",
+          letterSpacing: "-0.01em",
+        }}
+      >
+        Event Collections
+      </Typography>
+
+      {/* Tabs Container */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, 1fr)",
+            md: "repeat(4, 1fr)",
+          },
+          gap: 2,
+        }}
+      >
+        {COLLECTION_TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <Box
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 1.5,
+                py: 1.6,
+                px: 2.5,
+                borderRadius: "14px",
+                cursor: "pointer",
+                userSelect: "none",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                bgcolor: (theme) => {
+                  if (isActive) {
+                    return theme.palette.mode === "dark" ? "#4c3a70" : "#45386d";
+                  }
+                  return theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.04)"
+                    : "rgba(124, 58, 237, 0.04)";
+                },
+                color: (theme) => {
+                  if (isActive) return "#ffffff";
+                  return theme.palette.mode === "dark" ? "#c4b5fd" : "#45386d";
+                },
+                boxShadow: (theme) =>
+                  isActive
+                    ? "0 6px 18px rgba(69, 56, 109, 0.28)"
+                    : "none",
+                border: (theme) =>
+                  isActive
+                    ? "1px solid transparent"
+                    : theme.palette.mode === "dark"
+                    ? "1px solid rgba(255, 255, 255, 0.06)"
+                    : "1px solid rgba(124, 58, 237, 0.08)",
+                "&:hover": {
+                  transform: "translateY(-1px)",
+                  bgcolor: (theme) => {
+                    if (isActive) {
+                      return theme.palette.mode === "dark" ? "#55427d" : "#403366";
+                    }
+                    return theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.08)"
+                      : "rgba(124, 58, 237, 0.09)";
+                  },
+                },
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", color: "inherit" }}>
+                {tab.icon}
+              </Box>
+              <Typography
+                fontWeight={isActive ? 800 : 700}
+                sx={{
+                  fontSize: "0.95rem",
+                  color: "inherit",
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {tab.label}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+
       {/* 1. Ticket Types Table */}
-      <AppDataTable
-        title="Ticket Types"
-        columns={ticketTypeColumns}
-        data={ticketTypes}
-        loading={ticketTypesLoading}
-        actions={
-          <AppButton
-            variant="contained"
-            size="small"
-            disabled={!hasWriteAccess}
-            startIcon={<AddIcon />}
-            onClick={() => {
-              setTicketTypeForm(initialTicketTypeForm);
-              setTicketTypeErrors({});
-              setTicketTypeDialogOpen(true);
-            }}
-          >
-            Add
-          </AppButton>
-        }
-      />
+      {activeTab === "ticketTypes" && (
+        <AppDataTable
+          title="Ticket Types"
+          columns={ticketTypeColumns}
+          data={ticketTypes}
+          loading={ticketTypesLoading}
+          actions={
+            <AppButton
+              variant="contained"
+              size="small"
+              disabled={!hasWriteAccess}
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setTicketTypeForm(initialTicketTypeForm);
+                setTicketTypeErrors({});
+                setTicketTypeDialogOpen(true);
+              }}
+            >
+              Add
+            </AppButton>
+          }
+        />
+      )}
 
       {/* 2. Work Types Table */}
-      <AppDataTable
-        title="Work Types"
-        columns={workTypeColumns}
-        data={workTypes}
-        loading={workTypesLoading}
-        actions={
-          <AppButton
-            variant="contained"
-            size="small"
-            disabled={!hasWriteAccess}
-            startIcon={<AddIcon />}
-            onClick={() => {
-              setWorkTypeForm(initialWorkTypeForm);
-              setWorkTypeErrors({});
-              setWorkTypeDialogOpen(true);
-            }}
-          >
-            Add
-          </AppButton>
-        }
-      />
+      {activeTab === "workTypes" && (
+        <AppDataTable
+          title="Work Types"
+          columns={workTypeColumns}
+          data={workTypes}
+          loading={workTypesLoading}
+          actions={
+            <AppButton
+              variant="contained"
+              size="small"
+              disabled={!hasWriteAccess}
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setWorkTypeForm(initialWorkTypeForm);
+                setWorkTypeErrors({});
+                setWorkTypeDialogOpen(true);
+              }}
+            >
+              Add
+            </AppButton>
+          }
+        />
+      )}
 
       {/* 3. Priorities Table */}
-      <AppDataTable
-        title="Priorities"
-        columns={priorityColumns}
-        data={priorities}
-        loading={prioritiesLoading}
-        actions={
-          <AppButton
-            variant="contained"
-            size="small"
-            disabled={!hasWriteAccess}
-            startIcon={<AddIcon />}
-            onClick={() => {
-              setPriorityForm(initialPriorityForm);
-              setPriorityErrors({});
-              setPriorityDialogOpen(true);
-            }}
-          >
-            Add
-          </AppButton>
-        }
-      />
+      {activeTab === "priorities" && (
+        <AppDataTable
+          title="Priorities"
+          columns={priorityColumns}
+          data={priorities}
+          loading={prioritiesLoading}
+          actions={
+            <AppButton
+              variant="contained"
+              size="small"
+              disabled={!hasWriteAccess}
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setPriorityForm(initialPriorityForm);
+                setPriorityErrors({});
+                setPriorityDialogOpen(true);
+              }}
+            >
+              Add
+            </AppButton>
+          }
+        />
+      )}
 
       {/* 4. Payment Modes Table */}
-      <AppDataTable
-        title="Payment Modes"
-        columns={paymentModeColumns}
-        data={paymentModes}
-        loading={paymentModesLoading}
-        actions={
-          <AppButton
-            variant="contained"
-            size="small"
-            disabled={!hasWriteAccess}
-            startIcon={<AddIcon />}
-            onClick={() => {
-              setPaymentModeForm(initialPaymentModeForm);
-              setPaymentModeErrors({});
-              setPaymentModeDialogOpen(true);
-            }}
-          >
-            Add
-          </AppButton>
-        }
-      />
+      {activeTab === "paymentModes" && (
+        <AppDataTable
+          title="Payment Modes"
+          columns={paymentModeColumns}
+          data={paymentModes}
+          loading={paymentModesLoading}
+          actions={
+            <AppButton
+              variant="contained"
+              size="small"
+              disabled={!hasWriteAccess}
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setPaymentModeForm(initialPaymentModeForm);
+                setPaymentModeErrors({});
+                setPaymentModeDialogOpen(true);
+              }}
+            >
+              Add
+            </AppButton>
+          }
+        />
+      )}
 
       {/* ==================== Ticket Type Dialog ==================== */}
 

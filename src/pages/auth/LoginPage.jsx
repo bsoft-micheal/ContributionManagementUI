@@ -105,7 +105,17 @@ export default function LoginPage() {
         navigate(destination, { replace: true });
       }
     } catch (error) {
-      toast.error(error.response?.data?.message ?? TOAST_MESSAGES.AUTH.LOGIN_FAILED);
+      const errorMsg =
+        error.response?.data?.message ||
+        error.response?.data?.Message ||
+        (error.response?.data?.errors
+          ? (typeof error.response.data.errors === "object"
+              ? Object.values(error.response.data.errors).flat().join(", ")
+              : String(error.response.data.errors))
+          : null) ||
+        error.response?.data?.title ||
+        TOAST_MESSAGES.AUTH.LOGIN_FAILED;
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }

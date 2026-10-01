@@ -69,8 +69,27 @@ export default function AppSelect({
                 </span>
               );
             }
-            const found = options.find((o) => o.value === selected);
-            return found ? found.label : selected;
+            const found = options.find(
+              (o) => String(o?.value ?? "").toLowerCase() === String(selected ?? "").toLowerCase()
+            );
+            if (found) return found.label;
+
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(selected));
+            if (isUuid) {
+              return (
+                <span
+                  style={{
+                    color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
+                    fontWeight: 500,
+                    fontSize: "0.82rem",
+                  }}
+                >
+                  {effectivePlaceholder}
+                </span>
+              );
+            }
+
+            return selected;
           },
         }}
         sx={{
