@@ -118,6 +118,7 @@ const initialSettings = {
   // General & Notifications
   orgName: "Unit 1A Residents Association",
   birthdayMembersExempt: true,
+  allowedMultipleEvent: false,
   enableEmailNotif: true,
   notifNewMember: true,
   notifPaymentConfirm: true,
@@ -163,6 +164,10 @@ export default function SettingsPage() {
             parsed.birthdayMembersExempt !== undefined
               ? parsed.birthdayMembersExempt
               : true,
+          allowedMultipleEvent:
+            parsed.allowedMultipleEvent !== undefined
+              ? Boolean(parsed.allowedMultipleEvent)
+              : false,
         };
       } catch (e) {
         return initialSettings;
@@ -642,6 +647,7 @@ export default function SettingsPage() {
           let localReminderIntervalDays = data.reminderIntervalDays ? String(data.reminderIntervalDays) : "10";
           let localMaxReminders = data.maxReminders ? String(data.maxReminders) : "3";
           let localBirthdayMembersExempt = undefined;
+          let localAllowedMultipleEvent = undefined;
 
           try {
             if (localSaved) {
@@ -666,6 +672,7 @@ export default function SettingsPage() {
                 localMaxReminders = String(parsed.maxReminders);
               }
               if (parsed.birthdayMembersExempt !== undefined) localBirthdayMembersExempt = parsed.birthdayMembersExempt;
+              if (parsed.allowedMultipleEvent !== undefined) localAllowedMultipleEvent = parsed.allowedMultipleEvent;
             }
           } catch (e) { }
 
@@ -675,6 +682,13 @@ export default function SettingsPage() {
               : localBirthdayMembersExempt !== undefined
                 ? localBirthdayMembersExempt
                 : true;
+
+          const resolvedAllowedMultipleEvent =
+            data.allowedMultipleEvent !== undefined
+              ? data.allowedMultipleEvent
+              : localAllowedMultipleEvent !== undefined
+                ? localAllowedMultipleEvent
+                : false;
 
           const isPlaceholderUpi =
             !data.qrUpiId ||
@@ -692,6 +706,7 @@ export default function SettingsPage() {
             ...initialSettings,
             ...data,
             birthdayMembersExempt: resolvedBirthdayMembersExempt,
+            allowedMultipleEvent: resolvedAllowedMultipleEvent,
             qrUpiId: cleanUpiId,
             qrReceiverName: cleanReceiver,
             qrMode: localMode,
@@ -764,6 +779,25 @@ export default function SettingsPage() {
       await updateSystemSettings(updated);
     } catch {
       // Sync birthdayMembersExempt error handled silently
+    }
+  };
+
+  // Immediate toggle and persistence for Allow Multiple Events setting
+  const handleAllowedMultipleEventToggle = async (checked) => {
+    const updated = { ...settings, allowedMultipleEvent: checked };
+    setSettings(updated);
+
+    try {
+      const saved = localStorage.getItem("cm_system_settings");
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem("cm_system_settings", JSON.stringify({ ...parsed, ...updated, allowedMultipleEvent: checked }));
+    } catch (e) { }
+
+    try {
+      await updateSystemSettings(updated);
+      toast.success(`Allow Multiple Events ${checked ? "enabled" : "disabled"} successfully.`);
+    } catch {
+      // Sync allowedMultipleEvent error handled silently
     }
   };
 
@@ -1162,63 +1196,119 @@ export default function SettingsPage() {
                     />
                   </Box>
 
-                  {/* Birthday Exemption */}
-                  <Box sx={{ pt: 0.5 }}>
-                    <Typography variant="caption" fontWeight={700} color="text.secondary">
-                      Birthday Members Exempt?
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
-                      <Switch
-                        checked={
-                          settings.birthdayMembersExempt !== undefined
-                            ? settings.birthdayMembersExempt
-                            : true
-                        }
-                        onChange={(e) => handleBirthdayExemptToggle(e.target.checked)}
-                        sx={{
-                          width: 44,
-                          height: 24,
-                          padding: 0,
-                          "& .MuiSwitch-switchBase": {
+                  {/* General Toggles */}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 3, sm: 6 }, flexWrap: "wrap", pt: 0.5 }}>
+                    {/* Birthday Exemption */}
+                    <Box>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
+                        Birthday Members Exempt?
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
+                        <Switch
+                          checked={
+                            settings.birthdayMembersExempt !== undefined
+                              ? settings.birthdayMembersExempt
+                              : true
+                          }
+                          onChange={(e) => handleBirthdayExemptToggle(e.target.checked)}
+                          sx={{
+                            width: 44,
+                            height: 24,
                             padding: 0,
-                            margin: "2px",
-                            transitionDuration: "200ms",
-                            "&.Mui-checked": {
-                              transform: "translateX(20px)",
-                              color: "#fff",
-                              "& + .MuiSwitch-track": {
-                                backgroundColor: "#1677c8",
-                                opacity: 1,
-                                border: 0,
+                            "& .MuiSwitch-switchBase": {
+                              padding: 0,
+                              margin: "2px",
+                              transitionDuration: "200ms",
+                              "&.Mui-checked": {
+                                transform: "translateX(20px)",
+                                color: "#fff",
+                                "& + .MuiSwitch-track": {
+                                  backgroundColor: "#1677c8",
+                                  opacity: 1,
+                                  border: 0,
+                                },
                               },
                             },
-                          },
-                          "& .MuiSwitch-thumb": {
-                            width: 20,
-                            height: 20,
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                          },
-                          "& .MuiSwitch-track": {
-                            borderRadius: 24 / 2,
-                            backgroundColor: (t) =>
-                              t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
-                            opacity: 1,
-                          },
-                        }}
-                      />
-                      <Typography
-                        variant="body2"
-                        fontWeight={700}
-                        color={
-                          settings.birthdayMembersExempt !== false ? "#1677c8" : "text.secondary"
-                        }
-                      >
-                        {settings.birthdayMembersExempt !== false ? "Enabled" : "Disabled"}
-                      </Typography>
+                            "& .MuiSwitch-thumb": {
+                              width: 20,
+                              height: 20,
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                            },
+                            "& .MuiSwitch-track": {
+                              borderRadius: 24 / 2,
+                              backgroundColor: (t) =>
+                                t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
+                              opacity: 1,
+                            },
+                          }}
+                        />
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          color={
+                            settings.birthdayMembersExempt !== false ? "#1677c8" : "text.secondary"
+                          }
+                        >
+                          {settings.birthdayMembersExempt !== false ? "Enabled" : "Disabled"}
+                        </Typography>
+                      </Box>
                     </Box>
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.4, display: "block" }}>
-                      Exempt celebrants from contributing towards their birthday event by default.
-                    </Typography>
+
+                    {/* Allow Multiple Events */}
+                    <Box>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
+                        Allow Multiple Events
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
+                        <Switch
+                          checked={
+                            settings.allowedMultipleEvent !== undefined
+                              ? settings.allowedMultipleEvent
+                              : false
+                          }
+                          onChange={(e) => handleAllowedMultipleEventToggle(e.target.checked)}
+                          sx={{
+                            width: 44,
+                            height: 24,
+                            padding: 0,
+                            "& .MuiSwitch-switchBase": {
+                              padding: 0,
+                              margin: "2px",
+                              transitionDuration: "200ms",
+                              "&.Mui-checked": {
+                                transform: "translateX(20px)",
+                                color: "#fff",
+                                "& + .MuiSwitch-track": {
+                                  backgroundColor: "#1677c8",
+                                  opacity: 1,
+                                  border: 0,
+                                },
+                              },
+                            },
+                            "& .MuiSwitch-thumb": {
+                              width: 20,
+                              height: 20,
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                            },
+                            "& .MuiSwitch-track": {
+                              borderRadius: 24 / 2,
+                              backgroundColor: (t) =>
+                                t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
+                              opacity: 1,
+                            },
+                          }}
+                        />
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          color={
+                            settings.allowedMultipleEvent ? "#1677c8" : "text.secondary"
+                          }
+                        >
+                          {settings.allowedMultipleEvent ? "Enabled" : "Disabled"}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Box>
 
                   <Divider sx={{ my: 1.5 }} />
