@@ -222,7 +222,7 @@ export default function EventsPage() {
   const columns = [
     {
       label: "Action",
-      sx: { width: 265, minWidth: 265 },
+      sx: { width: 215, minWidth: 215 },
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.4, alignItems: "center" }}>
           {canViewEvent && (
@@ -317,67 +317,6 @@ export default function EventsPage() {
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title="Send Reminders (Hangfire)">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() => handleSendEventReminders(row)}
-            >
-              <NotificationsActiveIcon sx={{ fontSize: "1.1rem", color: "#f59e0b" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Add Photos">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() =>
-                navigate("/gallery", {
-                  state: {
-                    openAddPhoto: true,
-                    eventName: row.eventName,
-                    category: row.eventTypeName,
-                    eventDate: row.eventDate,
-                    eventId: row.eventId,
-                  },
-                })
-              }
-            >
-              <AddPhotoAlternateIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="View Photos">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() => {
-                setPhotoEvent(row);
-                setPhotoDetailsDialogOpen(true);
-              }}
-            >
-              <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Add Expense">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() =>
-                navigate("/expense", {
-                  state: {
-                    openAddExpense: true,
-                    eventName: row.eventName,
-                    category: row.eventTypeName,
-                    eventDate: row.eventDate,
-                    eventId: row.eventId,
-                  },
-                })
-              }
-            >
-              <PostAddIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="View Expense">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() => {
-                setExpenseEvent(row);
-                setExpenseDetailsDialogOpen(true);
-              }}
-            >
-              <ReceiptLongIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
         </Box>
       )
     },

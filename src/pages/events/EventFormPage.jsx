@@ -20,8 +20,9 @@ import {
   ListItemText,
   OutlinedInput,
   FormHelperText,
+  Switch,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, styled } from "@mui/material/styles";
 import {
   Save as SaveIcon,
   ArrowBackRounded as ArrowBackIcon,
@@ -146,6 +147,40 @@ const getAllowMultipleEventsSetting = () => {
   }
   return false;
 };
+
+// ─── Custom Green Switch matching User Management Switch style ─────────────
+const CustomSwitch = styled(Switch)(({ theme }) => ({
+  width: 48,
+  height: 26,
+  padding: 0,
+  display: "flex",
+  "& .MuiSwitch-switchBase": {
+    padding: 3,
+    "&.Mui-checked": {
+      transform: "translateX(22px)",
+      color: "#fff",
+      "& + .MuiSwitch-track": {
+        opacity: 1,
+        backgroundColor: "#16a34a",
+      },
+    },
+  },
+  "& .MuiSwitch-thumb": {
+    width: 20,
+    height: 20,
+    borderRadius: "50%",
+    boxShadow: "0 2px 4px 0 rgba(0, 35, 11, 0.2)",
+  },
+  "& .MuiSwitch-track": {
+    borderRadius: 13,
+    opacity: 1,
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? "rgba(255, 255, 255, 0.15)"
+        : "rgba(74, 63, 107, 0.18)",
+    boxSizing: "border-box",
+  },
+}));
 
 // Helper for row icon styling in budget breakdown table
 const getItemStyle = (name = "") => {
@@ -916,6 +951,60 @@ export default function EventFormPage() {
     if (errors.baseAmount) setErrors((p) => ({ ...p, baseAmount: "" }));
   };
 
+  // Handle toggle for allowing multiple events
+  const handleToggleAllowMultipleEvents = async (checked) => {
+    setAllowMultipleEvents(checked);
+
+    if (checked) {
+      const currentTypes =
+        form.eventTypeIds && form.eventTypeIds.length > 0
+          ? form.eventTypeIds
+          : form.eventTypeId
+          ? [form.eventTypeId]
+          : [];
+      setForm((prev) => ({
+        ...prev,
+        eventTypeIds: currentTypes,
+      }));
+      if (currentTypes.length > 0) {
+        handleMultiTypeChange(currentTypes);
+      }
+    } else {
+      const singleId =
+        form.eventTypeIds && form.eventTypeIds.length > 0
+          ? form.eventTypeIds[0]
+          : form.eventTypeId;
+      setForm((prev) => ({
+        ...prev,
+        eventTypeId: singleId || "",
+        eventTypeIds: singleId ? [singleId] : [],
+      }));
+      if (singleId) {
+        handleTypeChange(singleId);
+      }
+    }
+
+    try {
+      const saved = localStorage.getItem("cm_system_settings");
+      let currentSettings = {};
+      if (saved) {
+        currentSettings = JSON.parse(saved);
+      }
+      const updated = {
+        ...currentSettings,
+        allowMultipleEvents: checked,
+        allowedMultipleEvent: checked,
+      };
+      localStorage.setItem("cm_system_settings", JSON.stringify(updated));
+      await updateSystemSettings({
+        allowMultipleEvents: checked,
+        allowedMultipleEvent: checked,
+      });
+    } catch (err) {
+      console.error("Failed to persist multiple events setting", err);
+    }
+  };
+
   // Handle date change
   const handleDateChange = (newDate) => {
     if (!newDate) return;
@@ -1230,7 +1319,16 @@ export default function EventFormPage() {
                 }}
               >
                 {/* Card Header */}
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    mb: 2.5,
+                    flexWrap: "wrap",
+                    gap: 1.5,
+                  }}
+                >
                   <Typography
                     variant="h6"
                     fontWeight={800}
@@ -1241,49 +1339,43 @@ export default function EventFormPage() {
                   >
                     Event Configuration
                   </Typography>
-                  {isBirthday && (
-                    <Box
+
+                  <Box
+                    sx={{
+                      p: 0.8,
+                      px: 1.8,
+                      borderRadius: "10px",
+                      border: "1px solid",
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(255, 255, 255, 0.1)"
+                          : "rgba(74, 63, 107, 0.14)",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(255, 255, 255, 0.03)"
+                          : "#f8f7fc",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5,
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight={700}
                       sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        bgcolor: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(124, 58, 237, 0.1)"
-                            : "#f5f3ff",
-                        px: 1.5,
-                        py: 0.4,
-                        borderRadius: "20px",
-                        border: "1px solid",
-                        borderColor: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(124, 58, 237, 0.2)"
-                            : "#ede9fe",
+                        color: (theme) =>
+                          theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+                        fontSize: "0.85rem",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontSize: "0.76rem",
-                          fontWeight: 600,
-                          color: (theme) =>
-                            theme.palette.mode === "dark" ? "#c4b5fd" : "#6d28d9",
-                        }}
-                      >
-                        Birthday Members Exempt:
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontSize: "0.76rem",
-                          fontWeight: 800,
-                          color: exempt ? "#10b981" : "#ef4444",
-                        }}
-                      >
-                        {exempt ? "Yes" : "No"}
-                      </Typography>
-                    </Box>
-                  )}
+                      Allow Multiple Events
+                    </Typography>
+                    <CustomSwitch
+                      checked={Boolean(allowMultipleEvents)}
+                      onChange={(e) => handleToggleAllowMultipleEvents(e.target.checked)}
+                    />
+                  </Box>
                 </Box>
 
                 {/* Form Grid */}
