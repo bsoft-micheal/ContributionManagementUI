@@ -26,6 +26,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
+import { MENU_FEATURE_IDS } from "../../constants";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission } from "../../utils/rightsHelper";
@@ -61,11 +62,18 @@ export default function EventsPage() {
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
 
+  const activeRole = authState?.role || authState?.roleName;
+
   // Granular Action Permissions
-  const canAddEvent = hasActionPermission("Add Event", 32, authState?.role).canExecute && hasWriteAccess;
-  const canEditEvent = hasActionPermission("Edit Event", 33, authState?.role).canExecute && hasWriteAccess;
-  const canDeleteEvent = hasActionPermission("Delete Event", 34, authState?.role).canExecute && hasWriteAccess;
-  const canViewEvent = hasActionPermission("View Event", 31, authState?.role).canView;
+  const canAddEvent = hasActionPermission("Add Event", MENU_FEATURE_IDS.EVENT_ADD, activeRole).canExecute;
+  const canEditEvent = hasActionPermission("Edit Event", MENU_FEATURE_IDS.EVENT_EDIT, activeRole).canExecute;
+  const canDeleteEvent = hasActionPermission("Delete Event", MENU_FEATURE_IDS.EVENT_DELETE, activeRole).canExecute;
+  const canViewEvent = hasActionPermission("View Event", MENU_FEATURE_IDS.EVENT_VIEW, activeRole).canView;
+
+  const canAddPhotos = hasActionPermission("Add Photos", MENU_FEATURE_IDS.EVENT_ADD_PHOTOS, activeRole).canExecute;
+  const canViewPhotos = hasActionPermission("view Photos", MENU_FEATURE_IDS.EVENT_VIEW_PHOTOS, activeRole).canView;
+  const canAddExpense = hasActionPermission("Add Expense", MENU_FEATURE_IDS.EVENT_ADD_EXPENSE, activeRole).canExecute;
+  const canViewExpense = hasActionPermission("view Expense", MENU_FEATURE_IDS.EVENT_VIEW_EXPENSE, activeRole).canView;
 
   const navigate = useNavigate();
   const toast = useAppToast();
@@ -237,60 +245,68 @@ export default function EventsPage() {
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title="Add Photos">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() =>
-                navigate("/gallery", {
-                  state: {
-                    openAddPhoto: true,
-                    eventName: row.eventName,
-                    category: row.eventTypeName,
-                    eventDate: row.eventDate,
-                    eventId: row.eventId,
-                  },
-                })
-              }
-            >
-              <AddPhotoAlternateIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="View Photos">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() => {
-                setPhotoEvent(row);
-                setPhotoDetailsDialogOpen(true);
-              }}
-            >
-              <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Add Expense">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() =>
-                navigate("/expense", {
-                  state: {
-                    openAddExpense: true,
-                    eventName: row.eventName,
-                    category: row.eventTypeName,
-                    eventDate: row.eventDate,
-                    eventId: row.eventId,
-                  },
-                })
-              }
-            >
-              <PostAddIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="View Expense">
-            <IconButton size="small" sx={{ p: 0.3 }}
-              onClick={() => {
-                setExpenseEvent(row);
-                setExpenseDetailsDialogOpen(true);
-              }}
-            >
-              <ReceiptLongIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-            </IconButton>
-          </Tooltip>
+          {canAddPhotos && (
+            <Tooltip title="Add Photos">
+              <IconButton size="small" sx={{ p: 0.3 }}
+                onClick={() =>
+                  navigate("/gallery", {
+                    state: {
+                      openAddPhoto: true,
+                      eventName: row.eventName,
+                      category: row.eventTypeName,
+                      eventDate: row.eventDate,
+                      eventId: row.eventId,
+                    },
+                  })
+                }
+              >
+                <AddPhotoAlternateIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canViewPhotos && (
+            <Tooltip title="View Photos">
+              <IconButton size="small" sx={{ p: 0.3 }}
+                onClick={() => {
+                  setPhotoEvent(row);
+                  setPhotoDetailsDialogOpen(true);
+                }}
+              >
+                <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canAddExpense && (
+            <Tooltip title="Add Expense">
+              <IconButton size="small" sx={{ p: 0.3 }}
+                onClick={() =>
+                  navigate("/expense", {
+                    state: {
+                      openAddExpense: true,
+                      eventName: row.eventName,
+                      category: row.eventTypeName,
+                      eventDate: row.eventDate,
+                      eventId: row.eventId,
+                    },
+                  })
+                }
+              >
+                <PostAddIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canViewExpense && (
+            <Tooltip title="View Expense">
+              <IconButton size="small" sx={{ p: 0.3 }}
+                onClick={() => {
+                  setExpenseEvent(row);
+                  setExpenseDetailsDialogOpen(true);
+                }}
+              >
+                <ReceiptLongIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       )
     },
