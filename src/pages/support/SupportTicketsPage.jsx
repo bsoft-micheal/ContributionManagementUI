@@ -30,7 +30,7 @@ import {
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
-import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
+import { formatGridDate, formatViewDateTime, formatCreatedBy } from "../../utils/dateHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -972,7 +972,7 @@ export default function SupportTicketsPage() {
     {
       label: "Created By",
       key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
+      render: (row) => formatCreatedBy(row.createdBy || row.CreatedBy),
     },
   ];
 

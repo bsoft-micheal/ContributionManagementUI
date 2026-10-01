@@ -13,7 +13,7 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
 import { getEventTypesAsync, createEventTypeAsync, updateEventTypeAsync, deleteEventTypeAsync } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
-import { formatGridDate } from "../../utils/dateHelper";
+import { formatGridDate, formatCreatedBy } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 
@@ -276,7 +276,7 @@ export default function EventTypesPage() {
     {
       label: COMMON_STRINGS.TABLE.CREATED_BY_COL,
       key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || COMMON_STRINGS.DEFAULTS.EMPTY_VALUE,
+      render: (row) => formatCreatedBy(row.createdBy || row.CreatedBy),
     },
     {
       label: COMMON_STRINGS.TABLE.CREATED_ON_COL,

@@ -378,7 +378,7 @@ export default function StatusPage() {
     <div className="page-shell">
       {/* 1. Manage Status with Module Filter */}
       <AppDataTable
-        title="Manage Status"
+        title="Module Wise Status "
         columns={statusColumns}
         data={filteredItems}
         loading={loading}

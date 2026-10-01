@@ -113,10 +113,13 @@ const defaultPaymentQr = `data:image/svg+xml;utf8,${encodeURIComponent(`
 </svg>
 `)}`;
 
+const isGuid = (val) => Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val).trim()));
+
 const initialSettings = {
   // General & Notifications
   orgName: "Unit 1A Residents Association",
   birthdayMembersExempt: true,
+  allowedMultipleEvent: false,
   enableEmailNotif: true,
   notifNewMember: true,
   notifPaymentConfirm: true,
@@ -166,6 +169,10 @@ export default function SettingsPage() {
             parsed.birthdayMembersExempt !== undefined
               ? parsed.birthdayMembersExempt
               : true,
+          allowedMultipleEvent:
+            parsed.allowedMultipleEvent !== undefined
+              ? Boolean(parsed.allowedMultipleEvent)
+              : false,
         };
       } catch (e) {
         return initialSettings;
@@ -346,7 +353,7 @@ export default function SettingsPage() {
             qrImage: config.qrImage || null,
             isConfigured: Boolean(config.isConfigured && hasUpi),
             isActive: config.isActive !== false,
-            createdBy: config.createdBy || c.createdBy || c.CreatedBy || "--",
+            createdBy: (!isGuid(config.createdBy) && config.createdBy) || (!isGuid(c.createdBy || c.CreatedBy) && (c.createdBy || c.CreatedBy)) || "--",
             createdOn: config.createdOn || config.createdAt || c.createdAt || c.createdOn || null,
           });
         }
@@ -368,7 +375,7 @@ export default function SettingsPage() {
           qrImage: config.qrImage || null,
           isConfigured: Boolean(config.isConfigured && hasUpi),
           isActive: config.isActive !== false,
-          createdBy: config.createdBy || "--",
+          createdBy: (!isGuid(config.createdBy) && config.createdBy) || "--",
           createdOn: config.createdOn || config.createdAt || null,
         });
       }
@@ -388,7 +395,7 @@ export default function SettingsPage() {
           qrImage: config.qrImage || null,
           isConfigured: Boolean(config.isConfigured && hasUpi),
           isActive: config.isActive !== false,
-          createdBy: config.createdBy || "--",
+          createdBy: (!isGuid(config.createdBy) && config.createdBy) || "--",
           createdOn: config.createdOn || config.createdAt || null,
         });
       });
@@ -473,7 +480,7 @@ export default function SettingsPage() {
         ),
       },
       {
-        label: "UPI ID (VPA)",
+        label: "UPI ID",
         key: "upiId",
         render: (row) =>
           row.upiId ? (
@@ -502,24 +509,6 @@ export default function SettingsPage() {
             {row.receiverName || "--"}
           </Typography>
         ),
-      },
-      {
-        label: "Amount",
-        key: "previewAmount",
-        render: (row) =>
-          row.previewAmount && Number(row.previewAmount) > 0 ? (
-            <Chip
-              label={`₹${Number(row.previewAmount).toLocaleString("en-IN")}`}
-              size="small"
-              sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: "rgba(2, 132, 199, 0.1)", color: "#0284c7" }}
-            />
-          ) : (
-            <Chip
-              label="Manual Entry"
-              size="small"
-              sx={{ height: 22, fontSize: "0.7rem", fontWeight: 650, bgcolor: "rgba(22, 163, 74, 0.1)", color: "#16a34a" }}
-            />
-          ),
       },
       {
         label: "QR Mode",
@@ -570,11 +559,15 @@ export default function SettingsPage() {
       {
         label: "Created By",
         key: "createdBy",
-        render: (row) => (
-          <Typography variant="body2" color="text.secondary">
-            {row.createdBy || row.CreatedBy || "--"}
-          </Typography>
-        ),
+        render: (row) => {
+          const raw = row.createdBy || row.CreatedBy;
+          const isUuid = Boolean(raw && isGuid(raw));
+          return (
+            <Typography variant="body2" color="text.secondary">
+              {isUuid || !raw ? "--" : raw}
+            </Typography>
+          );
+        },
       },
       {
         label: "Created On",
@@ -616,8 +609,13 @@ export default function SettingsPage() {
         const types = await getEventTypesAsync();
         if (Array.isArray(types)) {
           setCategoriesList(types);
-          // Initial template populate once categories arrive
-          loadTemplateForCategoryAndType(selectedCategoryId, templateType, settings, types);
+          // Check if selectedCategoryId is valid
+          const validCat = types.find(
+            (c) => String(c.eventTypeId || c.id || "").toLowerCase() === String(selectedCategoryId || "").toLowerCase()
+          );
+          const activeId = validCat ? String(validCat.eventTypeId || validCat.id) : "all";
+          setSelectedCategoryId(activeId);
+          loadTemplateForCategoryAndType(activeId, templateType, settings, types);
         }
       } catch {
         toast.error("Failed to load event types for email templates");
@@ -654,6 +652,7 @@ export default function SettingsPage() {
           let localReminderIntervalDays = data.reminderIntervalDays ? String(data.reminderIntervalDays) : "10";
           let localMaxReminders = data.maxReminders ? String(data.maxReminders) : "3";
           let localBirthdayMembersExempt = undefined;
+          let localAllowedMultipleEvent = undefined;
 
           try {
             if (localSaved) {
@@ -678,6 +677,7 @@ export default function SettingsPage() {
                 localMaxReminders = String(parsed.maxReminders);
               }
               if (parsed.birthdayMembersExempt !== undefined) localBirthdayMembersExempt = parsed.birthdayMembersExempt;
+              if (parsed.allowedMultipleEvent !== undefined) localAllowedMultipleEvent = parsed.allowedMultipleEvent;
             }
           } catch (e) { }
 
@@ -687,6 +687,13 @@ export default function SettingsPage() {
               : localBirthdayMembersExempt !== undefined
                 ? localBirthdayMembersExempt
                 : true;
+
+          const resolvedAllowedMultipleEvent =
+            data.allowedMultipleEvent !== undefined
+              ? data.allowedMultipleEvent
+              : localAllowedMultipleEvent !== undefined
+                ? localAllowedMultipleEvent
+                : false;
 
           const isPlaceholderUpi =
             !data.qrUpiId ||
@@ -704,6 +711,7 @@ export default function SettingsPage() {
             ...initialSettings,
             ...data,
             birthdayMembersExempt: resolvedBirthdayMembersExempt,
+            allowedMultipleEvent: resolvedAllowedMultipleEvent,
             qrUpiId: cleanUpiId,
             qrReceiverName: cleanReceiver,
             qrMode: localMode,
@@ -776,6 +784,25 @@ export default function SettingsPage() {
       await updateSystemSettings(updated);
     } catch {
       // Sync birthdayMembersExempt error handled silently
+    }
+  };
+
+  // Immediate toggle and persistence for Allow Multiple Events setting
+  const handleAllowedMultipleEventToggle = async (checked) => {
+    const updated = { ...settings, allowedMultipleEvent: checked };
+    setSettings(updated);
+
+    try {
+      const saved = localStorage.getItem("cm_system_settings");
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem("cm_system_settings", JSON.stringify({ ...parsed, ...updated, allowedMultipleEvent: checked }));
+    } catch (e) { }
+
+    try {
+      await updateSystemSettings(updated);
+      toast.success(`Allow Multiple Events ${checked ? "enabled" : "disabled"} successfully.`);
+    } catch {
+      // Sync allowedMultipleEvent error handled silently
     }
   };
 
@@ -1030,13 +1057,16 @@ export default function SettingsPage() {
   };
 
   // Category dropdown options
-  const categorySelectOptions = [
-    { label: "All Categories (Default Template)", value: "all" },
-    ...categoriesList.map((cat) => ({
-      label: cat.eventTypeName || "Unnamed Category",
-      value: String(cat.eventTypeId),
-    })),
-  ];
+  const categorySelectOptions = useMemo(
+    () => [
+      { label: "All Categories (Default Template)", value: "all" },
+      ...categoriesList.map((cat) => ({
+        label: cat.eventTypeName || cat.name || "Unnamed Category",
+        value: String(cat.eventTypeId || cat.id),
+      })),
+    ],
+    [categoriesList]
+  );
 
   return (
     <div className="page-shell">
@@ -1155,7 +1185,7 @@ export default function SettingsPage() {
                       General Settings
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                      
+
                     </Typography>
                   </Box>
                 </Box>
@@ -1171,63 +1201,119 @@ export default function SettingsPage() {
                     />
                   </Box>
 
-                  {/* Birthday Exemption */}
-                  <Box sx={{ pt: 0.5 }}>
-                    <Typography variant="caption" fontWeight={700} color="text.secondary">
-                      Birthday Members Exempt?
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
-                      <Switch
-                        checked={
-                          settings.birthdayMembersExempt !== undefined
-                            ? settings.birthdayMembersExempt
-                            : true
-                        }
-                        onChange={(e) => handleBirthdayExemptToggle(e.target.checked)}
-                        sx={{
-                          width: 44,
-                          height: 24,
-                          padding: 0,
-                          "& .MuiSwitch-switchBase": {
+                  {/* General Toggles */}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 3, sm: 6 }, flexWrap: "wrap", pt: 0.5 }}>
+                    {/* Birthday Exemption */}
+                    <Box>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
+                        Birthday Members Exempt?
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
+                        <Switch
+                          checked={
+                            settings.birthdayMembersExempt !== undefined
+                              ? settings.birthdayMembersExempt
+                              : true
+                          }
+                          onChange={(e) => handleBirthdayExemptToggle(e.target.checked)}
+                          sx={{
+                            width: 44,
+                            height: 24,
                             padding: 0,
-                            margin: "2px",
-                            transitionDuration: "200ms",
-                            "&.Mui-checked": {
-                              transform: "translateX(20px)",
-                              color: "#fff",
-                              "& + .MuiSwitch-track": {
-                                backgroundColor: "#1677c8",
-                                opacity: 1,
-                                border: 0,
+                            "& .MuiSwitch-switchBase": {
+                              padding: 0,
+                              margin: "2px",
+                              transitionDuration: "200ms",
+                              "&.Mui-checked": {
+                                transform: "translateX(20px)",
+                                color: "#fff",
+                                "& + .MuiSwitch-track": {
+                                  backgroundColor: "#1677c8",
+                                  opacity: 1,
+                                  border: 0,
+                                },
                               },
                             },
-                          },
-                          "& .MuiSwitch-thumb": {
-                            width: 20,
-                            height: 20,
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                          },
-                          "& .MuiSwitch-track": {
-                            borderRadius: 24 / 2,
-                            backgroundColor: (t) =>
-                              t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
-                            opacity: 1,
-                          },
-                        }}
-                      />
-                      <Typography
-                        variant="body2"
-                        fontWeight={700}
-                        color={
-                          settings.birthdayMembersExempt !== false ? "#1677c8" : "text.secondary"
-                        }
-                      >
-                        {settings.birthdayMembersExempt !== false ? "Enabled" : "Disabled"}
-                      </Typography>
+                            "& .MuiSwitch-thumb": {
+                              width: 20,
+                              height: 20,
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                            },
+                            "& .MuiSwitch-track": {
+                              borderRadius: 24 / 2,
+                              backgroundColor: (t) =>
+                                t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
+                              opacity: 1,
+                            },
+                          }}
+                        />
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          color={
+                            settings.birthdayMembersExempt !== false ? "#1677c8" : "text.secondary"
+                          }
+                        >
+                          {settings.birthdayMembersExempt !== false ? "Enabled" : "Disabled"}
+                        </Typography>
+                      </Box>
                     </Box>
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.4, display: "block" }}>
-                      Exempt celebrants from contributing towards their birthday event by default.
-                    </Typography>
+
+                    {/* Allow Multiple Events */}
+                    <Box>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
+                        Allow Multiple Events
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
+                        <Switch
+                          checked={
+                            settings.allowedMultipleEvent !== undefined
+                              ? settings.allowedMultipleEvent
+                              : false
+                          }
+                          onChange={(e) => handleAllowedMultipleEventToggle(e.target.checked)}
+                          sx={{
+                            width: 44,
+                            height: 24,
+                            padding: 0,
+                            "& .MuiSwitch-switchBase": {
+                              padding: 0,
+                              margin: "2px",
+                              transitionDuration: "200ms",
+                              "&.Mui-checked": {
+                                transform: "translateX(20px)",
+                                color: "#fff",
+                                "& + .MuiSwitch-track": {
+                                  backgroundColor: "#1677c8",
+                                  opacity: 1,
+                                  border: 0,
+                                },
+                              },
+                            },
+                            "& .MuiSwitch-thumb": {
+                              width: 20,
+                              height: 20,
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                            },
+                            "& .MuiSwitch-track": {
+                              borderRadius: 24 / 2,
+                              backgroundColor: (t) =>
+                                t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
+                              opacity: 1,
+                            },
+                          }}
+                        />
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          color={
+                            settings.allowedMultipleEvent ? "#1677c8" : "text.secondary"
+                          }
+                        >
+                          {settings.allowedMultipleEvent ? "Enabled" : "Disabled"}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Box>
 
                   <Divider sx={{ my: 1.5 }} />
@@ -1904,9 +1990,9 @@ export default function SettingsPage() {
                           </Box>
                         </Box>
 
-                        {/* Receiver Name, UPI ID, and Amount */}
-                        <Grid container spacing={1.5}>
-                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                        {/* Receiver Name and UPI ID */}
+                        <Grid container spacing={2}>
+                          <Grid size={{ xs: 12, sm: 6 }}>
                             <AppInput
                               label={`Receiver Name (${selectedQrEventType})`}
                               value={currentQrConfig.receiverName || ""}
@@ -1918,7 +2004,7 @@ export default function SettingsPage() {
                               helperText={receiverError}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                          <Grid size={{ xs: 12, sm: 6 }}>
                             <AppInput
                               label={`UPI ID (${selectedQrEventType})`}
                               value={currentQrConfig.upiId || ""}
@@ -1928,25 +2014,6 @@ export default function SettingsPage() {
                               size="small"
                               error={Boolean(upiError)}
                               helperText={upiError}
-                            />
-                          </Grid>
-                          <Grid size={{ xs: 12, sm: 12, md: 4 }}>
-                            <AppInput
-                              label={`Amount (₹) - Optional`}
-                              value={currentQrConfig.previewAmount || ""}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === "" || /^\d*\.?\d*$/.test(val)) {
-                                  handleQrFieldChange("previewAmount", val);
-                                }
-                              }}
-                              placeholder="Leave blank for manual entry"
-                              size="small"
-                              helperText={
-                                currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
-                                  ? `QR pre-fills ₹${Number(currentQrConfig.previewAmount).toLocaleString("en-IN")}`
-                                  : "Leave blank: Payer enters amount on scan"
-                              }
                             />
                           </Grid>
                         </Grid>
@@ -2220,45 +2287,6 @@ export default function SettingsPage() {
                             </Typography>
                           </Box>
                         )}
-                      </Box>
-
-                      {/* Amount Indicator Badge */}
-                      <Box
-                        sx={{
-                          width: "100%",
-                          py: 0.8,
-                          px: 1.2,
-                          borderRadius: "8px",
-                          bgcolor:
-                            currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
-                              ? "rgba(2, 132, 199, 0.08)"
-                              : "rgba(22, 163, 74, 0.08)",
-                          border: (t) =>
-                            `1px solid ${currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
-                              ? "rgba(2, 132, 199, 0.25)"
-                              : "rgba(22, 163, 74, 0.25)"
-                            }`,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 0.8,
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontWeight: 750,
-                            fontSize: "0.74rem",
-                            color:
-                              currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
-                                ? "#0284c7"
-                                : "#16a34a",
-                          }}
-                        >
-                          {currentQrConfig.previewAmount && Number(currentQrConfig.previewAmount) > 0
-                            ? `Preset Amount: ₹${Number(currentQrConfig.previewAmount).toLocaleString("en-IN")}`
-                            : "✨ Scan Amount: Manual Entry (Payer enters on scan)"}
-                        </Typography>
                       </Box>
 
                       {/* UPI ID Display */}
