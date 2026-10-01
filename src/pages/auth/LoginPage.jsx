@@ -367,7 +367,7 @@ export default function LoginPage() {
                         size="small"
                         sx={{
                           "& .MuiOutlinedInput-root": {
-                            borderRadius: "10px",
+                            borderRadius: "6px",
                             height: 42,
                             fontSize: "0.85rem",
                             bgcolor: (theme) => theme.palette.mode === "dark" ? "background.paper" : "#faf9fd",
@@ -409,6 +409,14 @@ export default function LoginPage() {
                         InputProps={{
                           endAdornment: (
                             <InputAdornment position="end">
+                              <Box
+                                sx={{
+                                  height: 22,
+                                  width: "1px",
+                                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.18)" : "rgba(74, 63, 107, 0.2)",
+                                  mr: 0.75,
+                                }}
+                              />
                               <IconButton
                                 size="small"
                                 onClick={() => setShowPassword((prev) => !prev)}
@@ -430,7 +438,7 @@ export default function LoginPage() {
                         }}
                         sx={{
                           "& .MuiOutlinedInput-root": {
-                            borderRadius: "10px",
+                            borderRadius: "6px",
                             height: 42,
                             fontSize: "0.85rem",
                             bgcolor: (theme) => theme.palette.mode === "dark" ? "background.paper" : "#faf9fd",
