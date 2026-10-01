@@ -14,3 +14,8 @@ export const getDashboardSummaryAsync = async (params) => {
   );
   return result;
 };
+
+export const getCurrentMonthSummaryAsync = async () => {
+  const result = await getApi("/dashboard/current-month-summary");
+  return result;
+};

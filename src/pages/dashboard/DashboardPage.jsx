@@ -1066,9 +1066,9 @@ export default function DashboardPage() {
               <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Stack spacing={3}>
 
-                  {/* ① Top Summary Metric Cards (4 Cards Grid, Total Collections hidden for Member) */}
+                  {/* ① Top Summary Metric Cards (5 Cards Grid, Total Collections hidden for Member) */}
                   <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 4 : 6, lg: isMember ? 4 : 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
                       <MetricCard
                         label="TOTAL EXPECTED"
                         value={`₹${totalExpected.toLocaleString()}`}
@@ -1079,7 +1079,7 @@ export default function DashboardPage() {
                       />
                     </Grid>
                     {!isMember && (
-                      <Grid size={{ xs: 12, sm: 6, md: 6, lg: 3 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
                         <MetricCard
                           label="TOTAL COLLECTIONS"
                           value={`₹${totalCollected.toLocaleString()}`}
@@ -1090,7 +1090,7 @@ export default function DashboardPage() {
                         />
                       </Grid>
                     )}
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 4 : 6, lg: isMember ? 4 : 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
                       <MetricCard
                         label="TOTAL PENDING"
                         value={`₹${totalPending.toLocaleString()}`}
@@ -1100,7 +1100,7 @@ export default function DashboardPage() {
                         actionText="View Unpaid →"
                       />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 4 : 6, lg: isMember ? 4 : 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
                       <MetricCard
                         label="TOTAL EVENTS"
                         value={events.length}
@@ -1108,6 +1108,83 @@ export default function DashboardPage() {
                         onClick={() => navigate("/events")}
                         actionText="View Events →"
                       />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 6 : 4, lg: isMember ? 3 : 2.4 }}>
+                      <MetricCard
+                        label="CURRENT MONTH SUMMARY"
+                        accent="#0284c7"
+                        helper="Overview for current month"
+                      >
+                        <Box sx={{ mt: 0.5 }}>
+                          <Grid container spacing={1}>
+                            <Grid size={{ xs: 6 }}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ fontSize: "0.68rem", fontWeight: 700, display: "block" }}
+                              >
+                                Total Count
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: 900, color: "primary.main", fontSize: "0.95rem", lineHeight: 1.2 }}
+                              >
+                                {summary?.currentMonthSummary?.totalCount ?? 0}
+                              </Typography>
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ fontSize: "0.68rem", fontWeight: 700, display: "block" }}
+                              >
+                                Collected
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: 900, color: "success.main", fontSize: "0.95rem", lineHeight: 1.2 }}
+                              >
+                                ₹{Number(summary?.currentMonthSummary?.totalAmountCollected ?? 0).toLocaleString()}
+                              </Typography>
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ fontSize: "0.68rem", fontWeight: 700, display: "block" }}
+                              >
+                                Expensed
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: 900, color: "warning.main", fontSize: "0.95rem", lineHeight: 1.2 }}
+                              >
+                                ₹{Number(summary?.currentMonthSummary?.totalAmountExpensed ?? 0).toLocaleString()}
+                              </Typography>
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ fontSize: "0.68rem", fontWeight: 700, display: "block" }}
+                              >
+                                Remaining
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 900,
+                                  color: (summary?.currentMonthSummary?.remainingAmount ?? 0) >= 0 ? "success.main" : "error.main",
+                                  fontSize: "0.95rem",
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                ₹{Number(summary?.currentMonthSummary?.remainingAmount ?? 0).toLocaleString()}
+                              </Typography>
+                            </Grid>
+                          </Grid>
+                        </Box>
+                      </MetricCard>
                     </Grid>
                   </Grid>
 

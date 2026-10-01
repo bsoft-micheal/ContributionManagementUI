@@ -10,6 +10,7 @@ export default function MetricCard({
   onClick,
   clickable = false,
   actionText,
+  children,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -81,52 +82,57 @@ export default function MetricCard({
             >
               {label}
             </Typography>
-            <Typography
-              variant="h4"
-              sx={{
-                color: resolvedAccent,
-                fontWeight: 900,
-                fontSize: { xs: "1.65rem", sm: "1.9rem" },
-                letterSpacing: "-0.02em",
-                mt: 0.5,
-                lineHeight: 1.1,
-              }}
-            >
-              {value}
-            </Typography>
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5 }}>
-            <Typography
-              variant="caption"
-              sx={{
-                color: "text.secondary",
-                fontSize: "0.72rem",
-                lineHeight: 1.2,
-                fontWeight: 500,
-              }}
-            >
-              {helper}
-            </Typography>
-            {isInteractive && (
+            {value !== undefined && (
               <Typography
-                className="metric-action-text"
-                variant="caption"
+                variant="h4"
                 sx={{
                   color: resolvedAccent,
-                  fontSize: "0.68rem",
-                  fontWeight: 700,
-                  opacity: { xs: 0.9, sm: 0.75 },
-                  transform: { xs: "none", sm: "translateX(2px)" },
-                  transition: "all 0.2s ease",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 0.25,
+                  fontWeight: 900,
+                  fontSize: { xs: "1.65rem", sm: "1.9rem" },
+                  letterSpacing: "-0.02em",
+                  mt: 0.5,
+                  lineHeight: 1.1,
                 }}
               >
-                {actionText || "View →"}
+                {value}
               </Typography>
             )}
           </Box>
+          {children}
+          {helper && (
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "text.secondary",
+                  fontSize: "0.72rem",
+                  lineHeight: 1.2,
+                  fontWeight: 500,
+                }}
+              >
+                {helper}
+              </Typography>
+              {isInteractive && (
+                <Typography
+                  className="metric-action-text"
+                  variant="caption"
+                  sx={{
+                    color: resolvedAccent,
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    opacity: { xs: 0.9, sm: 0.75 },
+                    transform: { xs: "none", sm: "translateX(2px)" },
+                    transition: "all 0.2s ease",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 0.25,
+                  }}
+                >
+                  {actionText || "View →"}
+                </Typography>
+              )}
+            </Box>
+          )}
         </Stack>
       </CardContent>
     </Card>
