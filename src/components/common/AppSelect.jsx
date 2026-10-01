@@ -111,6 +111,33 @@ export default function AppSelect({
               pr: "28px !important",
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             },
+            "& .MuiSelect-nativeInput": {
+              opacity: "0 !important",
+              visibility: "hidden !important",
+              position: "absolute !important",
+              width: "0px !important",
+              height: "0px !important",
+              pointerEvents: "none !important",
+              clip: "rect(0 0 0 0) !important",
+            },
+            "&.Mui-disabled": {
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
+              "& .MuiSelect-select": {
+                color: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+                WebkitTextFillColor: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+                fontWeight: "700 !important",
+                opacity: "1 !important",
+              },
+              "& .MuiSelect-nativeInput": {
+                opacity: "0 !important",
+                visibility: "hidden !important",
+                position: "absolute !important",
+                width: "0px !important",
+                height: "0px !important",
+                pointerEvents: "none !important",
+                clip: "rect(0 0 0 0) !important",
+              },
+            },
             "& fieldset": {
               borderColor: (theme) => error
                 ? theme.palette.error.main
