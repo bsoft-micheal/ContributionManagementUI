@@ -233,6 +233,7 @@ export default function EventFormPage() {
   }, [isEdit, canAddEvent, canEditEvent]);
 
   const [form, setForm] = useState(initialForm);
+  const [otherEventAmounts, setOtherEventAmounts] = useState({});
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -404,6 +405,15 @@ export default function EventFormPage() {
             }
           }
 
+          const editNonBdays = (typesData || []).filter(
+            (t) => eventTypeIdsList.includes(t.eventTypeId) && !t.eventTypeName?.toLowerCase().includes("birthday")
+          );
+          if (editNonBdays.length === 1 && (detailedEvent.baseAmount || initialBaseAmount)) {
+            setOtherEventAmounts({
+              [editNonBdays[0].eventTypeId]: String(detailedEvent.baseAmount || initialBaseAmount),
+            });
+          }
+
           setForm({
             eventId: detailedEvent.eventId || id,
             eventName: detailedEvent.eventName || "",
@@ -480,6 +490,30 @@ export default function EventFormPage() {
     () => selectedTypes.some((t) => t.eventTypeName?.toLowerCase().includes("birthday")),
     [selectedTypes]
   );
+
+  const nonBirthdaySelectedTypes = useMemo(
+    () => selectedTypes.filter((t) => !t.eventTypeName?.toLowerCase().includes("birthday")),
+    [selectedTypes]
+  );
+
+  const handleOtherEventAmountChange = (typeId, value) => {
+    const cleanVal = String(value).replace(/[^0-9]/g, "");
+    setOtherEventAmounts((prev) => ({
+      ...prev,
+      [typeId]: cleanVal,
+    }));
+    setForm((prev) => ({
+      ...prev,
+      baseAmount: cleanVal,
+    }));
+    if (errors[`baseAmount_${typeId}`] || errors.baseAmount) {
+      setErrors((prev) => ({
+        ...prev,
+        [`baseAmount_${typeId}`]: "",
+        baseAmount: "",
+      }));
+    }
+  };
 
   // Selected participants for non-birthday events (allows deselecting members)
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
@@ -620,130 +654,143 @@ export default function EventFormPage() {
   const computedBudgetItems = useMemo(() => {
     const items = [];
 
-    selectedTypes.forEach((type) => {
-      const typeName = type?.eventTypeName || "";
-      const typeNameLower = typeName.toLowerCase().trim();
-      const isThisBday = typeNameLower.includes("birthday");
-
-      // 1. Filter active master items matching this Event Type
-      const categoryItems = budgetItemsList.filter((b) => {
+    // 1. Birthday items (if Birthday is selected)
+    const bdayType = selectedTypes.find((t) => t.eventTypeName?.toLowerCase().includes("birthday"));
+    if (bdayType) {
+      const bdayMasterItems = budgetItemsList.filter((b) => {
         if (b.isActive === false) return false;
-        if (type.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === type.eventTypeId.toLowerCase()) {
+        if (bdayType.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === bdayType.eventTypeId.toLowerCase()) {
           return true;
         }
         const cat = (b.category || "").toLowerCase().trim();
-        return cat === typeNameLower;
+        return cat === "birthday" || cat.includes("birthday");
       });
 
-      if (isThisBday) {
-        categoryItems.forEach((item) => {
-          const name = (item.expenseItem || "").toLowerCase();
-          const rate = Number(item.rate) || 0;
-          let calcText = "";
-          let amount = 0;
-          let formulaPart = "";
+      bdayMasterItems.forEach((item) => {
+        const name = (item.expenseItem || "").toLowerCase();
+        const rate = Number(item.rate) || 0;
+        let calcText = "";
+        let amount = 0;
+        let formulaPart = "";
 
-          if (name.includes("cake")) {
-            calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
-            amount = office * rate;
-            formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
-          } else if (
-            name.includes("gift") ||
-            name.includes("present") ||
-            name.includes("voucher") ||
-            name.includes("memento")
-          ) {
-            calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
-            amount = bdays * rate;
-            formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
-          } else {
-            if (puffsFactor > 0) {
-              calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${
-                puffsFactor > 1 ? ` × ${puffsFactor}` : ""
-              }`;
-              amount = total * rate * puffsFactor;
-            } else {
-              calcText = "WFH only → Not provided";
-              amount = 0;
-            }
-            formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
-              "en-IN"
-            )})`;
-          }
-
-          items.push({
-            ...item,
-            category: "Birthday",
-            rate,
-            calcText,
-            amount,
-            formulaPart,
-          });
-        });
-      } else {
-        // Non-Birthday Event Type
-        const manualRate = Number(String(form.baseAmount).replace(/[^0-9.]/g, "")) || 0;
-        const rate = manualRate;
-
-        if (categoryItems.length > 0) {
-          categoryItems.forEach((item) => {
-            const calcText = rate > 0 ? `${total} × ₹${rate.toLocaleString("en-IN")}` : "Enter Contribution Amount";
-            const amount = total * rate;
-            const formulaPart = rate > 0
-              ? `${item.expenseItem} (${typeName}: Total Members × ₹${rate.toLocaleString("en-IN")})`
-              : `${typeName}: ₹0`;
-
-            items.push({
-              ...item,
-              category: typeName,
-              rate,
-              calcText,
-              amount,
-              formulaPart,
-            });
-          });
+        if (name.includes("cake")) {
+          calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
+          amount = office * rate;
+          formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+        } else if (
+          name.includes("gift") ||
+          name.includes("present") ||
+          name.includes("voucher") ||
+          name.includes("memento")
+        ) {
+          calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
+          amount = bdays * rate;
+          formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
         } else {
-          if (rate > 0) {
-            const amount = total * rate;
-            items.push({
-              expenseItem: `${typeName} Celebration`,
-              category: typeName,
-              rate,
-              calcText: `${total} × ₹${rate.toLocaleString("en-IN")}`,
-              amount,
-              formulaPart: `${typeName} (Total Members × ₹${rate.toLocaleString("en-IN")})`,
-            });
+          if (puffsFactor > 0) {
+            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${
+              puffsFactor > 1 ? ` × ${puffsFactor}` : ""
+            }`;
+            amount = total * rate * puffsFactor;
           } else {
-            items.push({
-              expenseItem: `${typeName} Celebration`,
-              category: typeName,
-              rate: 0,
-              calcText: "Enter Contribution Amount",
-              amount: 0,
-              formulaPart: `${typeName}: ₹0`,
-            });
+            calcText = "WFH only → Not provided";
+            amount = 0;
           }
+          formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
+            "en-IN"
+          )})`;
         }
-      }
+
+        items.push({
+          ...item,
+          category: "Birthday",
+          rate,
+          calcText,
+          amount,
+          formulaPart,
+        });
+      });
+    }
+
+    // 2. Non-Birthday Event items (each other selected event type has its own total budget)
+    nonBirthdaySelectedTypes.forEach((type) => {
+      const typeName = type.eventTypeName || "Event";
+      const rawVal = otherEventAmounts[type.eventTypeId] !== undefined
+        ? otherEventAmounts[type.eventTypeId]
+        : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
+      const totalAmount = Number(String(rawVal).replace(/[^0-9]/g, "")) || 0;
+      const splitPerPerson = total > 0 && totalAmount > 0 ? Math.ceil(totalAmount / total) : 0;
+
+      const calcText = totalAmount > 0
+        ? `₹${totalAmount.toLocaleString("en-IN")} Total ÷ ${total} Members = ₹${splitPerPerson.toLocaleString("en-IN")}/person`
+        : "Enter Total Event Budget";
+
+      const formulaPart = totalAmount > 0
+        ? `${typeName} (₹${totalAmount.toLocaleString("en-IN")} ÷ ${total} Members = ₹${splitPerPerson.toLocaleString("en-IN")}/person)`
+        : `${typeName}: ₹0`;
+
+      items.push({
+        id: type.eventTypeId,
+        expenseItem: `${typeName} Celebration (Total Budget)`,
+        category: typeName,
+        rate: totalAmount,
+        calcText,
+        amount: totalAmount,
+        formulaPart,
+        isOtherEvent: true,
+        splitPerPerson,
+      });
     });
 
     return items;
   }, [
     selectedTypes,
+    nonBirthdaySelectedTypes,
     budgetItemsList,
     office,
     bdays,
     total,
     eligible,
     puffsFactor,
+    otherEventAmounts,
     form.baseAmount,
   ]);
 
+  const bdayBudget = useMemo(
+    () =>
+      computedBudgetItems
+        .filter((i) => i.category === "Birthday")
+        .reduce((sum, i) => sum + i.amount, 0),
+    [computedBudgetItems]
+  );
+  const otherEventsBudget = useMemo(
+    () =>
+      computedBudgetItems
+        .filter((i) => i.category !== "Birthday")
+        .reduce((sum, i) => sum + i.amount, 0),
+    [computedBudgetItems]
+  );
+
+  const celebrantCount = isBirthday ? bdays : 0;
+  const birthdayEligibleCount = isBirthday ? (exempt ? Math.max(0, total - celebrantCount) : total) : 0;
+  const birthdaySharePerPerson = birthdayEligibleCount > 0 ? Math.ceil(bdayBudget / birthdayEligibleCount) : 0;
+  const otherEventsSharePerPerson = total > 0 ? Math.ceil(otherEventsBudget / total) : 0;
+
   const plannedBudget = computedBudgetItems.reduce((acc, curr) => acc + curr.amount, 0);
-  const rawPerMember = eligible > 0 ? plannedBudget / eligible : 0;
-  const contributionPerMember =
-    eligible > 0 ? Math.ceil(rawPerMember / RULES.rounding) * RULES.rounding : 0;
-  const expectedCollection = contributionPerMember * eligible;
+
+  const contributionPerMember = useMemo(() => {
+    if (isBirthday && exempt && celebrantCount > 0) {
+      return birthdaySharePerPerson + otherEventsSharePerPerson;
+    }
+    return total > 0 ? Math.ceil((plannedBudget / total) / RULES.rounding) * RULES.rounding : 0;
+  }, [isBirthday, exempt, celebrantCount, birthdaySharePerPerson, otherEventsSharePerPerson, plannedBudget, total]);
+
+  const expectedCollection = useMemo(() => {
+    if (isBirthday && exempt && celebrantCount > 0) {
+      return (birthdayEligibleCount * birthdaySharePerPerson) + (total * otherEventsSharePerPerson);
+    }
+    return contributionPerMember * (isBirthday ? eligible : total);
+  }, [isBirthday, exempt, celebrantCount, birthdayEligibleCount, birthdaySharePerPerson, total, otherEventsSharePerPerson, contributionPerMember, eligible]);
 
   const dynamicFormulaText = computedBudgetItems
     .map((i) => i.formulaPart)
@@ -928,11 +975,16 @@ export default function EventFormPage() {
       }
     }
 
-    if (!isBirthday) {
-      const cleanBase = Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0;
-      if (cleanBase <= 0 && contributionPerMember <= 0) {
-        newErrors.baseAmount = "Contribution amount is required";
-      }
+    if (nonBirthdaySelectedTypes.length > 0) {
+      nonBirthdaySelectedTypes.forEach((t) => {
+        const val = otherEventAmounts[t.eventTypeId] !== undefined
+          ? otherEventAmounts[t.eventTypeId]
+          : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
+        const num = Number(String(val).replace(/[^0-9]/g, "")) || 0;
+        if (num <= 0) {
+          newErrors[`baseAmount_${t.eventTypeId}`] = `Contribution amount is required for ${t.eventTypeName}`;
+        }
+      });
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -948,29 +1000,38 @@ export default function EventFormPage() {
         : participatingMembers.map((m) => m.memberId);
       const contributionOverrides = [];
 
-      if (isBirthday) {
-        const celebrantIds = monthCelebrants.map((m) => m.memberId);
-        if (exempt) {
-          celebrantIds.forEach((cId) => {
-            contributionOverrides.push({ memberId: cId, amount: 0 });
-          });
-          finalParticipantIds.forEach((mId) => {
-            if (!celebrantIds.includes(mId)) {
-              contributionOverrides.push({
-                memberId: mId,
-                amount: contributionPerMember,
-              });
-            }
-          });
-        } else {
-          finalParticipantIds.forEach((mId) => {
+      const bdayBudget = computedBudgetItems
+        .filter((i) => i.category === "Birthday")
+        .reduce((sum, i) => sum + i.amount, 0);
+      const otherEventsBudget = computedBudgetItems
+        .filter((i) => i.category !== "Birthday")
+        .reduce((sum, i) => sum + i.amount, 0);
+
+      const celebrantIds = monthCelebrants.map((m) => m.memberId);
+      const birthdayEligibleCount = isBirthday
+        ? (exempt ? Math.max(0, finalParticipantIds.length - celebrantIds.length) : finalParticipantIds.length)
+        : 0;
+      const birthdaySharePerPerson = birthdayEligibleCount > 0 ? Math.ceil(bdayBudget / birthdayEligibleCount) : 0;
+      const otherEventsSharePerPerson = finalParticipantIds.length > 0 ? Math.ceil(otherEventsBudget / finalParticipantIds.length) : 0;
+
+      if (isBirthday && exempt && celebrantIds.length > 0) {
+        finalParticipantIds.forEach((mId) => {
+          if (celebrantIds.includes(mId)) {
+            // Celebrant is exempt from birthday portion, but pays for other events (e.g. Farewell, Dinner)
             contributionOverrides.push({
               memberId: mId,
-              amount: contributionPerMember,
+              amount: otherEventsSharePerPerson,
             });
-          });
-        }
+          } else {
+            // Non-celebrant pays birthday share + other events share
+            contributionOverrides.push({
+              memberId: mId,
+              amount: birthdaySharePerPerson + otherEventsSharePerPerson,
+            });
+          }
+        });
       } else {
+        // Everyone pays total contribution per member
         finalParticipantIds.forEach((mId) => {
           contributionOverrides.push({
             memberId: mId,
@@ -988,7 +1049,7 @@ export default function EventFormPage() {
       const defaultDesc = isBirthday
         ? `Birthday celebration (${office} Office, ${wfh} WFH)${
             celebrantsSummary ? ` for ${celebrantsSummary}` : ""
-          }. Planned Budget: ₹${plannedBudget.toLocaleString(
+          }${nonBirthdaySelectedTypes.length > 0 ? ` + ${nonBirthdaySelectedTypes.map(t => t.eventTypeName).join(" & ")}` : ""}. Planned Budget: ₹${plannedBudget.toLocaleString(
             "en-IN"
           )}, Contribution/member: ₹${contributionPerMember}`
         : `${selectedTypeNames.join(" & ") || "Event"} celebration for ${total} members. Planned Budget: ₹${plannedBudget.toLocaleString(
@@ -1009,7 +1070,7 @@ export default function EventFormPage() {
         eventDates: isBirthday ? (celebrantDatesCsv || null) : null,
         description: form.description?.trim() || defaultDesc,
         status: form.status || "Planned",
-        baseAmount: plannedBudget > 0 ? plannedBudget : (Number(String(form.baseAmount).replace(/[^0-9]/g, "")) || 0) * (finalParticipantIds.length || 1),
+        baseAmount: plannedBudget,
         participantIds:
           finalParticipantIds.length > 0 ? finalParticipantIds : form.participantIds,
         contributionOverrides: contributionOverrides,
@@ -1473,32 +1534,63 @@ export default function EventFormPage() {
                     />
                   </Grid>
 
-                  {/* Row 4: Contribution Amount for non-Birthday events */}
-                  {!isBirthday && (
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <AppInput
-                        label="Contribution Amount"
-                        placeholder="Enter contribution amount (₹)"
-                        required
-                        fullWidth
-                        value={formatBaseAmount(form.baseAmount)}
-                        onChange={(e) => {
-                          const rawVal = e.target.value.replace(/[^0-9]/g, "");
-                          setForm((f) => ({ ...f, baseAmount: rawVal }));
-                          if (errors.baseAmount) {
-                            setErrors((prev) => ({ ...prev, baseAmount: "" }));
-                          }
-                        }}
-                        startAdornment={
-                          <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
-                            ₹
-                          </Typography>
-                        }
-                        error={!!errors.baseAmount}
-                        helperText={errors.baseAmount}
-                      />
-                    </Grid>
-                  )}
+                  {/* Row 4: Contribution Amount fields for each non-Birthday event type */}
+                  {nonBirthdaySelectedTypes.length > 0 &&
+                    nonBirthdaySelectedTypes.map((type) => {
+                      const rawVal =
+                        otherEventAmounts[type.eventTypeId] !== undefined
+                          ? otherEventAmounts[type.eventTypeId]
+                          : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
+                      const numVal = Number(String(rawVal).replace(/[^0-9]/g, "")) || 0;
+                      const splitPerPerson = total > 0 && numVal > 0 ? Math.ceil(numVal / total) : 0;
+                      const fieldError =
+                        errors[`baseAmount_${type.eventTypeId}`] ||
+                        (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
+
+                      return (
+                        <Grid
+                          size={{ xs: 12, sm: nonBirthdaySelectedTypes.length > 1 ? 6 : 6 }}
+                          key={type.eventTypeId}
+                        >
+                          <AppInput
+                            label={`${type.eventTypeName} Contribution Amount`}
+                            placeholder={`Enter total ${type.eventTypeName.toLowerCase()} budget (₹)`}
+                            required
+                            fullWidth
+                            value={formatBaseAmount(rawVal)}
+                            onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
+                            startAdornment={
+                              <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
+                                ₹
+                              </Typography>
+                            }
+                            endAdornment={
+                              numVal > 0 && total > 0 ? (
+                                <Chip
+                                  label={`₹${splitPerPerson.toLocaleString("en-IN")}/person`}
+                                  size="small"
+                                  sx={{
+                                    fontWeight: 700,
+                                    fontSize: "0.72rem",
+                                    height: 22,
+                                    bgcolor: "rgba(14, 165, 233, 0.1)",
+                                    color: "#0284c7",
+                                    border: "1px solid rgba(14, 165, 233, 0.25)",
+                                  }}
+                                />
+                              ) : null
+                            }
+                            error={!!fieldError}
+                            helperText={
+                              fieldError ||
+                              (numVal > 0 && total > 0
+                                ? `Total ₹${numVal.toLocaleString("en-IN")} split equally across ${total} members (₹${splitPerPerson.toLocaleString("en-IN")} each)`
+                                : `Enter total amount for ${type.eventTypeName} to split equally among ${total} members`)
+                            }
+                          />
+                        </Grid>
+                      );
+                    })}
                 </Grid>
 
                 {/* Row 4: Identified Celebrants (for Birthday) or Active Participants (for other Events) */}
@@ -1910,9 +2002,16 @@ export default function EventFormPage() {
                       borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
                     }}
                   >
-                    <Typography sx={{ fontSize: "0.88rem", color: "#64748b", fontWeight: 500 }}>
-                      Contribution / Member
-                    </Typography>
+                    <Box>
+                      <Typography sx={{ fontSize: "0.88rem", color: "#64748b", fontWeight: 500 }}>
+                        Contribution / Member
+                      </Typography>
+                      {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0 && (
+                        <Typography sx={{ fontSize: "0.73rem", color: "#6366f1", fontWeight: 600 }}>
+                          Celebrants: ₹{otherEventsSharePerPerson.toLocaleString("en-IN")}
+                        </Typography>
+                      )}
+                    </Box>
                     <Typography sx={{ fontSize: "1.05rem", fontWeight: 800, color: "#0284c7" }}>
                       ₹{contributionPerMember.toLocaleString("en-IN")}
                     </Typography>
@@ -1999,7 +2098,9 @@ export default function EventFormPage() {
                         fontSize: "0.78rem",
                       }}
                     >
-                      ₹{plannedBudget.toLocaleString("en-IN")} Total Budget ÷ {eligible} Members = ₹{contributionPerMember}/person
+                      {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0
+                        ? `₹${plannedBudget.toLocaleString("en-IN")} Total Budget (Non-Celebrants: ₹${contributionPerMember}/person, Celebrants: ₹${otherEventsSharePerPerson}/person)`
+                        : `₹${plannedBudget.toLocaleString("en-IN")} Total Budget ÷ ${isBirthday && exempt ? eligible : total} Members = ₹${contributionPerMember}/person`}
                     </Typography>
                   </Box>
                 </Box>

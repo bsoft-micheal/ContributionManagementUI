@@ -100,3 +100,7 @@ export const getSystemSettings = getSystemSettingsAsync;
 export const updateSystemSettings = updateSystemSettingsAsync;
 export const resetSystemSettings = resetSystemSettingsAsync;
 
+export const triggerHangfireRemindersAsync = async () => {
+  return await postApi("/settings/triggerRemindersAsync", {});
+};
+

@@ -70,6 +70,7 @@ import {
   updateSystemSettings,
   getAllPaymentQrSettingsAsync,
   savePaymentQrSettingAsync,
+  triggerHangfireRemindersAsync,
 } from "../../services/settingsService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import SendTestEmailDialog from "../../components/settings/SendTestEmailDialog";
@@ -134,6 +135,8 @@ const initialSettings = {
   enableMonthlyEmail: true,
   enableReminderEmail: true,
   reminderIntervalDays: "10",
+  reminderIntervalValue: "10",
+  reminderIntervalUnit: "Days",
   maxReminders: "3",
 
   // OTP / 2FA
@@ -208,6 +211,7 @@ export default function SettingsPage() {
   const [testEmailDialogOpen, setTestEmailDialogOpen] = useState(false);
   const [logsDialogOpen, setLogsDialogOpen] = useState(false);
   const [schedulerRunning, setSchedulerRunning] = useState(false);
+  const [triggeringHangfire, setTriggeringHangfire] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(() => dayjs().format("DD MMM YYYY"));
   const [mfaDevicesCount, setMfaDevicesCount] = useState(1);
 
@@ -656,13 +660,15 @@ export default function SettingsPage() {
               ? { ...DEFAULT_CATEGORY_TEMPLATES, ...backendCategoryTemplates }
               : DEFAULT_CATEGORY_TEMPLATES;
 
-          let localSelectedCategoryId = data.selectedTemplateCategoryId || "all";
-          let localEnableMonthlyEmail = data.enableMonthlyEmail !== undefined ? data.enableMonthlyEmail : true;
-          let localEnableReminderEmail = data.enableReminderEmail !== undefined ? data.enableReminderEmail : true;
           let localReminderIntervalDays = data.reminderIntervalDays ? String(data.reminderIntervalDays) : "10";
+          let localReminderIntervalValue = data.reminderIntervalValue ? String(data.reminderIntervalValue) : localReminderIntervalDays;
+          let localReminderIntervalUnit = data.reminderIntervalUnit || "Days";
           let localMaxReminders = data.maxReminders ? String(data.maxReminders) : "3";
           let localBirthdayMembersExempt = undefined;
           let localAllowedMultipleEvent = undefined;
+          let localSelectedCategoryId = data.selectedTemplateCategoryId || "all";
+          let localEnableMonthlyEmail = data.enableMonthlyEmail !== undefined ? data.enableMonthlyEmail : true;
+          let localEnableReminderEmail = data.enableReminderEmail !== undefined ? data.enableReminderEmail : true;
 
           try {
             if (localSaved) {
@@ -682,6 +688,12 @@ export default function SettingsPage() {
               }
               if (!data.reminderIntervalDays && parsed.reminderIntervalDays) {
                 localReminderIntervalDays = String(parsed.reminderIntervalDays);
+              }
+              if (!data.reminderIntervalValue && parsed.reminderIntervalValue) {
+                localReminderIntervalValue = String(parsed.reminderIntervalValue);
+              }
+              if (!data.reminderIntervalUnit && parsed.reminderIntervalUnit) {
+                localReminderIntervalUnit = String(parsed.reminderIntervalUnit);
               }
               if (!data.maxReminders && parsed.maxReminders) {
                 localMaxReminders = String(parsed.maxReminders);
@@ -734,6 +746,8 @@ export default function SettingsPage() {
             enableMonthlyEmail: localEnableMonthlyEmail,
             enableReminderEmail: localEnableReminderEmail,
             reminderIntervalDays: localReminderIntervalDays,
+            reminderIntervalValue: localReminderIntervalValue,
+            reminderIntervalUnit: localReminderIntervalUnit,
             maxReminders: localMaxReminders,
           };
 
@@ -894,15 +908,17 @@ export default function SettingsPage() {
       return;
     }
 
-    const intervalNum = Number(settings.reminderIntervalDays);
-    if (!settings.reminderIntervalDays || isNaN(intervalNum) || intervalNum < 1 || intervalNum > 31) {
-      toast.error("Please enter a valid Reminder Interval between 1 and 31 days.");
+    const intervalVal = Number(settings.reminderIntervalValue || settings.reminderIntervalDays);
+    const unit = settings.reminderIntervalUnit || "Days";
+
+    if (!intervalVal || isNaN(intervalVal) || intervalVal <= 0) {
+      toast.error("Please enter a valid Reminder Interval number greater than 0.");
       return;
     }
 
     const maxRemindersNum = Number(settings.maxReminders);
-    if (!settings.maxReminders || isNaN(maxRemindersNum) || maxRemindersNum < 1 || maxRemindersNum > 10) {
-      toast.error("Please enter a valid Maximum Reminders limit between 1 and 10.");
+    if (!settings.maxReminders || isNaN(maxRemindersNum) || maxRemindersNum < 1 || maxRemindersNum > 50) {
+      toast.error("Please enter a valid Maximum Reminders limit between 1 and 50.");
       return;
     }
 
@@ -941,7 +957,9 @@ export default function SettingsPage() {
         selectedTemplateCategoryId: selectedCategoryId,
         enableMonthlyEmail: settings.enableMonthlyEmail !== false,
         enableReminderEmail: settings.enableReminderEmail !== false,
-        reminderIntervalDays: String(intervalNum),
+        reminderIntervalDays: String(intervalVal),
+        reminderIntervalValue: String(intervalVal),
+        reminderIntervalUnit: unit,
         maxReminders: String(maxRemindersNum),
       };
 
@@ -970,6 +988,18 @@ export default function SettingsPage() {
       toast.error("Error executing scheduler check.");
     } finally {
       setSchedulerRunning(false);
+    }
+  };
+
+  const handleTriggerHangfireJob = async () => {
+    try {
+      setTriggeringHangfire(true);
+      await triggerHangfireRemindersAsync();
+      toast.success("Hangfire reminder job successfully enqueued! Check your inbox and the Hangfire Dashboard.");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to trigger Hangfire reminder job");
+    } finally {
+      setTriggeringHangfire(false);
     }
   };
 
@@ -1636,11 +1666,25 @@ export default function SettingsPage() {
                             bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#f8fafc",
                           }}
                         >
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-                            <ScheduleOutlinedIcon sx={{ fontSize: 19, color: "#0284c7" }} />
-                            <Typography variant="subtitle2" fontWeight={800} sx={{ fontSize: "0.85rem" }}>
-                              Automated Monthly & {settings.reminderIntervalDays || "10"}-Day Reminder Settings
-                            </Typography>
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <ScheduleOutlinedIcon sx={{ fontSize: 19, color: "#0284c7" }} />
+                              <Typography variant="subtitle2" fontWeight={800} sx={{ fontSize: "0.85rem" }}>
+                                Automated Monthly &amp; Recurring Reminder Settings
+                              </Typography>
+                            </Box>
+                            <Chip
+                              label={`Cadence: Every ${settings.reminderIntervalValue || settings.reminderIntervalDays || "10"} ${(settings.reminderIntervalUnit || "Days").toLowerCase()}`}
+                              size="small"
+                              sx={{
+                                height: 22,
+                                fontSize: "0.7rem",
+                                fontWeight: 700,
+                                bgcolor: "rgba(2, 132, 199, 0.1)",
+                                color: "#0284c7",
+                                border: "1px solid rgba(2, 132, 199, 0.2)",
+                              }}
+                            />
                           </Box>
 
                           <Grid container spacing={2}>
@@ -1661,31 +1705,82 @@ export default function SettingsPage() {
                                 onChange={(e) => handleChange("enableReminderEmail", e.target.checked)}
                               />
                               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", display: "block", pl: 0.5 }}>
-                                Send reminders every {settings.reminderIntervalDays || "10"} days for unpaid contributions (stops once paid).
+                                Send reminders every {settings.reminderIntervalValue || settings.reminderIntervalDays || "10"} {(settings.reminderIntervalUnit || "Days").toLowerCase()} for unpaid contributions (stops once paid).
                               </Typography>
                             </Grid>
 
-                            <Grid size={{ xs: 12, sm: 6 }}>
+                            <Grid size={{ xs: 12, sm: 4 }}>
                               <AppInput
-                                label="Reminder Interval (Days)"
-                                value={settings.reminderIntervalDays !== undefined && settings.reminderIntervalDays !== null ? settings.reminderIntervalDays : ""}
-                                onChange={(e) => handleChange("reminderIntervalDays", e.target.value)}
+                                label="Reminder Interval"
+                                value={settings.reminderIntervalValue !== undefined && settings.reminderIntervalValue !== null ? settings.reminderIntervalValue : (settings.reminderIntervalDays ?? "10")}
+                                onChange={(e) => {
+                                  handleChange("reminderIntervalValue", e.target.value);
+                                  handleChange("reminderIntervalDays", e.target.value);
+                                }}
                                 restrictType="numberonly"
                                 placeholder="e.g. 10"
                               />
                             </Grid>
-                            <Grid size={{ xs: 12, sm: 6 }}>
+                            <Grid size={{ xs: 12, sm: 4 }}>
+                              <AppSelect
+                                label="Interval Unit"
+                                value={settings.reminderIntervalUnit || "Days"}
+                                onChange={(e) => handleChange("reminderIntervalUnit", e.target.value)}
+                                options={[
+                                  { label: "Minutes", value: "Minutes" },
+                                  { label: "Hours", value: "Hours" },
+                                  { label: "Days", value: "Days" },
+                                ]}
+                              />
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}>
                               <AppInput
                                 label="Maximum Reminders Allowed"
-                                value={settings.maxReminders !== undefined && settings.maxReminders !== null ? settings.maxReminders : ""}
+                                value={settings.maxReminders !== undefined && settings.maxReminders !== null ? settings.maxReminders : "3"}
                                 onChange={(e) => handleChange("maxReminders", e.target.value)}
                                 restrictType="numberonly"
                                 placeholder="e.g. 3"
                               />
                             </Grid>
                           </Grid>
-                          {/* Manual Scheduler Trigger Action */}
-                          <Box sx={{ mt: 2, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                          {/* Manual Scheduler & Hangfire Action */}
+                          <Box sx={{ mt: 2.5, pt: 1.5, borderTop: `1px dashed ${theme.palette.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                              <AppButton
+                                variant="contained"
+                                startIcon={triggeringHangfire ? <CircularProgress size={16} color="inherit" /> : <PlayArrowOutlinedIcon />}
+                                disabled={triggeringHangfire}
+                                onClick={handleTriggerHangfireJob}
+                                sx={{
+                                  bgcolor: "#059669 !important",
+                                  "&:hover": { bgcolor: "#047857 !important" },
+                                  fontSize: "0.8rem",
+                                  py: 0.8,
+                                  px: 2,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {triggeringHangfire ? "Dispatching Reminders..." : "Run Hangfire Reminders Now"}
+                              </AppButton>
+                              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
+                                Evaluates all unpaid contributions and dispatches reminder emails via Hangfire.
+                              </Typography>
+                            </Box>
+                            <AppButton
+                              variant="outlined"
+                              size="small"
+                              startIcon={<OpenInNewOutlinedIcon sx={{ fontSize: 16 }} />}
+                              onClick={() => window.open(window.location.protocol + "//" + window.location.hostname + ":5111/hangfire", "_blank")}
+                              sx={{
+                                borderColor: "#0284c7",
+                                color: "#0284c7",
+                                "&:hover": { bgcolor: "rgba(2,132,199,0.06)", borderColor: "#0369a1" },
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Open Hangfire Dashboard
+                            </AppButton>
                           </Box>
                         </Box>
                       </Stack>
