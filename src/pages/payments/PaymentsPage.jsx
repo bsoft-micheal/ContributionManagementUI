@@ -59,8 +59,8 @@ export default function PaymentsPage() {
   const hasWriteAccess = rights?.write !== undefined ? rights.write : true;
 
   // Granular Action Permissions
-  const canViewPaymentHistory = hasActionPermission("View Payment History", 9, authState?.role).canView;
-  const canSubmitPayment = hasActionPermission("Submit Payemnt details", 41, authState?.role).canExecute && hasWriteAccess;
+  const canViewPaymentHistory = hasActionPermission("View Payment History", 43, authState?.role).canView;
+  const canSubmitPayment = (hasActionPermission("Submit Payment details", 42, authState?.role).canExecute !== false) && hasWriteAccess;
   const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
 
   const [transactions, setTransactions] = useState([]);

@@ -11,7 +11,7 @@ function getParentPageFeatureId(actionFeatureId) {
   if (id >= 36 && id <= 40) return 6;   // Gallery
   if (id >= 41 && id <= 43) return 8;   // Contribution
   if (id >= 44 && id <= 48) return 11;  // Expense
-  if (id >= 49 && id <= 53) return 12;  // Support Ticket
+  if ((id >= 49 && id <= 53) || id === 58) return 12;  // Support Ticket
   return null;
 }
 
