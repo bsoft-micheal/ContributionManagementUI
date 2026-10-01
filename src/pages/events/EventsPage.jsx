@@ -62,9 +62,9 @@ export default function EventsPage() {
   const hasWriteAccess = canEdit;
 
   // Granular Action Permissions
-  const canAddEvent = hasActionPermission("Add Event", 31, authState?.role).canExecute;
-  const canEditEvent = hasActionPermission("Edit Event", 32, authState?.role).canExecute;
-  const canDeleteEvent = hasActionPermission("Delete Event", 33, authState?.role).canExecute;
+  const canAddEvent = hasActionPermission("Add Event", 31, authState?.role).canExecute && hasWriteAccess;
+  const canEditEvent = hasActionPermission("Edit Event", 32, authState?.role).canExecute && hasWriteAccess;
+  const canDeleteEvent = hasActionPermission("Delete Event", 33, authState?.role).canExecute && hasWriteAccess;
   const canViewEvent = hasActionPermission("View Event", 30, authState?.role).canView;
 
   const navigate = useNavigate();

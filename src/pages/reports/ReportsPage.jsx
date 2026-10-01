@@ -22,7 +22,8 @@ import AppPieChart from "../../components/common/AppPieChart";
 import { useAppToast } from "../../components/common/AppToast";
 import { PieChart as PieChartIcon, BarChart as BarChartIcon, FilterList as FilterListIcon } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
-import { getRightsForPage } from "../../utils/rightsHelper";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
+import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
 
 function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
   const theme = useTheme();
@@ -158,7 +159,9 @@ export default function ReportsPage({ mode = "event" }) {
   const theme = useTheme();
   const navigate = useNavigate();
   const { authState } = useAuth();
-  const hasWriteAccess = getRightsForPage("Reports", authState?.role).write;
+  const { canEdit } = useAccessByLocation();
+  const canExportReports = hasActionPermission("Export Reports", 82, authState?.role).canExecute;
+  const hasWriteAccess = canExportReports && canEdit;
 
   const toast = useAppToast();
   const [report, setReport] = useState(null);

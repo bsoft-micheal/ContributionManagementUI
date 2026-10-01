@@ -10,12 +10,15 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
-import { getRightsForPage } from "../../utils/rightsHelper";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
+import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 export default function ExitProcessPage() {
   const { authState } = useAuth();
-  const hasWriteAccess = getRightsForPage("Exit Process", authState?.role).write;
+  const { canEdit } = useAccessByLocation();
+  const canProcessExit = hasActionPermission("Process Exit", 77, authState?.role).canExecute && canEdit;
+  const hasWriteAccess = canProcessExit;
 
   const [exitCandidates, setExitCandidates] = useState([]);
   const [loading, setLoading] = useState(true);

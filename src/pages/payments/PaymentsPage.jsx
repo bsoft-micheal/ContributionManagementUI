@@ -56,10 +56,11 @@ export default function PaymentsPage() {
     "secretary",
     "committee",
   ].includes(String(authState?.role || authState?.user?.role || "").toLowerCase());
-  const hasWriteAccess = isAuthorityRole || (rights?.write !== undefined ? rights.write : true);
+  const hasWriteAccess = rights?.write !== undefined ? rights.write : true;
 
   // Granular Action Permissions
   const canViewPaymentHistory = hasActionPermission("View Payment History", 42, authState?.role).canView;
+  const canSubmitPayment = hasActionPermission("Submit Payment", 53, authState?.role).canExecute && hasWriteAccess;
   const isMemberRole = String(authState?.role || "").toLowerCase() === "member";
 
   const [transactions, setTransactions] = useState([]);
@@ -463,13 +464,15 @@ export default function PaymentsPage() {
         data={filteredTransactions}
         loading={loading}
         actions={
-          <AppButton
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setSubmitModalOpen(true)}
-          >
-            Submit Payment
-          </AppButton>
+          canSubmitPayment && (
+            <AppButton
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setSubmitModalOpen(true)}
+            >
+              Submit Payment
+            </AppButton>
+          )
         }
         filterPanel={
           <Grid container spacing={2} alignItems="center">

@@ -11,6 +11,7 @@ import {
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
@@ -70,8 +71,8 @@ const initialPaymentModeForm = {
 
 export default function TypesPage() {
   const { authState } = useAuth();
-  const rights = getRightsForPage("Types", authState?.role) || getRightsForPage("Ticket Types", authState?.role);
-  const hasWriteAccess = rights?.write ?? (authState?.role === "Admin" || authState?.role === "Organizer");
+  const { canEdit } = useAccessByLocation();
+  const hasWriteAccess = canEdit;
 
   const toast = useAppToast();
 

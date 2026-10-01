@@ -16,6 +16,7 @@ import { FilterList as FilterListIcon, Refresh as RefreshIcon, Save as SaveIcon 
 import { getUserRightsAsync, saveUserRightsAsync } from "../../services/userRightsService";
 import { getRolesAsync } from "../../services/roleService";
 import { formatGridDate } from "../../utils/dateHelper";
+import { useAuth } from "../../contexts/AuthContext";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
 const ACCESS_OPTIONS = [
@@ -51,6 +52,7 @@ const CANONICAL_SUBMODULE_ORDER = {
   ],
   Tools: [
     "",
+    "Users",
     "Roles",
     "User Rights",
     "Event Types",
@@ -77,11 +79,20 @@ export default function UserRightsPage() {
   const [saving, setSaving] = useState(false);
 
   const toast = useAppToast();
+  const { authState } = useAuth();
 
   const moduleOptions = useMemo(() => {
     const roleRights = rights[selectedRoleName] || [];
-    const uniqueModules = Array.from(new Set(roleRights.map((r) => r.module).filter(Boolean)));
-    return [{ label: "All Modules", value: "All" }, ...uniqueModules.map((m) => ({ label: m, value: m }))];
+    const rawModules = roleRights.map((r) => r.module).filter(Boolean);
+    const uniqueModules = Array.from(new Set(rawModules));
+    const sortedModules = uniqueModules.sort((a, b) => {
+      const idxA = CANONICAL_MODULE_ORDER.indexOf(a);
+      const idxB = CANONICAL_MODULE_ORDER.indexOf(b);
+      const effA = idxA >= 0 ? idxA : 999;
+      const effB = idxB >= 0 ? idxB : 999;
+      return effA - effB;
+    });
+    return [{ label: "All Modules", value: "All" }, ...sortedModules.map((m) => ({ label: m, value: m }))];
   }, [rights, selectedRoleName]);
 
   // ── Initial load: fetch roles ─────────────────────────────────────────────
@@ -129,50 +140,56 @@ export default function UserRightsPage() {
         let subModuleVal = (r.subModule || r.SubModule || "").trim();
         let actionVal = (r.action || r.Action || "").trim();
 
+        // Title Case module names
+        const modLower = moduleVal.toLowerCase();
+        if (modLower === "user" || modLower === "users" || modLower === "members") {
+          moduleVal = "Users";
+        } else if (modLower === "dashbod" || modLower === "dashboard") {
+          moduleVal = "Dashboard";
+        } else if (modLower === "events") {
+          moduleVal = "Events";
+        } else if (modLower === "finance") {
+          moduleVal = "Finance";
+        } else if (modLower.includes("support") || modLower.includes("ticket")) {
+          moduleVal = "Support Ticket";
+        } else if (modLower === "tools") {
+          moduleVal = "Tools";
+        } else if (modLower === "reports") {
+          moduleVal = "Reports";
+        }
+
         // Frontend resilience: if action is empty but subModule contains action phrases
         if (!actionVal && subModuleVal) {
-          const actionPrefixes = ["View", "Add", "Edit", "Delete", "Export", "Import", "Create", "Reply", "Close", "Reset"];
+          const actionPrefixes = ["View", "Add", "Edit", "Delete", "Export", "Import", "Create", "Reply", "Close", "Reset", "Submit", "Update", "Process", "Change"];
           const isAction = actionPrefixes.some(p => subModuleVal.startsWith(p));
           if (isAction) {
             actionVal = subModuleVal;
-            if (moduleVal.toLowerCase() === "members" || moduleVal.toLowerCase() === "dashboard") {
-              subModuleVal = "";
-            } else if (subModuleVal.includes("Event")) {
-              subModuleVal = "Event";
-            } else if (subModuleVal.includes("Gallery") || subModuleVal.includes("Photo")) {
-              subModuleVal = "Gallery";
-            } else if (subModuleVal.includes("Contribution")) {
-              subModuleVal = "Contribution";
-            } else if (subModuleVal.includes("Payment Submission") || subModuleVal.includes("Submit Payment")) {
-              subModuleVal = "Payment Submission";
-            } else if (subModuleVal.includes("Payment")) {
-              subModuleVal = "Payment History";
-            } else if (subModuleVal.includes("Calculation")) {
-              subModuleVal = "Calculation";
-            } else if (subModuleVal.includes("Expense")) {
-              subModuleVal = "Expense";
-            } else if (subModuleVal.includes("Role")) {
-              subModuleVal = "Roles";
-            } else if (subModuleVal.includes("Exit")) {
-              subModuleVal = "Exit Process";
-            } else if (subModuleVal.includes("User Rights")) {
-              subModuleVal = "User Rights";
-            } else if (subModuleVal.includes("User")) {
-              subModuleVal = "Users";
-            } else if (subModuleVal.includes("Setting")) {
-              subModuleVal = "Settings";
-            }
+            if (subModuleVal.includes("Member") || subModuleVal.includes("User")) subModuleVal = "Users";
+            else if (subModuleVal.includes("Event Type") || subModuleVal.includes("Types")) subModuleVal = "Event Types";
+            else if (subModuleVal.includes("Event")) subModuleVal = "Event";
+            else if (subModuleVal.includes("Gallery") || subModuleVal.includes("Photo")) subModuleVal = "Gallery";
+            else if (subModuleVal.includes("Contribution")) subModuleVal = "Contribution";
+            else if (subModuleVal.includes("Payment Submission") || subModuleVal.includes("Submit Payment")) subModuleVal = "Payment Submission";
+            else if (subModuleVal.includes("Payment")) subModuleVal = "Payment History";
+            else if (subModuleVal.includes("Calculation")) subModuleVal = "Calculation";
+            else if (subModuleVal.includes("Expense")) subModuleVal = "Expense";
+            else if (subModuleVal.includes("Role")) subModuleVal = "Roles";
+            else if (subModuleVal.includes("Exit")) subModuleVal = "Exit Process";
+            else if (subModuleVal.includes("User Rights")) subModuleVal = "User Rights";
+            else if (subModuleVal.includes("Status")) subModuleVal = "Status";
+            else if (subModuleVal.includes("Setting")) subModuleVal = "Settings";
+            else if (subModuleVal.includes("Ticket")) subModuleVal = "Support Tickets";
           }
         }
 
         // Module fallback if blank
         if (!moduleVal) {
           const checkText = `${actionVal} ${subModuleVal}`.toLowerCase();
-          if (checkText.includes("member")) moduleVal = "Members";
+          if (checkText.includes("member") || checkText.includes("user")) moduleVal = "Users";
           else if (checkText.includes("event") || checkText.includes("gallery") || checkText.includes("photo") || checkText.includes("calendar")) moduleVal = "Events";
           else if (checkText.includes("contribution") || checkText.includes("payment") || checkText.includes("calculation") || checkText.includes("expense")) moduleVal = "Finance";
           else if (checkText.includes("ticket") || checkText.includes("helpdesk")) moduleVal = "Support Ticket";
-          else if (checkText.includes("role") || checkText.includes("user") || checkText.includes("setting") || checkText.includes("exit")) moduleVal = "Tools";
+          else if (checkText.includes("role") || checkText.includes("setting") || checkText.includes("exit")) moduleVal = "Tools";
           else if (checkText.includes("report")) moduleVal = "Reports";
           else if (checkText.includes("dashboard")) moduleVal = "Dashboard";
         }
@@ -227,6 +244,10 @@ export default function UserRightsPage() {
         const parsed = stored ? JSON.parse(stored) : {};
         parsed[roleName] = finalRows;
         parsed[roleName.toLowerCase()] = finalRows;
+        const activeUserRole = authState?.role || authState?.roleName || "";
+        if (activeUserRole && roleName.toLowerCase() === activeUserRole.toLowerCase()) {
+          parsed["current"] = finalRows;
+        }
         localStorage.setItem("projectRightsConfig", JSON.stringify(parsed));
       } catch {
         // ignore cache write error
@@ -296,10 +317,13 @@ export default function UserRightsPage() {
           const typeVal = Number(r.accessType) || (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2));
           const strVal = typeVal === 3 ? "deny" : (typeVal === 1 ? "readOnly" : "readWrite");
           const pageVal = (r.action && r.action.trim() !== "" ? r.action : (r.page || r.subModule || r.module || "")).trim();
+          const featId = Number(r.featureID || r.featureId || r.FeatureID || r.FeatureId) || 0;
           return {
             roleId: selectedRoleObj?.roleId || r.roleId || undefined,
             role: selectedRoleName,
-            featureId: r.featureID || r.featureId || 0,
+            featureId: featId,
+            featureID: featId,
+            FeatureID: featId,
             module: (r.module || "").trim(),
             subModule: (r.subModule || "").trim(),
             action: (r.action || "").trim(),
@@ -317,6 +341,10 @@ export default function UserRightsPage() {
         const parsed = stored ? JSON.parse(stored) : {};
         parsed[selectedRoleName] = currentRows;
         parsed[selectedRoleName.toLowerCase()] = currentRows;
+        const activeUserRole = authState?.role || authState?.roleName || "";
+        if (activeUserRole && selectedRoleName.toLowerCase() === activeUserRole.toLowerCase()) {
+          parsed["current"] = currentRows;
+        }
         localStorage.setItem("projectRightsConfig", JSON.stringify(parsed));
       } catch {
         // ignore cache write error

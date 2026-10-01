@@ -60,8 +60,9 @@ import AppSwitch from "../../components/common/AppSwitch";
 import AppButton from "../../components/common/AppButton";
 import AppTextArea from "../../components/common/AppTextArea";
 import AppDataTable from "../../components/common/AppDataTable";
-import { formatGridDate } from "../../utils/dateHelper";
-import MfaSettings from "../../components/common/MfaSettings";
+import { useAuth } from "../../contexts/AuthContext";
+import useAccessByLocation from "../../hooks/useAccessByLocation";
+import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
 import { useAppToast } from "../../components/common/AppToast";
 import {
   getSystemSettingsAsync,
@@ -148,6 +149,10 @@ export default function SettingsPage() {
   const theme = useTheme();
   const toast = useAppToast();
   const isDark = theme.palette.mode === "dark";
+  const { authState } = useAuth();
+  const { canEdit } = useAccessByLocation();
+  const canUpdateSettings = hasActionPermission("Update Settings", 80, authState?.role).canExecute;
+  const hasWriteAccess = canUpdateSettings && canEdit;
 
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem("cm_system_settings");
