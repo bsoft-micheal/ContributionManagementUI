@@ -1353,29 +1353,11 @@ export default function EventFormPage() {
                   <Box
                     onClick={() => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
                     sx={{
-                      p: 0.8,
-                      px: 1.8,
-                      borderRadius: "10px",
-                      border: "1px solid",
-                      borderColor: (theme) =>
-                        allowMultipleEvents
-                          ? "#4a3f6b"
-                          : theme.palette.mode === "dark"
-                            ? "rgba(255, 255, 255, 0.1)"
-                            : "rgba(74, 63, 107, 0.14)",
-                      bgcolor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(255, 255, 255, 0.03)"
-                          : "#f8f7fc",
                       display: "flex",
                       alignItems: "center",
-                      gap: 1,
+                      gap: 0.8,
                       cursor: "pointer",
                       userSelect: "none",
-                      transition: "all 0.2s ease",
-                      "&:hover": {
-                        borderColor: "#4a3f6b",
-                      },
                     }}
                   >
                     <Checkbox
@@ -1384,7 +1366,8 @@ export default function EventFormPage() {
                       onClick={(e) => e.stopPropagation()}
                       size="small"
                       sx={{
-                        p: 0,
+                        p: 0.2,
+                        transform: "scale(0.85)",
                         color: "#4a3f6b",
                         "&.Mui-checked": {
                           color: "#4a3f6b",
@@ -1392,12 +1375,12 @@ export default function EventFormPage() {
                       }}
                     />
                     <Typography
-                      variant="subtitle2"
-                      fontWeight={700}
+                      variant="body2"
+                      fontWeight={600}
                       sx={{
                         color: (theme) =>
-                          theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
-                        fontSize: "0.85rem",
+                          theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
+                        fontSize: "0.82rem",
                         whiteSpace: "nowrap",
                       }}
                     >

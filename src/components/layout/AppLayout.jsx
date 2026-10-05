@@ -48,6 +48,8 @@ import { getImageUrl } from "../../services/apiClient";
 import { getProfileAsync } from "../../services/userService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
 import { useThemeMode } from "../../contexts/ThemeModeContext";
+import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
+import AppPageLoader from "../common/AppPageLoader";
 import dayjs from "dayjs";
 import logo from "../../assets/logo.png";
 
@@ -77,6 +79,7 @@ export default function AppLayout() {
   const location = useLocation();
   const toast = useAppToast();
   const { isDark, toggleMode } = useThemeMode();
+  const { isLoading } = useNavigationLoading();
 
   const SIDEBAR = React.useMemo(() => {
     if (theme.palette.mode === "dark") {
@@ -816,8 +819,10 @@ export default function AppLayout() {
           minWidth: 0, // Prevent table from overflowing flexbox
           minHeight: "100vh",
           bgcolor: "background.default",
+          position: "relative",
         }}
       >
+        {isLoading && <AppPageLoader fullScreen={false} text="Loading..." />}
         <Outlet />
       </Box>
 
