@@ -18,7 +18,7 @@ import {
   Button,
   Popover,
   Checkbox,
-  FormControlLabel, 
+  FormControlLabel,
   Select,
   MenuItem,
   TableSortLabel,
@@ -48,6 +48,7 @@ import {
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { formatGridDate, formatGridDateTime } from "../../utils/dateHelper";
+import AppPageLoader from "./AppPageLoader";
 
 // ─── Printout & PDF Helper ──────────────────────────────────────────────────
 function printTable(title, columns, data) {
@@ -408,16 +409,14 @@ export default function AppDataTable({
   const processedData = useMemo(() => {
     let result = [...data];
 
-    // 1. Search across rendered column outputs + primary record fields
-    if (search && search.trim()) {
+    // 1. Deep search across rendered column outputs + nested row values
+    if (search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter((row) => {
-        if (!row) return false;
-
-        // A. Check formatted column output first (excluding Action & audit columns)
+        // Check formatted column output first (matches text shown in UI)
         const matchInColumns = (columns || []).some((col) => {
           if (!col) return false;
-          
+
           // Skip Action column icon tooltips/buttons
           const labelLower = String(col.label || "").toLowerCase();
           if (labelLower === "action") return false;
@@ -444,33 +443,8 @@ export default function AppDataTable({
 
         if (matchInColumns) return true;
 
-        // B. Fallback: check primary user/record fields explicitly (ignoring hidden metadata/audit fields)
-        const primaryFields = [
-          row.username,
-          row.Username,
-          row.memberUsername,
-          row.fullName,
-          row.FullName,
-          row.name,
-          row.Name,
-          row.email,
-          row.Email,
-          row.phone,
-          row.Phone,
-          row.roleName,
-          row.RoleName,
-          row.workType,
-          row.WorkType,
-          row.gender,
-          row.Gender,
-          Array.isArray(row.roles) ? row.roles.join(" ") : null,
-          Array.isArray(row.primaryRoles) ? row.primaryRoles.join(" ") : null,
-        ];
-
-        return primaryFields.some((field) => {
-          if (field == null) return false;
-          return String(field).toLowerCase().includes(q);
-        });
+        // Fallback: search raw & nested object values
+        return recursiveSearch(row, q);
       });
     }
 
@@ -499,7 +473,7 @@ export default function AppDataTable({
         }
         va = va ?? "";
         vb = vb ?? "";
-        
+
         // Handle sorting of numeric strings or normal comparison
         const numA = Number(va);
         const numB = Number(vb);
@@ -583,8 +557,8 @@ export default function AppDataTable({
       zIndex: isHeader ? 3 : 2,
       width: width,
       minWidth: width,
-      boxShadow: isLeft 
-        ? "2px 0 5px -2px rgba(0,0,0,0.12)" 
+      boxShadow: isLeft
+        ? "2px 0 5px -2px rgba(0,0,0,0.12)"
         : "-2px 0 5px -2px rgba(0,0,0,0.12)",
       bgcolor: isHeader
         ? (theme.palette.mode === "dark" ? "#1d2338" : "#eef4f8")
@@ -1066,14 +1040,9 @@ export default function AppDataTable({
       </Menu>
 
       {/* ── 3. Table ──────────────────────────────────────────────────────── */}
-      <Box sx={{ overflowX: "auto", flexGrow: isFullscreen ? 1 : 0 }}>
+      <Box sx={{ overflowX: "auto", flexGrow: isFullscreen ? 1 : 0, position: "relative", minHeight: loading ? 220 : "auto" }}>
         {loading ? (
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 10, gap: 1.5 }}>
-            <CircularProgress size={32} thickness={4} sx={{ color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: theme.palette.mode === "dark" ? "rgba(255,255,255,0.7)" : "#4a3f6b", fontSize: "0.85rem" }}>
-              Loading data...
-            </Typography>
-          </Box>
+          <AppPageLoader fullScreen={false} text="Loading..." />
         ) : (
           <Table size="small">
             <TableHead>
@@ -1114,10 +1083,10 @@ export default function AppDataTable({
                             fontWeight: "inherit",
                           }}
                         >
-                          {column.label}
+                          {column.label === "#" ? "S.No" : column.label}
                         </TableSortLabel>
                       ) : (
-                        <span>{column.label}</span>
+                        <span>{column.label === "#" ? "S.No" : column.label}</span>
                       )}
                       <IconButton
                         size="small"
@@ -1167,8 +1136,12 @@ export default function AppDataTable({
                           ...getPinStyles(column, false),
                         }}
                       >
-                        {column.render ? (
-                          column.render(row)
+                        {column.label === "#" || column.label === "S.No" || column.label === "S.No." || column.key === "sNo" || column.type === "index" ? (
+                          <Typography variant="body2" sx={{ fontSize: "inherit", fontWeight: 700, color: "inherit" }}>
+                            {page * rowsPerPage + rowIndex + 1}
+                          </Typography>
+                        ) : column.render ? (
+                          column.render(row, rowIndex, page * rowsPerPage + rowIndex + 1)
                         ) : (
                           <Typography
                             variant="body2"
@@ -1177,10 +1150,10 @@ export default function AppDataTable({
                             {column.type === "date" || column.key === "createdOn" || column.key === "createdAt" || column.key === "CreatedOn" || column.key === "CreatedAt" || column.label === "Created On" || column.label === "Created At"
                               ? formatGridDate(row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? row.createdOn ?? row.CreatedOn ?? row.createdAt ?? row.CreatedAt)
                               : column.type === "datetime"
-                              ? formatGridDateTime(row[column.key])
-                              : (column.key === "createdBy" || column.label === "Created By")
-                              ? (row.createdBy || row.CreatedBy || row.createdByName || row.CreatedByName || row.createdByUser || row.CreatedByUser || row.created_by || row.Created_By || "--")
-                              : (row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? "--")}
+                                ? formatGridDateTime(row[column.key])
+                                : (column.key === "createdBy" || column.label === "Created By")
+                                  ? (row.createdBy || row.CreatedBy || row.createdByName || row.CreatedByName || row.createdByUser || row.CreatedByUser || row.created_by || row.Created_By || "--")
+                                  : (row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? "--")}
                           </Typography>
                         )}
                       </TableCell>

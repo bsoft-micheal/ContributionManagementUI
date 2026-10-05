@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Typography, Box, IconButton, Tooltip, Stack } from "@mui/material";
+import { Typography, Box, IconButton, Tooltip, Stack, Card, CardContent, Grid } from "@mui/material";
 import {
   Edit as EditIcon,
   Add as AddIcon,
@@ -7,6 +7,7 @@ import {
   Delete as DeleteIcon,
   ToggleOn as ToggleOnIcon,
   ToggleOff as ToggleOffIcon,
+  InfoOutlined as InfoOutlinedIcon,
   ConfirmationNumberRounded as ConfirmationNumberRoundedIcon,
   WorkRounded as WorkRoundedIcon,
   FlagRounded as FlagRoundedIcon,
@@ -18,6 +19,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
+import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
@@ -1122,87 +1124,82 @@ export default function TypesPage() {
         Event Collections
       </Typography>
 
-      {/* Tabs Container */}
-      <Box
+      {/* Top Control Section */}
+      <Card
+        elevation={0}
         sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "1fr",
-            sm: "repeat(2, 1fr)",
-            md: "repeat(4, 1fr)",
-          },
-          gap: 2,
+          borderRadius: "12px",
+          border: (theme) =>
+            `1px solid ${
+              theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0"
+            }`,
+          bgcolor: (theme) =>
+            theme.palette.mode === "dark" ? "rgba(30, 41, 59, 0.6)" : "#f8fafc",
         }}
       >
-        {COLLECTION_TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <Box
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1.5,
-                py: 1.6,
-                px: 2.5,
-                borderRadius: "14px",
-                cursor: "pointer",
-                userSelect: "none",
-                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                bgcolor: (theme) => {
-                  if (isActive) {
-                    return theme.palette.mode === "dark" ? "#4c3a70" : "#45386d";
-                  }
-                  return theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.04)"
-                    : "rgba(124, 58, 237, 0.04)";
-                },
-                color: (theme) => {
-                  if (isActive) return "#ffffff";
-                  return theme.palette.mode === "dark" ? "#c4b5fd" : "#45386d";
-                },
-                boxShadow: (theme) =>
-                  isActive
-                    ? "0 6px 18px rgba(69, 56, 109, 0.28)"
-                    : "none",
-                border: (theme) =>
-                  isActive
-                    ? "1px solid transparent"
-                    : theme.palette.mode === "dark"
-                    ? "1px solid rgba(255, 255, 255, 0.06)"
-                    : "1px solid rgba(124, 58, 237, 0.08)",
-                "&:hover": {
-                  transform: "translateY(-1px)",
-                  bgcolor: (theme) => {
-                    if (isActive) {
-                      return theme.palette.mode === "dark" ? "#55427d" : "#403366";
-                    }
-                    return theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.08)"
-                      : "rgba(124, 58, 237, 0.09)";
-                  },
-                },
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", color: "inherit" }}>
-                {tab.icon}
+        <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+          <Grid container spacing={2} alignItems="center" justifyContent="space-between">
+            {/* Left: Dropdown */}
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+              <Box sx={{ width: { xs: "100%", sm: 260 } }}>
+                <AppSelect
+                  label="Collection Type"
+                  value={activeTab}
+                  onChange={(e) => setActiveTab(e.target.value)}
+                  options={[
+                    { label: "Ticket Types", value: "ticketTypes" },
+                    { label: "Work Types", value: "workTypes" },
+                    { label: "Priorities", value: "priorities" },
+                    { label: "Payment Modes", value: "paymentModes" },
+                  ]}
+                  fullWidth
+                />
               </Box>
-              <Typography
-                fontWeight={isActive ? 800 : 700}
+            </Grid>
+
+            {/* Right: Common Add Button */}
+            <Grid
+              size={{ xs: 12, sm: 6, md: 3, lg: 2.5 }}
+              sx={{ display: "flex", justifyContent: { xs: "flex-start", sm: "flex-end" } }}
+            >
+              <AppButton
+                variant="contained"
+                disabled={!hasWriteAccess}
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  if (activeTab === "ticketTypes") {
+                    setTicketTypeForm(initialTicketTypeForm);
+                    setTicketTypeErrors({});
+                    setTicketTypeDialogOpen(true);
+                  } else if (activeTab === "workTypes") {
+                    setWorkTypeForm(initialWorkTypeForm);
+                    setWorkTypeErrors({});
+                    setWorkTypeDialogOpen(true);
+                  } else if (activeTab === "priorities") {
+                    setPriorityForm(initialPriorityForm);
+                    setPriorityErrors({});
+                    setPriorityDialogOpen(true);
+                  } else if (activeTab === "paymentModes") {
+                    setPaymentModeForm(initialPaymentModeForm);
+                    setPaymentModeErrors({});
+                    setPaymentModeDialogOpen(true);
+                  }
+                }}
                 sx={{
-                  fontSize: "0.95rem",
-                  color: "inherit",
-                  letterSpacing: "0.01em",
+                  whiteSpace: "nowrap",
+                  px: 3,
+                  py: 1,
+                  fontWeight: 700,
+                  bgcolor: "#4a3f6b !important",
+                  "&:hover": { bgcolor: "#3b325c !important" },
                 }}
               >
-                {tab.label}
-              </Typography>
-            </Box>
-          );
-        })}
-      </Box>
+                Add
+              </AppButton>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       {/* 1. Ticket Types Table */}
       {activeTab === "ticketTypes" && (
@@ -1211,21 +1208,7 @@ export default function TypesPage() {
           columns={ticketTypeColumns}
           data={ticketTypes}
           loading={ticketTypesLoading}
-          actions={
-            <AppButton
-              variant="contained"
-              size="small"
-              disabled={!hasWriteAccess}
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setTicketTypeForm(initialTicketTypeForm);
-                setTicketTypeErrors({});
-                setTicketTypeDialogOpen(true);
-              }}
-            >
-              Add
-            </AppButton>
-          }
+          searchPlaceholder="Search by ticket type..."
         />
       )}
 
@@ -1236,21 +1219,7 @@ export default function TypesPage() {
           columns={workTypeColumns}
           data={workTypes}
           loading={workTypesLoading}
-          actions={
-            <AppButton
-              variant="contained"
-              size="small"
-              disabled={!hasWriteAccess}
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setWorkTypeForm(initialWorkTypeForm);
-                setWorkTypeErrors({});
-                setWorkTypeDialogOpen(true);
-              }}
-            >
-              Add
-            </AppButton>
-          }
+          searchPlaceholder="Search by work type..."
         />
       )}
 
@@ -1261,21 +1230,7 @@ export default function TypesPage() {
           columns={priorityColumns}
           data={priorities}
           loading={prioritiesLoading}
-          actions={
-            <AppButton
-              variant="contained"
-              size="small"
-              disabled={!hasWriteAccess}
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setPriorityForm(initialPriorityForm);
-                setPriorityErrors({});
-                setPriorityDialogOpen(true);
-              }}
-            >
-              Add
-            </AppButton>
-          }
+          searchPlaceholder="Search by priority..."
         />
       )}
 
@@ -1286,21 +1241,7 @@ export default function TypesPage() {
           columns={paymentModeColumns}
           data={paymentModes}
           loading={paymentModesLoading}
-          actions={
-            <AppButton
-              variant="contained"
-              size="small"
-              disabled={!hasWriteAccess}
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setPaymentModeForm(initialPaymentModeForm);
-                setPaymentModeErrors({});
-                setPaymentModeDialogOpen(true);
-              }}
-            >
-              Add
-            </AppButton>
-          }
+          searchPlaceholder="Search by payment mode..."
         />
       )}
 
@@ -1310,6 +1251,7 @@ export default function TypesPage() {
         open={ticketTypeDialogOpen}
         onClose={() => setTicketTypeDialogOpen(false)}
         title={ticketTypeForm.ticketTypeId ? "Edit Ticket Type" : "Add Ticket Type"}
+        maxWidth="xs"
         actions={
           <>
             <AppButton variant="outlined" onClick={() => setTicketTypeDialogOpen(false)}>
@@ -1378,6 +1320,7 @@ export default function TypesPage() {
         open={workTypeDialogOpen}
         onClose={() => setWorkTypeDialogOpen(false)}
         title={workTypeForm.workTypeId ? "Edit Work Type" : "Add Work Type"}
+        maxWidth="xs"
         actions={
           <>
             <AppButton variant="outlined" onClick={() => setWorkTypeDialogOpen(false)}>
@@ -1446,6 +1389,7 @@ export default function TypesPage() {
         open={priorityDialogOpen}
         onClose={() => setPriorityDialogOpen(false)}
         title={priorityForm.priorityId ? "Edit Priority" : "Add Priority"}
+        maxWidth="xs"
         actions={
           <>
             <AppButton variant="outlined" onClick={() => setPriorityDialogOpen(false)}>
@@ -1514,6 +1458,7 @@ export default function TypesPage() {
         open={paymentModeDialogOpen}
         onClose={() => setPaymentModeDialogOpen(false)}
         title={paymentModeForm.paymentModeId ? "Edit Payment Mode" : "Add Payment Mode"}
+        maxWidth="xs"
         actions={
           <>
             <AppButton variant="outlined" onClick={() => setPaymentModeDialogOpen(false)}>

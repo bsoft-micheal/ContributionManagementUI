@@ -49,7 +49,8 @@ export function NavigationLoadingProvider({ children }) {
       }}
     >
       {children}
-      {isLoading && <AppPageLoader message={message} fullScreen />}
+      {/* Global fullScreen loader disabled so pages with table loaders do not display dual loaders */}
+      {/* {isLoading && <AppPageLoader text={message} fullScreen />} */}
     </NavigationLoadingContext.Provider>
   );
 }

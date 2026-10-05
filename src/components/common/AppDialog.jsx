@@ -17,7 +17,7 @@ export default function AppDialog({
   title,
   children,
   actions,
-  maxWidth = "sm",
+  maxWidth = "xs",
   fullWidth = true,
   showCloseIcon = true,
 }) {
@@ -37,6 +37,10 @@ export default function AppDialog({
         sx: {
           borderRadius: "10px",
           overflow: "hidden",
+          maxHeight: "calc(100vh - 48px)",
+          maxWidth: maxWidth === "xs" ? "360px !important" : undefined,
+          display: "flex",
+          flexDirection: "column",
           boxShadow: theme.palette.mode === "dark"
             ? "0 24px 60px rgba(0,0,0,0.35)"
             : "0 20px 40px rgba(74,63,107,0.2)",
@@ -49,12 +53,13 @@ export default function AppDialog({
       <Box
         sx={{
           bgcolor: theme.palette.mode === "dark" ? "#1d2338" : "#4a3f6b",
-          px: 3,
-          py: 1.5,
+          px: 2.5,
+          py: 1.25,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          minHeight: 48,
+          minHeight: 44,
+          flexShrink: 0,
         }}
       >
         <Typography
@@ -84,7 +89,7 @@ export default function AppDialog({
       </Box>
 
       {/* ── Content ───────────────────────────────────────────────── */}
-      <DialogContent sx={{ p: 3, pt: 2.5, bgcolor: theme.palette.background.paper }}>
+      <DialogContent sx={{ p: 2.5, pt: 2, bgcolor: theme.palette.background.paper, flexGrow: 1, overflowY: "auto" }}>
         {children}
       </DialogContent>
 
@@ -100,6 +105,7 @@ export default function AppDialog({
             justifyContent: "center !important",
             display: "flex",
             alignItems: "center",
+            flexShrink: 0,
             "& > *": {
               justifyContent: "center",
             },

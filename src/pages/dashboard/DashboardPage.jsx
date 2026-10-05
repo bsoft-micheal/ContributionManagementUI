@@ -111,7 +111,7 @@ function getDonutArcPath(cx, cy, rInner, rOuter, startAngle, endAngle) {
 function InteractiveDonutChart({
   items = [],
   activeItem = null,
-  onHoverItem = () => {},
+  onHoverItem = () => { },
   defaultSummary = {},
   size = 300,
 }) {
@@ -808,8 +808,8 @@ export default function DashboardPage() {
       !selectedType || selectedType === "ALL"
         ? allEventsList
         : allEventsList.filter(
-            (e) => (e.eventTypeName || "").toLowerCase() === selectedType.toLowerCase()
-          );
+          (e) => (e.eventTypeName || "").toLowerCase() === selectedType.toLowerCase()
+        );
 
     matchingEvents.forEach((e) => {
       if (e.eventName) {
@@ -932,8 +932,8 @@ export default function DashboardPage() {
         totalExpected > 0
           ? (exp / totalExpected) * 100
           : events.length > 0
-          ? 100 / events.length
-          : 0;
+            ? 100 / events.length
+            : 0;
       const pctStr = pctNum % 1 === 0 ? pctNum.toFixed(0) : pctNum.toFixed(1);
       const colPct = exp > 0 ? Math.min(100, Math.round((col / exp) * 100)) : 0;
 
@@ -1144,359 +1144,348 @@ export default function DashboardPage() {
       </Card>
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
-      {loading ? (
-        <Card sx={{ p: { xs: 3, md: 5 }, borderRadius: 3, display: "grid", placeItems: "center" }}>
-          <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
-            <CircularProgress size={46} />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              Loading dashboard…
-            </Typography>
-          </Stack>
-        </Card>
-      ) : (
-        <Stack spacing={3}>
+      <Stack spacing={3}>
 
-                  {/* ① Top Summary Metric Cards (6 Cards Grid: Expected, Collections, Pending, Expenses, Remaining, Events) */}
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: {
-                        xs: "1fr",
-                        sm: "repeat(2, minmax(0, 1fr))",
-                        md: "repeat(3, minmax(0, 1fr))",
-                        lg: isMember ? "repeat(5, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
-                      },
-                      gap: { xs: 1.5, sm: 2 },
-                    }}
-                  >
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "TOTAL EXPECTED"}
-                      value={`₹${totalExpected.toLocaleString()}`}
-                      helper="Projected target amount"
-                      accent="#7c3aed"
-                      onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
-                      actionText="All Members →"
-                    />
-                    {!isMember && (
-                      <MetricCard
-                        label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "TOTAL COLLECTIONS"}
-                        value={`₹${totalCollected.toLocaleString()}`}
-                        helper="Amount collected (paid)"
-                        accent="success.main"
-                        onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-                        actionText="View Paid →"
-                      />
-                    )}
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "TOTAL PENDING"}
-                      value={`₹${totalPending.toLocaleString()}`}
-                      helper="Outstanding amount"
-                      accent="error.main"
-                      onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-                      actionText="View Unpaid →"
-                    />
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "TOTAL EXPENSES"}
-                      value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
-                      helper={isFilteredByEvent ? "Expenditure for event" : (isFilteredByType ? `Expenses for ${appliedFilters.eventType}` : "Total expenses recorded")}
-                      accent="warning.main"
-                      onClick={() => navigate("/expense")}
-                      actionText="View Expenses →"
-                    />
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "REMAINING AMOUNT"}
-                      value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
-                      helper={totalRemaining >= 0 ? "Expected − Expenses (Surplus)" : "Expected − Expenses (Deficit)"}
-                      accent={totalRemaining >= 0 ? "success.main" : "error.main"}
-                      actionText={totalRemaining >= 0 ? "Budget Surplus ✓" : "Budget Deficit ⚠"}
-                    />
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
-                      value={events.length}
-                      helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
-                    />
-                  </Box>
+          {/* ① Top Summary Metric Cards (6 Cards Grid: Expected, Collections, Pending, Expenses, Remaining, Events) */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+                md: "repeat(3, minmax(0, 1fr))",
+                lg: isMember ? "repeat(5, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
+              },
+              gap: { xs: 1.5, sm: 2 },
+            }}
+          >
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "TOTAL EXPECTED"}
+              value={`₹${totalExpected.toLocaleString()}`}
+              helper="Projected target amount"
+              accent="#7c3aed"
+              onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
+              actionText="All Members →"
+            />
+            {!isMember && (
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "TOTAL COLLECTIONS"}
+                value={`₹${totalCollected.toLocaleString()}`}
+                helper="Amount collected (paid)"
+                accent="success.main"
+                onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+                actionText="View Paid →"
+              />
+            )}
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "TOTAL PENDING"}
+              value={`₹${totalPending.toLocaleString()}`}
+              helper="Outstanding amount"
+              accent="error.main"
+              onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
+              actionText="View Unpaid →"
+            />
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "TOTAL EXPENSES"}
+              value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
+              helper={isFilteredByEvent ? "Expenditure for event" : (isFilteredByType ? `Expenses for ${appliedFilters.eventType}` : "Total expenses recorded")}
+              accent="warning.main"
+              onClick={() => navigate("/expense")}
+              actionText="View Expenses →"
+            />
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "REMAINING AMOUNT"}
+              value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
+              helper={totalRemaining >= 0 ? "Expected − Expenses (Surplus)" : "Expected − Expenses (Deficit)"}
+              accent={totalRemaining >= 0 ? "success.main" : "error.main"}
+              actionText={totalRemaining >= 0 ? "Budget Surplus ✓" : "Budget Deficit ⚠"}
+            />
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
+              value={events.length}
+              helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
+            />
+          </Box>
 
-                  {/* ② Segmented Interactive Donut Hero */}
-                  {events.length > 0 ? (
-                    <Card sx={{
+          {/* ② Segmented Interactive Donut Hero */}
+          {events.length > 0 ? (
+            <Card sx={{
+              border: `1px solid ${theme.palette.divider}`,
+              boxShadow: isDark
+                ? "0 8px 32px rgba(0,0,0,0.35)"
+                : "0 8px 32px rgba(0,0,0,0.08)",
+              background: isDark
+                ? "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
+                : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
+            }}>
+              <CardContent sx={{ p: { xs: 2, md: 3.5 } }}>
+                <Stack spacing={3}>
+
+                  {/* Card title & View Switcher */}
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1.25}>
+                      <Box sx={{
+                        width: 36, height: 36, borderRadius: 1.5,
+                        display: "grid", placeItems: "center",
+                        background: "linear-gradient(135deg, rgba(124,58,237,0.2) 0%, rgba(79,70,229,0.12) 100%)",
+                        border: "1px solid rgba(124,58,237,0.2)",
+                      }}>
+                        <DonutLargeIcon sx={{ fontSize: 20, color: "primary.main" }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="h6" fontWeight={900}>
+                          Financial Overview
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {donutView === "events" ? "Event contribution breakdown" : "Multi-ring contribution analysis"}
+                        </Typography>
+                      </Box>
+                    </Stack>
+
+                    {/* View Switcher: By Event / Financial Status */}
+                    <Stack direction="row" spacing={0.5} sx={{
+                      bgcolor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+                      p: 0.5, borderRadius: 2,
                       border: `1px solid ${theme.palette.divider}`,
-                      boxShadow: isDark
-                        ? "0 8px 32px rgba(0,0,0,0.35)"
-                        : "0 8px 32px rgba(0,0,0,0.08)",
-                      background: isDark
-                        ? "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
-                        : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
                     }}>
-                      <CardContent sx={{ p: { xs: 2, md: 3.5 } }}>
-                        <Stack spacing={3}>
+                      <Button
+                        size="small"
+                        onClick={() => { setDonutView("events"); setHoveredSlice(null); }}
+                        sx={{
+                          borderRadius: 1.5,
+                          px: 1.5, py: 0.4,
+                          fontSize: "0.75rem",
+                          fontWeight: 800,
+                          textTransform: "none",
+                          bgcolor: donutView === "events" ? "primary.main" : "transparent",
+                          color: donutView === "events" ? "#ffffff" : "text.secondary",
+                          boxShadow: donutView === "events" ? "0 2px 8px rgba(124, 58, 237, 0.3)" : "none",
+                          "&:hover": {
+                            bgcolor: donutView === "events" ? "primary.dark" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                          },
+                        }}
+                      >
+                        By Event
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={() => { setDonutView("status"); setHoveredSlice(null); }}
+                        sx={{
+                          borderRadius: 1.5,
+                          px: 1.5, py: 0.4,
+                          fontSize: "0.75rem",
+                          fontWeight: 800,
+                          textTransform: "none",
+                          bgcolor: donutView === "status" ? "primary.main" : "transparent",
+                          color: donutView === "status" ? "#ffffff" : "text.secondary",
+                          boxShadow: donutView === "status" ? "0 2px 8px rgba(124, 58, 237, 0.3)" : "none",
+                          "&:hover": {
+                            bgcolor: donutView === "status" ? "primary.dark" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                          },
+                        }}
+                      >
+                        Financial Status
+                      </Button>
+                    </Stack>
+                  </Stack>
 
-                          {/* Card title & View Switcher */}
-                          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5}>
-                            <Stack direction="row" alignItems="center" spacing={1.25}>
-                              <Box sx={{
-                                width: 36, height: 36, borderRadius: 1.5,
-                                display: "grid", placeItems: "center",
-                                background: "linear-gradient(135deg, rgba(124,58,237,0.2) 0%, rgba(79,70,229,0.12) 100%)",
-                                border: "1px solid rgba(124,58,237,0.2)",
-                              }}>
-                                <DonutLargeIcon sx={{ fontSize: 20, color: "primary.main" }} />
-                              </Box>
-                              <Box>
-                                <Typography variant="h6" fontWeight={900}>
-                                  Financial Overview
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  {donutView === "events" ? "Event contribution breakdown" : "Multi-ring contribution analysis"}
-                                </Typography>
-                              </Box>
-                            </Stack>
+                  {/* Donut + Stats side-by-side */}
+                  <Grid container spacing={3} alignItems="center">
 
-                            {/* View Switcher: By Event / Financial Status */}
-                            <Stack direction="row" spacing={0.5} sx={{
-                              bgcolor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
-                              p: 0.5, borderRadius: 2,
-                              border: `1px solid ${theme.palette.divider}`,
-                            }}>
-                              <Button
-                                size="small"
-                                onClick={() => { setDonutView("events"); setHoveredSlice(null); }}
+                    {/* Donut chart */}
+                    <Grid size={{ xs: 12, md: 5 }}>
+                      <Stack alignItems="center" spacing={1.5}>
+                        <InteractiveDonutChart
+                          items={donutView === "events" ? eventSlices : statusSlices}
+                          activeItem={hoveredSlice}
+                          onHoverItem={setHoveredSlice}
+                          defaultSummary={defaultSummary}
+                          size={300}
+                        />
+
+                        {/* Interactive hint below donut */}
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.72rem" }}>
+                          Hover any slice to view details in center
+                        </Typography>
+                      </Stack>
+                    </Grid>
+
+                    {/* Stats panel */}
+                    <Grid size={{ xs: 12, md: 7 }}>
+                      <Stack spacing={2}>
+                        {donutView === "events" ? (
+                          <>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                              <Typography
+                                variant="caption"
+                                fontWeight={800}
                                 sx={{
-                                  borderRadius: 1.5,
-                                  px: 1.5, py: 0.4,
-                                  fontSize: "0.75rem",
-                                  fontWeight: 800,
-                                  textTransform: "none",
-                                  bgcolor: donutView === "events" ? "primary.main" : "transparent",
-                                  color: donutView === "events" ? "#ffffff" : "text.secondary",
-                                  boxShadow: donutView === "events" ? "0 2px 8px rgba(124, 58, 237, 0.3)" : "none",
-                                  "&:hover": {
-                                    bgcolor: donutView === "events" ? "primary.dark" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-                                  },
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.08em",
+                                  fontSize: "0.72rem",
+                                  color: "text.secondary",
                                 }}
                               >
-                                By Event
-                              </Button>
-                              <Button
-                                size="small"
-                                onClick={() => { setDonutView("status"); setHoveredSlice(null); }}
-                                sx={{
-                                  borderRadius: 1.5,
-                                  px: 1.5, py: 0.4,
-                                  fontSize: "0.75rem",
-                                  fontWeight: 800,
-                                  textTransform: "none",
-                                  bgcolor: donutView === "status" ? "primary.main" : "transparent",
-                                  color: donutView === "status" ? "#ffffff" : "text.secondary",
-                                  boxShadow: donutView === "status" ? "0 2px 8px rgba(124, 58, 237, 0.3)" : "none",
-                                  "&:hover": {
-                                    bgcolor: donutView === "status" ? "primary.dark" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-                                  },
-                                }}
-                              >
-                                Financial Status
-                              </Button>
+                                Event Contribution Share
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.7rem" }}>
+                                Hover event to inspect
+                              </Typography>
                             </Stack>
-                          </Stack>
 
-                          {/* Donut + Stats side-by-side */}
-                          <Grid container spacing={3} alignItems="center">
+                            {/* Scrollable Event List */}
+                            <Box
+                              sx={{
+                                maxHeight: 310,
+                                overflowY: "auto",
+                                pr: 0.5,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 1.2,
+                                "&::-webkit-scrollbar": { width: 5 },
+                                "&::-webkit-scrollbar-thumb": {
+                                  backgroundColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
+                                  borderRadius: 4,
+                                },
+                              }}
+                            >
+                              {eventSlices.map((item) => {
+                                const isSelected = hoveredSlice?.id === item.id;
+                                return (
+                                  <Box
+                                    key={item.id}
+                                    onMouseEnter={() => setHoveredSlice(item)}
+                                    onMouseLeave={() => setHoveredSlice(null)}
+                                    sx={{
+                                      p: 1.2,
+                                      borderRadius: 2,
+                                      border: `1px solid ${isSelected ? item.color : isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"}`,
+                                      bgcolor: isSelected
+                                        ? alpha(item.color, isDark ? 0.16 : 0.08)
+                                        : isDark
+                                          ? "rgba(255,255,255,0.02)"
+                                          : "rgba(0,0,0,0.015)",
+                                      cursor: "pointer",
+                                      transition: "all 0.2s ease",
+                                      "&:hover": {
+                                        borderColor: item.color,
+                                        transform: "translateX(2px)",
+                                      },
+                                    }}
+                                  >
+                                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.6 }}>
+                                      <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+                                        <Box
+                                          sx={{
+                                            width: 10,
+                                            height: 10,
+                                            borderRadius: "50%",
+                                            bgcolor: item.color,
+                                            flexShrink: 0,
+                                            boxShadow: `0 0 6px ${alpha(item.color, 0.55)}`,
+                                          }}
+                                        />
+                                        <Typography variant="body2" fontWeight={800} noWrap sx={{ fontSize: "0.82rem", maxWidth: 180 }}>
+                                          {item.label}
+                                        </Typography>
+                                      </Stack>
 
-                            {/* Donut chart */}
-                            <Grid size={{ xs: 12, md: 5 }}>
-                              <Stack alignItems="center" spacing={1.5}>
-                                <InteractiveDonutChart
-                                  items={donutView === "events" ? eventSlices : statusSlices}
-                                  activeItem={hoveredSlice}
-                                  onHoverItem={setHoveredSlice}
-                                  defaultSummary={defaultSummary}
-                                  size={300}
-                                />
-
-                                {/* Interactive hint below donut */}
-                                <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.72rem" }}>
-                                  Hover any slice to view details in center
-                                </Typography>
-                              </Stack>
-                            </Grid>
-
-                            {/* Stats panel */}
-                            <Grid size={{ xs: 12, md: 7 }}>
-                              <Stack spacing={2}>
-                                {donutView === "events" ? (
-                                  <>
-                                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                      <Typography
-                                        variant="caption"
-                                        fontWeight={800}
-                                        sx={{
-                                          textTransform: "uppercase",
-                                          letterSpacing: "0.08em",
-                                          fontSize: "0.72rem",
-                                          color: "text.secondary",
-                                        }}
-                                      >
-                                        Event Contribution Share
-                                      </Typography>
-                                      <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.7rem" }}>
-                                        Hover event to inspect
-                                      </Typography>
+                                      <Stack direction="row" alignItems="center" spacing={1.25}>
+                                        <Tooltip title={`Expected: ₹${Number(item.value).toLocaleString()} | Expense: ₹${Number(item.expense || 0).toLocaleString()}`}>
+                                          <Stack alignItems="flex-end" sx={{ lineHeight: 1.15 }}>
+                                            <Typography variant="body2" fontWeight={800} sx={{ fontSize: "0.80rem" }}>
+                                              ₹{Number(item.collected).toLocaleString()} <Typography component="span" sx={{ fontSize: "0.68rem", color: "text.secondary", fontWeight: 600 }}>/ ₹{Number(item.value).toLocaleString()}</Typography>
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ fontSize: "0.68rem", color: "#f59e0b", fontWeight: 700 }}>
+                                              Expense: ₹{Number(item.expense || 0).toLocaleString()}
+                                            </Typography>
+                                          </Stack>
+                                        </Tooltip>
+                                        <Chip
+                                          label={`Rem: ₹${Number(item.remaining || 0).toLocaleString()}`}
+                                          size="small"
+                                          sx={{
+                                            height: 22,
+                                            fontSize: "0.68rem",
+                                            fontWeight: 900,
+                                            bgcolor: item.remaining >= 0 ? alpha("#10b981", 0.12) : alpha("#ef4444", 0.12),
+                                            color: item.remaining >= 0 ? "#10b981" : "#ef4444",
+                                            border: `1px solid ${item.remaining >= 0 ? alpha("#10b981", 0.3) : alpha("#ef4444", 0.3)}`,
+                                          }}
+                                        />
+                                      </Stack>
                                     </Stack>
 
-                                    {/* Scrollable Event List */}
+                                    {/* Mini collection progress for this event */}
                                     <Box
                                       sx={{
-                                        maxHeight: 310,
-                                        overflowY: "auto",
-                                        pr: 0.5,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: 1.2,
-                                        "&::-webkit-scrollbar": { width: 5 },
-                                        "&::-webkit-scrollbar-thumb": {
-                                          backgroundColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
-                                          borderRadius: 4,
-                                        },
+                                        height: 5,
+                                        borderRadius: 3,
+                                        bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+                                        overflow: "hidden",
                                       }}
                                     >
-                                      {eventSlices.map((item) => {
-                                        const isSelected = hoveredSlice?.id === item.id;
-                                        return (
-                                          <Box
-                                            key={item.id}
-                                            onMouseEnter={() => setHoveredSlice(item)}
-                                            onMouseLeave={() => setHoveredSlice(null)}
-                                            sx={{
-                                              p: 1.2,
-                                              borderRadius: 2,
-                                              border: `1px solid ${isSelected ? item.color : isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"}`,
-                                              bgcolor: isSelected
-                                                ? alpha(item.color, isDark ? 0.16 : 0.08)
-                                                : isDark
-                                                ? "rgba(255,255,255,0.02)"
-                                                : "rgba(0,0,0,0.015)",
-                                              cursor: "pointer",
-                                              transition: "all 0.2s ease",
-                                              "&:hover": {
-                                                borderColor: item.color,
-                                                transform: "translateX(2px)",
-                                              },
-                                            }}
-                                          >
-                                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.6 }}>
-                                              <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-                                                <Box
-                                                  sx={{
-                                                    width: 10,
-                                                    height: 10,
-                                                    borderRadius: "50%",
-                                                    bgcolor: item.color,
-                                                    flexShrink: 0,
-                                                    boxShadow: `0 0 6px ${alpha(item.color, 0.55)}`,
-                                                  }}
-                                                />
-                                                <Typography variant="body2" fontWeight={800} noWrap sx={{ fontSize: "0.82rem", maxWidth: 180 }}>
-                                                  {item.label}
-                                                </Typography>
-                                              </Stack>
-
-                                              <Stack direction="row" alignItems="center" spacing={1.25}>
-                                                <Tooltip title={`Expected: ₹${Number(item.value).toLocaleString()} | Expense: ₹${Number(item.expense || 0).toLocaleString()}`}>
-                                                  <Stack alignItems="flex-end" sx={{ lineHeight: 1.15 }}>
-                                                    <Typography variant="body2" fontWeight={800} sx={{ fontSize: "0.80rem" }}>
-                                                      ₹{Number(item.collected).toLocaleString()} <Typography component="span" sx={{ fontSize: "0.68rem", color: "text.secondary", fontWeight: 600 }}>/ ₹{Number(item.value).toLocaleString()}</Typography>
-                                                    </Typography>
-                                                    <Typography variant="caption" sx={{ fontSize: "0.68rem", color: "#f59e0b", fontWeight: 700 }}>
-                                                      Expense: ₹{Number(item.expense || 0).toLocaleString()}
-                                                    </Typography>
-                                                  </Stack>
-                                                </Tooltip>
-                                                <Chip
-                                                  label={`Rem: ₹${Number(item.remaining || 0).toLocaleString()}`}
-                                                  size="small"
-                                                  sx={{
-                                                    height: 22,
-                                                    fontSize: "0.68rem",
-                                                    fontWeight: 900,
-                                                    bgcolor: item.remaining >= 0 ? alpha("#10b981", 0.12) : alpha("#ef4444", 0.12),
-                                                    color: item.remaining >= 0 ? "#10b981" : "#ef4444",
-                                                    border: `1px solid ${item.remaining >= 0 ? alpha("#10b981", 0.3) : alpha("#ef4444", 0.3)}`,
-                                                  }}
-                                                />
-                                              </Stack>
-                                            </Stack>
-
-                                            {/* Mini collection progress for this event */}
-                                            <Box
-                                              sx={{
-                                                height: 5,
-                                                borderRadius: 3,
-                                                bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
-                                                overflow: "hidden",
-                                              }}
-                                            >
-                                              <Box
-                                                sx={{
-                                                  height: "100%",
-                                                  width: `${item.collectedPct}%`,
-                                                  background: `linear-gradient(90deg, ${item.color} 0%, ${alpha(item.color, 0.7)} 100%)`,
-                                                  borderRadius: 3,
-                                                  transition: "width 0.6s ease",
-                                                }}
-                                              />
-                                            </Box>
-                                          </Box>
-                                        );
-                                      })}
+                                      <Box
+                                        sx={{
+                                          height: "100%",
+                                          width: `${item.collectedPct}%`,
+                                          background: `linear-gradient(90deg, ${item.color} 0%, ${alpha(item.color, 0.7)} 100%)`,
+                                          borderRadius: 3,
+                                          transition: "width 0.6s ease",
+                                        }}
+                                      />
                                     </Box>
-                                  </>
-                                ) : (
-                                  <>
-                                    {/* Ring legends for Financial Status */}
-                                    <RingLegendGroup
-                                      index="①"
-                                      label="Amount Ring"
-                                      color={C.collected}
-                                      segments={amountRing.segments}
-                                      total={totalExpected}
-                                    />
-                                    <Divider />
-                                    <RingLegendGroup
-                                      index="②"
-                                      label="Payments Ring"
-                                      color={C.paid}
-                                      segments={paymentsRing.segments}
-                                      total={paidCount + pendingCount}
-                                    />
-                                  </>
-                                )}
-                              </Stack>
-                            </Grid>
-                          </Grid>
-                        </Stack>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Box sx={{
-                      py: 10, display: "grid", placeItems: "center", color: "text.secondary",
-                      border: `1px dashed ${theme.palette.divider}`, borderRadius: 2,
-                    }}>
-                      <Typography variant="body2">
-                        {isFilteredByType
-                          ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
-                          : "No events found for the selected period."}
-                      </Typography>
-                    </Box>
-                  )}
-                  <CollapsibleSection
-                    title="Events for Selected Period"
-                    count={events.length}
-                    defaultOpen
-                  >
-                    <AppDataTable columns={columns} data={events} loading={false} />
-                  </CollapsibleSection>
-              </Stack>
-            )}
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                          </>
+                        ) : (
+                          <>
+                            {/* Ring legends for Financial Status */}
+                            <RingLegendGroup
+                              index="①"
+                              label="Amount Ring"
+                              color={C.collected}
+                              segments={amountRing.segments}
+                              total={totalExpected}
+                            />
+                            <Divider />
+                            <RingLegendGroup
+                              index="②"
+                              label="Payments Ring"
+                              color={C.paid}
+                              segments={paymentsRing.segments}
+                              total={paidCount + pendingCount}
+                            />
+                          </>
+                        )}
+                      </Stack>
+                    </Grid>
+                  </Grid>
+                </Stack>
+              </CardContent>
+            </Card>
+          ) : (
+            <Box sx={{
+              py: 10, display: "grid", placeItems: "center", color: "text.secondary",
+              border: `1px dashed ${theme.palette.divider}`, borderRadius: 2,
+            }}>
+              <Typography variant="body2">
+                {isFilteredByType
+                  ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
+                  : "No events found for the selected period."}
+              </Typography>
+            </Box>
+          )}
+          <CollapsibleSection
+            title="Events for Selected Period"
+            count={events.length}
+            defaultOpen
+          >
+            <AppDataTable columns={columns} data={events} loading={false} />
+          </CollapsibleSection>
+        </Stack>
 
       {/* Quick Access Slide-Over Drawer */}
       <Drawer
