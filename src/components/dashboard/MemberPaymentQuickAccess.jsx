@@ -87,6 +87,12 @@ export default function MemberPaymentQuickAccess({
     setSelectedEventId(appliedFilters?.eventId || "ALL");
   }, [appliedFilters?.eventType, appliedFilters?.eventId]);
 
+  // Format amount cleanly without forced .00 trailing decimals
+  const formatAmount = (val) =>
+    Number(val || 0).toLocaleString(undefined, {
+      maximumFractionDigits: Number(val || 0) % 1 === 0 ? 0 : 2,
+    });
+
   // Readable period label (e.g. "October 2026")
   const periodLabel = useMemo(() => {
     if (targetMonth > 0 && targetYear > 0) {
@@ -622,14 +628,14 @@ export default function MemberPaymentQuickAccess({
               <Typography variant="caption" color="text.secondary" fontWeight={700} textTransform="uppercase">
                 Total Expected Amount
               </Typography>
-              <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a" }}>
-                  ₹{stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <Box sx={{ mt: 0.75 }}>
+                <Typography variant="h6" fontWeight={900} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
+                  ₹{formatAmount(stats.totalAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: "block", mt: 0.35 }}>
                   {stats.totalCount} Members
                 </Typography>
-              </Stack>
+              </Box>
             </Paper>
           </Grid>
 
@@ -657,14 +663,14 @@ export default function MemberPaymentQuickAccess({
                 </Typography>
                 <HourglassEmptyIcon sx={{ fontSize: 16, color: "error.main" }} />
               </Stack>
-              <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} color="error.main" sx={{ fontFamily: '"Outfit", sans-serif' }}>
-                  ₹{stats.pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <Box sx={{ mt: 0.75 }}>
+                <Typography variant="h6" fontWeight={900} color="error.main" sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                  ₹{formatAmount(stats.pendingAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="error.main">
+                <Typography variant="caption" fontWeight={700} color="error.main" sx={{ display: "block", mt: 0.35 }}>
                   {stats.pendingCount} Members
                 </Typography>
-              </Stack>
+              </Box>
             </Paper>
           </Grid>
 
@@ -692,14 +698,14 @@ export default function MemberPaymentQuickAccess({
                 </Typography>
                 <CheckCircleIcon sx={{ fontSize: 16, color: "success.main" }} />
               </Stack>
-              <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} color="success.main" sx={{ fontFamily: '"Outfit", sans-serif' }}>
-                  ₹{stats.paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <Box sx={{ mt: 0.75 }}>
+                <Typography variant="h6" fontWeight={900} color="success.main" sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                  ₹{formatAmount(stats.paidAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="success.main">
+                <Typography variant="caption" fontWeight={700} color="success.main" sx={{ display: "block", mt: 0.35 }}>
                   {stats.paidCount} Members
                 </Typography>
-              </Stack>
+              </Box>
             </Paper>
           </Grid>
 
@@ -727,14 +733,14 @@ export default function MemberPaymentQuickAccess({
                 </Typography>
                 <ReceiptLongRoundedIcon sx={{ fontSize: 16, color: "warning.main" }} />
               </Stack>
-              <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} color="warning.main" sx={{ fontFamily: '"Outfit", sans-serif' }}>
-                  ₹{expenseTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <Box sx={{ mt: 0.75 }}>
+                <Typography variant="h6" fontWeight={900} color="warning.main" sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                  ₹{formatAmount(expenseTotal)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="warning.main">
+                <Typography variant="caption" fontWeight={700} color="warning.main" sx={{ display: "block", mt: 0.35 }}>
                   {eventScopedExpenses.length} Expenses
                 </Typography>
-              </Stack>
+              </Box>
             </Paper>
           </Grid>
         </Grid>
@@ -898,7 +904,7 @@ export default function MemberPaymentQuickAccess({
                                 color: "warning.main",
                               }}
                             >
-                              ₹{(Number(item.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₹{formatAmount(item.amount)}
                             </Typography>
                           </TableCell>
 
@@ -1034,7 +1040,7 @@ export default function MemberPaymentQuickAccess({
                                 color: item.isPaid ? "success.main" : "error.main",
                               }}
                             >
-                              ₹{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₹{formatAmount(item.amount)}
                             </Typography>
                           </TableCell>
 

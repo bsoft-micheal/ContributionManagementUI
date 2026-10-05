@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Grid,
   Typography,
   IconButton,
   Tooltip,
+  Chip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
@@ -32,6 +33,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission } from "../../utils/rightsHelper";
 import { getEventsAsync, deleteEventAsync, sendRemindersForEventAsync } from "../../services/eventService";
+import { getExpensesAsync } from "../../services/expenseService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
 import { getUsersAsync } from "../../services/userService";
@@ -48,9 +50,16 @@ export default function EventsPage() {
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
   const [users, setUsers] = useState([]);
-  const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
   const [filterYear, setFilterYear] = useState(dayjs().year());
-  const [filters, setFilters] = useState({ month: filterMonth, year: filterYear });
+  const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
+  const [filterEventType, setFilterEventType] = useState("ALL");
+  const [filterEvent, setFilterEvent] = useState("ALL");
+  const [filters, setFilters] = useState({
+    year: dayjs().year(),
+    month: dayjs().month() + 1,
+    eventType: "ALL",
+    event: "ALL",
+  });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [photoDetailsDialogOpen, setPhotoDetailsDialogOpen] = useState(false);
@@ -64,6 +73,7 @@ export default function EventsPage() {
   const hasWriteAccess = canEdit;
 
   const activeRole = authState?.role || authState?.roleName;
+  const isMember = String(activeRole || "").toLowerCase() === "member";
 
   // Granular Action Permissions
   const canAddEvent = hasActionPermission("Add Event", MENU_FEATURE_IDS.EVENT_ADD, activeRole).canExecute;
@@ -80,13 +90,15 @@ export default function EventsPage() {
   const toast = useAppToast();
   const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
 
-  async function loadData() {
+  async function loadData(targetFilters) {
+    const activeFilters = targetFilters || filters;
     try {
-      const [eventsData, types, membersData, usersData] = await Promise.all([
-        getEventsAsync(filters),
+      const [eventsData, types, membersData, usersData, expensesData] = await Promise.all([
+        getEventsAsync({ month: activeFilters.month, year: activeFilters.year }),
         getEventTypesAsync(),
         getMembersAsync(),
         getUsersAsync().catch(() => []),
+        getExpensesAsync().catch(() => []),
       ]);
       const combinedMembers = Array.isArray(membersData) ? [...membersData] : [];
       const existingIds = new Set(
@@ -156,8 +168,24 @@ export default function EventsPage() {
           ? name
           : userMap[rawCreatedBy] || (e.createdBy && !isGuid(e.createdBy) ? e.createdBy : "--");
 
+        const matchedExpenses = (expensesData || []).filter((exp) =>
+          String(exp.eventName || "").trim().toLowerCase() === String(e.eventName || "").trim().toLowerCase()
+        );
+        const eventExpenseTotal = matchedExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+
+        const expAmount = Number(e.expenseAmount) > 0 ? Number(e.expenseAmount) : eventExpenseTotal;
+        const expectedAmt = Number(e.totalExpectedAmount) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
+        const paidAmt = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
+        const pendingAmt = Number(e.pendingAmount !== undefined ? e.pendingAmount : (expectedAmt - paidAmt));
+        const remainingAmt = expectedAmt - expAmount;
+
         return {
           ...e,
+          expenseAmount: expAmount,
+          remainingAmount: remainingAmt,
+          pendingAmount: pendingAmt,
+          totalPaidAmount: paidAmt,
+          collectedAmount: paidAmt,
           createdByName: resolvedDisplay,
           createdBy: resolvedDisplay,
         };
@@ -171,15 +199,7 @@ export default function EventsPage() {
 
   useEffect(() => {
     loadData();
-  }, [filters]);
-
-  const monthOptions = [
-    { label: "All", value: 0 },
-    ...Array.from({ length: 12 }, (_, i) => ({
-      label: dayjs().month(i).format("MMMM"),
-      value: i + 1
-    }))
-  ];
+  }, [filters.year, filters.month]);
 
   const currentYear = dayjs().year();
   const yearOptions = [
@@ -187,8 +207,108 @@ export default function EventsPage() {
     ...Array.from({ length: 11 }, (_, i) => {
       const y = currentYear - 5 + i;
       return { label: String(y), value: y };
-    })
+    }),
   ];
+
+  const monthOptions = [
+    { label: "All", value: 0 },
+    ...Array.from({ length: 12 }, (_, i) => ({
+      label: dayjs().month(i).format("MMMM"),
+      value: i + 1,
+    })),
+  ];
+
+  const eventTypeOptions = useMemo(() => {
+    const list = [{ label: "All Event Types", value: "ALL" }];
+    const seen = new Set();
+    (eventTypes || []).forEach((t) => {
+      const name = t.eventTypeName || t.typeName || t.name;
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push({ label: name, value: name });
+      }
+    });
+    (events || []).forEach((e) => {
+      const cat = e.eventTypeName || e.category;
+      if (cat && !seen.has(cat.toLowerCase())) {
+        seen.add(cat.toLowerCase());
+        list.push({ label: cat, value: cat });
+      }
+    });
+    return list;
+  }, [eventTypes, events]);
+
+  const eventOptions = useMemo(() => {
+    const list = [{ label: "All Events", value: "ALL" }];
+    const seen = new Set();
+    (events || []).forEach((e) => {
+      const name = e.eventName || e.name;
+      if (!name || seen.has(name.toLowerCase())) return;
+      const cat = (e.eventTypeName || e.category || "").toLowerCase();
+      if (filterEventType !== "ALL" && cat !== filterEventType.toLowerCase()) {
+        return;
+      }
+      seen.add(name.toLowerCase());
+      list.push({ label: name, value: name });
+    });
+    return list;
+  }, [events, filterEventType]);
+
+  const handleEventTypeChange = (newType) => {
+    setFilterEventType(newType);
+    if (newType !== "ALL" && filterEvent !== "ALL") {
+      const isStillValid = (events || []).some((e) => {
+        const name = e.eventName || e.name;
+        const cat = (e.eventTypeName || e.category || "").toLowerCase();
+        return name?.toLowerCase() === filterEvent.toLowerCase() && cat === newType.toLowerCase();
+      });
+      if (!isStillValid) {
+        setFilterEvent("ALL");
+      }
+    }
+  };
+
+  const handleApplyFilter = () => {
+    const nextFilters = {
+      year: filterYear,
+      month: filterMonth,
+      eventType: filterEventType,
+      event: filterEvent,
+    };
+    setFilters(nextFilters);
+    loadData(nextFilters);
+  };
+
+  const handleClearFilter = () => {
+    const defaultMonth = dayjs().month() + 1;
+    const defaultYear = dayjs().year();
+    setFilterYear(defaultYear);
+    setFilterMonth(defaultMonth);
+    setFilterEventType("ALL");
+    setFilterEvent("ALL");
+    const resetFilters = {
+      year: defaultYear,
+      month: defaultMonth,
+      eventType: "ALL",
+      event: "ALL",
+    };
+    setFilters(resetFilters);
+    loadData(resetFilters);
+  };
+
+  const displayedEvents = useMemo(() => {
+    return (events || []).filter((e) => {
+      if (filters.eventType && filters.eventType !== "ALL") {
+        const cat = (e.eventTypeName || e.category || "").trim().toLowerCase();
+        if (cat !== filters.eventType.trim().toLowerCase()) return false;
+      }
+      if (filters.event && filters.event !== "ALL") {
+        const name = (e.eventName || e.name || "").trim().toLowerCase();
+        if (name !== filters.event.trim().toLowerCase()) return false;
+      }
+      return true;
+    });
+  }, [events, filters]);
 
   const handleDeleteRequest = (eventItem) => {
     setEventToDelete(eventItem);
@@ -363,7 +483,7 @@ export default function EventsPage() {
     },
 
     {
-      label: "Valuation",
+      label: "Expected Amount",
       key: "totalExpectedAmount",
       align: "right",
       render: (row) => {
@@ -371,6 +491,78 @@ export default function EventsPage() {
           ? Number(row.totalExpectedAmount)
           : Number(row.baseAmount || 0);
         return <Typography variant="body2" fontWeight={700}>₹{val.toLocaleString("en-IN")}</Typography>;
+      }
+    },
+    {
+      label: isMember ? "Paid Amount" : "Total Collections",
+      key: "collectedAmount",
+      align: "right",
+      render: (row) => {
+        const val = Number(row.collectedAmount ?? row.totalPaidAmount ?? 0);
+        return (
+          <Typography variant="body2" fontWeight={700} sx={{ color: "#10b981" }}>
+            ₹{val.toLocaleString("en-IN")}
+          </Typography>
+        );
+      }
+    },
+    {
+      label: "Total Pending",
+      key: "pendingAmount",
+      align: "right",
+      render: (row) => {
+        const exp = Number(row.totalExpectedAmount || row.baseAmount || 0);
+        const col = Number(row.collectedAmount ?? row.totalPaidAmount ?? 0);
+        const val = Number(row.pendingAmount !== undefined ? row.pendingAmount : (exp - col));
+        return (
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            sx={{ color: val > 0 ? "#ef4444" : "text.secondary" }}
+          >
+            ₹{val.toLocaleString("en-IN")}
+          </Typography>
+        );
+      }
+    },
+    {
+      label: "Total Expenses",
+      key: "expenseAmount",
+      align: "right",
+      render: (row) => {
+        const val = Number(row.expenseAmount || 0);
+        return (
+          <Typography variant="body2" fontWeight={700} sx={{ color: "#f59e0b" }}>
+            ₹{val.toLocaleString("en-IN")}
+          </Typography>
+        );
+      }
+    },
+    {
+      label: "Remaining Amount",
+      key: "remainingAmount",
+      align: "right",
+      render: (row) => {
+        const exp = Number(row.totalExpectedAmount || row.baseAmount || 0);
+        const expn = Number(row.expenseAmount || 0);
+        const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (exp - expn);
+        const isDeficit = rem < 0;
+        return (
+          <Chip
+            size="small"
+            label={`${isDeficit ? "-₹" : "₹"}${Math.abs(rem).toLocaleString("en-IN")}`}
+            sx={{
+              fontWeight: 800,
+              fontSize: "0.75rem",
+              height: 24,
+              px: 0.5,
+              borderRadius: "6px",
+              bgcolor: isDeficit ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 185, 129, 0.12)",
+              color: isDeficit ? "#dc2626" : "#059669",
+              border: `1px solid ${isDeficit ? "rgba(239, 68, 68, 0.3)" : "rgba(16, 185, 129, 0.3)"}`,
+            }}
+          />
+        );
       }
     },
     {
@@ -390,7 +582,7 @@ export default function EventsPage() {
       <AppDataTable
         title="Events Details"
         columns={columns}
-        data={events}
+        data={displayedEvents}
         actions={
           canAddEvent && (
             <AppButton
@@ -404,45 +596,73 @@ export default function EventsPage() {
           )
         }
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 150 }}>
-                <AppSelect
-                  label="Month"
-                  value={filterMonth}
-                  onChange={(event) => {
-                    setFilterMonth(Number(event.target.value));
-                  }}
-                  options={monthOptions}
-                  placeholder="Select Month"
-                  required
-                />
-              </Box>
-              <Box sx={{ minWidth: 120 }}>
-                <AppSelect
-                  label="Year"
-                  value={filterYear}
-                  onChange={(event) => {
-                    setFilterYear(Number(event.target.value));
-                  }}
-                  options={yearOptions}
-                  placeholder="Select Year"
-                  required
-                />
-              </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 1.2,
+              width: "100%",
+            }}
+          >
+            <Box sx={{ width: { xs: "100%", sm: 100 } }}>
+              <AppSelect
+                label="Year"
+                value={filterYear}
+                onChange={(event) => {
+                  setFilterYear(Number(event.target.value));
+                }}
+                options={yearOptions}
+                placeholder="Select Year"
+                required
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 130 } }}>
+              <AppSelect
+                label="Month"
+                value={filterMonth}
+                onChange={(event) => {
+                  setFilterMonth(Number(event.target.value));
+                }}
+                options={monthOptions}
+                placeholder="Select Month"
+                required
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 155 } }}>
+              <AppSelect
+                label="Event Type"
+                value={filterEventType}
+                onChange={(event) => {
+                  handleEventTypeChange(event.target.value);
+                }}
+                options={eventTypeOptions}
+                placeholder="Select Event Type"
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 175 } }}>
+              <AppSelect
+                label="Event"
+                value={filterEvent}
+                onChange={(event) => {
+                  setFilterEvent(event.target.value);
+                }}
+                options={eventOptions}
+                placeholder="Select Event"
+              />
+            </Box>
+            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
               <AppButton
                 variant="contained"
                 size="small"
-                startIcon={<FilterListIcon />}
-                onClick={() => {
-                  setFilters({ month: filterMonth, year: filterYear });
-                }}
+                startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
+                onClick={handleApplyFilter}
                 sx={{
-                  height: 34,
-                  mt: 2.2,
+                  height: 36,
                   fontWeight: 700,
                   fontSize: "0.75rem",
-                  px: 2,
+                  px: 1.8,
+                  whiteSpace: "nowrap",
                 }}
               >
                 Filter
@@ -450,39 +670,25 @@ export default function EventsPage() {
               <AppButton
                 variant="outlined"
                 size="small"
-                onClick={() => {
-                  const defaultMonth = dayjs().month() + 1;
-                  const defaultYear = dayjs().year();
-                  setFilterMonth(defaultMonth);
-                  setFilterYear(defaultYear);
-                  setFilters({ month: defaultMonth, year: defaultYear });
-                }}
+                onClick={handleClearFilter}
                 sx={{
                   color: "#ef4444",
                   borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  mt: 2.2,
+                  height: 36,
                   fontWeight: 700,
                   fontSize: "0.75rem",
-                  px: 2,
+                  px: 1.8,
+                  whiteSpace: "nowrap",
                   "&:hover": {
                     borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)"
-                  }
+                    bgcolor: "rgba(239, 68, 68, 0.05)",
+                  },
                 }}
               >
                 Clear Filter
               </AppButton>
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 3, justifyContent: { xs: "flex-start", md: "flex-end" } }}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, fontSize: "0.65rem" }}>Expected Amount</Typography>
-                  <Typography variant="body2" fontWeight={800} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }} display="block">₹{events.reduce((sum, e) => sum + (Number(e.totalExpectedAmount) > 0 ? Number(e.totalExpectedAmount) : (Number(e.baseAmount) || 0)), 0).toLocaleString("en-IN")}</Typography>
-                </Box>
-              </Box>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         }
       />
 
@@ -519,6 +725,7 @@ export default function EventsPage() {
         onClose={() => {
           setExpenseDetailsDialogOpen(false);
           setExpenseEvent(null);
+          loadData();
         }}
         event={expenseEvent}
       />
