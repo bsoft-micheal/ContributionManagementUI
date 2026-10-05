@@ -74,7 +74,6 @@ import {
   triggerHangfireRemindersAsync,
 } from "../../services/settingsService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
-import { formatGridDate } from "../../utils/dateHelper";
 import SendTestEmailDialog from "../../components/settings/SendTestEmailDialog";
 import EmailReminderLogsDialog from "../../components/settings/EmailReminderLogsDialog";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
