@@ -1513,6 +1513,8 @@ export default function DashboardPage() {
       >
         <MemberPaymentQuickAccess
           events={events}
+          allEvents={allEvents}
+          eventTypes={eventTypes}
           appliedFilters={appliedFilters}
           isMember={isMember}
           initialStatus={quickAccessStatus}
