@@ -1151,17 +1151,7 @@ export default function DashboardPage() {
       </Card>
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
-      {loading ? (
-        <Card sx={{ p: { xs: 3, md: 5 }, borderRadius: 3, display: "grid", placeItems: "center" }}>
-          <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
-            <CircularProgress size={46} />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              Loading dashboard…
-            </Typography>
-          </Stack>
-        </Card>
-      ) : (
-        <Stack spacing={3}>
+      <Stack spacing={3}>
 
           {/* ① Top Summary Metric Cards (6 Cards Grid: Expected, Collections, Pending, Expenses, Remaining, Events) */}
           <Box

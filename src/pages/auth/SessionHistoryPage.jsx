@@ -69,11 +69,7 @@ export default function SessionHistoryPage() {
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <Box sx={{ minHeight: 200 }} />;
   }
 
   return (

@@ -38,6 +38,7 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { hasActionPermission } from "../../utils/rightsHelper";
+import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 import { getEventsAsync } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 
@@ -329,6 +330,7 @@ export default function ReportsPage({ mode = "event" }) {
   const isMember = authState?.role === "Member" || authState?.user?.role === "Member";
   const canExport = hasActionPermission("Export Reports", 60, authState?.role).canView !== false;
   const toast = useAppToast();
+  const { isLoading: globalLoading } = useNavigationLoading();
 
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1199,12 +1201,16 @@ export default function ReportsPage({ mode = "event" }) {
         {/* ── Main Content Area ── */}
         <CardContent sx={{ p: { xs: 2, md: 3 } }}>
           {loading ? (
-            <Stack alignItems="center" justifyContent="center" sx={{ py: 12 }}>
-              <CircularProgress size={42} thickness={4} />
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontWeight: 600 }}>
-                Loading report analytics...
-              </Typography>
-            </Stack>
+            !globalLoading ? (
+              <Stack alignItems="center" justifyContent="center" sx={{ py: 12 }}>
+                <CircularProgress size={42} thickness={4} />
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontWeight: 600 }}>
+                  Loading report analytics...
+                </Typography>
+              </Stack>
+            ) : (
+              <Box sx={{ minHeight: 300 }} />
+            )
           ) : (
             <Stack spacing={3}>
 

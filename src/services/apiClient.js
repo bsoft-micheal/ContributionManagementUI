@@ -5,6 +5,21 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
+  const url = (config.url || "").toLowerCase();
+  const currentPath = (window.location.pathname || "").toLowerCase();
+
+  const isAuthPageOrEndpoint =
+    currentPath === "/login" ||
+    currentPath.startsWith("/forgot-password") ||
+    url.includes("/auth/login") ||
+    url.includes("/auth/forgot-password") ||
+    url.includes("/auth/verify-2fa") ||
+    url.includes("/logout");
+
+  if (isAuthPageOrEndpoint) {
+    config.hideLoader = true;
+  }
+
   if (!config.hideLoader) {
     window.dispatchEvent(new CustomEvent("app:api-start"));
   }

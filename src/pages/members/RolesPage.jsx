@@ -179,6 +179,7 @@ export default function RolesPage() {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         title={form.roleId ? "Edit Role" : "Add Role"}
+        maxWidth="xs"
         actions={
           <>
             <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>{COMMON_STRINGS.ACTIONS.CANCEL}</AppButton>

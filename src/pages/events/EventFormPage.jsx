@@ -732,9 +732,8 @@ export default function EventFormPage() {
           formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
         } else {
           if (puffsFactor > 0) {
-            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${
-              puffsFactor > 1 ? ` × ${puffsFactor}` : ""
-            }`;
+            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""
+              }`;
             amount = total * rate * puffsFactor;
           } else {
             calcText = "WFH only → Not provided";
@@ -969,8 +968,8 @@ export default function EventFormPage() {
         form.eventTypeIds && form.eventTypeIds.length > 0
           ? form.eventTypeIds
           : form.eventTypeId
-          ? [form.eventTypeId]
-          : [];
+            ? [form.eventTypeId]
+            : [];
       setForm((prev) => ({
         ...prev,
         eventTypeIds: currentTypes,
@@ -1143,19 +1142,18 @@ export default function EventFormPage() {
 
       const celebrantsSummary = isBirthday
         ? monthCelebrants
-            .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
-            .join(", ")
+          .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
+          .join(", ")
         : "";
 
       const defaultDesc = isBirthday
-        ? `Birthday celebration (${office} Office, ${wfh} WFH)${
-            celebrantsSummary ? ` for ${celebrantsSummary}` : ""
-          }${nonBirthdaySelectedTypes.length > 0 ? ` + ${nonBirthdaySelectedTypes.map(t => t.eventTypeName).join(" & ")}` : ""}. Planned Budget: ₹${plannedBudget.toLocaleString(
-            "en-IN"
-          )}, Contribution/member: ₹${contributionPerMember}`
+        ? `Birthday celebration (${office} Office, ${wfh} WFH)${celebrantsSummary ? ` for ${celebrantsSummary}` : ""
+        }${nonBirthdaySelectedTypes.length > 0 ? ` + ${nonBirthdaySelectedTypes.map(t => t.eventTypeName).join(" & ")}` : ""}. Planned Budget: ₹${plannedBudget.toLocaleString(
+          "en-IN"
+        )}, Contribution/member: ₹${contributionPerMember}`
         : `${selectedTypeNames.join(" & ") || "Event"} celebration for ${total} members. Planned Budget: ₹${plannedBudget.toLocaleString(
-            "en-IN"
-          )}, Contribution/member: ₹${contributionPerMember}`;
+          "en-IN"
+        )}, Contribution/member: ₹${contributionPerMember}`;
 
       const finalTypeIds = allowMultipleEvents && form.eventTypeIds?.length > 0
         ? form.eventTypeIds
@@ -1355,29 +1353,11 @@ export default function EventFormPage() {
                   <Box
                     onClick={() => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
                     sx={{
-                      p: 0.8,
-                      px: 1.8,
-                      borderRadius: "10px",
-                      border: "1px solid",
-                      borderColor: (theme) =>
-                        allowMultipleEvents
-                          ? "#4a3f6b"
-                          : theme.palette.mode === "dark"
-                          ? "rgba(255, 255, 255, 0.1)"
-                          : "rgba(74, 63, 107, 0.14)",
-                      bgcolor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(255, 255, 255, 0.03)"
-                          : "#f8f7fc",
                       display: "flex",
                       alignItems: "center",
-                      gap: 1,
+                      gap: 0.8,
                       cursor: "pointer",
                       userSelect: "none",
-                      transition: "all 0.2s ease",
-                      "&:hover": {
-                        borderColor: "#4a3f6b",
-                      },
                     }}
                   >
                     <Checkbox
@@ -1386,7 +1366,8 @@ export default function EventFormPage() {
                       onClick={(e) => e.stopPropagation()}
                       size="small"
                       sx={{
-                        p: 0,
+                        p: 0.2,
+                        transform: "scale(0.85)",
                         color: "#4a3f6b",
                         "&.Mui-checked": {
                           color: "#4a3f6b",
@@ -1394,12 +1375,12 @@ export default function EventFormPage() {
                       }}
                     />
                     <Typography
-                      variant="subtitle2"
-                      fontWeight={700}
+                      variant="body2"
+                      fontWeight={600}
                       sx={{
                         color: (theme) =>
-                          theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
-                        fontSize: "0.85rem",
+                          theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
+                        fontSize: "0.82rem",
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -1753,9 +1734,8 @@ export default function EventFormPage() {
                           return (
                             <Chip
                               key={m.memberId}
-                              label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${
-                                m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
-                              }`}
+                              label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
+                                }`}
                               size="small"
                               sx={{
                                 fontWeight: 600,

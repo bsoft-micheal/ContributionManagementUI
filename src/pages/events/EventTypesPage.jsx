@@ -382,7 +382,7 @@ export default function EventTypesPage() {
                 >
                   Enable Dynamic Calculation
                 </Typography>
-               
+
               </Box>
             </Box>
 
