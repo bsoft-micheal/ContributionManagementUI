@@ -695,7 +695,7 @@ export default function EventsPage() {
                 label="BALANCE AMOUNT"
                 value={`₹${summaryTotals.totalBalance.toLocaleString("en-IN")}`}
                 helper={summaryTotals.totalBalance >= 0 ? "Budget Surplus" : "Budget Deficit"}
-                accent={summaryTotals.totalBalance >= 0 ? "#10b981" : "#f43f5e"}
+                accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}
               />
             </Box>
           </Stack>

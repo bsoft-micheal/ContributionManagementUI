@@ -17,6 +17,8 @@ import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppPieChart from "../../components/common/AppPieChart";
 import ExecutiveFinancialBarChart from "../../components/dashboard/ExecutiveFinancialBarChart";
+import FinancialBarChart from "../../components/dashboard/FinancialBarChart";
+import MetricCard from "../../components/MetricCard";
 import { useAppToast } from "../../components/common/AppToast";
 import {
   PieChart as PieChartIcon,
@@ -105,11 +107,11 @@ function StatCard({ label, value, icon: Icon, color = "primary", subLabel, helpe
   const isDark = theme.palette.mode === "dark";
   const colorMap = {
     primary: {
-      accent: "#7c3aed",
-      gradient: "linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(99, 102, 241, 0.04) 100%)",
-      glow: "rgba(124, 58, 237, 0.25)",
-      badgeBg: isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)",
-      text: isDark ? "#c4b5fd" : "#6d28d9",
+      accent: "#6366f1",
+      gradient: "linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(129, 140, 248, 0.04) 100%)",
+      glow: "rgba(99, 102, 241, 0.25)",
+      badgeBg: isDark ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.1)",
+      text: isDark ? "#c4b5fd" : "#6366f1",
     },
     info: {
       accent: "#3b82f6",
@@ -120,24 +122,31 @@ function StatCard({ label, value, icon: Icon, color = "primary", subLabel, helpe
     },
     success: {
       accent: "#10b981",
-      gradient: "linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.04) 100%)",
+      gradient: "linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(52, 211, 153, 0.04) 100%)",
       glow: "rgba(16, 185, 129, 0.25)",
       badgeBg: isDark ? "rgba(16, 185, 129, 0.2)" : "rgba(16, 185, 129, 0.1)",
-      text: isDark ? "#6ee7b7" : "#047857",
+      text: isDark ? "#6ee7b7" : "#10b981",
     },
     error: {
-      accent: "#ef4444",
-      gradient: "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.04) 100%)",
-      glow: "rgba(239, 68, 68, 0.25)",
-      badgeBg: isDark ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
-      text: isDark ? "#fca5a5" : "#b91c1c",
+      accent: "#f43f5e",
+      gradient: "linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(251, 113, 133, 0.04) 100%)",
+      glow: "rgba(244, 63, 94, 0.25)",
+      badgeBg: isDark ? "rgba(244, 63, 94, 0.2)" : "rgba(244, 63, 94, 0.1)",
+      text: isDark ? "#fca5a5" : "#f43f5e",
     },
     warning: {
       accent: "#f59e0b",
-      gradient: "linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.04) 100%)",
+      gradient: "linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(251, 191, 36, 0.04) 100%)",
       glow: "rgba(245, 158, 11, 0.25)",
       badgeBg: isDark ? "rgba(245, 158, 11, 0.2)" : "rgba(245, 158, 11, 0.1)",
-      text: isDark ? "#fcd34d" : "#b45309",
+      text: isDark ? "#fcd34d" : "#f59e0b",
+    },
+    cyan: {
+      accent: "#06b6d4",
+      gradient: "linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(56, 189, 248, 0.04) 100%)",
+      glow: "rgba(6, 182, 212, 0.25)",
+      badgeBg: isDark ? "rgba(6, 182, 212, 0.2)" : "rgba(6, 182, 212, 0.1)",
+      text: isDark ? "#67e8f9" : "#06b6d4",
     },
     neutral: {
       accent: "#64748b",
@@ -242,8 +251,8 @@ function StatCard({ label, value, icon: Icon, color = "primary", subLabel, helpe
             title={typeof value === "string" ? value : undefined}
             sx={{
               fontFamily: '"Outfit", sans-serif',
-              fontWeight: 800,
-              color: c.text,
+              fontWeight: 500,
+              color: isDark ? "#ffffff" : "#0f172a",
               fontSize: { xs: "1.15rem", sm: "1.22rem", md: "1.28rem", lg: "1.22rem", xl: "1.34rem" },
               lineHeight: 1.15,
               letterSpacing: "-0.015em",
@@ -605,29 +614,20 @@ export default function ReportsPage({ mode = "event" }) {
     { label: "Event", key: "eventName", render: (r) => <Typography variant="body2" fontWeight={700}>{r.eventName}</Typography> },
     { label: "Type", key: "eventTypeName", render: (r) => <Typography variant="body2" color="text.secondary">{r.eventTypeName || "General"}</Typography> },
     { label: "Date", key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
-    { label: "Expected", key: "expectedAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700}>{INR(r.expectedAmount)}</Typography> },
-    { label: "Paid", key: "paidAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="success.main">{INR(r.paidAmount)}</Typography> },
-    { label: "Pending", key: "pendingAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR(r.pendingAmount)}</Typography> },
-    { label: "Expense ₹", key: "expenseAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="warning.main">{INR(r.expenseAmount || 0)}</Typography> },
+    { label: "Expected", key: "expectedAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.expectedAmount)}</Typography> },
+    { label: "Paid", key: "paidAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.paidAmount)}</Typography> },
+    { label: "Pending", key: "pendingAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.pendingAmount)}</Typography> },
+    { label: "Expense ₹", key: "expenseAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.expenseAmount || 0)}</Typography> },
     {
       label: "Balance ₹", key: "remainingAmount", align: "right",
       render: (r) => {
         const exp = Number(r.expectedAmount || 0);
         const expAmt = Number(r.expenseAmount || 0);
         const rem = exp - expAmt;
-        const isDeficit = rem < 0;
         return (
-          <Chip
-            size="small"
-            label={INR(rem)}
-            sx={{
-              fontWeight: 800,
-              fontSize: "0.76rem",
-              bgcolor: isDeficit ? alpha("#ef4444", 0.12) : alpha("#10b981", 0.12),
-              color: isDeficit ? "error.main" : "success.main",
-              border: `1px solid ${isDeficit ? alpha("#ef4444", 0.3) : alpha("#10b981", 0.3)}`,
-            }}
-          />
+          <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
+            {INR(rem)}
+          </Typography>
         );
       },
     },
@@ -648,9 +648,9 @@ export default function ReportsPage({ mode = "event" }) {
         </Typography>
       ),
     },
-    { label: "Expected", key: "totalExpectedAmount", align: "right", render: (r) => INR(r.totalExpectedAmount) },
-    { label: "Paid", key: "totalPaidAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="success.main">{INR(r.totalPaidAmount)}</Typography> },
-    { label: "Pending", key: "totalPendingAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0))}</Typography> },
+    { label: "Expected", key: "totalExpectedAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.totalExpectedAmount)}</Typography> },
+    { label: "Paid", key: "totalPaidAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.totalPaidAmount)}</Typography> },
+    { label: "Pending", key: "totalPendingAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0))}</Typography> },
     {
       label: "Paid Events",
       key: "paidEventsCount",
@@ -681,22 +681,6 @@ export default function ReportsPage({ mode = "event" }) {
         />
       ),
     },
-    {
-      label: "Action",
-      key: "action",
-      align: "center",
-      render: (r) => (
-        <AppButton
-          size="small"
-          variant="outlined"
-          startIcon={<ReceiptLongIcon sx={{ fontSize: 16 }} />}
-          onClick={() => openBreakdownModal(r, "all")}
-          sx={{ fontSize: "0.72rem", py: 0.3, px: 1.2, height: 28, textTransform: "none", fontWeight: 700 }}
-        >
-          View Events
-        </AppButton>
-      ),
-    },
   ];
 
   const pendingColumns = [
@@ -704,7 +688,7 @@ export default function ReportsPage({ mode = "event" }) {
     { label: "Phone", key: "phone", render: (r) => <Typography variant="body2" color="text.secondary">{r.phone || "\u2014"}</Typography> },
     { label: "Event", key: "eventName", render: (r) => <Typography variant="body2" fontWeight={600}>{r.eventName}</Typography> },
     { label: "Event Date", key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
-    { label: "Due Amount", key: "amount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR(r.amount)}</Typography> },
+    { label: "Due Amount", key: "amount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.amount)}</Typography> },
     {
       label: "Aging", key: "agingCategory", align: "center",
       render: (r) => {
@@ -855,6 +839,38 @@ export default function ReportsPage({ mode = "event" }) {
     ];
   }, [activeSelectedMember]);
 
+  const reportTotals = useMemo(() => {
+    if (mode === "member") {
+      const mb = filteredMemberContributions ?? [];
+      const exp = mb.reduce((s, m) => s + Number(m.totalExpectedAmount || 0), 0);
+      const paid = mb.reduce((s, m) => s + Number(m.totalPaidAmount || 0), 0);
+      const pend = Math.max(0, exp - paid);
+      const ev = filteredEventCollections ?? [];
+      const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
+      const remaining = exp - totalExp;
+      return {
+        totalExpected: exp,
+        totalCollected: paid,
+        totalPending: pend,
+        totalExpenses: totalExp,
+        totalRemaining: remaining,
+      };
+    }
+    const ev = filteredEventCollections ?? [];
+    const exp = ev.reduce((s, e) => s + Number(e.expectedAmount || 0), 0);
+    const paid = ev.reduce((s, e) => s + Number(e.paidAmount || 0), 0);
+    const pend = ev.reduce((s, e) => s + Number(e.pendingAmount || 0), 0);
+    const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
+    const remaining = exp - totalExp;
+    return {
+      totalExpected: exp,
+      totalCollected: paid,
+      totalPending: pend,
+      totalExpenses: totalExp,
+      totalRemaining: remaining,
+    };
+  }, [mode, filteredEventCollections, filteredMemberContributions]);
+
   const kpiCards = useMemo(() => {
     if (mode === "event") {
       const ev = filteredEventCollections ?? [];
@@ -865,12 +881,12 @@ export default function ReportsPage({ mode = "event" }) {
       const remaining = exp - totalExp;
       const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
       return [
-        { label: "Total Expected", value: INR(exp), icon: AccountBalanceWallet, color: "primary", helper: "Projected target collections" },
-        { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: "Total amount collected" },
-        { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: "Total outstanding balance" },
-        { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
-        { label: "Balance Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
-        { label: "Total Events", value: ev.length, icon: EventIcon, color: "neutral", helper: `${ev.length} active collection events` },
+        { label: "TOTAL EXPECTED", value: INR(exp), helper: "Projected target collections", accent: "#6366f1" },
+        { label: "TOTAL COLLECTED", value: INR(paid), helper: "Total amount collected", accent: "#10b981" },
+        { label: "TOTAL PENDING", value: INR(pend), helper: "Total outstanding balance", accent: "#f43f5e" },
+        { label: "TOTAL EXPENSES", value: INR(totalExp), helper: "Total expenses for events", accent: "#f59e0b" },
+        { label: "BALANCE AMOUNT", value: INR(remaining), helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)", accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: remaining >= 0 ? "Surplus ✓" : "Deficit ⚠" },
+        { label: "TOTAL EVENTS", value: ev.length, helper: `${ev.length} active collection events`, accent: "#3b82f6" },
       ];
     }
     if (mode === "member") {
@@ -883,12 +899,12 @@ export default function ReportsPage({ mode = "event" }) {
       const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
       const remaining = exp - totalExp;
       return [
-        { label: "Total Expected", value: INR(exp), icon: AccountBalanceWallet, color: "primary", helper: "Total expected member dues" },
-        { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: "Total collections received" },
-        { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: "Total outstanding balance" },
-        { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
-        { label: "Balance Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
-        { label: "Total Members", value: mb.length, icon: People, color: "neutral", helper: `${mb.length} contributing members` },
+        { label: "TOTAL EXPECTED", value: INR(exp), helper: "Total expected member dues", accent: "#6366f1" },
+        { label: "TOTAL COLLECTED", value: INR(paid), helper: "Total collections received", accent: "#10b981" },
+        { label: "TOTAL PENDING", value: INR(pend), helper: "Total outstanding balance", accent: "#f43f5e" },
+        { label: "TOTAL EXPENSES", value: INR(totalExp), helper: "Total expenses for events", accent: "#f59e0b" },
+        { label: "BALANCE AMOUNT", value: INR(remaining), helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)", accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: remaining >= 0 ? "Surplus ✓" : "Deficit ⚠" },
+        { label: "TOTAL MEMBERS", value: mb.length, helper: `${mb.length} contributing members`, accent: "#3b82f6" },
       ];
     }
     if (mode === "pending") {
@@ -898,11 +914,11 @@ export default function ReportsPage({ mode = "event" }) {
       const crit = du.filter((d) => d.daysOverdue > 30).length;
       const mod = du.filter((d) => d.daysOverdue >= 15 && d.daysOverdue <= 30).length;
       return [
-        { label: "Total Pending Dues", value: INR(total), icon: AccountBalanceWallet, color: "error", helper: "Total uncollected amount" },
-        { label: "Pending Records", value: du.length, icon: Warning, color: "warning", helper: "Unpaid line items" },
-        { label: "Unique Defaulters", value: uniq, icon: People, color: "error", helper: "Members with overdue payments" },
-        { label: "Critical (>30 days)", value: crit, icon: HourglassEmpty, color: "error", helper: "Over 30 days overdue" },
-        { label: "Moderate (15-30 days)", value: mod, icon: TrendingUp, color: "warning", helper: "15 to 30 days overdue" },
+        { label: "TOTAL PENDING DUES", value: INR(total), helper: "Total uncollected amount", accent: "#f43f5e" },
+        { label: "PENDING RECORDS", value: du.length, helper: "Unpaid line items", accent: "#f59e0b" },
+        { label: "UNIQUE DEFAULTERS", value: uniq, helper: "Members with overdue payments", accent: "#f43f5e" },
+        { label: "CRITICAL (>30 DAYS)", value: crit, helper: "Over 30 days overdue", accent: "#f43f5e" },
+        { label: "MODERATE (15-30 DAYS)", value: mod, helper: "15 to 30 days overdue", accent: "#f59e0b" },
       ];
     }
     return [];
@@ -1218,7 +1234,7 @@ export default function ReportsPage({ mode = "event" }) {
               <Grid container spacing={2}>
                 {kpiCards.map((card) => (
                   <Grid key={card.label} size={{ xs: 12, sm: 6, md: 4, lg: kpiCards.length === 6 ? 2 : Math.max(3, Math.floor(12 / kpiCards.length)) }}>
-                    <StatCard {...card} />
+                    <MetricCard {...card} />
                   </Grid>
                 ))}
               </Grid>
@@ -1226,22 +1242,22 @@ export default function ReportsPage({ mode = "event" }) {
               {/* Chart + Summary Widgets Grid */}
               <Grid container spacing={2.5}>
 
-                {/* Financial Overview Bar Chart */}
+                {/* Financial Overview Bar Chart + Pie Chart */}
                 <Grid size={{ xs: 12 }}>
-                  <Card
-                    sx={{
-                      border: `1px solid ${theme.palette.divider}`,
-                      boxShadow: isDark
-                        ? "0 8px 32px rgba(0,0,0,0.35)"
-                        : "0 8px 32px rgba(0,0,0,0.06)",
-                      background: isDark
-                        ? "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
-                        : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
-                      borderRadius: "16px",
-                    }}
-                  >
-                    <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                      {mode === "member" ? (
+                  {mode === "member" ? (
+                    <Card
+                      sx={{
+                        border: `1px solid ${theme.palette.divider}`,
+                        boxShadow: isDark
+                          ? "0 8px 32px rgba(0,0,0,0.35)"
+                          : "0 8px 32px rgba(0,0,0,0.06)",
+                        background: isDark
+                          ? "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
+                          : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
+                        borderRadius: "16px",
+                      }}
+                    >
+                      <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                         <Grid container spacing={2.5}>
                           {/* Left Column: Member Directory & Selector */}
                           <Grid size={{ xs: 12, md: 4.5, lg: 4 }}>
@@ -1406,20 +1422,31 @@ export default function ReportsPage({ mode = "event" }) {
 
                           {/* Right Column: Financial Bar Chart for the Selected Member */}
                           <Grid size={{ xs: 12, md: 7.5, lg: 8 }}>
-                            <ExecutiveFinancialBarChart
-                              events={selectedMemberBarEvents}
+                            <FinancialBarChart
+                              totalExpected={selectedMemberBarEvents[0]?.expected || reportTotals.totalExpected}
+                              totalCollected={selectedMemberBarEvents[0]?.collected || reportTotals.totalCollected}
+                              totalPending={selectedMemberBarEvents[0]?.pending || reportTotals.totalPending}
+                              totalExpenses={0}
+                              totalRemaining={selectedMemberBarEvents[0]?.remaining || reportTotals.totalRemaining}
+                              events={reportBarEvents}
                               isMember={isMember}
+                              showPieChart={false}
                             />
                           </Grid>
                         </Grid>
-                      ) : (
-                        <ExecutiveFinancialBarChart
-                          events={reportBarEvents}
-                          isMember={isMember}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <FinancialBarChart
+                      totalExpected={reportTotals.totalExpected}
+                      totalCollected={reportTotals.totalCollected}
+                      totalPending={reportTotals.totalPending}
+                      totalExpenses={reportTotals.totalExpenses}
+                      totalRemaining={reportTotals.totalRemaining}
+                      events={reportBarEvents}
+                      isMember={isMember}
+                    />
+                  )}
                 </Grid>
               </Grid>
 
