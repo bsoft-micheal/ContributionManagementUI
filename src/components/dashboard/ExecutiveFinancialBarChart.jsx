@@ -13,7 +13,7 @@ import dayjs from "dayjs";
  * ExecutiveFinancialBarChart
  * Clean executive financial bar chart visualization for the main Dashboard.
  * Displays comparative bars matching the exact top metric cards:
- * Total Expected, Total Collections, Total Pending, Total Expenses, and Remaining Amount.
+ * Total Expected, Total Collections, Total Pending, Total Expenses, and Balance Amount.
  */
 export default function ExecutiveFinancialBarChart({
   events = [],
@@ -292,11 +292,11 @@ export default function ExecutiveFinancialBarChart({
                     </Box>
                   </Box>
 
-                  {/* Remaining Amount Bar */}
+                  {/* Balance Amount Bar */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                       <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: isSurplus ? "#10b981" : "#ef4444" }}>
-                        Remaining Amount
+                        Balance Amount
                       </Typography>
                       <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: isSurplus ? "#10b981" : "#ef4444" }}>
                         ₹{formatAmount(rem)}
