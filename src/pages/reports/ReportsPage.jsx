@@ -610,7 +610,7 @@ export default function ReportsPage({ mode = "event" }) {
     { label: "Pending", key: "pendingAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR(r.pendingAmount)}</Typography> },
     { label: "Expense ₹", key: "expenseAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="warning.main">{INR(r.expenseAmount || 0)}</Typography> },
     {
-      label: "Remaining ₹", key: "remainingAmount", align: "right",
+      label: "Balance ₹", key: "remainingAmount", align: "right",
       render: (r) => {
         const exp = Number(r.expectedAmount || 0);
         const expAmt = Number(r.expenseAmount || 0);
@@ -869,7 +869,7 @@ export default function ReportsPage({ mode = "event" }) {
         { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: "Total amount collected" },
         { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: "Total outstanding balance" },
         { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
-        { label: "Remaining Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
+        { label: "Balance Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
         { label: "Total Events", value: ev.length, icon: EventIcon, color: "neutral", helper: `${ev.length} active collection events` },
       ];
     }
@@ -887,7 +887,7 @@ export default function ReportsPage({ mode = "event" }) {
         { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: "Total collections received" },
         { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: "Total outstanding balance" },
         { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
-        { label: "Remaining Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
+        { label: "Balance Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
         { label: "Total Members", value: mb.length, icon: People, color: "neutral", helper: `${mb.length} contributing members` },
       ];
     }
@@ -917,7 +917,7 @@ export default function ReportsPage({ mode = "event" }) {
       { label: "Expected", key: "expected" },
       { label: "Pending", key: "pending" },
       { label: "Expense", key: "expense" },
-      { label: "Remaining", key: "remaining" },
+      { label: "Balance", key: "remaining" },
     ];
 
   const navTabs = [
@@ -936,7 +936,7 @@ export default function ReportsPage({ mode = "event" }) {
         "Paid Amount": Number(e.paidAmount || 0),
         "Pending Amount": Number(e.pendingAmount || 0),
         "Expense Amount": Number(e.expenseAmount || 0),
-        "Remaining Amount": (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0)),
+        "Balance Amount": (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0)),
       }));
 
       exportSheets("team-contribution-reports.xlsx", [
