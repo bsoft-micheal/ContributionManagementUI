@@ -963,8 +963,11 @@ export default function AppDataTable({
       {/* ── 3. Table ──────────────────────────────────────────────────────── */}
       <Box sx={{ overflowX: "auto", flexGrow: isFullscreen ? 1 : 0 }}>
         {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
-            <CircularProgress size={30} sx={{ color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 10, gap: 1.5 }}>
+            <CircularProgress size={32} thickness={4} sx={{ color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: theme.palette.mode === "dark" ? "rgba(255,255,255,0.7)" : "#4a3f6b", fontSize: "0.85rem" }}>
+              Loading data...
+            </Typography>
           </Box>
         ) : (
           <Table size="small">

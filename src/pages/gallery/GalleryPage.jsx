@@ -187,16 +187,27 @@ export default function GalleryPage() {
       };
 
       if (Array.isArray(data)) {
+        // Fetch active events to ensure deleted events' photos are excluded
+        const currentEvents = await getEventsAsync().catch(() => []);
+        const activeEventNames = new Set(
+          (currentEvents || []).map((e) => (e.eventName || e.EventName || "").trim().toLowerCase()).filter(Boolean)
+        );
+
         // Group items if they were saved with Title (1), Title (2) under same event/date
         const groupedMap = new Map();
 
         data.forEach((item, idx) => {
+          const eventName = (item.eventName || "").trim();
+          // Exclude photos where event name exists but event is deleted/no longer in active events list
+          if (eventName && activeEventNames.size > 0 && !activeEventNames.has(eventName.toLowerCase())) {
+            return;
+          }
+
           const rawTitle = (item.title || "").trim();
           // Check if title ends with (1), (2), etc.
           const match = rawTitle.match(/^(.*?)\s*\(\d+\)$/);
           const baseTitle = match ? match[1].trim() : rawTitle;
 
-          const eventName = (item.eventName || "").trim();
           const category = (item.category || "").trim();
           const dateStr = item.takenDate ? dayjs(item.takenDate).format("YYYY-MM-DD") : "";
 
@@ -307,7 +318,7 @@ export default function GalleryPage() {
     }
   }, [location.state]);
 
-  // Dynamically derive event options from DB events + existing photos
+  // Dynamically derive event options from DB events + existing photos, filtered by selected Event Type (filterCategory)
   const eventOptions = useMemo(() => {
     const list = [{ label: "All Events", value: "ALL" }];
     const unique = new Set();
@@ -316,20 +327,26 @@ export default function GalleryPage() {
       list.push({ label: filterEvent, value: filterEvent });
     }
     eventsList.forEach((e) => {
-      const name = e.name || e.eventName;
-      if (name && !unique.has(name)) {
-        unique.add(name);
-        list.push({ label: name, value: name });
+      const typeName = (e.eventTypeName || e.categoryName || "").trim().toLowerCase();
+      if (!filterCategory || filterCategory === "ALL" || typeName === filterCategory.trim().toLowerCase()) {
+        const name = e.name || e.eventName;
+        if (name && !unique.has(name)) {
+          unique.add(name);
+          list.push({ label: name, value: name });
+        }
       }
     });
     photos.forEach((p) => {
-      if (p.eventName && !unique.has(p.eventName)) {
-        unique.add(p.eventName);
-        list.push({ label: p.eventName, value: p.eventName });
+      const pCat = (p.category || "").trim().toLowerCase();
+      if (!filterCategory || filterCategory === "ALL" || pCat === filterCategory.trim().toLowerCase()) {
+        if (p.eventName && !unique.has(p.eventName)) {
+          unique.add(p.eventName);
+          list.push({ label: p.eventName, value: p.eventName });
+        }
       }
     });
     return list;
-  }, [eventsList, photos, filterEvent]);
+  }, [eventsList, photos, filterEvent, filterCategory]);
 
   // Dynamically derive category options from DB event_types table and recorded photos
   const categoryOptions = useMemo(() => {
@@ -631,7 +648,7 @@ export default function GalleryPage() {
     if (!form.title || !form.title.trim()) newErrors.title = "Title is required";
     if (!form.category) newErrors.category = "Event Type is required";
     if (!form.eventName) newErrors.eventName = "Event Name is required";
-    
+
     const currentImages = (form.imageUrls && form.imageUrls.length > 0)
       ? form.imageUrls
       : (form.imageUrl ? [form.imageUrl] : []);
@@ -852,6 +869,22 @@ export default function GalleryPage() {
         filterPanel={
           <Grid container spacing={2} alignItems="center">
             <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <Box sx={{ minWidth: 180 }}>
+                <AppSelect
+                  label="Select Event Type"
+                  value={filterCategory}
+                  onChange={(e) => {
+                    const newCategory = e.target.value;
+                    setFilterCategory(newCategory);
+                    setFilterEvent("ALL");
+                  }}
+                  options={categoryOptions}
+                  size="small"
+                  placeholder="Select Category"
+                  required
+                  fullWidth
+                />
+              </Box>
               <Box sx={{ minWidth: 220 }}>
                 <AppSelect
                   label="Select Event"
@@ -862,20 +895,6 @@ export default function GalleryPage() {
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
-                  required
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: 180 }}>
-                <AppSelect
-                  label="Select Category"
-                  value={filterCategory}
-                  onChange={(e) => {
-                    setFilterCategory(e.target.value);
-                  }}
-                  options={categoryOptions}
-                  size="small"
-                  placeholder="Select Category"
                   required
                   fullWidth
                 />
