@@ -640,19 +640,6 @@ export default function EventPhotoDetailsDialog({
               <strong>{event.eventName}</strong>.
             </Typography>
           </Box>
-          {onAddPhotosClick && (
-            <AppButton
-              variant="contained"
-              startIcon={<AddPhotoAlternateIcon />}
-              onClick={() => {
-                onClose();
-                onAddPhotosClick(event);
-              }}
-              sx={{ mt: 1 }}
-            >
-              Upload Photos Now
-            </AppButton>
-          )}
         </Box>
       )}
     </AppDialog>

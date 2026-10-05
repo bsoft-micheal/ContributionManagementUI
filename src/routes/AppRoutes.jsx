@@ -19,6 +19,7 @@ import ContributionCalculationPage from "../pages/contributions/ContributionCalc
 import ExitProcessPage from "../pages/members/ExitProcessPage";
 import UserRightsPage from "../pages/members/UserRightsPage";
 import UsersPage from "../pages/members/UsersPage";
+import UserFormPage from "../pages/members/UserFormPage";
 import RolesPage from "../pages/members/RolesPage";
 import ExpensePage from "../pages/expenses/ExpensePage";
 import SupportTicketsPage from "../pages/support/SupportTicketsPage";
@@ -76,6 +77,8 @@ export default function AppRoutes() {
         <Route path="/exit-process" element={<ProtectedRoute><ExitProcessPage /></ProtectedRoute>} />
         <Route path="/user-rights" element={<ProtectedRoute><UserRightsPage /></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
+        <Route path="/users/add" element={<ProtectedRoute><UserFormPage key="add-user" /></ProtectedRoute>} />
+        <Route path="/users/edit/:id" element={<ProtectedRoute><UserFormPage key="edit-user" /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

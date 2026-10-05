@@ -112,7 +112,7 @@ function getDonutArcPath(cx, cy, rInner, rOuter, startAngle, endAngle) {
 function InteractiveDonutChart({
   items = [],
   activeItem = null,
-  onHoverItem = () => {},
+  onHoverItem = () => { },
   defaultSummary = {},
   size = 300,
 }) {
@@ -809,8 +809,8 @@ export default function DashboardPage() {
       !selectedType || selectedType === "ALL"
         ? allEventsList
         : allEventsList.filter(
-            (e) => (e.eventTypeName || "").toLowerCase() === selectedType.toLowerCase()
-          );
+          (e) => (e.eventTypeName || "").toLowerCase() === selectedType.toLowerCase()
+        );
 
     matchingEvents.forEach((e) => {
       if (e.eventName) {
@@ -934,8 +934,8 @@ export default function DashboardPage() {
         totalExpected > 0
           ? (exp / totalExpected) * 100
           : events.length > 0
-          ? 100 / events.length
-          : 0;
+            ? 100 / events.length
+            : 0;
       const pctStr = pctNum % 1 === 0 ? pctNum.toFixed(0) : pctNum.toFixed(1);
       const colPct = exp > 0 ? Math.min(100, Math.round((col / exp) * 100)) : 0;
 
@@ -1147,78 +1147,68 @@ export default function DashboardPage() {
       </Card>
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
-      {loading ? (
-        <Card sx={{ p: { xs: 3, md: 5 }, borderRadius: 3, display: "grid", placeItems: "center" }}>
-          <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
-            <CircularProgress size={46} />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              Loading dashboard…
-            </Typography>
-          </Stack>
-        </Card>
-      ) : (
-        <Stack spacing={3}>
+      <Stack spacing={3}>
 
-                  {/* ① Top Summary Metric Cards (6 Cards Grid: Expected, Collections, Pending, Expenses, Remaining, Events) */}
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: {
-                        xs: "1fr",
-                        sm: "repeat(2, minmax(0, 1fr))",
-                        md: "repeat(3, minmax(0, 1fr))",
-                        lg: isMember ? "repeat(5, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
-                      },
-                      gap: { xs: 1.5, sm: 2 },
-                    }}
-                  >
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "TOTAL EXPECTED"}
-                      value={`₹${totalExpected.toLocaleString()}`}
-                      helper="Projected target amount"
-                      accent="#7c3aed"
-                      onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
-                      actionText="All Members →"
-                    />
-                    {!isMember && (
-                      <MetricCard
-                        label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "TOTAL COLLECTIONS"}
-                        value={`₹${totalCollected.toLocaleString()}`}
-                        helper="Amount collected (paid)"
-                        accent="success.main"
-                        onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-                        actionText="View Paid →"
-                      />
-                    )}
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "TOTAL PENDING"}
-                      value={`₹${totalPending.toLocaleString()}`}
-                      helper="Outstanding amount"
-                      accent="error.main"
-                      onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-                      actionText="View Unpaid →"
-                    />
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "TOTAL EXPENSES"}
-                      value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
-                      helper={isFilteredByEvent ? "Expenditure for event" : (isFilteredByType ? `Expenses for ${appliedFilters.eventType}` : "Total expenses recorded")}
-                      accent="warning.main"
-                      onClick={() => navigate("/expense")}
-                      actionText="View Expenses →"
-                    />
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "REMAINING AMOUNT"}
-                      value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
-                      helper={totalRemaining >= 0 ? "Expected − Expenses (Surplus)" : "Expected − Expenses (Deficit)"}
-                      accent={totalRemaining >= 0 ? "success.main" : "error.main"}
-                      actionText={totalRemaining >= 0 ? "Budget Surplus ✓" : "Budget Deficit ⚠"}
-                    />
-                    <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
-                      value={events.length}
-                      helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
-                    />
-                  </Box>
+          {/* ① Top Summary Metric Cards (6 Cards Grid: Expected, Collections, Pending, Expenses, Remaining, Events) */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+                md: "repeat(3, minmax(0, 1fr))",
+                lg: isMember ? "repeat(5, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
+              },
+              gap: { xs: 1.5, sm: 2 },
+            }}
+          >
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "TOTAL EXPECTED"}
+              value={`₹${totalExpected.toLocaleString()}`}
+              helper="Projected target amount"
+              accent="#7c3aed"
+              onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
+              actionText="All Members →"
+            />
+            {!isMember && (
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "TOTAL COLLECTIONS"}
+                value={`₹${totalCollected.toLocaleString()}`}
+                helper="Amount collected (paid)"
+                accent="success.main"
+                onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+                actionText="View Paid →"
+              />
+            )}
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "TOTAL PENDING"}
+              value={`₹${totalPending.toLocaleString()}`}
+              helper="Outstanding amount"
+              accent="error.main"
+              onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
+              actionText="View Unpaid →"
+            />
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "TOTAL EXPENSES"}
+              value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
+              helper={isFilteredByEvent ? "Expenditure for event" : (isFilteredByType ? `Expenses for ${appliedFilters.eventType}` : "Total expenses recorded")}
+              accent="warning.main"
+              onClick={() => navigate("/expense")}
+              actionText="View Expenses →"
+            />
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "REMAINING AMOUNT"}
+              value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
+              helper={totalRemaining >= 0 ? "Expected − Expenses (Surplus)" : "Expected − Expenses (Deficit)"}
+              accent={totalRemaining >= 0 ? "success.main" : "error.main"}
+              actionText={totalRemaining >= 0 ? "Budget Surplus ✓" : "Budget Deficit ⚠"}
+            />
+            <MetricCard
+              label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
+              value={events.length}
+              helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
+            />
+          </Box>
 
                   {/* ② Executive Financial Bar Chart Hero */}
                   {events.length > 0 ? (
