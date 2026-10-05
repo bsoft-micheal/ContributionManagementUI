@@ -30,6 +30,8 @@ export default function MetricCard({
       onKeyDown={isInteractive ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick?.(); } } : undefined}
       sx={{
         height: "100%",
+        display: "flex",
+        flexDirection: "column",
         borderRadius: 2.5,
         transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
         position: "relative",
@@ -66,17 +68,27 @@ export default function MetricCard({
         },
       }}
     >
-      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-        <Stack spacing={1}>
+      <CardContent
+        sx={{
+          p: { xs: 1.5, sm: 1.75 },
+          "&:last-child": { pb: { xs: 1.5, sm: 1.75 } },
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
+        <Stack spacing={0.75}>
           <Box>
             <Typography
               variant="caption"
               color="text.secondary"
               sx={{
                 fontWeight: 800,
-                letterSpacing: "0.06em",
+                letterSpacing: "0.05em",
                 textTransform: "uppercase",
-                fontSize: "0.68rem",
+                fontSize: { xs: "0.62rem", sm: "0.65rem", xl: "0.68rem" },
+                display: "block",
               }}
             >
               {label}
@@ -86,48 +98,68 @@ export default function MetricCard({
               sx={{
                 color: resolvedAccent,
                 fontWeight: 900,
-                fontSize: { xs: "1.65rem", sm: "1.9rem" },
+                fontSize: { xs: "1.35rem", sm: "1.5rem", md: "1.55rem", xl: "1.75rem" },
                 letterSpacing: "-0.02em",
-                mt: 0.5,
-                lineHeight: 1.1,
+                mt: 0.35,
+                lineHeight: 1.15,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
+              title={typeof value === "string" ? value : undefined}
             >
               {value}
             </Typography>
           </Box>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5 }}>
+        </Stack>
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 0.5,
+            mt: 1,
+            pt: 0.5,
+            borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)"}`,
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              color: "text.secondary",
+              fontSize: { xs: "0.68rem", sm: "0.71rem" },
+              lineHeight: 1.2,
+              fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={typeof helper === "string" ? helper : undefined}
+          >
+            {helper}
+          </Typography>
+          {isInteractive && (
             <Typography
+              className="metric-action-text"
               variant="caption"
               sx={{
-                color: "text.secondary",
-                fontSize: "0.72rem",
-                lineHeight: 1.2,
-                fontWeight: 500,
+                color: resolvedAccent,
+                fontSize: { xs: "0.68rem", sm: "0.71rem" },
+                fontWeight: 700,
+                opacity: { xs: 0.9, sm: 0.75 },
+                transform: { xs: "none", sm: "translateX(2px)" },
+                transition: "all 0.2s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                flexShrink: 0,
+                whiteSpace: "nowrap",
               }}
             >
-              {helper}
+              {actionText || "View →"}
             </Typography>
-            {isInteractive && (
-              <Typography
-                className="metric-action-text"
-                variant="caption"
-                sx={{
-                  color: resolvedAccent,
-                  fontSize: "0.68rem",
-                  fontWeight: 700,
-                  opacity: { xs: 0.9, sm: 0.75 },
-                  transform: { xs: "none", sm: "translateX(2px)" },
-                  transition: "all 0.2s ease",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 0.25,
-                }}
-              >
-                {actionText || "View →"}
-              </Typography>
-            )}
-          </Box>
-        </Stack>
+          )}
+        </Box>
       </CardContent>
     </Card>
   );
