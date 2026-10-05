@@ -33,6 +33,7 @@ import { formatGridDate, parseMemberDob } from "../../utils/dateHelper";
 import MetricCard from "../../components/MetricCard";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
+import { COMMON_STRINGS } from "../../constants";
 import { getDashboardSummaryAsync } from "../../services/dashboardService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
@@ -527,7 +528,7 @@ const YEAR_OPTIONS = [
   }),
 ];
 
-function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, loading }) {
+function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eventOptions, loading }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -540,30 +541,39 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, loa
         alignItems: "flex-end",
       }}
     >
-      <Box sx={{ width: { xs: "100%", sm: 160 } }}>
+      <Box sx={{ width: { xs: "100%", sm: 150 } }}>
         <AppSelect
-          label="Month"
+          label={COMMON_STRINGS.DASHBOARD?.MONTH_LABEL || "Month"}
           value={pending.month}
           onChange={(e) => onChange("month", Number(e.target.value))}
           options={MONTH_OPTIONS}
           size="small"
         />
       </Box>
-      <Box sx={{ width: { xs: "100%", sm: 130 } }}>
+      <Box sx={{ width: { xs: "100%", sm: 120 } }}>
         <AppSelect
-          label="Year"
+          label={COMMON_STRINGS.DASHBOARD?.YEAR_LABEL || "Year"}
           value={pending.year}
           onChange={(e) => onChange("year", Number(e.target.value))}
           options={YEAR_OPTIONS}
           size="small"
         />
       </Box>
-      <Box sx={{ width: { xs: "100%", sm: 200 } }}>
+      <Box sx={{ width: { xs: "100%", sm: 180 } }}>
         <AppSelect
-          label="Event Type"
+          label={COMMON_STRINGS.DASHBOARD?.EVENT_TYPE_LABEL || "Event Type"}
           value={pending.eventType || "ALL"}
           onChange={(e) => onChange("eventType", e.target.value)}
           options={eventTypeOptions}
+          size="small"
+        />
+      </Box>
+      <Box sx={{ width: { xs: "100%", sm: 200 } }}>
+        <AppSelect
+          label={COMMON_STRINGS.DASHBOARD?.EVENT_LABEL || "Event"}
+          value={pending.eventId || "ALL"}
+          onChange={(e) => onChange("eventId", e.target.value)}
+          options={eventOptions}
           size="small"
         />
       </Box>
@@ -584,7 +594,7 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, loa
             fontSize: "0.82rem",
           }}
         >
-          Filter
+          {COMMON_STRINGS.DASHBOARD?.FILTER_BUTTON || "Filter"}
         </AppButton>
 
         <AppButton
@@ -609,7 +619,7 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, loa
             },
           }}
         >
-          Clear Filter
+          {COMMON_STRINGS.DASHBOARD?.CLEAR_FILTER_BUTTON || "Clear Filter"}
         </AppButton>
       </Box>
     </Box>
@@ -677,11 +687,13 @@ export default function DashboardPage() {
     month: dayjs().month() + 1,
     year: dayjs().year(),
     eventType: "ALL",
+    eventId: "ALL",
   });
   const [appliedFilters, setAppliedFilters] = useState({
     month: dayjs().month() + 1,
     year: dayjs().year(),
     eventType: "ALL",
+    eventId: "ALL",
   });
 
   // Fetch event types for filter dropdown
@@ -774,7 +786,9 @@ export default function DashboardPage() {
 
   // Build Event Type options combining API categories and any upcoming events
   const eventTypeOptions = useMemo(() => {
-    const options = [{ label: "All Event Types", value: "ALL" }];
+    const options = [
+      { label: COMMON_STRINGS.DASHBOARD?.ALL_EVENT_TYPES || "All Event Types", value: "ALL" },
+    ];
     const set = new Set();
     eventTypes.forEach((t) => {
       const name = t.eventTypeName || t.name;
@@ -792,8 +806,43 @@ export default function DashboardPage() {
     return options;
   }, [eventTypes, summary?.upcomingEvents]);
 
+  // Build Event options cascading from pendingFilters.eventType
+  const eventOptions = useMemo(() => {
+    const options = [
+      { label: COMMON_STRINGS.DASHBOARD?.ALL_EVENTS || "All Events", value: "ALL" },
+    ];
+    const allEventsList = summary?.upcomingEvents ?? [];
+    const selectedType = pendingFilters.eventType;
+
+    const matchingEvents =
+      !selectedType || selectedType === "ALL"
+        ? allEventsList
+        : allEventsList.filter(
+            (e) => (e.eventTypeName || "").toLowerCase() === selectedType.toLowerCase()
+          );
+
+    matchingEvents.forEach((e) => {
+      if (e.eventName) {
+        options.push({
+          label: e.eventName,
+          value: e.eventId ? String(e.eventId) : e.eventName,
+        });
+      }
+    });
+
+    return options;
+  }, [summary?.upcomingEvents, pendingFilters.eventType]);
+
   function handleFilterChange(key, value) {
-    setPendingFilters((prev) => ({ ...prev, [key]: value }));
+    if (key === "eventType") {
+      setPendingFilters((prev) => ({
+        ...prev,
+        eventType: value,
+        eventId: "ALL", // Automatically reset selected event when event type changes
+      }));
+    } else {
+      setPendingFilters((prev) => ({ ...prev, [key]: value }));
+    }
   }
 
   function handleFilter() {
@@ -806,6 +855,7 @@ export default function DashboardPage() {
       month: dayjs().month() + 1,
       year: dayjs().year(),
       eventType: "ALL",
+      eventId: "ALL",
     };
     setPendingFilters(defaultValues);
     setAppliedFilters(defaultValues);
@@ -815,19 +865,36 @@ export default function DashboardPage() {
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const isFilteredByType = Boolean(appliedFilters.eventType && appliedFilters.eventType !== "ALL");
+  const isFilteredByEvent = Boolean(appliedFilters.eventId && appliedFilters.eventId !== "ALL");
   const allEvents = summary?.upcomingEvents ?? [];
   const events = useMemo(() => {
-    if (!isFilteredByType) return allEvents;
-    return allEvents.filter(
-      (e) => (e.eventTypeName || "").toLowerCase() === appliedFilters.eventType.toLowerCase()
-    );
-  }, [allEvents, isFilteredByType, appliedFilters.eventType]);
+    let list = allEvents;
+    if (isFilteredByType) {
+      list = list.filter(
+        (e) => (e.eventTypeName || "").toLowerCase() === appliedFilters.eventType.toLowerCase()
+      );
+    }
+    if (isFilteredByEvent) {
+      list = list.filter(
+        (e) =>
+          String(e.eventId) === String(appliedFilters.eventId) ||
+          e.eventName === appliedFilters.eventId
+      );
+    }
+    return list;
+  }, [allEvents, isFilteredByType, isFilteredByEvent, appliedFilters.eventType, appliedFilters.eventId]);
 
   const chartEvents = events.slice(0, 6);
 
   const totalCollected = events.reduce((sum, e) => sum + (Number(e.collectedAmount) || 0), 0);
   const totalPending = events.reduce((sum, e) => sum + (Number(e.pendingAmount) || 0), 0);
   const totalExpected = totalCollected + totalPending;
+  const totalExpenses = useMemo(() => {
+    if (isFilteredByEvent || isFilteredByType) {
+      return events.reduce((sum, e) => sum + (Number(e.expenseAmount) || 0), 0);
+    }
+    return Number(summary?.totalExpenses ?? events.reduce((sum, e) => sum + (Number(e.expenseAmount) || 0), 0));
+  }, [events, isFilteredByEvent, isFilteredByType, summary?.totalExpenses]);
 
   const pendingCount = events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0);
   const totalContributionsCount = events.reduce((sum, e) => sum + (Number(e.totalContributionsCount) || 0), 0);
@@ -892,14 +959,26 @@ export default function DashboardPage() {
   }, [totalCollected, totalPending, totalExpected, isMember]);
 
   const defaultSummary = useMemo(() => {
-    const title = donutView === "events"
-      ? (isFilteredByType ? appliedFilters.eventType : "All Events")
-      : "Total Expected";
+    let title = "All Events";
+    if (donutView === "events") {
+      if (isFilteredByEvent) {
+        const found = allEvents.find(
+          (e) =>
+            String(e.eventId) === String(appliedFilters.eventId) ||
+            e.eventName === appliedFilters.eventId
+        );
+        title = found?.eventName || "Event Details";
+      } else if (isFilteredByType) {
+        title = appliedFilters.eventType;
+      }
+    } else {
+      title = "Total Expected";
+    }
     return {
       title,
       amount: totalExpected,
     };
-  }, [donutView, isFilteredByType, appliedFilters.eventType, totalExpected]);
+  }, [donutView, isFilteredByType, isFilteredByEvent, appliedFilters.eventType, appliedFilters.eventId, allEvents, totalExpected]);
 
   // Multi-ring chart ring definitions
   const amountRing = {
@@ -927,14 +1006,6 @@ export default function DashboardPage() {
       )
       : events;
   }, [events, search]);
-
-  // Totals for Dashboard Events table
-  const tableTotals = useMemo(() => {
-    const expected = filteredEvents.reduce((sum, e) => sum + (Number(e.expectedAmount) || 0), 0);
-    const collected = filteredEvents.reduce((sum, e) => sum + (Number(e.collectedAmount) || 0), 0);
-    const pending = filteredEvents.reduce((sum, e) => sum + (Number(e.pendingAmount) || 0), 0);
-    return { expected, collected, pending };
-  }, [filteredEvents]);
 
   // Table columns (Dashboard tab)
   const columns = [
@@ -974,6 +1045,14 @@ export default function DashboardPage() {
         <Typography variant="body2" fontWeight={700}
           color={row.pendingAmount > 0 ? "error.main" : "text.secondary"}>
           ₹{Number(row.pendingAmount).toLocaleString()}
+        </Typography>
+      ),
+    },
+    {
+      label: "Expense ₹", key: "expenseAmount", align: "right",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={700} color="warning.main">
+          ₹{Number(row.expenseAmount || 0).toLocaleString()}
         </Typography>
       ),
     },
@@ -1024,6 +1103,7 @@ export default function DashboardPage() {
           onFilter={handleFilter}
           onClear={handleClear}
           eventTypeOptions={eventTypeOptions}
+          eventOptions={eventOptions}
           loading={loading}
         />
       </Card>
@@ -1041,48 +1121,59 @@ export default function DashboardPage() {
       ) : (
         <Stack spacing={3}>
 
-                  {/* ① Top Summary Metric Cards (4 Cards Grid, Total Collections hidden for Member) */}
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 4 : 6, lg: isMember ? 4 : 3 }}>
-                      <MetricCard
-                        label="TOTAL EXPECTED"
-                        value={`₹${totalExpected.toLocaleString()}`}
-                        helper="Projected target amount"
-                        accent="#7c3aed"
-                        onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
-                        actionText="All Members →"
-                      />
-                    </Grid>
+                  {/* ① Top Summary Metric Cards (5 Cards Grid, Total Collections hidden for Member) */}
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "1fr",
+                        sm: "repeat(2, minmax(0, 1fr))",
+                        md: isMember ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+                        lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))",
+                      },
+                      gap: { xs: 1.5, sm: 2 },
+                    }}
+                  >
+                    <MetricCard
+                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "TOTAL EXPECTED"}
+                      value={`₹${totalExpected.toLocaleString()}`}
+                      helper="Projected target amount"
+                      accent="#7c3aed"
+                      onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
+                      actionText="All Members →"
+                    />
                     {!isMember && (
-                      <Grid size={{ xs: 12, sm: 6, md: 6, lg: 3 }}>
-                        <MetricCard
-                          label="TOTAL COLLECTIONS"
-                          value={`₹${totalCollected.toLocaleString()}`}
-                          helper="Amount collected (paid)"
-                          accent="success.main"
-                          onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-                          actionText="View Paid →"
-                        />
-                      </Grid>
+                      <MetricCard
+                        label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "TOTAL COLLECTIONS"}
+                        value={`₹${totalCollected.toLocaleString()}`}
+                        helper="Amount collected (paid)"
+                        accent="success.main"
+                        onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+                        actionText="View Paid →"
+                      />
                     )}
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 4 : 6, lg: isMember ? 4 : 3 }}>
-                      <MetricCard
-                        label="TOTAL PENDING"
-                        value={`₹${totalPending.toLocaleString()}`}
-                        helper="Outstanding amount"
-                        accent="error.main"
-                        onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-                        actionText="View Unpaid →"
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: isMember ? 4 : 6, lg: isMember ? 4 : 3 }}>
-                      <MetricCard
-                        label="TOTAL EVENTS"
-                        value={events.length}
-                        helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
-                      />
-                    </Grid>
-                  </Grid>
+                    <MetricCard
+                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "TOTAL PENDING"}
+                      value={`₹${totalPending.toLocaleString()}`}
+                      helper="Outstanding amount"
+                      accent="error.main"
+                      onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
+                      actionText="View Unpaid →"
+                    />
+                    <MetricCard
+                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "TOTAL EXPENSES"}
+                      value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
+                      helper={isFilteredByEvent ? "Expenditure for event" : (isFilteredByType ? `Expenses for ${appliedFilters.eventType}` : "Total expenses recorded")}
+                      accent="warning.main"
+                      onClick={() => navigate("/expense")}
+                      actionText="View Expenses →"
+                    />
+                    <MetricCard
+                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
+                      value={events.length}
+                      helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
+                    />
+                  </Box>
 
                   {/* ② Segmented Interactive Donut Hero */}
                   {events.length > 0 ? (
@@ -1191,9 +1282,10 @@ export default function DashboardPage() {
                             <Grid size={{ xs: 12, md: 7 }}>
                               <Stack spacing={2.5}>
                                 {/* Quick stat pills */}
-                                <Stack direction="row" spacing={1.5}>
+                                <Stack direction="row" spacing={1.5} flexWrap="wrap" gap={1}>
                                   <StatPill label={isMember ? "Total Paid" : "Total Collected"} value={`₹${Number(totalCollected).toLocaleString()}`} color={C.collected} />
                                   <StatPill label="Paid Payments" value={`${paidCount} / ${paidCount + pendingCount}`} color={C.paid} />
+                                  <StatPill label="Total Expenses" value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`} color="#f59e0b" />
                                   <StatPill label="Total Events" value={events.length} color="#7c3aed" />
                                 </Stack>
 
@@ -1363,116 +1455,6 @@ export default function DashboardPage() {
                     defaultOpen
                   >
                   <Stack spacing={2}>
-                    <Grid container spacing={2} sx={{ mb: 1 }}>
-                      <Grid size={{ xs: 12, sm: 4 }}>
-                        <Paper
-                          elevation={0}
-                          onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
-                          sx={{
-                            p: 2,
-                            borderRadius: 2.5,
-                            border: "1px solid",
-                            borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
-                            bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            "&:hover": {
-                              transform: "translateY(-2px)",
-                              borderColor: "primary.main",
-                              boxShadow: "0 6px 16px rgba(0,0,0,0.08)",
-                            },
-                          }}
-                        >
-                          <Box>
-                            <Typography variant="caption" color="text.secondary" fontWeight={700} textTransform="uppercase" letterSpacing="0.05em">
-                              Total Expected
-                            </Typography>
-                            <Typography variant="h6" fontWeight={800} color="text.primary" sx={{ mt: 0.5 }}>
-                              ₹{tableTotals.expected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Typography>
-                          </Box>
-                          <Typography variant="caption" color="primary.main" fontWeight={700}>
-                            View →
-                          </Typography>
-                        </Paper>
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 4 }}>
-                        <Paper
-                          elevation={0}
-                          onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-                          sx={{
-                            p: 2,
-                            borderRadius: 2.5,
-                            border: "1px solid",
-                            borderColor: "rgba(16, 185, 129, 0.2)",
-                            bgcolor: isDark ? "rgba(16, 185, 129, 0.08)" : "rgba(16, 185, 129, 0.05)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            "&:hover": {
-                              transform: "translateY(-2px)",
-                              borderColor: "#10b981",
-                              boxShadow: "0 6px 16px rgba(16,185,129,0.15)",
-                            },
-                          }}
-                        >
-                          <Box>
-                            <Typography variant="caption" color="#10b981" fontWeight={700} textTransform="uppercase" letterSpacing="0.05em">
-                              {isMember ? "Total Paid" : "Total Collected"}
-                            </Typography>
-                            <Typography variant="h6" fontWeight={800} color="#10b981" sx={{ mt: 0.5 }}>
-                              ₹{tableTotals.collected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Typography>
-                          </Box>
-                          <Typography variant="caption" color="#10b981" fontWeight={700}>
-                            View →
-                          </Typography>
-                        </Paper>
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 4 }}>
-                        <Paper
-                          elevation={0}
-                          onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-                          sx={{
-                            p: 2,
-                            borderRadius: 2.5,
-                            border: "1px solid",
-                            borderColor: "rgba(239, 68, 68, 0.2)",
-                            bgcolor: isDark ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.05)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            "&:hover": {
-                              transform: "translateY(-2px)",
-                              borderColor: "#ef4444",
-                              boxShadow: "0 6px 16px rgba(239,68,68,0.15)",
-                            },
-                          }}
-                        >
-                          <Box>
-                            <Typography variant="caption" color="#ef4444" fontWeight={700} textTransform="uppercase" letterSpacing="0.05em">
-                              {isMember ? "Total Pending" : "Total Collection Pending"}
-                            </Typography>
-                            <Typography variant="h6" fontWeight={800} color="#ef4444" sx={{ mt: 0.5 }}>
-                              ₹{tableTotals.pending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Typography>
-                          </Box>
-                          <Typography variant="caption" color="#ef4444" fontWeight={700}>
-                            View →
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                    </Grid>
-
                     <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
                       <TextField
                         size="small"
