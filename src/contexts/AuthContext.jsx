@@ -90,9 +90,9 @@ export function AuthProvider({ children }) {
       deviceInfo: getDeviceInfo()
     };
     
-    const { data: resData } = await apiClient.post("/auth/loginAsync", payload);
+    const { data: resData } = await apiClient.post("/auth/loginAsync", payload, { hideLoader: true });
     const data = (resData && resData.data !== undefined) ? resData.data : resData;
-    
+
     // Save fetched menu rights dynamically to local storage for immediate routing and access control enforcement
     if (data.rights && data.role) {
       const savedRights = localStorage.getItem("projectRightsConfig");
@@ -118,12 +118,6 @@ export function AuthProvider({ children }) {
 
       rightsMap[data.role] = processedRights;
       rightsMap[data.role.toLowerCase()] = processedRights;
-      if (Array.isArray(data.roles)) {
-        data.roles.forEach(r => {
-          rightsMap[r] = processedRights;
-          rightsMap[r.toLowerCase()] = processedRights;
-        });
-      }
       rightsMap["current"] = processedRights;
       localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
     }
@@ -151,7 +145,7 @@ export function AuthProvider({ children }) {
       deviceInfo: getDeviceInfo()
     };
 
-    const response = await apiClient.post("/auth/verify-2faAsync", payload);
+    const response = await apiClient.post("/auth/verify-2faAsync", payload, { hideLoader: true });
     const resData = response.data;
     const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
@@ -172,12 +166,6 @@ export function AuthProvider({ children }) {
 
       rightsMap[data.role] = processed;
       rightsMap[data.role.toLowerCase()] = processed;
-      if (Array.isArray(data.roles)) {
-        data.roles.forEach(r => {
-          rightsMap[r] = processed;
-          rightsMap[r.toLowerCase()] = processed;
-        });
-      }
       rightsMap["current"] = processed;
 
       localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));

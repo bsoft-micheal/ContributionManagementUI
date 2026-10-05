@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import React, { createContext, useContext, useState } from "react";
 import AppPageLoader from "../components/common/AppPageLoader";
 
 const NavigationLoadingContext = createContext({
@@ -12,20 +11,22 @@ const NavigationLoadingContext = createContext({
 export const useNavigationLoading = () => useContext(NavigationLoadingContext);
 
 export function NavigationLoadingProvider({ children }) {
-  const location = useLocation();
-  const [isNavigating, setIsNavigating] = useState(false);
   const [customLoading, setCustomLoading] = useState(false);
+  const [apiActiveCount, setApiActiveCount] = useState(0);
   const [message, setMessage] = useState("Loading...");
 
-  // Trigger smooth transition loader whenever route changes
-  useEffect(() => {
-    setIsNavigating(true);
-    const timer = setTimeout(() => {
-      setIsNavigating(false);
-    }, 420); // Smooth 420ms transition window for crisp UX
+  React.useEffect(() => {
+    const handleApiStart = () => setApiActiveCount((prev) => prev + 1);
+    const handleApiEnd = () => setApiActiveCount((prev) => Math.max(0, prev - 1));
 
-    return () => clearTimeout(timer);
-  }, [location.pathname, location.search]);
+    window.addEventListener("app:api-start", handleApiStart);
+    window.addEventListener("app:api-end", handleApiEnd);
+
+    return () => {
+      window.removeEventListener("app:api-start", handleApiStart);
+      window.removeEventListener("app:api-end", handleApiEnd);
+    };
+  }, []);
 
   const showLoader = (customMsg = "Loading...") => {
     setMessage(customMsg);
@@ -36,7 +37,7 @@ export function NavigationLoadingProvider({ children }) {
     setCustomLoading(false);
   };
 
-  const isLoading = isNavigating || customLoading;
+  const isLoading = customLoading || apiActiveCount > 0;
 
   return (
     <NavigationLoadingContext.Provider

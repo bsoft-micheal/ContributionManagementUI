@@ -5,6 +5,10 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
+  if (!config.hideLoader) {
+    window.dispatchEvent(new CustomEvent("app:api-start"));
+  }
+
   const authState = sessionStorage.getItem("teamContributionAuth") || localStorage.getItem("teamContributionAuth");
   if (authState) {
     try {
@@ -18,11 +22,22 @@ apiClient.interceptors.request.use((config) => {
   }
 
   return config;
+}, (error) => {
+  window.dispatchEvent(new CustomEvent("app:api-end"));
+  return Promise.reject(error);
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (!response.config?.hideLoader) {
+      window.dispatchEvent(new CustomEvent("app:api-end"));
+    }
+    return response;
+  },
   (error) => {
+    if (!error.config?.hideLoader) {
+      window.dispatchEvent(new CustomEvent("app:api-end"));
+    }
     if (error.response?.status === 401) {
       sessionStorage.removeItem("teamContributionAuth");
       localStorage.removeItem("teamContributionAuth");

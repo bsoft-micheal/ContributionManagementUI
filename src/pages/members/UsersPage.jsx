@@ -117,8 +117,8 @@ const initialForm = {
   username: "",
   email: "",
   phone: "",
-  gender: "Male",
-  workType: "Office",
+  gender: "",
+  workType: "",
   dateOfBirth: dayjs().subtract(18, "year"),
   joiningDate: dayjs(),
   createMemberProfile: false, // Enable User Access (OFF by default)
@@ -325,19 +325,16 @@ export default function UsersPage() {
   // ── Open dialog ────────────────────────────────────────────────────────────
   function openCreate() {
     if (!canAddUser) return;
-    const defaultMemberRole = userRolesList.find((r) => r.label?.toLowerCase() === "member")?.value || (userRolesList[0]?.value || "Member");
-    const defaultAdminRole = userRolesList.find((r) => r.label?.toLowerCase() === "admin")?.value || (userRolesList[0]?.value || "Admin");
-    const defaultSecondary = userRolesList.find((r) => r.value !== defaultAdminRole)?.value || defaultMemberRole;
 
     setForm({
       ...initialForm,
-      workType: typeOptions.length > 0 ? typeOptions[0].value : "Office",
-      gender: "Male",
+      workType: "",
+      gender: "",
       createMemberProfile: false,
       enableMultipleRoles: false,
-      roleName: defaultMemberRole,
-      primaryRole: defaultAdminRole,
-      secondaryRole: defaultSecondary,
+      roleName: "",
+      primaryRole: "",
+      secondaryRole: "",
       username: "",
       newPassword: "",
       confirmPassword: "",
@@ -995,15 +992,7 @@ export default function UsersPage() {
         );
       },
     },
-    {
-      label: "Full Name",
-      key: "fullName",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={700} color="text.primary">
-          {row.fullName || row.FullName || row.username}
-        </Typography>
-      ),
-    },
+
     {
       label: "Username",
       key: "username",
@@ -1015,231 +1004,66 @@ export default function UsersPage() {
     },
     { label: "Email", key: "email" },
     {
-      label: "User Role",
-      key: "roleId",
+      label: "Primary Role",
+      key: "primaryRole",
       render: (row) => {
-        let assignedRoleNames = [];
-        if (Array.isArray(row.roleIds) && row.roleIds.length > 0) {
-          assignedRoleNames = row.roleIds.map((id) => getRoleNameById(id)).filter(Boolean);
+        let pRole = "";
+        if (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0) {
+          pRole = getRoleNameById(row.primaryRoleIds[0]);
+        } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0) {
+          pRole = row.primaryRoles[0];
         } else if (row.roleId) {
-          assignedRoleNames = [getRoleNameById(row.roleId)];
-        } else if (Array.isArray(row.roles) && row.roles.length > 0) {
-          assignedRoleNames = row.roles;
+          pRole = getRoleNameById(row.roleId);
         } else if (row.roleName) {
-          assignedRoleNames = [row.roleName];
+          pRole = row.roleName;
+        } else if (Array.isArray(row.roleIds) && row.roleIds.length > 0) {
+          pRole = getRoleNameById(row.roleIds[0]);
+        } else if (Array.isArray(row.roles) && row.roles.length > 0) {
+          pRole = row.roles[0];
         } else {
-          assignedRoleNames = ["Member"];
+          pRole = "Member";
         }
 
-        const primaryRoleName = (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0)
-          ? getRoleNameById(row.primaryRoleIds[0])
-          : (row.roleId ? getRoleNameById(row.roleId) : null);
+        return (
+          <Typography variant="body2" fontWeight={600} color="text.secondary">
+            {pRole}
+          </Typography>
+        );
+      },
+    },
+    {
+      label: "Secondary Role",
+      key: "secondaryRole",
+      render: (row) => {
+        let pRole = "";
+        if (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0) {
+          pRole = getRoleNameById(row.primaryRoleIds[0]);
+        } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0) {
+          pRole = row.primaryRoles[0];
+        } else if (row.roleId) {
+          pRole = getRoleNameById(row.roleId);
+        } else if (row.roleName) {
+          pRole = row.roleName;
+        }
+
+        let sRole = "";
+        if (Array.isArray(row.secondaryRoleIds) && row.secondaryRoleIds.length > 0) {
+          sRole = getRoleNameById(row.secondaryRoleIds[0]);
+        } else if (Array.isArray(row.secondaryRoles) && row.secondaryRoles.length > 0) {
+          sRole = row.secondaryRoles[0];
+        } else if (Array.isArray(row.roleIds) && row.roleIds.length > 1) {
+          const otherId = row.roleIds.find((id) => getRoleNameById(id) !== pRole) || row.roleIds[1];
+          sRole = getRoleNameById(otherId);
+        } else if (Array.isArray(row.roles) && row.roles.length > 1) {
+          sRole = row.roles.find((r) => r !== pRole) || row.roles[1];
+        }
 
         return (
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>
-            {assignedRoleNames.map((r, idx) => {
-              const style = getRoleStyle(r);
-              const isPrimary = Boolean(
-                (primaryRoleName && r === primaryRoleName) ||
-                (!primaryRoleName && idx === 0)
-              );
-              return (
-                <React.Fragment key={`${r}-${idx}`}>
-                  <Chip
-                    label={r}
-                    size="small"
-                    sx={{
-                      bgcolor: (theme) =>
-                        theme.palette.mode === "dark" ? style.darkBg : style.bg,
-                      color: (theme) =>
-                        theme.palette.mode === "dark" ? style.darkColor : style.color,
-                      fontWeight: 700,
-                      fontSize: "0.72rem",
-                      height: 22,
-                      borderRadius: "4px",
-                      border: isPrimary ? "1px solid rgba(124, 58, 237, 0.35)" : "none",
-                    }}
-                  />
-                  {idx < assignedRoleNames.length - 1 && (
-                    <Typography
-                      variant="caption"
-                      sx={{ color: "text.disabled", fontWeight: 700, mx: 0.2 }}
-                    >
-                      |
-                    </Typography>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </Box>
-        );
-      },
-    },
-    {
-      label: "Is Primary",
-      key: "isPrimary",
-      render: (row) => {
-        const isPrimary = row.isPrimary !== false;
-        return isPrimary ? (
-          <Typography
-            variant="caption"
-            fontWeight={800}
-            sx={{
-              color: "#16a34a",
-              bgcolor: "rgba(22,163,74,0.1)",
-              px: 1.2,
-              py: 0.3,
-              borderRadius: "4px",
-              fontSize: "0.7rem",
-              letterSpacing: "0.03em",
-              display: "inline-block",
-            }}
-          >
-            Yes
-          </Typography>
-        ) : (
-          <Typography
-            variant="caption"
-            fontWeight={800}
-            sx={{
-              color: "#64748b",
-              bgcolor: "rgba(100,116,139,0.1)",
-              px: 1.2,
-              py: 0.3,
-              borderRadius: "4px",
-              fontSize: "0.7rem",
-              letterSpacing: "0.03em",
-              display: "inline-block",
-            }}
-          >
-            No
+          <Typography variant="body2" fontWeight={600} color="text.secondary">
+            {sRole || "—"}
           </Typography>
         );
       },
-    },
-    {
-      label: "Is Secondary",
-      key: "isSecondary",
-      render: (row) => {
-        const hasSecondary = Boolean(
-          row.isSecondary ||
-          (Array.isArray(row.secondaryRoles) && row.secondaryRoles.length > 0)
-        );
-        return hasSecondary ? (
-          <Typography
-            variant="caption"
-            fontWeight={800}
-            sx={{
-              color: "#16a34a",
-              bgcolor: "rgba(22,163,74,0.1)",
-              px: 1.2,
-              py: 0.3,
-              borderRadius: "4px",
-              fontSize: "0.7rem",
-              letterSpacing: "0.03em",
-              display: "inline-block",
-            }}
-          >
-            Yes
-          </Typography>
-        ) : (
-          <Typography
-            variant="caption"
-            fontWeight={800}
-            sx={{
-              color: "#64748b",
-              bgcolor: "rgba(100,116,139,0.1)",
-              px: 1.2,
-              py: 0.3,
-              borderRadius: "4px",
-              fontSize: "0.7rem",
-              letterSpacing: "0.03em",
-              display: "inline-block",
-            }}
-          >
-            No
-          </Typography>
-        );
-      },
-    },
-    {
-      label: "Phone",
-      key: "phone",
-      render: (row) => row.phone || "--",
-    },
-    {
-      label: "Work Type",
-      key: "workType",
-      render: (row) => {
-        const wt = row.workType || "Office";
-        const isWfh = wt.toUpperCase() === "WFH";
-        return (
-          <Typography
-            variant="caption"
-            fontWeight={700}
-            sx={{
-              bgcolor: isWfh ? "rgba(147, 51, 234, 0.1)" : "rgba(37, 99, 235, 0.1)",
-              color: isWfh ? "#9333ea" : "#2563eb",
-              border: isWfh ? "1px solid rgba(147, 51, 234, 0.25)" : "1px solid rgba(37, 99, 235, 0.25)",
-              px: 1.2,
-              py: 0.3,
-              borderRadius: "12px",
-              fontSize: "0.75rem",
-              display: "inline-block",
-            }}
-          >
-            {wt}
-          </Typography>
-        );
-      },
-    },
-    {
-      label: "Status",
-      key: "isActive",
-      render: (row) =>
-        row.isActive ? (
-          <Typography
-            variant="caption"
-            fontWeight={800}
-            sx={{
-              color: "#16a34a",
-              bgcolor: "rgba(22,163,74,0.08)",
-              px: 1.2,
-              py: 0.3,
-              borderRadius: "3px",
-              fontSize: "0.7rem",
-              letterSpacing: "0.04em",
-            }}
-          >
-            Active
-          </Typography>
-        ) : (
-          <Typography
-            variant="caption"
-            fontWeight={800}
-            sx={{
-              color: "#ef4444",
-              bgcolor: "rgba(239,68,68,0.08)",
-              px: 1.2,
-              py: 0.3,
-              borderRadius: "3px",
-              fontSize: "0.7rem",
-              letterSpacing: "0.04em",
-            }}
-          >
-            Inactive
-          </Typography>
-        ),
-    },
-    {
-      label: "Date of Birth",
-      key: "dateOfBirth",
-      render: (row) => formatGridDate(row.dateOfBirth),
-    },
-    {
-      label: "Joining Date",
-      key: "joiningDate",
-      render: (row) => formatGridDate(row.joiningDate),
     },
     {
       label: "Created On",
@@ -1461,7 +1285,7 @@ export default function UsersPage() {
             <Grid size={{ xs: 12, md: 6 }}>
               <AppSelect
                 label="User Role"
-                placeholder="Select role…"
+                placeholder="Select user role"
                 value={form.roleName}
                 onChange={(e) => fieldChange("roleName", e.target.value)}
                 options={userRolesList}
@@ -1478,7 +1302,7 @@ export default function UsersPage() {
               <Grid size={{ xs: 12, md: 6 }}>
                 <AppSelect
                   label="Primary Role"
-                  placeholder="Select primary role…"
+                  placeholder="Select primary role"
                   value={form.primaryRole}
                   onChange={(e) => {
                     const newPrimary = e.target.value;
@@ -1499,7 +1323,7 @@ export default function UsersPage() {
               <Grid size={{ xs: 12, md: 6 }}>
                 <AppSelect
                   label="Secondary Role"
-                  placeholder="Select secondary role…"
+                  placeholder="Select secondary role"
                   value={form.secondaryRole}
                   onChange={(e) => fieldChange("secondaryRole", e.target.value)}
                   options={userRolesList.map((r) => ({
@@ -1545,7 +1369,7 @@ export default function UsersPage() {
           <Grid size={{ xs: 12, md: 6 }}>
             <AppSelect
               label="Gender"
-              placeholder="Select gender…"
+              placeholder="Select gender"
               value={form.gender}
               onChange={(e) => fieldChange("gender", e.target.value)}
               options={GENDER_OPTIONS}
@@ -1557,7 +1381,7 @@ export default function UsersPage() {
           <Grid size={{ xs: 12, md: 6 }}>
             <AppSelect
               label="Work Type"
-              placeholder="Select work type…"
+              placeholder="Select work type"
               value={form.workType}
               onChange={(e) => fieldChange("workType", e.target.value)}
               options={typeOptions}

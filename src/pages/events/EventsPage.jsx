@@ -246,9 +246,11 @@ export default function EventsPage() {
               </IconButton>
             </Tooltip>
           )}
-          {canDeleteEvent && (
+          {canDeleteEvent && Number(row.totalPaidAmount || row.paidAmount || 0) === 0 && (
             <Tooltip title="Delete Event">
-              <IconButton size="small" sx={{ p: 0.3 }}
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
                 onClick={() => handleDeleteRequest(row)}
               >
                 <DeleteIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
@@ -329,11 +331,35 @@ export default function EventsPage() {
     {
       label: "Event Date",
       key: "eventDate",
-      render: (row) => (
-        <Typography variant="body2" sx={{ maxWidth: 220, whiteSpace: "normal", wordBreak: "break-word" }}>
-          {row.eventDates || formatGridDate(row.eventDate)}
-        </Typography>
-      ),
+      render: (row) => {
+        if (!row.eventDates) {
+          return (
+            <Typography variant="body2" sx={{ maxWidth: 220, whiteSpace: "normal", wordBreak: "break-word" }}>
+              {formatGridDate(row.eventDate)}
+            </Typography>
+          );
+        }
+
+        const rawList = String(row.eventDates)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+        const countsMap = new Map();
+        rawList.forEach((d) => {
+          countsMap.set(d, (countsMap.get(d) || 0) + 1);
+        });
+
+        const formattedParts = Array.from(countsMap.entries()).map(([dateStr, count]) =>
+          count > 1 ? `${dateStr} (${count})` : dateStr
+        );
+
+        return (
+          <Typography variant="body2" sx={{ maxWidth: 220, whiteSpace: "normal", wordBreak: "break-word" }}>
+            {formattedParts.join(", ")}
+          </Typography>
+        );
+      },
     },
 
     {
