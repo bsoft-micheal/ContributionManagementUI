@@ -286,6 +286,55 @@ function exportToCSV(columns, data, filename = "export.csv") {
   URL.revokeObjectURL(url);
 }
 
+// ─── Search Helpers ──────────────────────────────────────────────────────────
+function extractTextFromReactNode(node) {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractTextFromReactNode).filter(Boolean).join(" ");
+  if (React.isValidElement(node)) {
+    const props = node.props || {};
+    return extractTextFromReactNode(props.children);
+  }
+  return "";
+}
+
+const AUDIT_SEARCH_KEYS = new Set([
+  "createdby",
+  "created_by",
+  "createdon",
+  "created_on",
+  "createdat",
+  "created_at",
+  "updatedby",
+  "updated_by",
+  "updatedon",
+  "updated_on",
+  "updatedat",
+  "updated_at",
+  "isdeleted",
+  "is_deleted",
+]);
+
+function recursiveSearch(obj, q, depth = 0) {
+  if (obj == null || depth > 4) return false;
+  if (typeof obj === "string" || typeof obj === "number" || typeof obj === "boolean") {
+    return String(obj).toLowerCase().includes(q);
+  }
+  if (obj instanceof Date) {
+    return formatGridDate(obj).toLowerCase().includes(q) || obj.toISOString().toLowerCase().includes(q);
+  }
+  if (Array.isArray(obj)) {
+    return obj.some((item) => recursiveSearch(item, q, depth + 1));
+  }
+  if (typeof obj === "object") {
+    return Object.entries(obj).some(([key, val]) => {
+      if (AUDIT_SEARCH_KEYS.has(key.toLowerCase())) return false;
+      return recursiveSearch(val, q, depth + 1);
+    });
+  }
+  return false;
+}
+
 export default function AppDataTable({
   title,
   columns,
@@ -294,6 +343,7 @@ export default function AppDataTable({
   actions,
   filterPanel,
   allowExport = true,
+  searchPlaceholder = "Search by username...",
 }) {
   const theme = useTheme();
   const surface = theme.palette.background.paper;
@@ -358,15 +408,70 @@ export default function AppDataTable({
   const processedData = useMemo(() => {
     let result = [...data];
 
-    // 1. Deep search across all row values
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(row =>
-        Object.values(row).some(val =>
+    // 1. Search across rendered column outputs + primary record fields
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter((row) => {
+        if (!row) return false;
+
+        // A. Check formatted column output first (excluding Action & audit columns)
+        const matchInColumns = (columns || []).some((col) => {
+          if (!col) return false;
           
-          val != null && val.toString().toLowerCase().includes(q)
-        )
-      );
+          // Skip Action column icon tooltips/buttons
+          const labelLower = String(col.label || "").toLowerCase();
+          if (labelLower === "action") return false;
+
+          // Skip audit metadata columns (Created By / Created On) from general text search
+          const keyLower = String(col.key || col.label || "").toLowerCase().replace(/[\s_]/g, "");
+          if (AUDIT_SEARCH_KEYS.has(keyLower) || keyLower === "createdby" || keyLower === "createdon") return false;
+
+          if (col.render) {
+            try {
+              const rendered = col.render(row);
+              const text = extractTextFromReactNode(rendered).toLowerCase();
+              if (text && text.includes(q)) return true;
+            } catch (e) {
+              // ignore render errors during search
+            }
+          }
+          if (col.key && row[col.key] != null) {
+            const val = String(row[col.key]).toLowerCase();
+            if (val.includes(q)) return true;
+          }
+          return false;
+        });
+
+        if (matchInColumns) return true;
+
+        // B. Fallback: check primary user/record fields explicitly (ignoring hidden metadata/audit fields)
+        const primaryFields = [
+          row.username,
+          row.Username,
+          row.memberUsername,
+          row.fullName,
+          row.FullName,
+          row.name,
+          row.Name,
+          row.email,
+          row.Email,
+          row.phone,
+          row.Phone,
+          row.roleName,
+          row.RoleName,
+          row.workType,
+          row.WorkType,
+          row.gender,
+          row.Gender,
+          Array.isArray(row.roles) ? row.roles.join(" ") : null,
+          Array.isArray(row.primaryRoles) ? row.primaryRoles.join(" ") : null,
+        ];
+
+        return primaryFields.some((field) => {
+          if (field == null) return false;
+          return String(field).toLowerCase().includes(q);
+        });
+      });
     }
 
     // 2. Column-specific filters
@@ -710,7 +815,7 @@ export default function AppDataTable({
 
           <TextField
             size="small"
-            placeholder="Search"
+            placeholder={searchPlaceholder}
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(0); }}
             InputProps={{

@@ -156,15 +156,22 @@ export default function EventFormDialog({
     return list;
   }, [form.eventDate, activeMembers]);
 
-  // Comma-separated birthday dates of all celebrants in the target month (sorted ascending by date, unique dates only)
+  // Comma-separated birthday dates of all celebrants in the target month (sorted ascending by date, unique dates with counts)
   const celebrantDatesCsv = useMemo(() => {
     if (!monthCelebrants || monthCelebrants.length === 0) return "";
     const sorted = [...monthCelebrants]
       .filter((m) => m.dateOfBirth)
       .sort((a, b) => dayjs(a.dateOfBirth).date() - dayjs(b.dateOfBirth).date());
 
-    const dates = sorted.map((m) => dayjs(m.dateOfBirth).format("D MMM"));
-    return Array.from(new Set(dates)).join(", ");
+    const dateCounts = new Map();
+    for (const m of sorted) {
+      const formattedDate = dayjs(m.dateOfBirth).format("D MMM");
+      dateCounts.set(formattedDate, (dateCounts.get(formattedDate) || 0) + 1);
+    }
+
+    return Array.from(dateCounts.entries())
+      .map(([dateStr, count]) => `${dateStr} (${count})`)
+      .join(", ");
   }, [monthCelebrants]);
 
   // Birthday calculation math

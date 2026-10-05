@@ -667,14 +667,22 @@ export default function EventFormPage() {
     return list;
   }, [form.eventDate, activeMembers]);
 
-  // Comma-separated birthday dates of all celebrants in target month (sorted ascending by day)
+  // Comma-separated birthday dates of all celebrants in target month (sorted ascending by day, unique dates with counts)
   const celebrantDatesCsv = useMemo(() => {
     if (!monthCelebrants || monthCelebrants.length === 0) return "";
     const sorted = [...monthCelebrants]
       .filter((m) => m.dateOfBirth)
       .sort((a, b) => dayjs(a.dateOfBirth).date() - dayjs(b.dateOfBirth).date());
 
-    return sorted.map((m) => dayjs(m.dateOfBirth).format("D Oct") === dayjs(m.dateOfBirth).format("D MMM") ? dayjs(m.dateOfBirth).format("D Oct") : dayjs(m.dateOfBirth).format("D MMM")).join(", ");
+    const dateCounts = new Map();
+    for (const m of sorted) {
+      const formattedDate = dayjs(m.dateOfBirth).format("D MMM");
+      dateCounts.set(formattedDate, (dateCounts.get(formattedDate) || 0) + 1);
+    }
+
+    return Array.from(dateCounts.entries())
+      .map(([dateStr, count]) => `${dateStr} (${count})`)
+      .join(", ");
   }, [monthCelebrants]);
 
 
@@ -1056,8 +1064,11 @@ export default function EventFormPage() {
     const newErrors = validateForm(form, schema);
 
     if (allowMultipleEvents) {
-      if (!form.eventTypeIds || form.eventTypeIds.length === 0) {
-        newErrors.eventTypeId = "Please select at least one event type";
+      if (!form.eventTypeIds || form.eventTypeIds.length < 2) {
+        newErrors.eventTypeId = "Please select at least 2 Event types";
+        toast.error("Please select at least 2 Event types");
+        setErrors(newErrors);
+        return;
       }
     } else {
       if (!form.eventTypeId) {
@@ -1342,13 +1353,16 @@ export default function EventFormPage() {
                   </Typography>
 
                   <Box
+                    onClick={() => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
                     sx={{
                       p: 0.8,
                       px: 1.8,
                       borderRadius: "10px",
                       border: "1px solid",
                       borderColor: (theme) =>
-                        theme.palette.mode === "dark"
+                        allowMultipleEvents
+                          ? "#4a3f6b"
+                          : theme.palette.mode === "dark"
                           ? "rgba(255, 255, 255, 0.1)"
                           : "rgba(74, 63, 107, 0.14)",
                       bgcolor: (theme) =>
@@ -1357,9 +1371,28 @@ export default function EventFormPage() {
                           : "#f8f7fc",
                       display: "flex",
                       alignItems: "center",
-                      gap: 1.5,
+                      gap: 1,
+                      cursor: "pointer",
+                      userSelect: "none",
+                      transition: "all 0.2s ease",
+                      "&:hover": {
+                        borderColor: "#4a3f6b",
+                      },
                     }}
                   >
+                    <Checkbox
+                      checked={Boolean(allowMultipleEvents)}
+                      onChange={(e) => handleToggleAllowMultipleEvents(e.target.checked)}
+                      onClick={(e) => e.stopPropagation()}
+                      size="small"
+                      sx={{
+                        p: 0,
+                        color: "#4a3f6b",
+                        "&.Mui-checked": {
+                          color: "#4a3f6b",
+                        },
+                      }}
+                    />
                     <Typography
                       variant="subtitle2"
                       fontWeight={700}
@@ -1372,10 +1405,6 @@ export default function EventFormPage() {
                     >
                       Allow Multiple Events
                     </Typography>
-                    <CustomSwitch
-                      checked={Boolean(allowMultipleEvents)}
-                      onChange={(e) => handleToggleAllowMultipleEvents(e.target.checked)}
-                    />
                   </Box>
                 </Box>
 

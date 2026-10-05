@@ -281,8 +281,39 @@ export default function EventTypesPage() {
         title={form.eventTypeId ? "Edit Event Type" : "Add Event Type"}
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>{COMMON_STRINGS.ACTIONS.CANCEL}</AppButton>
-            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>{COMMON_STRINGS.ACTIONS.SAVE}</AppButton>
+            <AppButton
+              variant="outlined"
+              onClick={() => setDialogOpen(false)}
+              sx={{
+                borderRadius: "8px",
+                px: 3,
+                fontWeight: 700,
+                textTransform: "none",
+                borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "rgba(74, 63, 107, 0.4)",
+                color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                "&:hover": {
+                  borderColor: "#4a3f6b",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74, 63, 107, 0.04)"
+                }
+              }}
+            >
+              Cancel
+            </AppButton>
+            <AppButton
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handleSubmit}
+              sx={{
+                borderRadius: "8px",
+                px: 3,
+                fontWeight: 700,
+                textTransform: "none",
+                bgcolor: "#4a3f6b !important",
+                "&:hover": { bgcolor: "#3b325c !important" }
+              }}
+            >
+              Save
+            </AppButton>
           </>
         }
       >
@@ -305,28 +336,61 @@ export default function EventTypesPage() {
             required
           />
 
-          {/* Dynamic Contribution Calculation Rule Settings */}
+          {/* Dynamic Contribution Calculation Rule Flag / Checkbox Container */}
           <Paper
-            variant="outlined"
+            elevation={0}
+            onClick={() => setForm((f) => ({ ...f, hasTenureRule: !f.hasTenureRule }))}
             sx={{
-              p: 2,
-              borderRadius: 2,
-              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)",
-              borderColor: (theme) => theme.palette.divider,
+              p: 2.2,
+              borderRadius: "14px",
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8f7fc",
+              border: (theme) => form.hasTenureRule ? "1.5px solid #4a3f6b" : `1px solid ${theme.palette.divider}`,
+              transition: "all 0.2s ease",
+              cursor: "pointer",
+              "&:hover": {
+                borderColor: "#4a3f6b",
+              },
             }}
           >
-            <AppSwitch
-              label="Enable Dynamic Tenure Calculation Rule"
-              checked={form.hasTenureRule}
-              onChange={(e) => setForm(f => ({ ...f, hasTenureRule: e.target.checked }))}
-            />
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.8 }}>
+              <Checkbox
+                checked={form.hasTenureRule}
+                onChange={(e) => setForm((f) => ({ ...f, hasTenureRule: e.target.checked }))}
+                onClick={(e) => e.stopPropagation()}
+                sx={{
+                  p: 0,
+                  mt: 0.2,
+                  color: "#4a3f6b",
+                  "&.Mui-checked": {
+                    color: "#4a3f6b",
+                  },
+                  "& .MuiSvgIcon-root": {
+                    fontSize: "1.6rem",
+                    borderRadius: "6px",
+                  },
+                }}
+              />
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={800}
+                  sx={{
+                    color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#2d244c",
+                    fontSize: "0.95rem",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  Enable Dynamic Calculation
+                </Typography>
+               
+              </Box>
+            </Box>
 
             {form.hasTenureRule && (
-              <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                  Configure custom contribution split percentages based on employee tenure / joining date for this event category.
-                </Typography>
-                
+              <Box
+                onClick={(e) => e.stopPropagation()}
+                sx={{ mt: 2.5, display: "flex", flexDirection: "column", gap: 2, pt: 2, borderTop: (theme) => `1px solid ${theme.palette.divider}` }}
+              >
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={4}>
                     <AppInput
@@ -336,7 +400,7 @@ export default function EventTypesPage() {
                       value={form.tenureThresholdYears}
                       onChange={(e) => {
                         const val = e.target.value.replace(/[^0-9.]/g, "");
-                        setForm(f => ({ ...f, tenureThresholdYears: val }));
+                        setForm((f) => ({ ...f, tenureThresholdYears: val }));
                       }}
                       helperText="Threshold in years (e.g., 1 yr)"
                     />
@@ -349,7 +413,7 @@ export default function EventTypesPage() {
                       value={form.newEntrantSharePercentage}
                       onChange={(e) => {
                         const val = e.target.value.replace(/[^0-9]/g, "");
-                        setForm(f => ({ ...f, newEntrantSharePercentage: val }));
+                        setForm((f) => ({ ...f, newEntrantSharePercentage: val }));
                       }}
                       helperText="Discounted share percentage"
                     />
@@ -362,7 +426,7 @@ export default function EventTypesPage() {
                       value={form.standardSharePercentage}
                       onChange={(e) => {
                         const val = e.target.value.replace(/[^0-9]/g, "");
-                        setForm(f => ({ ...f, standardSharePercentage: val }));
+                        setForm((f) => ({ ...f, standardSharePercentage: val }));
                       }}
                       helperText="Standard share percentage"
                     />
@@ -374,7 +438,7 @@ export default function EventTypesPage() {
                   placeholder="e.g. 50% for new entrants with less than 1 year tenure"
                   fullWidth
                   value={form.ruleDescription}
-                  onChange={(e) => setForm(f => ({ ...f, ruleDescription: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, ruleDescription: e.target.value }))}
                   maxLength={100}
                 />
               </Box>
