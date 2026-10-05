@@ -890,8 +890,24 @@ export default function DashboardPage() {
     return eventExpensesSum > 0 ? eventExpensesSum : Number(summary?.totalExpenses ?? 0);
   }, [events, isFilteredByEvent, isFilteredByType, summary?.totalExpenses]);
 
-  // Current Remaining Amount: Total Expected minus Total Expenses
-  const totalRemaining = totalExpected - totalExpenses;
+  // Current Remaining Amount:
+  // For members, do not minus member's personal expected from total expenses; use the team's overall remaining pool
+  const totalRemaining = useMemo(() => {
+    if (isMember) {
+      if (isFilteredByEvent || isFilteredByType) {
+        return events.reduce((sum, e) => {
+          const rem = e.remainingAmount !== undefined
+            ? Number(e.remainingAmount)
+            : (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0));
+          return sum + (Number(rem) || 0);
+        }, 0);
+      }
+      return summary?.totalRemainingAmount !== undefined
+        ? Number(summary.totalRemainingAmount)
+        : (totalExpected - totalExpenses);
+    }
+    return totalExpected - totalExpenses;
+  }, [isMember, isFilteredByEvent, isFilteredByType, events, summary?.totalRemainingAmount, totalExpected, totalExpenses]);
 
   const pendingCount = events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0);
   const totalContributionsCount = events.reduce((sum, e) => sum + (Number(e.totalContributionsCount) || 0), 0);
@@ -911,7 +927,7 @@ export default function DashboardPage() {
       const exp = Number(e.expectedAmount) || (Number(e.collectedAmount || 0) + Number(e.pendingAmount || 0));
       const col = Number(e.collectedAmount) || 0;
       const expense = Number(e.expenseAmount) || 0;
-      const remaining = exp - expense;
+      const remaining = e.remainingAmount !== undefined ? Number(e.remainingAmount) : (exp - expense);
       const pctNum =
         totalExpected > 0
           ? (exp / totalExpected) * 100
@@ -1058,7 +1074,7 @@ export default function DashboardPage() {
       render: (row) => {
         const expected = Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0)));
         const expense = Number(row.expenseAmount || 0);
-        const rem = expected - expense;
+        const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (expected - expense);
         const isDeficit = rem < 0;
         return (
           <Chip
@@ -1188,7 +1204,7 @@ export default function DashboardPage() {
                       actionText="View Expenses →"
                     />
                     <MetricCard
-                      label={COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "CURRENT REMAINING"}
+                      label={COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "REMAINING AMOUNT"}
                       value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
                       helper={totalRemaining >= 0 ? "Expected − Expenses (Surplus)" : "Expected − Expenses (Deficit)"}
                       accent={totalRemaining >= 0 ? "success.main" : "error.main"}

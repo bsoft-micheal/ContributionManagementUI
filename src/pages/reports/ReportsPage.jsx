@@ -747,7 +747,7 @@ export default function ReportsPage({ mode = "event" }) {
         { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: `${rate}% completion rate` },
         { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: `${Math.max(0, 100 - rate)}% outstanding dues` },
         { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
-        { label: "Current Remaining", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
+        { label: "Remaining Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
       ];
     }
     if (mode === "member") {
@@ -765,7 +765,7 @@ export default function ReportsPage({ mode = "event" }) {
         { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: `${rate}% dues cleared` },
         { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: `${Math.max(0, 100 - rate)}% remaining dues` },
         { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
-        { label: "Current Remaining", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
+        { label: "Remaining Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
       ];
     }
     if (mode === "pending") {
