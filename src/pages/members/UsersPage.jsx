@@ -466,29 +466,28 @@ export default function UsersPage() {
 
   // ── Validation ─────────────────────────────────────────────────────────────
   function validate() {
-    const filed = "This field is required";
     const schema = {
-      fullName: { required: true, type: "letteronly", min: 2, max: 100, label: filed },
-      email: { required: true, email: true, label: filed },
-      phone: { required: true, type: "numberonly", min: 10, max: 10, label: filed },
-      gender: { required: true, label: filed },
-      workType: { required: true, label: filed },
-      dateOfBirth: { required: true, label: filed },
-      joiningDate: { required: true, label: filed },
+      fullName: { required: true, type: "letteronly", min: 2, max: 100, label: "Full Name" },
+      email: { required: true, email: true, label: "Email" },
+      phone: { required: true, type: "numberonly", min: 10, max: 10, label: "Phone Number" },
+      gender: { required: true, label: "Gender" },
+      workType: { required: true, label: "Work Type" },
+      dateOfBirth: { required: true, label: "Date of Birth" },
+      joiningDate: { required: true, label: "Joining Date" },
     };
 
     if (!form.enableMultipleRoles) {
-      schema.roleName = { required: true, label: filed };
+      schema.roleName = { required: true, label: "User Role" };
     }
 
     if (form.createMemberProfile) {
-      schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: filed };
+      schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: "Username" };
       if (!form.userId) {
-        schema.newPassword = { required: true, min: 6, max: 50, label: filed };
-        schema.confirmPassword = { required: true, min: 6, max: 50, label: filed };
+        schema.newPassword = { required: true, min: 6, max: 50, label: "Password" };
+        schema.confirmPassword = { required: true, min: 6, max: 50, label: "Confirm Password" };
       } else if (form.newPassword) {
-        schema.newPassword = { required: false, min: 6, max: 50, label: filed };
-        schema.confirmPassword = { required: true, min: 6, max: 50, label: filed };
+        schema.newPassword = { required: false, min: 6, max: 50, label: "Password" };
+        schema.confirmPassword = { required: true, min: 6, max: 50, label: "Confirm Password" };
       }
     }
 
@@ -994,11 +993,20 @@ export default function UsersPage() {
     },
 
     {
+      label: "Full Name",
+      key: "fullName",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={600} sx={{ color: "#1e1a2e" }}>
+          {row.fullName || row.FullName || row.memberUsername || "--"}
+        </Typography>
+      ),
+    },
+    {
       label: "Username",
       key: "username",
       render: (row) => (
         <Typography variant="body2" fontWeight={600} color="text.secondary">
-          {row.username}
+          {row.username || "--"}
         </Typography>
       ),
     },
@@ -1086,6 +1094,7 @@ export default function UsersPage() {
         data={filteredUsers}
         loading={loading}
         allowExport={canExportUsers}
+        searchPlaceholder="Search by username..."
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             <AppButton
@@ -1413,16 +1422,19 @@ export default function UsersPage() {
             />
           </Grid>
 
-          {/* Bottom Switches: Enable User Access & Enable Multiple Roles in the same row */}
+          {/* Bottom Checkboxes: Enable User Access & Enable Multiple Roles in the same row */}
           <Grid size={{ xs: 12, md: 6 }}>
             <Box
+              onClick={() => fieldChange("createMemberProfile", !form.createMemberProfile)}
               sx={{
                 p: 1.75,
                 px: 2.5,
                 borderRadius: "10px",
                 border: "1px solid",
                 borderColor: (theme) =>
-                  theme.palette.mode === "dark"
+                  form.createMemberProfile
+                    ? "#4a3f6b"
+                    : theme.palette.mode === "dark"
                     ? "rgba(255, 255, 255, 0.1)"
                     : "rgba(74, 63, 107, 0.14)",
                 bgcolor: (theme) =>
@@ -1431,10 +1443,29 @@ export default function UsersPage() {
                     : "#f8f7fc",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
+                gap: 1.5,
                 minHeight: 52,
+                cursor: "pointer",
+                userSelect: "none",
+                transition: "all 0.2s ease",
+                "&:hover": {
+                  borderColor: "#4a3f6b",
+                },
               }}
             >
+              <Checkbox
+                checked={Boolean(form.createMemberProfile)}
+                onChange={(e) => fieldChange("createMemberProfile", e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
+                size="small"
+                sx={{
+                  p: 0,
+                  color: "#4a3f6b",
+                  "&.Mui-checked": {
+                    color: "#4a3f6b",
+                  },
+                }}
+              />
               <Typography
                 variant="subtitle1"
                 fontWeight={700}
@@ -1444,23 +1475,22 @@ export default function UsersPage() {
                   fontSize: "0.95rem",
                 }}
               >
-                Enable User Access
+                Create Login Account
               </Typography>
-              <CustomSwitch
-                checked={Boolean(form.createMemberProfile)}
-                onChange={(e) => fieldChange("createMemberProfile", e.target.checked)}
-              />
             </Box>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <Box
+              onClick={() => handleToggleMultipleRoles(!form.enableMultipleRoles)}
               sx={{
                 p: 1.75,
                 px: 2.5,
                 borderRadius: "10px",
                 border: "1px solid",
                 borderColor: (theme) =>
-                  theme.palette.mode === "dark"
+                  form.enableMultipleRoles
+                    ? "#4a3f6b"
+                    : theme.palette.mode === "dark"
                     ? "rgba(255, 255, 255, 0.1)"
                     : "rgba(74, 63, 107, 0.14)",
                 bgcolor: (theme) =>
@@ -1469,10 +1499,29 @@ export default function UsersPage() {
                     : "#f8f7fc",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
+                gap: 1.5,
                 minHeight: 52,
+                cursor: "pointer",
+                userSelect: "none",
+                transition: "all 0.2s ease",
+                "&:hover": {
+                  borderColor: "#4a3f6b",
+                },
               }}
             >
+              <Checkbox
+                checked={Boolean(form.enableMultipleRoles)}
+                onChange={(e) => handleToggleMultipleRoles(e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
+                size="small"
+                sx={{
+                  p: 0,
+                  color: "#4a3f6b",
+                  "&.Mui-checked": {
+                    color: "#4a3f6b",
+                  },
+                }}
+              />
               <Typography
                 variant="subtitle1"
                 fontWeight={700}
@@ -1484,10 +1533,6 @@ export default function UsersPage() {
               >
                 Enable Multiple Roles
               </Typography>
-              <CustomSwitch
-                checked={Boolean(form.enableMultipleRoles)}
-                onChange={(e) => handleToggleMultipleRoles(e.target.checked)}
-              />
             </Box>
           </Grid>
 

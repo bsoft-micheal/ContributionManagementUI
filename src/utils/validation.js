@@ -68,23 +68,24 @@ export function validateField(value, config = {}) {
     type,
     min,
     max,
-    label = "Field",
+    label,
     customValidate,
     email = false
   } = config;
 
+  const displayLabel = label && label !== "This field is required" ? label : "Field";
   const strVal = String(value ?? "").trim();
 
-  // 1. Required Check
+  // 1. Required Check: when empty and required, return standard required message
   if (required && !strVal) {
-    return `${label}`;
+    return config.requiredMessage || "This field is required";
   }
 
   if (!strVal) return ""; // Not required and empty: valid
 
   // 2. Email format check
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strVal)) {
-    return "Invalid email address";
+    return "Please enter a valid email address";
   }
 
   // 3. Pattern / Character check
@@ -96,28 +97,33 @@ export function validateField(value, config = {}) {
   }
 
   // 4. Min/Max bounds check
-  // Smart heuristic: check if this is an explicit numeric value (amount, price, etc.) vs a numeric string (phone number, OTP)
   const isNumericValCheck = (type === "numberonly" || type === "decimalonly") && (
     min === 0 || 
     (max !== undefined && max > 100) || 
-    /amount|price|fee|cost|contribution|value/i.test(label || "") ||
+    /amount|price|fee|cost|contribution|value/i.test(displayLabel || "") ||
     config.isNumericValue === true
   );
 
   if (isNumericValCheck) {
     const numVal = parseFloat(strVal);
     if (min !== undefined && numVal < min) {
-      return `${label} must be at least ${min}`;
+      return `${displayLabel} must be at least ${min}`;
     }
     if (max !== undefined && numVal > max) {
-      return `${label} must be at most ${max}`;
+      return `${displayLabel} must be at most ${max}`;
     }
   } else {
     if (min !== undefined && strVal.length < min) {
-      return `${label} must be at least ${min} characters`;
+      if (type === "numberonly" && min === max) {
+        return `Must be exactly ${min} digits`;
+      }
+      return `${displayLabel} must be at least ${min} characters`;
     }
     if (max !== undefined && strVal.length > max) {
-      return `${label} must be at most ${max} characters`;
+      if (type === "numberonly" && min === max) {
+        return `Must be at most ${max} digits`;
+      }
+      return `${displayLabel} must be at most ${max} characters`;
     }
   }
 
