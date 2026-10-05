@@ -73,6 +73,7 @@ import {
   triggerHangfireRemindersAsync,
 } from "../../services/settingsService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
+import { formatGridDate } from "../../utils/dateHelper";
 import SendTestEmailDialog from "../../components/settings/SendTestEmailDialog";
 import EmailReminderLogsDialog from "../../components/settings/EmailReminderLogsDialog";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -1399,10 +1400,7 @@ export default function SettingsPage() {
                       <Typography variant="subtitle1" fontWeight={800}>
                         Two-Factor Authentication (2FA)
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                        Secure account logins with an Authenticator app (Google Authenticator, Microsoft Authenticator).
-                      </Typography>
-                    </Box>
+                      </Box>
                   </Box>
 
                   {/* Personal 2FA Device Configuration at UI level */}
@@ -1638,9 +1636,7 @@ export default function SettingsPage() {
                                 checked={settings.enableMonthlyEmail !== false}
                                 onChange={(e) => handleChange("enableMonthlyEmail", e.target.checked)}
                               />
-                              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", display: "block", pl: 0.5 }}>
-                                Automatically dispatch initial email on 1st of month to users with pending contributions.
-                              </Typography>
+                    
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                               <AppSwitch
@@ -1690,7 +1686,7 @@ export default function SettingsPage() {
                           {/* Manual Scheduler & Hangfire Action */}
                           <Box sx={{ mt: 2.5, pt: 1.5, borderTop: `1px dashed ${theme.palette.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                              <AppButton
+                              {/* <AppButton
                                 variant="contained"
                                 startIcon={triggeringHangfire ? <CircularProgress size={16} color="inherit" /> : <PlayArrowOutlinedIcon />}
                                 disabled={triggeringHangfire}
@@ -1705,10 +1701,8 @@ export default function SettingsPage() {
                                 }}
                               >
                                 {triggeringHangfire ? "Dispatching Reminders..." : "Run Hangfire Reminders Now"}
-                              </AppButton>
-                              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
-                                Evaluates all unpaid contributions and dispatches reminder emails via Hangfire.
-                              </Typography>
+                              </AppButton> */}
+   
                             </Box>
                             <AppButton
                               variant="outlined"

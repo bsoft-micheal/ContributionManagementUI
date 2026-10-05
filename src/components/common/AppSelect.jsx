@@ -63,6 +63,11 @@ export default function AppSelect({
         SelectProps={{
           displayEmpty: true,
           renderValue: (selected) => {
+            const found = options.find(
+              (o) => String(o?.value ?? "").toLowerCase() === String(selected ?? "").toLowerCase()
+            );
+            if (found) return found.label;
+
             if (selected === "" || selected === undefined || selected === null) {
               return (
                 <span
@@ -76,10 +81,6 @@ export default function AppSelect({
                 </span>
               );
             }
-            const found = options.find(
-              (o) => String(o?.value ?? "").toLowerCase() === String(selected ?? "").toLowerCase()
-            );
-            if (found) return found.label;
 
             const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(selected));
             if (isUuid) {

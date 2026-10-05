@@ -667,15 +667,16 @@ export default function EventFormPage() {
     return list;
   }, [form.eventDate, activeMembers]);
 
-  // Comma-separated birthday dates of all celebrants in the target month (sorted ascending by date)
+  // Comma-separated birthday dates of all celebrants in target month (sorted ascending by day)
   const celebrantDatesCsv = useMemo(() => {
     if (!monthCelebrants || monthCelebrants.length === 0) return "";
     const sorted = [...monthCelebrants]
       .filter((m) => m.dateOfBirth)
       .sort((a, b) => dayjs(a.dateOfBirth).date() - dayjs(b.dateOfBirth).date());
 
-    return sorted.map((m) => dayjs(m.dateOfBirth).format("D MMM")).join(", ");
+    return sorted.map((m) => dayjs(m.dateOfBirth).format("D Oct") === dayjs(m.dateOfBirth).format("D MMM") ? dayjs(m.dateOfBirth).format("D Oct") : dayjs(m.dateOfBirth).format("D MMM")).join(", ");
   }, [monthCelebrants]);
+
 
   // Calculation counts
   const total = isBirthday ? activeMembers.length : nonBdayTotal;

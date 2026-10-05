@@ -9,6 +9,7 @@ import {
   TableHead,
   TableRow,
   Chip,
+  Tooltip,
 } from "@mui/material";
 import { Delete as DeleteIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
@@ -268,7 +269,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
       actions={
         <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
           <Box>
-            {canDeleteEvent && event?.eventId && (
+            {canDeleteEvent && event?.eventId && totalPaid === 0 && (
               <AppButton
                 variant="outlined"
                 color="error"
@@ -308,7 +309,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     >
       <Grid container spacing={3}>
         {/* Event Identity */}
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Box>
             <Typography
               variant="caption"
@@ -316,6 +317,8 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                 fontWeight: 800,
                 color: "text.secondary",
                 fontSize: "0.65rem",
+                display: "block",
+                mb: 0.2,
               }}
             >
               Event Identity
@@ -327,7 +330,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
         </Grid>
 
         {/* Category */}
-        <Grid size={{ xs: 6, md: 3 }}>
+        <Grid size={{ xs: 6, sm: 3, md: 2 }}>
           <Box>
             <Typography
               variant="caption"
@@ -335,18 +338,20 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                 fontWeight: 800,
                 color: "text.secondary",
                 fontSize: "0.65rem",
+                display: "block",
+                mb: 0.2,
               }}
             >
               Category
             </Typography>
-            <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
               {event?.eventTypeName || "Custom Event"}
             </Typography>
           </Box>
         </Grid>
 
         {/* Date */}
-        <Grid size={{ xs: 6, md: 3 }}>
+        <Grid size={{ xs: 6, sm: 3, md: 2.5 }}>
           <Box>
             <Typography
               variant="caption"
@@ -354,18 +359,20 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                 fontWeight: 800,
                 color: "text.secondary",
                 fontSize: "0.65rem",
+                display: "block",
+                mb: 0.2,
               }}
             >
               Date
             </Typography>
-            <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
               {formatViewDate(event?.eventDate)}
             </Typography>
           </Box>
         </Grid>
 
         {/* Created By */}
-        <Grid size={{ xs: 6, md: 3 }}>
+        <Grid size={{ xs: 6, sm: 3, md: 2.5 }}>
           <Box>
             <Typography
               variant="caption"
@@ -373,18 +380,20 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                 fontWeight: 800,
                 color: "text.secondary",
                 fontSize: "0.65rem",
+                display: "block",
+                mb: 0.2,
               }}
             >
               Created By
             </Typography>
-            <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
               {event?.createdByName || event?.createdBy || "--"}
             </Typography>
           </Box>
         </Grid>
 
         {/* Created On */}
-        <Grid size={{ xs: 6, md: 3 }}>
+        <Grid size={{ xs: 6, sm: 3, md: 2 }}>
           <Box>
             <Typography
               variant="caption"
@@ -392,11 +401,13 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                 fontWeight: 800,
                 color: "text.secondary",
                 fontSize: "0.65rem",
+                display: "block",
+                mb: 0.2,
               }}
             >
               Created On
             </Typography>
-            <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
               {formatViewDate(event?.createdAt || event?.createdOn)}
             </Typography>
           </Box>
