@@ -83,7 +83,7 @@ export default function LoginPage() {
     }
 
     const newErrors = {};
-    if (!form.email?.trim()) newErrors.email = COMMON_STRINGS.VALIDATION.USERNAME_OR_EMAIL_REQUIRED || "Username or email is required";
+    if (!form.email?.trim()) newErrors.email = COMMON_STRINGS.VALIDATION.USERNAME_OR_EMAIL_REQUIRED || COMMON_STRINGS.VALIDATION.REQUIRED;
     if (!form.password?.trim()) newErrors.password = COMMON_STRINGS.VALIDATION.PASSWORD_REQUIRED || COMMON_STRINGS.VALIDATION.REQUIRED;
 
     if (Object.keys(newErrors).length > 0) {
@@ -286,9 +286,9 @@ export default function LoginPage() {
               border: "1px solid",
               borderColor: theme.palette.mode === "dark" ? "rgba(231, 235, 247, 0.08)" : "rgba(74, 63, 107, 0.06)",
               borderRadius: "20px",
-              p: { xs: 3, sm: 4 },
+              p: { xs: 2.5, sm: 3.5 },
               width: "100%",
-              maxWidth: "400px",
+              maxWidth: "420px",
               position: "relative",
               zIndex: 1,
             }}
@@ -369,7 +369,7 @@ export default function LoginPage() {
                         sx={{
                           "& .MuiOutlinedInput-root": {
                             borderRadius: "6px",
-                            height: 42,
+                            height: 38,
                             fontSize: "0.85rem",
                             bgcolor: (theme) => theme.palette.mode === "dark" ? "background.paper" : "#faf9fd",
                             "& fieldset": {
@@ -382,10 +382,22 @@ export default function LoginPage() {
                               borderColor: "#7c3aed",
                               borderWidth: "1.5px",
                             },
+                            "&.Mui-error fieldset": {
+                              borderColor: "rgba(239, 68, 68, 0.5)",
+                            },
                             "& input": {
-                              py: 1,
+                              py: 0.75,
                               px: 1.5,
                             },
+                          },
+                          "& .MuiFormHelperText-root.Mui-error": {
+                            color: "#ef4444",
+                            opacity: 0.88,
+                            fontSize: "0.74rem",
+                            fontWeight: 500,
+                            letterSpacing: "0.01em",
+                            mt: 0.4,
+                            mx: 0.25,
                           },
                         }}
                       />
@@ -440,7 +452,7 @@ export default function LoginPage() {
                         sx={{
                           "& .MuiOutlinedInput-root": {
                             borderRadius: "6px",
-                            height: 42,
+                            height: 38,
                             fontSize: "0.85rem",
                             bgcolor: (theme) => theme.palette.mode === "dark" ? "background.paper" : "#faf9fd",
                             "& fieldset": {
@@ -453,10 +465,22 @@ export default function LoginPage() {
                               borderColor: "#7c3aed",
                               borderWidth: "1.5px",
                             },
+                            "&.Mui-error fieldset": {
+                              borderColor: "rgba(239, 68, 68, 0.5)",
+                            },
                             "& input": {
-                              py: 1,
+                              py: 0.75,
                               px: 1.5,
                             },
+                          },
+                          "& .MuiFormHelperText-root.Mui-error": {
+                            color: "#ef4444",
+                            opacity: 0.88,
+                            fontSize: "0.74rem",
+                            fontWeight: 500,
+                            letterSpacing: "0.01em",
+                            mt: 0.4,
+                            mx: 0.25,
                           },
                         }}
                       />
@@ -564,29 +588,29 @@ export default function LoginPage() {
                 {/* Submit Button */}
                 <AppButton
                   type="submit"
-                  size="large"
+                  size="medium"
                   disabled={loading || (showOtpField && isLockedOut)}
                   fullWidth
                   sx={{
-                    height: 44,
-                    fontSize: "0.86rem",
-                    fontWeight: 800,
-                    letterSpacing: "0.04em",
-                    borderRadius: "10px",
+                    height: 36,
+                    fontSize: "0.80rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.02em",
+                    borderRadius: "8px",
                     background: (theme) => theme.palette.mode === "dark"
                       ? "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)"
                       : "linear-gradient(135deg, #1e1a2e 0%, #2d2550 100%)",
                     boxShadow: (theme) => theme.palette.mode === "dark"
-                      ? "0 6px 20px rgba(124, 58, 237, 0.3)"
-                      : "0 6px 20px rgba(30, 26, 46, 0.2)",
+                      ? "0 4px 14px rgba(124, 58, 237, 0.25)"
+                      : "0 4px 14px rgba(30, 26, 46, 0.15)",
                     "&:hover": {
                       background: (theme) => theme.palette.mode === "dark"
                         ? "linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%)"
                         : "linear-gradient(135deg, #2d2550 0%, #1e1a2e 100%)",
                       transform: "translateY(-1px)",
                       boxShadow: (theme) => theme.palette.mode === "dark"
-                        ? "0 8px 24px rgba(124, 58, 237, 0.4)"
-                        : "0 8px 24px rgba(30, 26, 46, 0.3)",
+                        ? "0 6px 18px rgba(124, 58, 237, 0.35)"
+                        : "0 6px 18px rgba(30, 26, 46, 0.22)",
                     },
                     transition: "all 0.2s ease",
                   }}

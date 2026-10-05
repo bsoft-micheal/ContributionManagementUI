@@ -26,7 +26,6 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import EventIcon from "@mui/icons-material/Event";
-import SearchIcon from "@mui/icons-material/Search";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import dayjs from "dayjs";
 import { formatGridDate, parseMemberDob } from "../../utils/dateHelper";
@@ -255,12 +254,12 @@ function InteractiveDonutChart({
             noWrap
             sx={{
               maxWidth: 114,
-              fontSize: "0.82rem",
+              fontSize: "0.80rem",
               fontWeight: 700,
               color: "#2563eb",
-              lineHeight: 1.3,
+              lineHeight: 1.2,
               letterSpacing: "0.01em",
-              mb: 0.5,
+              mb: 0.3,
             }}
           >
             {display?.label || display?.title || "Details"}
@@ -270,15 +269,40 @@ function InteractiveDonutChart({
         {/* Amount */}
         <Typography
           sx={{
-            fontSize: "1.36rem",
+            fontSize: "1.25rem",
             fontWeight: 900,
             color: isDark ? "#ffffff" : "#0f172a",
-            lineHeight: 1.2,
+            lineHeight: 1.1,
             letterSpacing: "-0.02em",
           }}
         >
           ₹{Number(display?.value ?? display?.amount ?? 0).toLocaleString()}
         </Typography>
+
+        {/* Current Remaining Amount */}
+        {display?.remaining !== undefined && (
+          <Box
+            sx={{
+              mt: 0.5,
+              px: 0.8,
+              py: 0.2,
+              borderRadius: 1,
+              bgcolor: display.remaining >= 0 ? alpha("#10b981", 0.12) : alpha("#ef4444", 0.12),
+              border: `1px solid ${display.remaining >= 0 ? alpha("#10b981", 0.3) : alpha("#ef4444", 0.3)}`,
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: "0.68rem",
+                fontWeight: 800,
+                color: display.remaining >= 0 ? "#10b981" : "#ef4444",
+                lineHeight: 1,
+              }}
+            >
+              Rem: ₹{Math.abs(display.remaining).toLocaleString()}
+            </Typography>
+          </Box>
+        )}
       </Box>
     </Box>
   );
@@ -541,21 +565,21 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
         alignItems: "flex-end",
       }}
     >
-      <Box sx={{ width: { xs: "100%", sm: 150 } }}>
-        <AppSelect
-          label={COMMON_STRINGS.DASHBOARD?.MONTH_LABEL || "Month"}
-          value={pending.month}
-          onChange={(e) => onChange("month", Number(e.target.value))}
-          options={MONTH_OPTIONS}
-          size="small"
-        />
-      </Box>
       <Box sx={{ width: { xs: "100%", sm: 120 } }}>
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.YEAR_LABEL || "Year"}
           value={pending.year}
           onChange={(e) => onChange("year", Number(e.target.value))}
           options={YEAR_OPTIONS}
+          size="small"
+        />
+      </Box>
+      <Box sx={{ width: { xs: "100%", sm: 150 } }}>
+        <AppSelect
+          label={COMMON_STRINGS.DASHBOARD?.MONTH_LABEL || "Month"}
+          value={pending.month}
+          onChange={(e) => onChange("month", Number(e.target.value))}
+          options={MONTH_OPTIONS}
           size="small"
         />
       </Box>
@@ -626,39 +650,6 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
   );
 }
 
-// ─── Summary Stat Pill ────────────────────────────────────────────────────────
-
-function StatPill({ label, value, color }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-
-  return (
-    <Box sx={{
-      px: { xs: 1.5, sm: 2 },
-      py: 1.5,
-      borderRadius: 2,
-      border: `1px solid ${alpha(color, isDark ? 0.35 : 0.22)}`,
-      bgcolor: alpha(color, isDark ? 0.12 : 0.05),
-      flex: 1,
-      textAlign: "center",
-      transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-      "&:hover": {
-        bgcolor: alpha(color, isDark ? 0.18 : 0.09),
-        transform: "translateY(-2px)",
-        boxShadow: `0 4px 12px ${alpha(color, 0.15)}`,
-      },
-    }}>
-      <Typography sx={{ fontSize: { xs: "1.1rem", sm: "1.3rem" }, fontWeight: 900, color, lineHeight: 1.1 }}>
-        {value}
-      </Typography>
-      <Typography variant="caption" color="text.secondary" fontWeight={700}
-        sx={{ fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.05em", mt: 0.5, display: "block" }}>
-        {label}
-      </Typography>
-    </Box>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -671,7 +662,6 @@ export default function DashboardPage() {
 
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
   const [eventTypes, setEventTypes] = useState([]);
   const [quickAccessDrawerOpen, setQuickAccessDrawerOpen] = useState(false);
   const [quickAccessStatus, setQuickAccessStatus] = useState("all");
@@ -860,7 +850,6 @@ export default function DashboardPage() {
     setPendingFilters(defaultValues);
     setAppliedFilters(defaultValues);
     loadDashboard(defaultValues.month, defaultValues.year);
-    setSearch("");
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -888,13 +877,37 @@ export default function DashboardPage() {
 
   const totalCollected = events.reduce((sum, e) => sum + (Number(e.collectedAmount) || 0), 0);
   const totalPending = events.reduce((sum, e) => sum + (Number(e.pendingAmount) || 0), 0);
-  const totalExpected = totalCollected + totalPending;
+  const totalExpected = events.reduce((sum, e) => {
+    const exp = Number(e.expectedAmount);
+    return sum + (!isNaN(exp) && exp > 0 ? exp : (Number(e.collectedAmount || 0) + Number(e.pendingAmount || 0)));
+  }, 0) || (totalCollected + totalPending);
+
   const totalExpenses = useMemo(() => {
+    const eventExpensesSum = events.reduce((sum, e) => sum + (Number(e.expenseAmount) || 0), 0);
     if (isFilteredByEvent || isFilteredByType) {
-      return events.reduce((sum, e) => sum + (Number(e.expenseAmount) || 0), 0);
+      return eventExpensesSum;
     }
-    return Number(summary?.totalExpenses ?? events.reduce((sum, e) => sum + (Number(e.expenseAmount) || 0), 0));
+    return eventExpensesSum > 0 ? eventExpensesSum : Number(summary?.totalExpenses ?? 0);
   }, [events, isFilteredByEvent, isFilteredByType, summary?.totalExpenses]);
+
+  // Current Remaining Amount:
+  // For members, do not minus member's personal expected from total expenses; use the team's overall remaining pool
+  const totalRemaining = useMemo(() => {
+    if (isMember) {
+      if (isFilteredByEvent || isFilteredByType) {
+        return events.reduce((sum, e) => {
+          const rem = e.remainingAmount !== undefined
+            ? Number(e.remainingAmount)
+            : (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0));
+          return sum + (Number(rem) || 0);
+        }, 0);
+      }
+      return summary?.totalRemainingAmount !== undefined
+        ? Number(summary.totalRemainingAmount)
+        : (totalExpected - totalExpenses);
+    }
+    return totalExpected - totalExpenses;
+  }, [isMember, isFilteredByEvent, isFilteredByType, events, summary?.totalRemainingAmount, totalExpected, totalExpenses]);
 
   const pendingCount = events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0);
   const totalContributionsCount = events.reduce((sum, e) => sum + (Number(e.totalContributionsCount) || 0), 0);
@@ -911,8 +924,10 @@ export default function DashboardPage() {
   // Slices for By Event mode (matches reference mockup)
   const eventSlices = useMemo(() => {
     return events.map((e, idx) => {
-      const exp = Number(e.expectedAmount) || 0;
+      const exp = Number(e.expectedAmount) || (Number(e.collectedAmount || 0) + Number(e.pendingAmount || 0));
       const col = Number(e.collectedAmount) || 0;
+      const expense = Number(e.expenseAmount) || 0;
+      const remaining = e.remainingAmount !== undefined ? Number(e.remainingAmount) : (exp - expense);
       const pctNum =
         totalExpected > 0
           ? (exp / totalExpected) * 100
@@ -926,7 +941,10 @@ export default function DashboardPage() {
         id: e.eventId || `event-${idx}`,
         label: e.eventName,
         value: exp,
+        expected: exp,
         collected: col,
+        expense: expense,
+        remaining: remaining,
         collectedPct: colPct,
         percent: pctStr,
         color: DONUT_COLORS[idx % DONUT_COLORS.length],
@@ -977,8 +995,10 @@ export default function DashboardPage() {
     return {
       title,
       amount: totalExpected,
+      expenses: totalExpenses,
+      remaining: totalRemaining,
     };
-  }, [donutView, isFilteredByType, isFilteredByEvent, appliedFilters.eventType, appliedFilters.eventId, allEvents, totalExpected]);
+  }, [donutView, isFilteredByType, isFilteredByEvent, appliedFilters.eventType, appliedFilters.eventId, allEvents, totalExpected, totalExpenses, totalRemaining]);
 
   // Multi-ring chart ring definitions
   const amountRing = {
@@ -996,16 +1016,7 @@ export default function DashboardPage() {
     ],
   };
 
-  // Dashboard tab search
-  const filteredEvents = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return q
-      ? events.filter((e) =>
-        e.eventName.toLowerCase().includes(q) ||
-        e.eventTypeName.toLowerCase().includes(q)
-      )
-      : events;
-  }, [events, search]);
+
 
   // Table columns (Dashboard tab)
   const columns = [
@@ -1028,7 +1039,9 @@ export default function DashboardPage() {
     {
       label: "Expected", key: "expectedAmount", align: "right",
       render: (row) => (
-        <Typography variant="body2" fontWeight={700}>₹{Number(row.expectedAmount).toLocaleString()}</Typography>
+        <Typography variant="body2" fontWeight={700}>
+          ₹{Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))).toLocaleString()}
+        </Typography>
       ),
     },
     {
@@ -1055,6 +1068,28 @@ export default function DashboardPage() {
           ₹{Number(row.expenseAmount || 0).toLocaleString()}
         </Typography>
       ),
+    },
+    {
+      label: "Remaining ₹", key: "remainingAmount", align: "right",
+      render: (row) => {
+        const expected = Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0)));
+        const expense = Number(row.expenseAmount || 0);
+        const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (expected - expense);
+        const isDeficit = rem < 0;
+        return (
+          <Chip
+            size="small"
+            label={`₹${rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
+            sx={{
+              fontWeight: 800,
+              fontSize: "0.76rem",
+              bgcolor: isDeficit ? alpha("#ef4444", 0.12) : alpha("#10b981", 0.12),
+              color: isDeficit ? "error.main" : "success.main",
+              border: `1px solid ${isDeficit ? alpha("#ef4444", 0.3) : alpha("#10b981", 0.3)}`,
+            }}
+          />
+        );
+      },
     },
     {
       label: "Paid / Total", key: "totalContributionsCount", align: "center",
@@ -1121,15 +1156,15 @@ export default function DashboardPage() {
       ) : (
         <Stack spacing={3}>
 
-                  {/* ① Top Summary Metric Cards (5 Cards Grid, Total Collections hidden for Member) */}
+                  {/* ① Top Summary Metric Cards (6 Cards Grid: Expected, Collections, Pending, Expenses, Remaining, Events) */}
                   <Box
                     sx={{
                       display: "grid",
                       gridTemplateColumns: {
                         xs: "1fr",
                         sm: "repeat(2, minmax(0, 1fr))",
-                        md: isMember ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
-                        lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))",
+                        md: "repeat(3, minmax(0, 1fr))",
+                        lg: isMember ? "repeat(5, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
                       },
                       gap: { xs: 1.5, sm: 2 },
                     }}
@@ -1167,6 +1202,13 @@ export default function DashboardPage() {
                       accent="warning.main"
                       onClick={() => navigate("/expense")}
                       actionText="View Expenses →"
+                    />
+                    <MetricCard
+                      label={COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "REMAINING AMOUNT"}
+                      value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
+                      helper={totalRemaining >= 0 ? "Expected − Expenses (Surplus)" : "Expected − Expenses (Deficit)"}
+                      accent={totalRemaining >= 0 ? "success.main" : "error.main"}
+                      actionText={totalRemaining >= 0 ? "Budget Surplus ✓" : "Budget Deficit ⚠"}
                     />
                     <MetricCard
                       label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
@@ -1280,15 +1322,7 @@ export default function DashboardPage() {
 
                             {/* Stats panel */}
                             <Grid size={{ xs: 12, md: 7 }}>
-                              <Stack spacing={2.5}>
-                                {/* Quick stat pills */}
-                                <Stack direction="row" spacing={1.5} flexWrap="wrap" gap={1}>
-                                  <StatPill label={isMember ? "Total Paid" : "Total Collected"} value={`₹${Number(totalCollected).toLocaleString()}`} color={C.collected} />
-                                  <StatPill label="Paid Payments" value={`${paidCount} / ${paidCount + pendingCount}`} color={C.paid} />
-                                  <StatPill label="Total Expenses" value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`} color="#f59e0b" />
-                                  <StatPill label="Total Events" value={events.length} color="#7c3aed" />
-                                </Stack>
-
+                              <Stack spacing={2}>
                                 {donutView === "events" ? (
                                   <>
                                     <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -1312,7 +1346,7 @@ export default function DashboardPage() {
                                     {/* Scrollable Event List */}
                                     <Box
                                       sx={{
-                                        maxHeight: 230,
+                                        maxHeight: 310,
                                         overflowY: "auto",
                                         pr: 0.5,
                                         display: "flex",
@@ -1366,22 +1400,27 @@ export default function DashboardPage() {
                                                 </Typography>
                                               </Stack>
 
-                                              <Stack direction="row" alignItems="center" spacing={1}>
-                                                <Box sx={{ textAlign: "right" }}>
-                                                  <Typography variant="body2" fontWeight={900} sx={{ fontSize: "0.84rem", display: "block", lineHeight: 1.1 }}>
-                                                    ₹{Number(item.collected).toLocaleString()} <Typography component="span" sx={{ fontSize: "0.7rem", color: "text.secondary", fontWeight: 600 }}>/ ₹{Number(item.value).toLocaleString()}</Typography>
-                                                  </Typography>
-                                                </Box>
+                                              <Stack direction="row" alignItems="center" spacing={1.25}>
+                                                <Tooltip title={`Expected: ₹${Number(item.value).toLocaleString()} | Expense: ₹${Number(item.expense || 0).toLocaleString()}`}>
+                                                  <Stack alignItems="flex-end" sx={{ lineHeight: 1.15 }}>
+                                                    <Typography variant="body2" fontWeight={800} sx={{ fontSize: "0.80rem" }}>
+                                                      ₹{Number(item.collected).toLocaleString()} <Typography component="span" sx={{ fontSize: "0.68rem", color: "text.secondary", fontWeight: 600 }}>/ ₹{Number(item.value).toLocaleString()}</Typography>
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ fontSize: "0.68rem", color: "#f59e0b", fontWeight: 700 }}>
+                                                      Expense: ₹{Number(item.expense || 0).toLocaleString()}
+                                                    </Typography>
+                                                  </Stack>
+                                                </Tooltip>
                                                 <Chip
-                                                  label={item.collected >= item.value && item.value > 0 ? "✓ Settled" : isMember ? `₹${Number(item.collected).toLocaleString()} Paid` : `₹${Number(item.collected).toLocaleString()} Collected`}
+                                                  label={`Rem: ₹${Number(item.remaining || 0).toLocaleString()}`}
                                                   size="small"
                                                   sx={{
-                                                    height: 20,
-                                                    fontSize: "0.65rem",
+                                                    height: 22,
+                                                    fontSize: "0.68rem",
                                                     fontWeight: 900,
-                                                    bgcolor: alpha(item.color, 0.12),
-                                                    color: item.color,
-                                                    border: `1px solid ${alpha(item.color, 0.3)}`,
+                                                    bgcolor: item.remaining >= 0 ? alpha("#10b981", 0.12) : alpha("#ef4444", 0.12),
+                                                    color: item.remaining >= 0 ? "#10b981" : "#ef4444",
+                                                    border: `1px solid ${item.remaining >= 0 ? alpha("#10b981", 0.3) : alpha("#ef4444", 0.3)}`,
                                                   }}
                                                 />
                                               </Stack>
@@ -1454,30 +1493,8 @@ export default function DashboardPage() {
                     count={events.length}
                     defaultOpen
                   >
-                  <Stack spacing={2}>
-                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                      <TextField
-                        size="small"
-                        id="dashboard-event-search"
-                        placeholder="Search by name or category…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <SearchIcon fontSize="small" sx={{ color: "text.disabled" }} />
-                            </InputAdornment>
-                          ),
-                        }}
-                        sx={{
-                          width: { xs: "100%", sm: 280 },
-                          "& .MuiOutlinedInput-root": { borderRadius: 2 },
-                        }}
-                      />
-                    </Box>
-                    <AppDataTable columns={columns} data={filteredEvents} loading={false} />
-                  </Stack>
-                </CollapsibleSection>
+                    <AppDataTable columns={columns} data={events} loading={false} />
+                  </CollapsibleSection>
               </Stack>
             )}
 

@@ -972,7 +972,7 @@ export default function SubmitPaymentModal({
                   "&:hover": { bgcolor: isFullySettled ? "action.disabledBackground !important" : "#3b325c !important" },
                 }}
               >
-                {submitting ? "Submitting..." : isFullySettled ? "All Dues Settled" : "Submit Payment Details"}
+                {submitting ? "Saving..." : isFullySettled ? "All Dues Settled" : "Save"}
               </AppButton>
             );
           })()}
@@ -1343,7 +1343,7 @@ export default function SubmitPaymentModal({
                     textTransform: "none",
                   }}
                 >
-                  + Add Row
+                  Add Row
                 </Button>
               </Stack>
             </Box>
