@@ -1117,79 +1117,78 @@ export default function AppDataTable({
                 </TableCell>
               </TableRow>
             ) : paginatedData.length > 0 ? (
-                paginatedData.map((row, rowIndex) => (
-                  <TableRow
-                    key={rowIndex}
-                    hover
-                    sx={{
-                      bgcolor: rowIndex % 2 === 1
-                        ? (theme.palette.mode === "dark" ? "rgba(255,255,255,0.015)" : "#fafafa")
-                        : (theme.palette.mode === "dark" ? surface : "#ffffff"),
-                      "&:hover": { bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f5f7fa" },
-                      "& td": {
-                        borderRight: theme.palette.mode === "dark"
-                          ? "1px solid rgba(255, 255, 255, 0.08)"
-                          : "1px solid rgba(224, 224, 224, 0.8)",
-                        borderBottom: theme.palette.mode === "dark"
-                          ? "1px solid rgba(255, 255, 255, 0.08)"
-                          : "1px solid rgba(224, 224, 224, 0.8)",
-                      },
-                      "& td:last-child": { borderRight: "none" },
-                    }}
-                  >
-                    {orderedColumns.map((column, colIndex) => (
-                      <TableCell
-                        key={colIndex}
-                        align={column.align || "left"}
-                        sx={{
-                          py: 0.8,
-                          px: 2,
-                          fontSize: "0.78rem",
-                          color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
-                          ...column.cellSx,
-                          ...getPinStyles(column, false),
-                        }}
-                      >
-                        {column.label === "#" || column.label === "S.No" || column.label === "S.No." || column.key === "sNo" || column.type === "index" ? (
-                          <Typography variant="body2" sx={{ fontSize: "inherit", fontWeight: 700, color: "inherit" }}>
-                            {page * rowsPerPage + rowIndex + 1}
-                          </Typography>
-                        ) : column.render ? (
-                          column.render(row, rowIndex, page * rowsPerPage + rowIndex + 1)
-                        ) : (
-                          <Typography
-                            variant="body2"
-                            sx={{ fontSize: "inherit", color: "inherit" }}
-                          >
-                            {column.type === "date" || column.key === "createdOn" || column.key === "createdAt" || column.key === "CreatedOn" || column.key === "CreatedAt" || column.label === "Created On" || column.label === "Created At"
-                              ? formatGridDate(row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? row.createdOn ?? row.CreatedOn ?? row.createdAt ?? row.CreatedAt)
-                              : column.type === "datetime"
-                                ? formatGridDateTime(row[column.key])
-                                : (column.key === "createdBy" || column.label === "Created By")
-                                  ? (row.createdBy || row.CreatedBy || row.createdByName || row.CreatedByName || row.createdByUser || row.CreatedByUser || row.created_by || row.Created_By || "--")
-                                  : (row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? "--")}
-                          </Typography>
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={orderedColumns.length}
-                    align="center"
-                    sx={{ py: 6 }}
-                  >
-                    <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                      No records found.
-                    </Typography>
-                  </TableCell>
+              paginatedData.map((row, rowIndex) => (
+                <TableRow
+                  key={rowIndex}
+                  hover
+                  sx={{
+                    bgcolor: rowIndex % 2 === 1
+                      ? (theme.palette.mode === "dark" ? "rgba(255,255,255,0.015)" : "#fafafa")
+                      : (theme.palette.mode === "dark" ? surface : "#ffffff"),
+                    "&:hover": { bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f5f7fa" },
+                    "& td": {
+                      borderRight: theme.palette.mode === "dark"
+                        ? "1px solid rgba(255, 255, 255, 0.08)"
+                        : "1px solid rgba(224, 224, 224, 0.8)",
+                      borderBottom: theme.palette.mode === "dark"
+                        ? "1px solid rgba(255, 255, 255, 0.08)"
+                        : "1px solid rgba(224, 224, 224, 0.8)",
+                    },
+                    "& td:last-child": { borderRight: "none" },
+                  }}
+                >
+                  {orderedColumns.map((column, colIndex) => (
+                    <TableCell
+                      key={colIndex}
+                      align={column.align || "left"}
+                      sx={{
+                        py: 0.8,
+                        px: 2,
+                        fontSize: "0.78rem",
+                        color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
+                        ...column.cellSx,
+                        ...getPinStyles(column, false),
+                      }}
+                    >
+                      {column.label === "#" || column.label === "S.No" || column.label === "S.No." || column.key === "sNo" || column.type === "index" ? (
+                        <Typography variant="body2" sx={{ fontSize: "inherit", fontWeight: 700, color: "inherit" }}>
+                          {page * rowsPerPage + rowIndex + 1}
+                        </Typography>
+                      ) : column.render ? (
+                        column.render(row, rowIndex, page * rowsPerPage + rowIndex + 1)
+                      ) : (
+                        <Typography
+                          variant="body2"
+                          sx={{ fontSize: "inherit", color: "inherit" }}
+                        >
+                          {column.type === "date" || column.key === "createdOn" || column.key === "createdAt" || column.key === "CreatedOn" || column.key === "CreatedAt" || column.label === "Created On" || column.label === "Created At"
+                            ? formatGridDate(row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? row.createdOn ?? row.CreatedOn ?? row.createdAt ?? row.CreatedAt)
+                            : column.type === "datetime"
+                              ? formatGridDateTime(row[column.key])
+                              : (column.key === "createdBy" || column.label === "Created By")
+                                ? (row.createdBy || row.CreatedBy || row.createdByName || row.CreatedByName || row.createdByUser || row.CreatedByUser || row.created_by || row.Created_By || "--")
+                                : (row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? "--")}
+                        </Typography>
+                      )}
+                    </TableCell>
+                  ))}
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        )}
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={orderedColumns.length}
+                  align="center"
+                  sx={{ py: 6 }}
+                >
+                  <Typography variant="body2" color="text.secondary" fontWeight={500}>
+                    No records found.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </Box>
 
       {/* ── 4. Custom Footer / Pagination (Mockup matching) ──────────────── */}

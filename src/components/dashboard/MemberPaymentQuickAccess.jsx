@@ -583,7 +583,7 @@ export default function MemberPaymentQuickAccess({
               />
             </Stack>
             <Typography variant="caption" color="text.secondary">
-              Quick access breakdown for {periodLabel} — showing who has paid, pending dues, and event expenses.
+              Quick access breakdown for {periodLabel} — showing who has paid and pending dues.
             </Typography>
           </Box>
 
@@ -608,7 +608,7 @@ export default function MemberPaymentQuickAccess({
         {/* Status Filter Pills Banner */}
         <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
           {/* Total Expected Amount */}
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <Paper
               onClick={() => { setStatusFilter("all"); setPage(0); }}
               elevation={0}
@@ -629,10 +629,10 @@ export default function MemberPaymentQuickAccess({
                 Total Expected Amount
               </Typography>
               <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h6" fontWeight={900} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
+                <Typography variant="h6" fontWeight={500} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
                   ₹{formatAmount(stats.totalAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: "block", mt: 0.35 }}>
+                <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ display: "block", mt: 0.35 }}>
                   {stats.totalCount} Members
                 </Typography>
               </Box>
@@ -640,7 +640,7 @@ export default function MemberPaymentQuickAccess({
           </Grid>
 
           {/* Pending / Unpaid */}
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <Paper
               onClick={() => { setStatusFilter("pending"); setPage(0); }}
               elevation={0}
@@ -664,10 +664,10 @@ export default function MemberPaymentQuickAccess({
                 <HourglassEmptyIcon sx={{ fontSize: 16, color: "error.main" }} />
               </Stack>
               <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h6" fontWeight={900} color="error.main" sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                <Typography variant="h6" fontWeight={500} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
                   ₹{formatAmount(stats.pendingAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="error.main" sx={{ display: "block", mt: 0.35 }}>
+                <Typography variant="caption" fontWeight={500} color="error.main" sx={{ display: "block", mt: 0.35 }}>
                   {stats.pendingCount} Members
                 </Typography>
               </Box>
@@ -675,7 +675,7 @@ export default function MemberPaymentQuickAccess({
           </Grid>
 
           {/* Paid */}
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <Paper
               onClick={() => { setStatusFilter("paid"); setPage(0); }}
               elevation={0}
@@ -699,46 +699,11 @@ export default function MemberPaymentQuickAccess({
                 <CheckCircleIcon sx={{ fontSize: 16, color: "success.main" }} />
               </Stack>
               <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h6" fontWeight={900} color="success.main" sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                <Typography variant="h6" fontWeight={500} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
                   ₹{formatAmount(stats.paidAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="success.main" sx={{ display: "block", mt: 0.35 }}>
+                <Typography variant="caption" fontWeight={500} color="success.main" sx={{ display: "block", mt: 0.35 }}>
                   {stats.paidCount} Members
-                </Typography>
-              </Box>
-            </Paper>
-          </Grid>
-
-          {/* Expense Amount */}
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Paper
-              onClick={() => { setStatusFilter("expense"); setPage(0); }}
-              elevation={0}
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                cursor: "pointer",
-                border: "1.5px solid",
-                borderColor: statusFilter === "expense" ? "#f59e0b" : isDark ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.2)",
-                bgcolor: statusFilter === "expense"
-                  ? isDark ? "rgba(245,158,11,0.18)" : "rgba(245,158,11,0.08)"
-                  : isDark ? "rgba(245,158,11,0.04)" : "rgba(245,158,11,0.03)",
-                transition: "all 0.2s ease",
-                "&:hover": { borderColor: "#f59e0b" },
-              }}
-            >
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography variant="caption" color="warning.main" fontWeight={700} textTransform="uppercase">
-                  Expense Amount
-                </Typography>
-                <ReceiptLongRoundedIcon sx={{ fontSize: 16, color: "warning.main" }} />
-              </Stack>
-              <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h6" fontWeight={900} color="warning.main" sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
-                  ₹{formatAmount(expenseTotal)}
-                </Typography>
-                <Typography variant="caption" fontWeight={700} color="warning.main" sx={{ display: "block", mt: 0.35 }}>
-                  {eventScopedExpenses.length} Expenses
                 </Typography>
               </Box>
             </Paper>
@@ -897,11 +862,12 @@ export default function MemberPaymentQuickAccess({
                           {/* Amount */}
                           <TableCell align="right">
                             <Typography
-                              variant="subtitle2"
-                              fontWeight={800}
+                              variant="body2"
+                              fontWeight={500}
                               sx={{
                                 fontFamily: '"Outfit", sans-serif',
-                                color: "warning.main",
+                                color: "text.primary",
+                                fontVariantNumeric: "tabular-nums",
                               }}
                             >
                               ₹{formatAmount(item.amount)}
@@ -1033,11 +999,12 @@ export default function MemberPaymentQuickAccess({
                           {/* Amount */}
                           <TableCell align="right">
                             <Typography
-                              variant="subtitle2"
-                              fontWeight={800}
+                              variant="body2"
+                              fontWeight={500}
                               sx={{
                                 fontFamily: '"Outfit", sans-serif',
-                                color: item.isPaid ? "success.main" : "error.main",
+                                color: "text.primary",
+                                fontVariantNumeric: "tabular-nums",
                               }}
                             >
                               ₹{formatAmount(item.amount)}

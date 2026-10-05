@@ -7,6 +7,8 @@ export default function MetricCard({
   value,
   helper,
   accent = "primary.main",
+  valueColor,
+  fontWeight = 500,
   onClick,
   clickable = false,
   actionText,
@@ -102,8 +104,8 @@ export default function MetricCard({
               variant="h4"
               sx={{
                 fontFamily: '"Outfit", sans-serif',
-                color: resolvedAccent,
-                fontWeight: 800,
+                color: valueColor || (isDark ? "#ffffff" : "#0f172a"),
+                fontWeight: fontWeight || 500,
                 fontSize: { xs: "1.35rem", sm: "1.45rem", md: "1.5rem", xl: "1.65rem" },
                 letterSpacing: "-0.02em",
                 mt: 0.35,
