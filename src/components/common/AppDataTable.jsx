@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Box,
   CircularProgress,
@@ -359,6 +359,11 @@ export default function AppDataTable({
   const [order, setOrder] = useState("asc");
   const [search, setSearch] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Reset pagination to first page whenever input data is filtered or changed
+  useEffect(() => {
+    setPage(0);
+  }, [data]);
 
   // Column visibility state
   const [visibleColumns, setVisibleColumns] = useState(() => {

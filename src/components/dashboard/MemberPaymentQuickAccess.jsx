@@ -38,12 +38,15 @@ import dayjs from "dayjs";
 import { getContributionsAsync } from "../../services/contributionService";
 import { getMembersAsync } from "../../services/memberService";
 import { getExpensesAsync } from "../../services/expenseService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getDashboardSummaryAsync } from "../../services/dashboardService";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppToast } from "../common/AppToast";
 
 export default function MemberPaymentQuickAccess({
   events = [],
+  allEvents = [],
+  eventTypes: propEventTypes = [],
   appliedFilters = {},
   initialStatus = "all", // "all" | "pending" | "paid"
   onClose = null,
@@ -59,16 +62,36 @@ export default function MemberPaymentQuickAccess({
   const [contributions, setContributions] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [fallbackEvents, setFallbackEvents] = useState([]);
+  const [eventTypes, setEventTypes] = useState(propEventTypes || []);
   const [membersMap, setMembersMap] = useState(new Map());
   const [statusFilter, setStatusFilter] = useState(initialStatus); // "all" | "pending" | "paid" | "expense"
   const [search, setSearch] = useState("");
-  const [selectedEventId, setSelectedEventId] = useState("ALL");
+  const [selectedEventType, setSelectedEventType] = useState(appliedFilters?.eventType || "ALL");
+  const [selectedEventId, setSelectedEventId] = useState(appliedFilters?.eventId || "ALL");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const targetMonth = appliedFilters?.month ? Number(appliedFilters.month) : 0;
   const targetYear = appliedFilters?.year ? Number(appliedFilters.year) : 0;
-  const eventTypeFilter = appliedFilters?.eventType || "ALL";
+
+  // Sync eventTypes prop if provided
+  useEffect(() => {
+    if (propEventTypes && propEventTypes.length > 0) {
+      setEventTypes(propEventTypes);
+    }
+  }, [propEventTypes]);
+
+  // Sync filters if appliedFilters changes
+  useEffect(() => {
+    setSelectedEventType(appliedFilters?.eventType || "ALL");
+    setSelectedEventId(appliedFilters?.eventId || "ALL");
+  }, [appliedFilters?.eventType, appliedFilters?.eventId]);
+
+  // Format amount cleanly without forced .00 trailing decimals
+  const formatAmount = (val) =>
+    Number(val || 0).toLocaleString(undefined, {
+      maximumFractionDigits: Number(val || 0) % 1 === 0 ? 0 : 2,
+    });
 
   // Readable period label (e.g. "October 2026")
   const periodLabel = useMemo(() => {
@@ -102,10 +125,11 @@ export default function MemberPaymentQuickAccess({
           getContributionsAsync().catch(() => []),
           getMembersAsync().catch(() => []),
           getExpensesAsync().catch(() => []),
+          getEventTypesAsync().catch(() => []),
         ];
 
         // If events prop is empty and we have a target month/year, fetch dashboard summary to get the month events
-        if ((!events || events.length === 0) && (targetMonth > 0 || targetYear > 0)) {
+        if ((!events || events.length === 0) && (!allEvents || allEvents.length === 0) && (targetMonth > 0 || targetYear > 0)) {
           promises.push(
             getDashboardSummaryAsync({
               month: targetMonth > 0 ? targetMonth : null,
@@ -114,16 +138,20 @@ export default function MemberPaymentQuickAccess({
           );
         }
 
-        const [contribRes, membersRes, expensesRes, dashRes] = await Promise.all(promises);
+        const [contribRes, membersRes, expensesRes, typesRes, dashRes] = await Promise.all(promises);
 
         if (cancelled) return;
 
         const rawContribs = Array.isArray(contribRes) ? contribRes : (contribRes?.data ?? []);
         const rawMembers = Array.isArray(membersRes) ? membersRes : (membersRes?.data ?? []);
         const rawExpenses = Array.isArray(expensesRes) ? expensesRes : (expensesRes?.data ?? []);
+        const rawTypes = Array.isArray(typesRes) ? typesRes : (typesRes?.data ?? []);
 
         setContributions(rawContribs);
         setExpenses(rawExpenses);
+        if (rawTypes.length > 0) {
+          setEventTypes(rawTypes);
+        }
 
         if (dashRes) {
           const dashData = dashRes?.data || dashRes;
@@ -151,21 +179,23 @@ export default function MemberPaymentQuickAccess({
     }
 
     loadData();
-    setSelectedEventId("ALL");
     setPage(0);
 
     return () => {
       cancelled = true;
     };
-  }, [targetMonth, targetYear, eventTypeFilter]);
+  }, [targetMonth, targetYear]);
 
   // Events for the selected month/year
   const monthEvents = useMemo(() => {
+    if (Array.isArray(allEvents) && allEvents.length > 0) {
+      return allEvents;
+    }
     if (Array.isArray(events) && events.length > 0) {
       return events;
     }
     return fallbackEvents;
-  }, [events, fallbackEvents]);
+  }, [allEvents, events, fallbackEvents]);
 
   // Set of event IDs for the selected month/year
   const monthEventIdSet = useMemo(() => {
@@ -194,7 +224,7 @@ export default function MemberPaymentQuickAccess({
   // Combined and scoped contributions
   const scopedItems = useMemo(() => {
     const isMonthScoped = targetMonth > 0 || targetYear > 0;
-    const isFilteredByType = Boolean(eventTypeFilter && eventTypeFilter !== "ALL");
+    const isFilteredByType = Boolean(selectedEventType && selectedEventType !== "ALL");
     const isMemberRole = isMember || String(authState?.role || "").toLowerCase() === "member";
     const userEmail = String(authState?.email || "").toLowerCase().trim();
     const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
@@ -224,7 +254,7 @@ export default function MemberPaymentQuickAccess({
 
       // Event Type category filter if specified
       if (isFilteredByType) {
-        if (categoryName.toLowerCase() !== eventTypeFilter.toLowerCase()) {
+        if (categoryName.toLowerCase() !== selectedEventType.toLowerCase()) {
           return;
         }
       }
@@ -274,7 +304,7 @@ export default function MemberPaymentQuickAccess({
     membersMap,
     targetMonth,
     targetYear,
-    eventTypeFilter,
+    selectedEventType,
     isMember,
     authState,
   ]);
@@ -309,11 +339,43 @@ export default function MemberPaymentQuickAccess({
     };
   }, [eventScopedItems]);
 
-  // Event dropdown options
+  // Event Type dropdown options
+  const eventTypeOptions = useMemo(() => {
+    const opts = [{ label: "All Event Types", value: "ALL" }];
+    const seen = new Set();
+
+    (eventTypes || []).forEach((t) => {
+      const name = t.eventTypeName || t.name;
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        opts.push({ label: name, value: name });
+      }
+    });
+
+    monthEvents.forEach((e) => {
+      const tName = e.eventTypeName || e.CategoryName || e.categoryName;
+      if (tName && !seen.has(tName.toLowerCase())) {
+        seen.add(tName.toLowerCase());
+        opts.push({ label: tName, value: tName });
+      }
+    });
+
+    return opts;
+  }, [eventTypes, monthEvents]);
+
+  // Event dropdown options (cascading from selectedEventType)
   const eventOptions = useMemo(() => {
     const opts = [{ label: "All Events", value: "ALL" }];
     const seen = new Set();
-    monthEvents.forEach((e) => {
+    const isFilteredByType = Boolean(selectedEventType && selectedEventType !== "ALL");
+    const matchingEvents = isFilteredByType
+      ? monthEvents.filter((e) => {
+          const tName = e.eventTypeName || e.CategoryName || e.categoryName || "";
+          return tName.toLowerCase() === selectedEventType.toLowerCase();
+        })
+      : monthEvents;
+
+    matchingEvents.forEach((e) => {
       const id = String(e.eventId || e.EventId || "");
       if (id && !seen.has(id.toLowerCase())) {
         seen.add(id.toLowerCase());
@@ -322,9 +384,9 @@ export default function MemberPaymentQuickAccess({
       }
     });
     return opts;
-  }, [monthEvents]);
+  }, [monthEvents, selectedEventType]);
 
-  // Filter expenses strictly against the selected event (or month's events)
+  // Filter expenses strictly against the selected event (or month's events / event type)
   const eventScopedExpenses = useMemo(() => {
     // If a specific event is selected, filter strictly against that event's name
     if (selectedEventId !== "ALL") {
@@ -338,15 +400,21 @@ export default function MemberPaymentQuickAccess({
       );
     }
 
-    // All events mode: match events belonging to the active month or month date
-    const monthEventNames = new Set(
-      monthEvents.map((e) => (e.eventName || e.EventName || "").trim().toLowerCase()).filter(Boolean)
+    // Filter by Event Type if selected
+    const isFilteredByType = Boolean(selectedEventType && selectedEventType !== "ALL");
+    const matchingMonthEvents = isFilteredByType
+      ? monthEvents.filter((e) => (e.eventTypeName || e.CategoryName || e.categoryName || "").toLowerCase() === selectedEventType.toLowerCase())
+      : monthEvents;
+
+    const matchingEventNames = new Set(
+      matchingMonthEvents.map((e) => (e.eventName || e.EventName || "").trim().toLowerCase()).filter(Boolean)
     );
     const isMonthScoped = targetMonth > 0 || targetYear > 0;
 
     return expenses.filter((exp) => {
       const expEvtName = (exp.eventName || "").trim().toLowerCase();
-      if (monthEventNames.has(expEvtName)) return true;
+      if (matchingEventNames.has(expEvtName)) return true;
+      if (isFilteredByType) return false;
 
       if (isMonthScoped && exp.expenseDate) {
         const d = dayjs(exp.expenseDate);
@@ -357,7 +425,7 @@ export default function MemberPaymentQuickAccess({
 
       return !isMonthScoped;
     });
-  }, [expenses, selectedEventId, monthEvents, targetMonth, targetYear]);
+  }, [expenses, selectedEventId, selectedEventType, monthEvents, targetMonth, targetYear]);
 
   const expenseTotal = useMemo(() => {
     return eventScopedExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
@@ -560,14 +628,14 @@ export default function MemberPaymentQuickAccess({
               <Typography variant="caption" color="text.secondary" fontWeight={700} textTransform="uppercase">
                 Total Expected Amount
               </Typography>
-              <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a" }}>
-                  ₹{stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <Box sx={{ mt: 0.75 }}>
+                <Typography variant="h6" fontWeight={900} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
+                  ₹{formatAmount(stats.totalAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: "block", mt: 0.35 }}>
                   {stats.totalCount} Members
                 </Typography>
-              </Stack>
+              </Box>
             </Paper>
           </Grid>
 
@@ -595,14 +663,14 @@ export default function MemberPaymentQuickAccess({
                 </Typography>
                 <HourglassEmptyIcon sx={{ fontSize: 16, color: "error.main" }} />
               </Stack>
-              <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} color="error.main" sx={{ fontFamily: '"Outfit", sans-serif' }}>
-                  ₹{stats.pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <Box sx={{ mt: 0.75 }}>
+                <Typography variant="h6" fontWeight={900} color="error.main" sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                  ₹{formatAmount(stats.pendingAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="error.main">
+                <Typography variant="caption" fontWeight={700} color="error.main" sx={{ display: "block", mt: 0.35 }}>
                   {stats.pendingCount} Members
                 </Typography>
-              </Stack>
+              </Box>
             </Paper>
           </Grid>
 
@@ -630,14 +698,14 @@ export default function MemberPaymentQuickAccess({
                 </Typography>
                 <CheckCircleIcon sx={{ fontSize: 16, color: "success.main" }} />
               </Stack>
-              <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} color="success.main" sx={{ fontFamily: '"Outfit", sans-serif' }}>
-                  ₹{stats.paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <Box sx={{ mt: 0.75 }}>
+                <Typography variant="h6" fontWeight={900} color="success.main" sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                  ₹{formatAmount(stats.paidAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="success.main">
+                <Typography variant="caption" fontWeight={700} color="success.main" sx={{ display: "block", mt: 0.35 }}>
                   {stats.paidCount} Members
                 </Typography>
-              </Stack>
+              </Box>
             </Paper>
           </Grid>
 
@@ -665,26 +733,31 @@ export default function MemberPaymentQuickAccess({
                 </Typography>
                 <ReceiptLongRoundedIcon sx={{ fontSize: 16, color: "warning.main" }} />
               </Stack>
-              <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                <Typography variant="h6" fontWeight={900} color="warning.main" sx={{ fontFamily: '"Outfit", sans-serif' }}>
-                  ₹{expenseTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <Box sx={{ mt: 0.75 }}>
+                <Typography variant="h6" fontWeight={900} color="warning.main" sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                  ₹{formatAmount(expenseTotal)}
                 </Typography>
-                <Typography variant="caption" fontWeight={700} color="warning.main">
+                <Typography variant="caption" fontWeight={700} color="warning.main" sx={{ display: "block", mt: 0.35 }}>
                   {eventScopedExpenses.length} Expenses
                 </Typography>
-              </Stack>
+              </Box>
             </Paper>
           </Grid>
         </Grid>
 
         {/* Search and Filters Bar */}
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          alignItems={{ sm: "center" }}
+          sx={{ mb: 2 }}
+        >
           <TextField
             size="small"
             placeholder={statusFilter === "expense" ? "Search expense category, event, or description…" : "Search member, phone, or event…"}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            sx={{ flex: 1 }}
+            sx={{ flex: 1, minWidth: { xs: "100%", sm: 200 } }}
             slotProps={{
               input: {
                 startAdornment: (
@@ -696,16 +769,30 @@ export default function MemberPaymentQuickAccess({
             }}
           />
 
-          {eventOptions.length > 2 && (
-            <Box sx={{ minWidth: 200 }}>
-              <AppSelect
-                size="small"
-                value={selectedEventId}
-                onChange={(e) => { setSelectedEventId(e.target.value); setPage(0); }}
-                options={eventOptions}
-              />
-            </Box>
-          )}
+          <Box sx={{ minWidth: { xs: "100%", sm: 165 } }}>
+            <AppSelect
+              size="small"
+              value={selectedEventType}
+              onChange={(e) => {
+                setSelectedEventType(e.target.value);
+                setSelectedEventId("ALL");
+                setPage(0);
+              }}
+              options={eventTypeOptions}
+            />
+          </Box>
+
+          <Box sx={{ minWidth: { xs: "100%", sm: 195 } }}>
+            <AppSelect
+              size="small"
+              value={selectedEventId}
+              onChange={(e) => {
+                setSelectedEventId(e.target.value);
+                setPage(0);
+              }}
+              options={eventOptions}
+            />
+          </Box>
         </Stack>
 
         {/* Content Table / Loading State */}
@@ -817,7 +904,7 @@ export default function MemberPaymentQuickAccess({
                                 color: "warning.main",
                               }}
                             >
-                              ₹{(Number(item.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₹{formatAmount(item.amount)}
                             </Typography>
                           </TableCell>
 
@@ -953,7 +1040,7 @@ export default function MemberPaymentQuickAccess({
                                 color: item.isPaid ? "success.main" : "error.main",
                               }}
                             >
-                              ₹{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₹{formatAmount(item.amount)}
                             </Typography>
                           </TableCell>
 
