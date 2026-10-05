@@ -57,7 +57,7 @@ import { getEventsAsync } from "../../services/eventService";
 import { getMembersAsync } from "../../services/memberService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getStatusesAsync } from "../../services/statusService";
-import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { TOAST_MESSAGES, COMMON_STRINGS, MENU_FEATURE_IDS } from "../../constants";
 
 const resolveAttachmentUrl = (filePath) => {
   if (!filePath) return "";
@@ -123,12 +123,12 @@ export default function ExpensePage() {
   const fileInputRef = useRef(null);
 
   // Granular Action Permissions configured via User Rights
-  const canViewExpense = hasActionPermission("View details", 44, authState?.role).canView;
-  const canAddExpense = hasActionPermission("Add Expense", 48, authState?.role).canExecute && hasWriteAccess;
-  const canEditExpense = hasActionPermission("Edit", 46, authState?.role).canExecute && hasWriteAccess;
-  const canDeleteExpense = hasActionPermission("Delete", 47, authState?.role).canExecute && hasWriteAccess;
-  const canVerifyExpense = hasActionPermission("Verify", 45, authState?.role).canExecute && hasWriteAccess;
-  const canExportExpense = hasActionPermission("Export Expense", 48, authState?.role).canExecute;
+  const canViewExpense = hasActionPermission("view", MENU_FEATURE_IDS.EXPENSE_VIEW, authState?.role).canView || hasActionPermission("View details", MENU_FEATURE_IDS.EXPENSE_VIEW, authState?.role).canView;
+  const canAddExpense = hasActionPermission("Add", MENU_FEATURE_IDS.EXPENSE_ADD, authState?.role).canExecute || hasActionPermission("Add Expense", MENU_FEATURE_IDS.EXPENSE_ADD, authState?.role).canExecute;
+  const canEditExpense = hasActionPermission("edit/verify", MENU_FEATURE_IDS.EXPENSE_EDIT, authState?.role).canExecute || hasActionPermission("Edit", MENU_FEATURE_IDS.EXPENSE_EDIT, authState?.role).canExecute;
+  const canDeleteExpense = hasActionPermission("Delete", MENU_FEATURE_IDS.EXPENSE_DELETE, authState?.role).canExecute;
+  const canVerifyExpense = hasActionPermission("verify", MENU_FEATURE_IDS.EXPENSE_VERIFY, authState?.role).canExecute || hasActionPermission("Verify", MENU_FEATURE_IDS.EXPENSE_VERIFY, authState?.role).canExecute;
+  const canExportExpense = hasActionPermission("Export Expense", MENU_FEATURE_IDS.EXPENSE_VIEW, authState?.role).canExecute || canViewExpense;
 
   const [expenses, setExpenses] = useState([]);
   const [eventsList, setEventsList] = useState([]);
@@ -177,6 +177,7 @@ export default function ExpensePage() {
           eventName: item.eventName || "",
           category: item.category || "",
           amount: item.amount || 0,
+          rawExpenseDate: item.expenseDate,
           expenseDate: item.expenseDate ? dayjs(item.expenseDate).format("YYYY-MM-DD") : "",
           status: item.status || "Pending",
           submittedBy: item.submittedBy || "",
@@ -326,6 +327,32 @@ export default function ExpensePage() {
 
     return list;
   }, [eventsList, eventTypesList, form.category, form.eventName]);
+
+  // Dynamically calculate selected event budget and remaining limit
+  const selectedEventBudget = useMemo(() => {
+    if (!form.eventName) return null;
+    const ev = eventsList.find(
+      (e) => (e.name || e.eventName || "").trim().toLowerCase() === form.eventName.trim().toLowerCase()
+    );
+    if (!ev) return null;
+
+    const expected = Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0);
+    const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
+    const spent = expenses
+      .filter((ex) => 
+        (ex.eventName || "").trim().toLowerCase() === form.eventName.trim().toLowerCase() &&
+        (!currentExpenseId || (ex.expenseId !== currentExpenseId && ex.id !== currentExpenseId)) &&
+        (ex.status || "").toLowerCase() !== "rejected"
+      )
+      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+
+    const remaining = Math.max(0, expected - spent);
+    return {
+      expected,
+      spent,
+      remaining,
+    };
+  }, [form.eventName, eventsList, expenses, editingExpense]);
 
   // Event options for the filter panel (cascaded by filterCategory)
   const eventOptions = useMemo(() => {
@@ -550,7 +577,13 @@ export default function ExpensePage() {
     const newErrors = {};
     if (!form.eventName) newErrors.eventName = "Event is required";
     if (!form.category) newErrors.category = "Event Type is required";
-    if (!form.amount || Number(form.amount) <= 0) newErrors.amount = "Valid amount is required";
+    if (!form.amount || Number(form.amount) <= 0) {
+      newErrors.amount = "Valid amount is required";
+    } else if (selectedEventBudget && Number(form.amount) > selectedEventBudget.remaining) {
+      newErrors.amount = COMMON_STRINGS.EXPENSES?.AMOUNT_EXCEEDS_BUDGET
+        ? COMMON_STRINGS.EXPENSES.AMOUNT_EXCEEDS_BUDGET(selectedEventBudget.remaining)
+        : `Amount cannot exceed the remaining budget (₹${selectedEventBudget.remaining.toLocaleString()})`;
+    }
     if (!form.submittedBy) newErrors.submittedBy = "Submitted by is required";
     if (!form.attachment && (!editingExpense || (!editingExpense.fileName && !editingExpense.fileUrl))) {
       newErrors.attachment = "Attachment (1 Image) is required";
@@ -559,7 +592,11 @@ export default function ExpensePage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
+      if (newErrors.amount && selectedEventBudget && Number(form.amount) > selectedEventBudget.remaining) {
+        toast.error(newErrors.amount);
+      } else {
+        toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
+      }
       return;
     }
 
@@ -628,11 +665,13 @@ export default function ExpensePage() {
           : `[Status Note - ${newStatus} (${timestamp}) by ${userTag}]: ${statusRemarks.trim()}`;
       }
 
+      const safeExpenseDate = statusExpense.rawExpenseDate || (statusExpense.expenseDate ? `${statusExpense.expenseDate}T00:00:00.000Z` : new Date().toISOString());
+
       await updateExpenseAsync(expenseId, {
         eventName: statusExpense.eventName,
         category: statusExpense.category,
         amount: Number(statusExpense.amount),
-        expenseDate: statusExpense.expenseDate ? dayjs(statusExpense.expenseDate).toISOString() : new Date().toISOString(),
+        expenseDate: safeExpenseDate,
         status: newStatus,
         submittedBy: statusExpense.submittedBy,
         approvedBy: approvedByVal,
@@ -640,6 +679,20 @@ export default function ExpensePage() {
         fileName: statusExpense.fileName || "",
         fileData: statusExpense.fileName?.startsWith("data:") ? statusExpense.fileName : null,
       });
+
+      // Optimistically update table data so status and reviewer change immediately
+      setExpenses((prev) =>
+        prev.map((item) =>
+          (item.expenseId === expenseId || item.id === expenseId)
+            ? {
+                ...item,
+                status: newStatus,
+                approvedBy: approvedByVal,
+                description: updatedDescription,
+              }
+            : item
+        )
+      );
 
       toast.success("Expense verified successfully!");
       setStatusDialogOpen(false);
@@ -680,7 +733,7 @@ export default function ExpensePage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canVerifyExpense ? "Verify" : (hasWriteAccess ? "Access Denied" : "")}>
+          <Tooltip title={canVerifyExpense ? "Verify" : "Access Denied"}>
             <span>
               <IconButton
                 size="small"
@@ -704,7 +757,7 @@ export default function ExpensePage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canEditExpense ? "Edit" : (hasWriteAccess ? "Access Denied" : "")}>
+          <Tooltip title={canEditExpense ? "Edit" : "Access Denied"}>
             <span>
               <IconButton
                 size="small"
@@ -728,7 +781,7 @@ export default function ExpensePage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canDeleteExpense ? "Delete" : (hasWriteAccess ? "Access Denied" : "")}>
+          <Tooltip title={canDeleteExpense ? "Delete" : "Access Denied"}>
             <span>
               <IconButton
                 size="small"
@@ -795,20 +848,20 @@ export default function ExpensePage() {
       label: "Status",
       key: "status",
       render: (row) => {
-        const isApproved = row.status === "Approved";
+        const isApprovedOrVerified = row.status === "Approved" || row.status === "Verified" || row.status === "Paid";
         const isPending = row.status === "Pending";
         return (
           <Typography
             variant="caption"
             fontWeight={700}
             sx={{
-              bgcolor: isApproved
+              bgcolor: isApprovedOrVerified
                 ? "rgba(22, 163, 74, 0.1)"
                 : isPending
                   ? "rgba(234, 179, 8, 0.12)"
                   : "rgba(220, 38, 38, 0.1)",
-              color: isApproved ? "#16a34a" : isPending ? "#d97706" : "#dc2626",
-              border: isApproved
+              color: isApprovedOrVerified ? "#16a34a" : isPending ? "#d97706" : "#dc2626",
+              border: isApprovedOrVerified
                 ? "1px solid rgba(22, 163, 74, 0.25)"
                 : isPending
                   ? "1px solid rgba(234, 179, 8, 0.25)"
@@ -864,32 +917,36 @@ export default function ExpensePage() {
         allowExport={canExportExpense}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppButton
-              variant="contained"
-              size="small"
-              disabled={!canAddExpense}
-              startIcon={<AddIcon />}
-              onClick={() => {
-                if (!canAddExpense) {
-                  toast.error("You do not have permission to add expenses.");
-                  return;
-                }
-                const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
-                const matched = membersList.find((m) => {
-                  const mName = (m.name || m.memberName || "").trim().toLowerCase();
-                  return mName === currentUserName.trim().toLowerCase();
-                });
-                setEditingExpense(null);
-                setForm({
-                  ...initialForm,
-                  submittedBy: matched ? (matched.name || matched.memberName) : currentUserName,
-                });
-                setErrors({});
-                setDialogOpen(true);
-              }}
-            >
-              Add
-            </AppButton>
+            <Tooltip title={!canAddExpense ? "Access Denied" : ""}>
+              <span>
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  disabled={!canAddExpense}
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    if (!canAddExpense) {
+                      toast.error("You do not have permission to add expenses.");
+                      return;
+                    }
+                    const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
+                    const matched = membersList.find((m) => {
+                      const mName = (m.name || m.memberName || "").trim().toLowerCase();
+                      return mName === currentUserName.trim().toLowerCase();
+                    });
+                    setEditingExpense(null);
+                    setForm({
+                      ...initialForm,
+                      submittedBy: matched ? (matched.name || matched.memberName) : currentUserName,
+                    });
+                    setErrors({});
+                    setDialogOpen(true);
+                  }}
+                >
+                  Add
+                </AppButton>
+              </span>
+            </Tooltip>
           </Stack>
         }
         filterPanel={
@@ -1093,18 +1150,77 @@ export default function ExpensePage() {
             />
           </Grid>
 
+          {/* Budget Info Card for Selected Event */}
+          {selectedEventBudget && (
+            <Grid size={{ xs: 12 }}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.08)" : "rgba(124, 58, 237, 0.04)",
+                  border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.25)" : "rgba(124, 58, 237, 0.18)"}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 1.5,
+                }}
+              >
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                    {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
+                    ₹{selectedEventBudget.expected.toLocaleString()}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                    {COMMON_STRINGS.EXPENSES?.ALREADY_SPENT || "Already Spent"}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: "warning.main" }}>
+                    ₹{selectedEventBudget.spent.toLocaleString()}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                    {COMMON_STRINGS.EXPENSES?.REMAINING_LIMIT || "Remaining Limit"}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 900, color: selectedEventBudget.remaining > 0 ? "success.main" : "error.main" }}>
+                    ₹{selectedEventBudget.remaining.toLocaleString()}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+          )}
+
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
               label="Amount"
               placeholder="₹ Enter amount"
               value={form.amount}
               onChange={(e) => {
-                setForm((c) => ({ ...c, amount: e.target.value }));
-                if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
+                const val = e.target.value;
+                setForm((c) => ({ ...c, amount: val }));
+                if (selectedEventBudget && Number(val) > selectedEventBudget.remaining) {
+                  setErrors((p) => ({
+                    ...p,
+                    amount: COMMON_STRINGS.EXPENSES?.AMOUNT_EXCEEDS_BUDGET
+                      ? COMMON_STRINGS.EXPENSES.AMOUNT_EXCEEDS_BUDGET(selectedEventBudget.remaining)
+                      : `Amount cannot exceed the remaining budget (₹${selectedEventBudget.remaining.toLocaleString()})`,
+                  }));
+                } else if (errors.amount) {
+                  setErrors((p) => ({ ...p, amount: "" }));
+                }
               }}
               restrictType="numberonly"
               error={!!errors.amount}
-              helperText={errors.amount}
+              helperText={
+                errors.amount ||
+                (selectedEventBudget
+                  ? `Max allowable: ₹${selectedEventBudget.remaining.toLocaleString()}`
+                  : undefined)
+              }
               required
             />
           </Grid>

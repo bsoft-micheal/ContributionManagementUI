@@ -37,6 +37,8 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { hasActionPermission } from "../../utils/rightsHelper";
+import { getEventsAsync } from "../../services/eventService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
 
 /* ─── Horizontal Bar Chart ─── */
 function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
@@ -170,70 +172,98 @@ function StatCard({ label, value, icon: Icon, color = "primary", subLabel, helpe
         },
       }}
     >
-      <CardContent sx={{ p: "18px 20px !important" }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+      <CardContent
+        sx={{
+          p: "14px 14px !important",
+          "&:last-child": { pb: "14px !important" },
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          height: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        <Box>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 0.75,
+              mb: 0.5,
+            }}
+          >
             <Typography
               variant="caption"
               sx={{
-                fontWeight: 700,
+                fontWeight: 800,
                 color: "text.secondary",
                 textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                fontSize: "0.68rem",
-                display: "block",
+                letterSpacing: "0.03em",
+                fontSize: { xs: "0.62rem", sm: "0.66rem", xl: "0.68rem" },
+                lineHeight: 1.25,
+                minHeight: { xs: "auto", sm: "2.5em" },
+                display: "flex",
+                alignItems: "center",
+                flex: 1,
               }}
             >
               {label}
             </Typography>
-            <Typography
-              variant="h4"
+            <Box
               sx={{
-                fontFamily: '"Outfit", sans-serif',
-                fontWeight: 800,
-                color: c.text,
-                mt: 0.6,
-                fontSize: { xs: "1.45rem", sm: "1.65rem" },
-                lineHeight: 1.1,
-                letterSpacing: "-0.02em",
-                fontVariantNumeric: "tabular-nums",
+                width: 28,
+                height: 28,
+                borderRadius: "7px",
+                bgcolor: c.badgeBg,
+                color: c.accent,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                boxShadow: `0 2px 6px ${c.glow}`,
               }}
-              noWrap
             >
-              {value}
-            </Typography>
-            {(subLabel || helper) && (
-              <Typography
-                variant="caption"
-                sx={{
-                  display: "block",
-                  color: "text.secondary",
-                  fontSize: "0.72rem",
-                  mt: 0.5,
-                  fontWeight: 500,
-                }}
-              >
-                {subLabel || helper}
-              </Typography>
-            )}
+              <Icon sx={{ fontSize: 16 }} />
+            </Box>
           </Box>
-          <Box
+
+          <Typography
+            variant="h4"
+            title={typeof value === "string" ? value : undefined}
             sx={{
-              width: 44,
-              height: 44,
-              borderRadius: "12px",
-              bgcolor: c.badgeBg,
-              color: c.accent,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              boxShadow: `0 2px 8px ${c.glow}`,
+              fontFamily: '"Outfit", sans-serif',
+              fontWeight: 800,
+              color: c.text,
+              fontSize: { xs: "1.15rem", sm: "1.22rem", md: "1.28rem", lg: "1.22rem", xl: "1.34rem" },
+              lineHeight: 1.15,
+              letterSpacing: "-0.015em",
+              fontVariantNumeric: "tabular-nums",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            <Icon sx={{ fontSize: 22 }} />
-          </Box>
+            {value}
+          </Typography>
         </Box>
+
+        {(subLabel || helper) && (
+          <Typography
+            variant="caption"
+            sx={{
+              display: "block",
+              color: "text.secondary",
+              fontSize: "0.68rem",
+              lineHeight: 1.25,
+              mt: 0.6,
+              fontWeight: 500,
+              minHeight: { xs: "auto", sm: "2.4em" },
+            }}
+          >
+            {subLabel || helper}
+          </Typography>
+        )}
       </CardContent>
     </Card>
   );
@@ -268,8 +298,8 @@ function SegmentedTab({ label, icon: Icon, isActive, onClick }) {
           bgcolor: isActive
             ? theme.palette.primary.main
             : isDark
-            ? "rgba(255, 255, 255, 0.06)"
-            : "rgba(124, 58, 237, 0.08)",
+              ? "rgba(255, 255, 255, 0.06)"
+              : "rgba(124, 58, 237, 0.08)",
         },
       }}
     >
@@ -288,20 +318,29 @@ export default function ReportsPage({ mode = "event" }) {
   const canExport = hasActionPermission("Export Reports", 60, authState?.role).canView !== false;
   const toast = useAppToast();
 
-  const [report, setReport]       = useState(null);
-  const [loading, setLoading]     = useState(true);
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
-  const [filterYear, setFilterYear]   = useState(dayjs().year());
-  const [filters, setFilters]     = useState({ month: dayjs().month() + 1, year: dayjs().year() });
+  const [filterYear, setFilterYear] = useState(dayjs().year());
+  const [filterEventType, setFilterEventType] = useState("ALL");
+  const [filterEvent, setFilterEvent] = useState("ALL");
+  const [filters, setFilters] = useState({
+    month: dayjs().month() + 1,
+    year: dayjs().year(),
+    eventType: "ALL",
+    event: "ALL",
+  });
+  const [eventsList, setEventsList] = useState([]);
+  const [eventTypesList, setEventTypesList] = useState([]);
   const [chartType, setChartType] = useState("pie");
-  const [metric, setMetric]       = useState("paid");
+  const [metric, setMetric] = useState("paid");
 
   /* Modal state for member event breakdown */
   const [selectedMember, setSelectedMember] = useState(null);
-  const [dialogFilter, setDialogFilter]     = useState("all");
-  const [dialogSearch, setDialogSearch]     = useState("");
+  const [dialogFilter, setDialogFilter] = useState("all");
+  const [dialogSearch, setDialogSearch] = useState("");
   const [memberContributions, setMemberContributions] = useState([]);
-  const [modalLoading, setModalLoading]     = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const openBreakdownModal = async (member, filter = "all") => {
     setSelectedMember(member);
@@ -432,17 +471,150 @@ export default function ReportsPage({ mode = "event" }) {
     ...Array.from({ length: 11 }, (_, i) => { const y = yr - 5 + i; return { label: String(y), value: y }; }),
   ];
 
+  useEffect(() => {
+    async function fetchLookups() {
+      try {
+        const [eventsRes, typesRes] = await Promise.all([
+          getEventsAsync().catch(() => []),
+          getEventTypesAsync().catch(() => []),
+        ]);
+        if (Array.isArray(eventsRes)) setEventsList(eventsRes);
+        if (Array.isArray(typesRes)) setEventTypesList(typesRes);
+      } catch {
+        // silent fallback
+      }
+    }
+    fetchLookups();
+  }, []);
+
+  // Dynamic Event Type options
+  const eventTypeOptions = useMemo(() => {
+    const set = new Set();
+    (eventTypesList || []).forEach((et) => {
+      if (et.eventTypeName) set.add(et.eventTypeName.trim());
+    });
+    (report?.eventCollections || []).forEach((ec) => {
+      if (ec.eventTypeName) set.add(ec.eventTypeName.trim());
+    });
+    const list = [{ label: "All Event Types", value: "ALL" }];
+    Array.from(set).sort().forEach((name) => {
+      list.push({ label: name, value: name });
+    });
+    return list;
+  }, [eventTypesList, report?.eventCollections]);
+
+  // Cascading Event options based on selected filterEventType
+  const eventOptions = useMemo(() => {
+    const list = [{ label: "All Events", value: "ALL" }];
+    const unique = new Set();
+
+    const combined = [];
+    (eventsList || []).forEach((e) => {
+      const typeName = e.eventTypeName || e.category || eventTypesList.find((t) => t.eventTypeId === e.eventTypeId)?.eventTypeName || "General";
+      combined.push({
+        name: e.name || e.eventName || "",
+        typeName: typeName.trim(),
+      });
+    });
+
+    (report?.eventCollections || []).forEach((ec) => {
+      if (ec.eventName && !combined.some((c) => c.name.toLowerCase() === ec.eventName.toLowerCase())) {
+        combined.push({
+          name: ec.eventName,
+          typeName: (ec.eventTypeName || "General").trim(),
+        });
+      }
+    });
+
+    combined.forEach((e) => {
+      if (!e.name || unique.has(e.name.toLowerCase())) return;
+      if (
+        filterEventType !== "ALL" &&
+        e.typeName.toLowerCase() !== filterEventType.toLowerCase()
+      ) {
+        return;
+      }
+      unique.add(e.name.toLowerCase());
+      list.push({ label: e.name, value: e.name });
+    });
+
+    return list;
+  }, [eventsList, eventTypesList, report?.eventCollections, filterEventType]);
+
+  const handleEventTypeChange = (newType) => {
+    setFilterEventType(newType);
+    if (newType !== "ALL" && filterEvent !== "ALL") {
+      const isStillValid = (eventsList || []).some((e) => {
+        const typeName = e.eventTypeName || e.category || eventTypesList.find((t) => t.eventTypeId === e.eventTypeId)?.eventTypeName || "General";
+        return (e.name || e.eventName) === filterEvent && typeName.toLowerCase() === newType.toLowerCase();
+      });
+      if (!isStillValid) {
+        setFilterEvent("ALL");
+      }
+    }
+  };
+
+  /* Filtered Collections */
+  const filteredEventCollections = useMemo(() => {
+    let list = report?.eventCollections ?? [];
+    if (filters.eventType && filters.eventType !== "ALL") {
+      list = list.filter((e) => (e.eventTypeName || "General").trim().toLowerCase() === filters.eventType.trim().toLowerCase());
+    }
+    if (filters.event && filters.event !== "ALL") {
+      list = list.filter((e) => (e.eventName || "").trim().toLowerCase() === filters.event.trim().toLowerCase());
+    }
+    return list;
+  }, [report?.eventCollections, filters.eventType, filters.event]);
+
+  const filteredMemberContributions = useMemo(() => {
+    let list = report?.memberContributionHistory ?? [];
+    if ((filters.eventType && filters.eventType !== "ALL") || (filters.event && filters.event !== "ALL")) {
+      list = list.filter((m) => {
+        const events = m.events || [];
+        return events.some((ev) => {
+          const matchType = !filters.eventType || filters.eventType === "ALL" || (ev.categoryName || "General").trim().toLowerCase() === filters.eventType.trim().toLowerCase();
+          const matchEv = !filters.event || filters.event === "ALL" || (ev.eventName || "").trim().toLowerCase() === filters.event.trim().toLowerCase();
+          return matchType && matchEv;
+        });
+      });
+    }
+    return list;
+  }, [report?.memberContributionHistory, filters.eventType, filters.event]);
+
   /* Rupee formatter */
   const INR = (n) => "\u20B9" + Number(n || 0).toLocaleString();
 
   /* ── Column Definitions ── */
   const eventColumns = [
     { label: "Event", key: "eventName", render: (r) => <Typography variant="body2" fontWeight={700}>{r.eventName}</Typography> },
-    { label: "Type",  key: "eventTypeName", render: (r) => <Typography variant="body2" color="text.secondary">{r.eventTypeName || "General"}</Typography> },
-    { label: "Date",  key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
+    { label: "Type", key: "eventTypeName", render: (r) => <Typography variant="body2" color="text.secondary">{r.eventTypeName || "General"}</Typography> },
+    { label: "Date", key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
     { label: "Expected", key: "expectedAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700}>{INR(r.expectedAmount)}</Typography> },
-    { label: "Paid",     key: "paidAmount",     align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="success.main">{INR(r.paidAmount)}</Typography> },
-    { label: "Pending",  key: "pendingAmount",  align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR(r.pendingAmount)}</Typography> },
+    { label: "Paid", key: "paidAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="success.main">{INR(r.paidAmount)}</Typography> },
+    { label: "Pending", key: "pendingAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR(r.pendingAmount)}</Typography> },
+    { label: "Expense ₹", key: "expenseAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="warning.main">{INR(r.expenseAmount || 0)}</Typography> },
+    {
+      label: "Remaining ₹", key: "remainingAmount", align: "right",
+      render: (r) => {
+        const exp = Number(r.expectedAmount || 0);
+        const expAmt = Number(r.expenseAmount || 0);
+        const rem = exp - expAmt;
+        const isDeficit = rem < 0;
+        return (
+          <Chip
+            size="small"
+            label={INR(rem)}
+            sx={{
+              fontWeight: 800,
+              fontSize: "0.76rem",
+              bgcolor: isDeficit ? alpha("#ef4444", 0.12) : alpha("#10b981", 0.12),
+              color: isDeficit ? "error.main" : "success.main",
+              border: `1px solid ${isDeficit ? alpha("#ef4444", 0.3) : alpha("#10b981", 0.3)}`,
+            }}
+          />
+        );
+      },
+    },
   ];
 
   const memberColumns = [
@@ -460,9 +632,9 @@ export default function ReportsPage({ mode = "event" }) {
         </Typography>
       ),
     },
-    { label: "Expected",      key: "totalExpectedAmount", align: "right", render: (r) => INR(r.totalExpectedAmount) },
-    { label: "Paid",          key: "totalPaidAmount",     align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="success.main">{INR(r.totalPaidAmount)}</Typography> },
-    { label: "Pending",       key: "totalPendingAmount",  align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0))}</Typography> },
+    { label: "Expected", key: "totalExpectedAmount", align: "right", render: (r) => INR(r.totalExpectedAmount) },
+    { label: "Paid", key: "totalPaidAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="success.main">{INR(r.totalPaidAmount)}</Typography> },
+    { label: "Pending", key: "totalPendingAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0))}</Typography> },
     {
       label: "Paid Events",
       key: "paidEventsCount",
@@ -512,11 +684,11 @@ export default function ReportsPage({ mode = "event" }) {
   ];
 
   const pendingColumns = [
-    { label: "Member",     key: "memberName", render: (r) => <Typography variant="body2" fontWeight={700}>{r.memberName}</Typography> },
-    { label: "Phone",      key: "phone",      render: (r) => <Typography variant="body2" color="text.secondary">{r.phone || "\u2014"}</Typography> },
-    { label: "Event",      key: "eventName",  render: (r) => <Typography variant="body2" fontWeight={600}>{r.eventName}</Typography> },
-    { label: "Event Date", key: "eventDate",  render: (r) => formatGridDate(r.eventDate) },
-    { label: "Due Amount", key: "amount",     align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR(r.amount)}</Typography> },
+    { label: "Member", key: "memberName", render: (r) => <Typography variant="body2" fontWeight={700}>{r.memberName}</Typography> },
+    { label: "Phone", key: "phone", render: (r) => <Typography variant="body2" color="text.secondary">{r.phone || "\u2014"}</Typography> },
+    { label: "Event", key: "eventName", render: (r) => <Typography variant="body2" fontWeight={600}>{r.eventName}</Typography> },
+    { label: "Event Date", key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
+    { label: "Due Amount", key: "amount", align: "right", render: (r) => <Typography variant="body2" fontWeight={700} color="error.main">{INR(r.amount)}</Typography> },
     {
       label: "Aging", key: "agingCategory", align: "center",
       render: (r) => {
@@ -529,12 +701,12 @@ export default function ReportsPage({ mode = "event" }) {
   /* ── Chart Data ── */
   const chartData = useMemo(() => {
     if (mode === "member") {
-      return (report?.memberContributionHistory ?? []).map((item) => {
+      return (filteredMemberContributions ?? []).map((item) => {
         const val = metric === "paid"
           ? Number(item.totalPaidAmount) || 0
           : metric === "pending"
-          ? Math.max(0, (Number(item.totalExpectedAmount) || 0) - (Number(item.totalPaidAmount) || 0))
-          : Number(item.totalExpectedAmount) || 0;
+            ? Math.max(0, (Number(item.totalExpectedAmount) || 0) - (Number(item.totalPaidAmount) || 0))
+            : Number(item.totalExpectedAmount) || 0;
         return { label: item.memberName, value: val };
       }).filter((i) => i.value > 0);
     }
@@ -546,94 +718,108 @@ export default function ReportsPage({ mode = "event" }) {
       });
       return Object.entries(map).map(([k, v]) => ({ label: k, value: v }));
     }
-    return (report?.eventCollections ?? []).map((item) => {
-      const val = metric === "paid" ? Number(item.paidAmount) || 0 : metric === "pending" ? Number(item.pendingAmount) || 0 : Number(item.expectedAmount) || 0;
+    return (filteredEventCollections ?? []).map((item) => {
+      const val = metric === "paid"
+        ? Number(item.paidAmount) || 0
+        : metric === "pending"
+          ? Number(item.pendingAmount) || 0
+          : metric === "expense"
+            ? Number(item.expenseAmount) || 0
+            : metric === "remaining"
+              ? (Number(item.expectedAmount) || 0) - (Number(item.expenseAmount) || 0)
+              : Number(item.expectedAmount) || 0;
       return { label: item.eventName, value: val };
     }).filter((i) => i.value > 0);
-  }, [mode, report, metric]);
-
-  /* ── KPI Cards & Efficiency Metrics ── */
-  const efficiencyMetrics = useMemo(() => {
-    let exp = 0;
-    let paid = 0;
-    let count = 0;
-    if (mode === "member") {
-      const mb = report?.memberContributionHistory ?? [];
-      count = mb.length;
-      exp = mb.reduce((s, m) => s + Number(m.totalExpectedAmount || 0), 0);
-      paid = mb.reduce((s, m) => s + Number(m.totalPaidAmount || 0), 0);
-    } else {
-      const ev = report?.eventCollections ?? [];
-      count = ev.length;
-      exp = ev.reduce((s, e) => s + Number(e.expectedAmount || 0), 0);
-      paid = ev.reduce((s, e) => s + Number(e.paidAmount || 0), 0);
-    }
-    const pend = Math.max(0, exp - paid);
-    const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 1000) / 10) : 0;
-    return { expected: exp, paid, pending: pend, rate, count };
-  }, [mode, report]);
+  }, [mode, filteredEventCollections, filteredMemberContributions, report?.pendingDues, metric]);
 
   const kpiCards = useMemo(() => {
     if (mode === "event") {
-      const ev = report?.eventCollections ?? [];
-      const exp  = ev.reduce((s, e) => s + Number(e.expectedAmount || 0), 0);
+      const ev = filteredEventCollections ?? [];
+      const exp = ev.reduce((s, e) => s + Number(e.expectedAmount || 0), 0);
       const paid = ev.reduce((s, e) => s + Number(e.paidAmount || 0), 0);
       const pend = ev.reduce((s, e) => s + Number(e.pendingAmount || 0), 0);
+      const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
+      const remaining = exp - totalExp;
       const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
       return [
-        { label: "Total Events",    value: ev.length, icon: EventIcon,           color: "primary", helper: `${ev.length} active collection events` },
-        { label: "Total Expected",  value: INR(exp),  icon: AccountBalanceWallet, color: "info",    helper: "Projected target collections" },
-        { label: "Total Collected", value: INR(paid), icon: CheckCircle,          color: "success", helper: `${rate}% completion rate` },
-        { label: "Total Pending",   value: INR(pend), icon: HourglassEmpty,       color: "error",   helper: `${Math.max(0, 100 - rate)}% outstanding dues` },
+        { label: "Total Events", value: ev.length, icon: EventIcon, color: "primary", helper: `${ev.length} active collection events` },
+        { label: "Total Expected", value: INR(exp), icon: AccountBalanceWallet, color: "info", helper: "Projected target collections" },
+        { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: `${rate}% completion rate` },
+        { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: `${Math.max(0, 100 - rate)}% outstanding dues` },
+        { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
+        { label: "Current Remaining", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
       ];
     }
     if (mode === "member") {
-      const mb = report?.memberContributionHistory ?? [];
-      const exp  = mb.reduce((s, m) => s + Number(m.totalExpectedAmount || 0), 0);
+      const mb = filteredMemberContributions ?? [];
+      const exp = mb.reduce((s, m) => s + Number(m.totalExpectedAmount || 0), 0);
       const paid = mb.reduce((s, m) => s + Number(m.totalPaidAmount || 0), 0);
       const pend = exp - paid;
       const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
+      const ev = filteredEventCollections ?? [];
+      const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
+      const remaining = exp - totalExp;
       return [
-        { label: "Total Members",  value: mb.length,  icon: People,              color: "primary", helper: `${mb.length} contributing members` },
-        { label: "Total Expected", value: INR(exp),   icon: AccountBalanceWallet, color: "info",    helper: "Total expected member dues" },
-        { label: "Total Collected",value: INR(paid),  icon: CheckCircle,         color: "success", helper: `${rate}% dues cleared` },
-        { label: "Total Pending",  value: INR(pend),  icon: HourglassEmpty,       color: "error",   helper: `${Math.max(0, 100 - rate)}% remaining dues` },
+        { label: "Total Members", value: mb.length, icon: People, color: "primary", helper: `${mb.length} contributing members` },
+        { label: "Total Expected", value: INR(exp), icon: AccountBalanceWallet, color: "info", helper: "Total expected member dues" },
+        { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: `${rate}% dues cleared` },
+        { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: `${Math.max(0, 100 - rate)}% remaining dues` },
+        { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
+        { label: "Current Remaining", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
       ];
     }
     if (mode === "pending") {
-      const du    = report?.pendingDues ?? [];
+      const du = report?.pendingDues ?? [];
       const total = du.reduce((s, d) => s + Number(d.amount || 0), 0);
-      const uniq  = new Set(du.map((d) => d.memberId)).size;
-      const crit  = du.filter((d) => d.daysOverdue > 30).length;
-      const mod   = du.filter((d) => d.daysOverdue >= 15 && d.daysOverdue <= 30).length;
+      const uniq = new Set(du.map((d) => d.memberId)).size;
+      const crit = du.filter((d) => d.daysOverdue > 30).length;
+      const mod = du.filter((d) => d.daysOverdue >= 15 && d.daysOverdue <= 30).length;
       return [
-        { label: "Total Pending Dues",    value: INR(total), icon: AccountBalanceWallet, color: "error",   helper: "Total uncollected amount" },
-        { label: "Pending Records",       value: du.length,  icon: Warning,             color: "warning", helper: "Unpaid line items" },
-        { label: "Unique Defaulters",     value: uniq,       icon: People,              color: "error",   helper: "Members with overdue payments" },
-        { label: "Critical (>30 days)",   value: crit,       icon: HourglassEmpty,      color: "error",   helper: "Over 30 days overdue" },
-        { label: "Moderate (15-30 days)", value: mod,        icon: TrendingUp,          color: "warning", helper: "15 to 30 days overdue" },
+        { label: "Total Pending Dues", value: INR(total), icon: AccountBalanceWallet, color: "error", helper: "Total uncollected amount" },
+        { label: "Pending Records", value: du.length, icon: Warning, color: "warning", helper: "Unpaid line items" },
+        { label: "Unique Defaulters", value: uniq, icon: People, color: "error", helper: "Members with overdue payments" },
+        { label: "Critical (>30 days)", value: crit, icon: HourglassEmpty, color: "error", helper: "Over 30 days overdue" },
+        { label: "Moderate (15-30 days)", value: mod, icon: TrendingUp, color: "warning", helper: "15 to 30 days overdue" },
       ];
     }
     return [];
-  }, [mode, report]);
+  }, [mode, filteredEventCollections, filteredMemberContributions, report]);
 
   const pageTitle = { event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections";
 
   const metricOptions = mode === "pending"
     ? [{ label: "By Event", key: "event" }, { label: "By Member", key: "member" }]
-    : [{ label: "Paid", key: "paid" }, { label: "Expected", key: "expected" }, { label: "Pending", key: "pending" }];
+    : [
+      { label: "Paid", key: "paid" },
+      { label: "Expected", key: "expected" },
+      { label: "Pending", key: "pending" },
+      { label: "Expense", key: "expense" },
+      { label: "Remaining", key: "remaining" },
+    ];
 
   const navTabs = [
-    { label: "Event Collections",   path: "/reports/event-collection-audit", modeKey: "event",  icon: EventIcon },
-    { label: "Member Contributions",path: "/reports/member-velocity",         modeKey: "member", icon: People },
+    { label: "Event Collections", path: "/reports/event-collection-audit", modeKey: "event", icon: EventIcon },
+    { label: "Member Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
   ];
 
   const handleExport = () => {
     if (!canExport) return;
     try {
+      const eventCollectionsExport = (filteredEventCollections ?? []).map((e) => ({
+        "Event Name": e.eventName,
+        "Event Type": e.eventTypeName || "General",
+        "Event Date": formatGridDate(e.eventDate),
+        "Expected Amount": Number(e.expectedAmount || 0),
+        "Paid Amount": Number(e.paidAmount || 0),
+        "Pending Amount": Number(e.pendingAmount || 0),
+        "Expense Amount": Number(e.expenseAmount || 0),
+        "Remaining Amount": (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0)),
+        "Collection Rate (%)": e.collectionRate ?? 0,
+      }));
+
       exportSheets("team-contribution-reports.xlsx", [
-        { name: "Event Collections",   data: report?.eventCollections ?? [] },
-        { name: "Member Contributions",data: report?.memberContributionHistory ?? [] },
+        { name: "Event Collections", data: eventCollectionsExport },
+        { name: "Member Contributions", data: filteredMemberContributions ?? [] },
       ]);
       toast.success("Reports exported successfully!");
     } catch {
@@ -641,9 +827,17 @@ export default function ReportsPage({ mode = "event" }) {
     }
   };
 
-  const periodLabel = filters.month === 0
-    ? `All Months, ${filters.year}`
-    : `${dayjs().month(filters.month - 1).format("MMMM")} ${filters.year}`;
+  const periodLabel = useMemo(() => {
+    let text = filters.month === 0
+      ? `All Months, ${filters.year}`
+      : `${dayjs().month(filters.month - 1).format("MMMM")} ${filters.year}`;
+    if (filters.event && filters.event !== "ALL") {
+      text += ` • ${filters.event}`;
+    } else if (filters.eventType && filters.eventType !== "ALL") {
+      text += ` • ${filters.eventType}`;
+    }
+    return text;
+  }, [filters]);
 
   return (
     <div className="page-shell">
@@ -797,15 +991,7 @@ export default function ReportsPage({ mode = "event" }) {
                 gap: 1.2,
               }}
             >
-              <Box sx={{ width: { xs: "100%", sm: 155 } }}>
-                <AppSelect
-                  label="Month"
-                  value={filterMonth}
-                  onChange={(e) => setFilterMonth(Number(e.target.value))}
-                  options={monthOptions}
-                />
-              </Box>
-              <Box sx={{ width: { xs: "100%", sm: 120 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 110 } }}>
                 <AppSelect
                   label="Year"
                   value={filterYear}
@@ -813,12 +999,36 @@ export default function ReportsPage({ mode = "event" }) {
                   options={yearOptions}
                 />
               </Box>
+              <Box sx={{ width: { xs: "100%", sm: 140 } }}>
+                <AppSelect
+                  label="Month"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(Number(e.target.value))}
+                  options={monthOptions}
+                />
+              </Box>
+              <Box sx={{ width: { xs: "100%", sm: 165 } }}>
+                <AppSelect
+                  label="Event Type"
+                  value={filterEventType}
+                  onChange={(e) => handleEventTypeChange(e.target.value)}
+                  options={eventTypeOptions}
+                />
+              </Box>
+              <Box sx={{ width: { xs: "100%", sm: 185 } }}>
+                <AppSelect
+                  label="Event"
+                  value={filterEvent}
+                  onChange={(e) => setFilterEvent(e.target.value)}
+                  options={eventOptions}
+                />
+              </Box>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <AppButton
                   variant="contained"
                   size="small"
                   startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
-                  onClick={() => setFilters({ month: filterMonth, year: filterYear })}
+                  onClick={() => setFilters({ month: filterMonth, year: filterYear, eventType: filterEventType, event: filterEvent })}
                   sx={{
                     height: 34,
                     minHeight: 34,
@@ -829,7 +1039,7 @@ export default function ReportsPage({ mode = "event" }) {
                 >
                   Filter
                 </AppButton>
-                <Tooltip title="Clear filters and reset to current month and year">
+                <Tooltip title="Clear filters and reset">
                   <AppButton
                     variant="outlined"
                     size="small"
@@ -839,7 +1049,9 @@ export default function ReportsPage({ mode = "event" }) {
                       const y = dayjs().year();
                       setFilterMonth(m);
                       setFilterYear(y);
-                      setFilters({ month: m, year: y });
+                      setFilterEventType("ALL");
+                      setFilterEvent("ALL");
+                      setFilters({ month: m, year: y, eventType: "ALL", event: "ALL" });
                     }}
                     sx={{
                       height: 34,
@@ -879,7 +1091,7 @@ export default function ReportsPage({ mode = "event" }) {
               {/* KPI Cards Grid */}
               <Grid container spacing={2}>
                 {kpiCards.map((card) => (
-                  <Grid key={card.label} size={{ xs: 12, sm: 6, lg: Math.max(3, Math.floor(12 / kpiCards.length)) }}>
+                  <Grid key={card.label} size={{ xs: 12, sm: 6, md: 4, lg: kpiCards.length === 6 ? 2 : Math.max(3, Math.floor(12 / kpiCards.length)) }}>
                     <StatCard {...card} />
                   </Grid>
                 ))}
@@ -888,8 +1100,8 @@ export default function ReportsPage({ mode = "event" }) {
               {/* Chart + Summary Widgets Grid */}
               <Grid container spacing={2.5}>
 
-                {/* Left: Visual Breakdown Panel */}
-                <Grid size={{ xs: 12, lg: 8 }}>
+                {/* Visual Breakdown Panel */}
+                <Grid size={{ xs: 12 }}>
                   <Card
                     sx={{
                       height: "100%",
@@ -1013,137 +1225,15 @@ export default function ReportsPage({ mode = "event" }) {
                     </CardContent>
                   </Card>
                 </Grid>
-
-                {/* Right: Performance Summary & Efficiency Panel */}
-                <Grid size={{ xs: 12, lg: 4 }}>
-                  <Card
-                    sx={{
-                      height: "100%",
-                      borderRadius: "14px",
-                      bgcolor: isDark ? "background.default" : "var(--app-surface-alt)",
-                      border: "1px solid",
-                      borderColor: isDark ? "rgba(255,255,255,0.06)" : "var(--app-border)",
-                      boxShadow: isDark ? "none" : "0 2px 12px rgba(0,0,0,0.02)",
-                    }}
-                  >
-                    <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-                      {/* Card Header */}
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <TrendingUp sx={{ fontSize: 20, color: "success.main" }} />
-                          <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1rem" }}>
-                            Collection Performance
-                          </Typography>
-                        </Box>
-                        <Chip
-                          size="small"
-                          label={`${efficiencyMetrics.rate}% Cleared`}
-                          color={efficiencyMetrics.rate >= 80 ? "success" : efficiencyMetrics.rate >= 40 ? "warning" : "error"}
-                          sx={{ fontWeight: 800, fontSize: "0.72rem", height: 22 }}
-                        />
-                      </Box>
-
-                      {/* Collection Progress Section */}
-                      <Box
-                        sx={{
-                          p: 2,
-                          mb: 2,
-                          borderRadius: "10px",
-                          bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#ffffff",
-                          border: "1px solid " + (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"),
-                        }}
-                      >
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                          <Typography variant="caption" fontWeight={700} color="text.secondary">
-                            Collection Efficiency
-                          </Typography>
-                          <Typography variant="caption" fontWeight={800} sx={{ color: efficiencyMetrics.rate >= 80 ? "success.main" : "text.primary" }}>
-                            {efficiencyMetrics.rate}% of Target
-                          </Typography>
-                        </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={Math.min(100, efficiencyMetrics.rate)}
-                          sx={{
-                            height: 8,
-                            borderRadius: 4,
-                            bgcolor: isDark ? "rgba(255,255,255,0.08)" : "rgba(239, 68, 68, 0.12)",
-                            "& .MuiLinearProgress-bar": {
-                              borderRadius: 4,
-                              background: "linear-gradient(90deg, #10b981 0%, #059669 100%)",
-                            },
-                          }}
-                        />
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 1.5, fontSize: "0.72rem" }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
-                            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#10b981" }} />
-                            <Typography variant="caption" color="text.secondary">
-                              Collected: <strong style={{ color: "#10b981" }}>{INR(efficiencyMetrics.paid)}</strong>
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
-                            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#ef4444" }} />
-                            <Typography variant="caption" color="text.secondary">
-                              Pending: <strong style={{ color: "#ef4444" }}>{INR(efficiencyMetrics.pending)}</strong>
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Box>
-
-                      {/* Summary Metrics List */}
-                      <Stack spacing={0}>
-                        {kpiCards.map((card, idx) => (
-                          <Box
-                            key={card.label}
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              py: 1.25,
-                              px: 1,
-                              borderRadius: "6px",
-                              borderBottom: idx < kpiCards.length - 1 ? "1px solid " + theme.palette.divider : "none",
-                              "&:hover": { bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)" },
-                            }}
-                          >
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                              <card.icon sx={{ fontSize: 16, color: "text.secondary" }} />
-                              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ fontSize: "0.82rem" }}>
-                                {card.label}
-                              </Typography>
-                            </Box>
-                            <Typography
-                              variant="body2"
-                              fontWeight={800}
-                              sx={{
-                                bgcolor: isDark ? "rgba(255,255,255,0.05)" : "rgba(124,58,237,0.06)",
-                                px: 1.2,
-                                py: 0.25,
-                                borderRadius: "6px",
-                                fontFamily: '"Outfit", sans-serif',
-                                fontSize: "0.82rem",
-                                fontVariantNumeric: "tabular-nums",
-                              }}
-                            >
-                              {card.value}
-                            </Typography>
-                          </Box>
-                        ))}
-                      </Stack>
-
-
-                    </CardContent>
-                  </Card>
-                </Grid>
               </Grid>
 
               {/* Data Tables Section */}
               <Box sx={{ mt: 1 }}>
                 {(mode === "event" || !mode) && (
-                  <AppDataTable title="Event Collections" columns={eventColumns} data={report?.eventCollections ?? []} loading={false} />
+                  <AppDataTable title="Event Collections" columns={eventColumns} data={filteredEventCollections} loading={false} />
                 )}
                 {mode === "member" && (
-                  <AppDataTable title="Member Contributions" columns={memberColumns} data={report?.memberContributionHistory ?? []} loading={false} />
+                  <AppDataTable title="Member Contributions" columns={memberColumns} data={filteredMemberContributions} loading={false} />
                 )}
                 {mode === "pending" && (
                   <AppDataTable title="Pending Dues & Defaulters" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />

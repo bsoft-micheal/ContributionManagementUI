@@ -241,7 +241,7 @@ export function hasActionPermission(actionName, featureId, roleName) {
   const roleRights = getActiveRoleRights(resolvedName);
 
   if (!roleRights) {
-    return { canView: true, canExecute: false, isDenied: false, readOnly: true };
+    return { canView: true, canExecute: isAdminOrOrg, isDenied: false, readOnly: !isAdminOrOrg };
   }
 
   const numericFeatureId = Number(featureId);
@@ -270,7 +270,7 @@ export function hasActionPermission(actionName, featureId, roleName) {
   }
 
   if (!matchedRight) {
-    return { canView: true, canExecute: false, isDenied: false, readOnly: true };
+    return { canView: true, canExecute: isAdminOrOrg, isDenied: false, readOnly: !isAdminOrOrg };
   }
 
   let accessType = matchedRight.accessType ?? matchedRight.AccessType;
