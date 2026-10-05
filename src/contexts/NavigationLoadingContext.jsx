@@ -3,9 +3,9 @@ import AppPageLoader from "../components/common/AppPageLoader";
 
 const NavigationLoadingContext = createContext({
   isLoading: false,
-  showLoader: () => {},
-  hideLoader: () => {},
-  setLoadingMessage: () => {},
+  showLoader: () => { },
+  hideLoader: () => { },
+  setLoadingMessage: () => { },
 });
 
 export const useNavigationLoading = () => useContext(NavigationLoadingContext);
@@ -37,7 +37,10 @@ export function NavigationLoadingProvider({ children }) {
     setCustomLoading(false);
   };
 
-  const isLoading = customLoading || apiActiveCount > 0;
+  const currentPath = (window.location.pathname || "").toLowerCase();
+  const isAuthPage = currentPath === "/login" || currentPath.startsWith("/forgot-password");
+
+  const isLoading = !isAuthPage && (customLoading || apiActiveCount > 0);
 
   return (
     <NavigationLoadingContext.Provider
@@ -49,8 +52,6 @@ export function NavigationLoadingProvider({ children }) {
       }}
     >
       {children}
-      {/* Global fullScreen loader disabled so pages with table loaders do not display dual loaders */}
-      {/* {isLoading && <AppPageLoader text={message} fullScreen />} */}
     </NavigationLoadingContext.Provider>
   );
 }

@@ -49,6 +49,7 @@ import {
 import * as XLSX from "xlsx";
 import { formatGridDate, formatGridDateTime } from "../../utils/dateHelper";
 import AppPageLoader from "./AppPageLoader";
+import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 
 // ─── Printout & PDF Helper ──────────────────────────────────────────────────
 function printTable(title, columns, data) {
@@ -347,6 +348,7 @@ export default function AppDataTable({
   searchPlaceholder = "Search by username...",
 }) {
   const theme = useTheme();
+  const { isLoading: globalLoading } = useNavigationLoading();
   const surface = theme.palette.background.paper;
   const surfaceAlt = theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "rgba(248,250,252,0.95)";
   const borderColor = theme.palette.divider;
@@ -1046,68 +1048,75 @@ export default function AppDataTable({
 
       {/* ── 3. Table ──────────────────────────────────────────────────────── */}
       <Box sx={{ overflowX: "auto", flexGrow: isFullscreen ? 1 : 0, position: "relative", minHeight: loading ? 220 : "auto" }}>
-        {loading ? (
-          <AppPageLoader fullScreen={false} text="Loading..." />
-        ) : (
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ bgcolor: theme.palette.mode === "dark" ? surfaceAlt : "#eef4f8" }}>
-                {orderedColumns.map((column, index) => (
-                  <TableCell
-                    key={index}
-                    align={column.align || "left"}
-                    sx={{
-                      fontWeight: 800,
-                      fontSize: "0.75rem",
-                      color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
-                      py: 1,
-                      px: 2,
-                      borderRight: theme.palette.mode === "dark"
-                        ? "1px solid rgba(255, 255, 255, 0.08)"
-                        : "1px solid rgba(224, 224, 224, 0.8)",
-                      borderBottom: theme.palette.mode === "dark"
-                        ? "1px solid rgba(255, 255, 255, 0.1)"
-                        : "1px solid rgba(224, 224, 224, 1)",
-                      "&:last-child": { borderRight: "none" },
-                      whiteSpace: "nowrap",
-                      ...column.sx,
-                      ...getPinStyles(column, true),
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: column.align === "right" ? "flex-end" : "space-between", width: "100%", gap: 1 }}>
-                      {column.key ? (
-                        <TableSortLabel
-                          active={orderBy === column.key}
-                          direction={orderBy === column.key ? order : "asc"}
-                          onClick={() => handleSort(column.key)}
-                          IconComponent={() => (
-                            <Typography variant="caption" sx={{ ml: 0.5, fontSize: "0.85rem", color: "inherit", opacity: 0.7 }}>⇅</Typography>
-                          )}
-                          sx={{
-                            color: "inherit !important",
-                            fontWeight: "inherit",
-                          }}
-                        >
-                          {column.label === "#" ? "S.No" : column.label}
-                        </TableSortLabel>
-                      ) : (
-                        <span>{column.label === "#" ? "S.No" : column.label}</span>
-                      )}
-                      <IconButton
-                        size="small"
-                        onClick={(e) => handleColumnMenuClick(e, column)}
-                        sx={{ p: 0.1, color: "inherit", opacity: 0.5, "&:hover": { opacity: 1 } }}
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ bgcolor: theme.palette.mode === "dark" ? surfaceAlt : "#eef4f8" }}>
+              {orderedColumns.map((column, index) => (
+                <TableCell
+                  key={index}
+                  align={column.align || "left"}
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: "0.75rem",
+                    color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                    py: 1,
+                    px: 2,
+                    borderRight: theme.palette.mode === "dark"
+                      ? "1px solid rgba(255, 255, 255, 0.08)"
+                      : "1px solid rgba(224, 224, 224, 0.8)",
+                    borderBottom: theme.palette.mode === "dark"
+                      ? "1px solid rgba(255, 255, 255, 0.1)"
+                      : "1px solid rgba(224, 224, 224, 1)",
+                    "&:last-child": { borderRight: "none" },
+                    whiteSpace: "nowrap",
+                    ...column.sx,
+                    ...getPinStyles(column, true),
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: column.align === "right" ? "flex-end" : "space-between", width: "100%", gap: 1 }}>
+                    {column.key ? (
+                      <TableSortLabel
+                        active={orderBy === column.key}
+                        direction={orderBy === column.key ? order : "asc"}
+                        onClick={() => handleSort(column.key)}
+                        IconComponent={() => (
+                          <Typography variant="caption" sx={{ ml: 0.5, fontSize: "0.85rem", color: "inherit", opacity: 0.7 }}>⇅</Typography>
+                        )}
+                        sx={{
+                          color: "inherit !important",
+                          fontWeight: "inherit",
+                        }}
                       >
-                        <Typography variant="caption" sx={{ fontSize: "0.85rem", fontWeight: 700 }}>⋮</Typography>
-                      </IconButton>
-                    </Box>
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
+                        {column.label === "#" ? "S.No" : column.label}
+                      </TableSortLabel>
+                    ) : (
+                      <span>{column.label === "#" ? "S.No" : column.label}</span>
+                    )}
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleColumnMenuClick(e, column)}
+                      sx={{ p: 0.1, color: "inherit", opacity: 0.5, "&:hover": { opacity: 1 } }}
+                    >
+                      <Typography variant="caption" sx={{ fontSize: "0.85rem", fontWeight: 700 }}>⋮</Typography>
+                    </IconButton>
+                  </Box>
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
 
-            <TableBody>
-              {paginatedData.length > 0 ? (
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={orderedColumns.length || 1} align="center" sx={{ py: 3, border: "none" }}>
+                  {!globalLoading ? (
+                    <AppPageLoader fullScreen={false} text="Loading data..." minHeight={180} />
+                  ) : (
+                    <Box sx={{ minHeight: 180 }} />
+                  )}
+                </TableCell>
+              </TableRow>
+            ) : paginatedData.length > 0 ? (
                 paginatedData.map((row, rowIndex) => (
                   <TableRow
                     key={rowIndex}

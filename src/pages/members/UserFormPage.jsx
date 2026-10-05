@@ -427,68 +427,61 @@ export default function UserFormPage() {
 
   return (
     <div className="page-shell">
-      {/* ── Page Title Bar ────────────────────────────────────────── */}
-      <Box
-        sx={{
-          mb: 3,
-          display: "flex",
-          alignItems: "center",
-          gap: 1.5,
-        }}
-      >
-        <IconButton
-          onClick={() => navigate("/users")}
-          sx={{
-            bgcolor: (theme) =>
-              theme.palette.mode === "dark"
-                ? "rgba(255, 255, 255, 0.08)"
-                : "rgba(74, 63, 107, 0.08)",
-            color: (theme) =>
-              theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-            "&:hover": {
-              bgcolor: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "rgba(255, 255, 255, 0.15)"
-                  : "rgba(74, 63, 107, 0.15)",
-            },
-          }}
-        >
-          <ArrowBackIcon />
-        </IconButton>
-        <Box>
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: 800,
-              color: (theme) =>
-                theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {isEdit ? "Edit User" : "Add User"}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {isEdit
-              ? "Update user profile details, roles, and access settings"
-              : "Create a new user account with role assignments"}
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* ── Main Form Paper Container ──────────────────────────────────────── */}
       <Paper
         elevation={0}
         sx={{
-          p: { xs: 2.5, md: 3.5 },
+          border:
+            theme.palette.mode === "dark"
+              ? `1px solid ${theme.palette.divider}`
+              : "1px solid rgba(74, 63, 107, 0.08)",
           borderRadius: "14px",
-          border: "2px solid #4a3f6b",
-          bgcolor: (theme) =>
-            theme.palette.mode === "dark" ? "#1b2033" : "#ffffff",
+          overflow: "hidden",
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
         }}
       >
-        <Grid container spacing={2.5}>
-          {/* Row 1: Full Name & User Role */}
-          <Grid size={{ xs: 12, md: form.enableMultipleRoles ? 12 : 6 }}>
+        {/* Top Header Banner */}
+        <Box
+          sx={{
+            bgcolor: "#45386d",
+            color: "#ffffff",
+            px: { xs: 2, sm: 3 },
+            py: 1.4,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            minHeight: 52,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Tooltip title="Back to Users">
+              <IconButton
+                size="small"
+                onClick={() => navigate("/users")}
+                sx={{
+                  color: "#ffffff",
+                  p: 0.5,
+                  "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)" },
+                }}
+              >
+                <ArrowBackIcon sx={{ fontSize: "1.25rem" }} />
+              </IconButton>
+            </Tooltip>
+            <Typography
+              variant="subtitle1"
+              fontWeight={700}
+              sx={{ fontSize: "1.05rem", letterSpacing: "0.01em", color: "#ffffff" }}
+            >
+              {isEdit ? "Edit User" : "Add User"}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Main Body Container */}
+        <Box sx={{ p: { xs: 2.5, md: 3.5 } }}>
+          <Grid container spacing={2.5}>
+          {/* Form Fields: 3 Controls per row */}
+          <Grid size={{ xs: 12, md: 4 }}>
             <AppInput
               label="Full Name"
               placeholder="Enter full name"
@@ -503,7 +496,7 @@ export default function UserFormPage() {
           </Grid>
 
           {!form.enableMultipleRoles && (
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <AppSelect
                 label="User Role"
                 placeholder="Select user role"
@@ -517,10 +510,10 @@ export default function UserFormPage() {
             </Grid>
           )}
 
-          {/* Row 2 (When Enable Multiple Roles = ON): Primary & Secondary Role */}
+          {/* When Enable Multiple Roles = ON: Primary & Secondary Role */}
           {form.enableMultipleRoles && (
             <>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <AppSelect
                   label="Primary Role"
                   placeholder="Select primary role"
@@ -541,7 +534,7 @@ export default function UserFormPage() {
                   required
                 />
               </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <AppSelect
                   label="Secondary Role"
                   placeholder="Select secondary role"
@@ -559,8 +552,8 @@ export default function UserFormPage() {
             </>
           )}
 
-          {/* Row: Email & Phone Number */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          {/* Email & Phone Number */}
+          <Grid size={{ xs: 12, md: 4 }}>
             <AppInput
               label="Email"
               placeholder="Enter email address"
@@ -572,7 +565,7 @@ export default function UserFormPage() {
               required
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <AppInput
               label="Phone Number"
               placeholder="Enter 10-digit phone number"
@@ -586,8 +579,8 @@ export default function UserFormPage() {
             />
           </Grid>
 
-          {/* Row: Gender & Work Type */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          {/* Gender & Work Type */}
+          <Grid size={{ xs: 12, md: 4 }}>
             <AppSelect
               label="Gender"
               placeholder="Select gender"
@@ -599,7 +592,7 @@ export default function UserFormPage() {
               required
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <AppSelect
               label="Work Type"
               placeholder="Select work type"
@@ -612,8 +605,8 @@ export default function UserFormPage() {
             />
           </Grid>
 
-          {/* Row: Date of Birth & Joining Date */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          {/* Date of Birth & Joining Date */}
+          <Grid size={{ xs: 12, md: 4 }}>
             <AppDateInput
               label="Date of Birth"
               value={form.dateOfBirth}
@@ -623,7 +616,7 @@ export default function UserFormPage() {
               required
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <AppDateInput
               label="Joining Date"
               value={form.joiningDate}
@@ -635,34 +628,16 @@ export default function UserFormPage() {
           </Grid>
 
           {/* Bottom Checkboxes: Create Login Account & Enable Multiple Roles */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box
               onClick={() => fieldChange("createMemberProfile", !form.createMemberProfile)}
               sx={{
-                p: 1,
-                px: 2,
-                borderRadius: "8px",
-                border: "1px solid",
-                borderColor: (theme) =>
-                  form.createMemberProfile
-                    ? "#4a3f6b"
-                    : theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.1)"
-                      : "rgba(74, 63, 107, 0.14)",
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.03)"
-                    : "#f8f7fc",
                 display: "flex",
                 alignItems: "center",
-                gap: 1.2,
-                minHeight: 38,
+                gap: 0.8,
+                py: 0.8,
                 cursor: "pointer",
                 userSelect: "none",
-                transition: "all 0.2s ease",
-                "&:hover": {
-                  borderColor: "#4a3f6b",
-                },
               }}
             >
               <Checkbox
@@ -671,7 +646,8 @@ export default function UserFormPage() {
                 onClick={(e) => e.stopPropagation()}
                 size="small"
                 sx={{
-                  p: 0,
+                  p: 0.2,
+                  transform: "scale(0.85)",
                   color: "#4a3f6b",
                   "&.Mui-checked": {
                     color: "#4a3f6b",
@@ -679,11 +655,11 @@ export default function UserFormPage() {
                 }}
               />
               <Typography
-                variant="subtitle1"
-                fontWeight={700}
+                variant="body2"
+                fontWeight={600}
                 sx={{
                   color: (theme) =>
-                    theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+                    theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
                   fontSize: "0.82rem",
                 }}
               >
@@ -692,34 +668,16 @@ export default function UserFormPage() {
             </Box>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box
               onClick={() => handleToggleMultipleRoles(!form.enableMultipleRoles)}
               sx={{
-                p: 1,
-                px: 2,
-                borderRadius: "8px",
-                border: "1px solid",
-                borderColor: (theme) =>
-                  form.enableMultipleRoles
-                    ? "#4a3f6b"
-                    : theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.1)"
-                      : "rgba(74, 63, 107, 0.14)",
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.03)"
-                    : "#f8f7fc",
                 display: "flex",
                 alignItems: "center",
-                gap: 1.2,
-                minHeight: 38,
+                gap: 0.8,
+                py: 0.8,
                 cursor: "pointer",
                 userSelect: "none",
-                transition: "all 0.2s ease",
-                "&:hover": {
-                  borderColor: "#4a3f6b",
-                },
               }}
             >
               <Checkbox
@@ -728,7 +686,8 @@ export default function UserFormPage() {
                 onClick={(e) => e.stopPropagation()}
                 size="small"
                 sx={{
-                  p: 0,
+                  p: 0.2,
+                  transform: "scale(0.85)",
                   color: "#4a3f6b",
                   "&.Mui-checked": {
                     color: "#4a3f6b",
@@ -736,11 +695,11 @@ export default function UserFormPage() {
                 }}
               />
               <Typography
-                variant="subtitle1"
-                fontWeight={700}
+                variant="body2"
+                fontWeight={600}
                 sx={{
                   color: (theme) =>
-                    theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+                    theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
                   fontSize: "0.82rem",
                 }}
               >
@@ -752,7 +711,7 @@ export default function UserFormPage() {
           {/* Conditional User Access Fields */}
           {form.createMemberProfile && (
             <>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <AppInput
                   label="Username"
                   placeholder="Enter username"
@@ -765,9 +724,8 @@ export default function UserFormPage() {
                   required
                 />
               </Grid>
-              <Grid size={{ xs: 12, md: 6 }} sx={{ display: { xs: "none", md: "block" } }} />
 
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <AppInput
                   label={isEdit ? "New Password (leave blank to keep current)" : "Password"}
                   placeholder="Enter password (min 6 characters)"
@@ -797,7 +755,7 @@ export default function UserFormPage() {
                   }}
                 />
               </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <AppInput
                   label={isEdit ? "Confirm New Password" : "Confirm Password"}
                   placeholder="Re-enter password"
@@ -887,6 +845,7 @@ export default function UserFormPage() {
             {saving ? "Saving…" : "Save User"}
           </AppButton>
         </Stack>
+        </Box>
       </Paper>
     </div>
   );
