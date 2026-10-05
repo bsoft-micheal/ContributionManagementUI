@@ -16,6 +16,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppPieChart from "../../components/common/AppPieChart";
+import ExecutiveFinancialBarChart from "../../components/dashboard/ExecutiveFinancialBarChart";
 import { useAppToast } from "../../components/common/AppToast";
 import {
   PieChart as PieChartIcon,
@@ -136,6 +137,13 @@ function StatCard({ label, value, icon: Icon, color = "primary", subLabel, helpe
       glow: "rgba(245, 158, 11, 0.25)",
       badgeBg: isDark ? "rgba(245, 158, 11, 0.2)" : "rgba(245, 158, 11, 0.1)",
       text: isDark ? "#fcd34d" : "#b45309",
+    },
+    neutral: {
+      accent: "#64748b",
+      gradient: "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(148, 163, 184, 0.04) 100%)",
+      glow: "rgba(100, 116, 139, 0.25)",
+      badgeBg: isDark ? "rgba(100, 116, 139, 0.2)" : "rgba(100, 116, 139, 0.1)",
+      text: isDark ? "#cbd5e1" : "#475569",
     },
   };
   const c = colorMap[color] || colorMap.primary;
@@ -285,21 +293,24 @@ function SegmentedTab({ label, icon: Icon, isActive, onClick }) {
         gap: 0.8,
         fontSize: "0.82rem",
         fontWeight: isActive ? 700 : 600,
-        color: isActive ? "#ffffff" : "text.secondary",
+        color: isActive ? "#ffffff" : isDark ? "text.secondary" : "#334155",
         bgcolor: isActive
-          ? theme.palette.primary.main
-          : "transparent",
+          ? "#31275d"
+          : isDark ? "transparent" : "#ffffff",
         boxShadow: isActive
-          ? "0 2px 8px rgba(124, 58, 237, 0.35)"
-          : "none",
+          ? "0 2px 8px rgba(49, 39, 93, 0.3)"
+          : isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.04)",
+        border: isActive
+          ? "1px solid #31275d"
+          : `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0"}`,
         transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
         "&:hover": {
           color: isActive ? "#ffffff" : "text.primary",
           bgcolor: isActive
-            ? theme.palette.primary.main
+            ? "#31275d"
             : isDark
               ? "rgba(255, 255, 255, 0.06)"
-              : "rgba(124, 58, 237, 0.08)",
+              : "#f8fafc",
         },
       }}
     >
@@ -315,6 +326,7 @@ export default function ReportsPage({ mode = "event" }) {
   const isDark = theme.palette.mode === "dark";
   const navigate = useNavigate();
   const { authState } = useAuth();
+  const isMember = authState?.role === "Member" || authState?.user?.role === "Member";
   const canExport = hasActionPermission("Export Reports", 60, authState?.role).canView !== false;
   const toast = useAppToast();
 
@@ -341,6 +353,8 @@ export default function ReportsPage({ mode = "event" }) {
   const [dialogSearch, setDialogSearch] = useState("");
   const [memberContributions, setMemberContributions] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
+  const [selectedReportMemberId, setSelectedReportMemberId] = useState(null);
+  const [memberSearchTerm, setMemberSearchTerm] = useState("");
 
   const openBreakdownModal = async (member, filter = "all") => {
     setSelectedMember(member);
@@ -732,6 +746,113 @@ export default function ReportsPage({ mode = "event" }) {
     }).filter((i) => i.value > 0);
   }, [mode, filteredEventCollections, filteredMemberContributions, report?.pendingDues, metric]);
 
+  /* ── Dynamic Event Data for ExecutiveFinancialBarChart ── */
+  const reportBarEvents = useMemo(() => {
+    if (mode === "member") {
+      return (filteredMemberContributions ?? []).map((m, idx) => {
+        const exp = Number(m.totalExpectedAmount || 0);
+        const col = Number(m.totalPaidAmount || 0);
+        const pen = Math.max(0, exp - col);
+        return {
+          id: m.memberId || `mem-${idx}`,
+          label: m.memberName,
+          expected: exp,
+          collected: col,
+          pending: pen,
+          expense: 0,
+          remaining: exp - col,
+          eventTypeName: m.department || "Member",
+          date: null,
+        };
+      });
+    }
+
+    if (mode === "pending") {
+      const map = {};
+      (report?.pendingDues ?? []).forEach((d) => {
+        const name = d.eventName || "Event";
+        if (!map[name]) {
+          map[name] = {
+            id: name,
+            label: name,
+            expected: 0,
+            collected: 0,
+            pending: 0,
+            expense: 0,
+            remaining: 0,
+            eventTypeName: "Pending Due",
+            date: d.eventDate,
+          };
+        }
+        map[name].pending += Number(d.amount || 0);
+        map[name].expected += Number(d.amount || 0);
+      });
+      return Object.values(map);
+    }
+
+    return (filteredEventCollections ?? []).map((e, idx) => {
+      const exp = Number(e.expectedAmount || 0);
+      const col = Number(e.paidAmount || 0);
+      const pen = e.pendingAmount !== undefined ? Number(e.pendingAmount) : Math.max(0, exp - col);
+      const expense = Number(e.expenseAmount || 0);
+      const remaining = exp - expense;
+      return {
+        id: e.eventId || `event-${idx}`,
+        label: e.eventName,
+        expected: exp,
+        collected: col,
+        pending: pen,
+        expense: expense,
+        remaining: remaining,
+        eventTypeName: e.eventTypeName || "General",
+        date: e.eventDate,
+      };
+    });
+  }, [mode, filteredEventCollections, filteredMemberContributions, report?.pendingDues]);
+
+  const searchedMembers = useMemo(() => {
+    const list = filteredMemberContributions ?? [];
+    if (!memberSearchTerm.trim()) return list;
+    const q = memberSearchTerm.toLowerCase();
+    return list.filter((m) =>
+      (m.memberName || "").toLowerCase().includes(q) ||
+      (m.department || "").toLowerCase().includes(q)
+    );
+  }, [filteredMemberContributions, memberSearchTerm]);
+
+  const activeSelectedMember = useMemo(() => {
+    if (!filteredMemberContributions || filteredMemberContributions.length === 0) return null;
+    if (selectedReportMemberId) {
+      const found = filteredMemberContributions.find(
+        (m, idx) => String(m.memberId || m.MemberId || idx) === String(selectedReportMemberId)
+      );
+      if (found) return found;
+    }
+    return filteredMemberContributions[0];
+  }, [filteredMemberContributions, selectedReportMemberId]);
+
+  const selectedMemberBarEvents = useMemo(() => {
+    if (!activeSelectedMember) return [];
+    const exp = Number(activeSelectedMember.totalExpectedAmount || 0);
+    const col = Number(activeSelectedMember.totalPaidAmount || 0);
+    const pen = Math.max(0, exp - col);
+    const expense = 0;
+    const rem = exp - col;
+    return [
+      {
+        id: activeSelectedMember.memberId || "selected-mem",
+        label: activeSelectedMember.memberName,
+        expected: exp,
+        collected: col,
+        pending: pen,
+        expense: expense,
+        remaining: rem,
+        eventTypeName: activeSelectedMember.department || "Member",
+        date: null,
+      },
+    ];
+  }, [activeSelectedMember]);
+
   const kpiCards = useMemo(() => {
     if (mode === "event") {
       const ev = filteredEventCollections ?? [];
@@ -742,12 +863,12 @@ export default function ReportsPage({ mode = "event" }) {
       const remaining = exp - totalExp;
       const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
       return [
-        { label: "Total Events", value: ev.length, icon: EventIcon, color: "primary", helper: `${ev.length} active collection events` },
-        { label: "Total Expected", value: INR(exp), icon: AccountBalanceWallet, color: "info", helper: "Projected target collections" },
-        { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: `${rate}% completion rate` },
-        { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: `${Math.max(0, 100 - rate)}% outstanding dues` },
+        { label: "Total Expected", value: INR(exp), icon: AccountBalanceWallet, color: "primary", helper: "Projected target collections" },
+        { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: "Total amount collected" },
+        { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: "Total outstanding balance" },
         { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
         { label: "Remaining Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
+        { label: "Total Events", value: ev.length, icon: EventIcon, color: "neutral", helper: `${ev.length} active collection events` },
       ];
     }
     if (mode === "member") {
@@ -760,12 +881,12 @@ export default function ReportsPage({ mode = "event" }) {
       const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
       const remaining = exp - totalExp;
       return [
-        { label: "Total Members", value: mb.length, icon: People, color: "primary", helper: `${mb.length} contributing members` },
-        { label: "Total Expected", value: INR(exp), icon: AccountBalanceWallet, color: "info", helper: "Total expected member dues" },
-        { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: `${rate}% dues cleared` },
-        { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: `${Math.max(0, 100 - rate)}% remaining dues` },
+        { label: "Total Expected", value: INR(exp), icon: AccountBalanceWallet, color: "primary", helper: "Total expected member dues" },
+        { label: "Total Collected", value: INR(paid), icon: CheckCircle, color: "success", helper: "Total collections received" },
+        { label: "Total Pending", value: INR(pend), icon: HourglassEmpty, color: "error", helper: "Total outstanding balance" },
         { label: "Total Expenses", value: INR(totalExp), icon: ReceiptLongIcon, color: "warning", helper: "Total expenses for events" },
         { label: "Remaining Amount", value: INR(remaining), icon: AccountBalanceWallet, color: remaining >= 0 ? "success" : "error", helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)" },
+        { label: "Total Members", value: mb.length, icon: People, color: "neutral", helper: `${mb.length} contributing members` },
       ];
     }
     if (mode === "pending") {
@@ -814,7 +935,6 @@ export default function ReportsPage({ mode = "event" }) {
         "Pending Amount": Number(e.pendingAmount || 0),
         "Expense Amount": Number(e.expenseAmount || 0),
         "Remaining Amount": (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0)),
-        "Collection Rate (%)": e.collectionRate ?? 0,
       }));
 
       exportSheets("team-contribution-reports.xlsx", [
@@ -860,7 +980,7 @@ export default function ReportsPage({ mode = "event" }) {
             pb: { xs: 2, md: 2.5 },
             background: isDark
               ? "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(30, 26, 46, 0.6) 100%)"
-              : "linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(248, 250, 252, 0.95) 100%)",
+              : "#ffffff",
             borderBottom: "1px solid " + theme.palette.divider,
           }}
         >
@@ -943,7 +1063,7 @@ export default function ReportsPage({ mode = "event" }) {
             </AppButton>
           </Box>
 
-          {/* Bottom Row: Unified Glass Toolbar (Navigation Tabs + Inline Filters) */}
+          {/* Bottom Row: Unified Toolbar (Navigation Tabs + Inline Filters) */}
           <Box
             sx={{
               display: "flex",
@@ -953,22 +1073,22 @@ export default function ReportsPage({ mode = "event" }) {
               gap: 2,
               p: 1.25,
               borderRadius: "12px",
-              bgcolor: isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.85)",
+              bgcolor: isDark ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
               border: "1px solid",
-              borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.06)",
-              backdropFilter: "blur(12px)",
+              borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#e2e8f0",
+              boxShadow: isDark ? "none" : "0 1px 4px rgba(0, 0, 0, 0.03)",
             }}
           >
             {/* Left: Navigation Segmented Track */}
             <Box
               sx={{
                 display: "inline-flex",
-                p: "3px",
+                p: "4px",
                 borderRadius: "10px",
-                bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(124, 58, 237, 0.05)",
+                bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "#ffffff",
                 border: "1px solid",
-                borderColor: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(124, 58, 237, 0.1)",
-                gap: 0.5,
+                borderColor: isDark ? "rgba(255, 255, 255, 0.05)" : "#e2e8f0",
+                gap: 0.6,
               }}
             >
               {navTabs.map((tab) => (
@@ -1100,128 +1220,198 @@ export default function ReportsPage({ mode = "event" }) {
               {/* Chart + Summary Widgets Grid */}
               <Grid container spacing={2.5}>
 
-                {/* Visual Breakdown Panel */}
+                {/* Financial Overview Bar Chart */}
                 <Grid size={{ xs: 12 }}>
                   <Card
                     sx={{
-                      height: "100%",
-                      borderRadius: "14px",
-                      bgcolor: isDark ? "background.default" : "var(--app-surface-alt)",
-                      border: "1px solid",
-                      borderColor: isDark ? "rgba(255,255,255,0.06)" : "var(--app-border)",
-                      boxShadow: isDark ? "none" : "0 2px 12px rgba(0,0,0,0.02)",
+                      border: `1px solid ${theme.palette.divider}`,
+                      boxShadow: isDark
+                        ? "0 8px 32px rgba(0,0,0,0.35)"
+                        : "0 8px 32px rgba(0,0,0,0.06)",
+                      background: isDark
+                        ? "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
+                        : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
+                      borderRadius: "16px",
                     }}
                   >
-                    <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-                      <Stack spacing={2}>
-                        {/* Header: Title + Metric Pills + Chart View Switcher */}
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <PieChartIcon sx={{ fontSize: 20, color: "primary.main" }} />
-                            <Typography variant="subtitle1" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', fontSize: "1rem" }}>
-                              Visual Breakdown
-                            </Typography>
-                            <Chip
-                              size="small"
-                              label={`${chartData.length} ${chartData.length === 1 ? "entry" : "entries"}`}
-                              sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(124,58,237,0.08)", color: "text.secondary" }}
+                    <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                      {mode === "member" ? (
+                        <Grid container spacing={2.5}>
+                          {/* Left Column: Member Directory & Selector */}
+                          <Grid size={{ xs: 12, md: 4.5, lg: 4 }}>
+                            <Box
+                              sx={{
+                                p: 2,
+                                borderRadius: "14px",
+                                border: `1px solid ${theme.palette.divider}`,
+                                bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#fcfcfd",
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column",
+                              }}
+                            >
+                              {/* Member Search & Count */}
+                              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                                <Typography variant="subtitle2" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif' }}>
+                                  Select Member
+                                </Typography>
+                                <Chip
+                                  size="small"
+                                  label={`${searchedMembers.length} ${searchedMembers.length === 1 ? "member" : "members"}`}
+                                  sx={{
+                                    height: 20,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    bgcolor: isDark ? "rgba(124,58,237,0.2)" : "rgba(124,58,237,0.1)",
+                                    color: "primary.main",
+                                  }}
+                                />
+                              </Stack>
+
+                              <TextField
+                                size="small"
+                                placeholder="Search member..."
+                                value={memberSearchTerm}
+                                onChange={(e) => setMemberSearchTerm(e.target.value)}
+                                slotProps={{
+                                  input: {
+                                    startAdornment: (
+                                      <InputAdornment position="start">
+                                        <SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                                      </InputAdornment>
+                                    ),
+                                  },
+                                }}
+                                sx={{
+                                  mb: 1.5,
+                                  "& .MuiOutlinedInput-root": {
+                                    height: 36,
+                                    fontSize: "0.82rem",
+                                    borderRadius: "8px",
+                                  },
+                                }}
+                              />
+
+                              {/* Scrollable Member List */}
+                              <Box
+                                sx={{
+                                  maxHeight: 380,
+                                  overflowY: "auto",
+                                  pr: 0.5,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 1,
+                                  "&::-webkit-scrollbar": { width: 5 },
+                                  "&::-webkit-scrollbar-thumb": {
+                                    bgcolor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
+                                    borderRadius: 3,
+                                  },
+                                }}
+                              >
+                                {searchedMembers.length === 0 ? (
+                                  <Box sx={{ py: 4, textAlign: "center" }}>
+                                    <Typography variant="caption" color="text.secondary">
+                                      No members found matching &quot;{memberSearchTerm}&quot;
+                                    </Typography>
+                                  </Box>
+                                ) : (
+                                  searchedMembers.map((m, idx) => {
+                                    const mId = m.memberId || m.MemberId || idx;
+                                    const isSelected = String(activeSelectedMember?.memberId || activeSelectedMember?.MemberId || 0) === String(mId);
+                                    const exp = Number(m.totalExpectedAmount || 0);
+                                    const paid = Number(m.totalPaidAmount || 0);
+                                    const pen = Math.max(0, exp - paid);
+
+                                    return (
+                                      <Box
+                                        key={mId}
+                                        onClick={() => setSelectedReportMemberId(mId)}
+                                        sx={{
+                                          p: 1.25,
+                                          px: 1.5,
+                                          borderRadius: "10px",
+                                          cursor: "pointer",
+                                          border: "1.5px solid",
+                                          borderColor: isSelected
+                                            ? "#7c3aed"
+                                            : isDark
+                                            ? "rgba(255,255,255,0.06)"
+                                            : "rgba(0,0,0,0.06)",
+                                          bgcolor: isSelected
+                                            ? isDark
+                                              ? "rgba(124,58,237,0.16)"
+                                              : "rgba(124,58,237,0.08)"
+                                            : isDark
+                                            ? "rgba(255,255,255,0.015)"
+                                            : "#ffffff",
+                                          boxShadow: isSelected
+                                            ? "0 4px 14px rgba(124,58,237,0.2)"
+                                            : "none",
+                                          transition: "all 0.2s ease",
+                                          "&:hover": {
+                                            borderColor: isSelected ? "#7c3aed" : theme.palette.primary.light,
+                                            bgcolor: isSelected
+                                              ? isDark
+                                                ? "rgba(124,58,237,0.2)"
+                                                : "rgba(124,58,237,0.12)"
+                                              : isDark
+                                              ? "rgba(255,255,255,0.04)"
+                                              : "rgba(0,0,0,0.02)",
+                                          },
+                                        }}
+                                      >
+                                        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                                            <Typography
+                                              variant="body2"
+                                              fontWeight={isSelected ? 800 : 700}
+                                              noWrap
+                                              sx={{
+                                                fontSize: "0.84rem",
+                                                color: isSelected ? "primary.main" : "text.primary",
+                                              }}
+                                            >
+                                              {m.memberName}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem" }}>
+                                              {m.department || "Member"} • Paid ₹{paid.toLocaleString()}
+                                            </Typography>
+                                          </Box>
+                                          <Chip
+                                            size="small"
+                                            label={pen === 0 ? "Paid ✓" : `₹${pen.toLocaleString()} Due`}
+                                            sx={{
+                                              height: 20,
+                                              fontSize: "0.66rem",
+                                              fontWeight: 800,
+                                              bgcolor: pen === 0 ? alpha("#10b981", 0.12) : alpha("#ef4444", 0.12),
+                                              color: pen === 0 ? "#10b981" : "#ef4444",
+                                              border: `1px solid ${pen === 0 ? alpha("#10b981", 0.3) : alpha("#ef4444", 0.3)}`,
+                                            }}
+                                          />
+                                        </Stack>
+                                      </Box>
+                                    );
+                                  })
+                                )}
+                              </Box>
+                            </Box>
+                          </Grid>
+
+                          {/* Right Column: Financial Bar Chart for the Selected Member */}
+                          <Grid size={{ xs: 12, md: 7.5, lg: 8 }}>
+                            <ExecutiveFinancialBarChart
+                              events={selectedMemberBarEvents}
+                              isMember={isMember}
                             />
-                          </Box>
-
-                          <Box sx={{ display: "flex", gap: 1.2, alignItems: "center", flexWrap: "wrap" }}>
-                            {/* Metric Selector Pills */}
-                            <Box
-                              sx={{
-                                display: "inline-flex",
-                                p: 0.3,
-                                borderRadius: "8px",
-                                bgcolor: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(124, 58, 237, 0.06)",
-                                gap: 0.3,
-                              }}
-                            >
-                              {metricOptions.map((m) => {
-                                const isSel = metric === m.key;
-                                return (
-                                  <ButtonBase
-                                    key={m.key}
-                                    onClick={() => setMetric(m.key)}
-                                    sx={{
-                                      px: 1.2,
-                                      py: 0.4,
-                                      borderRadius: "6px",
-                                      fontSize: "0.72rem",
-                                      fontWeight: 700,
-                                      color: isSel ? "#fff" : "text.secondary",
-                                      bgcolor: isSel ? "primary.main" : "transparent",
-                                      transition: "all 0.18s ease",
-                                      "&:hover": { color: isSel ? "#fff" : "text.primary" },
-                                    }}
-                                  >
-                                    {m.label}
-                                  </ButtonBase>
-                                );
-                              })}
-                            </Box>
-
-                            {/* Chart View Toggle (Pie vs Bar) */}
-                            <Box
-                              sx={{
-                                display: "inline-flex",
-                                p: 0.3,
-                                borderRadius: "8px",
-                                bgcolor: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(124, 58, 237, 0.06)",
-                                gap: 0.3,
-                              }}
-                            >
-                              {[
-                                { key: "pie", label: "Donut", Ic: PieChartIcon },
-                                { key: "bar", label: "Bar", Ic: BarChartIcon },
-                              ].map(({ key, label, Ic }) => {
-                                const isSel = chartType === key;
-                                return (
-                                  <ButtonBase
-                                    key={key}
-                                    onClick={() => setChartType(key)}
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                      px: 1,
-                                      py: 0.4,
-                                      borderRadius: "6px",
-                                      fontSize: "0.72rem",
-                                      fontWeight: 700,
-                                      color: isSel ? "#fff" : "text.secondary",
-                                      bgcolor: isSel ? "primary.main" : "transparent",
-                                      transition: "all 0.18s ease",
-                                    }}
-                                  >
-                                    <Ic sx={{ fontSize: 14 }} />
-                                    {label}
-                                  </ButtonBase>
-                                );
-                              })}
-                            </Box>
-                          </Box>
-                        </Box>
-
-                        <Divider sx={{ borderColor: theme.palette.divider }} />
-
-                        {/* Chart Render Canvas */}
-                        <Box sx={{ minHeight: 310, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                          {chartData.length === 0 ? (
-                            <Box sx={{ py: 8, textAlign: "center" }}>
-                              <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                                No contribution records found for the selected filter.
-                              </Typography>
-                            </Box>
-                          ) : chartType === "pie" ? (
-                            <AppPieChart items={chartData} />
-                          ) : (
-                            <SimpleBarChart items={chartData} />
-                          )}
-                        </Box>
-                      </Stack>
+                          </Grid>
+                        </Grid>
+                      ) : (
+                        <ExecutiveFinancialBarChart
+                          events={reportBarEvents}
+                          isMember={isMember}
+                        />
+                      )}
                     </CardContent>
                   </Card>
                 </Grid>

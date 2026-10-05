@@ -545,15 +545,22 @@ export default function UserRightsPage() {
               <AppButton
                 variant="contained"
                 size="small"
-                color="success"
-                startIcon={<SaveIcon />}
+                startIcon={<SaveIcon sx={{ fontSize: 18 }} />}
                 onClick={handleSave}
                 loading={saving}
                 disabled={saving || loading}
                 sx={{
-                  height: 34, fontWeight: 700, fontSize: "0.75rem", px: 2,
-                  bgcolor: "#10b981",
-                  "&:hover": { bgcolor: "#059669" },
+                  height: 34,
+                  fontWeight: 700,
+                  fontSize: "0.78rem",
+                  px: 2.2,
+                  borderRadius: "8px",
+                  bgcolor: "#31275d !important",
+                  color: "#ffffff !important",
+                  boxShadow: "0 2px 8px rgba(49, 39, 93, 0.3)",
+                  "&:hover": {
+                    bgcolor: "#241c46 !important",
+                  },
                 }}
               >
                 Save
