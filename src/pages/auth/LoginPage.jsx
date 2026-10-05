@@ -28,6 +28,7 @@ export default function LoginPage() {
 
   // 2FA State
   const [showOtpField, setShowOtpField] = useState(false);
+  const [resolvedEmail, setResolvedEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [mfaStatusMessage, setMfaStatusMessage] = useState("");
   const [isLockedOut, setIsLockedOut] = useState(false);
@@ -81,10 +82,9 @@ export default function LoginPage() {
       return handleOtpSubmit();
     }
 
-    const fieldRequired = COMMON_STRINGS.VALIDATION.REQUIRED;
     const newErrors = {};
-    if (!form.email?.trim()) newErrors.email = fieldRequired;
-    if (!form.password?.trim()) newErrors.password = fieldRequired;
+    if (!form.email?.trim()) newErrors.email = COMMON_STRINGS.VALIDATION.USERNAME_OR_EMAIL_REQUIRED || "Username or email is required";
+    if (!form.password?.trim()) newErrors.password = COMMON_STRINGS.VALIDATION.PASSWORD_REQUIRED || COMMON_STRINGS.VALIDATION.REQUIRED;
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -97,6 +97,7 @@ export default function LoginPage() {
       const data = await login(form, keepSignedIn);
       if (data?.requiresTwoFactor) {
         setShowOtpField(true);
+        setResolvedEmail(data?.email || form.email);
         setMfaStatusMessage("");
         setIsLockedOut(false);
         toast.info(TOAST_MESSAGES.AUTH.TWO_FACTOR_REQUIRED || "Please check OTP code in Authenticator app.");
@@ -134,7 +135,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await verifyTwoFactor(form.email, otp, keepSignedIn);
+      await verifyTwoFactor(resolvedEmail || form.email, otp, keepSignedIn);
       setMfaStatusMessage("");
       setIsLockedOut(false);
       const destination = getRedirectDestination();
@@ -244,7 +245,7 @@ export default function LoginPage() {
                 whiteSpace: "nowrap",
               }}
             >
-              Welcome to Contribution Management !!
+              {COMMON_STRINGS.AUTH.WELCOME_TITLE}
             </Typography>
             <Typography
               variant="body2"
@@ -257,7 +258,7 @@ export default function LoginPage() {
                 mx: "auto",
               }}
             >
-              Log in to track social collections, manage event budgets, calculate allocations, and celebrate corporate milestones with full transparency.
+              {COMMON_STRINGS.AUTH.WELCOME_SUBTITLE}
             </Typography>
           </Card>
         </Box>
@@ -331,7 +332,7 @@ export default function LoginPage() {
                 lineHeight: 1.2,
               }}
             >
-              Sign In
+              {COMMON_STRINGS.AUTH.SIGN_IN_TITLE}
             </Typography>
             <Typography
               sx={{
@@ -342,7 +343,7 @@ export default function LoginPage() {
                 textAlign: "left",
               }}
             >
-              Enter your credentials to access the system.
+              {COMMON_STRINGS.AUTH.SIGN_IN_SUBTITLE}
             </Typography>
 
             {/* Form */}
@@ -352,7 +353,7 @@ export default function LoginPage() {
                   <>
                     <Box sx={{ textAlign: "left" }}>
                       <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "text.primary", mb: 0.6 }}>
-                        Email Address <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
+                        {COMMON_STRINGS.AUTH.USERNAME_OR_EMAIL_LABEL} <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
                       </Typography>
                       <TextField
                         fullWidth
@@ -363,7 +364,7 @@ export default function LoginPage() {
                         }}
                         error={!!errors.email}
                         helperText={errors.email}
-                        placeholder="Enter Email"
+                        placeholder={COMMON_STRINGS.AUTH.USERNAME_OR_EMAIL_PLACEHOLDER}
                         size="small"
                         sx={{
                           "& .MuiOutlinedInput-root": {
@@ -392,7 +393,7 @@ export default function LoginPage() {
 
                     <Box sx={{ textAlign: "left" }}>
                       <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "text.primary", mb: 0.6 }}>
-                        Password <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
+                        {COMMON_STRINGS.AUTH.PASSWORD_LABEL} <Box component="span" sx={{ color: "#ef4444" }}>*</Box>
                       </Typography>
                       <TextField
                         fullWidth
@@ -404,7 +405,7 @@ export default function LoginPage() {
                         }}
                         error={!!errors.password}
                         helperText={errors.password}
-                        placeholder="Enter Password"
+                        placeholder={COMMON_STRINGS.AUTH.PASSWORD_PLACEHOLDER}
                         size="small"
                         InputProps={{
                           endAdornment: (
@@ -483,7 +484,7 @@ export default function LoginPage() {
                           "&:hover": { textDecoration: "underline" },
                         }}
                       >
-                        Forgot Password ?
+                        {COMMON_STRINGS.AUTH.FORGOT_PASSWORD}
                       </Link>
                     </Box>
                   </>
@@ -590,7 +591,7 @@ export default function LoginPage() {
                     transition: "all 0.2s ease",
                   }}
                 >
-                  {loading ? (showOtpField ? "Verifying..." : "Signing in...") : (showOtpField ? (isLockedOut ? "LOCKED OUT" : "VERIFY OTP") : "LOGIN")}
+                  {loading ? (showOtpField ? "Verifying..." : "Signing in...") : (showOtpField ? (isLockedOut ? "LOCKED OUT" : "VERIFY OTP") : COMMON_STRINGS.AUTH.LOGIN_BUTTON)}
                 </AppButton>
 
                 {/* Back to Login Button for OTP step */}
