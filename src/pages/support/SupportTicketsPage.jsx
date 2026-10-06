@@ -76,22 +76,19 @@ export default function SupportTicketsPage() {
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
 
-  // Action-level feature IDs from navigation_menus (parent_id=12):
-  // 49=Add support, 50=View details, 51=Verify, 52=Edit, 53=Delete
-  const canViewTicket = hasActionPermission("View details", 50, authState?.role).canView;
-  const canAddTicket = hasActionPermission("Add support", 49, authState?.role).canExecute && hasWriteAccess;
-  const canEditTicket = hasActionPermission("Edit", 52, authState?.role).canExecute && hasWriteAccess;
-  const canDeleteTicket = hasActionPermission("Delete", 53, authState?.role).canExecute && hasWriteAccess;
-  const canVerifyTicket = hasActionPermission("Verify", 51, authState?.role).canExecute && hasWriteAccess;
-  const canExportTicket = hasActionPermission("Export Support Ticket", 50, authState?.role).canExecute;
-
-  const toast = useAppToast();
-  const location = useLocation();
-  const { addNotification } = useNotifications();
-
   const userRole = String(authState?.role || authState?.user?.roleName || "").trim().toLowerCase();
+  const isAdminOrOrg = userRole === "admin" || userRole === "organizer";
   const isMemberRole = userRole === "member";
   const isNameLocked = isMemberRole || Boolean(location.state?.raiseTicket) || Boolean(location.state?.memberName);
+
+  // Action-level feature IDs from navigation_menus (parent_id=12):
+  // 49=Add support, 50=View details, 51=Verify, 52=Edit, 53=Delete
+  const canViewTicket = isAdminOrOrg || hasActionPermission("View details", 50, authState?.role).canView;
+  const canAddTicket = (isAdminOrOrg || hasActionPermission("Add support", 49, authState?.role).canExecute) && hasWriteAccess;
+  const canEditTicket = (isAdminOrOrg || hasActionPermission("Edit", 52, authState?.role).canExecute) && hasWriteAccess;
+  const canDeleteTicket = (isAdminOrOrg || hasActionPermission("Delete", 53, authState?.role).canExecute) && hasWriteAccess;
+  const canVerifyTicket = (isAdminOrOrg || hasActionPermission("Verify", 51, authState?.role).canExecute) && hasWriteAccess;
+  const canExportTicket = isAdminOrOrg || hasActionPermission("Export Support Ticket", 50, authState?.role).canExecute;
 
   const getLoggedInMember = () => {
     const rawName = (
@@ -722,8 +719,8 @@ export default function SupportTicketsPage() {
                     color: (theme) =>
                       canVerifyTicket
                         ? theme.palette.mode === "dark"
-                          ? "#38bdf8"
-                          : "#0284c7"
+                          ? "#ffffff"
+                          : "#4a3f6b"
                         : theme.palette.mode === "dark"
                           ? "rgba(255,255,255,0.45)"
                           : "#94a3b8",

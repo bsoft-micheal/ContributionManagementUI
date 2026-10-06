@@ -123,57 +123,40 @@ export default function MetricCard({
           </Box>
         </Stack>
 
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 0.75,
-            mt: 0.85,
-            pt: 0.75,
-            borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"}`,
-          }}
-        >
-          <Typography
-            component="span"
+        {Boolean(actionText) && (
+          <Box
             sx={{
-              color: isDark ? "rgba(255, 255, 255, 0.72)" : "#475569",
-              fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              fontSize: "0.72rem",
-              lineHeight: 1.35,
-              fontWeight: 500,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              flex: 1,
-              minWidth: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: 0.75,
+              mt: 0.85,
+              pt: 0.75,
+              borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"}`,
             }}
-            title={typeof helper === "string" ? helper : undefined}
           >
-            {helper}
-          </Typography>
-          {isInteractive && (
             <Typography
-              className="metric-action-text"
+              className={isInteractive ? "metric-action-text" : undefined}
               component="span"
               sx={{
                 color: resolvedAccent,
                 fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontSize: "0.7rem",
                 fontWeight: 600,
-                opacity: { xs: 0.95, sm: 0.85 },
-                transform: { xs: "none", sm: "translateX(2px)" },
+                opacity: isInteractive ? { xs: 0.95, sm: 0.85 } : 0.85,
+                transform: isInteractive ? { xs: "none", sm: "translateX(2px)" } : "none",
                 transition: "all 0.2s ease",
                 display: "inline-flex",
                 alignItems: "center",
                 flexShrink: 0,
                 whiteSpace: "nowrap",
+                cursor: isInteractive ? "pointer" : "default",
               }}
             >
-              {actionText || "View →"}
+              {actionText}
             </Typography>
-          )}
-        </Box>
+          </Box>
+        )}
       </CardContent>
     </Card>
   );

@@ -620,24 +620,24 @@ export default function EventsPage() {
                       flexShrink: 0,
                     }}
                   />
-                );
-              })}
-            </Box>
-            {dateDisplay && (
-              <Typography
-                variant="caption"
-                sx={{
-                  color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
-                  display: "block",
-                  maxWidth: 220,
-                  whiteSpace: "normal",
-                  wordBreak: "break-word",
-                  lineHeight: 1.35,
-                }}
-              >
-                {dateDisplay}
-              </Typography>
-            )}
+                  {dateDisplay && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
+                        display: "block",
+                        maxWidth: 220,
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {dateDisplay}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
           </Box>
         );
       },
@@ -796,31 +796,26 @@ export default function EventsPage() {
               <MetricCard
                 label="Total Expected"
                 value={`₹${summaryTotals.totalExpected.toLocaleString("en-IN")}`}
-                helper="Filtered events target"
                 accent="#6366f1"
               />
               <MetricCard
                 label="Total Collections"
                 value={`₹${summaryTotals.totalCollected.toLocaleString("en-IN")}`}
-                helper={isMember ? "Amount paid" : "Amount collected"}
                 accent="#10b981"
               />
               <MetricCard
                 label="Total Pending"
                 value={`₹${summaryTotals.totalPending.toLocaleString("en-IN")}`}
-                helper="Outstanding dues"
                 accent="#f43f5e"
               />
               <MetricCard
                 label="Total Expenses"
                 value={`₹${summaryTotals.totalExpenses.toLocaleString("en-IN")}`}
-                helper="Recorded expenses"
                 accent="#f59e0b"
               />
               <MetricCard
                 label="Balance Amount"
                 value={`₹${summaryTotals.totalBalance.toLocaleString("en-IN")}`}
-                helper={summaryTotals.totalBalance >= 0 ? "Budget Surplus" : "Budget Deficit"}
                 accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}
               />
             </Box>

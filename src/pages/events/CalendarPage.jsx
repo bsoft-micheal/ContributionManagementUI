@@ -128,7 +128,7 @@ const getEventTypeInfo = (typeName = "") => {
   };
 };
 
-export default function CalendarPage() {
+export default function CalendarPage({ isEmbedded = false }) {
   const theme = useTheme();
   const toast = useAppToast();
   const { authState } = useAuth();
@@ -790,7 +790,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="page-shell">
+    <div className={isEmbedded ? undefined : "page-shell"}>
       {/* Outer Card with Sleek Purple Border */}
       <Card
         sx={{

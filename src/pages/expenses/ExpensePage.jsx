@@ -797,8 +797,8 @@ export default function ExpensePage() {
                     color: (theme) =>
                       canVerifyExpense
                         ? theme.palette.mode === "dark"
-                          ? "#38bdf8"
-                          : "#0284c7"
+                          ? "#ffffff"
+                          : "#4a3f6b"
                         : theme.palette.mode === "dark"
                           ? "rgba(255,255,255,0.45)"
                           : "#94a3b8",
@@ -845,8 +845,8 @@ export default function ExpensePage() {
                     color: (theme) =>
                       canDeleteExpense
                         ? theme.palette.mode === "dark"
-                          ? "#ef4444"
-                          : "#dc2626"
+                          ? "#ffffff"
+                          : "#4a3f6b"
                         : theme.palette.mode === "dark"
                           ? "rgba(255,255,255,0.45)"
                           : "#94a3b8",

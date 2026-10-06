@@ -72,7 +72,7 @@ export default function AppRoutes() {
         <Route path="/reports/event-financials" element={<Navigate to="/reports/event-collection-audit" replace />} />
         <Route path="/reports/payment-modes" element={<Navigate to="/reports/event-collection-audit" replace />} />
         <Route path="/reports/member-category-paid" element={<Navigate to="/reports/member-velocity" replace />} />
-        <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+        <Route path="/calendar" element={<Navigate to="/?tab=calendar" replace />} />
         <Route path="/contribution-calculation" element={<ProtectedRoute><ContributionCalculationPage /></ProtectedRoute>} />
         <Route path="/exit-process" element={<ProtectedRoute><ExitProcessPage /></ProtectedRoute>} />
         <Route path="/user-rights" element={<ProtectedRoute><UserRightsPage /></ProtectedRoute>} />

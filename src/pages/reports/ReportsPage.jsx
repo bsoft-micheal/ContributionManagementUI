@@ -876,12 +876,12 @@ export default function ReportsPage({ mode = "event" }) {
       const remaining = exp - totalExp;
       const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
       return [
-        { label: "Total Expected", value: INR(exp), helper: "Projected target collections", accent: "#6366f1" },
-        { label: "Total Collected", value: INR(paid), helper: "Total amount collected", accent: "#10b981" },
-        { label: "Total Pending", value: INR(pend), helper: "Total outstanding balance", accent: "#f43f5e" },
-        { label: "Total Expenses", value: INR(totalExp), helper: "Total expenses for events", accent: "#f59e0b" },
-        { label: "Balance Amount", value: INR(remaining), helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)", accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: remaining >= 0 ? "Surplus ✓" : "Deficit ⚠" },
-        { label: "Total Events", value: ev.length, helper: `${ev.length} active collection events`, accent: "#3b82f6" },
+        { label: "Total Expected", value: INR(exp), accent: "#6366f1" },
+        { label: "Total Collected", value: INR(paid), accent: "#10b981" },
+        { label: "Total Pending", value: INR(pend), accent: "#f43f5e" },
+        { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b" },
+        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e" },
+        { label: "Total Events", value: ev.length, accent: "#3b82f6" },
       ];
     }
     if (mode === "member") {
@@ -894,12 +894,12 @@ export default function ReportsPage({ mode = "event" }) {
       const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
       const remaining = exp - totalExp;
       return [
-        { label: "Total Expected", value: INR(exp), helper: "Total expected member dues", accent: "#6366f1" },
-        { label: "Total Collected", value: INR(paid), helper: "Total collections received", accent: "#10b981" },
-        { label: "Total Pending", value: INR(pend), helper: "Total outstanding balance", accent: "#f43f5e" },
-        { label: "Total Expenses", value: INR(totalExp), helper: "Total expenses for events", accent: "#f59e0b" },
-        { label: "Balance Amount", value: INR(remaining), helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)", accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: remaining >= 0 ? "Surplus ✓" : "Deficit ⚠" },
-        { label: "Total Members", value: mb.length, helper: `${mb.length} contributing members`, accent: "#3b82f6" },
+        { label: "Total Expected", value: INR(exp), accent: "#6366f1" },
+        { label: "Total Collected", value: INR(paid), accent: "#10b981" },
+        { label: "Total Pending", value: INR(pend), accent: "#f43f5e" },
+        { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b" },
+        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e" },
+        { label: "Total Members", value: mb.length, accent: "#3b82f6" },
       ];
     }
     if (mode === "pending") {
@@ -909,11 +909,11 @@ export default function ReportsPage({ mode = "event" }) {
       const crit = du.filter((d) => d.daysOverdue > 30).length;
       const mod = du.filter((d) => d.daysOverdue >= 15 && d.daysOverdue <= 30).length;
       return [
-        { label: "Total Pending Dues", value: INR(total), helper: "Total uncollected amount", accent: "#f43f5e" },
-        { label: "Pending Records", value: du.length, helper: "Unpaid line items", accent: "#f59e0b" },
-        { label: "Unique Defaulters", value: uniq, helper: "Members with overdue payments", accent: "#f43f5e" },
-        { label: "Critical (>30 Days)", value: crit, helper: "Over 30 days overdue", accent: "#f43f5e" },
-        { label: "Moderate (15-30 Days)", value: mod, helper: "15 to 30 days overdue", accent: "#f59e0b" },
+        { label: "Total Pending Dues", value: INR(total), accent: "#f43f5e" },
+        { label: "Pending Records", value: du.length, accent: "#f59e0b" },
+        { label: "Unique Defaulters", value: uniq, accent: "#f43f5e" },
+        { label: "Critical (>30 Days)", value: crit, accent: "#f43f5e" },
+        { label: "Moderate (15-30 Days)", value: mod, accent: "#f59e0b" },
       ];
     }
     return [];

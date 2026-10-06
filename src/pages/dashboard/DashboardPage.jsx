@@ -13,6 +13,8 @@ import {
   InputAdornment,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -27,6 +29,8 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import EventIcon from "@mui/icons-material/Event";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import dayjs from "dayjs";
 import { formatGridDate, parseMemberDob } from "../../utils/dateHelper";
 import MetricCard from "../../components/MetricCard";
@@ -42,7 +46,8 @@ import BirthdayCelebrationModal from "../../components/common/BirthdayCelebratio
 import MemberPaymentQuickAccess from "../../components/dashboard/MemberPaymentQuickAccess";
 import FinancialBarChart from "../../components/dashboard/FinancialBarChart";
 import { useAuth } from "../../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import CalendarPage from "../events/CalendarPage";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 const C = {
@@ -665,7 +670,31 @@ export default function DashboardPage() {
   const toast = useAppToast();
   const { authState } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMember = authState?.role?.toLowerCase() === "member";
+
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    tabFromUrl === "calendar" ? "calendar" : "dashboard"
+  );
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "calendar" || tab === "dashboard") {
+      setActiveTab(tab);
+    } else {
+      setActiveTab("dashboard");
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    if (newTab === "calendar") {
+      setSearchParams({ tab: "calendar" });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1080,8 +1109,79 @@ export default function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="page-shell">
-      {/* ── Top Filter Bar ────────────────────────────────────────────────── */}
-      <Card
+      {/* ── Top Dashboard / Calendar Navigation Tabs ────────────────────── */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          borderBottom: (theme) =>
+            theme.palette.mode === "dark"
+              ? "1px solid rgba(255, 255, 255, 0.12)"
+              : "1px solid rgba(74, 63, 107, 0.15)",
+          mb: 0.5,
+        }}
+      >
+        <Tabs
+          value={activeTab}
+          onChange={(_, val) => handleTabChange(val)}
+          sx={{
+            minHeight: 46,
+            "& .MuiTabs-indicator": {
+              height: 3,
+              borderRadius: "3px 3px 0 0",
+              background: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "linear-gradient(90deg, #a78bfa 0%, #c4b5fd 100%)"
+                  : "linear-gradient(90deg, #4a3f6b 0%, #6f5bd3 100%)",
+            },
+            "& .MuiTab-root": {
+              minHeight: 46,
+              textTransform: "none",
+              fontSize: "0.95rem",
+              fontWeight: 600,
+              px: { xs: 2.5, sm: 3.5 },
+              py: 1,
+              borderRadius: "8px 8px 0 0",
+              color: "text.secondary",
+              transition: "all 0.2s ease",
+              "&.Mui-selected": {
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                fontWeight: 700,
+              },
+              "&:hover": {
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.04)"
+                    : "rgba(74, 63, 107, 0.04)",
+              },
+            },
+          }}
+        >
+          <Tab
+            value="dashboard"
+            icon={<DashboardRoundedIcon sx={{ fontSize: "1.15rem" }} />}
+            iconPosition="start"
+            label="Dashboard"
+          />
+          <Tab
+            value="calendar"
+            icon={<CalendarMonthRoundedIcon sx={{ fontSize: "1.15rem" }} />}
+            iconPosition="start"
+            label="Calendar"
+          />
+        </Tabs>
+      </Box>
+
+      {/* ── Tab Content ─────────────────────────────────────────────── */}
+      {activeTab === "calendar" ? (
+        <CalendarPage isEmbedded />
+      ) : (
+        <>
+          {/* ── Top Filter Bar ────────────────────────────────────────────────── */}
+          <Card
         sx={{
           p: { xs: 2, sm: 2.25 },
           px: { xs: 2, sm: 3 },
@@ -1124,7 +1224,6 @@ export default function DashboardPage() {
           <MetricCard
             label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Total Expected"}
             value={`₹${totalExpected.toLocaleString()}`}
-            helper="Target goal"
             accent="#6366f1"
             onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
             actionText="All Members →"
@@ -1132,7 +1231,6 @@ export default function DashboardPage() {
           <MetricCard
             label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Total Collections"}
             value={`₹${totalCollected.toLocaleString()}`}
-            helper={isMember ? "Amount paid" : "Total collected"}
             accent="#10b981"
             onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
             actionText={isMember ? "My Payments →" : "View Paid →"}
@@ -1140,7 +1238,6 @@ export default function DashboardPage() {
           <MetricCard
             label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Total Pending"}
             value={`₹${totalPending.toLocaleString()}`}
-            helper="Outstanding"
             accent="#f43f5e"
             onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
             actionText="View Unpaid →"
@@ -1148,7 +1245,6 @@ export default function DashboardPage() {
           <MetricCard
             label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
             value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
-            helper={isFilteredByEvent ? "Event expense" : (isFilteredByType ? appliedFilters.eventType : "Total spent")}
             accent="#f59e0b"
             onClick={() => navigate("/expense")}
             actionText="Expenses →"
@@ -1156,15 +1252,15 @@ export default function DashboardPage() {
           <MetricCard
             label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Balance Amount"}
             value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
-            helper="Net balance"
             accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
-            actionText={totalRemaining >= 0 ? "Surplus ✓" : "Deficit ⚠"}
+            actionText="Net Balance"
           />
           <MetricCard
             label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
             value={events.length}
-            helper={isFilteredByType ? appliedFilters.eventType : "Selected period"}
             accent="#3b82f6"
+            onClick={() => navigate("/events")}
+            actionText="View Events →"
           />
         </Box>
 
@@ -1199,6 +1295,8 @@ export default function DashboardPage() {
           <AppDataTable columns={columns} data={events} loading={false} />
         </CollapsibleSection>
       </Stack>
+        </>
+      )}
 
       {/* Quick Access Slide-Over Drawer */}
       <Drawer
