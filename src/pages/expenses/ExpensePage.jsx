@@ -1100,7 +1100,6 @@ export default function ExpensePage() {
                   options={categoryOptions}
                   size="small"
                   placeholder="Select Event Type"
-                  required
                   fullWidth
                 />
               </Box>
@@ -1114,7 +1113,6 @@ export default function ExpensePage() {
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
-                  required
                   fullWidth
                 />
               </Box>
@@ -1128,7 +1126,6 @@ export default function ExpensePage() {
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
-                  required
                   fullWidth
                 />
               </Box>

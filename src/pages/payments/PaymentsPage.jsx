@@ -491,7 +491,6 @@ export default function PaymentsPage() {
                     options={memberOptions}
                     size="small"
                     placeholder="Select Member"
-                    required
                     fullWidth
                   />
                 </Box>
@@ -506,7 +505,6 @@ export default function PaymentsPage() {
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
-                  required
                   fullWidth
                 />
               </Box>
@@ -520,7 +518,6 @@ export default function PaymentsPage() {
                   options={modeOptions}
                   size="small"
                   placeholder="Payment Mode"
-                  required
                   fullWidth
                 />
               </Box>

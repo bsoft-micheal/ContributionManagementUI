@@ -475,25 +475,27 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                     overflow: "hidden",
                     border: (theme) => `1px solid ${theme.palette.divider}`,
                     bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
+                    maxHeight: tableCelebrants.length > 6 ? 260 : "none",
+                    overflowY: tableCelebrants.length > 6 ? "auto" : "visible",
                   }}
                 >
-                  <Table size="small">
+                  <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow
                         sx={{
                           bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(74, 63, 107, 0.25)" : "rgba(74, 63, 107, 0.06)",
                         }}
                       >
-                        <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, width: 45, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
+                        <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, width: 45, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
                           #
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
+                        <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
                           Birthday Member
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
+                        <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
                           Date of Birth (DOB)
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, width: 110, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
+                        <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, width: 110, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
                           Member Type
                         </TableCell>
                       </TableRow>

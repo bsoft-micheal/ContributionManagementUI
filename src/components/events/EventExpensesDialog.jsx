@@ -245,8 +245,8 @@ export default function EventExpensesDialog({ open, onClose, event }) {
               </AppButton>
             </Box>
           ) : (
-            <Box sx={{ overflowX: "auto" }}>
-              <Table size="small">
+            <Box sx={{ overflowX: "auto", maxHeight: expenses.length > 6 ? 260 : "none", overflowY: expenses.length > 6 ? "auto" : "visible" }}>
+              <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow sx={{ bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "#f1f5f9") }}>
                     <TableCell sx={{ fontWeight: 800, fontSize: "0.75rem", py: 1 }}>Expense ID</TableCell>

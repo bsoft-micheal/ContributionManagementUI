@@ -1250,7 +1250,6 @@ export default function ContributionsPage() {
                     setSelectedEventId(val);
                   }}
                   options={eventOptions}
-                  required
                   fullWidth
                 />
               </Box>
