@@ -294,6 +294,124 @@ export default function PaymentsPage() {
     );
   };
 
+  const renderUtrReferenceBadges = (rawUtr) => {
+    if (!rawUtr || rawUtr === "-" || rawUtr === "--") {
+      return (
+        <Typography variant="body2" sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
+          --
+        </Typography>
+      );
+    }
+
+    const str = String(rawUtr).trim();
+    const parts = str.includes(";")
+      ? str.split(";").map((p) => p.trim()).filter(Boolean)
+      : [str];
+
+    return (
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6, alignItems: "center" }}>
+        {parts.map((part, idx) => {
+          const colonIdx = part.indexOf(":");
+          let modeName = "";
+          let refVal = part;
+
+          if (colonIdx > 0) {
+            modeName = part.substring(0, colonIdx).trim();
+            refVal = part.substring(colonIdx + 1).trim();
+          }
+
+          const lowerMode = modeName.toLowerCase();
+          let color = "#4a3f6b";
+          let bg = "rgba(74, 63, 107, 0.08)";
+          let border = "rgba(74, 63, 107, 0.22)";
+
+          if (lowerMode.includes("gpay") || lowerMode.includes("google")) {
+            color = "#2563eb";
+            bg = "rgba(37, 99, 235, 0.08)";
+            border = "rgba(37, 99, 235, 0.28)";
+          } else if (lowerMode.includes("phonepe") || lowerMode.includes("phone")) {
+            color = "#7c3aed";
+            bg = "rgba(124, 58, 237, 0.08)";
+            border = "rgba(124, 58, 237, 0.28)";
+          } else if (lowerMode.includes("paytm")) {
+            color = "#0284c7";
+            bg = "rgba(2, 132, 199, 0.08)";
+            border = "rgba(2, 132, 199, 0.28)";
+          } else if (lowerMode.includes("upi") || lowerMode.includes("bhim")) {
+            color = "#ea580c";
+            bg = "rgba(234, 88, 12, 0.08)";
+            border = "rgba(234, 88, 12, 0.28)";
+          } else if (lowerMode.includes("cash")) {
+            color = "#16a34a";
+            bg = "rgba(22, 163, 74, 0.08)";
+            border = "rgba(22, 163, 74, 0.28)";
+          } else if (lowerMode.includes("bank") || lowerMode.includes("transfer") || lowerMode.includes("neft")) {
+            color = "#059669";
+            bg = "rgba(5, 150, 105, 0.08)";
+            border = "rgba(5, 150, 105, 0.28)";
+          }
+
+          const isNumericRef = /^[0-9A-Za-z_-]{5,}$/.test(refVal);
+
+          return (
+            <Box
+              key={idx}
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                px: 0.9,
+                py: 0.25,
+                borderRadius: "6px",
+                bgcolor: bg,
+                border: `1px solid ${border}`,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {modeName ? (
+                <>
+                  <Typography
+                    component="span"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "0.72rem",
+                      color: color,
+                    }}
+                  >
+                    {modeName}:
+                  </Typography>
+                  <Typography
+                    component="span"
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: "0.73rem",
+                      color: (t) => t.palette.mode === "dark" ? "#e2e8f0" : "#1e293b",
+                      fontFamily: isNumericRef ? "monospace" : "inherit",
+                    }}
+                  >
+                    {refVal}
+                  </Typography>
+                </>
+              ) : (
+                <Typography
+                  component="span"
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: "0.74rem",
+                    color: (t) => t.palette.mode === "dark" ? "#e2e8f0" : "#1e293b",
+                    fontFamily: isNumericRef ? "monospace" : "inherit",
+                  }}
+                >
+                  {refVal}
+                </Typography>
+              )}
+            </Box>
+          );
+        })}
+      </Box>
+    );
+  };
+
   const columns = [
     {
       label: "Action",
@@ -387,11 +505,7 @@ export default function PaymentsPage() {
     {
       label: "UTR / Reference No",
       key: "utr",
-      render: (row) => (
-        <Typography variant="body2" sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
-          {row.utr || "--"}
-        </Typography>
-      ),
+      render: (row) => renderUtrReferenceBadges(row.utr),
     },
     {
       label: "Verification Status",
@@ -711,20 +825,18 @@ export default function PaymentsPage() {
                 <Typography variant="caption" color="text.secondary">
                   UTR / Reference No
                 </Typography>
-                <Stack direction="row" alignItems="center" spacing={0.6}>
-                  <Typography variant="body2" fontWeight={700} color="#1e293b">
-                    {selectedTxn.utr || "--"}
-                  </Typography>
-                  {selectedTxn.utr && selectedTxn.utr !== "-" && (
-                    <Tooltip title="Copy UTR">
+                <Box sx={{ mt: 0.5, display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+                  {renderUtrReferenceBadges(selectedTxn.utr)}
+                  {selectedTxn.utr && selectedTxn.utr !== "-" && selectedTxn.utr !== "--" && (
+                    <Tooltip title="Copy Reference">
                       <IconButton
                         size="small"
                         onClick={async () => {
                           try {
                             await navigator.clipboard.writeText(selectedTxn.utr);
-                            toast.success("UTR copied to clipboard!");
+                            toast.success("Reference copied to clipboard!");
                           } catch {
-                            toast.error("Failed to copy UTR");
+                            toast.error("Failed to copy reference");
                           }
                         }}
                         sx={{ p: 0.3 }}
@@ -733,7 +845,7 @@ export default function PaymentsPage() {
                       </IconButton>
                     </Tooltip>
                   )}
-                </Stack>
+                </Box>
               </Grid>
               <Grid size={{ xs: 6 }}>
                 <Typography variant="caption" color="text.secondary">
