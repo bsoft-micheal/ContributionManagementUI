@@ -74,7 +74,7 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [flyoutAnchorEl, setFlyoutAnchorEl] = useState(null);
   const [activeFlyoutItem, setActiveFlyoutItem] = useState(null);
-  const { authState, logout, updateProfile } = useAuth();
+  const { authState, logout, updateProfile, switchRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useAppToast();
@@ -143,6 +143,27 @@ export default function AppLayout() {
   }, [authState]);
 
   const hasMultipleRoles = userAssignedRoles.length > 1;
+
+  const handleQuickSwitchRole = async (e) => {
+    if (e) e.stopPropagation();
+    if (!hasMultipleRoles) return;
+
+    const currentRole = authState?.role || authState?.roleName || "";
+    const targetRole = userAssignedRoles.find(
+      (r) => r && r.toLowerCase() !== currentRole.toLowerCase()
+    );
+
+    if (userAssignedRoles.length <= 2 && targetRole) {
+      try {
+        await switchRole(targetRole);
+        toast.success(`Active role switched to ${targetRole}`);
+      } catch (err) {
+        toast.error(err.response?.data?.message || err.message || "Failed to switch role");
+      }
+    } else {
+      setSwitchRoleDialogOpen(true);
+    }
+  };
   const [, setRightsVersion] = useState(0);
 
   useEffect(() => {
@@ -613,10 +634,7 @@ export default function AppLayout() {
           <Tooltip title="Switch Role">
             <IconButton
               size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSwitchRoleDialogOpen(true);
-              }}
+              onClick={handleQuickSwitchRole}
               sx={{
                 color: SIDEBAR.text,
                 p: 0.6,
@@ -707,9 +725,9 @@ export default function AppLayout() {
 
           {hasMultipleRoles && (
             <MenuItem
-              onClick={() => {
+              onClick={(e) => {
                 setProfileMenuAnchor(null);
-                setSwitchRoleDialogOpen(true);
+                handleQuickSwitchRole(e);
               }}
               sx={{
                 fontSize: "0.85rem",

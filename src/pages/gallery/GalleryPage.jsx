@@ -881,7 +881,6 @@ export default function GalleryPage() {
                   options={categoryOptions}
                   size="small"
                   placeholder="Select Category"
-                  required
                   fullWidth
                 />
               </Box>
@@ -895,7 +894,6 @@ export default function GalleryPage() {
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event"
-                  required
                   fullWidth
                 />
               </Box>

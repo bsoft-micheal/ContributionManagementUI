@@ -1061,7 +1061,6 @@ export default function UsersPage() {
                   }}
                   options={[{ label: "All Roles", value: "" }, ...userRolesList]}
                   size="small"
-                  required
                   fullWidth
                 />
               </Box>
@@ -1081,7 +1080,6 @@ export default function UsersPage() {
                     { label: "Inactive", value: "false" },
                   ]}
                   size="small"
-                  required
                   fullWidth
                 />
               </Box>

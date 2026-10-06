@@ -627,86 +627,97 @@ export default function UserFormPage() {
             />
           </Grid>
 
-          {/* Bottom Checkboxes: Create Login Account & Enable Multiple Roles */}
+          {/* Checkboxes: Create Login Account & Enable Multiple Roles placed together in same row */}
           <Grid size={{ xs: 12, md: 4 }}>
             <Box
-              onClick={() => fieldChange("createMemberProfile", !form.createMemberProfile)}
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: 0.8,
-                py: 0.8,
-                cursor: "pointer",
-                userSelect: "none",
+                gap: 2,
+                height: "100%",
+                pt: { xs: 0, md: 2.8 },
+                flexWrap: "wrap",
               }}
             >
-              <Checkbox
-                checked={Boolean(form.createMemberProfile)}
-                onChange={(e) => fieldChange("createMemberProfile", e.target.checked)}
-                onClick={(e) => e.stopPropagation()}
-                size="small"
+              <Box
+                onClick={() => fieldChange("createMemberProfile", !form.createMemberProfile)}
                 sx={{
-                  p: 0.2,
-                  transform: "scale(0.85)",
-                  color: "#4a3f6b",
-                  "&.Mui-checked": {
-                    color: "#4a3f6b",
-                  },
-                }}
-              />
-              <Typography
-                variant="body2"
-                fontWeight={600}
-                sx={{
-                  color: (theme) =>
-                    theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
-                  fontSize: "0.82rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  cursor: "pointer",
+                  userSelect: "none",
                 }}
               >
-                Create Login Account
-              </Typography>
+                <Checkbox
+                  checked={Boolean(form.createMemberProfile)}
+                  onChange={(e) => fieldChange("createMemberProfile", e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  size="small"
+                  sx={{
+                    p: 0.2,
+                    transform: "scale(0.85)",
+                    color: "#4a3f6b",
+                    "&.Mui-checked": {
+                      color: "#4a3f6b",
+                    },
+                  }}
+                />
+                <Typography
+                  variant="body2"
+                  fontWeight={600}
+                  sx={{
+                    color: (theme) =>
+                      theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
+                    fontSize: "0.82rem",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Create Login Account
+                </Typography>
+              </Box>
+
+              <Box
+                onClick={() => handleToggleMultipleRoles(!form.enableMultipleRoles)}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <Checkbox
+                  checked={Boolean(form.enableMultipleRoles)}
+                  onChange={(e) => handleToggleMultipleRoles(e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  size="small"
+                  sx={{
+                    p: 0.2,
+                    transform: "scale(0.85)",
+                    color: "#4a3f6b",
+                    "&.Mui-checked": {
+                      color: "#4a3f6b",
+                    },
+                  }}
+                />
+                <Typography
+                  variant="body2"
+                  fontWeight={600}
+                  sx={{
+                    color: (theme) =>
+                      theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
+                    fontSize: "0.82rem",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Enable Multiple Roles
+                </Typography>
+              </Box>
             </Box>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Box
-              onClick={() => handleToggleMultipleRoles(!form.enableMultipleRoles)}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 0.8,
-                py: 0.8,
-                cursor: "pointer",
-                userSelect: "none",
-              }}
-            >
-              <Checkbox
-                checked={Boolean(form.enableMultipleRoles)}
-                onChange={(e) => handleToggleMultipleRoles(e.target.checked)}
-                onClick={(e) => e.stopPropagation()}
-                size="small"
-                sx={{
-                  p: 0.2,
-                  transform: "scale(0.85)",
-                  color: "#4a3f6b",
-                  "&.Mui-checked": {
-                    color: "#4a3f6b",
-                  },
-                }}
-              />
-              <Typography
-                variant="body2"
-                fontWeight={600}
-                sx={{
-                  color: (theme) =>
-                    theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
-                  fontSize: "0.82rem",
-                }}
-              >
-                Enable Multiple Roles
-              </Typography>
-            </Box>
-          </Grid>
+          {/* Conditional User Access Fields */}
 
           {/* Conditional User Access Fields */}
           {form.createMemberProfile && (
@@ -824,7 +835,7 @@ export default function UserFormPage() {
         {/* ── Bottom Action Buttons ────────────────────────────────────────── */}
         <Divider sx={{ my: 3, borderColor: "rgba(74, 63, 107, 0.15)" }} />
 
-        <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+        <Stack direction="row" spacing={1.5} justifyContent="center">
           <AppButton
             variant="outlined"
             onClick={() => navigate("/users")}

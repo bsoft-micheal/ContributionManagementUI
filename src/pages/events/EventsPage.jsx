@@ -447,37 +447,56 @@ export default function EventsPage() {
         <Typography variant="body2" fontWeight={700} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }}>{row.eventName}</Typography>
       )
     },
-    { label: "Category", key: "eventTypeName", render: (row) => <Typography variant="body2">{row.eventTypeName}</Typography> },
     {
-      label: "Event Date",
-      key: "eventDate",
+      label: "Category / Event Date",
+      key: "eventTypeName",
       render: (row) => {
+        let dateDisplay = "";
         if (!row.eventDates) {
-          return (
-            <Typography variant="body2" sx={{ maxWidth: 220, whiteSpace: "normal", wordBreak: "break-word" }}>
-              {formatGridDate(row.eventDate)}
-            </Typography>
+          dateDisplay = formatGridDate(row.eventDate);
+        } else {
+          const rawList = String(row.eventDates)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+          const countsMap = new Map();
+          rawList.forEach((d) => {
+            countsMap.set(d, (countsMap.get(d) || 0) + 1);
+          });
+
+          const formattedParts = Array.from(countsMap.entries()).map(([dateStr, count]) =>
+            count > 1 ? `${dateStr} (${count})` : dateStr
           );
+          dateDisplay = formattedParts.join(", ");
         }
 
-        const rawList = String(row.eventDates)
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-
-        const countsMap = new Map();
-        rawList.forEach((d) => {
-          countsMap.set(d, (countsMap.get(d) || 0) + 1);
-        });
-
-        const formattedParts = Array.from(countsMap.entries()).map(([dateStr, count]) =>
-          count > 1 ? `${dateStr} (${count})` : dateStr
-        );
-
         return (
-          <Typography variant="body2" sx={{ maxWidth: 220, whiteSpace: "normal", wordBreak: "break-word" }}>
-            {formattedParts.join(", ")}
-          </Typography>
+          <Box sx={{ py: 0.2 }}>
+            <Typography
+              variant="body2"
+              fontWeight={700}
+              sx={{ color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e") }}
+            >
+              {row.eventTypeName || row.category || "--"}
+            </Typography>
+            {dateDisplay && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "text.secondary",
+                  display: "block",
+                  mt: 0.4,
+                  maxWidth: 220,
+                  whiteSpace: "normal",
+                  wordBreak: "break-word",
+                  lineHeight: 1.35,
+                }}
+              >
+                {dateDisplay}
+              </Typography>
+            )}
+          </Box>
         );
       },
     },
@@ -614,7 +633,6 @@ export default function EventsPage() {
                 }}
                 options={yearOptions}
                 placeholder="Select Year"
-                required
               />
             </Box>
             <Box sx={{ width: { xs: "100%", sm: 130 } }}>
@@ -626,7 +644,6 @@ export default function EventsPage() {
                 }}
                 options={monthOptions}
                 placeholder="Select Month"
-                required
               />
             </Box>
             <Box sx={{ width: { xs: "100%", sm: 155 } }}>
