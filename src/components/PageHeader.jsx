@@ -19,17 +19,22 @@ export default function PageHeader({ eyebrow, title, description, actions }) {
           <Typography 
             variant="overline" 
             sx={{ 
-              fontWeight: 800, 
+              fontWeight: 600, 
               color: "primary.main",
-              letterSpacing: "0.1em",
+              letterSpacing: "0.06em",
+              fontSize: "0.75rem",
               display: "block",
               mb: 0.5
             }}
           >
             {eyebrow}
           </Typography>
-          <Typography variant="h4" sx={{ mb: 1 }}>{title}</Typography>
-          <Typography color="text.secondary" sx={{ maxWidth: 720, lineHeight: 1.6 }}>{description}</Typography>
+          <Typography variant="h4" sx={{ mb: 1, fontWeight: 700, fontSize: { xs: "1.5rem", sm: "1.625rem" }, letterSpacing: "-0.02em", lineHeight: 1.25 }}>
+            {title}
+          </Typography>
+          <Typography color="text.secondary" sx={{ maxWidth: 720, fontSize: "0.875rem", lineHeight: 1.55 }}>
+            {description}
+          </Typography>
         </Box>
         <Box 
           sx={{ 

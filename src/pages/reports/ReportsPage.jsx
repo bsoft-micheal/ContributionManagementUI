@@ -86,7 +86,7 @@ function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
                 }}
               />
             </Box>
-            <Typography variant="body2" fontWeight={800} sx={{ textAlign: "right", fontFamily: '"Outfit", sans-serif', fontSize: "0.85rem", fontVariantNumeric: "tabular-nums" }}>
+            <Typography variant="body2" fontWeight={600} sx={{ textAlign: "right", fontSize: "0.875rem", fontVariantNumeric: "tabular-nums" }}>
               {"\u20B9"}{value.toLocaleString()}
             </Typography>
           </Box>
@@ -250,12 +250,11 @@ function StatCard({ label, value, icon: Icon, color = "primary", subLabel, helpe
             variant="h4"
             title={typeof value === "string" ? value : undefined}
             sx={{
-              fontFamily: '"Outfit", sans-serif',
-              fontWeight: 500,
+              fontWeight: 700,
               color: isDark ? "#ffffff" : "#0f172a",
-              fontSize: { xs: "1.15rem", sm: "1.22rem", md: "1.28rem", lg: "1.22rem", xl: "1.34rem" },
-              lineHeight: 1.15,
-              letterSpacing: "-0.015em",
+              fontSize: { xs: "1.25rem", sm: "1.375rem" },
+              lineHeight: 1.2,
+              letterSpacing: "-0.02em",
               fontVariantNumeric: "tabular-nums",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -1033,12 +1032,13 @@ export default function ReportsPage({ mode = "event" }) {
               <Box>
                 <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                   <Typography
-                    variant="h5"
-                    fontWeight={800}
+                    variant="h4"
+                    fontWeight={700}
                     sx={{
-                      fontFamily: '"Outfit", sans-serif',
+                      fontSize: { xs: "1.5rem", sm: "1.625rem" },
+                      letterSpacing: "-0.02em",
                       color: "text.primary",
-                      lineHeight: 1.2,
+                      lineHeight: 1.25,
                     }}
                   >
                     {pageTitle}
@@ -1274,7 +1274,7 @@ export default function ReportsPage({ mode = "event" }) {
                             >
                               {/* Member Search & Count */}
                               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                                <Typography variant="subtitle2" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif' }}>
+                                <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: "0.9375rem" }}>
                                   Select Member
                                 </Typography>
                                 <Chip
@@ -1501,7 +1501,7 @@ export default function ReportsPage({ mode = "event" }) {
                     {selectedMember.memberName?.charAt(0)?.toUpperCase() || "M"}
                   </Avatar>
                   <Box>
-                    <Typography variant="h6" fontWeight={800} sx={{ fontFamily: '"Outfit", sans-serif', lineHeight: 1.2 }}>
+                    <Typography variant="h6" fontWeight={600} sx={{ fontSize: "1.1875rem", lineHeight: 1.35, letterSpacing: "-0.015em" }}>
                       {selectedMember.memberName}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">

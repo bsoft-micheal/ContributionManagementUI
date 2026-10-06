@@ -305,10 +305,10 @@ export default function FinancialBarChart({
               <BarChartRoundedIcon sx={{ fontSize: 22 }} />
             </Box>
             <Box>
-              <Typography variant="h6" fontWeight={800} sx={{ fontSize: "1.05rem", letterSpacing: "-0.01em" }}>
+              <Typography variant="h6" fontWeight={600} sx={{ fontSize: "1.1875rem", letterSpacing: "-0.015em", lineHeight: 1.35 }}>
                 Financial Overview
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.78rem" }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8125rem", fontWeight: 400, lineHeight: 1.4 }}>
                 Financial metrics comparison & contribution distribution
               </Typography>
             </Box>
@@ -323,7 +323,7 @@ export default function FinancialBarChart({
              ════════════════════════════════════════════════════════════════════ */}
           <Grid size={{ xs: 12, lg: showPieChart ? 7.2 : 12 }}>
             <Box sx={{ pr: { lg: showPieChart ? 2 : 0 } }}>
-              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: "block", textTransform: "uppercase", letterSpacing: "0.06em", fontSize: "0.70rem" }}>
+              <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: "block", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.78125rem" }}>
                 Core Financial Metrics
               </Typography>
 
@@ -354,8 +354,8 @@ export default function FinancialBarChart({
                               width: 55,
                               textAlign: "right",
                               pr: 1.2,
-                              fontSize: "0.70rem",
-                              fontWeight: 600,
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
                               color: "text.secondary",
                               userSelect: "none",
                             }}
@@ -422,7 +422,7 @@ export default function FinancialBarChart({
                                   ? "rgba(255,255,255,0.08)"
                                   : "rgba(0,0,0,0.04)",
                                 color: isHovered ? "#ffffff" : "text.primary",
-                                fontSize: "0.70rem",
+                                fontSize: "0.75rem",
                                 fontWeight: 600,
                                 whiteSpace: "nowrap",
                                 boxShadow: isHovered ? `0 4px 12px ${alpha(item.color, 0.4)}` : "none",
@@ -594,7 +594,7 @@ export default function FinancialBarChart({
                 <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <PieChartRoundedIcon sx={{ fontSize: 18, color: "primary.main" }} />
-                    <Typography variant="subtitle2" fontWeight={800} sx={{ fontSize: "0.86rem" }}>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: "0.9375rem", letterSpacing: "-0.005em" }}>
                       {pieMode === "events" ? "Event Distribution" : "Financial Distribution"}
                     </Typography>
                   </Stack>
@@ -616,8 +616,8 @@ export default function FinancialBarChart({
                         sx={{
                           py: 0.2,
                           px: 1,
-                          fontSize: "0.70rem",
-                          fontWeight: 700,
+                          fontSize: "0.78125rem",
+                          fontWeight: 600,
                           textTransform: "none",
                           borderRadius: 1,
                           bgcolor: pieMode === "events" ? "#6366f1" : "transparent",
@@ -632,8 +632,8 @@ export default function FinancialBarChart({
                         sx={{
                           py: 0.2,
                           px: 1,
-                          fontSize: "0.70rem",
-                          fontWeight: 700,
+                          fontSize: "0.78125rem",
+                          fontWeight: 600,
                           textTransform: "none",
                           borderRadius: 1,
                           bgcolor: pieMode === "status" ? "#6366f1" : "transparent",
@@ -834,10 +834,10 @@ export default function FinancialBarChart({
                           <Box sx={{ minWidth: 0 }}>
                             <Typography
                               variant="body2"
-                              fontWeight={700}
+                              fontWeight={500}
                               noWrap
                               sx={{
-                                fontSize: "0.78rem",
+                                fontSize: "0.78125rem",
                                 maxWidth: 130,
                                 color: isHovered ? slice.color : "text.primary",
                               }}
@@ -848,7 +848,7 @@ export default function FinancialBarChart({
                             <Typography
                               variant="caption"
                               color="text.secondary"
-                              sx={{ fontSize: "0.70rem" }}
+                              sx={{ fontSize: "0.75rem", fontWeight: 400 }}
                             >
                               {slice.formattedValue}
                             </Typography>

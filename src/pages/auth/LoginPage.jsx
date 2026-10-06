@@ -244,12 +244,11 @@ export default function LoginPage() {
             <Typography
               variant="h5"
               sx={{
-                fontWeight: 900,
+                fontWeight: 700,
                 mb: 1.5,
                 color: "text.primary",
-                fontFamily: '"Outfit", sans-serif',
-                fontSize: { xs: "1.15rem", sm: "1.25rem" },
-                letterSpacing: "-0.01em",
+                fontSize: { xs: "1.2rem", sm: "1.35rem" },
+                letterSpacing: "-0.015em",
                 whiteSpace: "nowrap",
               }}
             >
@@ -319,10 +318,10 @@ export default function LoginPage() {
                 <img src={logo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
               </Box>
               <Stack spacing={0} sx={{ textAlign: "left" }}>
-                <Typography sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 900, color: "text.primary", fontSize: "0.85rem", letterSpacing: "0.02em", lineHeight: 1.15 }}>
+                <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: "0.875rem", letterSpacing: "0.02em", lineHeight: 1.15 }}>
                   CONTRIBUTION
                 </Typography>
-                <Typography sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 900, color: "#7c3aed", fontSize: "0.85rem", letterSpacing: "0.02em", lineHeight: 1.15 }}>
+                <Typography sx={{ fontWeight: 700, color: "#7c3aed", fontSize: "0.875rem", letterSpacing: "0.02em", lineHeight: 1.15 }}>
                   MANAGEMENT
                 </Typography>
               </Stack>
@@ -330,14 +329,15 @@ export default function LoginPage() {
 
             {/* Header Text */}
             <Typography
+              variant="h4"
               sx={{
-                fontSize: "1.75rem",
-                fontWeight: 900,
+                fontSize: { xs: "1.5rem", sm: "1.625rem" },
+                fontWeight: 700,
                 color: "text.primary",
-                fontFamily: '"Outfit", sans-serif',
                 mb: 0.5,
                 textAlign: "left",
-                lineHeight: 1.2,
+                lineHeight: 1.25,
+                letterSpacing: "-0.02em",
               }}
             >
               {COMMON_STRINGS.AUTH.SIGN_IN_TITLE}

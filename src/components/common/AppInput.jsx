@@ -48,11 +48,11 @@ export default function AppInput({
           sx={{
             display: "block",
             mb: 0.5,
-            fontWeight: 700,
+            fontWeight: 500,
             color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.secondary",
             textTransform: "none",
-            letterSpacing: "0.04em",
-            fontSize: "0.7rem",
+            letterSpacing: "0.01em",
+            fontSize: "0.78125rem",
           }}
         >
           {label}
@@ -73,7 +73,7 @@ export default function AppInput({
         size={size}
         sx={{
           "& .MuiOutlinedInput-root": {
-            fontSize: "0.82rem",
+            fontSize: "0.875rem",
             bgcolor: "background.paper",
             borderRadius: "12px",
             height: props.multiline ? "auto" : (size === "small" ? 34 : 40),
@@ -92,7 +92,7 @@ export default function AppInput({
               "&::placeholder, &::-webkit-input-placeholder": {
                 color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
                 opacity: 1,
-                fontWeight: 500,
+                fontWeight: 400,
               }
             },
             "& fieldset": {
@@ -131,7 +131,7 @@ export default function AppInput({
           },
           "& .MuiFormHelperText-root": {
             fontSize: "0.75rem",
-            fontWeight: 600,
+            fontWeight: 400,
             mt: 0.5,
             color: (theme) => error ? "#dc2626 !important" : (theme.palette.mode === "dark" ? "#cbd5e1 !important" : "#334155 !important"),
           },

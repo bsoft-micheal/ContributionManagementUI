@@ -239,12 +239,12 @@ export default function AppPieChart({
               </Typography>
               <Typography
                 variant="subtitle2"
-                fontWeight={800}
+                fontWeight={700}
                 sx={{
-                  fontFamily: '"Outfit", sans-serif',
-                  fontSize: "1.05rem",
+                  fontSize: "1.25rem",
                   color: "text.primary",
                   lineHeight: 1.2,
+                  letterSpacing: "-0.015em",
                   mt: 0.25,
                 }}
               >
@@ -282,12 +282,12 @@ export default function AppPieChart({
               </Typography>
               <Typography
                 variant="subtitle1"
-                fontWeight={800}
+                fontWeight={700}
                 sx={{
-                  fontFamily: '"Outfit", sans-serif',
-                  fontSize: "1.15rem",
+                  fontSize: "1.375rem",
                   color: "text.primary",
                   lineHeight: 1.2,
+                  letterSpacing: "-0.02em",
                 }}
               >
                 ₹{totalValue.toLocaleString()}
@@ -381,10 +381,9 @@ export default function AppPieChart({
               {/* Amount */}
               <Typography
                 variant="subtitle2"
-                fontWeight={800}
+                fontWeight={600}
                 sx={{
-                  fontFamily: '"Outfit", sans-serif',
-                  fontSize: "0.85rem",
+                  fontSize: "0.875rem",
                   color: "text.primary",
                   textAlign: "right",
                   whiteSpace: "nowrap",

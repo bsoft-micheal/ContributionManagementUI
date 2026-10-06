@@ -38,11 +38,11 @@ export default function AppSelect({
           sx={{
             display: "block",
             mb: 0.5,
-            fontWeight: 700,
+            fontWeight: 500,
             color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.secondary",
             textTransform: "none",
-            letterSpacing: "0.04em",
-            fontSize: "0.7rem",
+            letterSpacing: "0.01em",
+            fontSize: "0.78125rem",
           }}
         >
           {label}
@@ -73,8 +73,8 @@ export default function AppSelect({
                 <span
                   style={{
                     color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
-                    fontWeight: 500,
-                    fontSize: "0.82rem",
+                    fontWeight: 400,
+                    fontSize: "0.875rem",
                   }}
                 >
                   {effectivePlaceholder}
@@ -88,8 +88,8 @@ export default function AppSelect({
                 <span
                   style={{
                     color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
-                    fontWeight: 500,
-                    fontSize: "0.82rem",
+                    fontWeight: 400,
+                    fontSize: "0.875rem",
                   }}
                 >
                   {effectivePlaceholder}
@@ -102,7 +102,7 @@ export default function AppSelect({
         }}
         sx={{
           "& .MuiOutlinedInput-root": {
-            fontSize: "0.82rem",
+            fontSize: "0.875rem",
             bgcolor: "background.paper",
             borderRadius: "12px",
             height: size === "small" ? 34 : 40,

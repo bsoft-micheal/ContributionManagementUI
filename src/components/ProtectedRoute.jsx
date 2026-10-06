@@ -24,7 +24,7 @@ export default function ProtectedRoute({ children, roles = [] }) {
     // In that scenario, fallback to a safe path or login.
     if (location.pathname === "/") {
       return (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", fontFamily: "sans-serif" }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", fontFamily: "'Inter', sans-serif" }}>
           <h2>Access Denied: You do not have permission to access the Dashboard.</h2>
         </div>
       );
