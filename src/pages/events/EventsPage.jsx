@@ -532,7 +532,7 @@ export default function EventsPage() {
     },
 
     {
-      label: "Valuation",
+      label: "Expected Collection",
       key: "totalExpectedAmount",
       align: "right",
       render: (row) => {
