@@ -152,7 +152,7 @@ export default function BudgetCalculationsPage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error("Please fill required field");
       return;
     }
 
@@ -265,8 +265,8 @@ export default function BudgetCalculationsPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
@@ -289,8 +289,8 @@ export default function BudgetCalculationsPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
@@ -316,14 +316,14 @@ export default function BudgetCalculationsPage() {
                   <ToggleOnIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#10b981" : "#cbd5e1",
+                      color: hasWriteAccess ? "#10b981" : "#94a3b8",
                     }}
                   />
                 ) : (
                   <ToggleOffIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#ef4444" : "#cbd5e1",
+                      color: hasWriteAccess ? "#ef4444" : "#94a3b8",
                     }}
                   />
                 )}

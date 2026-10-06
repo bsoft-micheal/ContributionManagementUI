@@ -49,6 +49,7 @@ import {
 import * as XLSX from "xlsx";
 import { formatGridDate, formatGridDateTime } from "../../utils/dateHelper";
 import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
+import { toPascalCase } from "../../utils/textHelper";
 
 // ─── Printout & PDF Helper ──────────────────────────────────────────────────
 function printTable(title, columns, data) {
@@ -77,7 +78,7 @@ function printTable(title, columns, data) {
   }
 
   const generatedDate = new Date().toLocaleString();
-  const tableHeaders = exportableCols.map((col) => `<th>${col.label}</th>`).join("");
+  const tableHeaders = exportableCols.map((col) => `<th>${toPascalCase(col.label || col.key)}</th>`).join("");
   const tableRows = data
     .map(
       (row, idx) => `
@@ -151,7 +152,7 @@ function printTable(title, columns, data) {
             padding: 9px 10px;
             border: 1px solid #4a3f6b;
             letter-spacing: 0.03em;
-            text-transform: uppercase;
+            text-transform: none;
             font-size: 10px;
           }
           td {
@@ -243,7 +244,7 @@ function exportToExcel(columns, data, filename = "export.xlsx", title = "Data") 
     return val;
   };
 
-  const headers = exportableCols.map((c) => c.label);
+  const headers = exportableCols.map((c) => toPascalCase(c.label || c.key));
   const rows = data.map((row) => exportableCols.map((col) => getCellText(col, row)));
 
   const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
@@ -271,7 +272,7 @@ function exportToCSV(columns, data, filename = "export.csv") {
     return val ?? "";
   };
 
-  const headers = exportableCols.map((c) => c.label);
+  const headers = exportableCols.map((c) => toPascalCase(c.label || c.key));
   const rows = data.map((row) =>
     exportableCols
       .map((col) => `"${String(getCellText(col, row)).replace(/"/g, '""')}"`)
@@ -644,6 +645,17 @@ export default function AppDataTable({
                 gap: 0.5,
                 "&:hover": { bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2) !important" : "#1a1033 !important" },
               },
+              "& .MuiButton-root.Mui-disabled, & .MuiButton-root:disabled": {
+                bgcolor: "rgba(255, 255, 255, 0.08) !important",
+                color: "rgba(255, 255, 255, 0.7) !important",
+                border: "1px solid rgba(255, 255, 255, 0.25) !important",
+                opacity: "0.75 !important",
+                cursor: "not-allowed !important",
+                boxShadow: "none !important",
+                "& .MuiSvgIcon-root": {
+                  color: "rgba(255, 255, 255, 0.7) !important",
+                },
+              },
             }}
           >
             {actions}
@@ -857,7 +869,7 @@ export default function AppDataTable({
                   sx={{ py: 0.3 }}
                 />
               }
-              label={<Typography variant="body2" sx={{ fontSize: "0.78rem" }}>{col.label}</Typography>}
+              label={<Typography variant="body2" sx={{ fontSize: "0.78rem" }}>{toPascalCase(col.label || col.key)}</Typography>}
             />
           ))}
         </Stack>
@@ -881,8 +893,8 @@ export default function AppDataTable({
         {activeColumn && (
           <Box>
             {/* Header info */}
-            <Typography variant="caption" sx={{ px: 2, py: 1, display: "block", fontWeight: 800, color: textSecondary, textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em" }}>
-              Column Options: {activeColumn.label}
+            <Typography variant="caption" sx={{ px: 2, py: 1, display: "block", fontWeight: 800, color: textSecondary, textTransform: "none", fontSize: "0.72rem", letterSpacing: "0.02em" }}>
+              Column Options: {toPascalCase(activeColumn.label || activeColumn.key)}
             </Typography>
             <Divider sx={{ my: 0.5 }} />
 
@@ -912,7 +924,7 @@ export default function AppDataTable({
                   sx={{ py: 1, fontSize: "0.78rem", fontWeight: orderBy === activeColumn.key && order === "asc" ? 700 : 500 }}
                 >
                   <SortAscIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: primaryMain }} />
-                  Sort by {activeColumn.label} ascending
+                  Sort by {toPascalCase(activeColumn.label || activeColumn.key)} ascending
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
@@ -924,7 +936,7 @@ export default function AppDataTable({
                   sx={{ py: 1, fontSize: "0.78rem", fontWeight: orderBy === activeColumn.key && order === "desc" ? 700 : 500 }}
                 >
                   <SortDescIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: primaryMain }} />
-                  Sort by {activeColumn.label} descending
+                  Sort by {toPascalCase(activeColumn.label || activeColumn.key)} descending
                 </MenuItem>
                 <Divider sx={{ my: 0.5 }} />
               </>
@@ -949,7 +961,7 @@ export default function AppDataTable({
                 <Box sx={{ px: 2, py: 1 }} onClick={(e) => e.stopPropagation()}>
                   <TextField
                     size="small"
-                    placeholder={`Filter by ${activeColumn.label}...`}
+                    placeholder={`Filter by ${toPascalCase(activeColumn.label || activeColumn.key)}...`}
                     value={columnFilters[activeColumn.key] || ""}
                     onChange={(e) => {
                       setColumnFilters(prev => ({
@@ -1024,7 +1036,7 @@ export default function AppDataTable({
               sx={{ py: 1, fontSize: "0.78rem", fontWeight: 500 }}
             >
               <HideIcon sx={{ mr: 1.5, fontSize: "1.05rem", color: textSecondary }} />
-              Hide {activeColumn.label} column
+              Hide {toPascalCase(activeColumn.label || activeColumn.key)} column
             </MenuItem>
             <MenuItem
               onClick={() => {
@@ -1057,6 +1069,7 @@ export default function AppDataTable({
                   sx={{
                     fontWeight: 800,
                     fontSize: "0.75rem",
+                    textTransform: "none",
                     color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
                     py: 1,
                     px: 2,
@@ -1084,12 +1097,13 @@ export default function AppDataTable({
                         sx={{
                           color: "inherit !important",
                           fontWeight: "inherit",
+                          textTransform: "none",
                         }}
                       >
-                        {column.label === "#" ? "S.No" : column.label}
+                        {toPascalCase(column.label || column.key)}
                       </TableSortLabel>
                     ) : (
-                      <span>{column.label === "#" ? "S.No" : column.label}</span>
+                      <span>{toPascalCase(column.label || column.key)}</span>
                     )}
                     <IconButton
                       size="small"
@@ -1141,6 +1155,12 @@ export default function AppDataTable({
                         px: 2,
                         fontSize: "0.78rem",
                         color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
+                        "& .MuiTypography-root:not(.MuiChip-label)": {
+                          fontSize: "inherit",
+                          color: "inherit",
+                          fontWeight: "inherit",
+                          lineHeight: "inherit",
+                        },
                         ...column.cellSx,
                         ...getPinStyles(column, false),
                       }}

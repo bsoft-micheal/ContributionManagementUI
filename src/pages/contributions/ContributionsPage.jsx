@@ -38,6 +38,7 @@ import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
 import { getContributionsAsync, getContributionsByEventAsync, recordPaymentAsync } from "../../services/contributionService";
 import { getEventsAsync } from "../../services/eventService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
 import { getRolesAsync } from "../../services/roleService";
 import { getPaymentModesAsync } from "../../services/paymentModeService";
@@ -121,6 +122,9 @@ export default function ContributionsPage() {
   const [previewImageSrc, setPreviewImageSrc] = useState(null);
 
   const [events, setEvents] = useState([]);
+  const [eventTypes, setEventTypes] = useState([]);
+  const [filterEventType, setFilterEventType] = useState("ALL");
+  const [appliedEventType, setAppliedEventType] = useState("ALL");
   const [selectedEventId, setSelectedEventId] = useState("");
   const [filterEventId, setFilterEventId] = useState("");
   const [contributions, setContributions] = useState([]);
@@ -279,6 +283,85 @@ export default function ContributionsPage() {
     return getMemberEventAmount(c, activeEv);
   };
 
+  const isMatchingEventType = (ev, typeFilter) => {
+    if (!typeFilter || typeFilter === "ALL") return true;
+    if (!ev) return false;
+    const filterIdStr = String(typeFilter).trim().toLowerCase();
+    const evTypeId = String(ev.eventTypeId || ev.id || "").trim().toLowerCase();
+    if (evTypeId && evTypeId === filterIdStr) return true;
+
+    const selectedTypeObj = (eventTypes || []).find(
+      (t) => String(t.eventTypeId || t.id || "").trim().toLowerCase() === filterIdStr
+    );
+    const targetTypeName = (selectedTypeObj?.eventTypeName || selectedTypeObj?.name || typeFilter).trim().toLowerCase();
+    const evTypeName = String(ev.eventTypeName || ev.categoryName || ev.eventType || "").trim().toLowerCase();
+
+    if (evTypeName && targetTypeName && (evTypeName === targetTypeName || evTypeName.includes(targetTypeName))) {
+      return true;
+    }
+    return false;
+  };
+
+  const enrichContributions = (rawData, allList = allContributions, evList = events, txList = transactions) => {
+    let enriched = (rawData || []).map((c) => {
+      const activeEv = (evList || []).find(
+        (e) => String(e.eventId || e.id) === String(c.eventId || (selectedEventId !== "ALL" ? selectedEventId : ""))
+      );
+      const resolvedAmount = getMemberEventAmount(c, activeEv);
+      const currentContribution = {
+        ...c,
+        amount: resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0),
+      };
+
+      // Calculate Arrears: sum of unpaid contributions for this member in other events
+      const previousUnpaidItems = (allList || []).filter(
+        (prev) =>
+          String(prev.memberId) === String(c.memberId) &&
+          String(prev.eventId) !== String(c.eventId) &&
+          !isContributionPaid(prev)
+      );
+      const matchedTx = findContributionTransaction(c, txList, c.eventId || (selectedEventId !== "ALL" ? selectedEventId : ""));
+      const scope = String(c.paymentScope || c.scope || matchedTx?.notes || "").toLowerCase();
+      const clearsArrears =
+        scope.includes("alloutstanding") ||
+        scope.includes("all outstanding") ||
+        scope.includes("scope: all") ||
+        scope.includes("arrear") ||
+        (!c.paymentScope && (hasSubmittedPayment(c) || isContributionPaid(c)));
+      const isArrearsCleared = (hasSubmittedPayment(c) || isContributionPaid(c)) && clearsArrears;
+
+      const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => {
+        const prevEv = (evList || []).find((e) => String(e.eventId || e.id) === String(prev.eventId));
+        const prevAmt = getMemberEventAmount(prev, prevEv);
+        return sum + (prevAmt > 0 ? prevAmt : Number(prev.amount) || 0);
+      }, 0);
+      const previousUnpaid = isArrearsCleared ? 0 : rawPreviousUnpaid;
+      const currentOutstanding = getContributionOutstanding(currentContribution, activeEv);
+
+      return {
+        ...currentContribution,
+        previousUnpaid,
+        previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
+        totalAccumulated: currentOutstanding + previousUnpaid,
+      };
+    });
+
+    if (isMemberRole) {
+      const userEmail = String(authState?.email || "").toLowerCase().trim();
+      const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
+      enriched = enriched.filter(
+        (c) =>
+          (currentMemberId && String(c.memberId).toLowerCase() === currentMemberId) ||
+          (userEmail && String(c.email || c.memberEmail || "").toLowerCase().trim() === userEmail) ||
+          (authState?.user?.fullName &&
+            String(c.memberName || "").toLowerCase().trim() ===
+              String(authState.user.fullName).toLowerCase().trim())
+      );
+    }
+
+    return enriched;
+  };
+
   const handleOpenSubmitPaymentModal = (row) => {
     const evId = row?.eventId || selectedEventId || "";
     const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(evId));
@@ -295,7 +378,7 @@ export default function ContributionsPage() {
       eventCategory: row?.categoryName || activeEv?.eventTypeName || activeEv?.categoryName || "",
       memberId: row?.memberId || "",
       memberName: row?.memberName || "",
-      amount: totalDue > 0 ? totalDue : (resolvedEvAmt > 0 ? resolvedEvAmt : 0),
+      amount: isPaidRow || totalDue === 0 ? 0 : (totalDue > 0 ? totalDue : (resolvedEvAmt > 0 ? resolvedEvAmt : 0)),
       currentEventDue: currentEvDue,
       previousArrears: prevArrears,
       totalDue: totalDue,
@@ -309,16 +392,18 @@ export default function ContributionsPage() {
   useEffect(() => {
     async function loadEvents() {
       try {
-        const [mems, rls, data, modes] = await Promise.all([
+        const [mems, rls, data, modes, evTypes] = await Promise.all([
           getMembersAsync(),
           getRolesAsync(),
           getEventsAsync(),
           getPaymentModesAsync(true).catch(() => []),
+          getEventTypesAsync().catch(() => []),
         ]);
         setMembers(mems);
         setRoles(rls);
         setEvents(data);
         setPaymentModes(Array.isArray(modes) ? modes : []);
+        setEventTypes(Array.isArray(evTypes) ? evTypes : []);
         if (data.length > 0) {
 
           setSelectedEventId(data[0].eventId);
@@ -380,54 +465,32 @@ export default function ContributionsPage() {
 
     async function loadContributions() {
       try {
-        const data = await getContributionsByEventAsync(selectedEventId);
-        const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(selectedEventId));
+        let rawData = [];
+        if (selectedEventId !== "ALL") {
+          rawData = await getContributionsByEventAsync(selectedEventId);
+        } else {
+          let freshAll = allContributions;
+          if (!freshAll || freshAll.length === 0) {
+            freshAll = await reloadAllContributions();
+          }
 
-        let enrichedData = data.map(c => {
-          const resolvedAmount = getMemberEventAmount(c, activeEv);
-          const currentContribution = {
-            ...c,
-            amount: resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0),
-          };
-
-          // Calculate Arrears: sum of unpaid contributions for this member in other events
-          const previousUnpaidItems = allContributions.filter(
-            prev =>
-              prev.memberId === c.memberId &&
-              prev.eventId !== c.eventId &&
-              !isContributionPaid(prev)
-          );
-          const matchedTx = findContributionTransaction(c, transactions, selectedEventId);
-          const scope = String(c.paymentScope || c.scope || matchedTx?.notes || "").toLowerCase();
-          const clearsArrears = scope.includes("alloutstanding") || scope.includes("all outstanding") || scope.includes("scope: all") || scope.includes("arrear") || (!c.paymentScope && (hasSubmittedPayment(c) || isContributionPaid(c)));
-          const isArrearsCleared = (hasSubmittedPayment(c) || isContributionPaid(c)) && clearsArrears;
-
-          const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => {
-            const prevEv = (events || []).find((e) => String(e.eventId || e.id) === String(prev.eventId));
-            const prevAmt = getMemberEventAmount(prev, prevEv);
-            return sum + (prevAmt > 0 ? prevAmt : (Number(prev.amount) || 0));
-          }, 0);
-          const previousUnpaid = isArrearsCleared ? 0 : rawPreviousUnpaid;
-          const currentOutstanding = getContributionOutstanding(currentContribution, activeEv);
-
-          return {
-            ...currentContribution,
-            previousUnpaid,
-            previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
-            totalAccumulated: currentOutstanding + previousUnpaid
-          };
-        });
-
-        if (isMemberRole) {
-          const userEmail = String(authState?.email || "").toLowerCase().trim();
-          const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
-          enrichedData = enrichedData.filter(c =>
-            (currentMemberId && String(c.memberId).toLowerCase() === currentMemberId) ||
-            (userEmail && String(c.email || c.memberEmail || "").toLowerCase().trim() === userEmail) ||
-            (authState?.user?.fullName && String(c.memberName || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim())
-          );
+          if (appliedEventType && appliedEventType !== "ALL") {
+            const matchingEventIds = new Set(
+              (events || [])
+                .filter((e) => isMatchingEventType(e, appliedEventType))
+                .map((e) => String(e.eventId || e.id))
+            );
+            rawData = (freshAll || []).filter(
+              (c) =>
+                matchingEventIds.has(String(c.eventId)) ||
+                (c.categoryName && c.categoryName.toLowerCase() === appliedEventType.toLowerCase())
+            );
+          } else {
+            rawData = freshAll || [];
+          }
         }
 
+        const enrichedData = enrichContributions(rawData, allContributions, events, transactions);
         setContributions(enrichedData);
       } catch (error) {
         toast.error("Failed to load contributions.");
@@ -435,7 +498,7 @@ export default function ContributionsPage() {
     }
 
     loadContributions();
-  }, [selectedEventId, allContributions, events, transactions]);
+  }, [selectedEventId, appliedEventType, allContributions, events, transactions]);
 
   useEffect(() => {
     const handleContributionUpdated = async () => {
@@ -655,36 +718,25 @@ export default function ContributionsPage() {
       const allData = await getContributionsAsync();
       setAllContributions(allData);
 
-      const eventData = await getContributionsByEventAsync(selectedEventId);
-      let enriched = eventData.map(c => {
-        const previousUnpaidItems = allData.filter(
-          prev =>
-            prev.memberId === c.memberId &&
-            prev.eventId !== c.eventId &&
-            !isContributionPaid(prev)
-        );
-        const previousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
-        const currentOutstanding = getContributionOutstanding(c);
-        const isPaid = isContributionPaid(c);
-
-        return {
-          ...c,
-          previousUnpaid,
-          previousUnpaidItems,
-          totalAccumulated: isPaid ? previousUnpaid : (currentOutstanding + previousUnpaid)
-        };
-      });
-
-      if (isMemberRole) {
-        const userEmail = String(authState?.email || "").toLowerCase().trim();
-        const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
-        enriched = enriched.filter(c =>
-          (currentMemberId && String(c.memberId).toLowerCase() === currentMemberId) ||
-          (userEmail && String(c.email || c.memberEmail || "").toLowerCase().trim() === userEmail) ||
-          (authState?.user?.fullName && String(c.memberName || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim())
-        );
+      let eventData = [];
+      if (selectedEventId && selectedEventId !== "ALL") {
+        eventData = await getContributionsByEventAsync(selectedEventId);
+      } else {
+        eventData = allData;
+        if (appliedEventType && appliedEventType !== "ALL") {
+          const matchingEventIds = new Set(
+            (events || [])
+              .filter((e) => isMatchingEventType(e, appliedEventType))
+              .map((e) => String(e.eventId || e.id))
+          );
+          eventData = eventData.filter(
+            (c) =>
+              matchingEventIds.has(String(c.eventId)) ||
+              (c.categoryName && c.categoryName.toLowerCase() === appliedEventType.toLowerCase())
+          );
+        }
       }
-
+      const enriched = enrichContributions(eventData, allData, events, transactions);
       setContributions(enriched);
     } catch (error) {
       const apiErrorMsg =
@@ -696,15 +748,73 @@ export default function ContributionsPage() {
     }
   }
 
-  const eventOptions = useMemo(() => {
-    return events.map((e) => {
-      const dateStr = e.eventDate ? dayjs(e.eventDate).format("DD/MM/YYYY") : "";
-      return {
-        label: dateStr ? `${e.eventName || "Unnamed Event"} (${dateStr})` : (e.eventName || "Unnamed Event"),
-        value: e.eventId,
-      };
+  const eventTypeOptions = useMemo(() => {
+    const list = [{ label: "All Event Types", value: "ALL" }];
+    const seen = new Set(["all"]);
+
+    (eventTypes || []).forEach((t) => {
+      const id = String(t.eventTypeId || t.id || "").trim();
+      const name = String(t.eventTypeName || t.name || "").trim();
+      if (id && name && !seen.has(id.toLowerCase()) && !seen.has(name.toLowerCase())) {
+        seen.add(id.toLowerCase());
+        seen.add(name.toLowerCase());
+        list.push({ label: name, value: id });
+      }
     });
-  }, [events]);
+
+    (events || []).forEach((e) => {
+      const id = String(e.eventTypeId || "").trim();
+      const name = String(e.eventTypeName || e.categoryName || "").trim();
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        if (id) seen.add(id.toLowerCase());
+        list.push({ label: name, value: id || name });
+      }
+    });
+
+    return list;
+  }, [eventTypes, events]);
+
+  const eventOptions = useMemo(() => {
+    const list = [{ label: "All Events", value: "ALL" }];
+    const filteredEvents = (events || []).filter((e) => isMatchingEventType(e, filterEventType));
+
+    filteredEvents.forEach((e) => {
+      const dateStr = e.eventDate ? dayjs(e.eventDate).format("DD/MM/YYYY") : "";
+      const label = dateStr ? `${e.eventName || "Unnamed Event"} (${dateStr})` : (e.eventName || "Unnamed Event");
+      list.push({
+        label,
+        value: String(e.eventId || e.id),
+      });
+    });
+
+    return list;
+  }, [events, filterEventType, eventTypes]);
+
+  const handleEventTypeChange = (newTypeId) => {
+    setFilterEventType(newTypeId);
+    if (newTypeId === "ALL") {
+      return;
+    }
+    const matching = (events || []).filter((e) => isMatchingEventType(e, newTypeId));
+    const stillValid = matching.some((e) => String(e.eventId || e.id) === String(filterEventId));
+    if (!stillValid && filterEventId !== "ALL") {
+      setFilterEventId("ALL");
+    }
+  };
+
+  const handleApplyFilter = () => {
+    setAppliedEventType(filterEventType);
+    setSelectedEventId(filterEventId);
+  };
+
+  const handleClearFilter = () => {
+    setFilterEventType("ALL");
+    setAppliedEventType("ALL");
+    setFilterEventId("ALL");
+    setSelectedEventId("ALL");
+    toast.success("Filter cleared");
+  };
 
   const modalStatusOptions = useMemo(() => {
     const set = new Set();
@@ -866,38 +976,25 @@ export default function ContributionsPage() {
 
       const freshAll = await reloadAllContributions();
       if (selectedEventId) {
-        const freshData = await getContributionsByEventAsync(selectedEventId);
-        const allList = (freshAll && freshAll.length > 0) ? freshAll : (allContributions || []);
-        let enriched = freshData.map((c) => {
-          const previousUnpaidItems = allList.filter(
-            (prev) => prev.memberId === c.memberId && prev.eventId !== c.eventId && !isContributionPaid(prev)
-          );
-          const scope = String(c.paymentScope || c.scope || "").toLowerCase();
-          const clearsArrears = scope === "alloutstanding" || scope === "previousarrears" || scope.includes("all") || scope.includes("arrear");
-          const isArrearsCleared = hasSubmittedPayment(c) && (clearsArrears || !c.paymentScope);
-
-          const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => sum + (Number(prev.amount) || 0), 0);
-          const previousUnpaid = isArrearsCleared ? 0 : rawPreviousUnpaid;
-          const currentOutstanding = getContributionOutstanding(c);
-
-          return {
-            ...c,
-            previousUnpaid,
-            previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
-            totalAccumulated: currentOutstanding + previousUnpaid,
-          };
-        });
-
-        if (isMemberRole) {
-          const userEmail = String(authState?.email || "").toLowerCase().trim();
-          const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
-          enriched = enriched.filter(c =>
-            (currentMemberId && String(c.memberId).toLowerCase() === currentMemberId) ||
-            (userEmail && String(c.email || c.memberEmail || "").toLowerCase().trim() === userEmail) ||
-            (authState?.user?.fullName && String(c.memberName || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim())
-          );
+        let freshData = [];
+        if (selectedEventId !== "ALL") {
+          freshData = await getContributionsByEventAsync(selectedEventId);
+        } else {
+          freshData = freshAll;
+          if (appliedEventType && appliedEventType !== "ALL") {
+            const matchingEventIds = new Set(
+              (events || [])
+                .filter((e) => isMatchingEventType(e, appliedEventType))
+                .map((e) => String(e.eventId || e.id))
+            );
+            freshData = freshData.filter(
+              (c) =>
+                matchingEventIds.has(String(c.eventId)) ||
+                (c.categoryName && c.categoryName.toLowerCase() === appliedEventType.toLowerCase())
+            );
+          }
         }
-
+        const enriched = enrichContributions(freshData, freshAll, events, transactions);
         setContributions(enriched);
       }
     } catch (err) {
@@ -1034,7 +1131,23 @@ export default function ContributionsPage() {
         );
       },
     },
-    { label: "Member", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
+    { label: "Member Name", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
+    ...(selectedEventId === "ALL"
+      ? [
+          {
+            label: "Event Name",
+            key: "eventName",
+            render: (row) => {
+              const ev = (events || []).find((e) => String(e.eventId || e.id) === String(row.eventId));
+              return (
+                <Typography variant="body2" fontWeight={600} color="primary.main">
+                  {row.eventName || ev?.eventName || "--"}
+                </Typography>
+              );
+            },
+          },
+        ]
+      : []),
     {
       label: "Status",
       key: "paymentStatus",
@@ -1163,19 +1276,11 @@ export default function ContributionsPage() {
         const currentDue = (isPaid || submitted) ? 0 : getContributionOutstanding(row, activeEv);
         const prevArrears = (isPaid || submitted) ? 0 : (row.previousUnpaid || 0);
         const due = currentDue + prevArrears;
-        return (
-          <Typography
-            variant="body2"
-            fontWeight={900}
-            color={due > 0 ? (theme.palette.mode === "dark" ? "#ffffff" : "primary.main") : "text.secondary"}
-          >
-            ₹{due.toLocaleString()}
-          </Typography>
-        );
+        return `₹${due.toLocaleString()}`;
       }
     },
     {
-      label: "Mode",
+      label: "Payment Mode",
       key: "paymentMode",
       render: (row) => {
         const matchedTx = findContributionTransaction(row);
@@ -1239,15 +1344,25 @@ export default function ContributionsPage() {
         filterPanel={
           <Grid container spacing={2} alignItems="center">
             <Grid size={{ xs: 12 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 220 }}>
+              <Box sx={{ minWidth: 220, maxWidth: 280 }}>
                 <AppSelect
-                  label="Selected Event"
+                  label="Event Type"
+                  placeholder="Select event type"
+                  value={filterEventType}
+                  onChange={(event) => {
+                    handleEventTypeChange(event.target.value);
+                  }}
+                  options={eventTypeOptions}
+                  fullWidth
+                />
+              </Box>
+              <Box sx={{ minWidth: 260, maxWidth: 360 }}>
+                <AppSelect
+                  label="Event"
                   placeholder="Select an event"
                   value={filterEventId}
                   onChange={(event) => {
-                    const val = event.target.value;
-                    setFilterEventId(val);
-                    setSelectedEventId(val);
+                    setFilterEventId(event.target.value);
                   }}
                   options={eventOptions}
                   fullWidth
@@ -1257,9 +1372,7 @@ export default function ContributionsPage() {
                 variant="contained"
                 size="small"
                 startIcon={<FilterListIcon />}
-                onClick={() => {
-                  setSelectedEventId(filterEventId);
-                }}
+                onClick={handleApplyFilter}
                 sx={{
                   height: 34,
                   mt: 2.2,
@@ -1273,14 +1386,7 @@ export default function ContributionsPage() {
               <AppButton
                 variant="outlined"
                 size="small"
-                onClick={() => {
-                  if (events.length > 0) {
-                    const firstEventId = events[0].eventId;
-                    setFilterEventId(firstEventId);
-                    setSelectedEventId(firstEventId);
-                    toast.success("Filter cleared");
-                  }
-                }}
+                onClick={handleClearFilter}
                 sx={{
                   color: "#ef4444",
                   borderColor: "rgba(239, 68, 68, 0.4)",
@@ -1291,8 +1397,8 @@ export default function ContributionsPage() {
                   px: 2,
                   "&:hover": {
                     borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)"
-                  }
+                    bgcolor: "rgba(239, 68, 68, 0.05)",
+                  },
                 }}
               >
                 Clear Filter
@@ -1630,44 +1736,27 @@ export default function ContributionsPage() {
           } catch { }
           const freshAll = await reloadAllContributions();
           if (selectedEventId) {
-            const freshData = await getContributionsByEventAsync(selectedEventId);
-            const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(selectedEventId));
-            const allList = (freshAll && freshAll.length > 0) ? freshAll : [];
-            let enriched = freshData.map((c) => {
-              const resolvedAmount = getMemberEventAmount(c, activeEv);
-              const currentContribution = {
-                ...c,
-                amount: resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0),
-              };
-              const isSubmitted = hasSubmittedPayment(c);
-              const isPaid = isContributionPaid(c);
-              const isCleared = isSubmitted || isPaid;
-
-              const previousUnpaidItems = isCleared ? [] : allList.filter(
-                (prev) => prev.memberId === c.memberId && prev.eventId !== c.eventId && !isContributionPaid(prev)
-              );
-              const previousUnpaid = isCleared ? 0 : previousUnpaidItems.reduce((sum, prev) => {
-                const prevEv = (events || []).find((e) => String(e.eventId || e.id) === String(prev.eventId));
-                const prevAmt = getMemberEventAmount(prev, prevEv);
-                return sum + (prevAmt > 0 ? prevAmt : (Number(prev.amount) || 0));
-              }, 0);
-              const currentOutstanding = isCleared ? 0 : getContributionOutstanding(currentContribution, activeEv);
-              return {
-                ...currentContribution,
-                previousUnpaid,
-                previousUnpaidItems,
-                totalAccumulated: isCleared ? 0 : (currentOutstanding + previousUnpaid),
-              };
-            });
-            if (isMemberRole) {
-              const userEmail = String(authState?.email || "").toLowerCase().trim();
-              const currentMemberId = authState?.memberId ? String(authState.memberId).toLowerCase() : null;
-              enriched = enriched.filter(c =>
-                (currentMemberId && String(c.memberId).toLowerCase() === currentMemberId) ||
-                (userEmail && String(c.email || c.memberEmail || "").toLowerCase().trim() === userEmail) ||
-                (authState?.user?.fullName && String(c.memberName || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim())
-              );
+            let freshData = [];
+            if (selectedEventId !== "ALL") {
+              freshData = await getContributionsByEventAsync(selectedEventId);
+            } else {
+              const allList = (freshAll && freshAll.length > 0) ? freshAll : [];
+              if (appliedEventType && appliedEventType !== "ALL") {
+                const matchingEventIds = new Set(
+                  (events || [])
+                    .filter((e) => isMatchingEventType(e, appliedEventType))
+                    .map((e) => String(e.eventId || e.id))
+                );
+                freshData = allList.filter(
+                  (c) =>
+                    matchingEventIds.has(String(c.eventId)) ||
+                    (c.categoryName && c.categoryName.toLowerCase() === appliedEventType.toLowerCase())
+                );
+              } else {
+                freshData = allList;
+              }
             }
+            const enriched = enrichContributions(freshData, freshAll, events, transactions);
             setContributions(enriched);
           }
         }}

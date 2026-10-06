@@ -13,6 +13,8 @@ import {
   InputAdornment,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -27,6 +29,8 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import EventIcon from "@mui/icons-material/Event";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import dayjs from "dayjs";
 import { formatGridDate, parseMemberDob } from "../../utils/dateHelper";
 import MetricCard from "../../components/MetricCard";
@@ -42,7 +46,8 @@ import BirthdayCelebrationModal from "../../components/common/BirthdayCelebratio
 import MemberPaymentQuickAccess from "../../components/dashboard/MemberPaymentQuickAccess";
 import FinancialBarChart from "../../components/dashboard/FinancialBarChart";
 import { useAuth } from "../../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import CalendarPage from "../events/CalendarPage";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 const C = {
@@ -618,9 +623,9 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
             fontWeight: 600,
             fontSize: "0.84375rem",
             letterSpacing: "0.01em",
-            bgcolor: "#6366f1 !important",
+            bgcolor: "#4a3f6b !important",
             "&:hover": {
-              bgcolor: "#4f46e5 !important",
+              bgcolor: "#3b325c !important",
             },
           }}
         >
@@ -665,7 +670,31 @@ export default function DashboardPage() {
   const toast = useAppToast();
   const { authState } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMember = authState?.role?.toLowerCase() === "member";
+
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    tabFromUrl === "calendar" ? "calendar" : "dashboard"
+  );
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "calendar" || tab === "dashboard") {
+      setActiveTab(tab);
+    } else {
+      setActiveTab("dashboard");
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    if (newTab === "calendar") {
+      setSearchParams({ tab: "calendar" });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -897,24 +926,11 @@ export default function DashboardPage() {
     return eventExpensesSum > 0 ? eventExpensesSum : Number(summary?.totalExpenses ?? 0);
   }, [events, isFilteredByEvent, isFilteredByType, summary?.totalExpenses]);
 
-  // Current Remaining Amount:
-  // For members, do not minus member's personal expected from total expenses; use the team's overall remaining pool
+  // Current Remaining / Balance Amount:
+  // Formula: Total Collection − Total Expense (for both Admin and Member's assigned events)
   const totalRemaining = useMemo(() => {
-    if (isMember) {
-      if (isFilteredByEvent || isFilteredByType) {
-        return events.reduce((sum, e) => {
-          const rem = e.remainingAmount !== undefined
-            ? Number(e.remainingAmount)
-            : (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0));
-          return sum + (Number(rem) || 0);
-        }, 0);
-      }
-      return summary?.totalRemainingAmount !== undefined
-        ? Number(summary.totalRemainingAmount)
-        : (totalExpected - totalExpenses);
-    }
-    return totalExpected - totalExpenses;
-  }, [isMember, isFilteredByEvent, isFilteredByType, events, summary?.totalRemainingAmount, totalExpected, totalExpenses]);
+    return totalCollected - totalExpenses;
+  }, [totalCollected, totalExpenses]);
 
   const pendingCount = events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0);
   const totalContributionsCount = events.reduce((sum, e) => sum + (Number(e.totalContributionsCount) || 0), 0);
@@ -934,7 +950,7 @@ export default function DashboardPage() {
       const exp = Number(e.expectedAmount) || (Number(e.collectedAmount || 0) + Number(e.pendingAmount || 0));
       const col = Number(e.collectedAmount) || 0;
       const expense = Number(e.expenseAmount) || 0;
-      const remaining = e.remainingAmount !== undefined ? Number(e.remainingAmount) : (exp - expense);
+      const remaining = e.remainingAmount !== undefined ? Number(e.remainingAmount) : (col - expense);
       const pctNum =
         totalExpected > 0
           ? (exp / totalExpected) * 100
@@ -1028,10 +1044,8 @@ export default function DashboardPage() {
   // Table columns (Dashboard tab)
   const columns = [
     {
-      label: "Event", key: "eventName",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={700} color="primary.main">{row.eventName}</Typography>
-      ),
+      label: "Event Name", key: "eventName",
+      render: (row) => row.eventName || "--",
     },
     {
       label: "Category", key: "eventTypeName",
@@ -1042,50 +1056,30 @@ export default function DashboardPage() {
         }} />
       ),
     },
-    { label: "Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
+    { label: "Event Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
     {
-      label: "Expected", key: "expectedAmount", align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          ₹{Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))).toLocaleString()}
-        </Typography>
-      ),
+      label: "Expected Amount", key: "expectedAmount", align: "right",
+      render: (row) => `₹${Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))).toLocaleString()}`,
     },
     {
-      label: isMember ? "Paid" : "Collected", key: "collectedAmount", align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          ₹{Number(row.collectedAmount).toLocaleString()}
-        </Typography>
-      ),
+      label: isMember ? "Paid Amount" : "Collected Amount", key: "collectedAmount", align: "right",
+      render: (row) => `₹${Number(row.collectedAmount || 0).toLocaleString()}`,
     },
     {
-      label: "Pending ₹", key: "pendingAmount", align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          ₹{Number(row.pendingAmount).toLocaleString()}
-        </Typography>
-      ),
+      label: "Pending Amount", key: "pendingAmount", align: "right",
+      render: (row) => `₹${Number(row.pendingAmount || 0).toLocaleString()}`,
     },
     {
-      label: "Expense ₹", key: "expenseAmount", align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          ₹{Number(row.expenseAmount || 0).toLocaleString()}
-        </Typography>
-      ),
+      label: "Expense Amount", key: "expenseAmount", align: "right",
+      render: (row) => `₹${Number(row.expenseAmount || 0).toLocaleString()}`,
     },
     {
-      label: "Balance ₹", key: "remainingAmount", align: "right",
+      label: "Balance Amount", key: "remainingAmount", align: "right",
       render: (row) => {
         const expected = Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0)));
         const expense = Number(row.expenseAmount || 0);
         const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (expected - expense);
-        return (
-          <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-            ₹{rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}
-          </Typography>
-        );
+        return `₹${rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`;
       },
     },
     {
@@ -1115,8 +1109,79 @@ export default function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="page-shell">
-      {/* ── Top Filter Bar ────────────────────────────────────────────────── */}
-      <Card
+      {/* ── Top Dashboard / Calendar Navigation Tabs ────────────────────── */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          borderBottom: (theme) =>
+            theme.palette.mode === "dark"
+              ? "1px solid rgba(255, 255, 255, 0.12)"
+              : "1px solid rgba(74, 63, 107, 0.15)",
+          mb: 0.5,
+        }}
+      >
+        <Tabs
+          value={activeTab}
+          onChange={(_, val) => handleTabChange(val)}
+          sx={{
+            minHeight: 46,
+            "& .MuiTabs-indicator": {
+              height: 3,
+              borderRadius: "3px 3px 0 0",
+              background: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "linear-gradient(90deg, #a78bfa 0%, #c4b5fd 100%)"
+                  : "linear-gradient(90deg, #4a3f6b 0%, #6f5bd3 100%)",
+            },
+            "& .MuiTab-root": {
+              minHeight: 46,
+              textTransform: "none",
+              fontSize: "0.95rem",
+              fontWeight: 600,
+              px: { xs: 2.5, sm: 3.5 },
+              py: 1,
+              borderRadius: "8px 8px 0 0",
+              color: "text.secondary",
+              transition: "all 0.2s ease",
+              "&.Mui-selected": {
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                fontWeight: 700,
+              },
+              "&:hover": {
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.04)"
+                    : "rgba(74, 63, 107, 0.04)",
+              },
+            },
+          }}
+        >
+          <Tab
+            value="dashboard"
+            icon={<DashboardRoundedIcon sx={{ fontSize: "1.15rem" }} />}
+            iconPosition="start"
+            label="Dashboard"
+          />
+          <Tab
+            value="calendar"
+            icon={<CalendarMonthRoundedIcon sx={{ fontSize: "1.15rem" }} />}
+            iconPosition="start"
+            label="Calendar"
+          />
+        </Tabs>
+      </Box>
+
+      {/* ── Tab Content ─────────────────────────────────────────────── */}
+      {activeTab === "calendar" ? (
+        <CalendarPage isEmbedded />
+      ) : (
+        <>
+          {/* ── Top Filter Bar ────────────────────────────────────────────────── */}
+          <Card
         sx={{
           p: { xs: 2, sm: 2.25 },
           px: { xs: 2, sm: 3 },
@@ -1151,57 +1216,51 @@ export default function DashboardPage() {
               xs: "1fr",
               sm: "repeat(2, minmax(0, 1fr))",
               md: "repeat(3, minmax(0, 1fr))",
-              lg: isMember ? "repeat(5, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
+              lg: "repeat(6, minmax(0, 1fr))",
             },
             gap: { xs: 1.5, sm: 2 },
           }}
         >
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "TOTAL EXPECTED"}
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Total Expected"}
             value={`₹${totalExpected.toLocaleString()}`}
-            helper="Target goal"
             accent="#6366f1"
             onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
             actionText="All Members →"
           />
-          {!isMember && (
-            <MetricCard
-              label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "TOTAL COLLECTIONS"}
-              value={`₹${totalCollected.toLocaleString()}`}
-              helper="Total collected"
-              accent="#10b981"
-              onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-              actionText="View Paid →"
-            />
-          )}
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "TOTAL PENDING"}
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Total Collections"}
+            value={`₹${totalCollected.toLocaleString()}`}
+            accent="#10b981"
+            onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+            actionText={isMember ? "My Payments →" : "View Paid →"}
+          />
+          <MetricCard
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Total Pending"}
             value={`₹${totalPending.toLocaleString()}`}
-            helper="Outstanding"
             accent="#f43f5e"
             onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
             actionText="View Unpaid →"
           />
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "TOTAL EXPENSES"}
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
             value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
-            helper={isFilteredByEvent ? "Event expense" : (isFilteredByType ? appliedFilters.eventType : "Total spent")}
             accent="#f59e0b"
             onClick={() => navigate("/expense")}
             actionText="Expenses →"
           />
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "BALANCE AMOUNT"}
+            label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Balance Amount"}
             value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
-            helper="Net balance"
             accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
-            actionText={totalRemaining >= 0 ? "Surplus ✓" : "Deficit ⚠"}
+            actionText="Net Balance"
           />
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
             value={events.length}
-            helper={isFilteredByType ? appliedFilters.eventType : "Selected period"}
             accent="#3b82f6"
+            onClick={() => navigate("/events")}
+            actionText="View Events →"
           />
         </Box>
 
@@ -1236,6 +1295,8 @@ export default function DashboardPage() {
           <AppDataTable columns={columns} data={events} loading={false} />
         </CollapsibleSection>
       </Stack>
+        </>
+      )}
 
       {/* Quick Access Slide-Over Drawer */}
       <Drawer
