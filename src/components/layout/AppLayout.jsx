@@ -154,9 +154,39 @@ export default function AppLayout() {
     Boolean(authState?.enableMultipleRoles) && userAssignedRoles.length > 1
   );
 
-  const handleQuickSwitchRole = (e) => {
+  const otherRoleName = React.useMemo(() => {
+    if (userAssignedRoles.length === 2) {
+      const currentRole = String(authState?.role || authState?.roleName || "").trim().toLowerCase();
+      return userAssignedRoles.find(
+        (r) => r.trim().toLowerCase() !== currentRole
+      ) || userAssignedRoles[0];
+    }
+    return null;
+  }, [userAssignedRoles, authState]);
+
+  const handleQuickSwitchRole = async (e) => {
     if (e) e.stopPropagation();
-    if (!hasMultipleRoles) return;
+    if (!hasMultipleRoles || userAssignedRoles.length === 0) return;
+
+    if (userAssignedRoles.length === 2) {
+      const currentRole = String(authState?.role || authState?.roleName || "").trim().toLowerCase();
+      const targetRole = otherRoleName || userAssignedRoles.find(
+        (r) => r.trim().toLowerCase() !== currentRole
+      ) || userAssignedRoles[0];
+
+      if (targetRole && targetRole.trim().toLowerCase() !== currentRole) {
+        try {
+          await switchRole(targetRole);
+          toast.success(`Switched to ${targetRole} role`);
+        } catch (err) {
+          const msg = err?.response?.data?.message || err?.message || "Failed to switch role";
+          toast.error(msg);
+        }
+      }
+      return;
+    }
+
+    // More than 2 roles: open dialog to let user select
     setSwitchRoleDialogOpen(true);
   };
   const [, setRightsVersion] = useState(0);
@@ -627,7 +657,7 @@ export default function AppLayout() {
             </Typography>
           </Box>
           {hasMultipleRoles && (
-            <Tooltip title="Switch Role">
+            <Tooltip title={otherRoleName ? `Switch to ${otherRoleName}` : "Switch Role"}>
               <IconButton
                 size="small"
                 onClick={handleQuickSwitchRole}
