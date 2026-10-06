@@ -365,7 +365,7 @@ export default function ContributionsPage() {
       try {
         const txRes = await getPaymentTransactionsAsync();
         if (Array.isArray(txRes)) setTransactions(txRes);
-      } catch {}
+      } catch { }
       reloadAllContributions();
     };
     window.addEventListener("contribution_updated", handleUpdate);
@@ -442,7 +442,7 @@ export default function ContributionsPage() {
       try {
         const txRes = await getPaymentTransactionsAsync();
         if (Array.isArray(txRes)) setTransactions(txRes);
-      } catch {}
+      } catch { }
       await reloadAllContributions();
     };
 
@@ -862,7 +862,7 @@ export default function ContributionsPage() {
       try {
         const txRes = await getPaymentTransactionsAsync();
         if (Array.isArray(txRes)) setTransactions(txRes);
-      } catch {}
+      } catch { }
 
       const freshAll = await reloadAllContributions();
       if (selectedEventId) {
@@ -1627,7 +1627,7 @@ export default function ContributionsPage() {
           try {
             const txRes = await getPaymentTransactionsAsync();
             if (Array.isArray(txRes)) setTransactions(txRes);
-          } catch {}
+          } catch { }
           const freshAll = await reloadAllContributions();
           if (selectedEventId) {
             const freshData = await getContributionsByEventAsync(selectedEventId);
