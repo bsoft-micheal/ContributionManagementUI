@@ -1229,18 +1229,7 @@ export default function EventFormPage() {
   }));
 
   if (loading) {
-    return (
-      <div className="page-shell">
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 12 }}>
-          <Stack spacing={2} alignItems="center">
-            <CircularProgress sx={{ color: "#45386d" }} />
-            <Typography variant="body2" color="text.secondary">
-              Loading event configuration...
-            </Typography>
-          </Stack>
-        </Box>
-      </div>
-    );
+    return <div className="page-shell" />;
   }
 
   return (

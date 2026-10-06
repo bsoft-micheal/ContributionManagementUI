@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
-import AppPageLoader from "../components/common/AppPageLoader";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 const NavigationLoadingContext = createContext({
   isLoading: false,
@@ -13,9 +12,10 @@ export const useNavigationLoading = () => useContext(NavigationLoadingContext);
 export function NavigationLoadingProvider({ children }) {
   const [customLoading, setCustomLoading] = useState(false);
   const [apiActiveCount, setApiActiveCount] = useState(0);
+  const [routeLoading, setRouteLoading] = useState(false);
   const [message, setMessage] = useState("Loading...");
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleApiStart = () => setApiActiveCount((prev) => prev + 1);
     const handleApiEnd = () => setApiActiveCount((prev) => Math.max(0, prev - 1));
 
@@ -27,6 +27,20 @@ export function NavigationLoadingProvider({ children }) {
       window.removeEventListener("app:api-end", handleApiEnd);
     };
   }, []);
+
+  // Listen for route changes to show a brief loader on page navigation
+  useEffect(() => {
+    const currentPath = (window.location.pathname || "").toLowerCase();
+    const isAuth = currentPath === "/login" || currentPath.startsWith("/forgot-password");
+
+    if (!isAuth) {
+      setRouteLoading(true);
+      const timer = setTimeout(() => {
+        setRouteLoading(false);
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [window.location.pathname]);
 
   const showLoader = (customMsg = "Loading...") => {
     setMessage(customMsg);
@@ -40,7 +54,7 @@ export function NavigationLoadingProvider({ children }) {
   const currentPath = (window.location.pathname || "").toLowerCase();
   const isAuthPage = currentPath === "/login" || currentPath.startsWith("/forgot-password");
 
-  const isLoading = !isAuthPage && (customLoading || apiActiveCount > 0);
+  const isLoading = !isAuthPage && (customLoading || routeLoading || apiActiveCount > 0);
 
   return (
     <NavigationLoadingContext.Provider

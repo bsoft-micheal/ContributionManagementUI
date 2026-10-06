@@ -703,10 +703,9 @@ export default function AppLayout() {
               borderRadius: "12px",
               boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
               border: (theme) =>
-                `1px solid ${
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(74, 63, 107, 0.12)"
+                `1px solid ${theme.palette.mode === "dark"
+                  ? "rgba(255,255,255,0.1)"
+                  : "rgba(74, 63, 107, 0.12)"
                 }`,
               py: 0.8,
             },
@@ -840,7 +839,7 @@ export default function AppLayout() {
           position: "relative",
         }}
       >
-        {isLoading && <AppPageLoader fullScreen={false} text="Loading..." />}
+        {isLoading && <AppPageLoader fullScreen={true} text="Loading..." />}
         <Outlet />
       </Box>
 

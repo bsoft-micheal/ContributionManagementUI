@@ -67,11 +67,7 @@ export default function EventDetailsPage() {
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
-        <Typography color="text.secondary">Loading strategic data...</Typography>
-      </Box>
-    );
+    return <div className="page-shell" />;
   }
 
   if (!eventDetails) {

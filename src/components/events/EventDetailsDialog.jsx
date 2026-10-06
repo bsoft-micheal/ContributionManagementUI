@@ -267,28 +267,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
         title="Event Details"
         maxWidth="md"
         actions={
-          <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
-            <Box>
-              {canDeleteEvent && event?.eventId && totalPaid === 0 && (
-                <AppButton
-                  variant="outlined"
-                  color="error"
-                  startIcon={<DeleteIcon sx={{ fontSize: "1.1rem" }} />}
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  disabled={deleting}
-                  sx={{
-                    borderColor: "#ef4444",
-                    color: "#ef4444",
-                    "&:hover": {
-                      borderColor: "#dc2626",
-                      bgcolor: "rgba(239, 68, 68, 0.08)",
-                    },
-                  }}
-                >
-                  Delete Event
-                </AppButton>
-              )}
-            </Box>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", width: "100%", alignItems: "center" }}>
             <AppButton
               variant="outlined"
               color="inherit"
@@ -344,9 +323,47 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
               >
                 Category
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                {event?.eventTypeName || "Custom Event"}
-              </Typography>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.2 }}>
+                {(() => {
+                  const set = new Set();
+                  const rawType = event?.eventTypeName || event?.category || "";
+                  if (rawType) {
+                    rawType.split(/[,&/]+/).map((s) => s.trim()).filter(Boolean).forEach((c) => set.add(c));
+                  }
+                  const name = String(event?.eventName || "").toLowerCase();
+                  if (name.includes("birthday")) set.add("Birthday");
+                  if (name.includes("farewell")) set.add("Farewell");
+
+                  const cats = Array.from(set);
+                  if (cats.length === 0) cats.push("Custom Event");
+
+                  return cats.map((cat, idx) => {
+                    const norm = cat.toLowerCase();
+                    const isBday = norm.includes("birthday");
+                    const isFarewell = norm.includes("farewell");
+                    const color = isBday ? "#7c3aed" : isFarewell ? "#0284c7" : "#4a3f6b";
+                    const bgcolor = isBday ? "rgba(124, 58, 237, 0.12)" : isFarewell ? "rgba(2, 132, 199, 0.12)" : "rgba(74, 63, 107, 0.12)";
+                    const borderColor = isBday ? "rgba(124, 58, 237, 0.3)" : isFarewell ? "rgba(2, 132, 199, 0.3)" : "rgba(74, 63, 107, 0.3)";
+
+                    return (
+                      <Chip
+                        key={idx}
+                        size="small"
+                        label={cat}
+                        sx={{
+                          height: 22,
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          color,
+                          bgcolor,
+                          border: `1px solid ${borderColor}`,
+                          "& .MuiChip-label": { px: 0.8 },
+                        }}
+                      />
+                    );
+                  });
+                })()}
+              </Box>
             </Box>
           </Grid>
 
