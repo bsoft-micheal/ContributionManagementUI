@@ -4,6 +4,12 @@ export const getUsersAsync = async () => {
   return await getApi("/users/getAllUserAsync");
 };
 
+export const getUserByIdAsync = async (id) => {
+  const res = await getApi("/users/getAllUserAsync");
+  const list = res?.data || res || [];
+  return list.find((u) => u.userId === id || u.id === id);
+};
+
 export const createUserAsync = async (data) => {
   return await postApi("/users/saveUserAsync", data);
 };
