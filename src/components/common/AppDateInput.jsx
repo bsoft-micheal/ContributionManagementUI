@@ -541,6 +541,66 @@ export default function AppDateInput({
                   borderColor: "#5c4b82",
                 },
               },
+              "& .MuiYearCalendar-root": {
+                width: "100%",
+                maxHeight: 260,
+                "& .MuiPickersYear-root": {
+                  my: 0.2,
+                },
+                "& .MuiPickersYear-yearButton": {
+                  fontSize: "0.78rem",
+                  fontWeight: 500,
+                  height: 28,
+                  minHeight: 28,
+                  py: 0.2,
+                  px: 0.8,
+                  borderRadius: "14px",
+                  color: (theme) =>
+                    theme.palette.mode === "dark" ? "#e7ebf7" : "#1d1b20",
+                  "&:hover": {
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(255, 255, 255, 0.1)"
+                        : "rgba(92, 75, 130, 0.1)",
+                  },
+                  "&.Mui-selected": {
+                    bgcolor: "#5c4b82 !important",
+                    color: "#ffffff !important",
+                    fontWeight: 700,
+                    "&:hover": {
+                      bgcolor: "#4a3b6b !important",
+                    },
+                  },
+                },
+              },
+              "& .MuiMonthCalendar-root": {
+                width: "100%",
+                "& .MuiPickersMonth-root": {
+                  my: 0.3,
+                },
+                "& .MuiPickersMonth-monthButton": {
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  height: 32,
+                  borderRadius: "16px",
+                  color: (theme) =>
+                    theme.palette.mode === "dark" ? "#e7ebf7" : "#1d1b20",
+                  "&:hover": {
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(255, 255, 255, 0.1)"
+                        : "rgba(92, 75, 130, 0.1)",
+                  },
+                  "&.Mui-selected": {
+                    bgcolor: "#5c4b82 !important",
+                    color: "#ffffff !important",
+                    fontWeight: 700,
+                    "&:hover": {
+                      bgcolor: "#4a3b6b !important",
+                    },
+                  },
+                },
+              },
               ...customSlotProps.popper?.sx,
             },
             ...customSlotProps.popper,

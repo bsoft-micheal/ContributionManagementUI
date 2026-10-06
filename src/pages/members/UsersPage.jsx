@@ -210,36 +210,27 @@ export default function UsersPage() {
   }, [workTypes]);
 
   const templateValidations = useMemo(() => {
-    const rolesStr = userRolesList.map((r) => r.value).join(",");
     const workTypesStr = typeOptions.map((t) => t.value).join(",");
     const eighteenYearsAgo = new Date();
     eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
 
     return {
-      Email: {
+      Email: (r, getColLetter) => ({
         type: "custom",
-        formulae: ['ISNUMBER(MATCH("*@*.*", C2, 0))'],
+        formulae: [`ISNUMBER(MATCH("*@*.*", ${getColLetter("Email")}${r}, 0))`],
         promptTitle: "Email Address",
         prompt: "Enter a valid, unique email address (e.g. user@domain.com).",
         errorTitle: "Invalid Email",
         error: "Please enter a valid email address.",
-      },
-      Role: {
-        type: "list",
-        formulae: [`"${rolesStr || "Admin,Organizer,Member"}"`],
-        promptTitle: "User Role",
-        prompt: "Select role from dropdown.",
-        errorTitle: "Invalid Role",
-        error: `Role must be one of: ${rolesStr || "Admin, Organizer, Member"}.`,
-      },
-      Phone: {
+      }),
+      "Phone Number": {
         type: "textLength",
         operator: "equal",
         formulae: [10],
-        promptTitle: "Mobile Number",
-        prompt: "Enter a unique 10-digit mobile number.",
-        errorTitle: "Invalid Mobile Number",
-        error: "Mobile number must be exactly 10 digits.",
+        promptTitle: "Phone Number",
+        prompt: "Enter a unique 10-digit phone number.",
+        errorTitle: "Invalid Phone Number",
+        error: "Phone number must be exactly 10 digits.",
       },
       Gender: {
         type: "list",
@@ -248,14 +239,6 @@ export default function UsersPage() {
         prompt: "Select Male, Female, or Other.",
         errorTitle: "Invalid Gender",
         error: "Please select a gender from the list.",
-      },
-      "Work Type": {
-        type: "list",
-        formulae: [`"${workTypesStr || "Office,WFH"}"`],
-        promptTitle: "Work Type",
-        prompt: "Select Work Type from dropdown.",
-        errorTitle: "Invalid Work Type",
-        error: "Please select a work type from the list.",
       },
       "Date of Birth": {
         type: "date",
@@ -274,8 +257,16 @@ export default function UsersPage() {
         errorTitle: "Invalid Joining Date",
         error: "Joining Date must be after Date of Birth.",
       }),
+      "Work Type": {
+        type: "list",
+        formulae: [`"${workTypesStr || "Office,WFH"}"`],
+        promptTitle: "Work Type",
+        prompt: "Select Work Type from dropdown.",
+        errorTitle: "Invalid Work Type",
+        error: "Please select a work type from the list.",
+      },
     };
-  }, [userRolesList, typeOptions]);
+  }, [typeOptions]);
 
   const filteredUsers = useMemo(() => {
     let result = users;
@@ -640,15 +631,12 @@ export default function UsersPage() {
     const fullName = row["full name"] !== undefined && row["full name"] !== null
       ? String(row["full name"]).trim()
       : (row["name"] !== undefined && row["name"] !== null ? String(row["name"]).trim() : "");
-    const username = row["username"] !== undefined && row["username"] !== null ? String(row["username"]).trim() : "";
     const email = row["email"] !== undefined && row["email"] !== null ? String(row["email"]).trim() : "";
-    const rawRole = row["role"] !== undefined && row["role"] !== null
-      ? String(row["role"]).trim()
-      : (row["rolename"] !== undefined && row["rolename"] !== null ? String(row["rolename"]).trim() : "");
-    const password = row["password"] !== undefined && row["password"] !== null ? String(row["password"]).trim() : "";
-    const phone = row["phone"] !== undefined && row["phone"] !== null
-      ? String(row["phone"]).trim()
-      : (row["phonenumber"] !== undefined && row["phonenumber"] !== null ? String(row["phonenumber"]).trim() : (row["mobile"] || ""));
+    const phone = row["phone number"] !== undefined && row["phone number"] !== null
+      ? String(row["phone number"]).trim()
+      : (row["phone"] !== undefined && row["phone"] !== null
+        ? String(row["phone"]).trim()
+        : (row["phonenumber"] !== undefined && row["phonenumber"] !== null ? String(row["phonenumber"]).trim() : (row["mobile"] || "")));
     const gender = row["gender"] !== undefined && row["gender"] !== null ? String(row["gender"]).trim() : "";
     const rawType = row["work type"] !== undefined && row["work type"] !== null
       ? String(row["work type"]).trim()
@@ -664,27 +652,7 @@ export default function UsersPage() {
     if (!fullName) return { error: `Row ${rowNum}: Full Name is required` };
     if (!/^[a-zA-Z\s]+$/.test(fullName)) return { error: `Row ${rowNum}: Full Name must contain only letters` };
 
-    // 2. Username
-    if (!username) return { error: `Row ${rowNum}: Username is required` };
-    if (!/^[a-zA-Z0-9]{3,30}$/.test(username)) {
-      return { error: `Row ${rowNum}: Username must be alphanumeric (3-30 characters)` };
-    }
-    const usernameLower = username.toLowerCase();
-    const existingUser = users.find((u) => u.username && u.username.trim().toLowerCase() === usernameLower);
-    if (existingUser) {
-      return { error: `Row ${rowNum}: Username '${username}' already exists in system` };
-    }
-    if (allRows && Array.isArray(allRows)) {
-      const firstUserIndex = allRows.findIndex((r) => {
-        const rUser = r["username"] !== undefined && r["username"] !== null ? String(r["username"]).trim().toLowerCase() : "";
-        return rUser === usernameLower;
-      });
-      if (firstUserIndex !== -1 && firstUserIndex < rowNum - 2) {
-        return { error: `Row ${rowNum}: Duplicate username '${username}' in Excel (Row ${firstUserIndex + 2})` };
-      }
-    }
-
-    // 3. Email Format & Email Uniqueness
+    // 2. Email Format & Email Uniqueness
     if (!email) return { error: `Row ${rowNum}: Email is required` };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return { error: `Row ${rowNum}: Invalid email format '${email}' (e.g. name@domain.com)` };
@@ -692,7 +660,7 @@ export default function UsersPage() {
     const emailLower = email.toLowerCase();
     const existingEmail = users.find((u) => u.email && u.email.trim().toLowerCase() === emailLower);
     if (existingEmail) {
-      return { error: `Row ${rowNum}: Email '${email}' already exists in system (Email uniqueness)` };
+      return { error: `Row ${rowNum}: Email '${email}' already exists in system` };
     }
     if (allRows && Array.isArray(allRows)) {
       const firstEmailIndex = allRows.findIndex((r) => {
@@ -704,40 +672,29 @@ export default function UsersPage() {
       }
     }
 
-    // 4. Role
-    const matchedRole = userRolesList.find((r) => r.value.toLowerCase() === rawRole.toLowerCase());
-    if (!matchedRole) {
-      return { error: `Row ${rowNum}: Invalid role '${rawRole}'. Allowed: ${userRolesList.map((r) => r.value).join(", ")}` };
-    }
-
-    // 5. Password
-    if (password && password.length < 6) {
-      return { error: `Row ${rowNum}: Password must be at least 6 characters` };
-    }
-
-    // 6. Mobile Number Exactly 10 Digits & Mobile Uniqueness
+    // 3. Mobile Number Exactly 10 Digits & Mobile Uniqueness
     const cleanPhone = String(phone).replace(/\D/g, "");
     if (!cleanPhone) {
-      return { error: `Row ${rowNum}: Mobile number is required` };
+      return { error: `Row ${rowNum}: Phone Number is required` };
     }
     if (cleanPhone.length !== 10) {
-      return { error: `Row ${rowNum}: Mobile number '${phone}' must be exactly 10 digits` };
+      return { error: `Row ${rowNum}: Phone Number '${phone}' must be exactly 10 digits` };
     }
     const existingPhone = users.find((u) => u.phone && String(u.phone).replace(/\D/g, "") === cleanPhone);
     if (existingPhone) {
-      return { error: `Row ${rowNum}: Mobile number '${phone}' already exists in system (Mobile uniqueness)` };
+      return { error: `Row ${rowNum}: Phone Number '${phone}' already exists in system` };
     }
     if (allRows && Array.isArray(allRows)) {
       const firstPhoneIndex = allRows.findIndex((r) => {
-        const rRaw = r["phone"] ?? r["phonenumber"] ?? r["mobile"] ?? "";
+        const rRaw = r["phone number"] ?? r["phone"] ?? r["phonenumber"] ?? r["mobile"] ?? "";
         return String(rRaw).replace(/\D/g, "") === cleanPhone;
       });
       if (firstPhoneIndex !== -1 && firstPhoneIndex < rowNum - 2) {
-        return { error: `Row ${rowNum}: Duplicate mobile number '${phone}' in Excel (Row ${firstPhoneIndex + 2})` };
+        return { error: `Row ${rowNum}: Duplicate phone number '${phone}' in Excel (Row ${firstPhoneIndex + 2})` };
       }
     }
 
-    // 7. Gender
+    // 4. Gender
     let normalizedGender = "Male";
     if (gender) {
       normalizedGender = gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
@@ -746,8 +703,8 @@ export default function UsersPage() {
       }
     }
 
-    // 8. Work Type
-    let normalizedType = "Office";
+    // 5. Work Type
+    let normalizedType = typeOptions[0]?.value || "Office";
     if (rawType) {
       const matchedType = typeOptions.find((t) => t.value.toLowerCase() === rawType.toLowerCase());
       if (matchedType) {
@@ -777,7 +734,7 @@ export default function UsersPage() {
       return null;
     };
 
-    // 9. DOB Minimum Age (18 years)
+    // 6. DOB Minimum Age (18 years)
     const dob = parseExcelDate(dobStr);
     if (!dob || !dob.isValid()) {
       return { error: `Row ${rowNum}: Date of Birth must be a valid date (DD/MM/YYYY)` };
@@ -787,7 +744,7 @@ export default function UsersPage() {
       return { error: `Row ${rowNum}: User must be at least 18 years old (Age: ${ageInYears} yrs, DOB: ${dob.format("DD/MM/YYYY")})` };
     }
 
-    // 10. Joining Date must be after DOB
+    // 7. Joining Date must be after DOB
     const joiningDate = parseExcelDate(joiningStr);
     if (!joiningDate || !joiningDate.isValid()) {
       return { error: `Row ${rowNum}: Joining Date must be a valid date (DD/MM/YYYY)` };
@@ -803,15 +760,15 @@ export default function UsersPage() {
       error: null,
       parsed: {
         fullName,
-        username,
         email,
-        password: password || "Welcome@123",
-        roleName: matchedRole.value,
         phone: cleanPhone,
         gender: normalizedGender,
         workType: normalizedType,
-        dateOfBirth: dob.toISOString(),
-        joiningDate: joiningDate.toISOString(),
+        dateOfBirth: dob.format("YYYY-MM-DD"),
+        joiningDate: joiningDate.format("YYYY-MM-DD"),
+        createMemberProfile: false,
+        enableUserAccess: false,
+        enableMultipleRoles: false,
         isActive: true,
       },
     };
@@ -923,7 +880,9 @@ export default function UsersPage() {
       key: "username",
       render: (row) => (
         <Typography variant="body2" fontWeight={600} color="text.secondary">
-          {row.username || "--"}
+          {row.createMemberProfile !== false && row.username && String(row.username).trim() !== ""
+            ? row.username
+            : "--"}
         </Typography>
       ),
     },
@@ -932,26 +891,32 @@ export default function UsersPage() {
       label: "Primary Role",
       key: "primaryRole",
       render: (row) => {
+        const hasLoginAccount = Boolean(
+          row.createMemberProfile === true ||
+          row.hasAccess === true ||
+          (row.createMemberProfile !== false && row.username && String(row.username).trim() !== "")
+        );
+
         let pRole = "";
-        if (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0) {
-          pRole = getRoleNameById(row.primaryRoleIds[0]);
-        } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0) {
-          pRole = row.primaryRoles[0];
-        } else if (row.roleId) {
-          pRole = getRoleNameById(row.roleId);
-        } else if (row.roleName) {
-          pRole = row.roleName;
-        } else if (Array.isArray(row.roleIds) && row.roleIds.length > 0) {
-          pRole = getRoleNameById(row.roleIds[0]);
-        } else if (Array.isArray(row.roles) && row.roles.length > 0) {
-          pRole = row.roles[0];
-        } else {
-          pRole = "Member";
+        if (hasLoginAccount) {
+          if (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0) {
+            pRole = getRoleNameById(row.primaryRoleIds[0]);
+          } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0) {
+            pRole = row.primaryRoles[0];
+          } else if (row.roleId) {
+            pRole = getRoleNameById(row.roleId);
+          } else if (row.roleName && row.roleName !== "None") {
+            pRole = row.roleName;
+          } else if (Array.isArray(row.roleIds) && row.roleIds.length > 0) {
+            pRole = getRoleNameById(row.roleIds[0]);
+          } else if (Array.isArray(row.roles) && row.roles.length > 0) {
+            pRole = row.roles[0];
+          }
         }
 
         return (
           <Typography variant="body2" fontWeight={600} color="text.secondary">
-            {pRole}
+            {pRole || "--"}
           </Typography>
         );
       },
@@ -1139,18 +1104,15 @@ export default function UsersPage() {
         open={importDialogOpen}
         onClose={() => setImportDialogOpen(false)}
         onImport={handleBulkImport}
-        title="Import Users & Member Profiles"
+        title="Import Users"
         templateHeaders={[
           "Full Name",
-          "Username",
           "Email",
-          "Password",
-          "Role",
-          "Phone",
+          "Phone Number",
           "Gender",
-          "Work Type",
           "Date of Birth",
           "Joining Date",
+          "Work Type",
         ]}
         templateValidations={templateValidations}
         validateRow={validateRow}

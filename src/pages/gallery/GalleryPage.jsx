@@ -7,6 +7,7 @@ import {
   Tooltip,
   Stack,
   Chip,
+  Alert,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -367,6 +368,31 @@ export default function GalleryPage() {
     ];
   }, [eventTypesList, photos, filterCategory]);
 
+  // Helper to calculate total existing photos for an event name across all entries (excluding the one being edited)
+  const getExistingPhotoCountForEvent = (eventName, excludePhoto = null) => {
+    if (!eventName || !eventName.trim()) return 0;
+    const targetName = eventName.trim().toLowerCase();
+
+    const excludeIds = new Set(
+      excludePhoto?.allPhotoIds?.length
+        ? excludePhoto.allPhotoIds
+        : (excludePhoto?.photoId ? [excludePhoto.photoId] : (excludePhoto?.id ? [excludePhoto.id] : []))
+    );
+
+    let count = 0;
+    photos.forEach((p) => {
+      if ((p.eventName || "").trim().toLowerCase() === targetName) {
+        const pIds = p.allPhotoIds?.length ? p.allPhotoIds : (p.photoId ? [p.photoId] : (p.id ? [p.id] : []));
+        const isExcluded = pIds.some((id) => excludeIds.has(id));
+        if (!isExcluded) {
+          const pImgs = p.images?.length > 0 ? p.images : extractImages(p.imageUrl);
+          count += pImgs.length;
+        }
+      }
+    });
+    return count;
+  };
+
   // Event Type options for the Add / Edit Photos modal (from DB event types)
   const modalEventTypeOptions = useMemo(() => {
     const set = new Set();
@@ -391,7 +417,12 @@ export default function GalleryPage() {
     const list = [];
     if (form.eventName) {
       set.add(form.eventName);
-      list.push({ label: form.eventName, value: form.eventName });
+      const existing = getExistingPhotoCountForEvent(form.eventName, editingPhoto);
+      const labelSuffix = existing >= 5 ? "(Limit reached - 5/5 photos)" : (existing > 0 ? `(${existing}/5 photos)` : "");
+      list.push({
+        label: labelSuffix ? `${form.eventName} ${labelSuffix}` : form.eventName,
+        value: form.eventName,
+      });
     }
     (eventsList || []).forEach((e) => {
       const typeName = (e.eventTypeName || e.categoryName || "").trim().toLowerCase();
@@ -399,12 +430,28 @@ export default function GalleryPage() {
         const name = e.name || e.eventName;
         if (name && !set.has(name)) {
           set.add(name);
-          list.push({ label: name, value: name });
+          const existing = getExistingPhotoCountForEvent(name, editingPhoto);
+          const labelSuffix = existing >= 5 ? "(Limit reached - 5/5 photos)" : (existing > 0 ? `(${existing}/5 photos)` : "");
+          list.push({
+            label: labelSuffix ? `${name} ${labelSuffix}` : name,
+            value: name,
+          });
         }
       }
     });
     return list;
-  }, [eventsList, form.category, form.eventName]);
+  }, [eventsList, form.category, form.eventName, photos, editingPhoto]);
+
+  // Existing photos count for the currently selected event in the Add/Edit form
+  const existingEventPhotoCount = useMemo(() => {
+    return getExistingPhotoCountForEvent(form.eventName, editingPhoto);
+  }, [photos, form.eventName, editingPhoto]);
+
+  // Maximum allowed photos in the current form entry (Max 5 per event in total)
+  const maxPhotosForForm = useMemo(() => {
+    if (!form.eventName) return 5;
+    return Math.max(0, 5 - existingEventPhotoCount);
+  }, [form.eventName, existingEventPhotoCount]);
 
   // Filtered photos
   const filteredPhotos = useMemo(() => {
@@ -495,11 +542,23 @@ export default function GalleryPage() {
   const handleMultipleImageUpload = (files) => {
     if (!files || files.length === 0) return;
 
+    const existingCount = getExistingPhotoCountForEvent(form.eventName, editingPhoto);
+    const maxAllowed = form.eventName ? Math.max(0, 5 - existingCount) : 5;
+
+    if (form.eventName && maxAllowed <= 0) {
+      toast.error(`Event "${form.eventName}" has already reached the maximum limit of 5 photos across all gallery entries.`);
+      return;
+    }
+
     const currentImages = form.imageUrls || (form.imageUrl ? [form.imageUrl] : []);
-    const availableSlots = 5 - currentImages.length;
+    const availableSlots = maxAllowed - currentImages.length;
 
     if (availableSlots <= 0) {
-      toast.error("Maximum 5 images allowed. Please remove an image before adding more.");
+      toast.error(
+        form.eventName
+          ? `Maximum limit for this entry is ${maxAllowed} photo(s) (Event "${form.eventName}" already has ${existingCount} photo(s), max 5 per event). Please remove a photo before adding more.`
+          : "Maximum 5 images allowed. Please remove an image before adding more."
+      );
       return;
     }
 
@@ -508,7 +567,11 @@ export default function GalleryPage() {
     // Only allow up to available slots
     let filesToProcess = fileList;
     if (fileList.length > availableSlots) {
-      toast.warning(`Maximum limit is 5 images. Selecting first ${availableSlots} image(s).`);
+      toast.warning(
+        form.eventName
+          ? `Event "${form.eventName}" has ${existingCount} existing photo(s). Only ${availableSlots} more photo(s) allowed (Max 5 per event). Selecting first ${availableSlots} photo(s).`
+          : `Maximum limit is ${maxAllowed} images. Selecting first ${availableSlots} image(s).`
+      );
       filesToProcess = fileList.slice(0, availableSlots);
     }
 
@@ -581,7 +644,7 @@ export default function GalleryPage() {
     const appendOptimizedImages = (newUrls) => {
       setForm((prev) => {
         const existing = prev.imageUrls || (prev.imageUrl ? [prev.imageUrl] : []);
-        const merged = [...existing, ...newUrls].slice(0, 5);
+        const merged = [...existing, ...newUrls].slice(0, maxAllowed);
         return {
           ...prev,
           imageUrls: merged,
@@ -649,12 +712,24 @@ export default function GalleryPage() {
     if (!form.category) newErrors.category = "Event Type is required";
     if (!form.eventName) newErrors.eventName = "Event Name is required";
 
+    const existingCount = getExistingPhotoCountForEvent(form.eventName, editingPhoto);
+    const maxAllowed = Math.max(0, 5 - existingCount);
+
+    if (form.eventName && maxAllowed === 0) {
+      toast.error(`Event "${form.eventName}" has already reached the maximum limit of 5 photos. Cannot add more photos.`);
+      return;
+    }
+
     const currentImages = (form.imageUrls && form.imageUrls.length > 0)
       ? form.imageUrls
       : (form.imageUrl ? [form.imageUrl] : []);
 
     if (currentImages.length === 0) {
-      newErrors.imageUrl = "Please upload at least 1 image file (up to 5 images, max 10MB)";
+      newErrors.imageUrl = maxAllowed > 0
+        ? `Please upload at least 1 image file (up to ${maxAllowed} image(s), max 10MB)`
+        : "Event limit reached (Max 5 photos per event)";
+    } else if (currentImages.length > maxAllowed) {
+      newErrors.imageUrl = `Event "${form.eventName}" already has ${existingCount} photos. You can only upload up to ${maxAllowed} photo(s) (Total max 5 per event).`;
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -1015,8 +1090,30 @@ export default function GalleryPage() {
               placeholder="Select Event"
               value={form.eventName}
               onChange={(e) => {
-                setForm((c) => ({ ...c, eventName: e.target.value }));
+                const newEventName = e.target.value;
+                const existing = getExistingPhotoCountForEvent(newEventName, editingPhoto);
+                const maxAllowed = Math.max(0, 5 - existing);
+
+                setForm((c) => {
+                  let updatedImages = c.imageUrls || [];
+                  if (updatedImages.length > maxAllowed) {
+                    updatedImages = updatedImages.slice(0, maxAllowed);
+                  }
+                  return {
+                    ...c,
+                    eventName: newEventName,
+                    imageUrls: updatedImages,
+                    imageUrl: updatedImages[0] || "",
+                  };
+                });
                 if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
+                if (errors.imageUrl) setErrors((p) => ({ ...p, imageUrl: "" }));
+
+                if (newEventName && maxAllowed === 0) {
+                  toast.warning(`Event "${newEventName}" has already reached the maximum limit of 5 photos.`);
+                } else if (newEventName && existing > 0) {
+                  toast.info(`Event "${newEventName}" already has ${existing} photo(s). Maximum ${maxAllowed} photo(s) allowed for this entry (Max 5 per event).`);
+                }
               }}
               options={modalEventOptions}
               error={!!errors.eventName}
@@ -1043,21 +1140,38 @@ export default function GalleryPage() {
               minRows={2}
             />
           </Grid>
+
+          {form.eventName && maxPhotosForForm === 0 && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="warning" sx={{ borderRadius: "8px", fontWeight: 600 }}>
+                Event &ldquo;<strong>{form.eventName}</strong>&rdquo; has already reached the maximum limit of 5 photos across all gallery entries. No additional photos can be uploaded for this event.
+              </Alert>
+            </Grid>
+          )}
+
+          {form.eventName && maxPhotosForForm > 0 && existingEventPhotoCount > 0 && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="info" sx={{ borderRadius: "8px", fontSize: "0.78rem", fontWeight: 600 }}>
+                Event &ldquo;<strong>{form.eventName}</strong>&rdquo; already has {existingEventPhotoCount} photo(s). You can upload up to {maxPhotosForForm} photo(s) in this entry (Total max 5 per event).
+              </Alert>
+            </Grid>
+          )}
+
           <Grid size={{ xs: 12 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: errors.imageUrl ? "error.main" : "text.secondary" }}>
-                Upload Images (Max 5 images, up to 10MB) <Box component="span" sx={{ color: "error.main" }}>*</Box>
+                Upload Images {form.eventName ? `(Max ${maxPhotosForForm} for this entry, Total 5 per event)` : "(Max 5 images per event, up to 10MB)"} <Box component="span" sx={{ color: "error.main" }}>*</Box>
               </Typography>
               {form.imageUrls && form.imageUrls.length > 0 && (
                 <Chip
-                  label={`${form.imageUrls.length} of 5 uploaded`}
+                  label={`${form.imageUrls.length} of ${maxPhotosForForm} uploaded ${form.eventName ? `(Event Total: ${existingEventPhotoCount + form.imageUrls.length}/5)` : ""}`}
                   size="small"
                   sx={{
                     height: 20,
                     fontSize: "0.65rem",
                     fontWeight: 800,
-                    bgcolor: form.imageUrls.length === 5 ? "rgba(22, 163, 74, 0.12)" : "rgba(74, 63, 107, 0.12)",
-                    color: form.imageUrls.length === 5 ? "#16a34a" : "#4a3f6b",
+                    bgcolor: (existingEventPhotoCount + form.imageUrls.length) >= 5 ? "rgba(22, 163, 74, 0.12)" : "rgba(74, 63, 107, 0.12)",
+                    color: (existingEventPhotoCount + form.imageUrls.length) >= 5 ? "#16a34a" : "#4a3f6b",
                   }}
                 />
               )}
@@ -1067,225 +1181,247 @@ export default function GalleryPage() {
               ref={fileInputRef}
               accept="image/*"
               multiple
+              disabled={maxPhotosForForm === 0}
               style={{ display: "none" }}
               onChange={(e) => {
                 handleMultipleImageUpload(e.target.files);
                 e.target.value = "";
               }}
             />
-            <Box
-              sx={{
-                border: "1.5px dashed",
-                borderColor: errors.imageUrl
-                  ? "error.main"
-                  : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)"),
-                borderRadius: "12px",
-                p: form.imageUrls && form.imageUrls.length > 0 ? 1.5 : 2.5,
-                textAlign: "center",
-                cursor: form.imageUrls && form.imageUrls.length > 0 ? "default" : "pointer",
-                transition: "all 0.2s ease",
-                bgcolor: errors.imageUrl
-                  ? "rgba(239, 68, 68, 0.04)"
-                  : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.02)"),
-                "&:hover": {
-                  borderColor: errors.imageUrl ? "error.main" : "#4a3f6b",
-                  bgcolor: (t) =>
-                    t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.05)",
-                },
-              }}
-              onClick={() => {
-                if (!form.imageUrls || form.imageUrls.length === 0) {
-                  fileInputRef.current?.click();
-                }
-              }}
-            >
-              {form.imageUrls && form.imageUrls.length > 0 ? (
-                <Box sx={{ width: "100%", position: "relative" }}>
-                  {/* Top Bar inside control */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      mb: 1.5,
-                      pb: 1,
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ fontWeight: 800, color: "text.primary" }}>
-                      Preview Uploaded Images ({form.imageUrls.length}/5)
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      {form.imageUrls.length < 5 && (
+            {maxPhotosForForm === 0 ? (
+              <Box
+                sx={{
+                  border: "1.5px dashed",
+                  borderColor: "warning.main",
+                  borderRadius: "12px",
+                  p: 3,
+                  textAlign: "center",
+                  bgcolor: "rgba(245, 158, 11, 0.04)",
+                }}
+              >
+                <CloudUploadIcon sx={{ fontSize: 36, color: "warning.main", mb: 0.5 }} />
+                <Typography variant="caption" sx={{ display: "block", fontWeight: 700, fontSize: "0.82rem", color: "warning.dark" }}>
+                  Maximum limit of 5 photos reached for event &ldquo;{form.eventName}&rdquo;
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", display: "block", mt: 0.4 }}>
+                  No more photos can be added for this event. To add new photos, delete or edit existing entries.
+                </Typography>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  border: "1.5px dashed",
+                  borderColor: errors.imageUrl
+                    ? "error.main"
+                    : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)"),
+                  borderRadius: "12px",
+                  p: form.imageUrls && form.imageUrls.length > 0 ? 1.5 : 2.5,
+                  textAlign: "center",
+                  cursor: form.imageUrls && form.imageUrls.length > 0 ? "default" : "pointer",
+                  transition: "all 0.2s ease",
+                  bgcolor: errors.imageUrl
+                    ? "rgba(239, 68, 68, 0.04)"
+                    : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.02)"),
+                  "&:hover": {
+                    borderColor: errors.imageUrl ? "error.main" : "#4a3f6b",
+                    bgcolor: (t) =>
+                      t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.05)",
+                  },
+                }}
+                onClick={() => {
+                  if (!form.imageUrls || form.imageUrls.length === 0) {
+                    fileInputRef.current?.click();
+                  }
+                }}
+              >
+                {form.imageUrls && form.imageUrls.length > 0 ? (
+                  <Box sx={{ width: "100%", position: "relative" }}>
+                    {/* Top Bar inside control */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        mb: 1.5,
+                        pb: 1,
+                        borderBottom: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: "text.primary" }}>
+                        Preview Uploaded Images ({form.imageUrls.length}/{maxPhotosForForm})
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        {form.imageUrls.length < maxPhotosForForm && (
+                          <AppButton
+                            size="small"
+                            variant="outlined"
+                            startIcon={<AddPhotoAlternateIcon sx={{ fontSize: 16 }} />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fileInputRef.current?.click();
+                            }}
+                            sx={{ fontSize: "0.72rem", height: 26, py: 0, px: 1 }}
+                          >
+                            Add More ({maxPhotosForForm - form.imageUrls.length} left)
+                          </AppButton>
+                        )}
                         <AppButton
                           size="small"
-                          variant="outlined"
-                          startIcon={<AddPhotoAlternateIcon sx={{ fontSize: 16 }} />}
+                          variant="text"
+                          color="error"
+                          onClick={handleClearAllImages}
+                          sx={{ fontSize: "0.72rem", height: 26, minWidth: "auto", p: 0.5 }}
+                        >
+                          Clear All
+                        </AppButton>
+                      </Box>
+                    </Box>
+
+                    {/* Thumbnails Grid within control */}
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: {
+                          xs: "repeat(2, 1fr)",
+                          sm: form.imageUrls.length === 1 ? "1fr" : "repeat(3, 1fr)",
+                          md: `repeat(${Math.min(form.imageUrls.length + (form.imageUrls.length < maxPhotosForForm ? 1 : 0), 4)}, 1fr)`,
+                        },
+                        gap: 1.5,
+                      }}
+                    >
+                      {form.imageUrls.map((url, idx) => (
+                        <Box
+                          key={idx}
+                          sx={{
+                            position: "relative",
+                            borderRadius: "10px",
+                            overflow: "hidden",
+                            border: "1px solid",
+                            borderColor: "divider",
+                            bgcolor: "background.paper",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                            aspectRatio: "4 / 3",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Box
+                            component="img"
+                            src={url}
+                            alt={`Uploaded Photo ${idx + 1}`}
+                            sx={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              display: "block",
+                            }}
+                          />
+
+                          {/* Number Index Badge */}
+                          <Chip
+                            label={`#${idx + 1}`}
+                            size="small"
+                            sx={{
+                              position: "absolute",
+                              top: 6,
+                              left: 6,
+                              height: 18,
+                              fontSize: "0.62rem",
+                              fontWeight: 800,
+                              bgcolor: "rgba(0,0,0,0.7)",
+                              color: "#ffffff",
+                            }}
+                          />
+
+                          {/* Individual Delete Button */}
+                          <Tooltip title="Remove photo">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleRemoveImageIndex(idx, e)}
+                              sx={{
+                                position: "absolute",
+                                top: 5,
+                                right: 5,
+                                bgcolor: "rgba(239, 68, 68, 0.9)",
+                                color: "#ffffff",
+                                p: 0.4,
+                                "&:hover": {
+                                  bgcolor: "#dc2626",
+                                  transform: "scale(1.1)",
+                                },
+                                transition: "all 0.2s ease",
+                              }}
+                            >
+                              <DeleteOutlineIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      ))}
+
+                      {/* Add More Tile if < maxPhotosForForm */}
+                      {form.imageUrls.length < maxPhotosForForm && (
+                        <Box
                           onClick={(e) => {
                             e.stopPropagation();
                             fileInputRef.current?.click();
                           }}
-                          sx={{ fontSize: "0.72rem", height: 26, py: 0, px: 1 }}
+                          sx={{
+                            border: "1.5px dashed",
+                            borderColor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.25)" : "rgba(74,63,107,0.3)"),
+                            borderRadius: "10px",
+                            aspectRatio: "4 / 3",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            p: 1,
+                            bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.02)"),
+                            transition: "all 0.2s ease",
+                            "&:hover": {
+                              borderColor: "#4a3f6b",
+                              bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(74,63,107,0.06)"),
+                            },
+                          }}
                         >
-                          Add More ({5 - form.imageUrls.length} left)
-                        </AppButton>
+                          <AddPhotoAlternateIcon sx={{ fontSize: 26, color: "#4a3f6b", mb: 0.5 }} />
+                          <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.7rem", color: "text.primary" }}>
+                            Add Photo
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.62rem" }}>
+                            {maxPhotosForForm - form.imageUrls.length} slot(s) left
+                          </Typography>
+                        </Box>
                       )}
-                      <AppButton
-                        size="small"
-                        variant="text"
-                        color="error"
-                        onClick={handleClearAllImages}
-                        sx={{ fontSize: "0.72rem", height: 26, minWidth: "auto", p: 0.5 }}
-                      >
-                        Clear All
-                      </AppButton>
                     </Box>
-                  </Box>
 
-                  {/* Thumbnails Grid within control */}
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: {
-                        xs: "repeat(2, 1fr)",
-                        sm: form.imageUrls.length === 1 ? "1fr" : "repeat(3, 1fr)",
-                        md: `repeat(${Math.min(form.imageUrls.length + (form.imageUrls.length < 5 ? 1 : 0), 4)}, 1fr)`,
-                      },
-                      gap: 1.5,
-                    }}
-                  >
-                    {form.imageUrls.map((url, idx) => (
-                      <Box
-                        key={idx}
-                        sx={{
-                          position: "relative",
-                          borderRadius: "10px",
-                          overflow: "hidden",
-                          border: "1px solid",
-                          borderColor: "divider",
-                          bgcolor: "background.paper",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                          aspectRatio: "4 / 3",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Box
-                          component="img"
-                          src={url}
-                          alt={`Uploaded Photo ${idx + 1}`}
-                          sx={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                            display: "block",
-                          }}
-                        />
-
-                        {/* Number Index Badge */}
-                        <Chip
-                          label={`#${idx + 1}`}
-                          size="small"
-                          sx={{
-                            position: "absolute",
-                            top: 6,
-                            left: 6,
-                            height: 18,
-                            fontSize: "0.62rem",
-                            fontWeight: 800,
-                            bgcolor: "rgba(0,0,0,0.7)",
-                            color: "#ffffff",
-                          }}
-                        />
-
-                        {/* Individual Delete Button */}
-                        <Tooltip title="Remove photo">
-                          <IconButton
-                            size="small"
-                            onClick={(e) => handleRemoveImageIndex(idx, e)}
-                            sx={{
-                              position: "absolute",
-                              top: 5,
-                              right: 5,
-                              bgcolor: "rgba(239, 68, 68, 0.9)",
-                              color: "#ffffff",
-                              p: 0.4,
-                              "&:hover": {
-                                bgcolor: "#dc2626",
-                                transform: "scale(1.1)",
-                              },
-                              transition: "all 0.2s ease",
-                            }}
-                          >
-                            <DeleteOutlineIcon sx={{ fontSize: 15 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    ))}
-
-                    {/* Add More Tile if < 5 */}
-                    {form.imageUrls.length < 5 && (
-                      <Box
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          fileInputRef.current?.click();
-                        }}
-                        sx={{
-                          border: "1.5px dashed",
-                          borderColor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.25)" : "rgba(74,63,107,0.3)"),
-                          borderRadius: "10px",
-                          aspectRatio: "4 / 3",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer",
-                          p: 1,
-                          bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.02)"),
-                          transition: "all 0.2s ease",
-                          "&:hover": {
-                            borderColor: "#4a3f6b",
-                            bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(74,63,107,0.06)"),
-                          },
-                        }}
-                      >
-                        <AddPhotoAlternateIcon sx={{ fontSize: 26, color: "#4a3f6b", mb: 0.5 }} />
-                        <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.7rem", color: "text.primary" }}>
-                          Add Photo
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.62rem" }}>
-                          {5 - form.imageUrls.length} slot(s) left
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
-
-                  <Typography
-                    variant="caption"
-                    sx={{ color: "#10b981", fontWeight: 700, mt: 1.2, display: "block" }}
-                  >
-                    ✓ {form.imageUrls.length} photo(s) selected and ready to save (Max 5 images, up to 10MB)
-                  </Typography>
-                </Box>
-              ) : (
-                <>
-                  <CloudUploadIcon sx={{ fontSize: 36, color: errors.imageUrl ? "error.main" : "#4a3f6b", mb: 0.5 }} />
-                  <Typography variant="caption" sx={{ display: "block", fontWeight: 700, fontSize: "0.8rem", color: errors.imageUrl ? "error.main" : (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
-                    Click to browse or drop images from device
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block", mt: 0.4 }}>
-                    Select up to 5 images • Maximum 10MB total • JPG, PNG, WebP
-                  </Typography>
-                  {errors.imageUrl && (
-                    <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, mt: 0.6, display: "block" }}>
-                      {errors.imageUrl}
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "#10b981", fontWeight: 700, mt: 1.2, display: "block" }}
+                    >
+                      ✓ {form.imageUrls.length} photo(s) selected for this entry (Event Total: {existingEventPhotoCount + form.imageUrls.length}/5)
                     </Typography>
-                  )}
-                </>
-              )}
-            </Box>
+                  </Box>
+                ) : (
+                  <>
+                    <CloudUploadIcon sx={{ fontSize: 36, color: errors.imageUrl ? "error.main" : "#4a3f6b", mb: 0.5 }} />
+                    <Typography variant="caption" sx={{ display: "block", fontWeight: 700, fontSize: "0.8rem", color: errors.imageUrl ? "error.main" : (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
+                      Click to browse or drop images from device
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block", mt: 0.4 }}>
+                      Select up to {maxPhotosForForm} image(s) • Max 5 photos per event • Maximum 10MB total • JPG, PNG, WebP
+                    </Typography>
+                    {errors.imageUrl && (
+                      <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, mt: 0.6, display: "block" }}>
+                        {errors.imageUrl}
+                      </Typography>
+                    )}
+                  </>
+                )}
+              </Box>
+            )}
           </Grid>
         </Grid>
       </AppDialog>
