@@ -48,7 +48,6 @@ import {
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { formatGridDate, formatGridDateTime } from "../../utils/dateHelper";
-import AppPageLoader from "./AppPageLoader";
 import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 
 // ─── Printout & PDF Helper ──────────────────────────────────────────────────
@@ -1109,11 +1108,7 @@ export default function AppDataTable({
             {loading ? (
               <TableRow>
                 <TableCell colSpan={orderedColumns.length || 1} align="center" sx={{ py: 3, border: "none" }}>
-                  {!globalLoading ? (
-                    <AppPageLoader fullScreen={false} text="Loading data..." minHeight={180} />
-                  ) : (
-                    <Box sx={{ minHeight: 180 }} />
-                  )}
+                  <Box sx={{ minHeight: 180 }} />
                 </TableCell>
               </TableRow>
             ) : paginatedData.length > 0 ? (

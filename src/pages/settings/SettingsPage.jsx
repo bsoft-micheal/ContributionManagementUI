@@ -255,10 +255,6 @@ export default function SettingsPage() {
         list.push(k);
       }
     });
-    // Fallback if no categories are yet fetched from backend
-    if (list.length === 0) {
-      list.push("Birthday", "Farewell", "Team Dinner", "Teamouting");
-    }
     return list.map((t) => ({ label: t, value: t }));
   }, [categoriesList, eventPaymentQrConfigs]);
 
@@ -395,26 +391,6 @@ export default function SettingsPage() {
         });
       }
     });
-
-    if (rows.length === 0) {
-      ["Birthday", "Farewell", "Team Dinner", "Teamouting"].forEach((typeName) => {
-        const config = getPaymentQrConfig(typeName);
-        const hasUpi = Boolean(config.upiId && config.upiId.trim());
-        rows.push({
-          id: typeName,
-          eventTypeName: typeName,
-          receiverName: config.receiverName || config.qrReceiverName || "",
-          upiId: config.upiId || config.qrUpiId || "",
-          previewAmount: config.previewAmount || "",
-          qrMode: config.qrMode || "generated",
-          qrImage: config.qrImage || null,
-          isConfigured: Boolean(config.isConfigured && hasUpi),
-          isActive: config.isActive !== false,
-          createdBy: (!isGuid(config.createdBy) && config.createdBy) || "--",
-          createdOn: config.createdOn || config.createdAt || null,
-        });
-      });
-    }
 
     return rows;
   }, [categoriesList, eventPaymentQrConfigs]);
@@ -2370,16 +2346,6 @@ export default function SettingsPage() {
                           sx={{ flex: 1, fontSize: "0.72rem", height: 32 }}
                         >
                           Copy UPI
-                        </AppButton>
-                        <AppButton
-                          size="small"
-                          variant="outlined"
-                          disabled={!isCurrentConfigured}
-                          startIcon={<ContentCopyOutlinedIcon sx={{ fontSize: 14 }} />}
-                          onClick={() => copyToClipboard(liveUpiUri, `UPI URI (${selectedQrEventType})`)}
-                          sx={{ flex: 1, fontSize: "0.72rem", height: 32 }}
-                        >
-                          Copy URI
                         </AppButton>
                       </Stack>
                     </Stack>
