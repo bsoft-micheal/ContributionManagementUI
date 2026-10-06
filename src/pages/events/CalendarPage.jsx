@@ -530,6 +530,27 @@ export default function CalendarPage() {
       }
     }
 
+    // Birthday member DOBs directly on calendar grid cells
+    if (categoryFilter === "ALL" || categoryFilter.toLowerCase().includes("birthday")) {
+      for (const member of activeMembers) {
+        const dob = parseMemberDob(member.dateOfBirth);
+        if (!dob) continue;
+        if (dob.month() === dayMonth && dob.date() === dayDate) {
+          if (!handledCelebrantIds.has(member.memberId)) {
+            handledCelebrantIds.add(member.memberId);
+            items.push({
+              key: `member-bday-${member.memberId}-${dayStr}`,
+              eventItem: null,
+              celebrant: member,
+              displayName: `${member.name}'s Birthday`,
+              categoryLabel: "Birthday",
+              colorType: "Birthday",
+            });
+          }
+        }
+      }
+    }
+
     return items;
   };
 

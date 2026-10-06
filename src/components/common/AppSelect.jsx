@@ -1,4 +1,4 @@
-import { MenuItem, TextField, Box, Typography } from "@mui/material";
+import { MenuItem, TextField, Box, Typography, InputAdornment } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
 export default function AppSelect({
@@ -12,6 +12,8 @@ export default function AppSelect({
   error = false,
   helperText = "",
   required = false,
+  startAdornment,
+  InputProps = {},
   ...props
 }) {
   const theme = useTheme();
@@ -168,6 +170,14 @@ export default function AppSelect({
         }}
         error={error}
         helperText={helperText}
+        InputProps={{
+          startAdornment: startAdornment ? (
+            <InputAdornment position="start" sx={{ mr: 0.5, pointerEvents: "none" }}>
+              {startAdornment}
+            </InputAdornment>
+          ) : undefined,
+          ...InputProps,
+        }}
         {...props}
       >
         {!hasEmptyOption && (

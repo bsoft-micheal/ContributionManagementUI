@@ -14,7 +14,7 @@ export default function AppConfirmDialog({
   onClose,
   onConfirm,
   title = COMMON_STRINGS.DIALOGS?.CONFIRM_TITLE || "Confirm",
-  content = COMMON_STRINGS.DIALOGS?.DELETE_CONFIRM_MSG || "Are you sure you want to delete?",
+  content = COMMON_STRINGS.DIALOGS?.DELETE_CONFIRM_MSG || " delete?",
   confirmText = COMMON_STRINGS.ACTIONS?.CONFIRM || "Confirm",
   cancelText = COMMON_STRINGS.ACTIONS?.CANCEL || "Cancel",
   confirmColor = "primary",

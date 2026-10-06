@@ -1,7 +1,17 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const getEventTypesAsync = async () => {
-  return await getApi("/event-types/getAllEventTypeAsync");
+export const getEventTypesAsync = async (includeInactive = false) => {
+  const data = await getApi("/event-types/getAllEventTypeAsync");
+  if (!includeInactive && Array.isArray(data)) {
+    return data.filter(
+      (t) =>
+        t.isActive !== false &&
+        t.status !== "Inactive" &&
+        !t.isDeleted &&
+        t.isDeleted !== true
+    );
+  }
+  return data || [];
 };
 
 export const createEventTypeAsync = async (data) => {

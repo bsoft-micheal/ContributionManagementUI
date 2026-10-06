@@ -254,6 +254,7 @@ export default function AppDateInput({
   disableFuture,
   disablePast,
   clearable = false,
+  startAdornment,
   sx: customSx = {},
   slotProps: customSlotProps = {},
   ...props
@@ -381,6 +382,23 @@ export default function AppDateInput({
             helperText: helperText,
             placeholder: format,
             variant: "outlined",
+            InputProps: {
+              startAdornment: startAdornment ? (
+                <Box
+                  component="span"
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    mr: 0.5,
+                    ml: 0.2,
+                    pointerEvents: "none",
+                  }}
+                >
+                  {startAdornment}
+                </Box>
+              ) : undefined,
+              ...customSlotProps.textField?.InputProps,
+            },
             sx: {
               "& .MuiOutlinedInput-root": {
                 fontSize: size === "small" ? "0.68rem" : "0.74rem",

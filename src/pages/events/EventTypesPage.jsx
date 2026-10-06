@@ -50,7 +50,7 @@ export default function EventTypesPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await getEventTypesAsync();
+      const data = await getEventTypesAsync(true);
       setTypes(data || []);
     } catch (error) {
       toast.error(error, "Failed to load event types");

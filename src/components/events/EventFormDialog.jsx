@@ -170,7 +170,7 @@ export default function EventFormDialog({
     }
 
     return Array.from(dateCounts.entries())
-      .map(([dateStr, count]) => `${dateStr} (${count})`)
+      .map(([dateStr, count]) => (count > 1 ? `${dateStr} (${count})` : dateStr))
       .join(", ");
   }, [monthCelebrants]);
 
