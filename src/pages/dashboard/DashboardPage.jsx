@@ -255,11 +255,11 @@ function InteractiveDonutChart({
             noWrap
             sx={{
               maxWidth: 114,
-              fontSize: "0.78rem",
-              fontWeight: 700,
+              fontSize: "0.78125rem",
+              fontWeight: 600,
               color: isDark ? "#93c5fd" : "#6366f1",
-              lineHeight: 1.2,
-              letterSpacing: "0.02em",
+              lineHeight: 1.25,
+              letterSpacing: "0.01em",
               mb: 0.3,
             }}
           >
@@ -270,11 +270,10 @@ function InteractiveDonutChart({
         {/* Amount */}
         <Typography
           sx={{
-            fontFamily: '"Outfit", sans-serif',
-            fontSize: "1.35rem",
-            fontWeight: 800,
+            fontSize: "1.375rem",
+            fontWeight: 700,
             color: isDark ? "#ffffff" : "#0f172a",
-            lineHeight: 1.15,
+            lineHeight: 1.2,
             letterSpacing: "-0.02em",
           }}
         >
@@ -523,9 +522,9 @@ function CollapsibleSection({ title, count, children, defaultOpen = true }) {
         {open
           ? <ExpandLessIcon fontSize="small" color="primary" />
           : <ExpandMoreIcon fontSize="small" color="primary" />}
-        <Typography variant="body1" fontWeight={700} sx={{ flex: 1 }}>
+        <Typography variant="h6" fontWeight={600} sx={{ fontSize: "1.1875rem", letterSpacing: "-0.015em", lineHeight: 1.35, flex: 1 }}>
           {title}{" "}
-          <Typography component="span" color="primary.main" fontWeight={900} sx={{ fontSize: "inherit" }}>
+          <Typography component="span" color="primary.main" fontWeight={700} sx={{ fontSize: "inherit" }}>
             ({count})
           </Typography>
         </Typography>
@@ -616,9 +615,9 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
             minHeight: 36,
             px: 2.5,
             borderRadius: "8px",
-            fontWeight: 700,
-            fontSize: "0.80rem",
-            letterSpacing: "0.02em",
+            fontWeight: 600,
+            fontSize: "0.84375rem",
+            letterSpacing: "0.01em",
             bgcolor: "#6366f1 !important",
             "&:hover": {
               bgcolor: "#4f46e5 !important",
@@ -641,9 +640,9 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
             borderRadius: "8px",
             color: "#ef4444",
             border: `1.5px solid ${isDark ? "rgba(239, 68, 68, 0.45)" : "rgba(239, 68, 68, 0.35)"}`,
-            fontWeight: 700,
-            fontSize: "0.80rem",
-            letterSpacing: "0.02em",
+            fontWeight: 600,
+            fontSize: "0.84375rem",
+            letterSpacing: "0.01em",
             "&:hover": {
               border: "1.5px solid #ef4444",
               bgcolor: isDark ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.05)",

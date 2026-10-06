@@ -120,7 +120,7 @@ export default function ForgotPasswordPage() {
               zIndex: 1,
             }}
           >
-            <Typography variant="h5" sx={{ fontWeight: 900, mb: 1.5, color: "text.primary", fontFamily: '"Outfit", sans-serif' }}>
+            <Typography variant="h5" sx={{ fontWeight: 700, mb: 1.5, color: "text.primary", letterSpacing: "-0.015em" }}>
               Account Recovery
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.88rem", fontWeight: 500, lineHeight: 1.6, maxWidth: "600px", mx: "auto" }}>
@@ -173,7 +173,7 @@ export default function ForgotPasswordPage() {
                 {["Email", "Verify OTP", "New Password"].map((label) => (
                   <Step key={label}>
                     <StepLabel StepIconProps={{ sx: { "&.Mui-active": { color: "#7c3aed" }, "&.Mui-completed": { color: "#7c3aed" } } }}>
-                      <span style={{ fontSize: "0.75rem", fontFamily: '"Outfit", sans-serif', fontWeight: 700, color: theme.palette.text.primary }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 600, color: theme.palette.text.primary }}>
                         {label}
                       </span>
                     </StepLabel>
@@ -183,7 +183,7 @@ export default function ForgotPasswordPage() {
             </Box>
 
             <Box component="form" onSubmit={handleRequestOtp} sx={{ width: "100%" }}>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: "text.primary", fontFamily: '"Outfit", sans-serif', mb: 1 }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.5rem", sm: "1.625rem" }, letterSpacing: "-0.02em", color: "text.primary", mb: 1 }}>
                 Forgot Password?
               </Typography>
               <Typography sx={{ fontSize: "0.85rem", color: "text.secondary", fontWeight: 500, mb: 4.5 }}>

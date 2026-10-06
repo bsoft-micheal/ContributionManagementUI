@@ -619,8 +619,8 @@ export default function AppDataTable({
       >
         <Typography
           variant="subtitle2"
-          fontWeight={700}
-          sx={{ fontSize: "0.95rem", letterSpacing: "0.02em" }}
+          fontWeight={600}
+          sx={{ fontSize: "0.9375rem", letterSpacing: "-0.005em" }}
         >
           {title}
         </Typography>

@@ -57,8 +57,8 @@ export default function ExecutiveFinancialBarChart({
           </Box>
           <Typography
             variant="h6"
-            fontWeight={900}
-            sx={{ lineHeight: 1.2, fontFamily: '"Outfit", sans-serif' }}
+            fontWeight={600}
+            sx={{ fontSize: "1.1875rem", letterSpacing: "-0.015em", lineHeight: 1.35 }}
           >
             Financial Overview
           </Typography>
@@ -214,7 +214,7 @@ export default function ExecutiveFinancialBarChart({
                       <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: "#6366f1" }}>
                         Total Expected
                       </Typography>
-                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: "#6366f1" }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#6366f1" }}>
                         ₹{formatAmount(exp)}
                       </Typography>
                     </Stack>
@@ -226,10 +226,10 @@ export default function ExecutiveFinancialBarChart({
                   {/* Total Collections Bar */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: "#10b981" }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#10b981" }}>
                         {isMember ? "My Collections" : "Total Collections"}
                       </Typography>
-                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: "#10b981" }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#10b981" }}>
                         ₹{formatAmount(col)}
                       </Typography>
                     </Stack>
@@ -249,10 +249,10 @@ export default function ExecutiveFinancialBarChart({
                   {/* Total Pending Bar */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: "#f43f5e" }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#f43f5e" }}>
                         Total Pending
                       </Typography>
-                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: "#f43f5e" }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#f43f5e" }}>
                         ₹{formatAmount(pen)}
                       </Typography>
                     </Stack>
@@ -272,10 +272,10 @@ export default function ExecutiveFinancialBarChart({
                   {/* Total Expenses Bar */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: "#f59e0b" }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#f59e0b" }}>
                         Total Expenses
                       </Typography>
-                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: "#f59e0b" }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#f59e0b" }}>
                         ₹{formatAmount(expense)}
                       </Typography>
                     </Stack>
@@ -295,10 +295,10 @@ export default function ExecutiveFinancialBarChart({
                   {/* Balance Amount Bar */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
                         Balance Amount
                       </Typography>
-                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
                         ₹{formatAmount(rem)}
                       </Typography>
                     </Stack>

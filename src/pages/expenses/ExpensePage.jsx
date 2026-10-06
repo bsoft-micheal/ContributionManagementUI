@@ -185,6 +185,7 @@ export default function ExpensePage() {
           description: item.description || "",
           fileName: item.fileName || "",
           fileUrl: item.fileUrl || item.fileName || "",
+          attachment: item.fileUrl || item.fileName || "",
           createdBy: item.createdBy || item.CreatedBy || "--",
           createdOn: item.createdOn || item.CreatedOn || item.createdAt || item.CreatedAt || null,
           createdAt: item.createdAt || item.CreatedAt || item.createdOn || item.CreatedOn || null,
@@ -925,6 +926,92 @@ export default function ExpensePage() {
           >
             {row.status}
           </Typography>
+        );
+      },
+    },
+    {
+      label: "Attachment",
+      key: "attachment",
+      render: (row) => {
+        const rawFile = row.attachment || row.fileName || row.fileUrl;
+        if (!rawFile) {
+          return (
+            <Typography variant="body2" color="text.secondary">
+              --
+            </Typography>
+          );
+        }
+        const url = resolveAttachmentUrl(rawFile);
+        const displayName = getAttachmentDisplayName(rawFile) || `${row.id || "EXP"}_receipt.png`;
+        const isPdf = isPdfFile(rawFile);
+
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+            <Tooltip title={isPdf ? "Click to view PDF" : "Click to preview image"}>
+              <Box
+                onClick={() => {
+                  if (isPdf) {
+                    window.open(url, "_blank");
+                  } else {
+                    openImagePreview(url, `${row.id || "Expense"} - Receipt Attachment`);
+                  }
+                }}
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                {isPdf ? (
+                  <Box
+                    sx={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: "6px",
+                      bgcolor: "rgba(239, 68, 68, 0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "1px solid rgba(239, 68, 68, 0.3)",
+                      "&:hover": { transform: "scale(1.1)" },
+                      transition: "transform 0.15s ease",
+                    }}
+                  >
+                    <PictureAsPdfIcon sx={{ fontSize: 18, color: "#ef4444" }} />
+                  </Box>
+                ) : (
+                  <Box
+                    component="img"
+                    src={url}
+                    alt="Receipt"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                    sx={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: "6px",
+                      objectFit: "cover",
+                      border: "1px solid rgba(0,0,0,0.15)",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      "&:hover": { transform: "scale(1.15)", boxShadow: "0 3px 8px rgba(0,0,0,0.2)" },
+                      transition: "all 0.15s ease",
+                    }}
+                  />
+                )}
+              </Box>
+            </Tooltip>
+            <Tooltip title="Download Receipt">
+              <IconButton
+                size="small"
+                sx={{ p: 0.2 }}
+                onClick={() => handleDownloadImage(url, displayName)}
+              >
+                <DownloadIcon sx={{ fontSize: 16, color: "#0284c7" }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
         );
       },
     },
