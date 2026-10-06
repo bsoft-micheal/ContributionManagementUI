@@ -98,27 +98,41 @@ export default function MembersPage() {
       sx: { width: 70 },
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          {canViewMember && (
-            <Tooltip title="View Details">
-              <IconButton size="small" sx={{ p: 0.3 }} onClick={() => {
-                setSelectedMember(row);
-                setViewDialogOpen(true);
-              }}>
-                <ViewIcon sx={{ fontSize: "1.05rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }} />
+          <Tooltip title={canViewMember ? "View Details" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canViewMember ? "not-allowed" : "pointer" }}>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                disabled={!canViewMember}
+                onClick={() => {
+                  if (!canViewMember) return;
+                  setSelectedMember(row);
+                  setViewDialogOpen(true);
+                }}
+              >
+                <ViewIcon
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) =>
+                      canViewMember
+                        ? theme.palette.mode === "dark"
+                          ? "#ffffff"
+                          : "#4a3f6b"
+                        : theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
+                  }}
+                />
               </IconButton>
-            </Tooltip>
-          )}
+            </span>
+          </Tooltip>
         </Box>
       ),
     },
     {
       label: "Member Name",
       key: "name",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={700} color="text.primary">
-          {row.name}
-        </Typography>
-      ),
+      render: (row) => row.name || "--",
     },
     { label: "Gender", key: "gender" },
     { label: "Email", key: "email" },

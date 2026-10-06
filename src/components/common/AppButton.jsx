@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "@mui/material";
+import { Button, Tooltip } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 
 export default function AppButton({
@@ -9,6 +9,9 @@ export default function AppButton({
   sx = {},
   startIcon,
   endIcon,
+  disabled,
+  disabledTooltip = "Disabled",
+  tooltip,
   ...props
 }) {
   let resolvedStartIcon = startIcon;
@@ -21,12 +24,15 @@ export default function AppButton({
     }
   }
 
-  return (
+  const isBtnDisabled = Boolean(disabled || props.disabled);
+
+  const buttonElement = (
     <Button
       variant={variant}
       color={color}
       startIcon={resolvedStartIcon}
       endIcon={endIcon}
+      disabled={isBtnDisabled}
       sx={{
         borderRadius: "8px",
         textTransform: "none",
@@ -37,20 +43,41 @@ export default function AppButton({
         py: 0.75,
         boxShadow: "none",
         ...(variant === "contained" && {
-          bgcolor: (theme) => props.disabled ? undefined : "#4a3f6b !important",
-          color: "#ffffff !important",
+          bgcolor: isBtnDisabled
+            ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12) !important" : "rgba(74, 63, 107, 0.3) !important")
+            : "#4a3f6b !important",
+          color: isBtnDisabled
+            ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.7) !important" : "#ffffff !important")
+            : "#ffffff !important",
           "&:hover": {
-            bgcolor: "#3b325c !important",
+            bgcolor: isBtnDisabled ? undefined : "#3b325c !important",
           },
         }),
         ...(variant === "outlined" && {
-          border: (theme) => `1.5px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.28)" : "#cbd5e1"}`,
-          color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#475569",
+          border: (theme) =>
+            isBtnDisabled
+              ? `1.5px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25)" : "rgba(74, 63, 107, 0.3)"} !important`
+              : `1.5px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.28)" : "#cbd5e1"}`,
+          color: (theme) =>
+            isBtnDisabled
+              ? theme.palette.mode === "dark"
+                ? "rgba(255, 255, 255, 0.7) !important"
+                : "#64748b !important"
+              : theme.palette.mode === "dark"
+              ? "#ffffff"
+              : "#475569",
           "&:hover": {
-            border: (theme) => `1.5px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.5)" : "#94a3b8"}`,
-            backgroundColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
+            border: (theme) =>
+              isBtnDisabled ? undefined : `1.5px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.5)" : "#94a3b8"}`,
+            backgroundColor: (theme) =>
+              isBtnDisabled ? undefined : theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
           },
         }),
+        "&.Mui-disabled": {
+          opacity: "0.7 !important",
+          cursor: "not-allowed !important",
+          pointerEvents: "none",
+        },
         ...sx,
       }}
       {...props}
@@ -58,4 +85,26 @@ export default function AppButton({
       {children}
     </Button>
   );
+
+  // If disabled, wrap in Tooltip with "Disabled" indicator and a span wrapper for pointer events
+  if (isBtnDisabled) {
+    return (
+      <Tooltip title={disabledTooltip || "Disabled"} arrow placement="top">
+        <span style={{ display: "inline-flex", cursor: "not-allowed", verticalAlign: "middle" }}>
+          {buttonElement}
+        </span>
+      </Tooltip>
+    );
+  }
+
+  // If active with explicit tooltip
+  if (tooltip) {
+    return (
+      <Tooltip title={tooltip} arrow placement="top">
+        {buttonElement}
+      </Tooltip>
+    );
+  }
+
+  return buttonElement;
 }

@@ -41,7 +41,6 @@ export const navigationItems = [
     icon: <EventRoundedIcon fontSize="small" />,
     children: [
       { featureId: MENU_FEATURE_IDS.EVENT_PAGE, label: "Event", path: "/events", icon: <EventRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: MENU_FEATURE_IDS.CALENDAR, label: "Calendar", path: "/calendar", icon: <CalendarMonthRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: MENU_FEATURE_IDS.GALLERY, label: "Gallery", path: "/gallery", icon: <CollectionsRoundedIcon sx={{ fontSize: "1rem" }} /> },
     ]
   },

@@ -714,12 +714,14 @@ export default function GalleryPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-          {canViewGallery && (
-            <Tooltip title="View Details">
+          <Tooltip title={canViewGallery ? "View Details" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canViewGallery ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
+                disabled={!canViewGallery}
                 onClick={() => {
+                  if (!canViewGallery) return;
                   setSelectedPhoto(row);
                   setActiveViewImageIndex(0);
                   setViewDialogOpen(true);
@@ -728,44 +730,46 @@ export default function GalleryPage() {
                 <ViewIcon
                   sx={{
                     fontSize: "1.05rem",
-                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                    color: (theme) => canViewGallery ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
                   }}
                 />
               </IconButton>
-            </Tooltip>
-          )}
-          {canEditPhoto && (
-            <Tooltip title="Edit">
+            </span>
+          </Tooltip>
+          <Tooltip title={canEditPhoto ? "Edit" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canEditPhoto ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
+                disabled={!canEditPhoto}
                 onClick={() => handleEditPhoto(row)}
               >
                 <EditIcon
                   sx={{
                     fontSize: "1.05rem",
-                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                    color: (theme) => canEditPhoto ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
                   }}
                 />
               </IconButton>
-            </Tooltip>
-          )}
-          {canDeletePhoto && (
-            <Tooltip title="Delete">
+            </span>
+          </Tooltip>
+          <Tooltip title={canDeletePhoto ? "Delete" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canDeletePhoto ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
+                disabled={!canDeletePhoto}
                 onClick={() => handleDeleteRequest(row)}
               >
                 <DeleteIcon
                   sx={{
                     fontSize: "1.05rem",
-                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                    color: (theme) => canDeletePhoto ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
                   }}
                 />
               </IconButton>
-            </Tooltip>
-          )}
+            </span>
+          </Tooltip>
         </Box>
       ),
     },
@@ -848,23 +852,22 @@ export default function GalleryPage() {
         data={filteredPhotos}
         loading={loading}
         actions={
-          canAddPhoto && (
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <AppButton
-                variant="contained"
-                size="small"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  setEditingPhoto(null);
-                  setForm(initialForm);
-                  setErrors({});
-                  setDialogOpen(true);
-                }}
-              >
-                Add
-              </AppButton>
-            </Stack>
-          )
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <AppButton
+              variant="contained"
+              size="small"
+              disabled={!canAddPhoto}
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setEditingPhoto(null);
+                setForm(initialForm);
+                setErrors({});
+                setDialogOpen(true);
+              }}
+            >
+              Add
+            </AppButton>
+          </Stack>
         }
         filterPanel={
           <Grid container spacing={2} alignItems="center">

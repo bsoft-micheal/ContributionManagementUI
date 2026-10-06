@@ -465,7 +465,7 @@ export default function UsersPage() {
     const newErrors = validate();
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fix all validation errors before saving");
+      toast.error("Please fill required field");
       return;
     }
 
@@ -852,44 +852,44 @@ export default function UsersPage() {
       render: (row) => {
         return (
           <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-            <Tooltip title={canViewUsers ? "View Details" : ""}>
-              <span>
+            <Tooltip title={canViewUsers ? "View Details" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canViewUsers ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
                   sx={{ p: 0.3 }}
                   disabled={!canViewUsers}
                   onClick={() => openView(row)}
                 >
-                  <ViewIcon sx={{ fontSize: "1.05rem", color: canViewUsers ? actionIconColor : "#cbd5e1" }} />
+                  <ViewIcon sx={{ fontSize: "1.05rem", color: canViewUsers ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title={canEditUser ? "Edit User" : ""}>
-              <span>
+            <Tooltip title={canEditUser ? "Edit User" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canEditUser ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
                   sx={{ p: 0.3 }}
                   disabled={!canEditUser}
                   onClick={() => openEdit(row)}
                 >
-                  <EditIcon sx={{ fontSize: "1.05rem", color: canEditUser ? actionIconColor : "#cbd5e1" }} />
+                  <EditIcon sx={{ fontSize: "1.05rem", color: canEditUser ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title={canDeleteUser ? "Delete User" : ""}>
-              <span>
+            <Tooltip title={canDeleteUser ? "Delete User" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canDeleteUser ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
                   sx={{ p: 0.3 }}
                   disabled={!canDeleteUser}
                   onClick={() => handleDeleteRequest(row.userId)}
                 >
-                  <DeleteIcon sx={{ fontSize: "1.05rem", color: canDeleteUser ? actionIconColor : "#cbd5e1" }} />
+                  <DeleteIcon sx={{ fontSize: "1.05rem", color: canDeleteUser ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title={canChangeUserStatus ? (row.isActive ? "Deactivate User" : "Activate User") : ""}>
-              <span>
+            <Tooltip title={canChangeUserStatus ? (row.isActive ? "Deactivate User" : "Activate User") : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canChangeUserStatus ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
                   sx={{ p: 0.3 }}
@@ -897,9 +897,9 @@ export default function UsersPage() {
                   onClick={() => handleToggleStatusRequest(row)}
                 >
                   {row.isActive ? (
-                    <ToggleOnIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#10b981" : "#cbd5e1" }} />
+                    <ToggleOnIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#10b981" : "#94a3b8" }} />
                   ) : (
-                    <ToggleOffIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#ef4444" : "#cbd5e1" }} />
+                    <ToggleOffIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#ef4444" : "#94a3b8" }} />
                   )}
                 </IconButton>
               </span>
@@ -912,20 +912,12 @@ export default function UsersPage() {
     {
       label: "Full Name",
       key: "fullName",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={600} sx={{ color: "#1e1a2e" }}>
-          {row.fullName || row.FullName || row.memberUsername || "--"}
-        </Typography>
-      ),
+      render: (row) => row.fullName || row.FullName || row.memberUsername || "--",
     },
     {
       label: "Username",
       key: "username",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={600} color="text.secondary">
-          {row.username || "--"}
-        </Typography>
-      ),
+      render: (row) => row.username || "--",
     },
     { label: "Email", key: "email" },
     {
@@ -949,11 +941,37 @@ export default function UsersPage() {
           pRole = "Member";
         }
 
-        return (
-          <Typography variant="body2" fontWeight={600} color="text.secondary">
-            {pRole}
-          </Typography>
-        );
+        return pRole;
+      },
+    },
+    {
+      label: "Secondary Role",
+      key: "secondaryRole",
+      render: (row) => {
+        let pRole = "";
+        if (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0) {
+          pRole = getRoleNameById(row.primaryRoleIds[0]);
+        } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0) {
+          pRole = row.primaryRoles[0];
+        } else if (row.roleId) {
+          pRole = getRoleNameById(row.roleId);
+        } else if (row.roleName) {
+          pRole = row.roleName;
+        }
+
+        let sRole = "";
+        if (Array.isArray(row.secondaryRoleIds) && row.secondaryRoleIds.length > 0) {
+          sRole = getRoleNameById(row.secondaryRoleIds[0]);
+        } else if (Array.isArray(row.secondaryRoles) && row.secondaryRoles.length > 0) {
+          sRole = row.secondaryRoles[0];
+        } else if (Array.isArray(row.roleIds) && row.roleIds.length > 1) {
+          const otherId = row.roleIds.find((id) => getRoleNameById(id) !== pRole) || row.roleIds[1];
+          sRole = getRoleNameById(otherId);
+        } else if (Array.isArray(row.roles) && row.roles.length > 1) {
+          sRole = row.roles.find((r) => r !== pRole) || row.roles[1];
+        }
+
+        return sRole || "—";
       },
     },
     {

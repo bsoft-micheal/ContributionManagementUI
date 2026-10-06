@@ -610,31 +610,27 @@ export default function ReportsPage({ mode = "event" }) {
 
   /* ── Column Definitions ── */
   const eventColumns = [
-    { label: "Event", key: "eventName", render: (r) => <Typography variant="body2" fontWeight={700}>{r.eventName}</Typography> },
-    { label: "Type", key: "eventTypeName", render: (r) => <Typography variant="body2" color="text.secondary">{r.eventTypeName || "General"}</Typography> },
-    { label: "Date", key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
-    { label: "Expected", key: "expectedAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.expectedAmount)}</Typography> },
-    { label: "Paid", key: "paidAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.paidAmount)}</Typography> },
-    { label: "Pending", key: "pendingAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.pendingAmount)}</Typography> },
-    { label: "Expense ₹", key: "expenseAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.expenseAmount || 0)}</Typography> },
+    { label: "Event Name", key: "eventName", render: (r) => r.eventName || "--" },
+    { label: "Event Type", key: "eventTypeName", render: (r) => r.eventTypeName || "General" },
+    { label: "Event Date", key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
+    { label: "Expected Amount", key: "expectedAmount", align: "right", render: (r) => INR(r.expectedAmount) },
+    { label: "Paid Amount", key: "paidAmount", align: "right", render: (r) => INR(r.paidAmount) },
+    { label: "Pending Amount", key: "pendingAmount", align: "right", render: (r) => INR(r.pendingAmount) },
+    { label: "Expense Amount", key: "expenseAmount", align: "right", render: (r) => INR(r.expenseAmount || 0) },
     {
-      label: "Balance ₹", key: "remainingAmount", align: "right",
+      label: "Balance Amount", key: "remainingAmount", align: "right",
       render: (r) => {
         const exp = Number(r.expectedAmount || 0);
         const expAmt = Number(r.expenseAmount || 0);
         const rem = exp - expAmt;
-        return (
-          <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-            {INR(rem)}
-          </Typography>
-        );
+        return INR(rem);
       },
     },
   ];
 
   const memberColumns = [
     {
-      label: "Member",
+      label: "Member Name",
       key: "memberName",
       render: (r) => (
         <Typography
@@ -647,9 +643,9 @@ export default function ReportsPage({ mode = "event" }) {
         </Typography>
       ),
     },
-    { label: "Expected", key: "totalExpectedAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.totalExpectedAmount)}</Typography> },
-    { label: "Paid", key: "totalPaidAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.totalPaidAmount)}</Typography> },
-    { label: "Pending", key: "totalPendingAmount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0))}</Typography> },
+    { label: "Expected Amount", key: "totalExpectedAmount", align: "right", render: (r) => INR(r.totalExpectedAmount) },
+    { label: "Paid Amount", key: "totalPaidAmount", align: "right", render: (r) => INR(r.totalPaidAmount) },
+    { label: "Pending Amount", key: "totalPendingAmount", align: "right", render: (r) => INR((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0)) },
     {
       label: "Paid Events",
       key: "paidEventsCount",
@@ -683,13 +679,13 @@ export default function ReportsPage({ mode = "event" }) {
   ];
 
   const pendingColumns = [
-    { label: "Member", key: "memberName", render: (r) => <Typography variant="body2" fontWeight={700}>{r.memberName}</Typography> },
-    { label: "Phone", key: "phone", render: (r) => <Typography variant="body2" color="text.secondary">{r.phone || "\u2014"}</Typography> },
-    { label: "Event", key: "eventName", render: (r) => <Typography variant="body2" fontWeight={600}>{r.eventName}</Typography> },
+    { label: "Member Name", key: "memberName", render: (r) => <Typography variant="body2" fontWeight={700}>{r.memberName}</Typography> },
+    { label: "Phone Number", key: "phone", render: (r) => r.phone || "—" },
+    { label: "Event Name", key: "eventName", render: (r) => <Typography variant="body2" fontWeight={600}>{r.eventName}</Typography> },
     { label: "Event Date", key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
-    { label: "Due Amount", key: "amount", align: "right", render: (r) => <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>{INR(r.amount)}</Typography> },
+    { label: "Due Amount", key: "amount", align: "right", render: (r) => INR(r.amount) },
     {
-      label: "Aging", key: "agingCategory", align: "center",
+      label: "Aging Status", key: "agingCategory", align: "center",
       render: (r) => {
         const cat = r.agingCategory || (r.daysOverdue > 30 ? "Critical" : r.daysOverdue >= 15 ? "Moderate" : "Recent");
         return <Chip size="small" label={cat} color={cat === "Critical" ? "error" : cat === "Moderate" ? "warning" : "info"} sx={{ fontWeight: 700, fontSize: "0.72rem", height: 22 }} />;
@@ -725,7 +721,7 @@ export default function ReportsPage({ mode = "event" }) {
           : metric === "expense"
             ? Number(item.expenseAmount) || 0
             : metric === "remaining"
-              ? (Number(item.expectedAmount) || 0) - (Number(item.expenseAmount) || 0)
+              ? (Number(item.paidAmount) || 0) - (Number(item.expenseAmount) || 0)
               : Number(item.expectedAmount) || 0;
       return { label: item.eventName, value: val };
     }).filter((i) => i.value > 0);
@@ -880,12 +876,12 @@ export default function ReportsPage({ mode = "event" }) {
       const remaining = exp - totalExp;
       const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
       return [
-        { label: "TOTAL EXPECTED", value: INR(exp), helper: "Projected target collections", accent: "#6366f1" },
-        { label: "TOTAL COLLECTED", value: INR(paid), helper: "Total amount collected", accent: "#10b981" },
-        { label: "TOTAL PENDING", value: INR(pend), helper: "Total outstanding balance", accent: "#f43f5e" },
-        { label: "TOTAL EXPENSES", value: INR(totalExp), helper: "Total expenses for events", accent: "#f59e0b" },
-        { label: "BALANCE AMOUNT", value: INR(remaining), helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)", accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: remaining >= 0 ? "Surplus ✓" : "Deficit ⚠" },
-        { label: "TOTAL EVENTS", value: ev.length, helper: `${ev.length} active collection events`, accent: "#3b82f6" },
+        { label: "Total Expected", value: INR(exp), accent: "#6366f1" },
+        { label: "Total Collected", value: INR(paid), accent: "#10b981" },
+        { label: "Total Pending", value: INR(pend), accent: "#f43f5e" },
+        { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b" },
+        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e" },
+        { label: "Total Events", value: ev.length, accent: "#3b82f6" },
       ];
     }
     if (mode === "member") {
@@ -898,12 +894,12 @@ export default function ReportsPage({ mode = "event" }) {
       const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
       const remaining = exp - totalExp;
       return [
-        { label: "TOTAL EXPECTED", value: INR(exp), helper: "Total expected member dues", accent: "#6366f1" },
-        { label: "TOTAL COLLECTED", value: INR(paid), helper: "Total collections received", accent: "#10b981" },
-        { label: "TOTAL PENDING", value: INR(pend), helper: "Total outstanding balance", accent: "#f43f5e" },
-        { label: "TOTAL EXPENSES", value: INR(totalExp), helper: "Total expenses for events", accent: "#f59e0b" },
-        { label: "BALANCE AMOUNT", value: INR(remaining), helper: remaining >= 0 ? "Budget Surplus (Expected − Expenses)" : "Budget Deficit (Expected − Expenses)", accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: remaining >= 0 ? "Surplus ✓" : "Deficit ⚠" },
-        { label: "TOTAL MEMBERS", value: mb.length, helper: `${mb.length} contributing members`, accent: "#3b82f6" },
+        { label: "Total Expected", value: INR(exp), accent: "#6366f1" },
+        { label: "Total Collected", value: INR(paid), accent: "#10b981" },
+        { label: "Total Pending", value: INR(pend), accent: "#f43f5e" },
+        { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b" },
+        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e" },
+        { label: "Total Members", value: mb.length, accent: "#3b82f6" },
       ];
     }
     if (mode === "pending") {
@@ -913,11 +909,11 @@ export default function ReportsPage({ mode = "event" }) {
       const crit = du.filter((d) => d.daysOverdue > 30).length;
       const mod = du.filter((d) => d.daysOverdue >= 15 && d.daysOverdue <= 30).length;
       return [
-        { label: "TOTAL PENDING DUES", value: INR(total), helper: "Total uncollected amount", accent: "#f43f5e" },
-        { label: "PENDING RECORDS", value: du.length, helper: "Unpaid line items", accent: "#f59e0b" },
-        { label: "UNIQUE DEFAULTERS", value: uniq, helper: "Members with overdue payments", accent: "#f43f5e" },
-        { label: "CRITICAL (>30 DAYS)", value: crit, helper: "Over 30 days overdue", accent: "#f43f5e" },
-        { label: "MODERATE (15-30 DAYS)", value: mod, helper: "15 to 30 days overdue", accent: "#f59e0b" },
+        { label: "Total Pending Dues", value: INR(total), accent: "#f43f5e" },
+        { label: "Pending Records", value: du.length, accent: "#f59e0b" },
+        { label: "Unique Defaulters", value: uniq, accent: "#f43f5e" },
+        { label: "Critical (>30 Days)", value: crit, accent: "#f43f5e" },
+        { label: "Moderate (15-30 Days)", value: mod, accent: "#f59e0b" },
       ];
     }
     return [];

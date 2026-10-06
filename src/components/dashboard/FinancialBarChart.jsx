@@ -308,7 +308,7 @@ export default function FinancialBarChart({
               <Typography variant="h6" fontWeight={600} sx={{ fontSize: "1.1875rem", letterSpacing: "-0.015em", lineHeight: 1.35 }}>
                 Financial Overview
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8125rem", fontWeight: 400, lineHeight: 1.4 }}>
+              <Typography variant="body2" sx={{ fontSize: "0.8125rem", fontWeight: 500, lineHeight: 1.4, color: isDark ? "rgba(255, 255, 255, 0.7)" : "#475569" }}>
                 Financial metrics comparison & contribution distribution
               </Typography>
             </Box>
@@ -323,8 +323,8 @@ export default function FinancialBarChart({
              ════════════════════════════════════════════════════════════════════ */}
           <Grid size={{ xs: 12, lg: showPieChart ? 7.2 : 12 }}>
             <Box sx={{ pr: { lg: showPieChart ? 2 : 0 } }}>
-              <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: "block", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.78125rem" }}>
-                Core Financial Metrics
+              <Typography variant="caption" sx={{ mb: 1, display: "block", textTransform: "none", letterSpacing: "0.01em", fontSize: "0.78125rem", fontWeight: 700, color: isDark ? "rgba(255, 255, 255, 0.8)" : "#334155" }}>
+              
               </Typography>
 
               {/* Bar Chart Plotting Area */}
@@ -435,20 +435,88 @@ export default function FinancialBarChart({
                             {/* The Bar */}
                             <Tooltip
                               title={
-                                <Box sx={{ p: 0.5 }}>
-                                  <Typography variant="subtitle2" fontWeight={800} sx={{ color: item.color }}>
-                                    {item.label}
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight={700}>
+                                <Box sx={{ p: 0.5, minWidth: 160 }}>
+                                  <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.4 }}>
+                                    <Box
+                                      sx={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: "50%",
+                                        bgcolor: item.color,
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <Typography
+                                      variant="subtitle2"
+                                      fontWeight={800}
+                                      sx={{
+                                        color: isDark ? "#ffffff !important" : "#0f172a !important",
+                                        fontSize: "0.82rem",
+                                        lineHeight: 1.2,
+                                      }}
+                                    >
+                                      {item.label}
+                                    </Typography>
+                                  </Stack>
+                                  <Typography
+                                    variant="body1"
+                                    fontWeight={800}
+                                    sx={{
+                                      color: `${item.color} !important`,
+                                      fontSize: "1.05rem",
+                                      lineHeight: 1.25,
+                                    }}
+                                  >
                                     {item.formattedValue}
                                   </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {item.helper}
-                                  </Typography>
+                                  {item.helper && (
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: isDark ? "rgba(255, 255, 255, 0.85) !important" : "#334155 !important",
+                                        display: "block",
+                                        mt: 0.5,
+                                        fontSize: "0.74rem",
+                                        lineHeight: 1.35,
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {item.helper}
+                                    </Typography>
+                                  )}
                                 </Box>
                               }
                               arrow
                               placement="top"
+                              slotProps={{
+                                tooltip: {
+                                  sx: {
+                                    bgcolor: isDark ? "#1e293b" : "#ffffff",
+                                    color: isDark ? "#ffffff" : "#0f172a",
+                                    border: isDark
+                                      ? "1px solid rgba(255, 255, 255, 0.15)"
+                                      : "1px solid #cbd5e1",
+                                    boxShadow: isDark
+                                      ? "0 10px 25px -4px rgba(0, 0, 0, 0.5)"
+                                      : "0 10px 25px -4px rgba(15, 23, 42, 0.15), 0 4px 6px -2px rgba(15, 23, 42, 0.05)",
+                                    p: 1.25,
+                                    borderRadius: 2,
+                                    "& .MuiTypography-root": {
+                                      color: isDark ? "#ffffff" : "#0f172a",
+                                    },
+                                  },
+                                },
+                                arrow: {
+                                  sx: {
+                                    color: isDark ? "#1e293b" : "#ffffff",
+                                    "&:before": {
+                                      border: isDark
+                                        ? "1px solid rgba(255, 255, 255, 0.15)"
+                                        : "1px solid #cbd5e1",
+                                    },
+                                  },
+                                },
+                              }}
                             >
                               <Box
                                 sx={{
@@ -563,14 +631,14 @@ export default function FinancialBarChart({
                   >
                     {activeBarDetail.icon}
                   </Box>
-                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.80rem" }}>
+                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem", color: isDark ? "#ffffff" : "#0f172a" }}>
                     {activeBarDetail.label}:{" "}
-                    <Box component="span" sx={{ color: activeBarDetail.color }}>
+                    <Box component="span" sx={{ color: activeBarDetail.color, fontWeight: 800 }}>
                       {activeBarDetail.formattedValue}
                     </Box>
                   </Typography>
                 </Stack>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.72rem" }}>
+                <Typography variant="caption" sx={{ fontSize: "0.75rem", fontWeight: 600, color: isDark ? "rgba(255, 255, 255, 0.78)" : "#334155" }}>
                   {activeBarDetail.helper}
                 </Typography>
               </Box>
@@ -683,27 +751,96 @@ export default function FinancialBarChart({
                         />
                       ) : pieData.slices.length === 1 ? (
                         // Single item = 100% circle
-                        <g>
-                          <circle
-                            cx={pieCenter}
-                            cy={pieCenter}
-                            r={pieRadius}
-                            fill={pieData.slices[0].color}
-                            stroke={isDark ? "#1e293b" : "#ffffff"}
-                            strokeWidth={2}
-                          />
-                          <text
-                            x={pieCenter}
-                            y={pieCenter}
-                            fill="#ffffff"
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            fontSize="13px"
-                            fontWeight={800}
-                          >
-                            100%
-                          </text>
-                        </g>
+                        <Tooltip
+                          title={
+                            <Box sx={{ p: 0.5, minWidth: 140 }}>
+                              <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.3 }}>
+                                <Box
+                                  sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "50%",
+                                    bgcolor: pieData.slices[0].color,
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <Typography
+                                  variant="subtitle2"
+                                  fontWeight={800}
+                                  sx={{
+                                    color: isDark ? "#ffffff !important" : "#0f172a !important",
+                                    fontSize: "0.82rem",
+                                  }}
+                                >
+                                  {pieData.slices[0].label}
+                                </Typography>
+                              </Stack>
+                              <Typography
+                                variant="body1"
+                                fontWeight={800}
+                                sx={{
+                                  color: `${pieData.slices[0].color} !important`,
+                                  fontSize: "1rem",
+                                }}
+                              >
+                                {pieData.slices[0].formattedValue}
+                              </Typography>
+                            </Box>
+                          }
+                          arrow
+                          placement="top"
+                          slotProps={{
+                            tooltip: {
+                              sx: {
+                                bgcolor: isDark ? "#1e293b" : "#ffffff",
+                                color: isDark ? "#ffffff" : "#0f172a",
+                                border: isDark
+                                  ? "1px solid rgba(255, 255, 255, 0.15)"
+                                  : "1px solid #cbd5e1",
+                                boxShadow: isDark
+                                  ? "0 10px 25px -4px rgba(0, 0, 0, 0.5)"
+                                  : "0 10px 25px -4px rgba(15, 23, 42, 0.15), 0 4px 6px -2px rgba(15, 23, 42, 0.05)",
+                                p: 1.25,
+                                borderRadius: 2,
+                                "& .MuiTypography-root": {
+                                  color: isDark ? "#ffffff" : "#0f172a",
+                                },
+                              },
+                            },
+                            arrow: {
+                              sx: {
+                                color: isDark ? "#1e293b" : "#ffffff",
+                                "&:before": {
+                                  border: isDark
+                                    ? "1px solid rgba(255, 255, 255, 0.15)"
+                                    : "1px solid #cbd5e1",
+                                },
+                              },
+                            },
+                          }}
+                        >
+                          <g style={{ cursor: "pointer" }}>
+                            <circle
+                              cx={pieCenter}
+                              cy={pieCenter}
+                              r={pieRadius}
+                              fill={pieData.slices[0].color}
+                              stroke={isDark ? "#1e293b" : "#ffffff"}
+                              strokeWidth={2}
+                            />
+                            <text
+                              x={pieCenter}
+                              y={pieCenter}
+                              fill="#ffffff"
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fontSize="13px"
+                              fontWeight={800}
+                            >
+                              100%
+                            </text>
+                          </g>
+                        </Tooltip>
                       ) : (
                         // Multiple slices
                         pieData.slices.map((slice) => {
@@ -733,16 +870,71 @@ export default function FinancialBarChart({
                             >
                               <Tooltip
                                 title={
-                                  <Box sx={{ p: 0.5 }}>
-                                    <Typography variant="subtitle2" fontWeight={800} sx={{ color: slice.color }}>
-                                      {slice.label}
-                                    </Typography>
-                                    <Typography variant="body2" fontWeight={700}>
-                                      {slice.formattedValue} ({slice.pct})
+                                  <Box sx={{ p: 0.5, minWidth: 140 }}>
+                                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.3 }}>
+                                      <Box
+                                        sx={{
+                                          width: 8,
+                                          height: 8,
+                                          borderRadius: "50%",
+                                          bgcolor: slice.color,
+                                          flexShrink: 0,
+                                        }}
+                                      />
+                                      <Typography
+                                        variant="subtitle2"
+                                        fontWeight={800}
+                                        sx={{
+                                          color: isDark ? "#ffffff !important" : "#0f172a !important",
+                                          fontSize: "0.82rem",
+                                        }}
+                                      >
+                                        {slice.label}
+                                      </Typography>
+                                    </Stack>
+                                    <Typography
+                                      variant="body1"
+                                      fontWeight={800}
+                                      sx={{
+                                        color: `${slice.color} !important`,
+                                        fontSize: "1rem",
+                                      }}
+                                    >
+                                      {slice.formattedValue}
                                     </Typography>
                                   </Box>
                                 }
                                 arrow
+                                placement="top"
+                                slotProps={{
+                                  tooltip: {
+                                    sx: {
+                                      bgcolor: isDark ? "#1e293b" : "#ffffff",
+                                      color: isDark ? "#ffffff" : "#0f172a",
+                                      border: isDark
+                                        ? "1px solid rgba(255, 255, 255, 0.15)"
+                                        : "1px solid #cbd5e1",
+                                      boxShadow: isDark
+                                        ? "0 10px 25px -4px rgba(0, 0, 0, 0.5)"
+                                        : "0 10px 25px -4px rgba(15, 23, 42, 0.15), 0 4px 6px -2px rgba(15, 23, 42, 0.05)",
+                                      p: 1.25,
+                                      borderRadius: 2,
+                                      "& .MuiTypography-root": {
+                                        color: isDark ? "#ffffff" : "#0f172a",
+                                      },
+                                    },
+                                  },
+                                  arrow: {
+                                    sx: {
+                                      color: isDark ? "#1e293b" : "#ffffff",
+                                      "&:before": {
+                                        border: isDark
+                                          ? "1px solid rgba(255, 255, 255, 0.15)"
+                                          : "1px solid #cbd5e1",
+                                      },
+                                    },
+                                  },
+                                }}
                               >
                                 <path
                                   d={pathD}

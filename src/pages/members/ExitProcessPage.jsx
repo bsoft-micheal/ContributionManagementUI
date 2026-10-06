@@ -159,7 +159,7 @@ export default function ExitProcessPage() {
           sx={{ 
             fontSize: "0.7rem", 
             py: 0.5,
-            ...( !hasWriteAccess ? { bgcolor: "#cbd5e1 !important", color: "#94a3b8 !important" } : {} )
+            ...( !hasWriteAccess ? { bgcolor: "#f1f5f9 !important", color: "#64748b !important", border: "1px solid #cbd5e1" } : {} )
           }}
         >
           Process Exit

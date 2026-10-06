@@ -209,8 +209,8 @@ export default function StatusPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title={hasWriteAccess ? "Edit Status" : ""}>
-            <span>
+          <Tooltip title={hasWriteAccess ? "Edit Status" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -235,15 +235,15 @@ export default function StatusPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this status is assigned to tickets, expenses, transactions, or events" : (hasWriteAccess ? "Delete Status" : "")}>
-            <span>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this status is assigned to tickets, expenses, transactions, or events" : (hasWriteAccess ? "Delete Status" : "Disabled")}>
+            <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -259,8 +259,8 @@ export default function StatusPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
@@ -272,10 +272,10 @@ export default function StatusPage() {
                 ? row.isActive
                   ? "Deactivate Status"
                   : "Activate Status"
-                : ""
+                : "Disabled"
             }
           >
-            <span>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -286,14 +286,14 @@ export default function StatusPage() {
                   <ToggleOnIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#10b981" : "#cbd5e1",
+                      color: hasWriteAccess ? "#10b981" : "#94a3b8",
                     }}
                   />
                 ) : (
                   <ToggleOffIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#ef4444" : "#cbd5e1",
+                      color: hasWriteAccess ? "#ef4444" : "#94a3b8",
                     }}
                   />
                 )}

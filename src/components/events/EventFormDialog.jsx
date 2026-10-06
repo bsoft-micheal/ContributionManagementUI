@@ -422,7 +422,7 @@ export default function EventFormDialog({
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill all the required fields");
+      toast.error("Please fill required field");
       return;
     }
 
