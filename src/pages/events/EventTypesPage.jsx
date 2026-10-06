@@ -337,54 +337,45 @@ export default function EventTypesPage() {
           />
 
           {/* Dynamic Contribution Calculation Rule Flag / Checkbox Container */}
-          <Paper
-            elevation={0}
+          {/* Dynamic Contribution Calculation Rule Checkbox */}
+          <Box
             onClick={() => setForm((f) => ({ ...f, hasTenureRule: !f.hasTenureRule }))}
             sx={{
-              p: 2.2,
-              borderRadius: "14px",
-              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8f7fc",
-              border: (theme) => form.hasTenureRule ? "1.5px solid #4a3f6b" : `1px solid ${theme.palette.divider}`,
-              transition: "all 0.2s ease",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 0.5,
               cursor: "pointer",
-              "&:hover": {
-                borderColor: "#4a3f6b",
-              },
+              userSelect: "none",
+              py: 0.2,
+              mt: 0.5,
+              width: "fit-content",
             }}
           >
-            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.8 }}>
-              <Checkbox
-                checked={form.hasTenureRule}
-                onChange={(e) => setForm((f) => ({ ...f, hasTenureRule: e.target.checked }))}
-                onClick={(e) => e.stopPropagation()}
-                sx={{
-                  p: 0,
-                  mt: 0.2,
+            <Checkbox
+              checked={form.hasTenureRule}
+              onChange={(e) => setForm((f) => ({ ...f, hasTenureRule: e.target.checked }))}
+              onClick={(e) => e.stopPropagation()}
+              size="small"
+              sx={{
+                p: 0.1,
+                transform: "scale(0.8)",
+                color: "#4a3f6b",
+                "&.Mui-checked": {
                   color: "#4a3f6b",
-                  "&.Mui-checked": {
-                    color: "#4a3f6b",
-                  },
-                  "& .MuiSvgIcon-root": {
-                    fontSize: "1.6rem",
-                    borderRadius: "6px",
-                  },
-                }}
-              />
-              <Box>
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={800}
-                  sx={{
-                    color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#2d244c",
-                    fontSize: "0.95rem",
-                    lineHeight: 1.3,
-                  }}
-                >
-                  Enable Dynamic Calculation
-                </Typography>
-
-              </Box>
-            </Box>
+                },
+              }}
+            />
+            <Typography
+              variant="body2"
+              fontWeight={500}
+              sx={{
+                color: (theme) => (theme.palette.mode === "dark" ? "#e2e8f0" : "#334155"),
+                fontSize: "0.8rem",
+              }}
+            >
+              Enable Dynamic Calculation
+            </Typography>
+          </Box>
 
             {form.hasTenureRule && (
               <Box
@@ -443,7 +434,6 @@ export default function EventTypesPage() {
                 />
               </Box>
             )}
-          </Paper>
 
           {form.eventTypeId && (
             <AppSwitch

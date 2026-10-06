@@ -1045,7 +1045,7 @@ export default function SupportTicketsPage() {
         filterPanel={
           <Grid container spacing={2} alignItems="center">
             <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 180 }}>
+              <Box sx={{ minWidth: 160 }}>
                 <AppSelect
                   label="Select Ticket Type"
                   value={filterType}
@@ -1055,7 +1055,6 @@ export default function SupportTicketsPage() {
                   options={ticketTypeOptions}
                   size="small"
                   placeholder="Select Ticket Type"
-                  required
                   fullWidth
                 />
               </Box>
@@ -1069,7 +1068,6 @@ export default function SupportTicketsPage() {
                   options={priorityOptions}
                   size="small"
                   placeholder="Select Priority"
-                  required
                   fullWidth
                 />
               </Box>
@@ -1083,7 +1081,6 @@ export default function SupportTicketsPage() {
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
-                  required
                   fullWidth
                 />
               </Box>

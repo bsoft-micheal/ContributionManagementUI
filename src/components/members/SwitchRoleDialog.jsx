@@ -63,9 +63,10 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
     }
   }, [open, currentActiveRole, rolesList]);
 
-  const handleSwitch = async () => {
-    if (!selectedRole) return;
-    if (selectedRole === currentActiveRole) {
+  const handleSwitch = async (roleToUse) => {
+    const targetRoleName = roleToUse || selectedRole;
+    if (!targetRoleName) return;
+    if (targetRoleName === currentActiveRole) {
       onClose();
       return;
     }
@@ -85,16 +86,16 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
           joiningDate: targetUser.joiningDate,
           isActive: targetUser.isActive,
           enableMultipleRoles: targetUser.enableMultipleRoles ?? (rolesList.length > 1),
-          primaryRoles: primaryRoles.length > 0 ? primaryRoles : [selectedRole],
+          primaryRoles: primaryRoles.length > 0 ? primaryRoles : [targetRoleName],
           secondaryRoles: targetUser.secondaryRoles || [],
-          roleName: selectedRole,
+          roleName: targetRoleName,
         });
-        toast.success(`Active role for ${targetUser.fullName || targetUser.username} switched to ${selectedRole}`);
+        toast.success(`Active role for ${targetUser.fullName || targetUser.username} switched to ${targetRoleName}`);
       } else {
-        await switchRole(selectedRole);
-        toast.success(`Active role switched to ${selectedRole}`);
+        await switchRole(targetRoleName);
+        toast.success(`Active role switched to ${targetRoleName}`);
       }
-      if (onSuccess) onSuccess(selectedRole);
+      if (onSuccess) onSuccess(targetRoleName);
       onClose();
     } catch (err) {
       const msg = err.response?.data?.message || err.message || "Failed to switch role";
@@ -180,7 +181,7 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
             return (
               <Box
                 key={r}
-                onClick={() => setSelectedRole(r)}
+                onClick={() => handleSwitch(r)}
                 sx={{
                   display: "flex",
                   alignItems: "center",
@@ -215,7 +216,7 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
                 <Stack direction="row" spacing={1.2} alignItems="center">
                   <Radio
                     checked={isSelected}
-                    onChange={() => setSelectedRole(r)}
+                    onChange={() => handleSwitch(r)}
                     value={r}
                     size="small"
                     sx={{
