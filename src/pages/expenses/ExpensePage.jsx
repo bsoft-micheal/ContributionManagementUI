@@ -188,6 +188,7 @@ export default function ExpensePage() {
           createdBy: item.createdBy || item.CreatedBy || "--",
           createdOn: item.createdOn || item.CreatedOn || item.createdAt || item.CreatedAt || null,
           createdAt: item.createdAt || item.CreatedAt || item.createdOn || item.CreatedOn || null,
+          modifiedOn: item.modifiedOn || item.ModifiedOn || null,
         }));
         setExpenses(mapped);
       } else {
@@ -206,12 +207,23 @@ export default function ExpensePage() {
         getEventsAsync().catch(() => []),
         getMembersAsync().catch(() => []),
         getEventTypesAsync().catch(() => []),
-        getStatusesAsync().catch(() => []),
+        getStatusesAsync(true, "Expense").catch(() => []),
       ]);
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
-      if (Array.isArray(statusesRes)) setStatusesList(statusesRes);
+      
+      let finalStatuses = Array.isArray(statusesRes) && statusesRes.length > 0 ? statusesRes : [];
+      if (finalStatuses.length === 0) {
+        // Fallback: fetch active statuses and filter locally for module === "Expense"
+        const allStatuses = await getStatusesAsync(true).catch(() => []);
+        if (Array.isArray(allStatuses)) {
+          finalStatuses = allStatuses.filter(
+            (s) => s.module && s.module.trim().toLowerCase() === "expense"
+          );
+        }
+      }
+      setStatusesList(finalStatuses);
     } catch {
       toast.error("Failed to load lookup data.");
     }
@@ -263,20 +275,32 @@ export default function ExpensePage() {
 
   // Filter panel status options (including "All Statuses")
   const statusOptions = useMemo(() => {
-    return [
-      { label: "All Statuses", value: "ALL" },
-      ...(statusesList || []).map((s) => ({ label: s.statusName, value: s.statusName })),
-    ];
+    const list = (statusesList || []).map((s) => s.statusName);
+    const base = list.length > 0 ? list : ["Pending", "Verify"];
+    const set = new Set(["ALL", ...base]);
+    return Array.from(set).map((s) => ({
+      label: s === "ALL" ? "All Statuses" : s,
+      value: s,
+    }));
   }, [statusesList]);
 
   // Form status options for Add/Edit dialog
   const dynamicStatusOptions = useMemo(() => {
-    const list = (statusesList || []).map((s) => ({ label: s.statusName, value: s.statusName }));
-    if (form.status && !list.some((o) => o.value === form.status)) {
-      list.unshift({ label: form.status, value: form.status });
-    }
-    return list;
+    const list = (statusesList || []).map((s) => s.statusName);
+    const base = list.length > 0 ? list : ["Pending", "Verify"];
+    const set = new Set(base);
+    if (form.status) set.add(form.status);
+    return Array.from(set).map((s) => ({ label: s, value: s }));
   }, [statusesList, form.status]);
+
+  // Dedicated status options for the Verify / Status dialog
+  const verificationStatusOptions = useMemo(() => {
+    const list = (statusesList || []).map((s) => s.statusName);
+    const base = list.length > 0 ? list : ["Verify", "Pending"];
+    const set = new Set(base);
+    if (newStatus) set.add(newStatus);
+    return Array.from(set).map((s) => ({ label: s, value: s }));
+  }, [statusesList, newStatus]);
 
   // Event Type options for the Add/Edit form
   const formEventTypeOptions = useMemo(() => {
@@ -423,13 +447,23 @@ export default function ExpensePage() {
     ];
   }, [eventTypesList, expenses]);
 
-  // Filtered expenses
+  // Filtered expenses with deterministic recency sorting
   const filteredExpenses = useMemo(() => {
-    return expenses.filter((item) => {
+    const list = expenses.filter((item) => {
       if (appliedEvent !== "ALL" && item.eventName !== appliedEvent) return false;
       if (appliedCategory !== "ALL" && item.category !== appliedCategory) return false;
       if (appliedStatus !== "ALL" && item.status !== appliedStatus) return false;
       return true;
+    });
+
+    return list.slice().sort((a, b) => {
+      const dateA = a.rawExpenseDate ? new Date(a.rawExpenseDate).getTime() : 0;
+      const dateB = b.rawExpenseDate ? new Date(b.rawExpenseDate).getTime() : 0;
+      if (dateB !== dateA) return dateB - dateA;
+
+      const modA = a.modifiedOn ? new Date(a.modifiedOn).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const modB = b.modifiedOn ? new Date(b.modifiedOn).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+      return modB - modA;
     });
   }, [expenses, appliedEvent, appliedCategory, appliedStatus]);
 
@@ -639,7 +673,15 @@ export default function ExpensePage() {
       return;
     }
     setStatusExpense(row);
-    setNewStatus(row.status || "Pending");
+
+    // Determine target verification status from the dynamic Expense module statuses (e.g. "Verify")
+    const nonPendingStatus = (statusesList || [])
+      .map((s) => s.statusName)
+      .find((name) => name && name.toLowerCase() !== "pending") || "Verify";
+
+    const isCurrentPending = !row.status || row.status.trim().toLowerCase() === "pending";
+    setNewStatus(isCurrentPending ? nonPendingStatus : row.status);
+
     const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "Admin";
     setReviewerName(row.approvedBy && row.approvedBy !== "-" ? row.approvedBy : currentUserName);
     setStatusRemarks("");
@@ -655,11 +697,12 @@ export default function ExpensePage() {
     const expenseId = statusExpense.expenseId || statusExpense.id;
     try {
       const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "Admin";
-      const approvedByVal = reviewerName.trim() || currentUserName;
+      const isPendingState = newStatus.trim().toLowerCase() === "pending";
+      const approvedByVal = isPendingState ? "-" : (reviewerName.trim() || currentUserName);
       let updatedDescription = statusExpense.description || "";
       if (statusRemarks && statusRemarks.trim()) {
         const timestamp = dayjs().format("DD MMM YYYY, hh:mm A");
-        const userTag = approvedByVal;
+        const userTag = approvedByVal && approvedByVal !== "-" ? approvedByVal : currentUserName;
         updatedDescription = updatedDescription
           ? `${updatedDescription}\n[Status Note - ${newStatus} (${timestamp}) by ${userTag}]: ${statusRemarks.trim()}`
           : `[Status Note - ${newStatus} (${timestamp}) by ${userTag}]: ${statusRemarks.trim()}`;
@@ -681,6 +724,7 @@ export default function ExpensePage() {
       });
 
       // Optimistically update table data so status and reviewer change immediately
+      const nowIso = new Date().toISOString();
       setExpenses((prev) =>
         prev.map((item) =>
           (item.expenseId === expenseId || item.id === expenseId)
@@ -689,12 +733,17 @@ export default function ExpensePage() {
                 status: newStatus,
                 approvedBy: approvedByVal,
                 description: updatedDescription,
+                modifiedOn: nowIso,
               }
             : item
         )
       );
 
-      toast.success("Expense verified successfully!");
+      if (!isPendingState) {
+        toast.success(`Expense ${newStatus.toLowerCase().includes("verify") ? "verified" : "updated"} successfully!`);
+      } else {
+        toast.success(`Expense status updated to ${newStatus}!`);
+      }
       setStatusDialogOpen(false);
       setStatusExpense(null);
       setStatusRemarks("");
@@ -848,8 +897,9 @@ export default function ExpensePage() {
       label: "Status",
       key: "status",
       render: (row) => {
-        const isApprovedOrVerified = row.status === "Approved" || row.status === "Verified" || row.status === "Paid";
-        const isPending = row.status === "Pending";
+        const s = (row.status || "").toLowerCase();
+        const isApprovedOrVerified = s.includes("verify") || s.includes("approved") || s.includes("paid");
+        const isPending = s.includes("pending");
         return (
           <Typography
             variant="caption"
@@ -1717,7 +1767,11 @@ export default function ExpensePage() {
               variant="contained"
               onClick={handleUpdateExpenseStatus}
             >
-              Verify
+              {newStatus.toLowerCase().includes("verify")
+                ? "Verify Expense"
+                : newStatus.toLowerCase().includes("approv")
+                  ? "Approve Expense"
+                  : "Save Status"}
             </AppButton>
           </Stack>
         }
@@ -1754,18 +1808,18 @@ export default function ExpensePage() {
                       sx={{
                         fontWeight: 700,
                         fontSize: "0.72rem",
-                        bgcolor:
-                          statusExpense.status === "Approved"
-                            ? "rgba(22, 163, 74, 0.12)"
-                            : statusExpense.status === "Pending"
-                              ? "rgba(234, 179, 8, 0.15)"
-                              : "rgba(220, 38, 38, 0.12)",
-                        color:
-                          statusExpense.status === "Approved"
-                            ? "#16a34a"
-                            : statusExpense.status === "Pending"
-                              ? "#d97706"
-                              : "#dc2626",
+                        bgcolor: (() => {
+                          const s = (statusExpense.status || "").toLowerCase();
+                          if (s.includes("verify") || s.includes("approved") || s.includes("paid")) return "rgba(22, 163, 74, 0.12)";
+                          if (s.includes("pending")) return "rgba(234, 179, 8, 0.15)";
+                          return "rgba(220, 38, 38, 0.12)";
+                        })(),
+                        color: (() => {
+                          const s = (statusExpense.status || "").toLowerCase();
+                          if (s.includes("verify") || s.includes("approved") || s.includes("paid")) return "#16a34a";
+                          if (s.includes("pending")) return "#d97706";
+                          return "#dc2626";
+                        })(),
                       }}
                     />
                   </Box>
@@ -1792,11 +1846,18 @@ export default function ExpensePage() {
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <AppSelect
-                  label="Status"
+                  label="Decision / Status"
                   placeholder="Select Status"
                   value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  options={dynamicStatusOptions}
+                  onChange={(e) => {
+                    const chosen = e.target.value;
+                    setNewStatus(chosen);
+                    if (chosen !== "Pending" && (!reviewerName || reviewerName === "-")) {
+                      const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "Admin";
+                      setReviewerName(currentUserName);
+                    }
+                  }}
+                  options={verificationStatusOptions}
                   required
                 />
               </Grid>

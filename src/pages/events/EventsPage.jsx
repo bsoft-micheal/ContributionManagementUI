@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Grid,
+  Stack,
   Typography,
   IconButton,
   Tooltip,
@@ -38,6 +39,7 @@ import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
 import { getUsersAsync } from "../../services/userService";
 import AppDataTable from "../../components/common/AppDataTable";
+import MetricCard from "../../components/MetricCard";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
 import EventPhotoDetailsDialog from "../../components/events/EventPhotoDetailsDialog";
 import EventExpensesDialog from "../../components/events/EventExpensesDialog";
@@ -310,6 +312,34 @@ export default function EventsPage() {
     });
   }, [events, filters]);
 
+  const summaryTotals = useMemo(() => {
+    const totalExpected = (displayedEvents || []).reduce((sum, e) => {
+      const exp = Number(e.totalExpectedAmount) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
+      return sum + exp;
+    }, 0);
+    const totalCollected = (displayedEvents || []).reduce((sum, e) => {
+      return sum + Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
+    }, 0);
+    const totalPending = (displayedEvents || []).reduce((sum, e) => {
+      const exp = Number(e.totalExpectedAmount) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
+      const col = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
+      const pen = Number(e.pendingAmount !== undefined ? e.pendingAmount : (exp - col));
+      return sum + pen;
+    }, 0);
+    const totalExpenses = (displayedEvents || []).reduce((sum, e) => {
+      return sum + Number(e.expenseAmount || 0);
+    }, 0);
+    const totalBalance = totalExpected - totalExpenses;
+
+    return {
+      totalExpected,
+      totalCollected,
+      totalPending,
+      totalExpenses,
+      totalBalance,
+    };
+  }, [displayedEvents]);
+
   const handleDeleteRequest = (eventItem) => {
     setEventToDelete(eventItem);
     setDeleteConfirmOpen(true);
@@ -502,7 +532,7 @@ export default function EventsPage() {
     },
 
     {
-      label: "Expected Amount",
+      label: "Valuation",
       key: "totalExpectedAmount",
       align: "right",
       render: (row) => {
@@ -510,78 +540,6 @@ export default function EventsPage() {
           ? Number(row.totalExpectedAmount)
           : Number(row.baseAmount || 0);
         return <Typography variant="body2" fontWeight={700}>₹{val.toLocaleString("en-IN")}</Typography>;
-      }
-    },
-    {
-      label: isMember ? "Paid Amount" : "Total Collections",
-      key: "collectedAmount",
-      align: "right",
-      render: (row) => {
-        const val = Number(row.collectedAmount ?? row.totalPaidAmount ?? 0);
-        return (
-          <Typography variant="body2" fontWeight={700} sx={{ color: "#10b981" }}>
-            ₹{val.toLocaleString("en-IN")}
-          </Typography>
-        );
-      }
-    },
-    {
-      label: "Total Pending",
-      key: "pendingAmount",
-      align: "right",
-      render: (row) => {
-        const exp = Number(row.totalExpectedAmount || row.baseAmount || 0);
-        const col = Number(row.collectedAmount ?? row.totalPaidAmount ?? 0);
-        const val = Number(row.pendingAmount !== undefined ? row.pendingAmount : (exp - col));
-        return (
-          <Typography
-            variant="body2"
-            fontWeight={700}
-            sx={{ color: val > 0 ? "#ef4444" : "text.secondary" }}
-          >
-            ₹{val.toLocaleString("en-IN")}
-          </Typography>
-        );
-      }
-    },
-    {
-      label: "Total Expenses",
-      key: "expenseAmount",
-      align: "right",
-      render: (row) => {
-        const val = Number(row.expenseAmount || 0);
-        return (
-          <Typography variant="body2" fontWeight={700} sx={{ color: "#f59e0b" }}>
-            ₹{val.toLocaleString("en-IN")}
-          </Typography>
-        );
-      }
-    },
-    {
-      label: "Remaining Amount",
-      key: "remainingAmount",
-      align: "right",
-      render: (row) => {
-        const exp = Number(row.totalExpectedAmount || row.baseAmount || 0);
-        const expn = Number(row.expenseAmount || 0);
-        const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (exp - expn);
-        const isDeficit = rem < 0;
-        return (
-          <Chip
-            size="small"
-            label={`${isDeficit ? "-₹" : "₹"}${Math.abs(rem).toLocaleString("en-IN")}`}
-            sx={{
-              fontWeight: 800,
-              fontSize: "0.75rem",
-              height: 24,
-              px: 0.5,
-              borderRadius: "6px",
-              bgcolor: isDeficit ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 185, 129, 0.12)",
-              color: isDeficit ? "#dc2626" : "#059669",
-              border: `1px solid ${isDeficit ? "rgba(239, 68, 68, 0.3)" : "rgba(16, 185, 129, 0.3)"}`,
-            }}
-          />
-        );
       }
     },
     {
@@ -615,97 +573,151 @@ export default function EventsPage() {
           )
         }
         filterPanel={
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "flex-end",
-              flexWrap: "wrap",
-              gap: 1.2,
-              width: "100%",
-            }}
-          >
-            <Box sx={{ width: { xs: "100%", sm: 100 } }}>
-              <AppSelect
-                label="Year"
-                value={filterYear}
-                onChange={(event) => {
-                  setFilterYear(Number(event.target.value));
-                }}
-                options={yearOptions}
-                placeholder="Select Year"
+          <Stack spacing={2} sx={{ width: "100%" }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "flex-end",
+                flexWrap: "wrap",
+                gap: 1.2,
+                width: "100%",
+              }}
+            >
+              <Box sx={{ width: { xs: "100%", sm: 100 } }}>
+                <AppSelect
+                  label="Year"
+                  value={filterYear}
+                  onChange={(event) => {
+                    setFilterYear(Number(event.target.value));
+                  }}
+                  options={yearOptions}
+                  placeholder="Select Year"
+                  required
+                />
+              </Box>
+              <Box sx={{ width: { xs: "100%", sm: 130 } }}>
+                <AppSelect
+                  label="Month"
+                  value={filterMonth}
+                  onChange={(event) => {
+                    setFilterMonth(Number(event.target.value));
+                  }}
+                  options={monthOptions}
+                  placeholder="Select Month"
+                  required
+                />
+              </Box>
+              <Box sx={{ width: { xs: "100%", sm: 155 } }}>
+                <AppSelect
+                  label="Event Type"
+                  value={filterEventType}
+                  onChange={(event) => {
+                    handleEventTypeChange(event.target.value);
+                  }}
+                  options={eventTypeOptions}
+                  placeholder="Select Event Type"
+                />
+              </Box>
+              <Box sx={{ width: { xs: "100%", sm: 175 } }}>
+                <AppSelect
+                  label="Event"
+                  value={filterEvent}
+                  onChange={(event) => {
+                    setFilterEvent(event.target.value);
+                  }}
+                  options={eventOptions}
+                  placeholder="Select Event"
+                />
+              </Box>
+              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
+                  onClick={handleApplyFilter}
+                  sx={{
+                    height: 36,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 1.8,
+                    whiteSpace: "nowrap",
+                    bgcolor: "#6366f1 !important",
+                    "&:hover": { bgcolor: "#4f46e5 !important" },
+                  }}
+                >
+                  Filter
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  onClick={handleClearFilter}
+                  sx={{
+                    color: "#ef4444",
+                    borderColor: "rgba(239, 68, 68, 0.4)",
+                    height: 36,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 1.8,
+                    whiteSpace: "nowrap",
+                    "&:hover": {
+                      borderColor: "#ef4444",
+                      bgcolor: "rgba(239, 68, 68, 0.05)",
+                    },
+                  }}
+                >
+                  Clear Filter
+                </AppButton>
+              </Box>
+            </Box>
+
+            {/* 5 Summary KPI Cards Under the Filter */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  md: "repeat(3, minmax(0, 1fr))",
+                  lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))",
+                },
+                gap: 1.5,
+                pt: 0.5,
+              }}
+            >
+              <MetricCard
+                label="TOTAL EXPECTED"
+                value={`₹${summaryTotals.totalExpected.toLocaleString("en-IN")}`}
+                helper="Filtered events target"
+                accent="#6366f1"
+              />
+              {!isMember && (
+                <MetricCard
+                  label="TOTAL COLLECTIONS"
+                  value={`₹${summaryTotals.totalCollected.toLocaleString("en-IN")}`}
+                  helper="Amount collected"
+                  accent="#10b981"
+                />
+              )}
+              <MetricCard
+                label="TOTAL PENDING"
+                value={`₹${summaryTotals.totalPending.toLocaleString("en-IN")}`}
+                helper="Outstanding dues"
+                accent="#f43f5e"
+              />
+              <MetricCard
+                label="TOTAL EXPENSES"
+                value={`₹${summaryTotals.totalExpenses.toLocaleString("en-IN")}`}
+                helper="Recorded expenses"
+                accent="#f59e0b"
+              />
+              <MetricCard
+                label="BALANCE AMOUNT"
+                value={`₹${summaryTotals.totalBalance.toLocaleString("en-IN")}`}
+                helper={summaryTotals.totalBalance >= 0 ? "Budget Surplus" : "Budget Deficit"}
+                accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}
               />
             </Box>
-            <Box sx={{ width: { xs: "100%", sm: 130 } }}>
-              <AppSelect
-                label="Month"
-                value={filterMonth}
-                onChange={(event) => {
-                  setFilterMonth(Number(event.target.value));
-                }}
-                options={monthOptions}
-                placeholder="Select Month"
-              />
-            </Box>
-            <Box sx={{ width: { xs: "100%", sm: 155 } }}>
-              <AppSelect
-                label="Event Type"
-                value={filterEventType}
-                onChange={(event) => {
-                  handleEventTypeChange(event.target.value);
-                }}
-                options={eventTypeOptions}
-                placeholder="Select Event Type"
-              />
-            </Box>
-            <Box sx={{ width: { xs: "100%", sm: 175 } }}>
-              <AppSelect
-                label="Event"
-                value={filterEvent}
-                onChange={(event) => {
-                  setFilterEvent(event.target.value);
-                }}
-                options={eventOptions}
-                placeholder="Select Event"
-              />
-            </Box>
-            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
-              <AppButton
-                variant="contained"
-                size="small"
-                startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
-                onClick={handleApplyFilter}
-                sx={{
-                  height: 36,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 1.8,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Filter
-              </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
-                onClick={handleClearFilter}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 36,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 1.8,
-                  whiteSpace: "nowrap",
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)",
-                  },
-                }}
-              >
-                Clear Filter
-              </AppButton>
-            </Box>
-          </Box>
+          </Stack>
         }
       />
 

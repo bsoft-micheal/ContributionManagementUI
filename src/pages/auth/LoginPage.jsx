@@ -116,7 +116,15 @@ export default function LoginPage() {
           : null) ||
         error.response?.data?.title ||
         TOAST_MESSAGES.AUTH.LOGIN_FAILED;
+
       toast.error(errorMsg);
+
+      const lowerMsg = String(errorMsg || "").toLowerCase();
+      if (lowerMsg.includes("password")) {
+        setErrors({ password: errorMsg });
+      } else if (lowerMsg.includes("username") || lowerMsg.includes("email")) {
+        setErrors({ email: errorMsg });
+      }
     } finally {
       setLoading(false);
     }

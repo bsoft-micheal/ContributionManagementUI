@@ -13,7 +13,7 @@ import dayjs from "dayjs";
  * ExecutiveFinancialBarChart
  * Clean executive financial bar chart visualization for the main Dashboard.
  * Displays comparative bars matching the exact top metric cards:
- * Total Expected, Total Collections, Total Pending, Total Expenses, and Remaining Amount.
+ * Total Expected, Total Collections, Total Pending, Total Expenses, and Balance Amount.
  */
 export default function ExecutiveFinancialBarChart({
   events = [],
@@ -211,15 +211,15 @@ export default function ExecutiveFinancialBarChart({
                   {/* Total Expected Bar */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: "#8b5cf6" }}>
+                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: "#6366f1" }}>
                         Total Expected
                       </Typography>
-                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: "#8b5cf6" }}>
+                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: "#6366f1" }}>
                         ₹{formatAmount(exp)}
                       </Typography>
                     </Stack>
                     <Box sx={{ height: 9, borderRadius: "5px", bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)", overflow: "hidden" }}>
-                      <Box sx={{ height: "100%", width: "100%", borderRadius: "5px", background: "linear-gradient(90deg, #7c3aed 0%, #6366f1 100%)" }} />
+                      <Box sx={{ height: "100%", width: "100%", borderRadius: "5px", background: "linear-gradient(90deg, #818cf8 0%, #6366f1 100%)" }} />
                     </Box>
                   </Box>
 
@@ -239,7 +239,7 @@ export default function ExecutiveFinancialBarChart({
                           height: "100%",
                           width: `${colPct}%`,
                           borderRadius: "5px",
-                          background: "linear-gradient(90deg, #10b981 0%, #059669 100%)",
+                          background: "linear-gradient(90deg, #34d399 0%, #10b981 100%)",
                           transition: "width 0.8s ease",
                         }}
                       />
@@ -249,10 +249,10 @@ export default function ExecutiveFinancialBarChart({
                   {/* Total Pending Bar */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: "#ef4444" }}>
+                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: "#f43f5e" }}>
                         Total Pending
                       </Typography>
-                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: "#ef4444" }}>
+                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: "#f43f5e" }}>
                         ₹{formatAmount(pen)}
                       </Typography>
                     </Stack>
@@ -262,7 +262,7 @@ export default function ExecutiveFinancialBarChart({
                           height: "100%",
                           width: `${penPct}%`,
                           borderRadius: "5px",
-                          background: "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)",
+                          background: "linear-gradient(90deg, #fb7185 0%, #f43f5e 100%)",
                           transition: "width 0.8s ease",
                         }}
                       />
@@ -285,20 +285,20 @@ export default function ExecutiveFinancialBarChart({
                           height: "100%",
                           width: `${expPct}%`,
                           borderRadius: "5px",
-                          background: "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)",
+                          background: "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)",
                           transition: "width 0.8s ease",
                         }}
                       />
                     </Box>
                   </Box>
 
-                  {/* Remaining Amount Bar */}
+                  {/* Balance Amount Bar */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: isSurplus ? "#10b981" : "#ef4444" }}>
-                        Remaining Amount
+                      <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
+                        Balance Amount
                       </Typography>
-                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: isSurplus ? "#10b981" : "#ef4444" }}>
+                      <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.78rem", fontFamily: '"Outfit", sans-serif', color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
                         ₹{formatAmount(rem)}
                       </Typography>
                     </Stack>
@@ -309,8 +309,8 @@ export default function ExecutiveFinancialBarChart({
                           width: `${remPct}%`,
                           borderRadius: "5px",
                           background: isSurplus
-                            ? "linear-gradient(90deg, #10b981 0%, #059669 100%)"
-                            : "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)",
+                            ? "linear-gradient(90deg, #38bdf8 0%, #06b6d4 100%)"
+                            : "linear-gradient(90deg, #fb7185 0%, #f43f5e 100%)",
                           transition: "width 0.8s ease",
                         }}
                       />

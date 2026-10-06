@@ -40,7 +40,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import AppDataTable from "../../components/common/AppDataTable";
 import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
 import MemberPaymentQuickAccess from "../../components/dashboard/MemberPaymentQuickAccess";
-import ExecutiveFinancialBarChart from "../../components/dashboard/ExecutiveFinancialBarChart";
+import FinancialBarChart from "../../components/dashboard/FinancialBarChart";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -255,11 +255,11 @@ function InteractiveDonutChart({
             noWrap
             sx={{
               maxWidth: 114,
-              fontSize: "0.80rem",
+              fontSize: "0.78rem",
               fontWeight: 700,
-              color: "#2563eb",
+              color: isDark ? "#93c5fd" : "#6366f1",
               lineHeight: 1.2,
-              letterSpacing: "0.01em",
+              letterSpacing: "0.02em",
               mb: 0.3,
             }}
           >
@@ -270,10 +270,11 @@ function InteractiveDonutChart({
         {/* Amount */}
         <Typography
           sx={{
-            fontSize: "1.25rem",
-            fontWeight: 900,
+            fontFamily: '"Outfit", sans-serif',
+            fontSize: "1.35rem",
+            fontWeight: 800,
             color: isDark ? "#ffffff" : "#0f172a",
-            lineHeight: 1.1,
+            lineHeight: 1.15,
             letterSpacing: "-0.02em",
           }}
         >
@@ -294,13 +295,13 @@ function InteractiveDonutChart({
           >
             <Typography
               sx={{
-                fontSize: "0.68rem",
+                fontSize: "0.70rem",
                 fontWeight: 800,
                 color: display.remaining >= 0 ? "#10b981" : "#ef4444",
                 lineHeight: 1,
               }}
             >
-              Rem: ₹{Math.abs(display.remaining).toLocaleString()}
+              Bal: ₹{Math.abs(display.remaining).toLocaleString()}
             </Typography>
           </Box>
         )}
@@ -611,12 +612,17 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
           disabled={loading}
           startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
           sx={{
-            height: 34,
-            minHeight: 34,
+            height: 36,
+            minHeight: 36,
             px: 2.5,
             borderRadius: "8px",
             fontWeight: 700,
-            fontSize: "0.82rem",
+            fontSize: "0.80rem",
+            letterSpacing: "0.02em",
+            bgcolor: "#6366f1 !important",
+            "&:hover": {
+              bgcolor: "#4f46e5 !important",
+            },
           }}
         >
           {COMMON_STRINGS.DASHBOARD?.FILTER_BUTTON || "Filter"}
@@ -629,14 +635,15 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
           disabled={loading}
           startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
           sx={{
-            height: 34,
-            minHeight: 34,
+            height: 36,
+            minHeight: 36,
             px: 2,
             borderRadius: "8px",
             color: "#ef4444",
             border: `1.5px solid ${isDark ? "rgba(239, 68, 68, 0.45)" : "rgba(239, 68, 68, 0.35)"}`,
             fontWeight: 700,
-            fontSize: "0.82rem",
+            fontSize: "0.80rem",
+            letterSpacing: "0.02em",
             "&:hover": {
               border: "1.5px solid #ef4444",
               bgcolor: isDark ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.05)",
@@ -927,7 +934,6 @@ export default function DashboardPage() {
     return events.map((e, idx) => {
       const exp = Number(e.expectedAmount) || (Number(e.collectedAmount || 0) + Number(e.pendingAmount || 0));
       const col = Number(e.collectedAmount) || 0;
-      const pen = Number(e.pendingAmount) !== undefined ? Number(e.pendingAmount) : Math.max(0, exp - col);
       const expense = Number(e.expenseAmount) || 0;
       const remaining = e.remainingAmount !== undefined ? Number(e.remainingAmount) : (exp - expense);
       const pctNum =
@@ -945,7 +951,6 @@ export default function DashboardPage() {
         value: exp,
         expected: exp,
         collected: col,
-        pending: pen,
         expense: expense,
         remaining: remaining,
         collectedPct: colPct,
@@ -1042,7 +1047,7 @@ export default function DashboardPage() {
     {
       label: "Expected", key: "expectedAmount", align: "right",
       render: (row) => (
-        <Typography variant="body2" fontWeight={700}>
+        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
           ₹{Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))).toLocaleString()}
         </Typography>
       ),
@@ -1050,7 +1055,7 @@ export default function DashboardPage() {
     {
       label: isMember ? "Paid" : "Collected", key: "collectedAmount", align: "right",
       render: (row) => (
-        <Typography variant="body2" fontWeight={700} color="success.main">
+        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
           ₹{Number(row.collectedAmount).toLocaleString()}
         </Typography>
       ),
@@ -1058,8 +1063,7 @@ export default function DashboardPage() {
     {
       label: "Pending ₹", key: "pendingAmount", align: "right",
       render: (row) => (
-        <Typography variant="body2" fontWeight={700}
-          color={row.pendingAmount > 0 ? "error.main" : "text.secondary"}>
+        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
           ₹{Number(row.pendingAmount).toLocaleString()}
         </Typography>
       ),
@@ -1067,30 +1071,21 @@ export default function DashboardPage() {
     {
       label: "Expense ₹", key: "expenseAmount", align: "right",
       render: (row) => (
-        <Typography variant="body2" fontWeight={700} color="warning.main">
+        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
           ₹{Number(row.expenseAmount || 0).toLocaleString()}
         </Typography>
       ),
     },
     {
-      label: "Remaining ₹", key: "remainingAmount", align: "right",
+      label: "Balance ₹", key: "remainingAmount", align: "right",
       render: (row) => {
         const expected = Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0)));
         const expense = Number(row.expenseAmount || 0);
         const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (expected - expense);
-        const isDeficit = rem < 0;
         return (
-          <Chip
-            size="small"
-            label={`₹${rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
-            sx={{
-              fontWeight: 800,
-              fontSize: "0.76rem",
-              bgcolor: isDeficit ? alpha("#ef4444", 0.12) : alpha("#10b981", 0.12),
-              color: isDeficit ? "error.main" : "success.main",
-              border: `1px solid ${isDeficit ? alpha("#ef4444", 0.3) : alpha("#10b981", 0.3)}`,
-            }}
-          />
+          <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
+            ₹{rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}
+          </Typography>
         );
       },
     },
@@ -1149,114 +1144,99 @@ export default function DashboardPage() {
       {/* ── Content ─────────────────────────────────────────────────────── */}
       <Stack spacing={3}>
 
-          {/* ① Top Summary Metric Cards (6 Cards Grid: Expected, Collections, Pending, Expenses, Remaining, Events) */}
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "repeat(2, minmax(0, 1fr))",
-                md: "repeat(3, minmax(0, 1fr))",
-                lg: isMember ? "repeat(5, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
-              },
-              gap: { xs: 1.5, sm: 2 },
-            }}
-          >
+        {/* ① Top Summary Metric Cards (6 Cards Grid: Expected, Collections, Pending, Expenses, Remaining, Events) */}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, minmax(0, 1fr))",
+              md: "repeat(3, minmax(0, 1fr))",
+              lg: isMember ? "repeat(5, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
+            },
+            gap: { xs: 1.5, sm: 2 },
+          }}
+        >
+          <MetricCard
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "TOTAL EXPECTED"}
+            value={`₹${totalExpected.toLocaleString()}`}
+            helper="Target goal"
+            accent="#6366f1"
+            onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
+            actionText="All Members →"
+          />
+          {!isMember && (
             <MetricCard
-              label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "TOTAL EXPECTED"}
-              value={`₹${totalExpected.toLocaleString()}`}
-              helper="Projected target amount"
-              accent="#7c3aed"
-              onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
-              actionText="All Members →"
+              label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "TOTAL COLLECTIONS"}
+              value={`₹${totalCollected.toLocaleString()}`}
+              helper="Total collected"
+              accent="#10b981"
+              onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+              actionText="View Paid →"
             />
-            {!isMember && (
-              <MetricCard
-                label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "TOTAL COLLECTIONS"}
-                value={`₹${totalCollected.toLocaleString()}`}
-                helper="Amount collected (paid)"
-                accent="success.main"
-                onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-                actionText="View Paid →"
-              />
-            )}
-            <MetricCard
-              label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "TOTAL PENDING"}
-              value={`₹${totalPending.toLocaleString()}`}
-              helper="Outstanding amount"
-              accent="error.main"
-              onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-              actionText="View Unpaid →"
-            />
-            <MetricCard
-              label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "TOTAL EXPENSES"}
-              value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
-              helper={isFilteredByEvent ? "Expenditure for event" : (isFilteredByType ? `Expenses for ${appliedFilters.eventType}` : "Total expenses recorded")}
-              accent="warning.main"
-              onClick={() => navigate("/expense")}
-              actionText="View Expenses →"
-            />
-            <MetricCard
-              label={COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "REMAINING AMOUNT"}
-              value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
-              helper={totalRemaining >= 0 ? "Expected − Expenses (Surplus)" : "Expected − Expenses (Deficit)"}
-              accent={totalRemaining >= 0 ? "success.main" : "error.main"}
-              actionText={totalRemaining >= 0 ? "Budget Surplus ✓" : "Budget Deficit ⚠"}
-            />
-            <MetricCard
-              label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
-              value={events.length}
-              helper={isFilteredByType ? `Scheduled for ${appliedFilters.eventType}` : "Scheduled for selected period"}
-            />
-          </Box>
+          )}
+          <MetricCard
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "TOTAL PENDING"}
+            value={`₹${totalPending.toLocaleString()}`}
+            helper="Outstanding"
+            accent="#f43f5e"
+            onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
+            actionText="View Unpaid →"
+          />
+          <MetricCard
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "TOTAL EXPENSES"}
+            value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
+            helper={isFilteredByEvent ? "Event expense" : (isFilteredByType ? appliedFilters.eventType : "Total spent")}
+            accent="#f59e0b"
+            onClick={() => navigate("/expense")}
+            actionText="Expenses →"
+          />
+          <MetricCard
+            label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "BALANCE AMOUNT"}
+            value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
+            helper="Net balance"
+            accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
+            actionText={totalRemaining >= 0 ? "Surplus ✓" : "Deficit ⚠"}
+          />
+          <MetricCard
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
+            value={events.length}
+            helper={isFilteredByType ? appliedFilters.eventType : "Selected period"}
+            accent="#3b82f6"
+          />
+        </Box>
 
-                  {/* ② Executive Financial Bar Chart Hero */}
-                  {events.length > 0 ? (
-                    <Card
-                      sx={{
-                        border: `1px solid ${theme.palette.divider}`,
-                        boxShadow: isDark
-                          ? "0 8px 32px rgba(0,0,0,0.35)"
-                          : "0 8px 32px rgba(0,0,0,0.06)",
-                        background: isDark
-                          ? "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
-                          : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
-                        borderRadius: "16px",
-                      }}
-                    >
-                      <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                        <ExecutiveFinancialBarChart
-                          events={eventSlices}
-                          totalExpected={totalExpected}
-                          totalCollected={totalCollected}
-                          totalExpenses={totalExpenses}
-                          totalRemaining={totalRemaining}
-                          isMember={isMember}
-                          collectionRate={collectionRate}
-                        />
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Box sx={{
-                      py: 10, display: "grid", placeItems: "center", color: "text.secondary",
-                      border: `1px dashed ${theme.palette.divider}`, borderRadius: 2,
-                    }}>
-                      <Typography variant="body2">
-                        {isFilteredByType
-                          ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
-                          : "No events found for the selected period."}
-                      </Typography>
-                    </Box>
-                  )}
-                  <CollapsibleSection
-                    title="Events for Selected Period"
-                    count={events.length}
-                    defaultOpen
-                  >
-                    <AppDataTable columns={columns} data={events} loading={false} />
-                  </CollapsibleSection>
-              </Stack>
-            )}
+        {/* ② Financial Overview Column / Bar Chart */}
+        {events.length > 0 ? (
+          <FinancialBarChart
+            totalExpected={totalExpected}
+            totalCollected={totalCollected}
+            totalPending={totalPending}
+            totalExpenses={totalExpenses}
+            totalRemaining={totalRemaining}
+            events={events}
+            isMember={isMember}
+          />
+        ) : (
+          <Box sx={{
+            py: 10, display: "grid", placeItems: "center", color: "text.secondary",
+            border: `1px dashed ${theme.palette.divider}`, borderRadius: 2,
+          }}>
+            <Typography variant="body2">
+              {isFilteredByType
+                ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
+                : "No events found for the selected period."}
+            </Typography>
+          </Box>
+        )}
+        <CollapsibleSection
+          title="Events for Selected Period"
+          count={events.length}
+          defaultOpen
+        >
+          <AppDataTable columns={columns} data={events} loading={false} />
+        </CollapsibleSection>
+      </Stack>
 
       {/* Quick Access Slide-Over Drawer */}
       <Drawer
