@@ -90,11 +90,11 @@ export default function MetricCard({
               variant="caption"
               color="text.secondary"
               sx={{
-                fontWeight: 700,
-                letterSpacing: "0.06em",
+                fontWeight: 600,
+                letterSpacing: "0.04em",
                 textTransform: "uppercase",
-                fontSize: { xs: "0.68rem", sm: "0.72rem" },
-                lineHeight: 1.2,
+                fontSize: "0.78125rem",
+                lineHeight: 1.3,
                 display: "block",
               }}
             >
@@ -103,13 +103,12 @@ export default function MetricCard({
             <Typography
               variant="h4"
               sx={{
-                fontFamily: '"Outfit", sans-serif',
                 color: valueColor || (isDark ? "#ffffff" : "#0f172a"),
-                fontWeight: fontWeight || 500,
-                fontSize: { xs: "1.35rem", sm: "1.45rem", md: "1.5rem", xl: "1.65rem" },
+                fontWeight: 700,
+                fontSize: { xs: "1.25rem", sm: "1.375rem", md: "1.45rem", xl: "1.5rem" },
                 letterSpacing: "-0.02em",
                 mt: 0.35,
-                lineHeight: 1.15,
+                lineHeight: 1.2,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -136,9 +135,9 @@ export default function MetricCard({
             variant="caption"
             sx={{
               color: "text.secondary",
-              fontSize: { xs: "0.68rem", sm: "0.72rem" },
-              lineHeight: 1.2,
-              fontWeight: 500,
+              fontSize: "0.75rem",
+              lineHeight: 1.4,
+              fontWeight: 400,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -155,8 +154,8 @@ export default function MetricCard({
               variant="caption"
               sx={{
                 color: resolvedAccent,
-                fontSize: { xs: "0.68rem", sm: "0.72rem" },
-                fontWeight: 700,
+                fontSize: "0.75rem",
+                fontWeight: 600,
                 opacity: { xs: 0.95, sm: 0.8 },
                 transform: { xs: "none", sm: "translateX(2px)" },
                 transition: "all 0.2s ease",

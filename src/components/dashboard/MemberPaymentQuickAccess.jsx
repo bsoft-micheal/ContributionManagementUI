@@ -386,8 +386,13 @@ export default function MemberPaymentQuickAccess({
     return opts;
   }, [monthEvents, selectedEventType]);
 
-  // Filter expenses strictly against the selected event (or month's events / event type)
+  // Filter expenses strictly against the selected event (or month's events / event type) - ONLY include verified expenses
   const eventScopedExpenses = useMemo(() => {
+    const verifiedExpenses = (expenses || []).filter((exp) => {
+      const s = (exp?.status || "").trim().toLowerCase();
+      return s.includes("verif") || s.includes("approv") || s.includes("paid");
+    });
+
     // If a specific event is selected, filter strictly against that event's name
     if (selectedEventId !== "ALL") {
       const selectedEvent = monthEvents.find(
@@ -395,7 +400,7 @@ export default function MemberPaymentQuickAccess({
       );
       const selectedName = (selectedEvent?.eventName || selectedEvent?.EventName || "").trim().toLowerCase();
       if (!selectedName) return [];
-      return expenses.filter(
+      return verifiedExpenses.filter(
         (exp) => (exp.eventName || "").trim().toLowerCase() === selectedName
       );
     }
@@ -411,7 +416,7 @@ export default function MemberPaymentQuickAccess({
     );
     const isMonthScoped = targetMonth > 0 || targetYear > 0;
 
-    return expenses.filter((exp) => {
+    return verifiedExpenses.filter((exp) => {
       const expEvtName = (exp.eventName || "").trim().toLowerCase();
       if (matchingEventNames.has(expEvtName)) return true;
       if (isFilteredByType) return false;
@@ -558,7 +563,7 @@ export default function MemberPaymentQuickAccess({
         >
           <Box>
             <Stack direction="row" alignItems="center" spacing={1}>
-              <Typography variant="h6" fontWeight={900} sx={{ fontFamily: '"Outfit", sans-serif' }}>
+              <Typography variant="h6" fontWeight={600} sx={{ fontSize: "1.1875rem", letterSpacing: "-0.015em", lineHeight: 1.35 }}>
                 Member Payment Status
               </Typography>
               <Chip
@@ -625,14 +630,14 @@ export default function MemberPaymentQuickAccess({
                 "&:hover": { borderColor: "primary.main" },
               }}
             >
-              <Typography variant="caption" color="text.secondary" fontWeight={700} textTransform="uppercase">
+              <Typography variant="caption" color="text.secondary" fontWeight={600} textTransform="uppercase" sx={{ fontSize: "0.78125rem", letterSpacing: "0.04em" }}>
                 Total Expected Amount
               </Typography>
               <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h6" fontWeight={500} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
+                <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: "1.25rem", sm: "1.375rem" }, letterSpacing: "-0.02em", color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
                   ₹{formatAmount(stats.totalAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ display: "block", mt: 0.35 }}>
+                <Typography variant="caption" fontWeight={400} color="text.secondary" sx={{ display: "block", mt: 0.35, fontSize: "0.75rem", lineHeight: 1.4 }}>
                   {stats.totalCount} Members
                 </Typography>
               </Box>
@@ -658,16 +663,16 @@ export default function MemberPaymentQuickAccess({
               }}
             >
               <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography variant="caption" color="error.main" fontWeight={700} textTransform="uppercase">
+                <Typography variant="caption" color="error.main" fontWeight={600} textTransform="uppercase" sx={{ fontSize: "0.78125rem", letterSpacing: "0.04em" }}>
                   Pending / Unpaid
                 </Typography>
                 <HourglassEmptyIcon sx={{ fontSize: 16, color: "error.main" }} />
               </Stack>
               <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h6" fontWeight={500} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
+                <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: "1.25rem", sm: "1.375rem" }, letterSpacing: "-0.02em", color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
                   ₹{formatAmount(stats.pendingAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={500} color="error.main" sx={{ display: "block", mt: 0.35 }}>
+                <Typography variant="caption" fontWeight={400} color="error.main" sx={{ display: "block", mt: 0.35, fontSize: "0.75rem", lineHeight: 1.4 }}>
                   {stats.pendingCount} Members
                 </Typography>
               </Box>
@@ -693,16 +698,16 @@ export default function MemberPaymentQuickAccess({
               }}
             >
               <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography variant="caption" color="success.main" fontWeight={700} textTransform="uppercase">
+                <Typography variant="caption" color="success.main" fontWeight={600} textTransform="uppercase" sx={{ fontSize: "0.78125rem", letterSpacing: "0.04em" }}>
                   Paid Members
                 </Typography>
                 <CheckCircleIcon sx={{ fontSize: 16, color: "success.main" }} />
               </Stack>
               <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h6" fontWeight={500} sx={{ fontFamily: '"Outfit", sans-serif', color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
+                <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: "1.25rem", sm: "1.375rem" }, letterSpacing: "-0.02em", color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
                   ₹{formatAmount(stats.paidAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={500} color="success.main" sx={{ display: "block", mt: 0.35 }}>
+                <Typography variant="caption" fontWeight={400} color="success.main" sx={{ display: "block", mt: 0.35, fontSize: "0.75rem", lineHeight: 1.4 }}>
                   {stats.paidCount} Members
                 </Typography>
               </Box>
@@ -865,7 +870,6 @@ export default function MemberPaymentQuickAccess({
                               variant="body2"
                               fontWeight={500}
                               sx={{
-                                fontFamily: '"Outfit", sans-serif',
                                 color: "text.primary",
                                 fontVariantNumeric: "tabular-nums",
                               }}
@@ -1002,7 +1006,6 @@ export default function MemberPaymentQuickAccess({
                               variant="body2"
                               fontWeight={500}
                               sx={{
-                                fontFamily: '"Outfit", sans-serif',
                                 color: "text.primary",
                                 fontVariantNumeric: "tabular-nums",
                               }}

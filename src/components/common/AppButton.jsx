@@ -30,8 +30,9 @@ export default function AppButton({
       sx={{
         borderRadius: "8px",
         textTransform: "none",
-        fontWeight: 700,
-        fontSize: "0.85rem",
+        fontWeight: 600,
+        fontSize: "0.84375rem",
+        letterSpacing: "0.01em",
         px: 2.5,
         py: 0.75,
         boxShadow: "none",

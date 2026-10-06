@@ -1,10 +1,30 @@
+:root {
+  --font-family-primary: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-size-page-heading: 1.625rem; /* 26px (24–28px range) */
+  --font-size-section-heading: 1.1875rem; /* 19px (18–20px range) */
+  --font-size-card-title: 0.9375rem; /* 15px (14–16px range) */
+  --font-size-main-value: 1.375rem; /* 22px (20–24px range) */
+  --font-size-body: 0.875rem; /* 14px */
+  --font-size-label: 0.78125rem; /* 12.5px (12–13px range) */
+  --font-size-helper: 0.75rem; /* 12px */
+  --font-size-button: 0.84375rem; /* 13.5px (13–14px range) */
+  --font-size-sidebar: 0.875rem; /* 14px */
+}
+
+body, button, input, select, textarea {
+  font-family: var(--font-family-primary);
+}
+
 body {
   margin: 0;
   background: var(--app-bg);
   min-height: 100vh;
   color: var(--app-text);
+  font-size: var(--font-size-body);
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 #root {

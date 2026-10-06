@@ -473,14 +473,14 @@ export default function AppLayout() {
               borderLeft: `3px solid ${SIDEBAR.active}`,
               pl: "calc(12px - 3px)",
               "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
-              "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 700 },
+              "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 600 },
               "&:hover": { bgcolor: SIDEBAR.activeBg },
             },
             "&:not(.Mui-selected)": {
               borderLeft: "3px solid transparent",
               color: SIDEBAR.text,
               "& .MuiListItemIcon-root": { color: SIDEBAR.icon },
-              "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 600 },
+              "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 500 },
             },
             "&:hover": { bgcolor: SIDEBAR.hover },
           }}
@@ -490,7 +490,7 @@ export default function AppLayout() {
           </ListItemIcon>
           <ListItemText
             primary={item.label}
-            primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: active || isFlyoutOpen ? 700 : 600 }}
+            primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: active || isFlyoutOpen ? 600 : 500 }}
           />
           <ChevronRightRoundedIcon
             sx={{
@@ -526,13 +526,13 @@ export default function AppLayout() {
             borderLeft: `3px solid ${SIDEBAR.active}`,
             pl: "calc(12px - 3px)",
             "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
-            "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 700 },
+            "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 600 },
             "&:hover": { bgcolor: SIDEBAR.activeBg },
           },
           "&:not(.Mui-selected)": {
             borderLeft: "3px solid transparent",
             "& .MuiListItemIcon-root": { color: SIDEBAR.icon },
-            "& .MuiListItemText-primary": { color: SIDEBAR.text },
+            "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 500 },
           },
           "&:hover": { bgcolor: SIDEBAR.hover },
         }}
@@ -543,8 +543,8 @@ export default function AppLayout() {
         <ListItemText
           primary={item.label}
           primaryTypographyProps={{
-            fontSize: "0.85rem",
-            fontWeight: active ? 700 : 600,
+            fontSize: "0.875rem",
+            fontWeight: active ? 600 : 500,
           }}
         />
       </ListItemButton>
@@ -1120,7 +1120,7 @@ export default function AppLayout() {
                             borderLeft: `3px solid ${SIDEBAR.active}`,
                             pl: "calc(11.2px - 3px)",
                             "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
-                            "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 700 },
+                            "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 600 },
                             "&:hover": { bgcolor: SIDEBAR.activeBg },
                           },
                           "&:not(.Mui-selected)": {
@@ -1142,8 +1142,8 @@ export default function AppLayout() {
                         <ListItemText
                           primary={child.label}
                           primaryTypographyProps={{
-                            fontSize: "0.83rem",
-                            fontWeight: childActive ? 700 : 500,
+                            fontSize: "0.875rem",
+                            fontWeight: childActive ? 600 : 500,
                           }}
                         />
                       </ListItemButton>
