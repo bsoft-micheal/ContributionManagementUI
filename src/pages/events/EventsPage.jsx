@@ -46,6 +46,68 @@ import EventExpensesDialog from "../../components/events/EventExpensesDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
+const getEventCategories = (row) => {
+  const set = new Set();
+
+  const primaryType = row.eventTypeName || row.category || row.categoryName || row.eventType;
+  if (primaryType) {
+    String(primaryType)
+      .split(/[,&/]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((cat) => set.add(cat));
+  }
+
+  if (Array.isArray(row.eventTypeNames)) {
+    row.eventTypeNames.forEach((t) => t && set.add(String(t).trim()));
+  }
+  if (Array.isArray(row.categories)) {
+    row.categories.forEach((c) => c && set.add(String(c).trim()));
+  }
+
+  const name = String(row.eventName || "").toLowerCase();
+  if (name.includes("birthday")) set.add("Birthday");
+  if (name.includes("farewell")) set.add("Farewell");
+  if (name.includes("outing") || name.includes("team outing")) set.add("Team Outing");
+
+  const list = Array.from(set);
+  return list.length > 0 ? list : ["General"];
+};
+
+const getCategoryChipConfig = (catName) => {
+  const norm = String(catName || "").toLowerCase().trim();
+  if (norm.includes("birthday")) {
+    return {
+      label: "Birthday",
+      color: "#7c3aed",
+      bgcolor: "rgba(124, 58, 237, 0.12)",
+      borderColor: "rgba(124, 58, 237, 0.3)",
+    };
+  }
+  if (norm.includes("farewell")) {
+    return {
+      label: "Farewell",
+      color: "#0284c7",
+      bgcolor: "rgba(2, 132, 199, 0.12)",
+      borderColor: "rgba(2, 132, 199, 0.3)",
+    };
+  }
+  if (norm.includes("outing")) {
+    return {
+      label: "Team Outing",
+      color: "#059669",
+      bgcolor: "rgba(5, 150, 105, 0.12)",
+      borderColor: "rgba(5, 150, 105, 0.3)",
+    };
+  }
+  return {
+    label: catName,
+    color: "#4a3f6b",
+    bgcolor: "rgba(74, 63, 107, 0.12)",
+    borderColor: "rgba(74, 63, 107, 0.3)",
+  };
+};
+
 export default function EventsPage() {
   const theme = useTheme();
   const [events, setEvents] = useState([]);
@@ -478,7 +540,7 @@ export default function EventsPage() {
       )
     },
     {
-      label: "Category / Event Date",
+      label: "Event Type/Event Date",
       key: "eventTypeName",
       render: (row) => {
         let dateDisplay = "";
@@ -501,22 +563,37 @@ export default function EventsPage() {
           dateDisplay = formattedParts.join(", ");
         }
 
+        const categories = getEventCategories(row);
+
         return (
           <Box sx={{ py: 0.2 }}>
-            <Typography
-              variant="body2"
-              fontWeight={700}
-              sx={{ color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e") }}
-            >
-              {row.eventTypeName || row.category || "--"}
-            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 0.4 }}>
+              {categories.map((cat, idx) => {
+                const cfg = getCategoryChipConfig(cat);
+                return (
+                  <Chip
+                    key={idx}
+                    size="small"
+                    label={cfg.label}
+                    sx={{
+                      height: 22,
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      color: cfg.color,
+                      bgcolor: cfg.bgcolor,
+                      border: `1px solid ${cfg.borderColor}`,
+                      "& .MuiChip-label": { px: 0.8 },
+                    }}
+                  />
+                );
+              })}
+            </Box>
             {dateDisplay && (
               <Typography
                 variant="caption"
                 sx={{
                   color: "text.secondary",
                   display: "block",
-                  mt: 0.4,
                   maxWidth: 220,
                   whiteSpace: "normal",
                   wordBreak: "break-word",
@@ -592,7 +669,6 @@ export default function EventsPage() {
                   }}
                   options={yearOptions}
                   placeholder="Select Year"
-                  required
                 />
               </Box>
               <Box sx={{ width: { xs: "100%", sm: 130 } }}>
@@ -604,7 +680,6 @@ export default function EventsPage() {
                   }}
                   options={monthOptions}
                   placeholder="Select Month"
-                  required
                 />
               </Box>
               <Box sx={{ width: { xs: "100%", sm: 155 } }}>
