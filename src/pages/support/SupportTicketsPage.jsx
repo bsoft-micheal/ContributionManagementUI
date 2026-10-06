@@ -676,8 +676,8 @@ export default function SupportTicketsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5 }}>
-          <Tooltip title={canViewTicket ? "View Details" : ""}>
-            <span>
+          <Tooltip title={canViewTicket ? "View Details" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canViewTicket ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -696,15 +696,15 @@ export default function SupportTicketsPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
+                          ? "rgba(255,255,255,0.45)"
+                          : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canVerifyTicket ? "Verify Ticket" : ""}>
-            <span>
+          <Tooltip title={canVerifyTicket ? "Verify Ticket" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canVerifyTicket ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -725,15 +725,15 @@ export default function SupportTicketsPage() {
                           ? "#38bdf8"
                           : "#0284c7"
                         : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
+                          ? "rgba(255,255,255,0.45)"
+                          : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canEditTicket ? "Edit" : ""}>
-            <span>
+          <Tooltip title={canEditTicket ? "Edit" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canEditTicket ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -749,15 +749,15 @@ export default function SupportTicketsPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
+                          ? "rgba(255,255,255,0.45)"
+                          : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canDeleteTicket ? "Delete" : ""}>
-            <span>
+          <Tooltip title={canDeleteTicket ? "Delete" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canDeleteTicket ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -773,8 +773,8 @@ export default function SupportTicketsPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
+                          ? "rgba(255,255,255,0.45)"
+                          : "#94a3b8",
                   }}
                 />
               </IconButton>
@@ -786,15 +786,7 @@ export default function SupportTicketsPage() {
     {
       label: "Ticket No",
       key: "ticketNo",
-      render: (row) => (
-        <Typography
-          variant="body2"
-          fontWeight={700}
-          sx={{ color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") }}
-        >
-          {row.ticketNo}
-        </Typography>
-      ),
+      render: (row) => row.ticketNo || "--",
     },
     {
       label: "Member Name",
@@ -806,31 +798,19 @@ export default function SupportTicketsPage() {
           name = matched?.name || matched?.memberName;
         }
         const cleanName = (name || "").replace(/\s*\([0-9a-fA-F-]{36}\)/g, "").trim() || name || "--";
-        return (
-          <Typography variant="body2" fontWeight={600}>
-            {cleanName}
-          </Typography>
-        );
+        return cleanName;
       },
     },
 
     {
       label: "Event Type",
       key: "eventType",
-      render: (row) => (
-        <Typography variant="body2" sx={{ fontSize: "0.82rem" }}>
-          {row.eventType || "--"}
-        </Typography>
-      ),
+      render: (row) => row.eventType || "--",
     },
     {
       label: "Event Name",
       key: "eventName",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.82rem" }}>
-          {row.eventName || "--"}
-        </Typography>
-      ),
+      render: (row) => row.eventName || "--",
     },
     {
       label: "Ticket Type",

@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Card, CardContent, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { toPascalCase } from "../utils/textHelper";
 
 export default function MetricCard({
   label,
@@ -76,39 +77,41 @@ export default function MetricCard({
     >
       <CardContent
         sx={{
-          p: { xs: 1.5, sm: 1.75 },
-          "&:last-child": { pb: { xs: 1.5, sm: 1.75 } },
+          p: { xs: 1.25, sm: 1.5 },
+          "&:last-child": { pb: { xs: 1.25, sm: 1.5 } },
           flex: 1,
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
         }}
       >
-        <Stack spacing={0.5}>
+        <Stack spacing={0.35}>
           <Box>
             <Typography
-              variant="caption"
-              color="text.secondary"
+              component="div"
               sx={{
-                fontWeight: 600,
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-                fontSize: "0.78125rem",
+                fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                fontWeight: 700,
+                letterSpacing: "0.01em",
+                textTransform: "none",
+                fontSize: "0.76rem",
                 lineHeight: 1.3,
                 display: "block",
+                color: isDark ? "rgba(255, 255, 255, 0.88)" : "#1e293b",
               }}
             >
-              {label}
+              {toPascalCase(label)}
             </Typography>
             <Typography
-              variant="h4"
+              component="div"
               sx={{
                 color: valueColor || (isDark ? "#ffffff" : "#0f172a"),
+                fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 700,
-                fontSize: { xs: "1.25rem", sm: "1.375rem", md: "1.45rem", xl: "1.5rem" },
-                letterSpacing: "-0.02em",
+                fontSize: { xs: "1.05rem", sm: "1.125rem", md: "1.18rem" },
+                letterSpacing: "-0.015em",
                 mt: 0.35,
-                lineHeight: 1.2,
+                lineHeight: 1.25,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -126,18 +129,19 @@ export default function MetricCard({
             alignItems: "center",
             justifyContent: "space-between",
             gap: 0.75,
-            mt: 1,
+            mt: 0.85,
             pt: 0.75,
             borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"}`,
           }}
         >
           <Typography
-            variant="caption"
+            component="span"
             sx={{
-              color: "text.secondary",
-              fontSize: "0.75rem",
-              lineHeight: 1.4,
-              fontWeight: 400,
+              color: isDark ? "rgba(255, 255, 255, 0.72)" : "#475569",
+              fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontSize: "0.72rem",
+              lineHeight: 1.35,
+              fontWeight: 500,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -151,12 +155,13 @@ export default function MetricCard({
           {isInteractive && (
             <Typography
               className="metric-action-text"
-              variant="caption"
+              component="span"
               sx={{
                 color: resolvedAccent,
-                fontSize: "0.75rem",
+                fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                fontSize: "0.7rem",
                 fontWeight: 600,
-                opacity: { xs: 0.95, sm: 0.8 },
+                opacity: { xs: 0.95, sm: 0.85 },
                 transform: { xs: "none", sm: "translateX(2px)" },
                 transition: "all 0.2s ease",
                 display: "inline-flex",

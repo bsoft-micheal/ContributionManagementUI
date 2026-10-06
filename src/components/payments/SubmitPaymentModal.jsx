@@ -138,6 +138,16 @@ export default function SubmitPaymentModal({
   const targetAmount = Number(formData.amount) || 0;
   const splitDifference = Math.round((targetAmount - allocatedSplitSum) * 100) / 100;
 
+  const isFullySettled = useMemo(() => {
+    if (duesSummary) {
+      return duesSummary.totalDue === 0 || String(duesSummary.status || "").toLowerCase() === "paid";
+    }
+    return (
+      String(initialStatus || "").toLowerCase() === "paid" ||
+      (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0)
+    );
+  }, [duesSummary, initialStatus, initialCurrentDue, initialPreviousArrears, initialTotalDue]);
+
   // Check if current payment mode is digital/UPI supporting QR
   const isCashMode = String(formData.paymentMode || "").toLowerCase().includes("cash");
   const selectedModeObj = (dbPaymentModes || []).find(
@@ -355,9 +365,12 @@ export default function SubmitPaymentModal({
     if (open) {
       let matchedEvName = initialEventName || "";
       let matchedCategory = initialEventCategory || "";
-      let resolvedAmount = initialAmount;
+      const isPaidInitial =
+        String(initialStatus || "").toLowerCase() === "paid" ||
+        (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0);
+      let resolvedAmount = isPaidInitial ? "0.00" : initialAmount;
 
-      if (initialEventId && eventsList.length > 0) {
+      if (!isPaidInitial && initialEventId && eventsList.length > 0) {
         const matched = eventsList.find(
           (e) => String(e.id || e.eventId) === String(initialEventId)
         );
@@ -399,13 +412,16 @@ export default function SubmitPaymentModal({
         eventCategory: matchedCategory || prev.eventCategory,
         eventName: matchedEvName || prev.eventName,
         memberName: resolvedMemName || prev.memberName,
-        amount: resolvedAmount ? String(resolvedAmount) : prev.amount,
+        amount: isPaidInitial ? "0.00" : (resolvedAmount ? String(resolvedAmount) : prev.amount),
         paymentMode: prev.paymentMode || (dynamicPaymentModes.length > 0 ? dynamicPaymentModes[0]?.value : ""),
         paymentDate: dayjs(),
         utr: "",
         notes: "",
         screenshot: "",
       }));
+      if (isPaidInitial) {
+        setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "0.00" })));
+      }
       setErrors({});
     }
   }, [
@@ -517,8 +533,12 @@ export default function SubmitPaymentModal({
           );
 
           if (res) {
-            const isPaidStatus = String(res.status || initialStatus || "").toLowerCase() === "paid" || String(res.status || initialStatus || "").toLowerCase() === "verified" || String(res.status || initialStatus || "").toLowerCase() === "completed";
-            const isSubmittedProps = initialIsSubmitted || (initialCurrentDue === 0 && initialPreviousArrears === 0) || isPaidStatus;
+            const isPaidStatus =
+              String(res.status || initialStatus || "").toLowerCase() === "paid" ||
+              String(res.status || initialStatus || "").toLowerCase() === "verified" ||
+              String(res.status || initialStatus || "").toLowerCase() === "completed" ||
+              (res.totalDue === 0 && (res.currentEventDue ?? 0) === 0);
+            const isSubmittedProps = initialIsSubmitted || (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0) || isPaidStatus;
 
             const fallbackEvAmt = () => {
               if (matchedEvent) {
@@ -562,18 +582,24 @@ export default function SubmitPaymentModal({
             });
             if (!paymentScope) setPaymentScope(prevArrears > 0 ? "AllOutstanding" : "CurrentEvent");
 
+            const resolvedDuesAmount = (isPaidStatus || total === 0)
+              ? "0.00"
+              : (total > 0
+                ? String(total)
+                : currentEvDue > 0
+                ? String(currentEvDue)
+                : (res.amount ? String(res.amount) : prev.amount));
+
             setFormData((prev) => ({
               ...prev,
               eventName: res.eventName || prev.eventName,
               memberName: res.memberName || prev.memberName || authState?.fullName || "",
-              amount: res.amount
-                ? String(res.amount)
-                : total > 0
-                ? String(total)
-                : currentEvDue > 0
-                ? String(currentEvDue)
-                : (resolvedFallback > 0 ? String(resolvedFallback) : prev.amount),
+              amount: resolvedDuesAmount,
             }));
+
+            if (isPaidStatus || total === 0) {
+              setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "0.00" })));
+            }
           } else if (matchedEvent) {
             const base = Number(matchedEvent.baseAmount || matchedEvent.totalExpectedAmount || 0);
             const count = Number(matchedEvent.participantCount || matchedEvent.participants?.length || 0);
@@ -784,18 +810,23 @@ export default function SubmitPaymentModal({
         }
       }
     }
+
+    const hasScreenshots =
+      (formData.screenshots && formData.screenshots.length > 0) ||
+      (typeof formData.screenshot === "string" && formData.screenshot.trim().length > 0);
+    if (!hasScreenshots) {
+      errs.screenshot = "Payment screenshot / receipt slip is required.";
+    }
+
     setErrors(errs);
-    return Object.keys(errs).length === 0;
+    return errs;
   };
 
   const handleSubmitProof = async (e) => {
     if (e) e.preventDefault();
-    if (!validateForm()) {
-      if (errors.split) {
-        toast.error(errors.split);
-      } else {
-        toast.error("Please fill in all required fields");
-      }
+    const formErrors = validateForm();
+    if (Object.keys(formErrors).length > 0) {
+      toast.error("Please fill required field");
       return;
     }
 
@@ -928,6 +959,11 @@ export default function SubmitPaymentModal({
               screenshot: updated[0] || "",
             };
           });
+          setErrors((prev) => {
+            const next = { ...prev };
+            delete next.screenshot;
+            return next;
+          });
           toast.success(`${newImages.length} image(s) attached successfully`);
         }
       };
@@ -960,22 +996,17 @@ export default function SubmitPaymentModal({
           <AppButton variant="outlined" onClick={onClose}>
             Cancel
           </AppButton>
-          {(() => {
-            const isFullySettled = duesSummary && (duesSummary.totalDue === 0 || String(duesSummary.status).toLowerCase() === "paid");
-            return (
-              <AppButton
-                variant="contained"
-                onClick={handleSubmitProof}
-                disabled={submitting || isFullySettled}
-                sx={{
-                  bgcolor: isFullySettled ? "action.disabledBackground !important" : "#4a3f6b !important",
-                  "&:hover": { bgcolor: isFullySettled ? "action.disabledBackground !important" : "#3b325c !important" },
-                }}
-              >
-                {submitting ? "Saving..." : isFullySettled ? "All Dues Settled" : "Save"}
-              </AppButton>
-            );
-          })()}
+          <AppButton
+            variant="contained"
+            onClick={handleSubmitProof}
+            disabled={submitting || isFullySettled}
+            sx={{
+              bgcolor: isFullySettled ? "action.disabledBackground !important" : "#4a3f6b !important",
+              "&:hover": { bgcolor: isFullySettled ? "action.disabledBackground !important" : "#3b325c !important" },
+            }}
+          >
+            {submitting ? "Saving..." : isFullySettled ? "All Dues Settled" : "Save"}
+          </AppButton>
         </Stack>
       }
     >
@@ -1087,7 +1118,7 @@ export default function SubmitPaymentModal({
         </Grid>
 
         {/* Live Contribution & Dues Summary Card */}
-        {duesSummary && (duesSummary.totalDue === 0 || String(duesSummary.status).toLowerCase() === "paid") && (
+        {isFullySettled && (
           <Alert severity="success" sx={{ borderRadius: "10px", fontWeight: 700, fontSize: "0.82rem" }}>
             ✓ All dues cleared! Payment has been fully settled for this member for this event (₹0 Outstanding).
           </Alert>
@@ -1247,7 +1278,7 @@ export default function SubmitPaymentModal({
             }}
             placeholder="0.00"
             error={!!errors.amount}
-            helperText={errors.amount || (duesSummary?.totalDue ? `Total due: ₹${duesSummary.totalDue}` : "")}
+            helperText={errors.amount || (isFullySettled ? "✓ All dues settled (₹0 Outstanding)" : (duesSummary?.totalDue ? `Total due: ₹${duesSummary.totalDue}` : ""))}
             required
           />
         </Box>
@@ -1295,7 +1326,9 @@ export default function SubmitPaymentModal({
                 <Chip
                   size="small"
                   label={
-                    splitDifference === 0
+                    isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0)
+                      ? "✓ Dues Cleared: ₹0"
+                      : splitDifference === 0
                       ? `✓ Allocated: ₹${allocatedSplitSum} / ₹${targetAmount}`
                       : splitDifference > 0
                       ? `Remaining: ₹${splitDifference}`
@@ -1305,13 +1338,13 @@ export default function SubmitPaymentModal({
                     fontWeight: 800,
                     fontSize: "0.72rem",
                     bgcolor:
-                      splitDifference === 0
+                      isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0) || splitDifference === 0
                         ? "rgba(22, 163, 74, 0.15)"
                         : splitDifference > 0
                         ? "rgba(234, 179, 8, 0.15)"
                         : "rgba(220, 38, 38, 0.15)",
                     color:
-                      splitDifference === 0
+                      isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0) || splitDifference === 0
                         ? "#16a34a"
                         : splitDifference > 0
                         ? "#b45309"
@@ -1471,10 +1504,21 @@ export default function SubmitPaymentModal({
         {/* Row 5: Multi-Image Upload (Maximum 3 Images) */}
         <Box>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
-            <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Payment Screenshots / Receipt Slips (Max 3 Images)
+            <Typography variant="caption" fontWeight={700} sx={{ color: errors.screenshot ? "error.main" : "text.secondary" }}>
+              Payment Screenshots / Receipt Slips (Max 3 Images){" "}
+              <Box component="span" sx={{ color: "error.main", fontWeight: 800 }}>*</Box>
             </Typography>
-            <Typography variant="caption" fontWeight={800} color={(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) === 3 ? "error.main" : "primary.main"}>
+            <Typography
+              variant="caption"
+              fontWeight={800}
+              color={
+                (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) === 3
+                  ? "error.main"
+                  : errors.screenshot
+                  ? "error.main"
+                  : "primary.main"
+              }
+            >
               {(formData.screenshots?.length || (formData.screenshot ? 1 : 0))}/3 Uploaded
             </Typography>
           </Box>
@@ -1544,28 +1588,61 @@ export default function SubmitPaymentModal({
                     minHeight: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 115 : "auto",
                     borderRadius: "10px",
                     borderStyle: "dashed",
+                    borderWidth: errors.screenshot ? "1.5px" : "1px",
+                    borderColor: errors.screenshot ? "error.main" : undefined,
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: 0.8,
                     cursor: "pointer",
-                    bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc"),
-                    "&:hover": { bgcolor: "rgba(99, 102, 241, 0.04)" },
+                    bgcolor: errors.screenshot
+                      ? (t) => (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.04)")
+                      : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc"),
+                    "&:hover": {
+                      bgcolor: errors.screenshot
+                        ? (t) => (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.08)")
+                        : "rgba(99, 102, 241, 0.04)",
+                      borderColor: errors.screenshot ? "error.main" : "#6366f1",
+                    },
                   }}
                 >
                   <input type="file" accept="image/*" multiple hidden onChange={handleScreenshotUpload} />
-                  <UploadIcon sx={{ color: "#6366f1", fontSize: "1.4rem" }} />
-                  <Typography variant="caption" textAlign="center" fontWeight={700} color="text.secondary" sx={{ fontSize: "0.72rem" }}>
+                  <UploadIcon sx={{ color: errors.screenshot ? "error.main" : "#6366f1", fontSize: "1.4rem" }} />
+                  <Typography
+                    variant="caption"
+                    textAlign="center"
+                    fontWeight={700}
+                    sx={{
+                      fontSize: "0.72rem",
+                      color: errors.screenshot ? "error.main" : "text.secondary",
+                    }}
+                  >
                     {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? "+ Add Image" : "Click to upload payment screenshot (PNG, JPG)"}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
-                    Select up to 3 images
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: "0.65rem",
+                      color: errors.screenshot ? "error.main" : "text.secondary",
+                    }}
+                  >
+                    Select up to 3 images (Mandatory)
                   </Typography>
                 </Paper>
               </Grid>
             )}
           </Grid>
+
+          {errors.screenshot && (
+            <Typography
+              variant="caption"
+              color="error"
+              sx={{ display: "block", mt: 0.8, fontWeight: 700 }}
+            >
+              ⚠️ {errors.screenshot}
+            </Typography>
+          )}
         </Box>
 
         {/* Row 6: Additional Notes */}

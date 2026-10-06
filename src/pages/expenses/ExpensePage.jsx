@@ -759,8 +759,8 @@ export default function ExpensePage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5 }}>
-          <Tooltip title={canViewExpense ? "View Details" : "Access Denied"}>
-            <span>
+          <Tooltip title={canViewExpense ? "View Details" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canViewExpense ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -777,14 +777,14 @@ export default function ExpensePage() {
                     color: (theme) =>
                       canViewExpense
                         ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")
-                        : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#cbd5e1"),
+                        : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canVerifyExpense ? "Verify" : "Access Denied"}>
-            <span>
+          <Tooltip title={canVerifyExpense ? "Verify" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canVerifyExpense ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -800,15 +800,15 @@ export default function ExpensePage() {
                           ? "#38bdf8"
                           : "#0284c7"
                         : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
+                          ? "rgba(255,255,255,0.45)"
+                          : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canEditExpense ? "Edit" : "Access Denied"}>
-            <span>
+          <Tooltip title={canEditExpense ? "Edit" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canEditExpense ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -824,15 +824,15 @@ export default function ExpensePage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
+                          ? "rgba(255,255,255,0.45)"
+                          : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={canDeleteExpense ? "Delete" : "Access Denied"}>
-            <span>
+          <Tooltip title={canDeleteExpense ? "Delete" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canDeleteExpense ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -848,8 +848,8 @@ export default function ExpensePage() {
                           ? "#ef4444"
                           : "#dc2626"
                         : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "#cbd5e1",
+                          ? "rgba(255,255,255,0.45)"
+                          : "#94a3b8",
                   }}
                 />
               </IconButton>
@@ -1054,14 +1054,12 @@ export default function ExpensePage() {
         allowExport={canExportExpense}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <Tooltip title={!canAddExpense ? "Access Denied" : ""}>
-              <span>
-                <AppButton
-                  variant="contained"
-                  size="small"
-                  disabled={!canAddExpense}
-                  startIcon={<AddIcon />}
-                  onClick={() => {
+            <AppButton
+              variant="contained"
+              size="small"
+              disabled={!canAddExpense}
+              startIcon={<AddIcon />}
+              onClick={() => {
                     if (!canAddExpense) {
                       toast.error("You do not have permission to add expenses.");
                       return;
@@ -1082,8 +1080,6 @@ export default function ExpensePage() {
                 >
                   Add
                 </AppButton>
-              </span>
-            </Tooltip>
           </Stack>
         }
         filterPanel={

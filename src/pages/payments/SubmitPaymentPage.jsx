@@ -354,11 +354,17 @@ export default function SubmitPaymentPage() {
             const total = Number((res.totalDue ?? (currentEvDue + prevArrears)).toFixed(2));
             const baseAmt = Number(res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? currentEvDue);
 
+            const isPaidStatus =
+              String(res.status || "").toLowerCase() === "paid" ||
+              String(res.status || "").toLowerCase() === "verified" ||
+              String(res.status || "").toLowerCase() === "completed" ||
+              (res.totalDue === 0 && (res.currentEventDue ?? 0) === 0);
+
             setDuesSummary({
-              currentEventDue: currentEvDue,
-              previousArrears: prevArrears,
-              totalDue: total > 0 ? total : currentEvDue,
-              status: res.status || (currentEvDue === 0 && baseAmt > 0 ? "Paid" : "Pending"),
+              currentEventDue: isPaidStatus ? 0 : currentEvDue,
+              previousArrears: isPaidStatus ? 0 : prevArrears,
+              totalDue: isPaidStatus ? 0 : (total > 0 ? total : currentEvDue),
+              status: isPaidStatus ? "Paid" : (res.status || (currentEvDue === 0 && baseAmt > 0 ? "Paid" : "Pending")),
               baseAmount: baseAmt,
             });
             if (!paymentScope) setPaymentScope("AllOutstanding");
@@ -367,7 +373,7 @@ export default function SubmitPaymentPage() {
               ...prev,
               eventName: res.eventName || prev.eventName,
               memberName: res.memberName || prev.memberName || authState?.fullName || "",
-              amount: res.amount ? String(res.amount) : total > 0 ? String(total) : currentEvDue > 0 ? String(currentEvDue) : prev.amount,
+              amount: isPaidStatus || total === 0 ? "0.00" : (total > 0 ? String(total) : currentEvDue > 0 ? String(currentEvDue) : prev.amount),
             }));
           } else if (matchedEvent) {
             const currentEvDue = Number(matchedEvent.amount || matchedEvent.contributionAmount || 0);

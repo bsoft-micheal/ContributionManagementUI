@@ -13,7 +13,7 @@ export const TOAST_MESSAGES = {
     UPDATE_FAILED: "Failed to update",
     FETCH_FAILED: "Failed to load data",
     STATUS_UPDATE_FAILED: "Failed to update status",
-    REQUIRED_FIELDS: "Please fill all the required fields",
+    REQUIRED_FIELDS: "Please fill required field",
     INVALID_FORM: "Please correct the errors in the form",
     UNAUTHORIZED: "You are not authorized to perform this action",
     SERVER_ERROR: "An unexpected error occurred. Please try again later.",

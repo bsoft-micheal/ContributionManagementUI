@@ -241,7 +241,7 @@ export default function EventsPage() {
         const expectedAmt = Number(e.totalExpectedAmount) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
         const paidAmt = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
         const pendingAmt = Number(e.pendingAmount !== undefined ? e.pendingAmount : (expectedAmt - paidAmt));
-        const remainingAmt = expectedAmt - expAmount;
+        const remainingAmt = paidAmt - expAmount;
 
         return {
           ...e,
@@ -391,7 +391,7 @@ export default function EventsPage() {
     const totalExpenses = (displayedEvents || []).reduce((sum, e) => {
       return sum + Number(e.expenseAmount || 0);
     }, 0);
-    const totalBalance = totalExpected - totalExpenses;
+    const totalBalance = totalCollected - totalExpenses;
 
     return {
       totalExpected,
@@ -435,112 +435,134 @@ export default function EventsPage() {
     {
       label: "Action",
       sx: { width: 215, minWidth: 215 },
-      render: (row) => (
-        <Box sx={{ display: "flex", gap: 0.4, alignItems: "center" }}>
-          {canViewEvent && (
-            <Tooltip title="View Details">
-              <IconButton size="small" sx={{ p: 0.3 }}
-                onClick={() => {
-                  setSelectedEvent(row);
-                  setViewDialogOpen(true);
-                }}
-              >
-                <ViewIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-              </IconButton>
+      render: (row) => {
+        const isDeletable = canDeleteEvent && Number(row.totalPaidAmount || row.paidAmount || 0) === 0;
+        return (
+          <Box sx={{ display: "flex", gap: 0.4, alignItems: "center" }}>
+            <Tooltip title={canViewEvent ? "View Details" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canViewEvent ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canViewEvent}
+                  onClick={() => {
+                    setSelectedEvent(row);
+                    setViewDialogOpen(true);
+                  }}
+                >
+                  <ViewIcon sx={{ fontSize: "1.1rem", color: canViewEvent ? actionIconColor : "#94a3b8" }} />
+                </IconButton>
+              </span>
             </Tooltip>
-          )}
-          {canEditEvent && (
-            <Tooltip title="Edit Event">
-              <IconButton size="small" sx={{ p: 0.3 }}
-                onClick={() => navigate(`/events/edit/${row.eventId}`)}
-              >
-                <EditIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-              </IconButton>
+            <Tooltip title={canEditEvent ? "Edit Event" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canEditEvent ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canEditEvent}
+                  onClick={() => navigate(`/events/edit/${row.eventId}`)}
+                >
+                  <EditIcon sx={{ fontSize: "1.1rem", color: canEditEvent ? actionIconColor : "#94a3b8" }} />
+                </IconButton>
+              </span>
             </Tooltip>
-          )}
-          {canDeleteEvent && Number(row.totalPaidAmount || row.paidAmount || 0) === 0 && (
-            <Tooltip title="Delete Event">
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                onClick={() => handleDeleteRequest(row)}
-              >
-                <DeleteIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-              </IconButton>
+            <Tooltip title={isDeletable ? "Delete Event" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !isDeletable ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!isDeletable}
+                  onClick={() => handleDeleteRequest(row)}
+                >
+                  <DeleteIcon sx={{ fontSize: "1.1rem", color: isDeletable ? actionIconColor : "#94a3b8" }} />
+                </IconButton>
+              </span>
             </Tooltip>
-          )}
-          {canAddPhotos && (
-            <Tooltip title="Add Photos">
-              <IconButton size="small" sx={{ p: 0.3 }}
-                onClick={() =>
-                  navigate("/gallery", {
-                    state: {
-                      openAddPhoto: true,
-                      eventName: row.eventName,
-                      category: row.eventTypeName,
-                      eventDate: row.eventDate,
-                      eventId: row.eventId,
-                    },
-                  })
-                }
-              >
-                <AddPhotoAlternateIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-              </IconButton>
+            <Tooltip title={canAddPhotos ? "Add Photos" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canAddPhotos ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canAddPhotos}
+                  onClick={() =>
+                    navigate("/gallery", {
+                      state: {
+                        openAddPhoto: true,
+                        eventName: row.eventName,
+                        category: row.eventTypeName,
+                        eventDate: row.eventDate,
+                        eventId: row.eventId,
+                      },
+                    })
+                  }
+                >
+                  <AddPhotoAlternateIcon sx={{ fontSize: "1.1rem", color: canAddPhotos ? actionIconColor : "#94a3b8" }} />
+                </IconButton>
+              </span>
             </Tooltip>
-          )}
-          {canViewPhotos && (
-            <Tooltip title="View Photos">
-              <IconButton size="small" sx={{ p: 0.3 }}
-                onClick={() => {
-                  setPhotoEvent(row);
-                  setPhotoDetailsDialogOpen(true);
-                }}
-              >
-                <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-              </IconButton>
+            <Tooltip title={canViewPhotos ? "View Photos" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canViewPhotos ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canViewPhotos}
+                  onClick={() => {
+                    setPhotoEvent(row);
+                    setPhotoDetailsDialogOpen(true);
+                  }}
+                >
+                  <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: canViewPhotos ? actionIconColor : "#94a3b8" }} />
+                </IconButton>
+              </span>
             </Tooltip>
-          )}
-          {canAddExpense && (
-            <Tooltip title="Add Expense">
-              <IconButton size="small" sx={{ p: 0.3 }}
-                onClick={() =>
-                  navigate("/expense", {
-                    state: {
-                      openAddExpense: true,
-                      eventName: row.eventName,
-                      category: row.eventTypeName,
-                      eventDate: row.eventDate,
-                      eventId: row.eventId,
-                    },
-                  })
-                }
-              >
-                <PostAddIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-              </IconButton>
+            <Tooltip title={canAddExpense ? "Add Expense" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canAddExpense ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canAddExpense}
+                  onClick={() =>
+                    navigate("/expense", {
+                      state: {
+                        openAddExpense: true,
+                        eventName: row.eventName,
+                        category: row.eventTypeName,
+                        eventDate: row.eventDate,
+                        eventId: row.eventId,
+                      },
+                    })
+                  }
+                >
+                  <PostAddIcon sx={{ fontSize: "1.1rem", color: canAddExpense ? actionIconColor : "#94a3b8" }} />
+                </IconButton>
+              </span>
             </Tooltip>
-          )}
-          {canViewExpense && (
-            <Tooltip title="View Expense">
-              <IconButton size="small" sx={{ p: 0.3 }}
-                onClick={() => {
-                  setExpenseEvent(row);
-                  setExpenseDetailsDialogOpen(true);
-                }}
-              >
-                <ReceiptLongIcon sx={{ fontSize: "1.1rem", color: actionIconColor }} />
-              </IconButton>
+            <Tooltip title={canViewExpense ? "View Expense" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canViewExpense ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canViewExpense}
+                  onClick={() => {
+                    setExpenseEvent(row);
+                    setExpenseDetailsDialogOpen(true);
+                  }}
+                >
+                  <ReceiptLongIcon sx={{ fontSize: "1.1rem", color: canViewExpense ? actionIconColor : "#94a3b8" }} />
+                </IconButton>
+              </span>
             </Tooltip>
-          )}
-        </Box>
-      )
+          </Box>
+        );
+      },
     },
     {
-      label: "Event Name", key: "eventName", render: (row) => (
-        <Typography variant="body2" fontWeight={700} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "primary.main" }}>{row.eventName}</Typography>
-      )
+      label: "Event Name",
+      key: "eventName",
+      render: (row) => row.eventName || "--",
     },
     {
-      label: "Event Type/Event Date",
+      label: "Event Type / Event Date",
       key: "eventTypeName",
       render: (row) => {
         let dateDisplay = "";
@@ -592,7 +614,7 @@ export default function EventsPage() {
               <Typography
                 variant="caption"
                 sx={{
-                  color: "text.secondary",
+                  color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
                   display: "block",
                   maxWidth: 220,
                   whiteSpace: "normal",
@@ -616,7 +638,7 @@ export default function EventsPage() {
         const val = Number(row.totalExpectedAmount) > 0
           ? Number(row.totalExpectedAmount)
           : Number(row.baseAmount || 0);
-        return <Typography variant="body2" fontWeight={700}>₹{val.toLocaleString("en-IN")}</Typography>;
+        return `₹${val.toLocaleString("en-IN")}`;
       }
     },
     {
@@ -638,16 +660,15 @@ export default function EventsPage() {
         columns={columns}
         data={displayedEvents}
         actions={
-          canAddEvent && (
-            <AppButton
-              size="small"
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => navigate("/events/add")}
-            >
-              Add
-            </AppButton>
-          )
+          <AppButton
+            size="small"
+            variant="contained"
+            disabled={!canAddEvent}
+            startIcon={<AddIcon />}
+            onClick={() => navigate("/events/add")}
+          >
+            Add
+          </AppButton>
         }
         filterPanel={
           <Stack spacing={2} sx={{ width: "100%" }}>
@@ -716,8 +737,8 @@ export default function EventsPage() {
                     fontSize: "0.75rem",
                     px: 1.8,
                     whiteSpace: "nowrap",
-                    bgcolor: "#6366f1 !important",
-                    "&:hover": { bgcolor: "#4f46e5 !important" },
+                    bgcolor: "#4a3f6b !important",
+                    "&:hover": { bgcolor: "#3b325c !important" },
                   }}
                 >
                   Filter
@@ -753,40 +774,38 @@ export default function EventsPage() {
                   xs: "1fr",
                   sm: "repeat(2, minmax(0, 1fr))",
                   md: "repeat(3, minmax(0, 1fr))",
-                  lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))",
+                  lg: "repeat(5, minmax(0, 1fr))",
                 },
                 gap: 1.5,
                 pt: 0.5,
               }}
             >
               <MetricCard
-                label="TOTAL EXPECTED"
+                label="Total Expected"
                 value={`₹${summaryTotals.totalExpected.toLocaleString("en-IN")}`}
                 helper="Filtered events target"
                 accent="#6366f1"
               />
-              {!isMember && (
-                <MetricCard
-                  label="TOTAL COLLECTIONS"
-                  value={`₹${summaryTotals.totalCollected.toLocaleString("en-IN")}`}
-                  helper="Amount collected"
-                  accent="#10b981"
-                />
-              )}
               <MetricCard
-                label="TOTAL PENDING"
+                label="Total Collections"
+                value={`₹${summaryTotals.totalCollected.toLocaleString("en-IN")}`}
+                helper={isMember ? "Amount paid" : "Amount collected"}
+                accent="#10b981"
+              />
+              <MetricCard
+                label="Total Pending"
                 value={`₹${summaryTotals.totalPending.toLocaleString("en-IN")}`}
                 helper="Outstanding dues"
                 accent="#f43f5e"
               />
               <MetricCard
-                label="TOTAL EXPENSES"
+                label="Total Expenses"
                 value={`₹${summaryTotals.totalExpenses.toLocaleString("en-IN")}`}
                 helper="Recorded expenses"
                 accent="#f59e0b"
               />
               <MetricCard
-                label="BALANCE AMOUNT"
+                label="Balance Amount"
                 value={`₹${summaryTotals.totalBalance.toLocaleString("en-IN")}`}
                 helper={summaryTotals.totalBalance >= 0 ? "Budget Surplus" : "Budget Deficit"}
                 accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}

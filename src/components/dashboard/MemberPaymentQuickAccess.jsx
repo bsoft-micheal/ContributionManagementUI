@@ -630,14 +630,45 @@ export default function MemberPaymentQuickAccess({
                 "&:hover": { borderColor: "primary.main" },
               }}
             >
-              <Typography variant="caption" color="text.secondary" fontWeight={600} textTransform="uppercase" sx={{ fontSize: "0.78125rem", letterSpacing: "0.04em" }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontWeight={600}
+                textTransform="none"
+                sx={{
+                  fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontSize: "0.75rem",
+                  letterSpacing: "0.01em",
+                }}
+              >
                 Total Expected Amount
               </Typography>
-              <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: "1.25rem", sm: "1.375rem" }, letterSpacing: "-0.02em", color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
+              <Box sx={{ mt: 0.5 }}>
+                <Typography
+                  component="div"
+                  fontWeight={700}
+                  sx={{
+                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontSize: { xs: "1.05rem", sm: "1.15rem", md: "1.2rem" },
+                    letterSpacing: "-0.015em",
+                    color: isDark ? "#ffffff" : "#0f172a",
+                    lineHeight: 1.25,
+                  }}
+                >
                   ₹{formatAmount(stats.totalAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={400} color="text.secondary" sx={{ display: "block", mt: 0.35, fontSize: "0.75rem", lineHeight: 1.4 }}>
+                <Typography
+                  variant="caption"
+                  fontWeight={400}
+                  color="text.secondary"
+                  sx={{
+                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    display: "block",
+                    mt: 0.25,
+                    fontSize: "0.7rem",
+                    lineHeight: 1.4,
+                  }}
+                >
                   {stats.totalCount} Members
                 </Typography>
               </Box>
@@ -663,16 +694,47 @@ export default function MemberPaymentQuickAccess({
               }}
             >
               <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography variant="caption" color="error.main" fontWeight={600} textTransform="uppercase" sx={{ fontSize: "0.78125rem", letterSpacing: "0.04em" }}>
+                <Typography
+                  variant="caption"
+                  color="error.main"
+                  fontWeight={600}
+                  textTransform="none"
+                  sx={{
+                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontSize: "0.75rem",
+                    letterSpacing: "0.01em",
+                  }}
+                >
                   Pending / Unpaid
                 </Typography>
                 <HourglassEmptyIcon sx={{ fontSize: 16, color: "error.main" }} />
               </Stack>
-              <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: "1.25rem", sm: "1.375rem" }, letterSpacing: "-0.02em", color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
+              <Box sx={{ mt: 0.5 }}>
+                <Typography
+                  component="div"
+                  fontWeight={700}
+                  sx={{
+                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontSize: { xs: "1.05rem", sm: "1.15rem", md: "1.2rem" },
+                    letterSpacing: "-0.015em",
+                    color: isDark ? "#ffffff" : "#0f172a",
+                    lineHeight: 1.25,
+                  }}
+                >
                   ₹{formatAmount(stats.pendingAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={400} color="error.main" sx={{ display: "block", mt: 0.35, fontSize: "0.75rem", lineHeight: 1.4 }}>
+                <Typography
+                  variant="caption"
+                  fontWeight={400}
+                  color="error.main"
+                  sx={{
+                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    display: "block",
+                    mt: 0.25,
+                    fontSize: "0.7rem",
+                    lineHeight: 1.4,
+                  }}
+                >
                   {stats.pendingCount} Members
                 </Typography>
               </Box>
@@ -698,16 +760,47 @@ export default function MemberPaymentQuickAccess({
               }}
             >
               <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography variant="caption" color="success.main" fontWeight={600} textTransform="uppercase" sx={{ fontSize: "0.78125rem", letterSpacing: "0.04em" }}>
+                <Typography
+                  variant="caption"
+                  color="success.main"
+                  fontWeight={600}
+                  textTransform="none"
+                  sx={{
+                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontSize: "0.75rem",
+                    letterSpacing: "0.01em",
+                  }}
+                >
                   Paid Members
                 </Typography>
                 <CheckCircleIcon sx={{ fontSize: 16, color: "success.main" }} />
               </Stack>
-              <Box sx={{ mt: 0.75 }}>
-                <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: "1.25rem", sm: "1.375rem" }, letterSpacing: "-0.02em", color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.2 }}>
+              <Box sx={{ mt: 0.5 }}>
+                <Typography
+                  component="div"
+                  fontWeight={700}
+                  sx={{
+                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontSize: { xs: "1.05rem", sm: "1.15rem", md: "1.2rem" },
+                    letterSpacing: "-0.015em",
+                    color: isDark ? "#ffffff" : "#0f172a",
+                    lineHeight: 1.25,
+                  }}
+                >
                   ₹{formatAmount(stats.paidAmount)}
                 </Typography>
-                <Typography variant="caption" fontWeight={400} color="success.main" sx={{ display: "block", mt: 0.35, fontSize: "0.75rem", lineHeight: 1.4 }}>
+                <Typography
+                  variant="caption"
+                  fontWeight={400}
+                  color="success.main"
+                  sx={{
+                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    display: "block",
+                    mt: 0.25,
+                    fontSize: "0.7rem",
+                    lineHeight: 1.4,
+                  }}
+                >
                   {stats.paidCount} Members
                 </Typography>
               </Box>
@@ -806,10 +899,10 @@ export default function MemberPaymentQuickAccess({
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Expense / Category</TableCell>
-                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Event</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Amount</TableCell>
-                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Expense Details</TableCell>
+                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Expense / Category</TableCell>
+                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Event Name</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Amount</TableCell>
+                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Expense Details</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -924,11 +1017,11 @@ export default function MemberPaymentQuickAccess({
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Member</TableCell>
-                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Event</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Amount</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem" }}>Payment Details</TableCell>
+                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Member Name</TableCell>
+                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Event Name</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Amount</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Payment Details</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>

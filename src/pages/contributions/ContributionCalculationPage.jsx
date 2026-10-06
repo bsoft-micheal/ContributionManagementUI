@@ -219,11 +219,8 @@ export default function ContributionCalculationPage() {
       align: "right",
       sx: { minWidth: 130 },
       cellSx: { minWidth: 130 },
-      render: (row) => (
-        <Typography variant="body2" fontWeight={900} sx={{ color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : theme.palette.primary.main }}>
-          ₹{(row.calculatedAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </Typography>
-      )
+      render: (row) =>
+        `₹${(row.calculatedAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     },
     {
       label: "Created By",

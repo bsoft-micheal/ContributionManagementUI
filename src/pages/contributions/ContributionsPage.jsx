@@ -295,7 +295,7 @@ export default function ContributionsPage() {
       eventCategory: row?.categoryName || activeEv?.eventTypeName || activeEv?.categoryName || "",
       memberId: row?.memberId || "",
       memberName: row?.memberName || "",
-      amount: totalDue > 0 ? totalDue : (resolvedEvAmt > 0 ? resolvedEvAmt : 0),
+      amount: isPaidRow || totalDue === 0 ? 0 : (totalDue > 0 ? totalDue : (resolvedEvAmt > 0 ? resolvedEvAmt : 0)),
       currentEventDue: currentEvDue,
       previousArrears: prevArrears,
       totalDue: totalDue,
@@ -1034,7 +1034,7 @@ export default function ContributionsPage() {
         );
       },
     },
-    { label: "Member", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
+    { label: "Member Name", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
     {
       label: "Status",
       key: "paymentStatus",
@@ -1163,19 +1163,11 @@ export default function ContributionsPage() {
         const currentDue = (isPaid || submitted) ? 0 : getContributionOutstanding(row, activeEv);
         const prevArrears = (isPaid || submitted) ? 0 : (row.previousUnpaid || 0);
         const due = currentDue + prevArrears;
-        return (
-          <Typography
-            variant="body2"
-            fontWeight={900}
-            color={due > 0 ? (theme.palette.mode === "dark" ? "#ffffff" : "primary.main") : "text.secondary"}
-          >
-            ₹{due.toLocaleString()}
-          </Typography>
-        );
+        return `₹${due.toLocaleString()}`;
       }
     },
     {
-      label: "Mode",
+      label: "Payment Mode",
       key: "paymentMode",
       render: (row) => {
         const matchedTx = findContributionTransaction(row);

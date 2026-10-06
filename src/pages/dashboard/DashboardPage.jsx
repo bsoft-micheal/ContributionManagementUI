@@ -618,9 +618,9 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
             fontWeight: 600,
             fontSize: "0.84375rem",
             letterSpacing: "0.01em",
-            bgcolor: "#6366f1 !important",
+            bgcolor: "#4a3f6b !important",
             "&:hover": {
-              bgcolor: "#4f46e5 !important",
+              bgcolor: "#3b325c !important",
             },
           }}
         >
@@ -897,24 +897,11 @@ export default function DashboardPage() {
     return eventExpensesSum > 0 ? eventExpensesSum : Number(summary?.totalExpenses ?? 0);
   }, [events, isFilteredByEvent, isFilteredByType, summary?.totalExpenses]);
 
-  // Current Remaining Amount:
-  // For members, do not minus member's personal expected from total expenses; use the team's overall remaining pool
+  // Current Remaining / Balance Amount:
+  // Formula: Total Collection − Total Expense (for both Admin and Member's assigned events)
   const totalRemaining = useMemo(() => {
-    if (isMember) {
-      if (isFilteredByEvent || isFilteredByType) {
-        return events.reduce((sum, e) => {
-          const rem = e.remainingAmount !== undefined
-            ? Number(e.remainingAmount)
-            : (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0));
-          return sum + (Number(rem) || 0);
-        }, 0);
-      }
-      return summary?.totalRemainingAmount !== undefined
-        ? Number(summary.totalRemainingAmount)
-        : (totalExpected - totalExpenses);
-    }
-    return totalExpected - totalExpenses;
-  }, [isMember, isFilteredByEvent, isFilteredByType, events, summary?.totalRemainingAmount, totalExpected, totalExpenses]);
+    return totalCollected - totalExpenses;
+  }, [totalCollected, totalExpenses]);
 
   const pendingCount = events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0);
   const totalContributionsCount = events.reduce((sum, e) => sum + (Number(e.totalContributionsCount) || 0), 0);
@@ -934,7 +921,7 @@ export default function DashboardPage() {
       const exp = Number(e.expectedAmount) || (Number(e.collectedAmount || 0) + Number(e.pendingAmount || 0));
       const col = Number(e.collectedAmount) || 0;
       const expense = Number(e.expenseAmount) || 0;
-      const remaining = e.remainingAmount !== undefined ? Number(e.remainingAmount) : (exp - expense);
+      const remaining = e.remainingAmount !== undefined ? Number(e.remainingAmount) : (col - expense);
       const pctNum =
         totalExpected > 0
           ? (exp / totalExpected) * 100
@@ -1028,10 +1015,8 @@ export default function DashboardPage() {
   // Table columns (Dashboard tab)
   const columns = [
     {
-      label: "Event", key: "eventName",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={700} color="primary.main">{row.eventName}</Typography>
-      ),
+      label: "Event Name", key: "eventName",
+      render: (row) => row.eventName || "--",
     },
     {
       label: "Category", key: "eventTypeName",
@@ -1042,50 +1027,30 @@ export default function DashboardPage() {
         }} />
       ),
     },
-    { label: "Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
+    { label: "Event Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
     {
-      label: "Expected", key: "expectedAmount", align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          ₹{Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))).toLocaleString()}
-        </Typography>
-      ),
+      label: "Expected Amount", key: "expectedAmount", align: "right",
+      render: (row) => `₹${Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))).toLocaleString()}`,
     },
     {
-      label: isMember ? "Paid" : "Collected", key: "collectedAmount", align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          ₹{Number(row.collectedAmount).toLocaleString()}
-        </Typography>
-      ),
+      label: isMember ? "Paid Amount" : "Collected Amount", key: "collectedAmount", align: "right",
+      render: (row) => `₹${Number(row.collectedAmount || 0).toLocaleString()}`,
     },
     {
-      label: "Pending ₹", key: "pendingAmount", align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          ₹{Number(row.pendingAmount).toLocaleString()}
-        </Typography>
-      ),
+      label: "Pending Amount", key: "pendingAmount", align: "right",
+      render: (row) => `₹${Number(row.pendingAmount || 0).toLocaleString()}`,
     },
     {
-      label: "Expense ₹", key: "expenseAmount", align: "right",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          ₹{Number(row.expenseAmount || 0).toLocaleString()}
-        </Typography>
-      ),
+      label: "Expense Amount", key: "expenseAmount", align: "right",
+      render: (row) => `₹${Number(row.expenseAmount || 0).toLocaleString()}`,
     },
     {
-      label: "Balance ₹", key: "remainingAmount", align: "right",
+      label: "Balance Amount", key: "remainingAmount", align: "right",
       render: (row) => {
         const expected = Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0)));
         const expense = Number(row.expenseAmount || 0);
         const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (expected - expense);
-        return (
-          <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: "tabular-nums" }}>
-            ₹{rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}
-          </Typography>
-        );
+        return `₹${rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`;
       },
     },
     {
@@ -1151,31 +1116,29 @@ export default function DashboardPage() {
               xs: "1fr",
               sm: "repeat(2, minmax(0, 1fr))",
               md: "repeat(3, minmax(0, 1fr))",
-              lg: isMember ? "repeat(5, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
+              lg: "repeat(6, minmax(0, 1fr))",
             },
             gap: { xs: 1.5, sm: 2 },
           }}
         >
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "TOTAL EXPECTED"}
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Total Expected"}
             value={`₹${totalExpected.toLocaleString()}`}
             helper="Target goal"
             accent="#6366f1"
             onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
             actionText="All Members →"
           />
-          {!isMember && (
-            <MetricCard
-              label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "TOTAL COLLECTIONS"}
-              value={`₹${totalCollected.toLocaleString()}`}
-              helper="Total collected"
-              accent="#10b981"
-              onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-              actionText="View Paid →"
-            />
-          )}
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "TOTAL PENDING"}
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Total Collections"}
+            value={`₹${totalCollected.toLocaleString()}`}
+            helper={isMember ? "Amount paid" : "Total collected"}
+            accent="#10b981"
+            onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+            actionText={isMember ? "My Payments →" : "View Paid →"}
+          />
+          <MetricCard
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Total Pending"}
             value={`₹${totalPending.toLocaleString()}`}
             helper="Outstanding"
             accent="#f43f5e"
@@ -1183,7 +1146,7 @@ export default function DashboardPage() {
             actionText="View Unpaid →"
           />
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "TOTAL EXPENSES"}
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
             value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
             helper={isFilteredByEvent ? "Event expense" : (isFilteredByType ? appliedFilters.eventType : "Total spent")}
             accent="#f59e0b"
@@ -1191,14 +1154,14 @@ export default function DashboardPage() {
             actionText="Expenses →"
           />
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "BALANCE AMOUNT"}
+            label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Balance Amount"}
             value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
             helper="Net balance"
             accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
             actionText={totalRemaining >= 0 ? "Surplus ✓" : "Deficit ⚠"}
           />
           <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "TOTAL EVENTS"}
+            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
             value={events.length}
             helper={isFilteredByType ? appliedFilters.eventType : "Selected period"}
             accent="#3b82f6"

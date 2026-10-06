@@ -550,8 +550,8 @@ export default function TypesPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title={hasWriteAccess ? "Edit Ticket Type" : ""}>
-            <span>
+          <Tooltip title={hasWriteAccess ? "Edit Ticket Type" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -575,15 +575,15 @@ export default function TypesPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this ticket type is referenced in support tickets" : (hasWriteAccess ? "Delete Ticket Type" : "")}>
-            <span>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this ticket type is referenced in support tickets" : (hasWriteAccess ? "Delete Ticket Type" : "Disabled")}>
+            <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -599,8 +599,8 @@ export default function TypesPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
@@ -612,10 +612,10 @@ export default function TypesPage() {
                 ? row.isActive
                   ? "Deactivate Ticket Type"
                   : "Activate Ticket Type"
-                : ""
+                : "Disabled"
             }
           >
-            <span>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -626,14 +626,14 @@ export default function TypesPage() {
                   <ToggleOnIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#10b981" : "#cbd5e1",
+                      color: hasWriteAccess ? "#10b981" : "#94a3b8",
                     }}
                   />
                 ) : (
                   <ToggleOffIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#ef4444" : "#cbd5e1",
+                      color: hasWriteAccess ? "#ef4444" : "#94a3b8",
                     }}
                   />
                 )}
@@ -693,8 +693,8 @@ export default function TypesPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title={hasWriteAccess ? "Edit Work Type" : ""}>
-            <span>
+          <Tooltip title={hasWriteAccess ? "Edit Work Type" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -718,15 +718,15 @@ export default function TypesPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this work type is assigned to active members" : (hasWriteAccess ? "Delete Work Type" : "")}>
-            <span>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this work type is assigned to active members" : (hasWriteAccess ? "Delete Work Type" : "Disabled")}>
+            <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -742,8 +742,8 @@ export default function TypesPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
@@ -755,10 +755,10 @@ export default function TypesPage() {
                 ? row.isActive
                   ? "Deactivate Work Type"
                   : "Activate Work Type"
-                : ""
+                : "Disabled"
             }
           >
-            <span>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -769,14 +769,14 @@ export default function TypesPage() {
                   <ToggleOnIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#10b981" : "#cbd5e1",
+                      color: hasWriteAccess ? "#10b981" : "#94a3b8",
                     }}
                   />
                 ) : (
                   <ToggleOffIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#ef4444" : "#cbd5e1",
+                      color: hasWriteAccess ? "#ef4444" : "#94a3b8",
                     }}
                   />
                 )}
@@ -836,8 +836,8 @@ export default function TypesPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title={hasWriteAccess ? "Edit Priority" : ""}>
-            <span>
+          <Tooltip title={hasWriteAccess ? "Edit Priority" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -861,15 +861,15 @@ export default function TypesPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this priority is assigned to support tickets" : (hasWriteAccess ? "Delete Priority" : "")}>
-            <span>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this priority is assigned to support tickets" : (hasWriteAccess ? "Delete Priority" : "Disabled")}>
+            <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -885,15 +885,15 @@ export default function TypesPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={hasWriteAccess ? (row.isActive ? "Deactivate Priority" : "Activate Priority") : ""}>
-            <span>
+          <Tooltip title={hasWriteAccess ? (row.isActive ? "Deactivate Priority" : "Activate Priority") : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -971,8 +971,8 @@ export default function TypesPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title={hasWriteAccess ? "Edit Payment Mode" : ""}>
-            <span>
+          <Tooltip title={hasWriteAccess ? "Edit Payment Mode" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -996,15 +996,15 @@ export default function TypesPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this payment mode is used in transactions or contributions" : (hasWriteAccess ? "Delete Payment Mode" : "")}>
-            <span>
+          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this payment mode is used in transactions or contributions" : (hasWriteAccess ? "Delete Payment Mode" : "Disabled")}>
+            <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -1020,8 +1020,8 @@ export default function TypesPage() {
                           ? "#ffffff"
                           : "#4a3f6b"
                         : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.3)"
-                        : "#cbd5e1",
+                        ? "rgba(255,255,255,0.45)"
+                        : "#94a3b8",
                   }}
                 />
               </IconButton>
@@ -1033,10 +1033,10 @@ export default function TypesPage() {
                 ? row.isActive
                   ? "Deactivate Payment Mode"
                   : "Activate Payment Mode"
-                : ""
+                : "Disabled"
             }
           >
-            <span>
+            <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
@@ -1047,14 +1047,14 @@ export default function TypesPage() {
                   <ToggleOnIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#10b981" : "#cbd5e1",
+                      color: hasWriteAccess ? "#10b981" : "#94a3b8",
                     }}
                   />
                 ) : (
                   <ToggleOffIcon
                     sx={{
                       fontSize: "1.25rem",
-                      color: hasWriteAccess ? "#ef4444" : "#cbd5e1",
+                      color: hasWriteAccess ? "#ef4444" : "#94a3b8",
                     }}
                   />
                 )}

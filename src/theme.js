@@ -5,7 +5,7 @@ const lightTokens = {
   surface: "#ffffff",
   surfaceAlt: "#faf9fd",
   text: "#1e1a2e",
-  mutedText: "#5b5280",
+  mutedText: "#475569",
   border: "rgba(74, 63, 107, 0.10)",
   borderStrong: "rgba(74, 63, 107, 0.18)",
   sidebarBg: "#1e1a2e",
@@ -49,10 +49,10 @@ export const typographyTokens = {
     letterSpacing: "-0.005em",
   },
   mainValue: {
-    fontSize: "1.375rem", // 22px (20–24px range)
+    fontSize: "1.1875rem", // 19px (medium level)
     fontWeight: 700,
-    lineHeight: 1.2,
-    letterSpacing: "-0.02em",
+    lineHeight: 1.25,
+    letterSpacing: "-0.015em",
   },
   bodyText: {
     fontSize: "0.875rem", // 14px
@@ -182,7 +182,7 @@ const baseTheme = {
       fontWeight: 600,
       letterSpacing: "0.06em",
       lineHeight: 1.4,
-      textTransform: "uppercase",
+      textTransform: "none",
     },
   },
 };
@@ -225,6 +225,11 @@ export function createAppTheme(mode = "light") {
         secondary: tokens.mutedText,
       },
       divider: tokens.border,
+      action: {
+        disabled: mode === "dark" ? "rgba(255, 255, 255, 0.45)" : "#94a3b8",
+        disabledBackground: mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)",
+        disabledOpacity: 0.7,
+      },
     },
     components: {
       MuiCssBaseline: {
@@ -286,6 +291,9 @@ export function createAppTheme(mode = "light") {
             lineHeight: typographyTokens.button.lineHeight,
             textTransform: "none",
             transition: "all 0.2s ease",
+            "&.Mui-disabled": {
+              opacity: "0.7 !important",
+            },
           },
           containedPrimary: {
             background: mode === "dark"
@@ -304,6 +312,19 @@ export function createAppTheme(mode = "light") {
               background: mode === "dark"
                 ? "linear-gradient(135deg, rgba(91, 100, 130, 0.75) 0%, rgba(55, 61, 82, 0.75) 100%) !important"
                 : "linear-gradient(135deg, rgba(74, 63, 107, 0.7) 0%, rgba(45, 37, 80, 0.7) 100%) !important",
+            },
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            "&.Mui-disabled": {
+              opacity: "0.7 !important",
+              color: mode === "dark" ? "rgba(255, 255, 255, 0.45) !important" : "#94a3b8 !important",
+              "& .MuiSvgIcon-root": {
+                color: mode === "dark" ? "rgba(255, 255, 255, 0.45) !important" : "#94a3b8 !important",
+              },
             },
           },
         },
@@ -360,7 +381,7 @@ export function createAppTheme(mode = "light") {
             fontWeight: 600,
             fontSize: typographyTokens.label.fontSize,
             letterSpacing: "0.04em",
-            textTransform: "uppercase",
+            textTransform: "none",
           },
         },
       },
@@ -369,8 +390,26 @@ export function createAppTheme(mode = "light") {
           root: {
             fontFamily: typographyTokens.fontFamily,
             fontSize: typographyTokens.label.fontSize,
-            fontWeight: 500,
+            fontWeight: 600,
             letterSpacing: "0.01em",
+            color: mode === "dark" ? "#f1f5f9 !important" : "#1e293b !important",
+            "&.Mui-focused": {
+              color: mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+            },
+          },
+        },
+      },
+      MuiInputLabel: {
+        styleOverrides: {
+          root: {
+            fontFamily: typographyTokens.fontFamily,
+            fontSize: typographyTokens.label.fontSize,
+            fontWeight: 600,
+            letterSpacing: "0.01em",
+            color: mode === "dark" ? "#f1f5f9 !important" : "#1e293b !important",
+            "&.Mui-focused": {
+              color: mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+            },
           },
         },
       },
@@ -450,11 +489,30 @@ export function createAppTheme(mode = "light") {
           },
         },
       },
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            "&.Mui-disabled": {
+              cursor: "not-allowed !important",
+              pointerEvents: "none",
+            },
+          },
+        },
+      },
       MuiIconButton: {
         styleOverrides: {
           root: {
             transition: "all 0.15s ease",
             borderRadius: 10,
+            "&.Mui-disabled": {
+              opacity: "0.65 !important",
+              cursor: "not-allowed !important",
+              pointerEvents: "none",
+              color: mode === "dark" ? "rgba(255, 255, 255, 0.45) !important" : "#94a3b8 !important",
+              "& .MuiSvgIcon-root": {
+                color: mode === "dark" ? "rgba(255, 255, 255, 0.45) !important" : "#94a3b8 !important",
+              },
+            },
           },
         },
       },
@@ -469,13 +527,21 @@ export function createAppTheme(mode = "light") {
         styleOverrides: {
           tooltip: {
             fontFamily: typographyTokens.fontFamily,
-            borderRadius: 8,
-            fontSize: typographyTokens.helperText.fontSize,
-            fontWeight: 400,
-            backgroundColor: mode === "dark" ? "#111624" : "#1e1a2e",
+            borderRadius: 6,
+            fontSize: "0.75rem",
+            fontWeight: 500,
+            backgroundColor: mode === "dark" ? "#334155" : "#475569",
+            color: "#ffffff",
+            boxShadow: mode === "dark"
+              ? "0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)"
+              : "0 4px 14px rgba(15, 23, 42, 0.15)",
+            padding: "5px 10px",
+            "& .MuiTypography-root": {
+              color: "inherit",
+            },
           },
           arrow: {
-            color: mode === "dark" ? "#111624" : "#1e1a2e",
+            color: mode === "dark" ? "#334155" : "#475569",
           },
         },
       },

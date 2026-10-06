@@ -48,8 +48,8 @@ export default function AppInput({
           sx={{
             display: "block",
             mb: 0.5,
-            fontWeight: 500,
-            color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.secondary",
+            fontWeight: 600,
+            color: (theme) => theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b",
             textTransform: "none",
             letterSpacing: "0.01em",
             fontSize: "0.78125rem",

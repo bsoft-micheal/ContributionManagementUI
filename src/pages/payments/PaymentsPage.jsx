@@ -417,12 +417,14 @@ export default function PaymentsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-          {canViewPaymentHistory && (
-            <Tooltip title="View Details">
+          <Tooltip title={canViewPaymentHistory ? "View Details" : "Disabled"}>
+            <span style={{ display: "inline-flex", cursor: !canViewPaymentHistory ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
+                disabled={!canViewPaymentHistory}
                 onClick={() => {
+                  if (!canViewPaymentHistory) return;
                   setSelectedTxn(row);
                   setViewDialogOpen(true);
                 }}
@@ -430,12 +432,15 @@ export default function PaymentsPage() {
                 <ViewIcon
                   sx={{
                     fontSize: "1.05rem",
-                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                    color: (theme) =>
+                      canViewPaymentHistory
+                        ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")
+                        : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
                   }}
                 />
               </IconButton>
-            </Tooltip>
-          )}
+            </span>
+          </Tooltip>
         </Box>
       ),
     },
@@ -473,29 +478,17 @@ export default function PaymentsPage() {
     {
       label: "Event Name",
       key: "eventName",
-      render: (row) => (
-        <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-          {row.eventName || "--"}
-        </Typography>
-      ),
+      render: (row) => row.eventName || "--",
     },
     {
       label: "Amount",
       key: "amount",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }}>
-          ₹{Number(row.amount).toLocaleString("en-IN")}
-        </Typography>
-      ),
+      render: (row) => `₹${Number(row.amount).toLocaleString("en-IN")}`,
     },
     {
       label: "Payment Date",
       key: "paymentDate",
-      render: (row) => (
-        <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.76rem" }}>
-          {formatGridDate(row.paymentDate)}
-        </Typography>
-      ),
+      render: (row) => formatGridDate(row.paymentDate),
     },
     {
       label: "Payment Mode",
@@ -515,20 +508,12 @@ export default function PaymentsPage() {
     {
       label: "Verified By",
       key: "verifiedBy",
-      render: (row) => (
-        <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-          {row.verifiedBy || "--"}
-        </Typography>
-      ),
+      render: (row) => row.verifiedBy || "--",
     },
     {
       label: "Created By",
       key: "createdBy",
-      render: (row) => (
-        <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-          {row.createdBy || row.CreatedBy || "--"}
-        </Typography>
-      ),
+      render: (row) => row.createdBy || row.CreatedBy || "--",
     },
     {
       label: "Created On",
@@ -578,15 +563,14 @@ export default function PaymentsPage() {
         data={filteredTransactions}
         loading={loading}
         actions={
-          canSubmitPayment && (
-            <AppButton
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setSubmitModalOpen(true)}
-            >
-              Submit Payment
-            </AppButton>
-          )
+          <AppButton
+            variant="contained"
+            disabled={!canSubmitPayment}
+            startIcon={<AddIcon />}
+            onClick={() => setSubmitModalOpen(true)}
+          >
+            Submit Payment
+          </AppButton>
         }
         filterPanel={
           <Grid container spacing={2} alignItems="center">

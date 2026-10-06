@@ -309,7 +309,7 @@ export default function UserFormPage() {
     const newErrors = validate();
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fix all validation errors before saving");
+      toast.error("Please fill required field");
       return;
     }
 
