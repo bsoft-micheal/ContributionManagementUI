@@ -6,7 +6,6 @@ import {
   IconButton,
   Tooltip,
   Paper,
-  Divider,
   Stack,
   Checkbox,
   InputAdornment,
@@ -19,6 +18,16 @@ import {
   VisibilityOff,
   PersonAdd as PersonAddIcon,
   Edit as EditIcon,
+  PersonRounded as PersonRoundedIcon,
+  PersonOutlineRounded as PersonOutlineRoundedIcon,
+  MailOutlineRounded as MailOutlineRoundedIcon,
+  PhoneOutlined as PhoneOutlinedIcon,
+  WcRounded as WcRoundedIcon,
+  CalendarMonthRounded as CalendarMonthRoundedIcon,
+  BusinessCenterRounded as BusinessCenterRoundedIcon,
+  GroupsRounded as GroupsRoundedIcon,
+  ShieldOutlined as ShieldOutlinedIcon,
+  LockOutlined as LockOutlinedIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import dayjs from "dayjs";
@@ -27,10 +36,11 @@ dayjs.extend(customParseFormat);
 
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
+import AppMultiSelect from "../../components/common/AppMultiSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
-import AppSwitch from "../../components/common/AppSwitch";
 import { useAppToast } from "../../components/common/AppToast";
+import { useAuth } from "../../contexts/AuthContext";
 import { validateForm } from "../../utils/validation";
 import {
   getUsersAsync,
@@ -61,10 +71,83 @@ const initialForm = {
   roleName: "",
   primaryRole: "",
   secondaryRole: "",
+  secondaryRoles: [],
   newPassword: "",
   confirmPassword: "",
   isActive: true,
 };
+
+function FormSectionCard({ icon, title, subtitle, children, sx = {} }) {
+  return (
+    <Box
+      sx={{
+        border: "1px solid",
+        borderColor: (theme) =>
+          theme.palette.mode === "dark" ? "divider" : "#e8e5f2",
+        borderRadius: "10px",
+        p: { xs: 1.5, sm: 1.8 },
+        mb: 1.5,
+        bgcolor: (theme) =>
+          theme.palette.mode === "dark"
+            ? "rgba(255, 255, 255, 0.015)"
+            : "#ffffff",
+        ...sx,
+      }}
+    >
+      {/* Section Header */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.2, mb: 1.4 }}>
+        <Box
+          sx={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark"
+                ? "rgba(255, 255, 255, 0.08)"
+                : "#1e1b4b",
+            color: "#ffffff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </Box>
+        <Box>
+          <Typography
+            variant="subtitle2"
+            fontWeight={700}
+            sx={{
+              fontSize: "0.88rem",
+              color: (theme) =>
+                theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+              lineHeight: 1.2,
+            }}
+          >
+            {title}
+          </Typography>
+          {subtitle && (
+            <Typography
+              variant="caption"
+              sx={{
+                fontSize: "0.75rem",
+                color: "text.secondary",
+                display: "block",
+                mt: 0.2,
+              }}
+            >
+              {subtitle}
+            </Typography>
+          )}
+        </Box>
+      </Box>
+
+      {/* Section Content */}
+      {children}
+    </Box>
+  );
+}
 
 export default function UserFormPage() {
   const theme = useTheme();
@@ -72,6 +155,7 @@ export default function UserFormPage() {
   const location = useLocation();
   const { id } = useParams();
   const toast = useAppToast();
+  const { authState, fetchProfile } = useAuth();
 
   const isEdit = Boolean(id);
 
@@ -148,11 +232,12 @@ export default function UserFormPage() {
     const hasMultiple = Boolean(
       row.enableMultipleRoles ||
       (row.roles && row.roles.length > 1) ||
-      (row.secondaryRoles && row.secondaryRoles.length > 0)
+      (row.secondaryRoles && row.secondaryRoles.length > 0) ||
+      (row.secondaryRoleIds && row.secondaryRoleIds.length > 0)
     );
 
     let pRole = "";
-    let sRole = "";
+    let sRolesList = [];
 
     const rList = (loadedRoles || []).map((r) => r.roleName || r.name);
 
@@ -167,16 +252,24 @@ export default function UserFormPage() {
     }
 
     if (Array.isArray(row.secondaryRoleIds) && row.secondaryRoleIds.length > 0) {
-      sRole = getRoleNameById(row.secondaryRoleIds[0]);
+      sRolesList = row.secondaryRoleIds.map((rid) => getRoleNameById(rid)).filter(Boolean);
     } else if (Array.isArray(row.secondaryRoles) && row.secondaryRoles.length > 0) {
-      sRole = row.secondaryRoles[0];
+      sRolesList = [...row.secondaryRoles];
+    } else if (Array.isArray(row.roles) && row.roles.length > 0) {
+      sRolesList = [...row.roles];
     }
 
-    if (!pRole && rList.length > 0) {
-      pRole = rList[0];
+    if (pRole && !sRolesList.includes(pRole)) {
+      sRolesList.push(pRole);
     }
-    if (pRole === sRole) {
-      sRole = rList.find((r) => r !== pRole) || "";
+
+    if (!pRole && sRolesList.length > 0) {
+      pRole = sRolesList[0];
+    }
+
+    if (hasMultiple && sRolesList.length === 0) {
+      sRolesList = [...rList];
+      if (!pRole) pRole = rList[0] || "Member";
     }
 
     const singleRole = pRole || row.roleName || rList[0] || "Member";
@@ -195,7 +288,8 @@ export default function UserFormPage() {
       enableMultipleRoles: hasMultiple,
       roleName: singleRole,
       primaryRole: pRole,
-      secondaryRole: sRole,
+      secondaryRole: sRolesList.find((r) => r !== pRole) || "",
+      secondaryRoles: sRolesList,
       newPassword: "",
       confirmPassword: "",
       isActive: row.isActive ?? true,
@@ -209,23 +303,49 @@ export default function UserFormPage() {
     }
   }
 
+  function handleSecondaryRolesChange(newSecondaryRoles) {
+    const updatedRoles = Array.isArray(newSecondaryRoles) ? newSecondaryRoles : [];
+    setForm((prev) => {
+      let nextPrimary = prev.primaryRole;
+      if (!updatedRoles.includes(nextPrimary)) {
+        nextPrimary = updatedRoles[0] || "";
+      }
+      return {
+        ...prev,
+        secondaryRoles: updatedRoles,
+        primaryRole: nextPrimary,
+      };
+    });
+    setErrors((prev) => ({
+      ...prev,
+      secondaryRoles: "",
+      primaryRole: "",
+    }));
+  }
+
   function handleToggleMultipleRoles(checked) {
     setForm((prev) => {
       if (checked) {
-        const pRole = prev.primaryRole || prev.roleName || userRolesList[0]?.value || "Admin";
-        let sRole = prev.secondaryRole;
-        if (!sRole || sRole === pRole) {
-          const alternate = userRolesList.find((r) => r.value !== pRole)?.value || "Member";
-          sRole = alternate;
+        const allRoleValues = userRolesList.map((r) => r.value);
+        const defaultSRoles = prev.secondaryRoles && prev.secondaryRoles.length > 0
+          ? [...prev.secondaryRoles]
+          : allRoleValues;
+        let pRole = prev.primaryRole && defaultSRoles.includes(prev.primaryRole)
+          ? prev.primaryRole
+          : (prev.roleName && defaultSRoles.includes(prev.roleName) ? prev.roleName : defaultSRoles[0] || "Member");
+
+        if (pRole && !defaultSRoles.includes(pRole)) {
+          defaultSRoles.push(pRole);
         }
+
         return {
           ...prev,
           enableMultipleRoles: true,
           primaryRole: pRole,
-          secondaryRole: sRole,
+          secondaryRoles: defaultSRoles,
         };
       } else {
-        const singleRole = prev.primaryRole || prev.roleName || (userRolesList[0]?.value || "Member");
+        const singleRole = prev.primaryRole || prev.secondaryRoles[0] || prev.roleName || (userRolesList[0]?.value || "Member");
         return {
           ...prev,
           enableMultipleRoles: false,
@@ -237,6 +357,7 @@ export default function UserFormPage() {
       ...prev,
       primaryRole: "",
       secondaryRole: "",
+      secondaryRoles: "",
       roleName: "",
     }));
   }
@@ -253,17 +374,19 @@ export default function UserFormPage() {
     };
 
     if (!form.enableMultipleRoles) {
-      schema.roleName = { required: true, label: "User Role" };
+      schema.roleName = { required: true, label: "Primary Role" };
     }
 
     const e = validateForm(form, schema);
 
     if (form.enableMultipleRoles) {
+      if (!form.secondaryRoles || form.secondaryRoles.length === 0) {
+        e.secondaryRoles = "At least one role must be selected in Secondary Roles";
+      }
       if (!form.primaryRole) {
         e.primaryRole = "Primary Role is required";
-      }
-      if (form.primaryRole && form.secondaryRole && form.primaryRole === form.secondaryRole) {
-        e.secondaryRole = "Secondary Role must be different from Primary Role";
+      } else if (form.secondaryRoles && !form.secondaryRoles.includes(form.primaryRole)) {
+        e.primaryRole = "Primary Role must be one of the selected Secondary Roles";
       }
     }
 
@@ -379,10 +502,10 @@ export default function UserFormPage() {
         ? [form.primaryRole].filter(Boolean)
         : [form.roleName].filter(Boolean);
       const secondaryRolesList = isMultiple
-        ? [form.secondaryRole].filter(Boolean)
+        ? (form.secondaryRoles || []).filter((r) => r !== form.primaryRole)
         : [];
       const combinedRolesList = isMultiple
-        ? Array.from(new Set([...primaryRolesList, ...secondaryRolesList]))
+        ? form.secondaryRoles || []
         : [form.roleName].filter(Boolean);
 
       const payload = {
@@ -399,7 +522,10 @@ export default function UserFormPage() {
         roleName: isMultiple ? form.primaryRole : form.roleName,
         primaryRoles: primaryRolesList,
         secondaryRoles: secondaryRolesList,
+        secondaryRole: (form.secondaryRoles || []).join(", "),
+        secondaryRolesCsv: (form.secondaryRoles || []).join(", "),
         roles: combinedRolesList,
+        rolesCsv: (form.secondaryRoles || []).join(", "),
         isActive: Boolean(form.isActive),
       };
 
@@ -409,6 +535,9 @@ export default function UserFormPage() {
 
       if (form.userId) {
         await updateUserAsync(form.userId, payload);
+        if (authState?.userId && String(form.userId) === String(authState.userId)) {
+          if (fetchProfile) await fetchProfile().catch(() => { });
+        }
         toast.success("User updated successfully");
       } else {
         await createUserAsync(payload);
@@ -433,11 +562,12 @@ export default function UserFormPage() {
               : "1px solid rgba(74, 63, 107, 0.08)",
           borderRadius: "14px",
           overflow: "hidden",
-          bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
+          bgcolor: (theme) =>
+            theme.palette.mode === "dark" ? "background.paper" : "#ffffff",
           boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
         }}
       >
-        {/* Top Header Banner */}
+        {/* ── 1. Page Header Bar ────────────────────────────────────────── */}
         <Box
           sx={{
             bgcolor: "#45386d",
@@ -464,6 +594,11 @@ export default function UserFormPage() {
                 <ArrowBackIcon sx={{ fontSize: "1.25rem" }} />
               </IconButton>
             </Tooltip>
+            {isEdit ? (
+              <EditIcon sx={{ fontSize: "1.2rem", color: "#ffffff" }} />
+            ) : (
+              <PersonAddIcon sx={{ fontSize: "1.2rem", color: "#ffffff" }} />
+            )}
             <Typography
               variant="subtitle1"
               fontWeight={700}
@@ -474,251 +609,343 @@ export default function UserFormPage() {
           </Box>
         </Box>
 
-        {/* Main Body Container */}
-        <Box sx={{ p: { xs: 2.5, md: 3.5 } }}>
-          <Grid container spacing={2.5}>
-            {/* Form Fields: 3 Controls per row */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput
-                label="Full Name"
-                placeholder="Enter full name"
-                value={form.fullName}
-                onChange={(e) => fieldChange("fullName", e.target.value)}
-                restrictType="letteronly"
-                maxLength={100}
-                error={!!errors.fullName}
-                helperText={errors.fullName}
-                required
-              />
-            </Grid>
+        {/* ── Main Form Body Container ──────────────────────────────────── */}
+        <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
 
-            {!form.enableMultipleRoles && (
-              <Grid size={{ xs: 12, md: 4 }}>
-                <AppSelect
-                  label="User Role"
-                  placeholder="Select user role"
-                  value={form.roleName}
-                  onChange={(e) => fieldChange("roleName", e.target.value)}
-                  options={userRolesList}
-                  error={!!errors.roleName}
-                  helperText={errors.roleName}
+          {/* ── SECTION 1 — Basic Information ──────────────────────────── */}
+          <FormSectionCard
+            icon={<PersonRoundedIcon sx={{ fontSize: "1.1rem" }} />}
+            title="Basic Information"
+          >
+            <Grid container spacing={1.6}>
+              {/* Row 1 */}
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <AppInput
+                  label="Full Name"
+                  placeholder="Enter full name"
+                  value={form.fullName}
+                  onChange={(e) => fieldChange("fullName", e.target.value)}
+                  restrictType="letteronly"
+                  maxLength={100}
+                  error={!!errors.fullName}
+                  helperText={errors.fullName}
+                  startAdornment={
+                    <PersonOutlineRoundedIcon
+                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                    />
+                  }
                   required
                 />
               </Grid>
-            )}
 
-            {/* When Enable Multiple Roles = ON: Primary & Secondary Role */}
-            {form.enableMultipleRoles && (
-              <>
-                <Grid size={{ xs: 12, md: 4 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <AppInput
+                  label="Email"
+                  placeholder="Enter email address"
+                  value={form.email}
+                  onChange={(e) => fieldChange("email", e.target.value)}
+                  maxLength={100}
+                  error={!!errors.email}
+                  helperText={errors.email}
+                  startAdornment={
+                    <MailOutlineRoundedIcon
+                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                    />
+                  }
+                  required
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <AppInput
+                  label="Phone Number"
+                  placeholder="Enter 10-digit phone number"
+                  value={form.phone}
+                  onChange={(e) => fieldChange("phone", e.target.value)}
+                  restrictType="numberonly"
+                  maxLength={10}
+                  error={!!errors.phone}
+                  helperText={errors.phone}
+                  startAdornment={
+                    <PhoneOutlinedIcon
+                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                    />
+                  }
+                  required
+                />
+              </Grid>
+
+              {/* Row 2 */}
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <AppSelect
+                  label="Gender"
+                  placeholder="Select gender"
+                  value={form.gender}
+                  onChange={(e) => fieldChange("gender", e.target.value)}
+                  options={GENDER_OPTIONS}
+                  error={!!errors.gender}
+                  helperText={errors.gender}
+                  startAdornment={
+                    <WcRoundedIcon
+                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                    />
+                  }
+                  required
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <AppDateInput
+                  label="Date of Birth"
+                  value={form.dateOfBirth}
+                  onChange={(newVal) => fieldChange("dateOfBirth", newVal)}
+                  maxDate={dayjs().subtract(18, "year")}
+                  error={!!errors.dateOfBirth}
+                  helperText={errors.dateOfBirth}
+                  startAdornment={
+                    <CalendarMonthRoundedIcon
+                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                    />
+                  }
+                  required
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <AppDateInput
+                  label="Joining Date"
+                  value={form.joiningDate}
+                  onChange={(newVal) => fieldChange("joiningDate", newVal)}
+                  error={!!errors.joiningDate}
+                  helperText={errors.joiningDate}
+                  startAdornment={
+                    <CalendarMonthRoundedIcon
+                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                    />
+                  }
+                  required
+                />
+              </Grid>
+            </Grid>
+          </FormSectionCard>
+
+          {/* ── SECTION 2 — Work Details ──────────────────────────────── */}
+          <FormSectionCard
+            icon={<BusinessCenterRoundedIcon sx={{ fontSize: "1.1rem" }} />}
+            title="Work Details"
+          >
+            <Grid container spacing={1.6}>
+              {/* Left Column: Work Type (reduced to 1/3 width) */}
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <AppSelect
+                  label="Work Type"
+                  placeholder="Select work type"
+                  value={form.workType}
+                  onChange={(e) => fieldChange("workType", e.target.value)}
+                  options={typeOptions}
+                  error={!!errors.workType}
+                  helperText={errors.workType}
+                  startAdornment={
+                    <GroupsRoundedIcon
+                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                    />
+                  }
+                  required
+                />
+              </Grid>
+
+              {/* Right Column: Checkboxes aligned horizontally */}
+              <Grid size={{ xs: 12, sm: 6, md: 8 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: { xs: 1.5, sm: 3 },
+                    height: "100%",
+                    pt: { xs: 0.5, md: 2.4 },
+                  }}
+                >
+                  {/* Create Login Account */}
+                  <Box
+                    onClick={() =>
+                      fieldChange("createMemberProfile", !form.createMemberProfile)
+                    }
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.8,
+                      cursor: "pointer",
+                      userSelect: "none",
+                      width: "fit-content",
+                    }}
+                  >
+                    <Checkbox
+                      checked={Boolean(form.createMemberProfile)}
+                      onChange={(e) =>
+                        fieldChange("createMemberProfile", e.target.checked)
+                      }
+                      onClick={(e) => e.stopPropagation()}
+                      size="small"
+                      sx={{
+                        p: 0,
+                        color: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(255, 255, 255, 0.4)"
+                            : "#4a3f6b",
+                        "&.Mui-checked": {
+                          color: "#4a3f6b",
+                        },
+                      }}
+                    />
+                    <Typography
+                      variant="body2"
+                      fontWeight={600}
+                      sx={{
+                        color: (theme) =>
+                          theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b",
+                        fontSize: "0.82rem",
+                      }}
+                    >
+                      Create Login Account
+                    </Typography>
+                  </Box>
+
+                  {/* Enable Multiple Roles */}
+                  <Box
+                    onClick={() =>
+                      handleToggleMultipleRoles(!form.enableMultipleRoles)
+                    }
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.8,
+                      cursor: "pointer",
+                      userSelect: "none",
+                      width: "fit-content",
+                    }}
+                  >
+                    <Checkbox
+                      checked={Boolean(form.enableMultipleRoles)}
+                      onChange={(e) =>
+                        handleToggleMultipleRoles(e.target.checked)
+                      }
+                      onClick={(e) => e.stopPropagation()}
+                      size="small"
+                      sx={{
+                        p: 0,
+                        color: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(255, 255, 255, 0.4)"
+                            : "#4a3f6b",
+                        "&.Mui-checked": {
+                          color: "#4a3f6b",
+                        },
+                      }}
+                    />
+                    <Typography
+                      variant="body2"
+                      fontWeight={600}
+                      sx={{
+                        color: (theme) =>
+                          theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b",
+                        fontSize: "0.82rem",
+                      }}
+                    >
+                      Enable Multiple Roles
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+          </FormSectionCard>
+
+          {/* ── SECTION 3 — Role Assignment ──────────────────────────── */}
+          <FormSectionCard
+            icon={<ShieldOutlinedIcon sx={{ fontSize: "1.1rem" }} />}
+            title="Role Assignment"
+          >
+            <Grid container spacing={1.6}>
+              {form.enableMultipleRoles ? (
+                <>
+                  {/* Secondary Role Multiselect with Purple Chips */}
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <AppMultiSelect
+                      label="Secondary Role"
+                      placeholder="Select secondary roles"
+                      value={form.secondaryRoles}
+                      onChange={(e) => handleSecondaryRolesChange(e.target.value)}
+                      options={userRolesList}
+                      error={!!errors.secondaryRoles}
+                      helperText={errors.secondaryRoles}
+                      required
+                    />
+                  </Grid>
+
+                  {/* Primary Role Dropdown */}
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <AppSelect
+                      label="Primary Role"
+                      placeholder="Select primary role"
+                      value={form.primaryRole}
+                      onChange={(e) => fieldChange("primaryRole", e.target.value)}
+                      options={
+                        form.secondaryRoles && form.secondaryRoles.length > 0
+                          ? form.secondaryRoles.map((r) => ({
+                            label: r,
+                            value: r,
+                          }))
+                          : [
+                            {
+                              label: "Select Secondary Roles First",
+                              value: "",
+                              disabled: true,
+                            },
+                          ]
+                      }
+                      error={!!errors.primaryRole}
+                      helperText={errors.primaryRole}
+                      startAdornment={
+                        <ShieldOutlinedIcon
+                          sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                        />
+                      }
+                      required
+                    />
+                  </Grid>
+                </>
+              ) : (
+                /* Single Role Mode (reduced to 1/3 width) */
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <AppSelect
                     label="Primary Role"
                     placeholder="Select primary role"
-                    value={form.primaryRole}
-                    onChange={(e) => {
-                      const newPrimary = e.target.value;
-                      fieldChange("primaryRole", newPrimary);
-                      if (form.secondaryRole === newPrimary) {
-                        fieldChange("secondaryRole", "");
-                      }
-                    }}
-                    options={userRolesList.map((r) => ({
-                      ...r,
-                      disabled: r.value === form.secondaryRole,
-                    }))}
-                    error={!!errors.primaryRole}
-                    helperText={errors.primaryRole}
+                    value={form.roleName}
+                    onChange={(e) => fieldChange("roleName", e.target.value)}
+                    options={userRolesList}
+                    error={!!errors.roleName}
+                    helperText={errors.roleName}
+                    startAdornment={
+                      <ShieldOutlinedIcon
+                        sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                      />
+                    }
                     required
                   />
                 </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <AppSelect
-                    label="Secondary Role"
-                    placeholder="Select secondary role"
-                    value={form.secondaryRole}
-                    onChange={(e) => fieldChange("secondaryRole", e.target.value)}
-                    options={[{ label: "None / Single Role", value: "" }, ...userRolesList.map((r) => ({
-                      ...r,
-                      disabled: r.value === form.primaryRole,
-                    }))]}
-                    error={!!errors.secondaryRole}
-                    helperText={errors.secondaryRole}
-                  />
-                </Grid>
-              </>
-            )}
-
-            {/* Email & Phone Number */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput
-                label="Email"
-                placeholder="Enter email address"
-                value={form.email}
-                onChange={(e) => fieldChange("email", e.target.value)}
-                maxLength={100}
-                error={!!errors.email}
-                helperText={errors.email}
-                required
-              />
+              )}
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput
-                label="Phone Number"
-                placeholder="Enter 10-digit phone number"
-                value={form.phone}
-                onChange={(e) => fieldChange("phone", e.target.value)}
-                restrictType="numberonly"
-                maxLength={10}
-                error={!!errors.phone}
-                helperText={errors.phone}
-                required
-              />
-            </Grid>
+          </FormSectionCard>
 
-            {/* Gender & Work Type */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppSelect
-                label="Gender"
-                placeholder="Select gender"
-                value={form.gender}
-                onChange={(e) => fieldChange("gender", e.target.value)}
-                options={GENDER_OPTIONS}
-                error={!!errors.gender}
-                helperText={errors.gender}
-                required
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppSelect
-                label="Work Type"
-                placeholder="Select work type"
-                value={form.workType}
-                onChange={(e) => fieldChange("workType", e.target.value)}
-                options={typeOptions}
-                error={!!errors.workType}
-                helperText={errors.workType}
-                required
-              />
-            </Grid>
-
-            {/* Date of Birth & Joining Date */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppDateInput
-                label="Date of Birth"
-                value={form.dateOfBirth}
-                onChange={(newVal) => fieldChange("dateOfBirth", newVal)}
-                error={!!errors.dateOfBirth}
-                helperText={errors.dateOfBirth}
-                required
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppDateInput
-                label="Joining Date"
-                value={form.joiningDate}
-                onChange={(newVal) => fieldChange("joiningDate", newVal)}
-                error={!!errors.joiningDate}
-                helperText={errors.joiningDate}
-                required
-              />
-            </Grid>
-
-            {/* Checkboxes: Create Login Account & Enable Multiple Roles placed together in same row */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                  height: "100%",
-                  pt: { xs: 0, md: 2.8 },
-                  flexWrap: "wrap",
-                }}
-              >
-                <Box
-                  onClick={() => fieldChange("createMemberProfile", !form.createMemberProfile)}
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    cursor: "pointer",
-                    userSelect: "none",
-                  }}
-                >
-                  <Checkbox
-                    checked={Boolean(form.createMemberProfile)}
-                    onChange={(e) => fieldChange("createMemberProfile", e.target.checked)}
-                    onClick={(e) => e.stopPropagation()}
-                    size="small"
-                    sx={{
-                      p: 0.2,
-                      transform: "scale(0.85)",
-                      color: "#4a3f6b",
-                      "&.Mui-checked": {
-                        color: "#4a3f6b",
-                      },
-                    }}
-                  />
-                  <Typography
-                    variant="body2"
-                    fontWeight={600}
-                    sx={{
-                      color: (theme) =>
-                        theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
-                      fontSize: "0.82rem",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Create Login Account
-                  </Typography>
-                </Box>
-
-                <Box
-                  onClick={() => handleToggleMultipleRoles(!form.enableMultipleRoles)}
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    cursor: "pointer",
-                    userSelect: "none",
-                  }}
-                >
-                  <Checkbox
-                    checked={Boolean(form.enableMultipleRoles)}
-                    onChange={(e) => handleToggleMultipleRoles(e.target.checked)}
-                    onClick={(e) => e.stopPropagation()}
-                    size="small"
-                    sx={{
-                      p: 0.2,
-                      transform: "scale(0.85)",
-                      color: "#4a3f6b",
-                      "&.Mui-checked": {
-                        color: "#4a3f6b",
-                      },
-                    }}
-                  />
-                  <Typography
-                    variant="body2"
-                    fontWeight={600}
-                    sx={{
-                      color: (theme) =>
-                        theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
-                      fontSize: "0.82rem",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Enable Multiple Roles
-                  </Typography>
-                </Box>
-              </Box>
-            </Grid>
-
-            {/* Conditional User Access Fields */}
-
-            {/* Conditional User Access Fields */}
-            {form.createMemberProfile && (
-              <>
-                <Grid size={{ xs: 12, md: 4 }}>
+          {/* ── SECTION 4 — Login Credentials ────────────────────────── */}
+          {form.createMemberProfile && (
+            <FormSectionCard
+              icon={<LockOutlinedIcon sx={{ fontSize: "1.1rem" }} />}
+              title="Login Credentials"
+            >
+              <Grid container spacing={1.6}>
+                {/* Username */}
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <AppInput
                     label="Username"
                     placeholder="Enter username"
@@ -728,14 +955,28 @@ export default function UserFormPage() {
                     maxLength={30}
                     error={!!errors.username}
                     helperText={errors.username}
+                    startAdornment={
+                      <PersonOutlineRoundedIcon
+                        sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                      />
+                    }
                     required
                   />
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 4 }}>
+                {/* Password */}
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <AppInput
-                    label={isEdit ? "New Password (leave blank to keep current)" : "Password"}
-                    placeholder="Enter password (min 6 characters)"
+                    label={
+                      isEdit
+                        ? "New Password (leave blank to keep current)"
+                        : "Password"
+                    }
+                    placeholder={
+                      isEdit
+                        ? "Enter new password (optional)"
+                        : "Enter password (min 6 characters)"
+                    }
                     type={showPassword ? "text" : "password"}
                     value={form.newPassword}
                     onChange={(e) => fieldChange("newPassword", e.target.value)}
@@ -743,6 +984,11 @@ export default function UserFormPage() {
                     error={!!errors.newPassword}
                     helperText={errors.newPassword}
                     required={!isEdit}
+                    startAdornment={
+                      <LockOutlinedIcon
+                        sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                      />
+                    }
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
@@ -750,6 +996,7 @@ export default function UserFormPage() {
                             size="small"
                             onClick={() => setShowPassword((v) => !v)}
                             edge="end"
+                            sx={{ color: "#94a3b8" }}
                           >
                             {showPassword ? (
                               <VisibilityOff sx={{ fontSize: "1.1rem" }} />
@@ -762,17 +1009,28 @@ export default function UserFormPage() {
                     }}
                   />
                 </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
+
+                {/* Confirm Password */}
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <AppInput
-                    label={isEdit ? "Confirm New Password" : "Confirm Password"}
+                    label={
+                      isEdit ? "Confirm New Password" : "Confirm Password"
+                    }
                     placeholder="Re-enter password"
                     type={showConfirm ? "text" : "password"}
                     value={form.confirmPassword}
-                    onChange={(e) => fieldChange("confirmPassword", e.target.value)}
+                    onChange={(e) =>
+                      fieldChange("confirmPassword", e.target.value)
+                    }
                     maxLength={50}
                     error={!!errors.confirmPassword}
                     helperText={errors.confirmPassword}
                     required={!isEdit || !!form.newPassword}
+                    startAdornment={
+                      <LockOutlinedIcon
+                        sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
+                      />
+                    }
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
@@ -780,6 +1038,7 @@ export default function UserFormPage() {
                             size="small"
                             onClick={() => setShowConfirm((v) => !v)}
                             edge="end"
+                            sx={{ color: "#94a3b8" }}
                           >
                             {showConfirm ? (
                               <VisibilityOff sx={{ fontSize: "1.1rem" }} />
@@ -792,61 +1051,60 @@ export default function UserFormPage() {
                     }}
                   />
                 </Grid>
-              </>
-            )}
-
-            {isEdit && (
-              <Grid size={{ xs: 12 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    p: 2,
-                    borderRadius: "10px",
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.03)"
-                        : "#f8f7fc",
-                    border: (theme) => `1px solid ${theme.palette.divider}`,
-                  }}
-                >
-                  <Box>
-                    <Typography variant="body2" fontWeight={700}>
-                      Account Status
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Active users can access the system according to their assigned roles.
-                    </Typography>
-                  </Box>
-                  <AppSwitch
-                    checked={form.isActive}
-                    onChange={(e) => fieldChange("isActive", e.target.checked)}
-                  />
-                </Box>
               </Grid>
-            )}
-          </Grid>
+            </FormSectionCard>
+          )}
 
-          {/* ── Bottom Action Buttons ────────────────────────────────────────── */}
-          <Divider sx={{ my: 3, borderColor: "rgba(74, 63, 107, 0.15)" }} />
-
-          <Stack direction="row" spacing={1.5} justifyContent="center">
+          {/* ── 5. Bottom Action Buttons ──────────────────────────────── */}
+          <Stack
+            direction="row"
+            spacing={1.5}
+            justifyContent="center"
+            sx={{ mt: 1.5 }}
+          >
             <AppButton
               variant="outlined"
               onClick={() => navigate("/users")}
               disabled={saving}
+              sx={{
+                px: 3,
+                py: 0.8,
+                borderRadius: "8px",
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.2)"
+                    : "#d8d8e5",
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#cbd5e1" : "#334155",
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark" ? "transparent" : "#ffffff",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                "&:hover": {
+                  borderColor: "#4a3f6b",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.05)"
+                      : "#f8fafc",
+                },
+              }}
             >
               Cancel
             </AppButton>
             <AppButton
               variant="contained"
-              startIcon={<SaveIcon />}
+              startIcon={<SaveIcon sx={{ fontSize: "1.15rem" }} />}
               disabled={saving}
               onClick={handleSubmit}
               sx={{
-                bgcolor: "#4a3f6b !important",
-                "&:hover": { bgcolor: "#3b325c !important" },
+                px: 3.5,
+                py: 0.8,
+                borderRadius: "8px",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                bgcolor: "#342b54 !important",
+                color: "#ffffff !important",
+                "&:hover": { bgcolor: "#241d3b !important" },
               }}
             >
               {saving ? "Saving…" : "Save"}

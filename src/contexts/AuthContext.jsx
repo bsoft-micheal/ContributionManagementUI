@@ -268,13 +268,20 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // ── Sync user profile on mount if token is present ──────────────────────────
+  useEffect(() => {
+    if (authState?.token) {
+      fetchProfile().catch(() => {});
+    }
+  }, []);
+
   async function fetchProfile() {
     try {
       const { data: resData } = await apiClient.get("/users/getProfileAsync");
       const data = (resData && resData.data !== undefined) ? resData.data : resData;
       setAuthState((current) => {
         if (!current) return current;
-        return {
+        const updated = {
           ...current,
           fullName: data.fullName || current.fullName,
           email: data.email || current.email,
@@ -285,8 +292,18 @@ export function AuthProvider({ children }) {
           memberType: data.workType || data.memberType || current.memberType,
           dateOfBirth: data.dateOfBirth,
           joiningDate: data.joiningDate,
-          role: data.roleName || current.role,
+          role: current.role || data.roleName || data.role,
+          roleName: current.roleName || data.roleName || data.role,
+          roles: (data.roles && data.roles.length > 0) ? data.roles : current.roles,
+          primaryRoles: (data.primaryRoles && data.primaryRoles.length > 0) ? data.primaryRoles : current.primaryRoles,
+          secondaryRoles: (data.secondaryRoles !== undefined) ? data.secondaryRoles : current.secondaryRoles,
+          enableMultipleRoles: data.enableMultipleRoles !== undefined ? data.enableMultipleRoles : current.enableMultipleRoles,
         };
+        sessionStorage.setItem("teamContributionAuth", JSON.stringify(updated));
+        if (localStorage.getItem("teamContributionRememberMe") === "true") {
+          localStorage.setItem("teamContributionAuth", JSON.stringify(updated));
+        }
+        return updated;
       });
       return data;
     } catch (err) {

@@ -128,41 +128,36 @@ export default function AppLayout() {
 
   const userAssignedRoles = React.useMemo(() => {
     const set = new Set();
-    if (Array.isArray(authState?.roles) && authState.roles.length > 0) {
-      authState.roles.forEach((r) => r && set.add(r));
-    }
-    if (Array.isArray(authState?.primaryRoles)) {
-      authState.primaryRoles.forEach((r) => r && set.add(r));
-    }
-    if (Array.isArray(authState?.secondaryRoles)) {
-      authState.secondaryRoles.forEach((r) => r && set.add(r));
-    }
-    if (authState?.role) set.add(authState.role);
-    if (authState?.roleName) set.add(authState.roleName);
+    const addRole = (r) => {
+      if (!r || typeof r !== "string") return;
+      const clean = r.trim();
+      if (!clean) return;
+      for (const item of set) {
+        if (item.toLowerCase() === clean.toLowerCase()) return;
+      }
+      set.add(clean);
+    };
+
+    if (Array.isArray(authState?.roles)) authState.roles.forEach(addRole);
+    if (Array.isArray(authState?.Roles)) authState.Roles.forEach(addRole);
+    if (Array.isArray(authState?.primaryRoles)) authState.primaryRoles.forEach(addRole);
+    if (Array.isArray(authState?.PrimaryRoles)) authState.PrimaryRoles.forEach(addRole);
+    if (Array.isArray(authState?.secondaryRoles)) authState.secondaryRoles.forEach(addRole);
+    if (Array.isArray(authState?.SecondaryRoles)) authState.SecondaryRoles.forEach(addRole);
+    if (authState?.role) addRole(authState.role);
+    if (authState?.roleName) addRole(authState.roleName);
+
     return Array.from(set);
   }, [authState]);
 
-  const hasMultipleRoles = userAssignedRoles.length > 1;
+  const hasMultipleRoles = Boolean(
+    Boolean(authState?.enableMultipleRoles) && userAssignedRoles.length > 1
+  );
 
-  const handleQuickSwitchRole = async (e) => {
+  const handleQuickSwitchRole = (e) => {
     if (e) e.stopPropagation();
     if (!hasMultipleRoles) return;
-
-    const currentRole = authState?.role || authState?.roleName || "";
-    const targetRole = userAssignedRoles.find(
-      (r) => r && r.toLowerCase() !== currentRole.toLowerCase()
-    );
-
-    if (userAssignedRoles.length <= 2 && targetRole) {
-      try {
-        await switchRole(targetRole);
-        toast.success(`Active role switched to ${targetRole}`);
-      } catch (err) {
-        toast.error(err.response?.data?.message || err.message || "Failed to switch role");
-      }
-    } else {
-      setSwitchRoleDialogOpen(true);
-    }
+    setSwitchRoleDialogOpen(true);
   };
   const [, setRightsVersion] = useState(0);
 
@@ -631,21 +626,23 @@ export default function AppLayout() {
               {authState?.role}
             </Typography>
           </Box>
-          <Tooltip title="Switch Role">
-            <IconButton
-              size="small"
-              onClick={handleQuickSwitchRole}
-              sx={{
-                color: SIDEBAR.text,
-                p: 0.6,
-                borderRadius: "6px",
-                "&:hover": { bgcolor: SIDEBAR.hover, color: "#10b981" },
-                transition: "all 0.2s ease",
-              }}
-            >
-              <SwapHorizRoundedIcon sx={{ fontSize: "1.15rem" }} />
-            </IconButton>
-          </Tooltip>
+          {hasMultipleRoles && (
+            <Tooltip title="Switch Role">
+              <IconButton
+                size="small"
+                onClick={handleQuickSwitchRole}
+                sx={{
+                  color: SIDEBAR.text,
+                  p: 0.6,
+                  borderRadius: "6px",
+                  "&:hover": { bgcolor: SIDEBAR.hover, color: "#10b981" },
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <SwapHorizRoundedIcon sx={{ fontSize: "1.15rem" }} />
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title="Log Out">
             <IconButton
               size="small"

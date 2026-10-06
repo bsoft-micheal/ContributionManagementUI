@@ -543,36 +543,48 @@ export default function EventsPage() {
       label: "Event Type/Event Date",
       key: "eventTypeName",
       render: (row) => {
-        let dateDisplay = "";
-        if (!row.eventDates) {
-          dateDisplay = formatGridDate(row.eventDate);
-        } else {
-          const rawList = String(row.eventDates)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-
-          const countsMap = new Map();
-          rawList.forEach((d) => {
-            countsMap.set(d, (countsMap.get(d) || 0) + 1);
-          });
-
-          const formattedParts = Array.from(countsMap.entries()).map(([dateStr, count]) =>
-            count > 1 ? `${dateStr} (${count})` : dateStr
-          );
-          dateDisplay = formattedParts.join(", ");
-        }
-
         const categories = getEventCategories(row);
 
         return (
-          <Box sx={{ py: 0.2 }}>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 0.4 }}>
-              {categories.map((cat, idx) => {
-                const cfg = getCategoryChipConfig(cat);
-                return (
+          <Box sx={{ py: 0.3, display: "flex", flexDirection: "column", gap: 0.8 }}>
+            {categories.map((cat, idx) => {
+              const cfg = getCategoryChipConfig(cat);
+              const isBirthdayCat = String(cat || "").toLowerCase().includes("birthday");
+
+              let dateDisplay = "";
+              if (isBirthdayCat && row.eventDates) {
+                const rawList = String(row.eventDates)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+
+                const countsMap = new Map();
+                rawList.forEach((d) => {
+                  const match = d.match(/^(.*?)(?:\s*\((\d+)\))?$/);
+                  const datePart = match && match[1] ? match[1].trim() : d;
+                  const count = match && match[2] ? Number(match[2]) : 1;
+                  countsMap.set(datePart, (countsMap.get(datePart) || 0) + count);
+                });
+
+                const formattedParts = Array.from(countsMap.entries()).map(([dateStr, count]) =>
+                  count > 1 ? `${dateStr} (${count})` : dateStr
+                );
+                dateDisplay = formattedParts.join(", ");
+              } else {
+                dateDisplay = formatGridDate(row.eventDate);
+              }
+
+              return (
+                <Box
+                  key={idx}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 0.8,
+                  }}
+                >
                   <Chip
-                    key={idx}
                     size="small"
                     label={cfg.label}
                     sx={{
@@ -583,26 +595,25 @@ export default function EventsPage() {
                       bgcolor: cfg.bgcolor,
                       border: `1px solid ${cfg.borderColor}`,
                       "& .MuiChip-label": { px: 0.8 },
+                      flexShrink: 0,
                     }}
                   />
-                );
-              })}
-            </Box>
-            {dateDisplay && (
-              <Typography
-                variant="caption"
-                sx={{
-                  color: "text.secondary",
-                  display: "block",
-                  maxWidth: 220,
-                  whiteSpace: "normal",
-                  wordBreak: "break-word",
-                  lineHeight: 1.35,
-                }}
-              >
-                {dateDisplay}
-              </Typography>
-            )}
+                  {dateDisplay && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "text.secondary",
+                        fontWeight: 600,
+                        fontSize: "0.75rem",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {dateDisplay}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
           </Box>
         );
       },

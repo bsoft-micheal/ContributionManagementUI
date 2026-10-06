@@ -136,7 +136,21 @@ export default function EventDetailsPage() {
       <PageHeader
         eyebrow={eventDetails.eventTypeName}
         title={eventDetails.eventName}
-        description={`${eventDetails.description} Scheduled for ${eventDetails.eventDates || formatViewDate(eventDetails.eventDate)}.`}
+        description={`${eventDetails.description || ""} Scheduled for ${
+          eventDetails.eventDates
+            ? String(eventDetails.eventDates)
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .map((d) => {
+                  const match = d.match(/^(.*?)(?:\s*\((\d+)\))?$/);
+                  const datePart = match && match[1] ? match[1].trim() : d;
+                  const count = match && match[2] ? Number(match[2]) : 1;
+                  return count > 1 ? `${datePart} (${count})` : datePart;
+                })
+                .join(", ")
+            : formatViewDate(eventDetails.eventDate)
+        }.`}
         actions={
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <AppButton

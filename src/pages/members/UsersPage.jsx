@@ -957,40 +957,6 @@ export default function UsersPage() {
       },
     },
     {
-      label: "Secondary Role",
-      key: "secondaryRole",
-      render: (row) => {
-        let pRole = "";
-        if (Array.isArray(row.primaryRoleIds) && row.primaryRoleIds.length > 0) {
-          pRole = getRoleNameById(row.primaryRoleIds[0]);
-        } else if (Array.isArray(row.primaryRoles) && row.primaryRoles.length > 0) {
-          pRole = row.primaryRoles[0];
-        } else if (row.roleId) {
-          pRole = getRoleNameById(row.roleId);
-        } else if (row.roleName) {
-          pRole = row.roleName;
-        }
-
-        let sRole = "";
-        if (Array.isArray(row.secondaryRoleIds) && row.secondaryRoleIds.length > 0) {
-          sRole = getRoleNameById(row.secondaryRoleIds[0]);
-        } else if (Array.isArray(row.secondaryRoles) && row.secondaryRoles.length > 0) {
-          sRole = row.secondaryRoles[0];
-        } else if (Array.isArray(row.roleIds) && row.roleIds.length > 1) {
-          const otherId = row.roleIds.find((id) => getRoleNameById(id) !== pRole) || row.roleIds[1];
-          sRole = getRoleNameById(otherId);
-        } else if (Array.isArray(row.roles) && row.roles.length > 1) {
-          sRole = row.roles.find((r) => r !== pRole) || row.roles[1];
-        }
-
-        return (
-          <Typography variant="body2" fontWeight={600} color="text.secondary">
-            {sRole || "—"}
-          </Typography>
-        );
-      },
-    },
-    {
       label: "Created On",
       key: "createdOn",
       render: (row) => formatGridDate(row.createdOn || row.CreatedOn || row.createdAt || row.CreatedAt),

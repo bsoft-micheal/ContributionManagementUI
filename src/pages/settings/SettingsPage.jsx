@@ -1234,64 +1234,7 @@ export default function SettingsPage() {
                     />
                   </Box>
 
-                  {/* General Toggles */}
-                  <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 3, sm: 6 }, flexWrap: "wrap", pt: 0.5 }}>
-                    {/* Birthday Exemption */}
-                    <Box>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary">
-                        Birthday Members Exempt?
-                      </Typography>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.6 }}>
-                        <Switch
-                          checked={
-                            settings.birthdayMembersExempt !== undefined
-                              ? settings.birthdayMembersExempt
-                              : true
-                          }
-                          onChange={(e) => handleBirthdayExemptToggle(e.target.checked)}
-                          sx={{
-                            width: 44,
-                            height: 24,
-                            padding: 0,
-                            "& .MuiSwitch-switchBase": {
-                              padding: 0,
-                              margin: "2px",
-                              transitionDuration: "200ms",
-                              "&.Mui-checked": {
-                                transform: "translateX(20px)",
-                                color: "#fff",
-                                "& + .MuiSwitch-track": {
-                                  backgroundColor: "#1677c8",
-                                  opacity: 1,
-                                  border: 0,
-                                },
-                              },
-                            },
-                            "& .MuiSwitch-thumb": {
-                              width: 20,
-                              height: 20,
-                              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                            },
-                            "& .MuiSwitch-track": {
-                              borderRadius: 24 / 2,
-                              backgroundColor: (t) =>
-                                t.palette.mode === "dark" ? "#39393D" : "#E9E9EA",
-                              opacity: 1,
-                            },
-                          }}
-                        />
-                        <Typography
-                          variant="body2"
-                          fontWeight={700}
-                          color={
-                            settings.birthdayMembersExempt !== false ? "#1677c8" : "text.secondary"
-                          }
-                        >
-                          {settings.birthdayMembersExempt !== false ? "Enabled" : "Disabled"}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Box>
+                  {/* General Toggles (Hidden as requested) */}
 
                   <Divider sx={{ my: 1.5 }} />
 
@@ -1315,9 +1258,7 @@ export default function SettingsPage() {
                       <Typography variant="subtitle1" fontWeight={800}>
                         Forgot Password OTP Settings
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
-                        Configure email OTP expiry time and maximum retry limits for password reset requests.
-                      </Typography>
+                     
                     </Box>
                   </Box>
 

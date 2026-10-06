@@ -1,4 +1,4 @@
-import { TextField, Box, Typography } from "@mui/material";
+import { TextField, Box, Typography, InputAdornment } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { sanitizeInput } from "../../utils/validation";
 
@@ -15,6 +15,8 @@ export default function AppInput({
   required = false,
   restrictType,
   maxLength,
+  startAdornment,
+  InputProps = {},
   ...props
 }) {
   const theme = useTheme();
@@ -140,6 +142,14 @@ export default function AppInput({
         error={error}
         helperText={helperText}
         inputProps={{ maxLength, ...props.inputProps }}
+        InputProps={{
+          startAdornment: startAdornment ? (
+            <InputAdornment position="start" sx={{ mr: 0.5 }}>
+              {startAdornment}
+            </InputAdornment>
+          ) : undefined,
+          ...InputProps,
+        }}
         {...props}
       />
     </Box>

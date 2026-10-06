@@ -14,51 +14,115 @@ import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppToast } from "../common/AppToast";
-import { updateUserAsync } from "../../services/userService";
+import { updateUserAsync, getUserByIdAsync, getProfileAsync } from "../../services/userService";
 
 export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess }) {
   const theme = useTheme();
-  const { authState, switchRole } = useAuth();
+  const { authState, switchRole, fetchProfile } = useAuth();
   const toast = useAppToast();
   const [selectedRole, setSelectedRole] = useState("");
   const [switching, setSwitching] = useState(false);
+  const [fetchedUserData, setFetchedUserData] = useState(null);
+  const [loadingUserRoles, setLoadingUserRoles] = useState(false);
 
-  // Determine effective user data (either target user or current logged in authState)
-  const effectiveUser = targetUser || authState;
+  // Fetch latest user details on modal open so any recently assigned secondary roles are immediately present
+  useEffect(() => {
+    if (open) {
+      let isMounted = true;
+      const loadUserDetails = async () => {
+        setLoadingUserRoles(true);
+        try {
+          if (targetUser && targetUser.userId && targetUser.userId !== authState?.userId) {
+            const res = await getUserByIdAsync(targetUser.userId);
+            const data = res?.data || res;
+            if (isMounted && data) {
+              setFetchedUserData(data);
+            }
+          } else {
+            const data = fetchProfile ? await fetchProfile() : await getProfileAsync().then((r) => r?.data || r);
+            if (isMounted && data) {
+              setFetchedUserData(data);
+            }
+          }
+        } catch {
+          // ignore background load error and fallback to effectiveUser
+        } finally {
+          if (isMounted) setLoadingUserRoles(false);
+        }
+      };
+      loadUserDetails();
+      return () => {
+        isMounted = false;
+      };
+    } else {
+      setFetchedUserData(null);
+    }
+  }, [open, targetUser, authState?.userId]);
+
+  // Determine effective user data (freshly fetched, or target user or current logged in authState)
+  const effectiveUser = fetchedUserData || targetUser || authState;
 
   // Extract roles list
   const rolesList = React.useMemo(() => {
     if (!effectiveUser) return [];
     const set = new Set();
-    if (Array.isArray(effectiveUser.roles) && effectiveUser.roles.length > 0) {
-      effectiveUser.roles.forEach((r) => r && set.add(r));
-    }
-    if (Array.isArray(effectiveUser.primaryRoles)) {
-      effectiveUser.primaryRoles.forEach((r) => r && set.add(r));
-    }
-    if (Array.isArray(effectiveUser.secondaryRoles)) {
-      effectiveUser.secondaryRoles.forEach((r) => r && set.add(r));
-    }
-    if (effectiveUser.role) set.add(effectiveUser.role);
-    if (effectiveUser.roleName) set.add(effectiveUser.roleName);
+    const addRole = (r) => {
+      if (!r || typeof r !== "string") return;
+      const clean = r.trim();
+      if (!clean) return;
+      for (const item of set) {
+        if (item.toLowerCase() === clean.toLowerCase()) return;
+      }
+      set.add(clean);
+    };
+
+    if (Array.isArray(effectiveUser.roles)) effectiveUser.roles.forEach(addRole);
+    if (Array.isArray(effectiveUser.Roles)) effectiveUser.Roles.forEach(addRole);
+    if (Array.isArray(effectiveUser.primaryRoles)) effectiveUser.primaryRoles.forEach(addRole);
+    if (Array.isArray(effectiveUser.PrimaryRoles)) effectiveUser.PrimaryRoles.forEach(addRole);
+    if (Array.isArray(effectiveUser.secondaryRoles)) effectiveUser.secondaryRoles.forEach(addRole);
+    if (Array.isArray(effectiveUser.SecondaryRoles)) effectiveUser.SecondaryRoles.forEach(addRole);
+    if (effectiveUser.role) addRole(effectiveUser.role);
+    if (effectiveUser.roleName) addRole(effectiveUser.roleName);
+
     return Array.from(set);
   }, [effectiveUser]);
 
   // Determine currently active role
-  const currentActiveRole = targetUser ? (targetUser.roleName || targetUser.role || "") : (authState?.role || "");
+  const currentActiveRole = targetUser
+    ? (targetUser.roleName || targetUser.role || "")
+    : (authState?.role || authState?.roleName || "");
 
   // Determine primary roles list for badges
   const primaryRoles = React.useMemo(() => {
-    if (effectiveUser?.primaryRoles && Array.isArray(effectiveUser.primaryRoles) && effectiveUser.primaryRoles.length > 0) {
-      return effectiveUser.primaryRoles;
+    const list = [];
+    const addP = (r) => {
+      if (!r || typeof r !== "string") return;
+      const clean = r.trim();
+      if (clean && !list.some((item) => item.toLowerCase() === clean.toLowerCase())) {
+        list.push(clean);
+      }
+    };
+    if (effectiveUser?.primaryRoles && Array.isArray(effectiveUser.primaryRoles)) {
+      effectiveUser.primaryRoles.forEach(addP);
     }
-    // Fallback: first role is primary
-    return rolesList.length > 0 ? [rolesList[0]] : [];
+    if (effectiveUser?.PrimaryRoles && Array.isArray(effectiveUser.PrimaryRoles)) {
+      effectiveUser.PrimaryRoles.forEach(addP);
+    }
+    if (list.length === 0 && rolesList.length > 0) {
+      list.push(rolesList[0]);
+    }
+    return list;
   }, [effectiveUser, rolesList]);
 
   useEffect(() => {
     if (open) {
-      setSelectedRole(currentActiveRole || (rolesList[0] || ""));
+      if (currentActiveRole && rolesList.some((r) => r.toLowerCase() === currentActiveRole.toLowerCase())) {
+        const found = rolesList.find((r) => r.toLowerCase() === currentActiveRole.toLowerCase());
+        setSelectedRole(found || currentActiveRole);
+      } else if (rolesList.length > 0) {
+        setSelectedRole(rolesList[0]);
+      }
       setSwitching(false);
     }
   }, [open, currentActiveRole, rolesList]);
@@ -66,7 +130,7 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
   const handleSwitch = async (roleToUse) => {
     const targetRoleName = roleToUse || selectedRole;
     if (!targetRoleName) return;
-    if (targetRoleName === currentActiveRole) {
+    if (targetRoleName.toLowerCase() === String(currentActiveRole).toLowerCase()) {
       onClose();
       return;
     }
@@ -90,10 +154,8 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
           secondaryRoles: targetUser.secondaryRoles || [],
           roleName: targetRoleName,
         });
-        toast.success(`Active role for ${targetUser.fullName || targetUser.username} switched to ${targetRoleName}`);
       } else {
         await switchRole(targetRoleName);
-        toast.success(`Active role switched to ${targetRoleName}`);
       }
       if (onSuccess) onSuccess(targetRoleName);
       onClose();
@@ -143,7 +205,7 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
           </AppButton>
           <AppButton
             variant="contained"
-            onClick={handleSwitch}
+            onClick={() => handleSwitch(selectedRole)}
             disabled={switching || !selectedRole}
             sx={{
               borderRadius: "8px",
@@ -172,117 +234,124 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
           Select the role you want to activate for your current session:
         </Typography>
 
-        <Stack spacing={1.2}>
-          {rolesList.map((r) => {
-            const isSelected = selectedRole === r;
-            const isActive = currentActiveRole === r;
-            const isPrimary = primaryRoles.includes(r);
+        {loadingUserRoles && rolesList.length === 0 ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+            <CircularProgress size={24} sx={{ color: "#7c3aed" }} />
+          </Box>
+        ) : (
+          <Stack spacing={1.2}>
+            {rolesList.map((r) => {
+              const isSelected = selectedRole.toLowerCase() === r.toLowerCase();
+              const isActive = String(currentActiveRole).toLowerCase() === r.toLowerCase();
+              const isPrimary = primaryRoles.some((p) => p.toLowerCase() === r.toLowerCase());
 
-            return (
-              <Box
-                key={r}
-                onClick={() => handleSwitch(r)}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  p: 1.4,
-                  px: 1.8,
-                  borderRadius: "10px",
-                  cursor: "pointer",
-                  border: "1.5px solid",
-                  borderColor: isSelected
-                    ? "#7c3aed"
-                    : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.08)"
-                    : "rgba(74, 63, 107, 0.12)",
-                  bgcolor: isSelected
-                    ? theme.palette.mode === "dark"
-                      ? "rgba(124, 58, 237, 0.16)"
-                      : "rgba(124, 58, 237, 0.05)"
-                    : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.02)"
-                    : "#faf9fd",
-                  transition: "all 0.18s ease",
-                  "&:hover": {
-                    borderColor: isSelected ? "#7c3aed" : "rgba(124, 58, 237, 0.4)",
-                    bgcolor:
-                      theme.palette.mode === "dark"
-                        ? "rgba(124, 58, 237, 0.12)"
-                        : "rgba(124, 58, 237, 0.03)",
-                  },
-                }}
-              >
-                <Stack direction="row" spacing={1.2} alignItems="center">
-                  <Radio
-                    checked={isSelected}
-                    onChange={() => handleSwitch(r)}
-                    value={r}
-                    size="small"
-                    sx={{
-                      p: 0.3,
-                      color:
+              return (
+                <Box
+                  key={r}
+                  onClick={() => setSelectedRole(r)}
+                  onDoubleClick={() => handleSwitch(r)}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    p: 1.4,
+                    px: 1.8,
+                    borderRadius: "10px",
+                    cursor: "pointer",
+                    border: "1.5px solid",
+                    borderColor: isSelected
+                      ? "#7c3aed"
+                      : theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.08)"
+                      : "rgba(74, 63, 107, 0.12)",
+                    bgcolor: isSelected
+                      ? theme.palette.mode === "dark"
+                        ? "rgba(124, 58, 237, 0.16)"
+                        : "rgba(124, 58, 237, 0.05)"
+                      : theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.02)"
+                      : "#faf9fd",
+                    transition: "all 0.18s ease",
+                    "&:hover": {
+                      borderColor: isSelected ? "#7c3aed" : "rgba(124, 58, 237, 0.4)",
+                      bgcolor:
                         theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.3)"
-                          : "rgba(74,63,107,0.3)",
-                      "&.Mui-checked": {
-                        color: "#7c3aed",
-                      },
-                    }}
-                  />
-                  <Typography
-                    variant="body2"
-                    fontWeight={isSelected ? 800 : 600}
-                    sx={{
-                      color:
-                        isSelected
-                          ? theme.palette.mode === "dark"
-                            ? "#ffffff"
-                            : "#1e1a2e"
-                          : "text.primary",
-                      fontSize: "0.92rem",
-                    }}
-                  >
-                    {r}
-                  </Typography>
-                </Stack>
-
-                <Stack direction="row" spacing={0.8} alignItems="center">
-                  {isPrimary && (
-                    <Chip
-                      label="Primary"
+                          ? "rgba(124, 58, 237, 0.12)"
+                          : "rgba(124, 58, 237, 0.03)",
+                    },
+                  }}
+                >
+                  <Stack direction="row" spacing={1.2} alignItems="center">
+                    <Radio
+                      checked={isSelected}
+                      onChange={() => setSelectedRole(r)}
+                      value={r}
                       size="small"
                       sx={{
-                        height: 22,
-                        fontSize: "0.68rem",
-                        fontWeight: 800,
-                        bgcolor: "rgba(16, 185, 129, 0.12)",
-                        color: "#10b981",
-                        borderRadius: "4px",
+                        p: 0.3,
+                        color:
+                          theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.3)"
+                            : "rgba(74,63,107,0.3)",
+                        "&.Mui-checked": {
+                          color: "#7c3aed",
+                        },
                       }}
                     />
-                  )}
-
-                  {isActive && (
-                    <Chip
-                      label="Active"
-                      size="small"
-                      icon={<CheckCircleRoundedIcon sx={{ fontSize: "0.85rem !important", color: "#7c3aed !important" }} />}
+                    <Typography
+                      variant="body2"
+                      fontWeight={isSelected ? 800 : 600}
                       sx={{
-                        height: 22,
-                        fontSize: "0.68rem",
-                        fontWeight: 800,
-                        bgcolor: "rgba(124, 58, 237, 0.12)",
-                        color: "#7c3aed",
-                        borderRadius: "4px",
+                        color:
+                          isSelected
+                            ? theme.palette.mode === "dark"
+                              ? "#ffffff"
+                              : "#1e1a2e"
+                            : "text.primary",
+                        fontSize: "0.92rem",
                       }}
-                    />
-                  )}
-                </Stack>
-              </Box>
-            );
-          })}
-        </Stack>
+                    >
+                      {r}
+                    </Typography>
+                  </Stack>
+
+                  <Stack direction="row" spacing={0.8} alignItems="center">
+                    {isPrimary && (
+                      <Chip
+                        label="Primary"
+                        size="small"
+                        sx={{
+                          height: 22,
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          bgcolor: "rgba(16, 185, 129, 0.12)",
+                          color: "#10b981",
+                          borderRadius: "4px",
+                        }}
+                      />
+                    )}
+
+                    {isActive && (
+                      <Chip
+                        label="Active"
+                        size="small"
+                        icon={<CheckCircleRoundedIcon sx={{ fontSize: "0.85rem !important", color: "#7c3aed !important" }} />}
+                        sx={{
+                          height: 22,
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          bgcolor: "rgba(124, 58, 237, 0.12)",
+                          color: "#7c3aed",
+                          borderRadius: "4px",
+                        }}
+                      />
+                    )}
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Stack>
+        )}
       </Box>
     </AppDialog>
   );
