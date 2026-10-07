@@ -257,6 +257,10 @@ export default function AppDateInput({
   startAdornment,
   sx: customSx = {},
   slotProps: customSlotProps = {},
+  InputProps,
+  inputProps,
+  InputLabelProps,
+  FormHelperTextProps,
   ...props
 }) {
   const theme = useTheme();
@@ -321,6 +325,16 @@ export default function AppDateInput({
           field: {
             clearable: clearable,
             ...customSlotProps.field,
+          },
+          textField: {
+            size: size,
+            error: error,
+            helperText: helperText,
+            ...(InputProps ? { InputProps } : {}),
+            ...(inputProps ? { inputProps } : {}),
+            ...(InputLabelProps ? { InputLabelProps } : {}),
+            ...(FormHelperTextProps ? { FormHelperTextProps } : {}),
+            ...customSlotProps.textField,
           },
           openPickerButton: {
             size: "small",

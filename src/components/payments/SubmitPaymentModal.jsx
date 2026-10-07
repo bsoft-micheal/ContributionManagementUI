@@ -130,6 +130,7 @@ export default function SubmitPaymentModal({
     { id: 2, mode: "Cash", amount: "", utr: "" },
   ]);
   const [activeQrModal, setActiveQrModal] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const allocatedSplitSum = useMemo(() => {
     return Math.round(splitRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0) * 100) / 100;
@@ -137,6 +138,18 @@ export default function SubmitPaymentModal({
 
   const targetAmount = Number(formData.amount) || 0;
   const splitDifference = Math.round((targetAmount - allocatedSplitSum) * 100) / 100;
+
+  const maxPayableDue = useMemo(() => {
+    if (!duesSummary) return null;
+    const currentDue = duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount;
+    const arrears = duesSummary.previousArrears || 0;
+    const total = (duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears;
+
+    if (paymentScope === "CurrentEvent") return currentDue;
+    if (paymentScope === "PreviousArrears") return arrears;
+    if (paymentScope === "AllOutstanding") return total > 0 ? total : duesSummary.totalDue;
+    return duesSummary.totalDue > 0 ? duesSummary.totalDue : total;
+  }, [duesSummary, paymentScope]);
 
   const isFullySettled = useMemo(() => {
     if (duesSummary) {
@@ -641,21 +654,23 @@ export default function SubmitPaymentModal({
     const arrears = duesSummary.previousArrears || 0;
     const total = (duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears;
 
+    const fmt = (num) => Number(num || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
     if (total > 0) {
       opts.push({
-        label: `All Outstanding (₹${total.toLocaleString()})`,
+        label: `All Outstanding (₹${fmt(total)})`,
         value: "AllOutstanding",
       });
     }
     if (currentDue > 0) {
       opts.push({
-        label: `Current Event Only (₹${currentDue.toLocaleString()})${duesSummary.status === "Paid" ? " [Paid]" : ""}`,
+        label: `Current Event Only (₹${fmt(currentDue)})${duesSummary.status === "Paid" ? " [Paid]" : ""}`,
         value: "CurrentEvent",
       });
     }
     if (arrears > 0) {
       opts.push({
-        label: `Previous Arrears Only (₹${arrears.toLocaleString()})`,
+        label: `Previous Arrears Only (₹${fmt(arrears)})`,
         value: "PreviousArrears",
       });
     }
@@ -716,16 +731,6 @@ export default function SubmitPaymentModal({
         utr: "",
       },
     ]);
-
-    const isDigital = !nextMode.toLowerCase().includes("cash") && nextMode.toLowerCase() !== "none";
-    if (isDigital) {
-      setActiveQrModal({
-        open: true,
-        rowId: newId,
-        mode: nextMode,
-        amount: rowAmt,
-      });
-    }
   };
 
   const handleRemoveSplitRow = (id) => {
@@ -737,23 +742,32 @@ export default function SubmitPaymentModal({
   };
 
   const handleSplitRowChange = (id, field, value) => {
-    setSplitRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
-    );
-
-    if (field === "mode") {
-      const lower = String(value || "").toLowerCase();
-      const isDigital = !lower.includes("cash") && lower !== "none";
-      if (isDigital) {
-        const row = splitRows.find((r) => r.id === id);
-        setActiveQrModal({
-          open: true,
-          rowId: id,
-          mode: value,
-          amount: row?.amount || "",
-        });
+    let sanitized = value;
+    if (field === "amount") {
+      const targetAmt = Number(formData.amount) || 0;
+      const numVal = Number(sanitized);
+      if (targetAmt > 0 && !isNaN(numVal) && numVal > targetAmt) {
+        // Automatically clamp to target total due amount so user cannot enter more than due
+        sanitized = String(targetAmt);
+      } else if (sanitized.length > 10) {
+        sanitized = sanitized.slice(0, 10);
       }
     }
+    if (field === "utr") {
+      const row = splitRows.find((r) => r.id === id);
+      const isCash = String(row?.mode || "").toLowerCase().includes("cash");
+      if (isCash) {
+        // Limit Cash Note to max 50 characters
+        sanitized = String(value || "").slice(0, 50);
+      } else {
+        // Limit UTR / Ref to max 12 characters (alphanumeric)
+        sanitized = String(value || "").replace(/[^a-zA-Z0-9\-_/]/g, "").slice(0, 12);
+      }
+    }
+
+    setSplitRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [field]: sanitized } : r))
+    );
   };
 
   const handleQuickSplitEvenly = () => {
@@ -773,40 +787,88 @@ export default function SubmitPaymentModal({
 
   const validateForm = () => {
     const errs = {};
-    if (!formData.memberName.trim()) errs.memberName = "Member Name is required";
-    if (!formData.eventCategory.trim()) errs.eventCategory = "Event Category is required";
-    if (!formData.eventName.trim()) errs.eventName = "Event Name is required";
-    if (!formData.amount || Number(formData.amount) <= 0) errs.amount = "Valid amount is required";
+    if (!formData.memberName || !formData.memberName.trim()) errs.memberName = "Member Name is required";
+    if (!formData.eventCategory || !formData.eventCategory.trim()) errs.eventCategory = "Event Category is required";
+    if (!formData.eventName || !formData.eventName.trim()) errs.eventName = "Event Name is required";
+    
+    const targetAmt = Number(formData.amount);
+    if (!formData.amount || isNaN(targetAmt) || targetAmt <= 0) {
+      errs.amount = "Contribution amount must be greater than ₹0.00";
+    } else if (maxPayableDue !== null && maxPayableDue > 0 && targetAmt > maxPayableDue) {
+      const fmtMax = maxPayableDue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      errs.amount = `Contribution amount (₹${targetAmt.toLocaleString("en-IN")}) cannot exceed the maximum payable due of ₹${fmtMax}`;
+    } else if (targetAmt > 10000000) {
+      errs.amount = "Contribution amount cannot exceed ₹1,00,00,000 (1 Crore)";
+    }
+
+    if (formData.paymentDate && dayjs(formData.paymentDate).isAfter(dayjs(), "day")) {
+      errs.paymentDate = "Payment date cannot be in the future";
+    }
 
     if (isMultiSplit) {
       if (splitRows.length === 0) {
-        errs.split = "At least one payment row is required in split payment";
+        errs.split = "At least one payment row is required for payment breakdown";
       } else {
         const sum = Math.round(splitRows.reduce((acc, r) => acc + (Number(r.amount) || 0), 0) * 100) / 100;
-        const target = Number(formData.amount) || 0;
-        if (Math.abs(sum - target) > 0.01) {
-          errs.split = `Split breakdown sum (₹${sum}) must equal Total Amount (₹${target}). Difference: ₹${(target - sum).toFixed(2)}`;
+        if (Math.abs(sum - (targetAmt || 0)) > 0.01) {
+          const diff = Math.round(((targetAmt || 0) - sum) * 100) / 100;
+          const fmtSum = sum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const fmtTarget = (targetAmt || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const fmtDiff = Math.abs(diff).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+          errs.split = diff > 0
+            ? `Allocated breakdown total (₹${fmtSum}) is less than Total Amount (₹${fmtTarget}). Remaining: ₹${fmtDiff}`
+            : `Allocated breakdown total (₹${fmtSum}) exceeds Total Amount (₹${fmtTarget}). Excess: ₹${fmtDiff}`;
         }
+
+        // Check for duplicate payment modes
+        const selectedModes = splitRows.map((r) => String(r.mode || "").trim().toLowerCase());
+        const dupIndex = selectedModes.findIndex((m, idx) => m && selectedModes.indexOf(m) !== idx);
+        if (dupIndex !== -1) {
+          const dupName = splitRows[dupIndex]?.mode;
+          errs.split = `Duplicate payment mode '${dupName}' selected. Please choose distinct payment modes per row or combine their amounts.`;
+        }
+
+        // Check individual rows
         for (let i = 0; i < splitRows.length; i++) {
           const r = splitRows[i];
-          if (!r.amount || Number(r.amount) <= 0) {
-            errs.split = `Row #${i + 1} (${r.mode}): Please enter a valid amount.`;
+          const rowAmt = Number(r.amount);
+          if (!r.amount || isNaN(rowAmt) || rowAmt <= 0) {
+            errs.split = "Amount must be greater than ₹0.00";
+            break;
+          }
+          if (targetAmt > 0 && rowAmt > targetAmt) {
+            errs.split = `Amount (₹${rowAmt.toLocaleString("en-IN")}) cannot exceed Total Amount (₹${targetAmt.toLocaleString("en-IN")})`;
+            break;
+          }
+          if (rowAmt > 10000000) {
+            errs.split = "Amount cannot exceed ₹1,00,00,000 (1 Crore)";
             break;
           }
           const isRowCash = String(r.mode || "").toLowerCase().includes("cash");
-          if (!isRowCash && (!r.utr || !r.utr.trim())) {
-            errs.split = `Row #${i + 1} (${r.mode}): UTR / Reference number is required for digital payments.`;
-            break;
+          if (!isRowCash) {
+            if (!r.utr || !r.utr.trim()) {
+              errs.split = "UTR / Reference number is mandatory for digital payments.";
+              break;
+            } else if (r.utr.trim().length < 6) {
+              errs.split = "UTR / Ref number must be at least 6 characters (e.g. 12-digit UTR).";
+              break;
+            } else if (r.utr.trim().length > 12) {
+              errs.split = "UTR / Ref number cannot exceed 12 characters.";
+              break;
+            }
           }
         }
       }
     } else {
       const isCash = String(formData.paymentMode || "").toLowerCase().includes("cash");
       if (!isCash) {
-        if (!formData.utr.trim()) {
-          errs.utr = "UPI / Reference Number is required";
+        if (!formData.utr || !formData.utr.trim()) {
+          errs.utr = "UPI / Reference Number is required for digital payments";
         } else if (formData.utr.trim().length < 6) {
           errs.utr = "UTR must be at least 6 characters";
+        } else if (formData.utr.trim().length > 12) {
+          errs.utr = "UTR cannot exceed 12 characters";
         }
       }
     }
@@ -815,7 +877,7 @@ export default function SubmitPaymentModal({
       (formData.screenshots && formData.screenshots.length > 0) ||
       (typeof formData.screenshot === "string" && formData.screenshot.trim().length > 0);
     if (!hasScreenshots) {
-      errs.screenshot = "Payment screenshot / receipt slip is required.";
+      errs.screenshot = "At least 1 payment screenshot / receipt slip is mandatory.";
     }
 
     setErrors(errs);
@@ -1001,11 +1063,21 @@ export default function SubmitPaymentModal({
             onClick={handleSubmitProof}
             disabled={submitting || isFullySettled}
             sx={{
-              bgcolor: isFullySettled ? "action.disabledBackground !important" : "#4a3f6b !important",
-              "&:hover": { bgcolor: isFullySettled ? "action.disabledBackground !important" : "#3b325c !important" },
+              bgcolor: isFullySettled
+                ? (t) => (t.palette.mode === "dark" ? "rgba(22, 163, 74, 0.25) !important" : "rgba(22, 163, 74, 0.12) !important")
+                : "#4a3f6b !important",
+              color: isFullySettled ? "#15803d !important" : "#ffffff !important",
+              fontWeight: 800,
+              "&.Mui-disabled": {
+                bgcolor: isFullySettled
+                  ? (t) => (t.palette.mode === "dark" ? "rgba(22, 163, 74, 0.25) !important" : "rgba(22, 163, 74, 0.12) !important")
+                  : undefined,
+                color: isFullySettled ? "#15803d !important" : undefined,
+              },
+              "&:hover": { bgcolor: isFullySettled ? "rgba(22, 163, 74, 0.18) !important" : "#3b325c !important" },
             }}
           >
-            {submitting ? "Saving..." : isFullySettled ? "All Dues Settled" : "Save"}
+            {submitting ? "Saving..." : isFullySettled ? "✓ All Dues Settled" : "Save"}
           </AppButton>
         </Stack>
       }
@@ -1117,13 +1189,63 @@ export default function SubmitPaymentModal({
           </Grid>
         </Grid>
 
-        {/* Live Contribution & Dues Summary Card */}
-        {isFullySettled && (
-          <Alert severity="success" sx={{ borderRadius: "10px", fontWeight: 700, fontSize: "0.82rem" }}>
-            ✓ All dues cleared! Payment has been fully settled for this member for this event (₹0 Outstanding).
-          </Alert>
-        )}
+        {/* Row 3: Payment Scope & Fixed Contribution Amount */}
+        <Grid container spacing={2}>
+          {duesSummary && (duesSummary.previousArrears > 0 || duesSummary.totalDue > 0) && (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <AppSelect
+                label="Payment Target / Scope"
+                placeholder="Select payment target"
+                value={paymentScope}
+                onChange={(e) => handlePaymentScopeChange(e.target.value)}
+                options={paymentScopeOptions}
+                required
+              />
+            </Grid>
+          )}
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <AppInput
+              label="Contribution Amount (₹)"
+              type={duesSummary ? "text" : "number"}
+              value={
+                duesSummary && !isNaN(Number(formData.amount)) && Number(formData.amount) > 0
+                  ? Number(formData.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : formData.amount
+              }
+              onChange={(e) => {
+                const val = e.target.value;
+                setFormData((prev) => ({ ...prev, amount: val }));
+                const num = Number(val) || 0;
+                if (splitRows.length === 1) {
+                  setSplitRows([{ ...splitRows[0], amount: val }]);
+                } else if (splitRows.length > 1 && num > 0) {
+                  const baseShare = Math.floor((num / splitRows.length) * 100) / 100;
+                  const remainder = Math.round((num - baseShare * splitRows.length) * 100) / 100;
+                  setSplitRows((rows) =>
+                    rows.map((r, i) => ({
+                      ...r,
+                      amount: i === 0 ? String((baseShare + remainder).toFixed(2)) : String(baseShare.toFixed(2)),
+                    }))
+                  );
+                }
+              }}
+              disabled={!!duesSummary}
+              placeholder="0.00"
+              error={!!errors.amount}
+              helperText={
+                errors.amount ||
+                (isFullySettled
+                  ? " All dues settled"
+                  : duesSummary?.totalDue
+                  ? `Fixed from target scope: ₹${Number(formData.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : "")
+              }
+              required
+            />
+          </Grid>
+        </Grid>
 
+        {/* Live Contribution & Dues Summary Card */}
         {duesSummary && (
           <Paper
             elevation={0}
@@ -1239,50 +1361,6 @@ export default function SubmitPaymentModal({
           </Paper>
         )}
 
-        {/* Payment Scope Selector */}
-        {duesSummary && (duesSummary.previousArrears > 0 || duesSummary.totalDue > 0) && (
-          <Box>
-            <AppSelect
-              label="Payment Target / Scope *"
-              placeholder="Select payment target"
-              value={paymentScope}
-              onChange={(e) => handlePaymentScopeChange(e.target.value)}
-              options={paymentScopeOptions}
-              required
-            />
-          </Box>
-        )}
-
-        {/* Row 3: Contribution Amount */}
-        <Box>
-          <AppInput
-            label="Contribution Amount (₹) *"
-            type="number"
-            value={formData.amount}
-            onChange={(e) => {
-              const val = e.target.value;
-              setFormData((prev) => ({ ...prev, amount: val }));
-              const num = Number(val) || 0;
-              if (splitRows.length === 1) {
-                setSplitRows([{ ...splitRows[0], amount: val }]);
-              } else if (splitRows.length > 1 && num > 0) {
-                const baseShare = Math.floor((num / splitRows.length) * 100) / 100;
-                const remainder = Math.round((num - baseShare * splitRows.length) * 100) / 100;
-                setSplitRows((rows) =>
-                  rows.map((r, i) => ({
-                    ...r,
-                    amount: i === 0 ? String((baseShare + remainder).toFixed(2)) : String(baseShare.toFixed(2)),
-                  }))
-                );
-              }
-            }}
-            placeholder="0.00"
-            error={!!errors.amount}
-            helperText={errors.amount || (isFullySettled ? "✓ All dues settled (₹0 Outstanding)" : (duesSummary?.totalDue ? `Total due: ₹${duesSummary.totalDue}` : ""))}
-            required
-          />
-        </Box>
-
         {/* Multi-Mode Split Breakdown Card (Add Row) */}
         {isMultiSplit && (
           <Paper
@@ -1329,10 +1407,10 @@ export default function SubmitPaymentModal({
                     isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0)
                       ? "✓ Dues Cleared: ₹0"
                       : splitDifference === 0
-                      ? `✓ Allocated: ₹${allocatedSplitSum} / ₹${targetAmount}`
+                      ? `✓ Allocated: ₹${allocatedSplitSum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ₹${targetAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : splitDifference > 0
-                      ? `Remaining: ₹${splitDifference}`
-                      : `Exceeds: ₹${Math.abs(splitDifference)}`
+                      ? `Remaining: ₹${splitDifference.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : `Exceeds: ₹${Math.abs(splitDifference).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                   }
                   sx={{
                     fontWeight: 800,
@@ -1405,7 +1483,7 @@ export default function SubmitPaymentModal({
                     <Grid container spacing={1.5} alignItems="center">
                       <Grid size={{ xs: 12, sm: 3.5 }}>
                         <AppSelect
-                          label={`Mode #${idx + 1}`}
+                          label={`Mode ${idx + 1}`}
                           value={row.mode}
                           onChange={(e) => handleSplitRowChange(row.id, "mode", e.target.value)}
                           options={dynamicPaymentModes.filter(m => m.value !== "Split").map(m => ({ label: m.label, value: m.value }))}
@@ -1415,7 +1493,7 @@ export default function SubmitPaymentModal({
                       </Grid>
                       <Grid size={{ xs: 12, sm: 2.5 }}>
                         <AppInput
-                          label="Amount (₹) *"
+                          label="Amount (₹)"
                           type="number"
                           placeholder="0.00"
                           value={row.amount}
@@ -1428,7 +1506,7 @@ export default function SubmitPaymentModal({
                         <Box sx={{ display: "flex", gap: 0.8, alignItems: "flex-end" }}>
                           <Box sx={{ flex: 1 }}>
                             <AppInput
-                              label={isRowCash ? "Cash Note (Optional)" : "UTR / Ref # *"}
+                              label={isRowCash ? "Cash Note" : "UTR/Ref"}
                               placeholder={isRowCash ? "Handover note" : "12-digit UTR ref"}
                               value={row.utr}
                               onChange={(e) => handleSplitRowChange(row.id, "utr", e.target.value)}
@@ -1501,158 +1579,175 @@ export default function SubmitPaymentModal({
 
 
 
-        {/* Row 5: Multi-Image Upload (Maximum 3 Images) */}
-        <Box>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
-            <Typography variant="caption" fontWeight={700} sx={{ color: errors.screenshot ? "error.main" : "text.secondary" }}>
-              Payment Screenshots / Receipt Slips (Max 3 Images){" "}
-              <Box component="span" sx={{ color: "error.main", fontWeight: 800 }}>*</Box>
-            </Typography>
-            <Typography
-              variant="caption"
-              fontWeight={800}
-              color={
-                (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) === 3
-                  ? "error.main"
-                  : errors.screenshot
-                  ? "error.main"
-                  : "primary.main"
-              }
-            >
-              {(formData.screenshots?.length || (formData.screenshot ? 1 : 0))}/3 Uploaded
-            </Typography>
-          </Box>
+        {/* Row 5: Multi-Image Upload & Additional Notes side-by-side */}
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
+              <Typography variant="caption" fontWeight={700} sx={{ color: errors.screenshot ? "error.main" : "text.secondary" }}>
+                Payment Screenshots (Max 3 Images){" "}
+                <Box component="span" sx={{ color: "error.main", fontWeight: 800 }}>*</Box>
+              </Typography>
+              <Typography
+                variant="caption"
+                fontWeight={800}
+                color={
+                  (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) === 3
+                    ? "error.main"
+                    : errors.screenshot
+                    ? "error.main"
+                    : "primary.main"
+                }
+              >
+                {(formData.screenshots?.length || (formData.screenshot ? 1 : 0))}/3 Uploaded
+              </Typography>
+            </Box>
 
-          <Grid container spacing={1.5}>
-            {(formData.screenshots && formData.screenshots.length > 0
-              ? formData.screenshots
-              : (formData.screenshot ? [formData.screenshot] : [])
-            ).map((imgSrc, idx) => (
-              <Grid size={{ xs: 6, sm: 4 }} key={idx}>
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 1,
-                    borderRadius: "10px",
-                    position: "relative",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc"),
-                    borderColor: "#6366f1",
-                  }}
-                >
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => handleRemoveScreenshot(idx)}
+            <Grid container spacing={1.5}>
+              {(formData.screenshots && formData.screenshots.length > 0
+                ? formData.screenshots
+                : (formData.screenshot ? [formData.screenshot] : [])
+              ).map((imgSrc, idx) => (
+                <Grid size={{ xs: 6, sm: 4 }} key={idx}>
+                  <Paper
+                    variant="outlined"
                     sx={{
-                      position: "absolute",
-                      top: 4,
-                      right: 4,
-                      bgcolor: "rgba(239, 68, 68, 0.9)",
-                      color: "#fff",
-                      p: 0.3,
-                      "&:hover": { bgcolor: "#dc2626" },
-                      zIndex: 2,
+                      p: 1,
+                      borderRadius: "10px",
+                      position: "relative",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc"),
+                      borderColor: "#6366f1",
+                      cursor: "pointer",
+                      transition: "transform 0.15s ease",
+                      "&:hover": { transform: "scale(1.02)", borderColor: "primary.main" },
                     }}
-                    title="Remove Image"
+                    onClick={() => setPreviewImage(imgSrc)}
                   >
-                    <DeleteIcon sx={{ fontSize: "0.9rem" }} />
-                  </IconButton>
-                  <Box
-                    component="img"
-                    src={imgSrc}
-                    alt={`Receipt ${idx + 1}`}
-                    sx={{
-                      width: "100%",
-                      height: 85,
-                      objectFit: "cover",
-                      borderRadius: "6px",
-                    }}
-                  />
-                  <Typography variant="caption" fontWeight={700} sx={{ mt: 0.5, color: "#4f46e5", fontSize: "0.68rem" }}>
-                    Image #{idx + 1}
-                  </Typography>
-                </Paper>
-              </Grid>
-            ))}
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveScreenshot(idx);
+                      }}
+                      sx={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        bgcolor: "rgba(239, 68, 68, 0.9)",
+                        color: "#fff",
+                        p: 0.3,
+                        "&:hover": { bgcolor: "#dc2626" },
+                        zIndex: 2,
+                      }}
+                      title="Remove Image"
+                    >
+                      <DeleteIcon sx={{ fontSize: "0.9rem" }} />
+                    </IconButton>
+                    <Tooltip title="Click to preview full image">
+                      <Box
+                        component="img"
+                        src={imgSrc}
+                        alt={`Receipt ${idx + 1}`}
+                        sx={{
+                          width: "100%",
+                          height: 85,
+                          objectFit: "cover",
+                          borderRadius: "6px",
+                        }}
+                      />
+                    </Tooltip>
+                    <Typography variant="caption" fontWeight={700} sx={{ mt: 0.5, color: "#4f46e5", fontSize: "0.68rem" }}>
+                      Image #{idx + 1} (Click to Preview)
+                    </Typography>
+                  </Paper>
+                </Grid>
+              ))}
 
-            {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) < 3 && (
-              <Grid size={{ xs: 12, sm: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 4 : 12 }}>
-                <Paper
-                  variant="outlined"
-                  component="label"
-                  sx={{
-                    p: 2,
-                    minHeight: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 115 : "auto",
-                    borderRadius: "10px",
-                    borderStyle: "dashed",
-                    borderWidth: errors.screenshot ? "1.5px" : "1px",
-                    borderColor: errors.screenshot ? "error.main" : undefined,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 0.8,
-                    cursor: "pointer",
-                    bgcolor: errors.screenshot
-                      ? (t) => (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.04)")
-                      : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc"),
-                    "&:hover": {
+              {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) < 3 && (
+                <Grid size={{ xs: 12, sm: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 4 : 12 }}>
+                  <Paper
+                    variant="outlined"
+                    component="label"
+                    sx={{
+                      p: 2,
+                      minHeight: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 115 : "auto",
+                      borderRadius: "10px",
+                      borderStyle: "dashed",
+                      borderWidth: errors.screenshot ? "1.5px" : "1px",
+                      borderColor: errors.screenshot ? "error.main" : undefined,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 0.8,
+                      cursor: "pointer",
                       bgcolor: errors.screenshot
-                        ? (t) => (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.08)")
-                        : "rgba(99, 102, 241, 0.04)",
-                      borderColor: errors.screenshot ? "error.main" : "#6366f1",
-                    },
-                  }}
-                >
-                  <input type="file" accept="image/*" multiple hidden onChange={handleScreenshotUpload} />
-                  <UploadIcon sx={{ color: errors.screenshot ? "error.main" : "#6366f1", fontSize: "1.4rem" }} />
-                  <Typography
-                    variant="caption"
-                    textAlign="center"
-                    fontWeight={700}
-                    sx={{
-                      fontSize: "0.72rem",
-                      color: errors.screenshot ? "error.main" : "text.secondary",
+                        ? (t) => (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.04)")
+                        : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc"),
+                      "&:hover": {
+                        bgcolor: errors.screenshot
+                          ? (t) => (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.08)")
+                          : "rgba(99, 102, 241, 0.04)",
+                        borderColor: errors.screenshot ? "error.main" : "#6366f1",
+                      },
                     }}
                   >
-                    {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? "+ Add Image" : "Click to upload payment screenshot (PNG, JPG)"}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontSize: "0.65rem",
-                      color: errors.screenshot ? "error.main" : "text.secondary",
-                    }}
-                  >
-                    Select up to 3 images (Mandatory)
-                  </Typography>
-                </Paper>
-              </Grid>
+                    <input type="file" accept="image/*" multiple hidden onChange={handleScreenshotUpload} />
+                    <UploadIcon sx={{ color: errors.screenshot ? "error.main" : "#6366f1", fontSize: "1.4rem" }} />
+                    <Typography
+                      variant="caption"
+                      textAlign="center"
+                      fontWeight={700}
+                      sx={{
+                        fontSize: "0.72rem",
+                        color: errors.screenshot ? "error.main" : "text.secondary",
+                      }}
+                    >
+                      {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? "+ Add Image" : "Click to upload payment screenshot (PNG, JPG)"}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: "0.65rem",
+                        color: errors.screenshot ? "error.main" : "text.secondary",
+                      }}
+                    >
+                      Select up to 3 images (Mandatory)
+                    </Typography>
+                  </Paper>
+                </Grid>
+              )}
+            </Grid>
+
+            {errors.screenshot && (
+              <Typography
+                variant="caption"
+                color="error"
+                sx={{ display: "block", mt: 0.8, fontWeight: 700 }}
+              >
+                ⚠️ {errors.screenshot}
+              </Typography>
             )}
           </Grid>
 
-          {errors.screenshot && (
-            <Typography
-              variant="caption"
-              color="error"
-              sx={{ display: "block", mt: 0.8, fontWeight: 700 }}
-            >
-              ⚠️ {errors.screenshot}
-            </Typography>
-          )}
-        </Box>
-
-        {/* Row 6: Additional Notes */}
-        <AppTextArea
-          label="Additional Notes (Optional)"
-          value={formData.notes}
-          onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-          placeholder="e.g. Paid via GPay account"
-          rows={2}
-        />
+          {/* Right Column: Additional Notes */}
+          <Grid size={{ xs: 12, md: 5 }}>
+            <AppTextArea
+              label="Additional Notes"
+              value={formData.notes}
+              onChange={(e) => {
+                const val = e.target.value.slice(0, 300);
+                setFormData((prev) => ({ ...prev, notes: val }));
+              }}
+              placeholder="e.g. Paid via GPay account"
+              rows={4}
+              helperText={`${formData.notes.length}/300 chars`}
+            />
+          </Grid>
+        </Grid>
       </Box>
 
       {/* ── Active Row QR Code Scanner Modal (Opens on GPay/PhonePe/UPI selection) ── */}
@@ -1755,6 +1850,45 @@ export default function SubmitPaymentModal({
           >
             I Have Paid • Enter UTR Reference
           </Button>
+        </Box>
+      </AppDialog>
+
+      {/* ── Fullscreen Receipt Screenshot Image Preview Modal ── */}
+      <AppDialog
+        open={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        title="Payment Receipt Screenshot Preview"
+        maxWidth="md"
+        actions={
+          <AppButton variant="outlined" onClick={() => setPreviewImage(null)}>
+            Close Preview
+          </AppButton>
+        }
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            p: 1.5,
+            bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(0,0,0,0.4)" : "#f8fafc"),
+            borderRadius: "12px",
+          }}
+        >
+          {previewImage && (
+            <Box
+              component="img"
+              src={previewImage}
+              alt="Receipt Screenshot Preview"
+              sx={{
+                maxWidth: "100%",
+                maxHeight: "72vh",
+                objectFit: "contain",
+                borderRadius: "10px",
+                boxShadow: "0 12px 36px rgba(0,0,0,0.3)",
+              }}
+            />
+          )}
         </Box>
       </AppDialog>
     </AppDialog>

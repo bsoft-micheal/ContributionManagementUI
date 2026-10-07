@@ -584,6 +584,7 @@ export default function UserRightsPage() {
         columns={columns}
         data={filteredRows}
         loading={loading}
+        allowPagination={false}
         filterPanel={
           <Grid container spacing={3} alignItems="center">
             <Grid size={{ xs: 12, md: 3.5 }}>
