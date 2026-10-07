@@ -632,6 +632,13 @@ export default function UsersPage() {
       ? String(row["full name"]).trim()
       : (row["name"] !== undefined && row["name"] !== null ? String(row["name"]).trim() : "");
     const email = row["email"] !== undefined && row["email"] !== null ? String(row["email"]).trim() : "";
+    const rawUsername = row["username"] !== undefined && row["username"] !== null
+      ? String(row["username"]).trim()
+      : (row["user name"] !== undefined && row["user name"] !== null
+        ? String(row["user name"]).trim()
+        : (row["user_name"] !== undefined && row["user_name"] !== null ? String(row["user_name"]).trim() : ""));
+    const derivedUsername = rawUsername || (email && email.includes("@") ? email.split("@")[0].trim() : "");
+    
     const phone = row["phone number"] !== undefined && row["phone number"] !== null
       ? String(row["phone number"]).trim()
       : (row["phone"] !== undefined && row["phone"] !== null
@@ -660,7 +667,8 @@ export default function UsersPage() {
     const emailLower = email.toLowerCase();
     const existingEmail = users.find((u) => u.email && u.email.trim().toLowerCase() === emailLower);
     if (existingEmail) {
-      return { error: `Row ${rowNum}: Email '${email}' already exists in system` };
+      const owner = existingEmail.fullName || existingEmail.username || "another user";
+      return { error: `Row ${rowNum}: Email '${email}' already exists in database (registered to '${owner}')` };
     }
     if (allRows && Array.isArray(allRows)) {
       const firstEmailIndex = allRows.findIndex((r) => {
@@ -668,11 +676,32 @@ export default function UsersPage() {
         return rEmail === emailLower;
       });
       if (firstEmailIndex !== -1 && firstEmailIndex < rowNum - 2) {
-        return { error: `Row ${rowNum}: Duplicate email '${email}' in Excel (Row ${firstEmailIndex + 2})` };
+        return { error: `Row ${rowNum}: Duplicate email '${email}' in Excel sheet (matches Row ${firstEmailIndex + 2})` };
       }
     }
 
-    // 3. Mobile Number Exactly 10 Digits & Mobile Uniqueness
+    // 3. Username Uniqueness (Explicit username or Email prefix)
+    if (derivedUsername) {
+      const usernameLower = derivedUsername.toLowerCase();
+      const existingUsername = users.find((u) => u.username && u.username.trim().toLowerCase() === usernameLower);
+      if (existingUsername) {
+        const owner = existingUsername.fullName || existingUsername.username || "another user";
+        return { error: `Row ${rowNum}: Username '${derivedUsername}' already exists in database (registered to '${owner}')` };
+      }
+      if (allRows && Array.isArray(allRows)) {
+        const firstUserIndex = allRows.findIndex((r) => {
+          const rRawUser = r["username"] ?? r["user name"] ?? r["user_name"] ?? "";
+          const rEmail = r["email"] !== undefined && r["email"] !== null ? String(r["email"]).trim().toLowerCase() : "";
+          const rUser = (rRawUser ? String(rRawUser).trim() : (rEmail.includes("@") ? rEmail.split("@")[0].trim() : "")).toLowerCase();
+          return rUser === usernameLower;
+        });
+        if (firstUserIndex !== -1 && firstUserIndex < rowNum - 2) {
+          return { error: `Row ${rowNum}: Duplicate username '${derivedUsername}' in Excel sheet (matches Row ${firstUserIndex + 2})` };
+        }
+      }
+    }
+
+    // 4. Mobile Number Exactly 10 Digits & Mobile Uniqueness
     const cleanPhone = String(phone).replace(/\D/g, "");
     if (!cleanPhone) {
       return { error: `Row ${rowNum}: Phone Number is required` };
@@ -682,7 +711,8 @@ export default function UsersPage() {
     }
     const existingPhone = users.find((u) => u.phone && String(u.phone).replace(/\D/g, "") === cleanPhone);
     if (existingPhone) {
-      return { error: `Row ${rowNum}: Phone Number '${phone}' already exists in system` };
+      const owner = existingPhone.fullName || existingPhone.username || "another user";
+      return { error: `Row ${rowNum}: Phone Number '${phone}' already exists in database (registered to '${owner}')` };
     }
     if (allRows && Array.isArray(allRows)) {
       const firstPhoneIndex = allRows.findIndex((r) => {
@@ -690,11 +720,11 @@ export default function UsersPage() {
         return String(rRaw).replace(/\D/g, "") === cleanPhone;
       });
       if (firstPhoneIndex !== -1 && firstPhoneIndex < rowNum - 2) {
-        return { error: `Row ${rowNum}: Duplicate phone number '${phone}' in Excel (Row ${firstPhoneIndex + 2})` };
+        return { error: `Row ${rowNum}: Duplicate phone number '${phone}' in Excel sheet (matches Row ${firstPhoneIndex + 2})` };
       }
     }
 
-    // 4. Gender
+    // 5. Gender
     let normalizedGender = "Male";
     if (gender) {
       normalizedGender = gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
@@ -703,7 +733,7 @@ export default function UsersPage() {
       }
     }
 
-    // 5. Work Type
+    // 6. Work Type
     let normalizedType = typeOptions[0]?.value || "Office";
     if (rawType) {
       const matchedType = typeOptions.find((t) => t.value.toLowerCase() === rawType.toLowerCase());
@@ -734,7 +764,7 @@ export default function UsersPage() {
       return null;
     };
 
-    // 6. DOB Minimum Age (18 years)
+    // 7. DOB Minimum Age (18 years)
     const dob = parseExcelDate(dobStr);
     if (!dob || !dob.isValid()) {
       return { error: `Row ${rowNum}: Date of Birth must be a valid date (DD/MM/YYYY)` };
@@ -744,7 +774,7 @@ export default function UsersPage() {
       return { error: `Row ${rowNum}: User must be at least 18 years old (Age: ${ageInYears} yrs, DOB: ${dob.format("DD/MM/YYYY")})` };
     }
 
-    // 7. Joining Date must be after DOB
+    // 8. Joining Date must be after DOB
     const joiningDate = parseExcelDate(joiningStr);
     if (!joiningDate || !joiningDate.isValid()) {
       return { error: `Row ${rowNum}: Joining Date must be a valid date (DD/MM/YYYY)` };
@@ -760,6 +790,7 @@ export default function UsersPage() {
       error: null,
       parsed: {
         fullName,
+        username: rawUsername || derivedUsername,
         email,
         phone: cleanPhone,
         gender: normalizedGender,
@@ -775,26 +806,34 @@ export default function UsersPage() {
   };
 
   const handleBulkImport = async (validData) => {
-    if (!validData || validData.length === 0) return;
+    if (!validData || validData.length === 0) {
+      toast.error("No valid records found to import.");
+      return;
+    }
     setLoading(true);
     try {
       await createUsersBulkAsync(validData);
-      toast.success(`Successfully imported all ${validData.length} user account(s) & member profile(s)!`);
+      toast.success(`Successfully imported all ${validData.length} user account(s) & profile(s)!`);
       loadData();
     } catch (err) {
+      const serverData = err.response?.data;
       const rawMsg =
-        err.response?.data?.message ||
-        (typeof err.response?.data === "string" ? err.response?.data : "") ||
+        serverData?.message ||
+        (typeof serverData === "string" ? serverData : "") ||
         err.message ||
         "";
-      if (
-        rawMsg.toLowerCase().includes("inner exception") ||
-        rawMsg.toLowerCase().includes("unique") ||
-        rawMsg.toLowerCase().includes("duplicate")
-      ) {
-        toast.error("One or more records contain a username, email, or phone that already exists in the database.");
+      
+      const lower = rawMsg.toLowerCase();
+      if (lower.includes("users_email_key") || (lower.includes("email") && lower.includes("unique"))) {
+        toast.error("Duplicate Credential: Email address is already registered in the database.");
+      } else if (lower.includes("users_username_key") || (lower.includes("username") && lower.includes("unique"))) {
+        toast.error("Duplicate Credential: Username is already registered in the database.");
+      } else if (lower.includes("users_phone_key") || (lower.includes("phone") && lower.includes("unique"))) {
+        toast.error("Duplicate Credential: Phone number is already registered in the database.");
+      } else if (rawMsg) {
+        toast.error(rawMsg);
       } else {
-        toast.error(rawMsg || "Failed to import users");
+        toast.error("Failed to import users. Please verify your credentials and try again.");
       }
     } finally {
       setLoading(false);

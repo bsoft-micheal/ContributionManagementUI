@@ -17,7 +17,6 @@ import {
   FilterList as FilterListIcon,
   AddPhotoAlternate as AddPhotoAlternateIcon,
   PhotoLibrary as PhotoLibraryIcon,
-  PostAdd as PostAddIcon,
   ReceiptLong as ReceiptLongIcon,
   NotificationsActive as NotificationsActiveIcon,
 } from "@mui/icons-material";
@@ -512,28 +511,6 @@ export default function EventsPage() {
                   }}
                 >
                   <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: canViewPhotos ? actionIconColor : "#94a3b8" }} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title={canAddExpense ? "Add Expense" : "Disabled"}>
-              <span style={{ display: "inline-flex", cursor: !canAddExpense ? "not-allowed" : "pointer" }}>
-                <IconButton
-                  size="small"
-                  sx={{ p: 0.3 }}
-                  disabled={!canAddExpense}
-                  onClick={() =>
-                    navigate("/expense", {
-                      state: {
-                        openAddExpense: true,
-                        eventName: row.eventName,
-                        category: row.eventTypeName,
-                        eventDate: row.eventDate,
-                        eventId: row.eventId,
-                      },
-                    })
-                  }
-                >
-                  <PostAddIcon sx={{ fontSize: "1.1rem", color: canAddExpense ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
               </span>
             </Tooltip>
