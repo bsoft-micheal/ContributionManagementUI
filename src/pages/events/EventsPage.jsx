@@ -18,6 +18,7 @@ import {
   AddPhotoAlternate as AddPhotoAlternateIcon,
   PhotoLibrary as PhotoLibraryIcon,
   ReceiptLong as ReceiptLongIcon,
+  PostAdd as AddExpenseIcon,
   NotificationsActive as NotificationsActiveIcon,
 } from "@mui/icons-material";
 
@@ -42,6 +43,8 @@ import MetricCard from "../../components/MetricCard";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
 import EventPhotoDetailsDialog from "../../components/events/EventPhotoDetailsDialog";
 import EventExpensesDialog from "../../components/events/EventExpensesDialog";
+import EventAddExpenseDialog from "../../components/events/EventAddExpenseDialog";
+import EventAddPhotoDialog from "../../components/events/EventAddPhotoDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
@@ -127,8 +130,12 @@ export default function EventsPage() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [photoDetailsDialogOpen, setPhotoDetailsDialogOpen] = useState(false);
   const [photoEvent, setPhotoEvent] = useState(null);
+  const [addPhotoDialogOpen, setAddPhotoDialogOpen] = useState(false);
+  const [addPhotoEvent, setAddPhotoEvent] = useState(null);
   const [expenseDetailsDialogOpen, setExpenseDetailsDialogOpen] = useState(false);
   const [expenseEvent, setExpenseEvent] = useState(null);
+  const [addExpenseDialogOpen, setAddExpenseDialogOpen] = useState(false);
+  const [addExpenseEvent, setAddExpenseEvent] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const { authState } = useAuth();
@@ -433,7 +440,7 @@ export default function EventsPage() {
   const columns = [
     {
       label: "Action",
-      sx: { width: 215, minWidth: 215 },
+      sx: { width: 245, minWidth: 245 },
       render: (row) => {
         const isDeletable = canDeleteEvent && Number(row.totalPaidAmount || row.paidAmount || 0) === 0;
         return (
@@ -483,17 +490,10 @@ export default function EventsPage() {
                   size="small"
                   sx={{ p: 0.3 }}
                   disabled={!canAddPhotos}
-                  onClick={() =>
-                    navigate("/gallery", {
-                      state: {
-                        openAddPhoto: true,
-                        eventName: row.eventName,
-                        category: row.eventTypeName,
-                        eventDate: row.eventDate,
-                        eventId: row.eventId,
-                      },
-                    })
-                  }
+                  onClick={() => {
+                    setAddPhotoEvent(row);
+                    setAddPhotoDialogOpen(true);
+                  }}
                 >
                   <AddPhotoAlternateIcon sx={{ fontSize: "1.1rem", color: canAddPhotos ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
@@ -511,6 +511,21 @@ export default function EventsPage() {
                   }}
                 >
                   <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: canViewPhotos ? actionIconColor : "#94a3b8" }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={canAddExpense ? "Add Expense" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canAddExpense ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canAddExpense}
+                  onClick={() => {
+                    setAddExpenseEvent(row);
+                    setAddExpenseDialogOpen(true);
+                  }}
+                >
+                  <AddExpenseIcon sx={{ fontSize: "1.1rem", color: canAddExpense ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
               </span>
             </Tooltip>
@@ -816,16 +831,29 @@ export default function EventsPage() {
         }}
         event={photoEvent}
         onAddPhotosClick={(ev) => {
-          navigate("/gallery", {
-            state: {
-              openAddPhoto: true,
-              eventName: ev.eventName,
-              category: ev.eventTypeName,
-              eventDate: ev.eventDate,
-              eventId: ev.eventId,
-            },
-          });
+          setAddPhotoEvent(ev);
+          setAddPhotoDialogOpen(true);
         }}
+      />
+
+      <EventAddPhotoDialog
+        open={addPhotoDialogOpen}
+        onClose={() => {
+          setAddPhotoDialogOpen(false);
+          setAddPhotoEvent(null);
+        }}
+        event={addPhotoEvent}
+        onPhotosSaved={() => loadData()}
+      />
+
+      <EventAddExpenseDialog
+        open={addExpenseDialogOpen}
+        onClose={() => {
+          setAddExpenseDialogOpen(false);
+          setAddExpenseEvent(null);
+        }}
+        event={addExpenseEvent}
+        onExpenseSaved={() => loadData()}
       />
 
       <EventExpensesDialog
@@ -836,6 +864,10 @@ export default function EventsPage() {
           loadData();
         }}
         event={expenseEvent}
+        onAddExpenseClick={(ev) => {
+          setAddExpenseEvent(ev);
+          setAddExpenseDialogOpen(true);
+        }}
       />
 
       <AppConfirmDialog

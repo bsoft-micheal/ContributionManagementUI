@@ -196,10 +196,8 @@ export default function AppLayout() {
       setRightsVersion((prev) => prev + 1);
     };
     window.addEventListener("rightsUpdated", handleRightsUpdate);
-    window.addEventListener("storage", handleRightsUpdate);
     return () => {
       window.removeEventListener("rightsUpdated", handleRightsUpdate);
-      window.removeEventListener("storage", handleRightsUpdate);
     };
   }, []);
 

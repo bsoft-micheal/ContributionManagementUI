@@ -480,15 +480,10 @@ export default function EventFormPage() {
           setTotalMembers(activeMems.length);
           setExempt(getDefaultBirthdayExempt());
 
-          const initialTypeName = bdayType?.eventTypeName || typesData?.[0]?.eventTypeName || "Event";
-          const isInitialBday = initialTypeName.toLowerCase().includes("birthday");
-
           setForm({
-            eventName: isInitialBday
-              ? `${defaultDate.format("MMMM")} Birthday Celebration`
-              : `${defaultDate.format("MMMM")} ${initialTypeName} Celebration`,
-            eventTypeId: defaultTypeId,
-            eventTypeIds: defaultTypeId ? [defaultTypeId] : [],
+            eventName: "",
+            eventTypeId: "",
+            eventTypeIds: [],
             eventDate: defaultDate,
             description: "",
             baseAmount: "",
@@ -1398,7 +1393,7 @@ export default function EventFormPage() {
                     {allowMultipleEvents ? (
                       <AppMultiSelect
                         label="Event Types"
-                        placeholder="Select event types"
+                        placeholder="Select EventType"
                         value={
                           form.eventTypeIds && form.eventTypeIds.length > 0
                             ? form.eventTypeIds
@@ -1421,6 +1416,7 @@ export default function EventFormPage() {
                     ) : (
                       <AppSelect
                         label="Event Type"
+                        placeholder="Select EventType"
                         value={form.eventTypeId}
                         onChange={(e) => handleTypeChange(e.target.value)}
                         options={typeOptions}
@@ -2083,107 +2079,122 @@ export default function EventFormPage() {
                   </Box>
                 </Box>
 
-                {/* Calculation Summary Details Section */}
+                {/* Calculation Summary Details Section - Extended Box Size */}
                 <Box
                   sx={{
-                    mt: 1.5,
-                    p: 1.4,
+                    mt: 2,
+                    p: { xs: 1.8, sm: 2.2 },
                     bgcolor: (theme) =>
                       theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
                     border: "1px solid",
                     borderColor: (theme) =>
                       theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
-                    borderRadius: "8px",
+                    borderRadius: "10px",
+                    flexGrow: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
                   }}
                 >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: "block",
-                      fontWeight: 700,
-                      color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7"),
-                      fontSize: "0.75rem",
-                      mb: 0.8,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                    }}
-                  >
-                    CALCULATION SUMMARY
-                  </Typography>
-
-                  {/* 3-Column Table */}
-                  <Box sx={{ width: "100%", mb: 0.8 }}>
-                    {/* Header Row */}
-                    <Box
+                  <Box>
+                    <Typography
+                      variant="caption"
                       sx={{
-                        display: "grid",
-                        gridTemplateColumns: "35% 45% 20%",
-                        gap: 1,
-                        pb: 0.6,
-                        borderBottom: "1px solid",
-                        borderColor: (theme) =>
-                          theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
-                        fontWeight: 700,
-                        fontSize: "0.76rem",
-                        color: "#64748b",
-                        alignItems: "center",
+                        display: "block",
+                        fontWeight: 800,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7"),
+                        fontSize: "0.8rem",
+                        mb: 1.2,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
                       }}
                     >
-                      <Box>Expense</Box>
-                      <Box>Calculation</Box>
-                      <Box sx={{ textAlign: "right" }}>Total</Box>
-                    </Box>
+                      CALCULATION SUMMARY
+                    </Typography>
 
-                    {/* Table Rows */}
-                    {computedBudgetItems.map((item, idx) => (
+                    {/* 3-Column Table */}
+                    <Box sx={{ width: "100%", mb: 1.2 }}>
+                      {/* Header Row */}
                       <Box
-                        key={item.budgetCalculationId || item.expenseItem || idx}
                         sx={{
                           display: "grid",
                           gridTemplateColumns: "35% 45% 20%",
-                          gap: 1,
-                          py: 0.5,
+                          gap: 1.2,
+                          pb: 0.8,
                           borderBottom: "1px solid",
                           borderColor: (theme) =>
-                            theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9",
-                          fontSize: "0.78rem",
+                            theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
+                          fontWeight: 700,
+                          fontSize: "0.8rem",
+                          color: "#64748b",
                           alignItems: "center",
                         }}
                       >
-                        <Typography
-                          variant="body2"
-                          fontWeight={600}
-                          sx={{
-                            color: (theme) => (theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b"),
-                            fontSize: "0.78rem",
-                            lineHeight: 1.25,
-                          }}
-                        >
-                          {item.expenseItem}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: (theme) => (theme.palette.mode === "dark" ? "#94a3b8" : "#475569"),
-                            fontSize: "0.76rem",
-                            lineHeight: 1.25,
-                          }}
-                        >
-                          {item.calcFormula || item.calcText || `₹${item.amount}`}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          fontWeight={700}
-                          sx={{
-                            color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
-                            fontSize: "0.8rem",
-                            textAlign: "right",
-                          }}
-                        >
-                          ₹{(item.amount || 0).toLocaleString("en-IN")}
-                        </Typography>
+                        <Box>Expense</Box>
+                        <Box>Calculation</Box>
+                        <Box sx={{ textAlign: "right" }}>Total</Box>
                       </Box>
-                    ))}
+
+                      {/* Table Rows */}
+                      {computedBudgetItems.length === 0 ? (
+                        <Box sx={{ py: 2.5, textAlign: "center" }}>
+                          <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>
+                            Select an event type to view calculation details
+                          </Typography>
+                        </Box>
+                      ) : (
+                        computedBudgetItems.map((item, idx) => (
+                          <Box
+                            key={item.budgetCalculationId || item.expenseItem || idx}
+                            sx={{
+                              display: "grid",
+                              gridTemplateColumns: "35% 45% 20%",
+                              gap: 1.2,
+                              py: 0.8,
+                              minHeight: 34,
+                              borderBottom: "1px solid",
+                              borderColor: (theme) =>
+                                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9",
+                              fontSize: "0.82rem",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              fontWeight={600}
+                              sx={{
+                                color: (theme) => (theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b"),
+                                fontSize: "0.82rem",
+                                lineHeight: 1.3,
+                              }}
+                            >
+                              {item.expenseItem}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: (theme) => (theme.palette.mode === "dark" ? "#94a3b8" : "#475569"),
+                                fontSize: "0.8rem",
+                                lineHeight: 1.3,
+                              }}
+                            >
+                              {item.calcFormula || item.calcText || `₹${item.amount}`}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={700}
+                              sx={{
+                                color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                                fontSize: "0.84rem",
+                                textAlign: "right",
+                              }}
+                            >
+                              ₹{(item.amount || 0).toLocaleString("en-IN")}
+                            </Typography>
+                          </Box>
+                        ))
+                      )}
+                    </Box>
                   </Box>
 
                   {/* Total Planned Budget Footer */}
@@ -2192,7 +2203,8 @@ export default function EventFormPage() {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      pt: 0.8,
+                      pt: 1.2,
+                      mt: 1,
                       borderTop: "1px dashed",
                       borderColor: (theme) =>
                         theme.palette.mode === "dark" ? "divider" : "#cbd5e1",
@@ -2201,7 +2213,7 @@ export default function EventFormPage() {
                     <Typography
                       sx={{
                         fontWeight: 700,
-                        fontSize: "0.8rem",
+                        fontSize: "0.85rem",
                         color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
                       }}
                     >
@@ -2210,7 +2222,7 @@ export default function EventFormPage() {
                     <Typography
                       sx={{
                         fontWeight: 800,
-                        fontSize: "0.92rem",
+                        fontSize: "0.98rem",
                         color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
                       }}
                     >
@@ -2222,13 +2234,13 @@ export default function EventFormPage() {
             </Grid>
           </Grid>
 
-          {/* Bottom Action Footer with Divider and Right Alignment */}
+          {/* Bottom Action Footer Centered */}
           <Box
             sx={{
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "center",
               alignItems: "center",
-              gap: 1.5,
+              gap: 2,
               mt: 2,
               pt: 1.75,
               pb: 0.5,
@@ -2242,16 +2254,16 @@ export default function EventFormPage() {
               onClick={() => navigate("/events")}
               disabled={saving}
               sx={{
-                minWidth: 100,
+                minWidth: 120,
                 borderRadius: "8px",
-                px: 2.8,
-                py: 0.7,
-                minHeight: 38,
+                px: 3.5,
+                py: 0.85,
+                minHeight: 40,
                 borderColor: (theme) =>
                   theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#d8d8e5",
                 color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
                 fontWeight: 600,
-                fontSize: "0.84rem",
+                fontSize: "0.88rem",
                 "&:hover": {
                   borderColor: "#4a3f6b",
                 },
@@ -2262,20 +2274,20 @@ export default function EventFormPage() {
             {canEdit && (
               <AppButton
                 variant="contained"
-                startIcon={<SaveIcon sx={{ fontSize: "1.05rem" }} />}
+                startIcon={<SaveIcon sx={{ fontSize: "1.1rem" }} />}
                 onClick={handleSubmit}
                 disabled={saving}
                 sx={{
                   bgcolor: "#342b54 !important",
                   color: "#ffffff !important",
                   "&:hover": { bgcolor: "#241d3b !important" },
-                  minWidth: 110,
+                  minWidth: 130,
                   borderRadius: "8px",
-                  px: 3,
-                  py: 0.7,
-                  minHeight: 38,
+                  px: 3.8,
+                  py: 0.85,
+                  minHeight: 40,
                   fontWeight: 600,
-                  fontSize: "0.84rem",
+                  fontSize: "0.88rem",
                 }}
               >
                 {saving ? "Saving..." : isEdit ? "Update" : "Save"}

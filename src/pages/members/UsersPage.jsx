@@ -50,7 +50,7 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import UserDetailsDialog from "../../components/members/UserDetailsDialog";
 import SwitchRoleDialog from "../../components/members/SwitchRoleDialog";
-import { validateForm } from "../../utils/validation";
+import { validateForm, validateIndianMobile } from "../../utils/validation";
 import {
   getUsersAsync,
   createUserAsync,
@@ -377,7 +377,6 @@ export default function UsersPage() {
     const schema = {
       fullName: { required: true, type: "letteronly", min: 2, max: 100, label: "Full Name" },
       email: { required: true, email: true, label: "Email" },
-      phone: { required: true, type: "numberonly", min: 10, max: 10, label: "Phone Number" },
       gender: { required: true, label: "Gender" },
       workType: { required: true, label: "Work Type" },
       dateOfBirth: { required: true, label: "Date of Birth" },
@@ -401,6 +400,12 @@ export default function UsersPage() {
 
     const e = validateForm(form, schema);
 
+    // Validate Indian mobile number
+    const phoneErr = validateIndianMobile(form.phone);
+    if (phoneErr) {
+      e.phone = phoneErr;
+    }
+
     if (form.enableMultipleRoles) {
       if (!form.primaryRole) {
         e.primaryRole = "Primary Role is required";
@@ -417,12 +422,6 @@ export default function UsersPage() {
       if (form.newPassword && form.confirmPassword && form.newPassword !== form.confirmPassword) {
         e.confirmPassword = "Passwords do not match";
       }
-    }
-
-    // Phone exact 10-digit validation
-    const cleanPhone = String(form.phone || "").replace(/\D/g, "");
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      e.phone = "Mobile number must be exactly 10 digits";
     }
 
     // DOB minimum age (18 years)
@@ -460,13 +459,12 @@ export default function UsersPage() {
       return;
     }
 
-    // Check duplicate email, username, and mobile number
+    // Check duplicate email and username (Duplicate phone is allowed)
     const emailLower = form.email.trim().toLowerCase();
     const isAccess = Boolean(form.createMemberProfile);
     const resolvedUsername = isAccess && form.username
       ? form.username.trim()
       : (form.username?.trim() || null);
-    const cleanPhone = String(form.phone || "").replace(/\D/g, "");
 
     if (!form.userId) {
       if (users.some((u) => u.email && u.email.trim().toLowerCase() === emailLower)) {
@@ -477,11 +475,6 @@ export default function UsersPage() {
       if (isAccess && resolvedUsername && users.some((u) => u.username && u.username.trim().toLowerCase() === resolvedUsername.toLowerCase())) {
         setErrors((prev) => ({ ...prev, username: "This username is already taken" }));
         toast.error("This username is already taken");
-        return;
-      }
-      if (cleanPhone && users.some((u) => u.phone && String(u.phone).replace(/\D/g, "") === cleanPhone)) {
-        setErrors((prev) => ({ ...prev, phone: "This mobile number is already registered" }));
-        toast.error("This mobile number is already registered");
         return;
       }
     } else {
@@ -495,10 +488,19 @@ export default function UsersPage() {
         toast.error("This username is already taken");
         return;
       }
-      if (cleanPhone && users.some((u) => u.userId !== form.userId && u.phone && String(u.phone).replace(/\D/g, "") === cleanPhone)) {
-        setErrors((prev) => ({ ...prev, phone: "This mobile number is already registered" }));
-        toast.error("This mobile number is already registered");
-        return;
+    }
+
+    // Show toaster if mobile number already exists, but proceed with saving
+    const cleanPhoneDigits = String(form.phone || "").replace(/\D/g, "").slice(-10);
+    if (cleanPhoneDigits) {
+      const isPhoneDuplicate = users.some(
+        (u) =>
+          u.phone &&
+          String(u.phone).replace(/\D/g, "").slice(-10) === cleanPhoneDigits &&
+          (!form.userId || u.userId !== form.userId)
+      );
+      if (isPhoneDuplicate) {
+        toast.info("Mobile number already exists");
       }
     }
 
@@ -574,9 +576,20 @@ export default function UsersPage() {
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  function handleDeleteRequest(id) {
+  function handleDeleteRequest(user) {
     if (!canDeleteUser) return;
-    setUserToDelete(id);
+    const targetUser = typeof user === "object" ? user : users.find((u) => u.userId === user);
+    if (targetUser) {
+      const hasLoginAccount = Boolean(
+        (targetUser.username && String(targetUser.username).trim() !== "") ||
+        targetUser.createMemberProfile === true
+      );
+      if (hasLoginAccount) {
+        toast.error("Users with a login account (username and password) cannot be deleted.");
+        return;
+      }
+    }
+    setUserToDelete(typeof user === "object" ? user.userId : user);
     setDeleteConfirmOpen(true);
   }
 
@@ -637,7 +650,7 @@ export default function UsersPage() {
       : (row["user name"] !== undefined && row["user name"] !== null
         ? String(row["user name"]).trim()
         : (row["user_name"] !== undefined && row["user_name"] !== null ? String(row["user_name"]).trim() : ""));
-    const derivedUsername = rawUsername || (email && email.includes("@") ? email.split("@")[0].trim() : "");
+    const derivedUsername = rawUsername;
     
     const phone = row["phone number"] !== undefined && row["phone number"] !== null
       ? String(row["phone number"]).trim()
@@ -680,7 +693,7 @@ export default function UsersPage() {
       }
     }
 
-    // 3. Username Uniqueness (Explicit username or Email prefix)
+    // 3. Username Uniqueness (Explicit username only)
     if (derivedUsername) {
       const usernameLower = derivedUsername.toLowerCase();
       const existingUsername = users.find((u) => u.username && u.username.trim().toLowerCase() === usernameLower);
@@ -691,9 +704,8 @@ export default function UsersPage() {
       if (allRows && Array.isArray(allRows)) {
         const firstUserIndex = allRows.findIndex((r) => {
           const rRawUser = r["username"] ?? r["user name"] ?? r["user_name"] ?? "";
-          const rEmail = r["email"] !== undefined && r["email"] !== null ? String(r["email"]).trim().toLowerCase() : "";
-          const rUser = (rRawUser ? String(rRawUser).trim() : (rEmail.includes("@") ? rEmail.split("@")[0].trim() : "")).toLowerCase();
-          return rUser === usernameLower;
+          const rUser = rRawUser ? String(rRawUser).trim().toLowerCase() : "";
+          return rUser && rUser === usernameLower;
         });
         if (firstUserIndex !== -1 && firstUserIndex < rowNum - 2) {
           return { error: `Row ${rowNum}: Duplicate username '${derivedUsername}' in Excel sheet (matches Row ${firstUserIndex + 2})` };
@@ -701,28 +713,22 @@ export default function UsersPage() {
       }
     }
 
-    // 4. Mobile Number Exactly 10 Digits & Mobile Uniqueness
-    const cleanPhone = String(phone).replace(/\D/g, "");
-    if (!cleanPhone) {
+    // 4. Mobile Number Validation (Strictly 10 digits starting with 6–9, duplicate mobile number is allowed)
+    const rawPhone = String(phone || "").trim().replace(/\D/g, "");
+    if (!rawPhone) {
       return { error: `Row ${rowNum}: Phone Number is required` };
     }
-    if (cleanPhone.length !== 10) {
-      return { error: `Row ${rowNum}: Phone Number '${phone}' must be exactly 10 digits` };
-    }
-    const existingPhone = users.find((u) => u.phone && String(u.phone).replace(/\D/g, "") === cleanPhone);
-    if (existingPhone) {
-      const owner = existingPhone.fullName || existingPhone.username || "another user";
-      return { error: `Row ${rowNum}: Phone Number '${phone}' already exists in database (registered to '${owner}')` };
-    }
-    if (allRows && Array.isArray(allRows)) {
-      const firstPhoneIndex = allRows.findIndex((r) => {
-        const rRaw = r["phone number"] ?? r["phone"] ?? r["phonenumber"] ?? r["mobile"] ?? "";
-        return String(rRaw).replace(/\D/g, "") === cleanPhone;
-      });
-      if (firstPhoneIndex !== -1 && firstPhoneIndex < rowNum - 2) {
-        return { error: `Row ${rowNum}: Duplicate phone number '${phone}' in Excel sheet (matches Row ${firstPhoneIndex + 2})` };
+    const mobileRegex = /^[6-9]\d{9}$/;
+    if (!mobileRegex.test(rawPhone)) {
+      if (rawPhone.length !== 10) {
+        return { error: `Row ${rowNum}: Mobile Number '${phone}' must be exactly 10 digits` };
       }
+      if (!/^[6-9]/.test(rawPhone)) {
+        return { error: `Row ${rowNum}: Mobile Number '${phone}' must start with 6, 7, 8, or 9` };
+      }
+      return { error: `Row ${rowNum}: Mobile Number '${phone}' is invalid. Enter a 10-digit mobile number starting with 6–9` };
     }
+    const cleanPhone = rawPhone;
 
     // 5. Gender
     let normalizedGender = "Male";
@@ -790,7 +796,7 @@ export default function UsersPage() {
       error: null,
       parsed: {
         fullName,
-        username: rawUsername || derivedUsername,
+        username: rawUsername ? rawUsername.trim() : null,
         email,
         phone: cleanPhone,
         gender: normalizedGender,
@@ -872,18 +878,33 @@ export default function UsersPage() {
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title={canDeleteUser ? "Delete User" : "Disabled"}>
-              <span style={{ display: "inline-flex", cursor: !canDeleteUser ? "not-allowed" : "pointer" }}>
-                <IconButton
-                  size="small"
-                  sx={{ p: 0.3 }}
-                  disabled={!canDeleteUser}
-                  onClick={() => handleDeleteRequest(row.userId)}
-                >
-                  <DeleteIcon sx={{ fontSize: "1.05rem", color: canDeleteUser ? actionIconColor : "#94a3b8" }} />
-                </IconButton>
-              </span>
-            </Tooltip>
+            {(() => {
+              const hasLoginAccount = Boolean(
+                (row.username && String(row.username).trim() !== "") ||
+                row.createMemberProfile === true
+              );
+              const isDeleteAllowed = canDeleteUser && !hasLoginAccount;
+              const deleteTooltip = hasLoginAccount
+                ? "Cannot delete: user has an active login account (username/password)"
+                : canDeleteUser
+                ? "Delete User"
+                : "Disabled";
+
+              return (
+                <Tooltip title={deleteTooltip}>
+                  <span style={{ display: "inline-flex", cursor: !isDeleteAllowed ? "not-allowed" : "pointer" }}>
+                    <IconButton
+                      size="small"
+                      sx={{ p: 0.3 }}
+                      disabled={!isDeleteAllowed}
+                      onClick={() => handleDeleteRequest(row)}
+                    >
+                      <DeleteIcon sx={{ fontSize: "1.05rem", color: isDeleteAllowed ? actionIconColor : "#94a3b8" }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              );
+            })()}
             <Tooltip title={canChangeUserStatus ? (row.isActive ? "Deactivate User" : "Activate User") : "Disabled"}>
               <span style={{ display: "inline-flex", cursor: !canChangeUserStatus ? "not-allowed" : "pointer" }}>
                 <IconButton

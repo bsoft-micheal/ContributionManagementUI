@@ -95,7 +95,7 @@ export default function UserDetailsDialog({ open, onClose, user }) {
               variant="caption"
               sx={{ fontWeight: 800, color: "text.secondary", fontSize: "0.7rem", display: "block" }}
             >
-              Role(s)
+              Role
             </Typography>
             <Box sx={{ mt: 0.4, display: "flex", flexWrap: "wrap", gap: 0.6, alignItems: "center" }}>
               {(() => {

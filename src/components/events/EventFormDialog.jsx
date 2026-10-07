@@ -6,8 +6,20 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Checkbox,
+  Button,
 } from "@mui/material";
-import { Save as SaveIcon, CakeRounded as CakeIcon } from "@mui/icons-material";
+import {
+  Save as SaveIcon,
+  CakeRounded as CakeIcon,
+  FastfoodRounded as SnackIcon,
+  CardGiftcardRounded as GiftIcon,
+  LocalCafeRounded as DrinkIcon,
+  ReceiptRounded as ReceiptIcon,
+  PeopleRounded as PeopleIcon,
+  RestartAltRounded as ResetIcon,
+  Close as CloseIcon,
+} from "@mui/icons-material";
 import dayjs from "dayjs";
 import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
@@ -18,9 +30,16 @@ import AppButton from "../common/AppButton";
 import AppDialog from "../common/AppDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../common/AppToast";
-import { createEventAsync, updateEventAsync, getEventByIdAsync } from "../../services/eventService";
+import {
+  createEventAsync,
+  updateEventAsync,
+  getEventByIdAsync,
+} from "../../services/eventService";
 import { getBudgetCalculationsAsync } from "../../services/budgetCalculationService";
-import { updateSystemSettings } from "../../services/settingsService";
+import {
+  getSystemSettingsAsync,
+  updateSystemSettings,
+} from "../../services/settingsService";
 import {
   getPaymentQrConfig,
   buildUpiPaymentUri,
@@ -44,8 +63,10 @@ const formatBaseAmount = (value) => {
 };
 
 const initialForm = {
+  eventId: "",
   eventName: "",
   eventTypeId: "",
+  eventTypeIds: [],
   eventDate: dayjs(),
   description: "",
   baseAmount: "",
@@ -61,7 +82,7 @@ const getDefaultBirthdayExempt = () => {
         return Boolean(parsed.birthdayMembersExempt);
       }
     }
-  } catch (e) {
+  } catch {
     // Setting read error ignored
   }
   return true;
@@ -79,7 +100,7 @@ const getAllowMultipleEventsSetting = () => {
         return Boolean(parsed.allowMultipleEvents);
       }
     }
-  } catch (e) {
+  } catch {
     // Setting read error ignored
   }
   return false;
@@ -93,27 +114,24 @@ export default function EventFormDialog({
   members = [],
   onSaveSuccess,
 }) {
+  const isEdit = Boolean(event?.eventId);
   const [form, setForm] = useState(initialForm);
+  const [otherEventAmounts, setOtherEventAmounts] = useState({});
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [allowMultipleEvents, setAllowMultipleEvents] = useState(getAllowMultipleEventsSetting);
 
   const [budgetItemsList, setBudgetItemsList] = useState([]);
-  const [budgetRates, setBudgetRates] = useState(RULES);
-
-  // Birthday-specific configuration states
   const [officeBirthdays, setOfficeBirthdays] = useState(0);
   const [wfhBirthdays, setWfhBirthdays] = useState(0);
   const [totalMembers, setTotalMembers] = useState(0);
+  const [officeMembers, setOfficeMembers] = useState(0);
+  const [wfhMembers, setWfhMembers] = useState(0);
   const [exempt, setExempt] = useState(getDefaultBirthdayExempt);
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
 
   const toast = useAppToast();
-
-  const selectedType = eventTypes.find((t) => t.eventTypeId === form.eventTypeId);
-  const isBirthday = Boolean(
-    selectedType && selectedType.eventTypeName?.toLowerCase().includes("birthday")
-  );
 
   const isMemberActive = (m) => {
     const active =
@@ -129,13 +147,93 @@ export default function EventFormDialog({
     return active && !exited;
   };
 
-  // Active members count
   const activeMembers = useMemo(
-    () => members.filter(isMemberActive),
+    () => (members || []).filter(isMemberActive),
     [members]
   );
 
-  // Detect month celebrants from active members (deduplicated by name + DOB or ID)
+  // Selected event types list
+  const selectedTypes = useMemo(() => {
+    if (allowMultipleEvents && form.eventTypeIds && form.eventTypeIds.length > 0) {
+      return (eventTypes || []).filter((t) => form.eventTypeIds.includes(t.eventTypeId));
+    }
+    const single = (eventTypes || []).find((t) => t.eventTypeId === form.eventTypeId);
+    return single ? [single] : [];
+  }, [allowMultipleEvents, form.eventTypeIds, form.eventTypeId, eventTypes]);
+
+  const isBirthday = useMemo(
+    () => selectedTypes.some((t) => t.eventTypeName?.toLowerCase().includes("birthday")),
+    [selectedTypes]
+  );
+
+  const nonBirthdaySelectedTypes = useMemo(
+    () => selectedTypes.filter((t) => !t.eventTypeName?.toLowerCase().includes("birthday")),
+    [selectedTypes]
+  );
+
+  const handleOtherEventAmountChange = (typeId, value) => {
+    const cleanVal = String(value).replace(/[^0-9]/g, "");
+    setOtherEventAmounts((prev) => ({
+      ...prev,
+      [typeId]: cleanVal,
+    }));
+    setForm((prev) => ({
+      ...prev,
+      baseAmount: cleanVal,
+    }));
+    if (errors[`baseAmount_${typeId}`] || errors.baseAmount) {
+      setErrors((prev) => ({
+        ...prev,
+        [`baseAmount_${typeId}`]: "",
+        baseAmount: "",
+      }));
+    }
+  };
+
+  // Selected participants for non-birthday events
+  const participatingMembers = useMemo(() => {
+    if (isBirthday) {
+      return activeMembers;
+    }
+    return activeMembers.filter((m) => selectedParticipantIds.includes(m.memberId));
+  }, [isBirthday, activeMembers, selectedParticipantIds]);
+
+  const nonBdayTotal = participatingMembers.length;
+  const nonBdayOffice = useMemo(
+    () =>
+      participatingMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length,
+    [participatingMembers]
+  );
+  const nonBdayWfh = useMemo(
+    () =>
+      participatingMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length,
+    [participatingMembers]
+  );
+
+  // Handler to deselect/remove a member from non-birthday event
+  const handleRemoveParticipant = (memberId) => {
+    if (isBirthday) return;
+    if (selectedParticipantIds.length <= 1) {
+      toast.warning("At least 1 participating member is required.");
+      return;
+    }
+    setSelectedParticipantIds((prev) => prev.filter((id) => id !== memberId));
+  };
+
+  const handleSelectAllParticipants = () => {
+    setSelectedParticipantIds(activeMembers.map((m) => m.memberId));
+  };
+
+  const excludedMembers = useMemo(() => {
+    if (isBirthday) return [];
+    return activeMembers.filter((m) => !selectedParticipantIds.includes(m.memberId));
+  }, [isBirthday, activeMembers, selectedParticipantIds]);
+
+  // Detect month celebrants from active members
   const monthCelebrants = useMemo(() => {
     if (!form.eventDate) return [];
     const targetMonth = dayjs(form.eventDate).month();
@@ -156,7 +254,7 @@ export default function EventFormDialog({
     return list;
   }, [form.eventDate, activeMembers]);
 
-  // Comma-separated birthday dates of all celebrants in the target month (sorted ascending by date, unique dates with counts)
+  // Comma-separated birthday dates of all celebrants
   const celebrantDatesCsv = useMemo(() => {
     if (!monthCelebrants || monthCelebrants.length === 0) return "";
     const sorted = [...monthCelebrants]
@@ -174,189 +272,342 @@ export default function EventFormDialog({
       .join(", ");
   }, [monthCelebrants]);
 
-  // Birthday calculation math
-  const office = Math.max(0, Number(officeBirthdays) || 0);
-  const wfh = Math.max(0, Number(wfhBirthdays) || 0);
-  const total = Math.max(0, Number(totalMembers) || 0);
-  const bdays = office + wfh;
-  const eligible = Math.max(0, total - (exempt ? bdays : 0));
+  // Calculation counts
+  const total = isBirthday ? activeMembers.length : nonBdayTotal;
+  const office = isBirthday ? Math.max(0, Number(officeBirthdays) || 0) : nonBdayOffice;
+  const wfh = isBirthday ? Math.max(0, Number(wfhBirthdays) || 0) : nonBdayWfh;
+  const bdays = isBirthday ? office + wfh : 0;
+  const eligible = isBirthday ? Math.max(0, total - (exempt ? bdays : 0)) : nonBdayTotal;
   const puffsFactor = office > 0 ? office : 0;
 
+  // Compute budget calculation items dynamically
   const computedBudgetItems = useMemo(() => {
-    const typeNameLower = (selectedType?.eventTypeName || "").toLowerCase().trim();
-    const items = budgetItemsList.filter((b) => {
-      if (b.isActive === false) return false;
-      if (form.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === form.eventTypeId.toLowerCase()) {
-        return true;
-      }
-      const cat = (b.category || "").toLowerCase().trim();
-      return typeNameLower ? cat === typeNameLower : false;
-    });
+    const items = [];
 
-    return items.map((item) => {
-      const name = (item.expenseItem || "").toLowerCase();
-      const rate = Number(item.rate) || 0;
-      let calcText = "";
-      let amount = 0;
-      let formulaPart = "";
-
-      if (name.includes("cake")) {
-        calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
-        amount = office * rate;
-        formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
-      } else if (
-        name.includes("gift") ||
-        name.includes("present") ||
-        name.includes("voucher") ||
-        name.includes("memento")
-      ) {
-        calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
-        amount = bdays * rate;
-        formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
-      } else {
-        if (puffsFactor > 0) {
-          calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""
-            }`;
-          amount = total * rate * puffsFactor;
-        } else {
-          calcText = "WFH only → Not provided";
-          amount = 0;
+    // 1. Birthday items (if Birthday is selected)
+    const bdayType = selectedTypes.find((t) => t.eventTypeName?.toLowerCase().includes("birthday"));
+    if (bdayType) {
+      const bdayMasterItems = budgetItemsList.filter((b) => {
+        if (b.isActive === false) return false;
+        if (bdayType.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === bdayType.eventTypeId.toLowerCase()) {
+          return true;
         }
-        formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
-          "en-IN"
-        )})`;
-      }
+        const cat = (b.category || "").toLowerCase().trim();
+        return cat === "birthday" || cat.includes("birthday");
+      });
 
-      return {
-        ...item,
-        rate,
+      bdayMasterItems.forEach((item) => {
+        const name = (item.expenseItem || "").toLowerCase();
+        const rate = Number(item.rate) || 0;
+        let calcText = "";
+        let calcFormula = "";
+        let amount = 0;
+        let formulaPart = "";
+
+        if (name.includes("cake")) {
+          calcText =
+            office > 0
+              ? `${office} Office Celebrants × ₹${rate.toLocaleString("en-IN")}`
+              : "No Office Celebrants";
+          calcFormula =
+            office > 0
+              ? `Office Celebrants × ₹${rate.toLocaleString("en-IN")}`
+              : "Office Celebrants × ₹0";
+          amount = office * rate;
+          formulaPart = `Cake (${office} Office Celebrants × ₹${rate.toLocaleString(
+            "en-IN"
+          )})`;
+        } else if (name.includes("snack") || name.includes("puff") || name.includes("roll")) {
+          const isOfficeOnly = (item.applicableFor || "").toLowerCase().includes("office");
+          if (isOfficeOnly) {
+            calcText =
+              office > 0
+                ? `${office} Office Celebrants × ₹${rate.toLocaleString(
+                  "en-IN"
+                )} × ${puffsFactor}`
+                : "No Office Celebrants";
+            calcFormula =
+              office > 0
+                ? `Office Celebrants × ₹${rate.toLocaleString(
+                  "en-IN"
+                )}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`
+                : "Office Celebrants × ₹0";
+            amount = office * rate * puffsFactor;
+          } else {
+            calcText =
+              office > 0
+                ? `${total} Active Members × ₹${rate.toLocaleString(
+                  "en-IN"
+                )} × ${puffsFactor}`
+                : "No Office Celebrants";
+            calcFormula =
+              office > 0
+                ? `Active Members × ₹${rate.toLocaleString(
+                  "en-IN"
+                )}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`
+                : "Active Members × ₹0";
+            amount = total * rate * puffsFactor;
+          }
+          formulaPart = `${item.expenseItem} (${total} Active Members × ₹${rate.toLocaleString(
+            "en-IN"
+          )}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""})`;
+        } else if (name.includes("gift")) {
+          calcText = `${bdays} Total Celebrants (Office + WFH) × ₹${rate.toLocaleString(
+            "en-IN"
+          )}`;
+          calcFormula = `Total Celebrants × ₹${rate.toLocaleString("en-IN")}`;
+          amount = bdays * rate;
+          formulaPart = `Gift (${bdays} Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+        } else {
+          if (office > 0) {
+            calcText = `${total} Active Members × ₹${rate.toLocaleString(
+              "en-IN"
+            )}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""
+              }`;
+            calcFormula = `Active Members × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`;
+            amount = total * rate * puffsFactor;
+          } else {
+            calcText = "WFH only → Not provided";
+            calcFormula = "WFH only → Not provided";
+            amount = 0;
+          }
+          formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
+            "en-IN"
+          )})`;
+        }
+
+        items.push({
+          ...item,
+          category: "Birthday",
+          rate,
+          calcText,
+          calcFormula,
+          amount,
+          formulaPart,
+        });
+      });
+    }
+
+    // 2. Non-Birthday Event items
+    nonBirthdaySelectedTypes.forEach((type) => {
+      const typeName = type.eventTypeName || "Event";
+      const rawVal = otherEventAmounts[type.eventTypeId] !== undefined
+        ? otherEventAmounts[type.eventTypeId]
+        : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
+      const totalAmount = Number(String(rawVal).replace(/[^0-9]/g, "")) || 0;
+      const splitPerPerson = total > 0 && totalAmount > 0 ? Math.ceil(totalAmount / total) : 0;
+
+      const calcText = totalAmount > 0
+        ? `₹${totalAmount.toLocaleString("en-IN")} Total ÷ ${total} Members = ₹${splitPerPerson.toLocaleString("en-IN")}/person`
+        : "Enter Total Event Budget";
+
+      const calcFormula = totalAmount > 0
+        ? `Active Members × ₹${splitPerPerson.toLocaleString("en-IN")}`
+        : "₹0";
+
+      const formulaPart = totalAmount > 0
+        ? `${typeName} (₹${totalAmount.toLocaleString("en-IN")} ÷ ${total} Members = ₹${splitPerPerson.toLocaleString("en-IN")}/person)`
+        : `${typeName}: ₹0`;
+
+      items.push({
+        id: type.eventTypeId,
+        expenseItem: `${typeName} Celebration (Total Budget)`,
+        category: typeName,
+        rate: totalAmount,
         calcText,
-        amount,
+        calcFormula,
+        amount: totalAmount,
         formulaPart,
-      };
+        isOtherEvent: true,
+        splitPerPerson,
+      });
     });
-  }, [budgetItemsList, office, bdays, total, puffsFactor]);
+
+    return items;
+  }, [
+    selectedTypes,
+    nonBirthdaySelectedTypes,
+    budgetItemsList,
+    office,
+    bdays,
+    total,
+    eligible,
+    puffsFactor,
+    otherEventAmounts,
+    form.baseAmount,
+  ]);
+
+  const bdayBudget = useMemo(
+    () =>
+      computedBudgetItems
+        .filter((i) => i.category === "Birthday")
+        .reduce((sum, i) => sum + i.amount, 0),
+    [computedBudgetItems]
+  );
+  const otherEventsBudget = useMemo(
+    () =>
+      computedBudgetItems
+        .filter((i) => i.category !== "Birthday")
+        .reduce((sum, i) => sum + i.amount, 0),
+    [computedBudgetItems]
+  );
+
+  const celebrantCount = isBirthday ? bdays : 0;
+  const birthdayEligibleCount = isBirthday ? (exempt ? Math.max(0, total - celebrantCount) : total) : 0;
+  const birthdaySharePerPerson = birthdayEligibleCount > 0 ? Math.ceil(bdayBudget / birthdayEligibleCount) : 0;
+  const otherEventsSharePerPerson = total > 0 ? Math.ceil(otherEventsBudget / total) : 0;
 
   const plannedBudget = computedBudgetItems.reduce((acc, curr) => acc + curr.amount, 0);
-  const rawPerMember = eligible > 0 ? plannedBudget / eligible : 0;
-  const contributionPerMember =
-    eligible > 0 ? Math.ceil(rawPerMember / RULES.rounding) * RULES.rounding : 0;
-  const expectedCollection = contributionPerMember * eligible;
-  const roundingSurplus = Math.max(0, expectedCollection - plannedBudget);
 
-  const dynamicFormulaText = computedBudgetItems
-    .map((i) => i.formulaPart)
-    .filter(Boolean)
-    .join(" + ");
+  const contributionPerMember = useMemo(() => {
+    if (isBirthday && exempt && celebrantCount > 0) {
+      return birthdaySharePerPerson + otherEventsSharePerPerson;
+    }
+    return total > 0 ? Math.ceil((plannedBudget / total) / RULES.rounding) * RULES.rounding : 0;
+  }, [isBirthday, exempt, celebrantCount, birthdaySharePerPerson, otherEventsSharePerPerson, plannedBudget, total]);
+
+  const expectedCollection = useMemo(() => {
+    if (isBirthday && exempt && celebrantCount > 0) {
+      return (birthdayEligibleCount * birthdaySharePerPerson) + (total * otherEventsSharePerPerson);
+    }
+    return contributionPerMember * (isBirthday ? eligible : total);
+  }, [isBirthday, exempt, celebrantCount, birthdayEligibleCount, birthdaySharePerPerson, total, otherEventsSharePerPerson, contributionPerMember, eligible]);
 
   // Dialog open & initialization
   useEffect(() => {
-    if (open) {
-      getBudgetCalculationsAsync()
-        .then((budgetData) => {
-          if (Array.isArray(budgetData) && budgetData.length > 0) {
-            const activeItems = budgetData.filter((b) => b.isActive !== false);
-            setBudgetItemsList(activeItems);
-            const bdayActive = activeItems.filter(
-              (b) => !b.category || b.category.toLowerCase().includes("birthday")
-            );
-            const cakeItem = bdayActive.find((b) => b.expenseItem?.toLowerCase().includes("cake"));
-            const puffsItem = bdayActive.find((b) => b.expenseItem?.toLowerCase().includes("puff") || b.expenseItem?.toLowerCase().includes("snack") || b.expenseItem?.toLowerCase().includes("roll"));
-            const giftItem = bdayActive.find((b) => b.expenseItem?.toLowerCase().includes("gift"));
+    if (!open) return;
 
-            setBudgetRates((prev) => ({
-              ...prev,
-              cakeRate: cakeItem ? Number(cakeItem.rate) : prev.cakeRate,
-              puffsRate: puffsItem ? Number(puffsItem.rate) : prev.puffsRate,
-              giftRate: giftItem ? Number(giftItem.rate) : prev.giftRate,
-            }));
+    let isMounted = true;
+    async function initDialogData() {
+      setLoading(true);
+      try {
+        const [budgetData, settingsData] = await Promise.all([
+          getBudgetCalculationsAsync().catch(() => []),
+          getSystemSettingsAsync().catch(() => null),
+        ]);
+
+        if (!isMounted) return;
+
+        let isMultipleAllowed = getAllowMultipleEventsSetting();
+        if (settingsData) {
+          if (settingsData.allowedMultipleEvent !== undefined) {
+            isMultipleAllowed = Boolean(settingsData.allowedMultipleEvent);
+          } else if (settingsData.allowMultipleEvents !== undefined) {
+            isMultipleAllowed = Boolean(settingsData.allowMultipleEvents);
           }
-        })
-        .catch(() => { });
+        }
+        setAllowMultipleEvents(isMultipleAllowed);
 
-      const bdayType = eventTypes.find((t) =>
-        t.eventTypeName?.toLowerCase().includes("birthday")
-      );
-      const defaultTypeId = bdayType ? bdayType.eventTypeId : eventTypes[0]?.eventTypeId || "";
+        const activeBudgetItems = Array.isArray(budgetData)
+          ? budgetData.filter((b) => b.isActive !== false)
+          : [];
+        setBudgetItemsList(activeBudgetItems);
 
-      if (event && event.eventId) {
-        const fetchDetails = async () => {
-          setLoading(true);
-          try {
-            const detailedEvent = await getEventByIdAsync(event.eventId);
-            const pIds =
-              detailedEvent.participantIds ||
-              (detailedEvent.participants ? detailedEvent.participants.map((p) => p.memberId) : []);
-
-            const currentEventDate = detailedEvent.eventDate ? dayjs(detailedEvent.eventDate) : dayjs();
-            const targetMonth = currentEventDate.month();
-            const celebrantsInMonth = activeMembers.filter(
-              (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
-            );
-            const offCount = celebrantsInMonth.filter(
-              (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
-            ).length;
-            const wfhCount = celebrantsInMonth.filter(
-              (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
-            ).length;
-
-            setOfficeBirthdays(offCount);
-            setWfhBirthdays(wfhCount);
-            setTotalMembers(activeMembers.length);
-            setExempt(true);
-
-            setForm({
-              eventId: detailedEvent.eventId || null,
-              eventName: detailedEvent.eventName || "",
-              eventTypeId: detailedEvent.eventTypeId || defaultTypeId,
-              eventDate: currentEventDate,
-              description: detailedEvent.description || "",
-              baseAmount:
-                detailedEvent.baseAmount !== undefined &&
-                  detailedEvent.baseAmount !== null &&
-                  Number(detailedEvent.baseAmount) > 0
-                  ? String(detailedEvent.baseAmount)
-                  : "",
-              participantIds: pIds,
-            });
-          } catch (error) {
-            toast.error("Failed to load event details");
-          } finally {
-            setLoading(false);
-          }
-        };
-        fetchDetails();
-      } else {
-        // Adding new event
-        const defaultDate = dayjs();
-        const targetMonth = defaultDate.month();
-        const celebrantsInMonth = activeMembers.filter(
-          (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
-        );
-        const offCount = celebrantsInMonth.filter(
+        const offTotal = activeMembers.filter(
           (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
         ).length;
-        const wfhCount = celebrantsInMonth.filter(
+        const wfhTotal = activeMembers.filter(
           (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
         ).length;
 
-        setOfficeBirthdays(offCount);
-        setWfhBirthdays(wfhCount);
+        setOfficeMembers(offTotal);
+        setWfhMembers(wfhTotal);
         setTotalMembers(activeMembers.length);
-        setExempt(getDefaultBirthdayExempt());
 
-        setForm({
-          eventName: `${defaultDate.format("MMMM")} Birthday Celebration`,
-          eventTypeId: defaultTypeId,
-          eventDate: defaultDate,
-          description: "",
-          baseAmount: "",
-          participantIds: activeMembers.map((m) => m.memberId),
-        });
+        const allActiveIds = activeMembers.map((m) => m.memberId);
+
+        if (event && event.eventId) {
+          // Editing an existing event
+          const detailedEvent = await getEventByIdAsync(event.eventId);
+          if (!isMounted) return;
+
+          const pIds =
+            detailedEvent.participantIds ||
+            (detailedEvent.participants ? detailedEvent.participants.map((p) => p.memberId) : allActiveIds);
+
+          const currentEventDate = detailedEvent.eventDate ? dayjs(detailedEvent.eventDate) : dayjs();
+          const targetMonth = currentEventDate.month();
+          const celebrantsInMonth = activeMembers.filter(
+            (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+          );
+          const offCount = celebrantsInMonth.filter(
+            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+          ).length;
+          const wfhCount = celebrantsInMonth.filter(
+            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+          ).length;
+
+          setOfficeBirthdays(offCount);
+          setWfhBirthdays(wfhCount);
+          setTotalMembers(activeMembers.length);
+          setExempt(true);
+          setSelectedParticipantIds(pIds.length > 0 ? pIds : allActiveIds);
+
+          const eventTypeIdsList =
+            detailedEvent.eventTypeIds && detailedEvent.eventTypeIds.length > 0
+              ? detailedEvent.eventTypeIds
+              : detailedEvent.eventTypeId
+                ? [detailedEvent.eventTypeId]
+                : [];
+
+          let initialBaseAmount = "";
+          if (detailedEvent.baseAmount) {
+            initialBaseAmount = String(detailedEvent.baseAmount);
+          }
+
+          setForm({
+            eventId: detailedEvent.eventId || event.eventId,
+            eventName: detailedEvent.eventName || "",
+            eventTypeId: detailedEvent.eventTypeId || "",
+            eventTypeIds: eventTypeIdsList,
+            eventDate: currentEventDate,
+            description: detailedEvent.description || "",
+            baseAmount: initialBaseAmount,
+            participantIds: pIds,
+          });
+        } else {
+          // Adding a new event
+          const defaultDate = dayjs();
+          const targetMonth = defaultDate.month();
+          const celebrantsInMonth = activeMembers.filter(
+            (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+          );
+          const offCount = celebrantsInMonth.filter(
+            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+          ).length;
+          const wfhCount = celebrantsInMonth.filter(
+            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+          ).length;
+
+          setOfficeBirthdays(offCount);
+          setWfhBirthdays(wfhCount);
+          setTotalMembers(activeMembers.length);
+          setExempt(getDefaultBirthdayExempt());
+          setSelectedParticipantIds(allActiveIds);
+
+          setForm({
+            eventId: "",
+            eventName: "",
+            eventTypeId: "",
+            eventTypeIds: [],
+            eventDate: defaultDate,
+            description: "",
+            baseAmount: "",
+            participantIds: allActiveIds,
+          });
+        }
+      } catch {
+        toast.error("Failed to initialize event configuration");
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      setErrors({});
     }
-  }, [open, event, eventTypes, activeMembers]);
+
+    initDialogData();
+    return () => {
+      isMounted = false;
+    };
+  }, [open, event, activeMembers]);
 
   // Handle date change
   const handleDateChange = (newDate) => {
@@ -372,54 +623,234 @@ export default function EventFormDialog({
       newEventName = `${dayjs(newDate).format("MMMM")} Birthday Celebration`;
     }
 
-    if (oldMonth !== newMonth) {
-      const celebrantsInNewMonth = activeMembers.filter(
-        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === newMonth
-      );
-      const offCount = celebrantsInNewMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
-      ).length;
-      const wfhCount = celebrantsInNewMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
-      ).length;
-      setOfficeBirthdays(offCount > 0 ? offCount : 1);
-      setWfhBirthdays(wfhCount);
-    }
-
-    setForm((c) => ({
-      ...c,
+    setForm((current) => ({
+      ...current,
       eventDate: newDate,
       eventName: newEventName,
     }));
-    if (errors.eventDate) setErrors((p) => ({ ...p, eventDate: "" }));
+
+    if (oldMonth !== newMonth) {
+      const celebrantsInMonth = activeMembers.filter(
+        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === newMonth
+      );
+      const offCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length;
+      const wfhCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length;
+
+      setOfficeBirthdays(offCount);
+      setWfhBirthdays(wfhCount);
+    }
   };
 
+  // Toggle multiple events setting
+  const handleToggleAllowMultipleEvents = async (newValue) => {
+    setAllowMultipleEvents(newValue);
+    try {
+      localStorage.setItem(
+        "cm_system_settings",
+        JSON.stringify({
+          ...JSON.parse(localStorage.getItem("cm_system_settings") || "{}"),
+          allowedMultipleEvent: newValue,
+          allowMultipleEvents: newValue,
+        })
+      );
+      await updateSystemSettings({
+        allowedMultipleEvent: newValue,
+        allowMultipleEvents: newValue,
+      });
+    } catch {
+      // Ignored
+    }
+
+    if (newValue) {
+      if (form.eventTypeId && (!form.eventTypeIds || form.eventTypeIds.length === 0)) {
+        setForm((prev) => ({
+          ...prev,
+          eventTypeIds: [form.eventTypeId],
+        }));
+      }
+    } else {
+      const singleId =
+        form.eventTypeIds && form.eventTypeIds.length > 0
+          ? form.eventTypeIds[0]
+          : form.eventTypeId;
+      handleTypeChange(singleId || "");
+    }
+  };
+
+  // Handle single event type switch
+  const handleTypeChange = (newTypeId) => {
+    const newType = (eventTypes || []).find((t) => t.eventTypeId === newTypeId);
+    const newTypeName = newType?.eventTypeName || "";
+    const isNewBday = newTypeName.toLowerCase().includes("birthday");
+
+    let updatedName = form.eventName;
+    if (!isEdit) {
+      const monthStr = dayjs(form.eventDate).format("MMMM");
+      if (newTypeId) {
+        updatedName = isNewBday
+          ? `${monthStr} Birthday Celebration`
+          : `${monthStr} ${newTypeName} Celebration`;
+      } else {
+        updatedName = "";
+      }
+    }
+
+    const allActiveIds = activeMembers.map((m) => m.memberId);
+    setSelectedParticipantIds(allActiveIds);
+
+    const offTotal = activeMembers.filter(
+      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+    ).length;
+    const wfhTotal = activeMembers.filter(
+      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+    ).length;
+
+    if (isNewBday) {
+      const targetMonth = dayjs(form.eventDate).month();
+      const celebrantsInMonth = activeMembers.filter(
+        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+      );
+      const offCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length;
+      const wfhCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length;
+      setOfficeBirthdays(offCount);
+      setWfhBirthdays(wfhCount);
+    }
+
+    setTotalMembers(activeMembers.length);
+    setOfficeMembers(offTotal);
+    setWfhMembers(wfhTotal);
+
+    setForm((prev) => ({
+      ...prev,
+      eventTypeId: newTypeId,
+      eventTypeIds: newTypeId ? [newTypeId] : [],
+      eventName: updatedName,
+      baseAmount: prev.baseAmount || "",
+      participantIds: allActiveIds,
+    }));
+    if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+    if (errors.baseAmount) setErrors((p) => ({ ...p, baseAmount: "" }));
+  };
+
+  // Handle multiple event types selection
+  const handleMultiTypeChange = (newTypeIds) => {
+    const selectedTypesList = (eventTypes || []).filter((t) => newTypeIds.includes(t.eventTypeId));
+    const hasBday = selectedTypesList.some((t) =>
+      t.eventTypeName?.toLowerCase().includes("birthday")
+    );
+
+    let updatedName = form.eventName;
+    if (!isEdit) {
+      const monthStr = dayjs(form.eventDate).format("MMMM");
+      if (selectedTypesList.length === 0) {
+        updatedName = "";
+      } else if (selectedTypesList.length === 1) {
+        updatedName = hasBday
+          ? `${monthStr} Birthday Celebration`
+          : `${monthStr} ${selectedTypesList[0].eventTypeName} Celebration`;
+      } else {
+        const names = selectedTypesList.map((t) => t.eventTypeName);
+        updatedName = `${monthStr} ${names.join(" & ")} Celebration`;
+      }
+    }
+
+    const allActiveIds = activeMembers.map((m) => m.memberId);
+    setSelectedParticipantIds(allActiveIds);
+
+    const offTotal = activeMembers.filter(
+      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+    ).length;
+    const wfhTotal = activeMembers.filter(
+      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+    ).length;
+
+    if (hasBday) {
+      const targetMonth = dayjs(form.eventDate).month();
+      const celebrantsInMonth = activeMembers.filter(
+        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+      );
+      const offCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length;
+      const wfhCount = celebrantsInMonth.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length;
+      setOfficeBirthdays(offCount);
+      setWfhBirthdays(wfhCount);
+    }
+
+    setTotalMembers(activeMembers.length);
+    setOfficeMembers(offTotal);
+    setWfhMembers(wfhTotal);
+
+    setForm((prev) => ({
+      ...prev,
+      eventTypeIds: newTypeIds,
+      eventTypeId: newTypeIds[0] || "",
+      eventName: updatedName,
+      participantIds: allActiveIds,
+    }));
+    if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+  };
+
+  // Submit Handler
   const handleSubmit = async () => {
     const filed = "This field is required";
     const schema = {
       eventName: { required: true, min: 3, max: 100, label: filed },
-      eventTypeId: { required: true, label: filed },
       eventDate: { required: true, label: filed },
     };
 
-    if (!isBirthday) {
-      schema.baseAmount = {
+    if (allowMultipleEvents) {
+      schema.eventTypeIds = {
         required: true,
-        type: "numberonly",
         label: filed,
         customValidate: (val) => {
-          const num = Number(String(val).replace(/[^0-9]/g, ""));
-          if (val === "" || val === undefined || val === null || num <= 0) {
-            return filed;
-          }
+          if (!val || val.length === 0) return filed;
           return "";
         },
       };
-      schema.participantIds = { required: true, label: filed };
+    } else {
+      schema.eventTypeId = { required: true, label: filed };
     }
 
-    const newErrors = validateForm(form, schema);
+    if (nonBirthdaySelectedTypes.length > 0) {
+      nonBirthdaySelectedTypes.forEach((type) => {
+        const val = otherEventAmounts[type.eventTypeId] !== undefined
+          ? otherEventAmounts[type.eventTypeId]
+          : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
+        const num = Number(String(val).replace(/[^0-9]/g, ""));
+        if (!val || num <= 0) {
+          schema[`baseAmount_${type.eventTypeId}`] = {
+            required: true,
+            label: `${type.eventTypeName} amount is required`,
+            customValidate: () => `${type.eventTypeName} budget amount is required`,
+          };
+        }
+      });
+    }
 
+    const validationPayload = {
+      ...form,
+      ...Object.fromEntries(
+        nonBirthdaySelectedTypes.map((t) => [
+          `baseAmount_${t.eventTypeId}`,
+          otherEventAmounts[t.eventTypeId] !== undefined
+            ? otherEventAmounts[t.eventTypeId]
+            : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : ""),
+        ])
+      ),
+    };
+
+    const newErrors = validateForm(validationPayload, schema);
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       toast.error("Please fill required field");
@@ -429,32 +860,35 @@ export default function EventFormDialog({
     setSaving(true);
     try {
       let payload;
+      const allActiveParticipantIds = activeMembers.map((m) => m.memberId);
+      const chosenParticipantIds = isBirthday
+        ? allActiveParticipantIds
+        : (selectedParticipantIds.length > 0 ? selectedParticipantIds : allActiveParticipantIds);
+
+      const resolvedEventTypeIds = allowMultipleEvents
+        ? form.eventTypeIds
+        : form.eventTypeId ? [form.eventTypeId] : [];
+
+      const primaryTypeId = resolvedEventTypeIds[0] || form.eventTypeId || "";
 
       if (isBirthday) {
         const celebrantIds = monthCelebrants.map((m) => m.memberId);
-        const allActiveParticipantIds = activeMembers.map((m) => m.memberId);
-
         const contributionOverrides = [];
-        if (exempt) {
-          celebrantIds.forEach((id) => {
-            contributionOverrides.push({ memberId: id, amount: 0 });
-          });
-          allActiveParticipantIds.forEach((id) => {
-            if (!celebrantIds.includes(id)) {
-              contributionOverrides.push({
-                memberId: id,
-                amount: contributionPerMember,
-              });
-            }
-          });
-        } else {
-          allActiveParticipantIds.forEach((id) => {
+
+        chosenParticipantIds.forEach((id) => {
+          const isCelebrant = celebrantIds.includes(id);
+          if (isCelebrant && exempt) {
+            contributionOverrides.push({
+              memberId: id,
+              amount: otherEventsSharePerPerson,
+            });
+          } else {
             contributionOverrides.push({
               memberId: id,
               amount: contributionPerMember,
             });
-          });
-        }
+          }
+        });
 
         const celebrantsSummary = monthCelebrants
           .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
@@ -462,7 +896,8 @@ export default function EventFormDialog({
 
         payload = {
           eventName: form.eventName.trim(),
-          eventTypeId: form.eventTypeId,
+          eventTypeId: primaryTypeId,
+          eventTypeIds: resolvedEventTypeIds,
           eventDate: dayjs(form.eventDate).hour(12).toISOString(),
           eventDates: celebrantDatesCsv || null,
           description:
@@ -471,27 +906,27 @@ export default function EventFormDialog({
             }. Planned Budget: ₹${plannedBudget.toLocaleString(
               "en-IN"
             )}, Contribution/member: ₹${contributionPerMember}`,
-          baseAmount: plannedBudget > 0 ? plannedBudget : Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
-          participantIds:
-            allActiveParticipantIds.length > 0
-              ? allActiveParticipantIds
-              : form.participantIds,
+          baseAmount: plannedBudget > 0 ? plannedBudget : 0,
+          participantIds: chosenParticipantIds,
           contributionOverrides: contributionOverrides,
         };
       } else {
-        const perMemberAmount = Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0);
-        const pIds = form.participantIds || [];
-        const totalBudget = perMemberAmount * (pIds.length || 1);
-        const overrides = pIds.map((mId) => ({
+        const overrides = chosenParticipantIds.map((mId) => ({
           memberId: mId,
-          amount: perMemberAmount,
+          amount: contributionPerMember,
         }));
+
         payload = {
           ...form,
-          baseAmount: totalBudget,
+          eventName: form.eventName.trim(),
+          eventTypeId: primaryTypeId,
+          eventTypeIds: resolvedEventTypeIds,
+          baseAmount: plannedBudget > 0 ? plannedBudget : Number(String(form.baseAmount).replace(/[^0-9]/g, "") || 0),
+          participantIds: chosenParticipantIds,
           contributionOverrides: overrides,
           eventDate: dayjs(form.eventDate).hour(12).toISOString(),
           eventDates: null,
+          description: form.description?.trim() || "",
         };
       }
 
@@ -499,37 +934,30 @@ export default function EventFormDialog({
         await updateEventAsync(form.eventId, payload);
         toast.success("Saved successfully");
       } else {
-        // Sync dynamic QR code with per-member contribution amount to backend settings before event creation
-        // This guarantees that backend's email template sends the real, scannable UPI QR code (not a static logo)
+        // Sync dynamic QR code with per-member contribution amount
         try {
           const qrConfig = getPaymentQrConfig();
-          const targetAmount = isBirthday
-            ? contributionPerMember
-            : (payload.participantIds?.length > 0
-              ? Math.round(Number(payload.baseAmount) / payload.participantIds.length)
-              : 0);
+          const targetAmount = contributionPerMember > 0 ? contributionPerMember : undefined;
 
           const eventUpiUri = buildUpiPaymentUri({
             upiId: qrConfig.qrUpiId,
             receiverName: qrConfig.qrReceiverName,
-            amount: targetAmount > 0 ? targetAmount : undefined,
+            amount: targetAmount,
             note: `Contribution for ${payload.eventName}`,
           });
 
-          // Generate the scanner QR image URL compatible with backend database and Gmail
           const eventQrImage = getQrCodeApiUrl(eventUpiUri, 300);
-
           if (eventQrImage) {
             await updateSystemSettings({
               ...qrConfig,
               qrImage: eventQrImage,
             });
           }
-        } catch (syncErr) {
+        } catch {
           // QR sync warning ignored
         }
 
-        const createdEvent = await createEventAsync(payload);
+        await createEventAsync(payload);
         toast.success("Event created successfully! Notification emails dispatched to contributors.");
       }
 
@@ -552,470 +980,961 @@ export default function EventFormDialog({
     }
   };
 
-  const typeOptions = eventTypes.map((t) => ({
+  const typeOptions = (eventTypes || []).map((t) => ({
     label: t.eventTypeName,
     value: t.eventTypeId,
-  }));
-
-  const memberOptions = members.map((m) => ({
-    label: m.name,
-    value: m.memberId,
   }));
 
   return (
     <AppDialog
       open={open}
       onClose={onClose}
-      title={form.eventId ? "Edit Event" : isBirthday ? "Event Details" : "Add Event"}
-      maxWidth={isBirthday ? "lg" : "md"}
+      title={form.eventId ? "Edit Event" : "Add Event"}
+      maxWidth="lg"
+      fullWidth
       actions={
-        <>
-          <AppButton variant="outlined" onClick={onClose} disabled={saving || loading}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 2,
+            width: "100%",
+            py: 0.5,
+          }}
+        >
+          <AppButton
+            variant="outlined"
+            onClick={onClose}
+            disabled={saving || loading}
+            sx={{
+              minWidth: 120,
+              borderRadius: "8px",
+              px: 3.5,
+              py: 0.85,
+              minHeight: 40,
+              fontWeight: 600,
+              fontSize: "0.88rem",
+            }}
+          >
             Cancel
           </AppButton>
           <AppButton
             variant="contained"
-            startIcon={<SaveIcon />}
+            startIcon={<SaveIcon sx={{ fontSize: "1.1rem" }} />}
             onClick={handleSubmit}
             disabled={saving || loading}
             sx={{
-              bgcolor: "#4a3f6b !important",
-              "&:hover": { bgcolor: "#3b325c !important" },
+              bgcolor: "#342b54 !important",
+              color: "#ffffff !important",
+              "&:hover": { bgcolor: "#241d3b !important" },
+              minWidth: 130,
+              borderRadius: "8px",
+              px: 3.8,
+              py: 0.85,
+              minHeight: 40,
+              fontWeight: 600,
+              fontSize: "0.88rem",
             }}
           >
-            {saving ? "Saving..." : loading ? "Loading..." : "Save"}
+            {saving ? "Saving..." : loading ? "Loading..." : form.eventId ? "Update" : "Save"}
           </AppButton>
-        </>
+        </Box>
       }
     >
-      {/* Birthday Event Setup (Prototype Implementation) */}
-      {isBirthday ? (
-        <Grid container spacing={3}>
-          {/* Left Column: Event Configuration Card */}
-          <Grid size={{ xs: 12, md: 7 }}>
+      <Box sx={{ p: { xs: 1, sm: 1.5 } }}>
+        <Grid container spacing={2} alignItems="stretch">
+          {/* Left Panel: Event Configuration (~65% width) */}
+          <Grid size={{ xs: 12, lg: 7.8 }}>
             <Box
               sx={{
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
                 border: "1px solid",
-                borderColor: "divider",
-                borderRadius: "14px",
-                overflow: "hidden",
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
-                boxShadow: "0 3px 12px rgba(20,60,90,0.06)",
+                borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
+                borderRadius: "12px",
+                p: { xs: 2, sm: 2.2 },
+                boxShadow: "0 2px 12px rgba(74, 63, 107, 0.03)",
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
+              {/* Panel Header */}
               <Box
                 sx={{
-                  px: 2.5,
-                  py: 1.6,
-                  borderBottom: "1px solid",
-                  borderColor: "divider",
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  mb: 1.8,
+                  flexWrap: "wrap",
+                  gap: 1,
                 }}
               >
-                <Typography variant="subtitle1" fontWeight={700}>
+                <Typography
+                  variant="h6"
+                  fontWeight={700}
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
+                    letterSpacing: "0.01em",
+                  }}
+                >
                   Event Configuration
                 </Typography>
+
+                <Box
+                  onClick={() => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.8,
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                >
+                  <Checkbox
+                    checked={Boolean(allowMultipleEvents)}
+                    onChange={(e) => handleToggleAllowMultipleEvents(e.target.checked)}
+                    onClick={(e) => e.stopPropagation()}
+                    size="small"
+                    sx={{
+                      p: 0.2,
+                      transform: "scale(0.85)",
+                      color: "#4a3f6b",
+                      "&.Mui-checked": {
+                        color: "#4a3f6b",
+                      },
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    sx={{
+                      color: (theme) =>
+                        theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
+                      fontSize: "0.82rem",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Allow Multiple Events
+                  </Typography>
+                </Box>
               </Box>
 
-              <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppSelect
-                      label="Event Category"
-                      value={form.eventTypeId}
+              {/* Form Grid */}
+              <Grid container spacing={1.75}>
+                {/* Row 1: Event Type(s) & Event Name */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  {allowMultipleEvents ? (
+                    <AppMultiSelect
+                      label="Event Types"
+                      placeholder="Select EventType"
+                      value={
+                        form.eventTypeIds && form.eventTypeIds.length > 0
+                          ? form.eventTypeIds
+                          : form.eventTypeId
+                            ? [form.eventTypeId]
+                            : []
+                      }
                       onChange={(e) => {
-                        setForm((c) => ({ ...c, eventTypeId: e.target.value }));
-                        if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
+                        const val =
+                          typeof e.target.value === "string"
+                            ? e.target.value.split(",")
+                            : e.target.value;
+                        handleMultiTypeChange(val);
                       }}
                       options={typeOptions}
                       error={!!errors.eventTypeId}
                       helperText={errors.eventTypeId}
                       required
                     />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label="Event Name"
-                      placeholder="Enter event name"
+                  ) : (
+                    <AppSelect
+                      label="Event Type"
+                      placeholder="Select EventType"
+                      value={form.eventTypeId}
+                      onChange={(e) => handleTypeChange(e.target.value)}
+                      options={typeOptions}
+                      error={!!errors.eventTypeId}
+                      helperText={errors.eventTypeId}
                       required
-                      value={form.eventName}
-                      onChange={(e) => {
-                        setForm((c) => ({ ...c, eventName: e.target.value }));
-                        if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
-                      }}
-                      error={!!errors.eventName}
-                      helperText={errors.eventName}
                     />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    {isBirthday ? (
-                      <AppInput
-                        label="Event Date"
-                        required
-                        value={
-                          celebrantDatesCsv ||
-                          (form.eventDate
-                            ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
-                            : "Auto calculated")
-                        }
-                        disabled
-                        multiline
-                        minRows={1}
-                        maxRows={2}
-                        placeholder="Auto calculated"
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            minHeight: 34,
-                            height: "auto",
-                            py: 0.6,
-                            px: 1,
-                            bgcolor: (theme) =>
-                              theme.palette.mode === "dark"
-                                ? "rgba(255, 255, 255, 0.05)"
-                                : "#f8fafd",
-                          },
-                          "& textarea": {
-                            fontSize: "0.82rem",
-                            fontWeight: 600,
-                            lineHeight: 1.45,
-                            maxHeight: 52,
-                            overflowY: "auto !important",
-                            cursor: "default",
-                            color: (theme) =>
-                              theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
-                            "&::-webkit-scrollbar": {
-                              width: "4px",
-                            },
-                            "&::-webkit-scrollbar-thumb": {
-                              backgroundColor: "rgba(124, 58, 237, 0.35)",
-                              borderRadius: "4px",
-                            },
-                          },
-                        }}
-                      />
-                    ) : (
-                      <AppDateInput
-                        label="Event Date"
-                        required
-                        value={form.eventDate}
-                        onChange={handleDateChange}
-                        error={!!errors.eventDate}
-                        helperText={errors.eventDate}
-                      />
-                    )}
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label="Total Active Members"
-                      placeholder="Enter count"
-                      type="Text"
-                      value={totalMembers}
-                      onChange={(e) =>
-                        setTotalMembers(Math.max(1, parseInt(e.target.value, 10) || 1))
-                      }
-                    />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label="Office Birthday Members"
-                      placeholder="Enter count"
-                      type="Text"
-                      value={officeBirthdays}
-                      onChange={(e) =>
-                        setOfficeBirthdays(Math.max(0, parseInt(e.target.value, 10) || 0))
-                      }
-                    />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label="WFH Birthday Members"
-                      placeholder="Enter count"
-                      type="Text"
-                      value={wfhBirthdays}
-                      onChange={(e) =>
-                        setWfhBirthdays(Math.max(0, parseInt(e.target.value, 10) || 0))
-                      }
-                    />
-                  </Grid>
+                  )}
                 </Grid>
 
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppInput
+                    label="Event Name"
+                    placeholder="Enter event name"
+                    required
+                    value={form.eventName}
+                    onChange={(e) => {
+                      setForm((c) => ({ ...c, eventName: e.target.value }));
+                      if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
+                    }}
+                    error={!!errors.eventName}
+                    helperText={errors.eventName}
+                  />
+                </Grid>
 
+                {/* Row 2: Event Date & Total Active Members */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  {isBirthday && selectedTypes.length === 1 ? (
+                    <AppInput
+                      label="Event Date"
+                      required
+                      value={
+                        celebrantDatesCsv ||
+                        (form.eventDate
+                          ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
+                          : "Auto calculated")
+                      }
+                      disabled
+                      multiline
+                      minRows={1}
+                      maxRows={2}
+                      placeholder="Auto calculated"
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          minHeight: 38,
+                          height: "auto",
+                          py: 0.6,
+                          px: 1,
+                          bgcolor: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(255, 255, 255, 0.05)"
+                              : "#f8fafd",
+                        },
+                        "& textarea": {
+                          fontSize: "0.82rem",
+                          fontWeight: 600,
+                          lineHeight: 1.4,
+                          maxHeight: 48,
+                          overflowY: "auto !important",
+                          cursor: "default",
+                          color: (theme) =>
+                            theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                          "&::-webkit-scrollbar": {
+                            width: "4px",
+                          },
+                          "&::-webkit-scrollbar-thumb": {
+                            backgroundColor: "rgba(124, 58, 237, 0.35)",
+                            borderRadius: "4px",
+                          },
+                        },
+                      }}
+                    />
+                  ) : (
+                    <AppDateInput
+                      label="Event Date"
+                      required
+                      value={form.eventDate}
+                      onChange={handleDateChange}
+                      error={!!errors.eventDate}
+                      helperText={errors.eventDate}
+                    />
+                  )}
+                </Grid>
 
-                {/* Celebrants detected for current month */}
-                {monthCelebrants.length > 0 && (
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppInput
+                    label="Total Active Members"
+                    placeholder="Auto calculated"
+                    type="text"
+                    value={totalMembers}
+                    disabled
+                  />
+                </Grid>
+
+                {/* Row 3: Office Members & WFH Members */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppInput
+                    label={isBirthday ? "Office Birthday Members" : "Office Members"}
+                    placeholder="Auto calculated"
+                    type="text"
+                    value={isBirthday ? officeBirthdays : officeMembers}
+                    disabled
+                  />
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppInput
+                    label={isBirthday ? "WFH Birthday Members" : "WFH Members"}
+                    placeholder="Auto calculated"
+                    type="text"
+                    value={isBirthday ? wfhBirthdays : wfhMembers}
+                    disabled
+                  />
+                </Grid>
+
+                {/* Subsection: Additional Event Contributions */}
+                {nonBirthdaySelectedTypes.length > 0 && (
+                  <>
+                    <Grid size={{ xs: 12 }}>
+                      <Typography
+                        variant="caption"
+                        fontWeight={700}
+                        sx={{
+                          display: "block",
+                          fontSize: "0.8rem",
+                          color: (theme) =>
+                            theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          mt: 0.5,
+                        }}
+                      >
+                        Additional Event Contributions
+                      </Typography>
+                    </Grid>
+
+                    {nonBirthdaySelectedTypes.map((type) => {
+                      const rawVal =
+                        otherEventAmounts[type.eventTypeId] !== undefined
+                          ? otherEventAmounts[type.eventTypeId]
+                          : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
+                      const numVal = Number(String(rawVal).replace(/[^0-9]/g, "")) || 0;
+                      const splitPerPerson = total > 0 && numVal > 0 ? Math.ceil(numVal / total) : 0;
+                      const fieldError =
+                        errors[`baseAmount_${type.eventTypeId}`] ||
+                        (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
+
+                      return (
+                        <Grid size={{ xs: 12, sm: 6 }} key={type.eventTypeId}>
+                          <AppInput
+                            label={`${type.eventTypeName} Total Budget (₹)`}
+                            placeholder="Enter total amount"
+                            required
+                            fullWidth
+                            value={formatBaseAmount(rawVal)}
+                            onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
+                            startAdornment={
+                              <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
+                                ₹
+                              </Typography>
+                            }
+                            endAdornment={
+                              numVal > 0 && total > 0 ? (
+                                <Chip
+                                  label={`₹${splitPerPerson.toLocaleString("en-IN")}/person`}
+                                  size="small"
+                                  sx={{
+                                    fontWeight: 700,
+                                    fontSize: "0.72rem",
+                                    height: 22,
+                                    bgcolor: "rgba(14, 165, 233, 0.1)",
+                                    color: "#0284c7",
+                                    border: "1px solid rgba(14, 165, 233, 0.25)",
+                                  }}
+                                />
+                              ) : null
+                            }
+                            error={!!fieldError}
+                            helperText={
+                              fieldError ||
+                              (numVal > 0 && total > 0
+                                ? `Total ₹${numVal.toLocaleString("en-IN")} split equally across ${total} members (₹${splitPerPerson.toLocaleString("en-IN")} each)`
+                                : `Total ${type.eventTypeName} budget to be divided among eligible members.`)
+                            }
+                          />
+                        </Grid>
+                      );
+                    })}
+                  </>
+                )}
+              </Grid>
+
+              {/* Identified Celebrants (for Birthday) or Active Participants (for other Events) */}
+              {isBirthday ? (
+                monthCelebrants.length > 0 && (
                   <Box
                     sx={{
-                      p: 1.5,
+                      mt: 1.8,
+                      p: 1.4,
                       borderRadius: "8px",
                       bgcolor: (theme) =>
                         theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.03)"
-                          : "rgba(22, 119, 200, 0.04)",
+                          ? "rgba(14, 165, 233, 0.06)"
+                          : "#f8fafd",
                       border: "1px solid",
-                      borderColor: "divider",
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(14, 165, 233, 0.2)"
+                          : "#e2e8f0",
                     }}
                   >
                     <Typography
                       variant="caption"
                       fontWeight={700}
-                      color="text.secondary"
-                      sx={{ display: "block", mb: 0.8 }}
+                      sx={{
+                        fontSize: "0.8rem",
+                        color: (theme) =>
+                          theme.palette.mode === "dark" ? "#38bdf8" : "#0f172a",
+                        display: "block",
+                        mb: 0.6,
+                      }}
                     >
                       Identified Celebrants in {dayjs(form.eventDate).format("MMMM")} ({monthCelebrants.length}):
                     </Typography>
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                      {monthCelebrants.map((m) => (
-                        <Chip
-                          key={m.memberId}
-                          label={`${m.name} (${m.workType || m.memberType || "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
-                            }`}
-                          size="small"
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: "0.75rem",
-                            bgcolor:
-                              (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
-                                ? "rgba(121, 87, 213, 0.1)"
-                                : "rgba(22, 119, 200, 0.1)",
-                            color:
-                              (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
-                                ? "#7957d5"
-                                : "#1677c8",
-                          }}
-                        />
-                      ))}
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px 8px" }}>
+                      {monthCelebrants.map((m) => {
+                        const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+                        return (
+                          <Chip
+                            key={m.memberId}
+                            label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""}`}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              fontSize: "0.75rem",
+                              height: 24,
+                              borderRadius: "6px",
+                              py: 0.3,
+                              px: 0.4,
+                              bgcolor: isWfh ? "#ede9fe" : "#e0f2fe",
+                              color: isWfh ? "#7c3aed" : "#0284c7",
+                              border: "1px solid",
+                              borderColor: isWfh
+                                ? "rgba(124, 58, 237, 0.25)"
+                                : "rgba(2, 132, 199, 0.25)",
+                            }}
+                          />
+                        );
+                      })}
                     </Box>
                   </Box>
-                )}
+                )
+              ) : (
+                activeMembers.length > 0 && (
+                  <Box
+                    sx={{
+                      mt: 1.8,
+                      p: 1.4,
+                      borderRadius: "8px",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(124, 58, 237, 0.06)"
+                          : "#f8fafd",
+                      border: "1px solid",
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(124, 58, 237, 0.2)"
+                          : "#e2e8f0",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 1,
+                        mb: 0.8,
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                        <PeopleIcon sx={{ color: "#7c3aed", fontSize: "1.1rem" }} />
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          sx={{
+                            fontSize: "0.8rem",
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#c4b5fd" : "#0f172a",
+                          }}
+                        >
+                          Participating Members ({participatingMembers.length} of {activeMembers.length}):
+                        </Typography>
+                      </Box>
+
+                      {excludedMembers.length > 0 && (
+                        <Button
+                          size="small"
+                          variant="text"
+                          startIcon={<ResetIcon sx={{ fontSize: "0.9rem !important" }} />}
+                          onClick={handleSelectAllParticipants}
+                          sx={{
+                            fontSize: "0.74rem",
+                            fontWeight: 700,
+                            textTransform: "none",
+                            py: 0.2,
+                            px: 0.8,
+                            color: "#7c3aed",
+                            borderRadius: "6px",
+                            "&:hover": {
+                              bgcolor: "rgba(124, 58, 237, 0.08)",
+                            },
+                          }}
+                        >
+                          Select All
+                        </Button>
+                      )}
+                    </Box>
+
+                    {/* Participating Member Chips */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "6px 8px",
+                        maxHeight: 90,
+                        overflowY: "auto",
+                        p: 0.4,
+                      }}
+                    >
+                      {participatingMembers.map((m) => {
+                        const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+                        return (
+                          <Chip
+                            key={m.memberId}
+                            label={`${m.name} (${isWfh ? "WFH" : "Office"})`}
+                            size="small"
+                            onDelete={() => handleRemoveParticipant(m.memberId)}
+                            deleteIcon={
+                              <Tooltip title="Remove member from this event">
+                                <CloseIcon sx={{ fontSize: "0.85rem !important" }} />
+                              </Tooltip>
+                            }
+                            sx={{
+                              fontWeight: 600,
+                              fontSize: "0.75rem",
+                              height: 24,
+                              borderRadius: "6px",
+                              bgcolor: isWfh ? "#f5f3ff" : "#f0f9ff",
+                              color: isWfh ? "#6d28d9" : "#0369a1",
+                              border: "1px solid",
+                              borderColor: isWfh ? "#ddd6fe" : "#bae6fd",
+                              "& .MuiChip-deleteIcon": {
+                                color: isWfh ? "#8b5cf6" : "#0284c7",
+                                "&:hover": {
+                                  color: "#ef4444",
+                                },
+                              },
+                            }}
+                          />
+                        );
+                      })}
+                    </Box>
+
+                    {/* Excluded Members list */}
+                    {excludedMembers.length > 0 && (
+                      <Box sx={{ mt: 1, pt: 1, borderTop: "1px dashed rgba(0,0,0,0.08)" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: "0.72rem",
+                            color: "text.secondary",
+                            fontWeight: 600,
+                            display: "block",
+                            mb: 0.4,
+                          }}
+                        >
+                          Not Participating ({excludedMembers.length}):
+                        </Typography>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6 }}>
+                          {excludedMembers.map((m) => {
+                            const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+                            return (
+                              <Chip
+                                key={m.memberId}
+                                label={`+ ${m.name} (${isWfh ? "WFH" : "Office"})`}
+                                size="small"
+                                onClick={() => {
+                                  setSelectedParticipantIds((prev) => [...prev, m.memberId]);
+                                }}
+                                sx={{
+                                  fontWeight: 500,
+                                  fontSize: "0.7rem",
+                                  height: 20,
+                                  cursor: "pointer",
+                                  bgcolor: "rgba(0,0,0,0.04)",
+                                  color: "text.secondary",
+                                  border: "1px dashed #cbd5e1",
+                                  "&:hover": {
+                                    bgcolor: "#f1f5f9",
+                                    color: "#7c3aed",
+                                    borderColor: "#7c3aed",
+                                  },
+                                }}
+                              />
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
+                )
+              )}
+
+              {/* Description */}
+              <Box sx={{ mt: 1.8 }}>
+                <AppTextArea
+                  label="Description"
+                  placeholder="Enter optional description..."
+                  value={form.description}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 500) {
+                      setForm((f) => ({ ...f, description: e.target.value }));
+                    }
+                  }}
+                  maxLength={500}
+                  minRows={2}
+                  maxRows={3}
+                  fullWidth
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      p: 0.8,
+                      "& .MuiOutlinedInput-input": {
+                        py: 0.2,
+                        px: 0.4,
+                        pb: 1.8,
+                        minHeight: 38,
+                        maxHeight: 52,
+                        fontSize: "0.82rem",
+                        lineHeight: 1.35,
+                      },
+                    },
+                  }}
+                />
               </Box>
             </Box>
           </Grid>
 
-          {/* Right Column: Calculated Event Summary Card */}
-          <Grid size={{ xs: 12, md: 5 }}>
+          {/* Right Panel: Calculated Event Summary (~35% width) */}
+          <Grid size={{ xs: 12, lg: 4.2 }}>
             <Box
               sx={{
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
                 border: "1px solid",
-                borderColor: "divider",
-                borderRadius: "14px",
-                overflow: "hidden",
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
-                boxShadow: "0 3px 12px rgba(20,60,90,0.06)",
+                borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
+                borderRadius: "12px",
+                p: { xs: 2, sm: 2.2 },
+                boxShadow: "0 2px 12px rgba(74, 63, 107, 0.03)",
                 height: "100%",
                 display: "flex",
                 flexDirection: "column",
+                justifyContent: "space-between",
               }}
             >
-              <Box
-                sx={{
-                  px: 2.5,
-                  py: 1.6,
-                  borderBottom: "1px solid",
-                  borderColor: "divider",
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                }}
-              >
-                <Typography variant="subtitle1" fontWeight={700}>
+              <Box>
+                {/* Panel Header */}
+                <Typography
+                  variant="h6"
+                  fontWeight={700}
+                  sx={{
+                    fontSize: "1.02rem",
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
+                    mb: 1,
+                    letterSpacing: "0.01em",
+                  }}
+                >
                   Calculated Event Summary
                 </Typography>
+
+                {/* Summary Metric Rows */}
+                <Box sx={{ display: "flex", flexDirection: "column" }}>
+                  {/* Row 1 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      {isBirthday ? "Birthday Members" : "Total Members"}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      {isBirthday ? bdays : total}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 2 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      Office / WFH
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      {isBirthday ? `${office} / ${wfh}` : `${officeMembers} / ${wfhMembers}`}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 3 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      Eligible Contributors
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      {eligible}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 4 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      Planned Budget
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      ₹{plannedBudget.toLocaleString("en-IN")}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 5 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 38,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                    }}
+                  >
+                    <Box>
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                        Contribution / Member
+                      </Typography>
+                      {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0 && (
+                        <Typography sx={{ fontSize: "0.72rem", color: "#6366f1", fontWeight: 600 }}>
+                          Celebrants: ₹{otherEventsSharePerPerson.toLocaleString("en-IN")}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Typography sx={{ fontSize: "0.98rem", fontWeight: 800, color: "#0284c7" }}>
+                      ₹{contributionPerMember.toLocaleString("en-IN")}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 6 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      Expected Collection
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      ₹{expectedCollection.toLocaleString("en-IN")}
+                    </Typography>
+                  </Box>
+                </Box>
               </Box>
 
+              {/* Calculation Summary Details Section - Extended Box Size */}
               <Box
                 sx={{
-                  p: 2.5,
-                  flex: 1,
+                  mt: 2,
+                  p: { xs: 1.8, sm: 2.2 },
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                  border: "1px solid",
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
+                  borderRadius: "10px",
+                  flexGrow: 1,
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
                 }}
               >
-                <MetricLine label="Birthday Members" value={bdays} />
-                <MetricLine label="Office / WFH" value={`${office} / ${wfh}`} />
-                <MetricLine label="Eligible Contributors" value={eligible} />
-                <MetricLine
-                  label="Planned Budget"
-                  value={`₹${plannedBudget.toLocaleString("en-IN")}`}
-                />
-                <MetricLine
-                  label="Contribution / Member"
-                  value={`₹${contributionPerMember.toLocaleString("en-IN")}`}
-                  highlight
-                />
-                <MetricLine
-                  label="Expected Collection"
-                  value={`₹${expectedCollection.toLocaleString("en-IN")}`}
-                />
-               
-              </Box>
-            </Box>
-          </Grid>
-
-          {/* Bottom Card: Budget Breakdown */}
-          <Grid size={{ xs: 12 }}>
-            <Box
-              sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: "14px",
-                overflow: "hidden",
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
-                boxShadow: "0 3px 12px rgba(20,60,90,0.06)",
-              }}
-            >
-              <Box
-                sx={{
-                  px: 2.5,
-                  py: 1.6,
-                  borderBottom: "1px solid",
-                  borderColor: "divider",
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 0.5,
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    flexWrap: "wrap",
-                    gap: 1,
-                  }}
-                >
-                  <Typography variant="subtitle1" fontWeight={700}>
-                    Budget Breakdown
-                  </Typography>
-                  <Chip
-                    label={`₹${plannedBudget.toLocaleString("en-IN")} Total Budget ÷ ${eligible} Members = ₹${contributionPerMember}/person`}
-                    size="small"
+                <Box>
+                  <Typography
+                    variant="caption"
                     sx={{
-                      fontWeight: 700,
-                      fontSize: "0.75rem",
-                      bgcolor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(124, 58, 237, 0.15)"
-                          : "rgba(74, 63, 107, 0.08)",
-                      color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
-                    }}
-                  />
-                </Box>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontSize: "0.78rem",
-                    lineHeight: 1.5,
-                    color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#1e293b"),
-                    fontWeight: 600,
-                    "& strong": {
+                      display: "block",
                       fontWeight: 800,
-                      color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
-                    },
-                  }}
-                >
-                  Calculation: {dynamicFormulaText ? (
-                    <span>{dynamicFormulaText}</span>
-                  ) : (
-                    <span>Calculation of active budget items</span>
-                  )}. Total planned budget is divided equally among eligible contributing members.
-                </Typography>
-              </Box>
+                      color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7"),
+                      fontSize: "0.8rem",
+                      mb: 1.2,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    CALCULATION SUMMARY
+                  </Typography>
 
-              <Box sx={{ p: 2.5 }}>
-                {/* Header row */}
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
-                    gap: 2,
-                    pb: 1.2,
-                    borderBottom: "1px solid",
-                    borderColor: "divider",
-                    fontWeight: 700,
-                    fontSize: "0.82rem",
-                    color: "text.secondary",
-                    alignItems: "center",
-                  }}
-                >
-                  <Box sx={{ textAlign: "left" }}>Expense Item</Box>
-                  <Box sx={{ textAlign: "left" }}>Calculation</Box>
-                  <Box sx={{ textAlign: "right" }}>Rate</Box>
-                  <Box sx={{ textAlign: "right" }}>Amount</Box>
-                </Box>
-
-                {/* Dynamic Budget Calculation Rows */}
-                {computedBudgetItems.map((item, idx) => {
-                  const isLast = idx === computedBudgetItems.length - 1;
-                  return (
+                  {/* 3-Column Table */}
+                  <Box sx={{ width: "100%", mb: 1.2 }}>
+                    {/* Header Row */}
                     <Box
-                      key={item.budgetCalculationId || item.expenseItem || idx}
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
-                        gap: 2,
-                        py: 1.4,
-                        borderBottom: isLast ? "2px solid" : "1px solid",
-                        borderColor: "divider",
+                        gridTemplateColumns: "35% 45% 20%",
+                        gap: 1.2,
+                        pb: 0.8,
+                        borderBottom: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
+                        fontWeight: 700,
+                        fontSize: "0.8rem",
+                        color: "#64748b",
                         alignItems: "center",
                       }}
                     >
-                      <Typography variant="body2" fontWeight={600} sx={{ textAlign: "left" }}>
-                        {item.expenseItem}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>
-                        {item.calcText}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
-                        ₹{item.rate.toLocaleString("en-IN")}
-                      </Typography>
-                      <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ textAlign: "right" }}>
-                        ₹{item.amount.toLocaleString("en-IN")}
-                      </Typography>
+                      <Box>Expense</Box>
+                      <Box>Calculation</Box>
+                      <Box sx={{ textAlign: "right" }}>Total</Box>
                     </Box>
-                  );
-                })}
 
-                {/* Total Summary Row under Amount */}
+                    {/* Table Rows */}
+                    {computedBudgetItems.length === 0 ? (
+                      <Box sx={{ py: 2.5, textAlign: "center" }}>
+                        <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>
+                          Select an event type to view calculation details
+                        </Typography>
+                      </Box>
+                    ) : (
+                      computedBudgetItems.map((item, idx) => (
+                        <Box
+                          key={item.budgetCalculationId || item.expenseItem || idx}
+                          sx={{
+                            display: "grid",
+                            gridTemplateColumns: "35% 45% 20%",
+                            gap: 1.2,
+                            py: 0.8,
+                            minHeight: 34,
+                            borderBottom: "1px solid",
+                            borderColor: (theme) =>
+                              theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9",
+                            fontSize: "0.82rem",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            sx={{
+                              color: (theme) => (theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b"),
+                              fontSize: "0.82rem",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {item.expenseItem}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: (theme) => (theme.palette.mode === "dark" ? "#94a3b8" : "#475569"),
+                              fontSize: "0.8rem",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {item.calcFormula || item.calcText || `₹${item.amount}`}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            fontWeight={700}
+                            sx={{
+                              color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                              fontSize: "0.84rem",
+                              textAlign: "right",
+                            }}
+                          >
+                            ₹{(item.amount || 0).toLocaleString("en-IN")}
+                          </Typography>
+                        </Box>
+                      ))
+                    )}
+                  </Box>
+                </Box>
+
+                {/* Total Planned Budget Footer */}
                 <Box
                   sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1.5fr 1.2fr 1fr 1.1fr", sm: "2fr 1.4fr 1fr 1.2fr" },
-                    gap: 2,
-                    pt: 1.6,
+                    display: "flex",
+                    justifyContent: "space-between",
                     alignItems: "center",
+                    pt: 1.2,
+                    mt: 1,
+                    borderTop: "1px dashed",
+                    borderColor: (theme) =>
+                      theme.palette.mode === "dark" ? "divider" : "#cbd5e1",
                   }}
                 >
                   <Typography
-                    variant="subtitle2"
-                    fontWeight={800}
                     sx={{
-                      gridColumn: "span 3",
-                      textAlign: "right",
-                      pr: 1,
-                      color: "text.primary",
-                      fontSize: "0.9rem",
+                      fontWeight: 700,
+                      fontSize: "0.85rem",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
                     }}
                   >
-                    Total Amount:
+                    Total Planned Budget
                   </Typography>
                   <Typography
-                    variant="subtitle1"
-                    fontWeight={900}
                     sx={{
-                      textAlign: "right",
-                      color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
-                      fontSize: "1.1rem",
+                      fontWeight: 800,
+                      fontSize: "0.98rem",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
                     }}
                   >
                     ₹{plannedBudget.toLocaleString("en-IN")}
@@ -1025,136 +1944,7 @@ export default function EventFormDialog({
             </Box>
           </Grid>
         </Grid>
-      ) : (
-        /* Non-Birthday Event Standard Form */
-        <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppSelect
-              label="Event Category"
-              value={form.eventTypeId}
-              onChange={(e) => {
-                const selected = eventTypes.find((t) => t.eventTypeId === e.target.value);
-                const isBday = selected?.eventTypeName?.toLowerCase().includes("birthday");
-                const defAmt = !isBday && Number(selected?.baseAmount) > 0 ? String(selected.baseAmount) : "";
-                setForm((c) => ({
-                  ...c,
-                  eventTypeId: e.target.value,
-                  baseAmount: defAmt || c.baseAmount,
-                }));
-                if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
-                if (errors.baseAmount) setErrors((p) => ({ ...p, baseAmount: "" }));
-              }}
-              options={typeOptions}
-              error={!!errors.eventTypeId}
-              helperText={errors.eventTypeId}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppInput
-              label="Event Name"
-              placeholder="Enter event name"
-              value={form.eventName}
-              onChange={(e) => {
-                setForm((current) => ({ ...current, eventName: e.target.value }));
-                if (errors.eventName) setErrors((prev) => ({ ...prev, eventName: "" }));
-              }}
-              restrictType="letteronly"
-              maxLength={100}
-              error={!!errors.eventName}
-              helperText={errors.eventName}
-              required
-            />
-          </Grid>
-          {!isBirthday && (
-            <Grid size={{ xs: 12, md: 6 }}>
-              <AppInput
-                label="Contribution Amount"
-                placeholder="Enter contribution amount (₹)"
-                value={formatBaseAmount(form.baseAmount)}
-                onChange={(e) => {
-                  const rawVal = e.target.value.replace(/[^0-9]/g, "");
-                  setForm((current) => ({ ...current, baseAmount: rawVal }));
-                  if (errors.baseAmount) setErrors((prev) => ({ ...prev, baseAmount: "" }));
-                }}
-                maxLength={15}
-                error={!!errors.baseAmount}
-                helperText={errors.baseAmount}
-                required
-              />
-            </Grid>
-          )}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppDateInput
-              label="Event Date"
-              value={form.eventDate}
-              onChange={(newValue) => {
-                setForm((current) => ({ ...current, eventDate: newValue }));
-                if (errors.eventDate) setErrors((prev) => ({ ...prev, eventDate: "" }));
-              }}
-              error={!!errors.eventDate}
-              helperText={errors.eventDate}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppMultiSelect
-              label="Participants"
-              placeholder="Select members..."
-              value={form.participantIds}
-              onChange={(e) => {
-                setForm((current) => ({ ...current, participantIds: e.target.value }));
-                if (errors.participantIds) setErrors((prev) => ({ ...prev, participantIds: "" }));
-              }}
-              options={memberOptions}
-              error={!!errors.participantIds}
-              helperText={errors.participantIds}
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <AppTextArea
-              label="Description"
-              placeholder="Enter event description..."
-              minRows={2}
-              maxRows={4}
-              value={form.description}
-              onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
-            />
-          </Grid>
-
-
-        </Grid>
-      )}
+      </Box>
     </AppDialog>
-  );
-}
-
-function MetricLine({ label, value, highlight, isLast }) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        py: 1.1,
-        borderBottom: isLast ? "none" : "1px solid",
-        borderColor: "divider",
-      }}
-    >
-      <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.88rem" }}>
-        {label}
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: highlight ? 900 : 700,
-          fontSize: highlight ? "1.05rem" : "0.95rem",
-          color: highlight ? "#1677c8" : "text.primary",
-        }}
-      >
-        {value}
-      </Typography>
-    </Box>
   );
 }

@@ -347,7 +347,6 @@ export default function UserRightsPage() {
         }
         localStorage.setItem("projectRightsConfig", JSON.stringify(parsed));
         window.dispatchEvent(new CustomEvent("rightsUpdated", { detail: { roleName: selectedRoleName } }));
-        window.dispatchEvent(new Event("storage"));
       } catch {
         // ignore cache write error
       }
