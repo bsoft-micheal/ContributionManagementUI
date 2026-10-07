@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Card, CardContent, Chip, CircularProgress, Grid, Stack, Typography,
@@ -43,6 +43,7 @@ import { hasActionPermission } from "../../utils/rightsHelper";
 import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 import { getEventsAsync } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getPaymentTransactionsAsync } from "../../services/paymentService";
 
 /* ─── Horizontal Bar Chart ─── */
 function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
@@ -335,7 +336,25 @@ export default function ReportsPage({ mode = "event" }) {
   const isDark = theme.palette.mode === "dark";
   const navigate = useNavigate();
   const { authState } = useAuth();
-  const isMember = authState?.role === "Member" || authState?.user?.role === "Member";
+  const isMember = String(authState?.role || authState?.user?.role || "").toLowerCase() === "member";
+  const currentUserId = authState?.userId || authState?.user?.userId || authState?.id;
+  const currentUserName = String(authState?.fullName || authState?.user?.fullName || authState?.name || "").trim().toLowerCase();
+
+  const isCurrentMember = useCallback((m) => {
+    const mId = m.memberId || m.MemberId || m.userId || m.UserId;
+    if (currentUserId && String(mId) === String(currentUserId)) return true;
+    const mName = String(m.memberName || m.MemberName || "").trim().toLowerCase();
+    if (currentUserName && (mName === currentUserName || mName.includes(currentUserName) || currentUserName.includes(mName))) return true;
+    return false;
+  }, [currentUserId, currentUserName]);
+
+  // If Member role navigates to event collection report, auto redirect to their contribution report
+  useEffect(() => {
+    if (isMember && (mode === "event" || !mode)) {
+      navigate("/reports/member-velocity", { replace: true });
+    }
+  }, [isMember, mode, navigate]);
+
   const canExport = hasActionPermission("Export Reports", 60, authState?.role).canView !== false;
   const toast = useAppToast();
   const { isLoading: globalLoading } = useNavigationLoading();
@@ -354,6 +373,7 @@ export default function ReportsPage({ mode = "event" }) {
   });
   const [eventsList, setEventsList] = useState([]);
   const [eventTypesList, setEventTypesList] = useState([]);
+  const [paymentTransactions, setPaymentTransactions] = useState([]);
   const [chartType, setChartType] = useState("pie");
   const [metric, setMetric] = useState("paid");
 
@@ -498,17 +518,25 @@ export default function ReportsPage({ mode = "event" }) {
   useEffect(() => {
     async function fetchLookups() {
       try {
-        const [eventsRes, typesRes] = await Promise.all([
+        const [eventsRes, typesRes, paymentsRes] = await Promise.all([
           getEventsAsync().catch(() => []),
           getEventTypesAsync().catch(() => []),
+          getPaymentTransactionsAsync().catch(() => []),
         ]);
         if (Array.isArray(eventsRes)) setEventsList(eventsRes);
         if (Array.isArray(typesRes)) setEventTypesList(typesRes);
+        if (Array.isArray(paymentsRes)) setPaymentTransactions(paymentsRes);
       } catch {
         // silent fallback
       }
     }
     fetchLookups();
+
+    const handleUpdate = () => {
+      fetchLookups();
+    };
+    window.addEventListener("contribution_updated", handleUpdate);
+    return () => window.removeEventListener("contribution_updated", handleUpdate);
   }, []);
 
   // Dynamic Event Type options
@@ -592,6 +620,11 @@ export default function ReportsPage({ mode = "event" }) {
 
   const filteredMemberContributions = useMemo(() => {
     let list = report?.memberContributionHistory ?? [];
+
+    if (isMember) {
+      list = list.filter((m) => isCurrentMember(m));
+    }
+
     if ((filters.eventType && filters.eventType !== "ALL") || (filters.event && filters.event !== "ALL")) {
       list = list.filter((m) => {
         const events = m.events || [];
@@ -603,7 +636,48 @@ export default function ReportsPage({ mode = "event" }) {
       });
     }
     return list;
-  }, [report?.memberContributionHistory, filters.eventType, filters.event]);
+  }, [report?.memberContributionHistory, filters.eventType, filters.event, isMember, isCurrentMember]);
+
+  /* Filtered Payment History (Event Type & Event against) */
+  const filteredPaymentHistory = useMemo(() => {
+    let list = paymentTransactions || [];
+
+    // If Member role, filter by the current logged-in member
+    if (isMember) {
+      list = list.filter((t) => {
+        const tId = t.userId || t.UserId || t.memberId || t.MemberId;
+        if (currentUserId && String(tId) === String(currentUserId)) return true;
+        const tName = String(t.memberName || t.MemberName || "").trim().toLowerCase();
+        if (currentUserName && (tName === currentUserName || tName.includes(currentUserName) || currentUserName.includes(tName))) return true;
+        return false;
+      });
+    }
+
+    // Year & Month filter
+    if (filters.year && filters.year !== 0) {
+      list = list.filter((t) => {
+        const d = t.paymentDate || t.PaymentDate || t.createdOn || t.CreatedOn || t.createdAt;
+        return d ? dayjs(d).year() === Number(filters.year) : true;
+      });
+    }
+    if (filters.month && filters.month !== 0) {
+      list = list.filter((t) => {
+        const d = t.paymentDate || t.PaymentDate || t.createdOn || t.CreatedOn || t.createdAt;
+        return d ? dayjs(d).month() + 1 === Number(filters.month) : true;
+      });
+    }
+
+    // Event Type & Event filter
+    return list.filter((t) => {
+      const tEventName = String(t.eventName || t.EventName || "").trim().toLowerCase();
+      const evMatch = (eventsList || []).find((e) => (e.name || e.eventName || "").trim().toLowerCase() === tEventName);
+      const tEventType = String(t.eventTypeName || t.categoryName || evMatch?.eventTypeName || evMatch?.category || "General").trim().toLowerCase();
+
+      const matchType = !filters.eventType || filters.eventType === "ALL" || tEventType === filters.eventType.trim().toLowerCase();
+      const matchEv = !filters.event || filters.event === "ALL" || tEventName === filters.event.trim().toLowerCase();
+      return matchType && matchEv;
+    });
+  }, [paymentTransactions, isMember, currentUserId, currentUserName, filters, eventsList]);
 
   /* Rupee formatter */
   const INR = (n) => "\u20B9" + Number(n || 0).toLocaleString();
@@ -693,6 +767,233 @@ export default function ReportsPage({ mode = "event" }) {
     },
   ];
 
+  const renderPaymentModeBadge = (mode) => {
+    const m = String(mode || "Cash").toLowerCase();
+    let bg = "rgba(16, 185, 129, 0.1)";
+    let color = "#10b981";
+    let border = "rgba(16, 185, 129, 0.25)";
+
+    if (m === "upi") {
+      bg = "rgba(124, 58, 237, 0.1)";
+      color = "#7c3aed";
+      border = "rgba(124, 58, 237, 0.25)";
+    } else if (m === "split") {
+      bg = "rgba(2, 132, 199, 0.1)";
+      color = "#0284c7";
+      border = "rgba(2, 132, 199, 0.25)";
+    }
+
+    return (
+      <Typography
+        variant="caption"
+        fontWeight={700}
+        sx={{
+          bgcolor: bg,
+          color,
+          border: `1px solid ${border}`,
+          px: 1.2,
+          py: 0.3,
+          borderRadius: "6px",
+          fontSize: "0.74rem",
+          display: "inline-block",
+        }}
+      >
+        {mode || "Cash"}
+      </Typography>
+    );
+  };
+
+  const renderUtrReferenceBadges = (rawUtr) => {
+    if (!rawUtr || rawUtr === "-" || rawUtr === "--") {
+      return (
+        <Typography variant="body2" sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
+          —
+        </Typography>
+      );
+    }
+
+    const str = String(rawUtr).trim();
+    const parts = str.includes(";")
+      ? str.split(";").map((p) => p.trim()).filter(Boolean)
+      : [str];
+
+    return (
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6, alignItems: "center" }}>
+        {parts.map((part, idx) => {
+          const colonIdx = part.indexOf(":");
+          let modeName = "";
+          let refVal = part;
+
+          if (colonIdx > 0) {
+            modeName = part.substring(0, colonIdx).trim();
+            refVal = part.substring(colonIdx + 1).trim();
+          }
+
+          const lowerMode = modeName.toLowerCase();
+          let color = "#4a3f6b";
+          let bg = "rgba(74, 63, 107, 0.08)";
+          let border = "rgba(74, 63, 107, 0.22)";
+
+          if (lowerMode.includes("gpay") || lowerMode.includes("google")) {
+            color = "#2563eb";
+            bg = "rgba(37, 99, 235, 0.08)";
+            border = "rgba(37, 99, 235, 0.28)";
+          } else if (lowerMode.includes("phonepe") || lowerMode.includes("phone")) {
+            color = "#7c3aed";
+            bg = "rgba(124, 58, 237, 0.08)";
+            border = "rgba(124, 58, 237, 0.28)";
+          } else if (lowerMode.includes("paytm")) {
+            color = "#0284c7";
+            bg = "rgba(2, 132, 199, 0.08)";
+            border = "rgba(2, 132, 199, 0.28)";
+          } else if (lowerMode.includes("upi") || lowerMode.includes("bhim")) {
+            color = "#ea580c";
+            bg = "rgba(234, 88, 12, 0.08)";
+            border = "rgba(234, 88, 12, 0.28)";
+          } else if (lowerMode.includes("cash")) {
+            color = "#16a34a";
+            bg = "rgba(22, 163, 74, 0.08)";
+            border = "rgba(22, 163, 74, 0.28)";
+          }
+
+          return (
+            <Box
+              key={idx}
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                px: 0.9,
+                py: 0.25,
+                borderRadius: "6px",
+                bgcolor: bg,
+                border: `1px solid ${border}`,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {modeName ? (
+                <>
+                  <Typography component="span" sx={{ fontWeight: 700, fontSize: "0.72rem", color }}>
+                    {modeName}:
+                  </Typography>
+                  <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 600, color: "text.primary" }}>
+                    {refVal}
+                  </Typography>
+                </>
+              ) : (
+                <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 600, color: "text.primary" }}>
+                  {refVal}
+                </Typography>
+              )}
+            </Box>
+          );
+        })}
+      </Box>
+    );
+  };
+
+  const renderStatusBadge = (status) => {
+    const st = String(status || "Pending").toLowerCase().trim();
+    let bg = "rgba(234, 179, 8, 0.12)";
+    let color = "#b45309";
+    let border = "rgba(234, 179, 8, 0.3)";
+
+    if (st === "verified" || st === "closed") {
+      bg = "rgba(22, 163, 74, 0.1)";
+      color = "#16a34a";
+      border = "rgba(22, 163, 74, 0.25)";
+    } else if (st === "failed" || st === "rejected") {
+      bg = "rgba(239, 68, 68, 0.1)";
+      color = "#dc2626";
+      border = "rgba(239, 68, 68, 0.25)";
+    }
+
+    return (
+      <Typography
+        variant="caption"
+        fontWeight={700}
+        sx={{
+          bgcolor: bg,
+          color,
+          border: `1px solid ${border}`,
+          px: 1.2,
+          py: 0.3,
+          borderRadius: "12px",
+          fontSize: "0.72rem",
+          display: "inline-block",
+        }}
+      >
+        {status || "Pending"}
+      </Typography>
+    );
+  };
+
+  const paymentHistoryColumns = [
+    {
+      label: "Event & Type",
+      key: "eventName",
+      render: (row) => {
+        const evMatch = (eventsList || []).find((e) => (e.name || e.eventName || "").trim().toLowerCase() === (row.eventName || "").trim().toLowerCase());
+        const evType = row.eventTypeName || row.categoryName || evMatch?.eventTypeName || evMatch?.category || "General";
+        return (
+          <Box>
+            <Typography variant="body2" fontWeight={700}>
+              {row.eventName || "—"}
+            </Typography>
+            <Typography variant="caption" color="primary.main" fontWeight={600} sx={{ fontSize: "0.7rem" }}>
+              {evType}
+            </Typography>
+          </Box>
+        );
+      },
+    },
+    {
+      label: "Member Name",
+      key: "memberName",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.82rem" }}>
+          {row.memberName || "—"}
+        </Typography>
+      ),
+    },
+    {
+      label: "Amount Paid",
+      key: "amount",
+      align: "right",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={700} color="success.main">
+          {INR(row.amount)}
+        </Typography>
+      ),
+    },
+    {
+      label: "Payment Date",
+      key: "paymentDate",
+      render: (row) => formatGridDate(row.paymentDate || row.PaymentDate || row.createdOn || row.CreatedOn),
+    },
+    {
+      label: "Payment Mode",
+      key: "paymentMode",
+      render: (row) => renderPaymentModeBadge(row.paymentMode || row.PaymentMode),
+    },
+    {
+      label: "UTR / Reference No",
+      key: "utr",
+      render: (row) => renderUtrReferenceBadges(row.utr || row.Utr),
+    },
+    {
+      label: "Verification Status",
+      key: "status",
+      align: "center",
+      render: (row) => renderStatusBadge(row.status || row.Status),
+    },
+    {
+      label: "Verified By",
+      key: "verifiedBy",
+      render: (row) => row.verifiedBy || row.VerifiedBy || "—",
+    },
+  ];
+
   /* ── Chart Data ── */
   const chartData = useMemo(() => {
     if (mode === "member") {
@@ -748,6 +1049,36 @@ export default function ReportsPage({ mode = "event" }) {
       });
     }
 
+    if (mode === "payment-history") {
+      const map = {};
+      (filteredPaymentHistory ?? []).forEach((t, idx) => {
+        const evName = t.eventName || t.EventName || "Event";
+        if (!map[evName]) {
+          const evMatch = (eventsList || []).find((e) => (e.name || e.eventName || "").trim().toLowerCase() === evName.trim().toLowerCase());
+          map[evName] = {
+            id: evName || `ev-pay-${idx}`,
+            label: evName,
+            expected: 0,
+            collected: 0,
+            pending: 0,
+            expense: 0,
+            remaining: 0,
+            eventTypeName: t.eventTypeName || t.categoryName || evMatch?.eventTypeName || evMatch?.category || "General",
+            date: t.paymentDate,
+          };
+        }
+        const amt = Number(t.amount || 0);
+        const isVer = String(t.status || "").toLowerCase() === "verified";
+        map[evName].expected += amt;
+        if (isVer) {
+          map[evName].collected += amt;
+        } else {
+          map[evName].pending += amt;
+        }
+      });
+      return Object.values(map);
+    }
+
     if (mode === "pending") {
       const map = {};
       (report?.pendingDues ?? []).forEach((d) => {
@@ -789,7 +1120,7 @@ export default function ReportsPage({ mode = "event" }) {
         date: e.eventDate,
       };
     });
-  }, [mode, filteredEventCollections, filteredMemberContributions, report?.pendingDues]);
+  }, [mode, filteredEventCollections, filteredMemberContributions, filteredPaymentHistory, report?.pendingDues, eventsList]);
 
   const searchedMembers = useMemo(() => {
     const list = filteredMemberContributions ?? [];
@@ -835,6 +1166,19 @@ export default function ReportsPage({ mode = "event" }) {
   }, [activeSelectedMember]);
 
   const reportTotals = useMemo(() => {
+    if (mode === "payment-history") {
+      const list = filteredPaymentHistory ?? [];
+      const totalAmt = list.reduce((s, t) => s + Number(t.amount || 0), 0);
+      const verifiedAmt = list.filter((t) => String(t.status || "").toLowerCase() === "verified").reduce((s, t) => s + Number(t.amount || 0), 0);
+      const pendingAmt = list.filter((t) => String(t.status || "").toLowerCase() !== "verified").reduce((s, t) => s + Number(t.amount || 0), 0);
+      return {
+        totalExpected: totalAmt,
+        totalCollected: verifiedAmt,
+        totalPending: pendingAmt,
+        totalExpenses: 0,
+        totalRemaining: verifiedAmt,
+      };
+    }
     if (mode === "member") {
       const mb = filteredMemberContributions ?? [];
       const exp = mb.reduce((s, m) => s + Number(m.totalExpectedAmount || 0), 0);
@@ -864,9 +1208,12 @@ export default function ReportsPage({ mode = "event" }) {
       totalExpenses: totalExp,
       totalRemaining: remaining,
     };
-  }, [mode, filteredEventCollections, filteredMemberContributions]);
+  }, [mode, filteredEventCollections, filteredMemberContributions, filteredPaymentHistory]);
 
   const kpiCards = useMemo(() => {
+    if (mode === "payment-history") {
+      return [];
+    }
     if (mode === "event") {
       const ev = filteredEventCollections ?? [];
       const exp = ev.reduce((s, e) => s + Number(e.expectedAmount || 0), 0);
@@ -874,7 +1221,6 @@ export default function ReportsPage({ mode = "event" }) {
       const pend = ev.reduce((s, e) => s + Number(e.pendingAmount || 0), 0);
       const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
       const remaining = exp - totalExp;
-      const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
       return [
         { label: "Total Expected", value: INR(exp), accent: "#6366f1" },
         { label: "Total Collected", value: INR(paid), accent: "#10b981" },
@@ -889,7 +1235,18 @@ export default function ReportsPage({ mode = "event" }) {
       const exp = mb.reduce((s, m) => s + Number(m.totalExpectedAmount || 0), 0);
       const paid = mb.reduce((s, m) => s + Number(m.totalPaidAmount || 0), 0);
       const pend = exp - paid;
-      const rate = exp > 0 ? Math.min(100, Math.round((paid / exp) * 100)) : 0;
+
+      if (isMember) {
+        const myData = mb[0] || {};
+        const totalEvents = (myData.events || []).length || (Number(myData.paidEventsCount || 0) + Number(myData.pendingEventsCount || 0));
+        return [
+          { label: "My Expected", value: INR(exp), accent: "#6366f1" },
+          { label: "My Paid", value: INR(paid), accent: "#10b981" },
+          { label: "My Pending", value: INR(pend), accent: "#f43f5e" },
+          { label: "Total Events", value: totalEvents, accent: "#3b82f6" },
+        ];
+      }
+
       const ev = filteredEventCollections ?? [];
       const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
       const remaining = exp - totalExp;
@@ -917,9 +1274,13 @@ export default function ReportsPage({ mode = "event" }) {
       ];
     }
     return [];
-  }, [mode, filteredEventCollections, filteredMemberContributions, report]);
+  }, [mode, filteredEventCollections, filteredMemberContributions, filteredPaymentHistory, report, isMember]);
 
-  const pageTitle = { event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections";
+  const pageTitle = mode === "payment-history"
+    ? (isMember ? "My Payment History" : "Event Payment Audit")
+    : (isMember
+        ? "My Contributions"
+        : ({ event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections"));
 
   const metricOptions = mode === "pending"
     ? [{ label: "By Event", key: "event" }, { label: "By Member", key: "member" }]
@@ -931,14 +1292,68 @@ export default function ReportsPage({ mode = "event" }) {
       { label: "Balance", key: "remaining" },
     ];
 
-  const navTabs = [
-    { label: "Event Collections", path: "/reports/event-collection-audit", modeKey: "event", icon: EventIcon },
-    { label: "Member Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
-  ];
+  const navTabs = isMember
+    ? [
+        { label: "My Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
+        { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
+      ]
+    : [
+        { label: "Event Collections", path: "/reports/event-collection-audit", modeKey: "event", icon: EventIcon },
+        { label: "Member Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
+        { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
+      ];
 
   const handleExport = () => {
     if (!canExport) return;
     try {
+      if (mode === "payment-history") {
+        const paymentExport = (filteredPaymentHistory ?? []).map((t) => {
+          const evMatch = (eventsList || []).find((e) => (e.name || e.eventName || "").trim().toLowerCase() === (t.eventName || "").trim().toLowerCase());
+          const evType = t.eventTypeName || t.categoryName || evMatch?.eventTypeName || evMatch?.category || "General";
+          return {
+            "Transaction ID": t.id || t.transactionId || "—",
+            "Event Name": t.eventName || "—",
+            "Event Type": evType,
+            "Member Name": t.memberName || "—",
+            "Amount Paid": Number(t.amount || 0),
+            "Payment Date": formatGridDate(t.paymentDate || t.createdOn),
+            "Payment Mode": t.paymentMode || "—",
+            "UTR / Reference": t.utr || "—",
+            "Verification Status": t.status || "Pending",
+            "Verified By": t.verifiedBy || "—",
+            "Verified On": t.verifiedOn ? formatGridDate(t.verifiedOn) : "—",
+            "Created By": t.createdBy || "—",
+          };
+        });
+
+        exportSheets("payment-history-audit.xlsx", [
+          { name: "Payment History", data: paymentExport },
+        ]);
+        toast.success("Payment history exported successfully!");
+        return;
+      }
+
+      if (isMember) {
+        const myData = filteredMemberContributions[0];
+        const myEventsExport = (myData?.events || []).map((e) => ({
+          "Event Name": e.eventName,
+          "Category": e.categoryName || "General",
+          "Event Date": formatGridDate(e.eventDate),
+          "Expected Amount": Number(e.expectedAmount ?? e.amount ?? 0),
+          "Paid Amount": Number(e.paidAmount ?? ((e.paymentStatus || "").toLowerCase() === "paid" ? e.amount : 0)),
+          "Pending Amount": Number(e.pendingAmount ?? (Math.max(0, Number(e.expectedAmount || 0) - Number(e.paidAmount || 0)))),
+          "Status": e.paymentStatus || (Number(e.paidAmount) >= Number(e.expectedAmount) ? "Paid" : "Pending"),
+          "Payment Mode": e.paymentMode || "—",
+          "Payment Date": e.paymentDate ? formatGridDate(e.paymentDate) : "—",
+        }));
+
+        exportSheets("my-contributions-report.xlsx", [
+          { name: "My Contributions", data: myEventsExport },
+        ]);
+        toast.success("My contribution report exported successfully!");
+        return;
+      }
+
       const eventCollectionsExport = (filteredEventCollections ?? []).map((e) => ({
         "Event Name": e.eventName,
         "Event Type": e.eventTypeName || "General",
@@ -1227,224 +1642,238 @@ export default function ReportsPage({ mode = "event" }) {
             <Stack spacing={3}>
 
               {/* KPI Cards Grid */}
-              <Grid container spacing={2}>
-                {kpiCards.map((card) => (
-                  <Grid key={card.label} size={{ xs: 12, sm: 6, md: 4, lg: kpiCards.length === 6 ? 2 : Math.max(3, Math.floor(12 / kpiCards.length)) }}>
-                    <MetricCard {...card} />
-                  </Grid>
-                ))}
-              </Grid>
+              {mode !== "payment-history" && kpiCards.length > 0 && (
+                <Grid container spacing={2}>
+                  {kpiCards.map((card) => (
+                    <Grid key={card.label} size={{ xs: 12, sm: 6, md: 4, lg: kpiCards.length === 6 ? 2 : Math.max(3, Math.floor(12 / kpiCards.length)) }}>
+                      <MetricCard {...card} />
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
 
               {/* Chart + Summary Widgets Grid */}
-              <Grid container spacing={2.5}>
-
-                {/* Financial Overview Bar Chart + Pie Chart */}
-                <Grid size={{ xs: 12 }}>
-                  {mode === "member" ? (
-                    <Card
-                      sx={{
-                        border: `1px solid ${theme.palette.divider}`,
-                        boxShadow: isDark
-                          ? "0 8px 32px rgba(0,0,0,0.35)"
-                          : "0 8px 32px rgba(0,0,0,0.06)",
-                        background: isDark
-                          ? "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
-                          : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
-                        borderRadius: "16px",
-                      }}
-                    >
-                      <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                        <Grid container spacing={2.5}>
-                          {/* Left Column: Member Directory & Selector */}
-                          <Grid size={{ xs: 12, md: 4.5, lg: 4 }}>
-                            <Box
-                              sx={{
-                                p: 2,
-                                borderRadius: "14px",
-                                border: `1px solid ${theme.palette.divider}`,
-                                bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#fcfcfd",
-                                height: "100%",
-                                display: "flex",
-                                flexDirection: "column",
-                              }}
-                            >
-                              {/* Member Search & Count */}
-                              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                                <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: "0.9375rem" }}>
-                                  Select Member
-                                </Typography>
-                                <Chip
-                                  size="small"
-                                  label={`${searchedMembers.length} ${searchedMembers.length === 1 ? "member" : "members"}`}
-                                  sx={{
-                                    height: 20,
-                                    fontSize: "0.68rem",
-                                    fontWeight: 700,
-                                    bgcolor: isDark ? "rgba(124,58,237,0.2)" : "rgba(124,58,237,0.1)",
-                                    color: "primary.main",
-                                  }}
-                                />
-                              </Stack>
-
-                              <TextField
-                                size="small"
-                                placeholder="Search member..."
-                                value={memberSearchTerm}
-                                onChange={(e) => setMemberSearchTerm(e.target.value)}
-                                slotProps={{
-                                  input: {
-                                    startAdornment: (
-                                      <InputAdornment position="start">
-                                        <SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} />
-                                      </InputAdornment>
-                                    ),
-                                  },
-                                }}
-                                sx={{
-                                  mb: 1.5,
-                                  "& .MuiOutlinedInput-root": {
-                                    height: 36,
-                                    fontSize: "0.82rem",
-                                    borderRadius: "8px",
-                                  },
-                                }}
-                              />
-
-                              {/* Scrollable Member List */}
+              {mode !== "payment-history" && (
+                <Grid container spacing={2.5}>
+                  {/* Financial Overview Bar Chart + Pie Chart */}
+                  <Grid size={{ xs: 12 }}>
+                    {mode === "member" && isMember ? (
+                      <FinancialBarChart
+                        totalExpected={reportTotals.totalExpected}
+                        totalCollected={reportTotals.totalCollected}
+                        totalPending={reportTotals.totalPending}
+                        totalExpenses={0}
+                        totalRemaining={reportTotals.totalRemaining}
+                        events={reportBarEvents}
+                        isMember={true}
+                        showPieChart={false}
+                      />
+                    ) : mode === "member" ? (
+                      <Card
+                        sx={{
+                          border: `1px solid ${theme.palette.divider}`,
+                          boxShadow: isDark
+                            ? "0 8px 32px rgba(0,0,0,0.35)"
+                            : "0 8px 32px rgba(0,0,0,0.06)",
+                          background: isDark
+                            ? "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
+                            : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
+                          borderRadius: "16px",
+                        }}
+                      >
+                        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                          <Grid container spacing={2.5}>
+                            {/* Left Column: Member Directory & Selector */}
+                            <Grid size={{ xs: 12, md: 4.5, lg: 4 }}>
                               <Box
                                 sx={{
-                                  maxHeight: 380,
-                                  overflowY: "auto",
-                                  pr: 0.5,
+                                  p: 2,
+                                  borderRadius: "14px",
+                                  border: `1px solid ${theme.palette.divider}`,
+                                  bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#fcfcfd",
+                                  height: "100%",
                                   display: "flex",
                                   flexDirection: "column",
-                                  gap: 1,
-                                  "&::-webkit-scrollbar": { width: 5 },
-                                  "&::-webkit-scrollbar-thumb": {
-                                    bgcolor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
-                                    borderRadius: 3,
-                                  },
                                 }}
                               >
-                                {searchedMembers.length === 0 ? (
-                                  <Box sx={{ py: 4, textAlign: "center" }}>
-                                    <Typography variant="caption" color="text.secondary">
-                                      No members found matching &quot;{memberSearchTerm}&quot;
-                                    </Typography>
-                                  </Box>
-                                ) : (
-                                  searchedMembers.map((m, idx) => {
-                                    const mId = m.memberId || m.MemberId || idx;
-                                    const isSelected = String(activeSelectedMember?.memberId || activeSelectedMember?.MemberId || 0) === String(mId);
-                                    const exp = Number(m.totalExpectedAmount || 0);
-                                    const paid = Number(m.totalPaidAmount || 0);
-                                    const pen = Math.max(0, exp - paid);
+                                {/* Member Search & Count */}
+                                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                                  <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: "0.9375rem" }}>
+                                    Select Member
+                                  </Typography>
+                                  <Chip
+                                    size="small"
+                                    label={`${searchedMembers.length} ${searchedMembers.length === 1 ? "member" : "members"}`}
+                                    sx={{
+                                      height: 20,
+                                      fontSize: "0.68rem",
+                                      fontWeight: 700,
+                                      bgcolor: isDark ? "rgba(124,58,237,0.2)" : "rgba(124,58,237,0.1)",
+                                      color: "primary.main",
+                                    }}
+                                  />
+                                </Stack>
 
-                                    return (
-                                      <Box
-                                        key={mId}
-                                        onClick={() => setSelectedReportMemberId(mId)}
-                                        sx={{
-                                          p: 1.25,
-                                          px: 1.5,
-                                          borderRadius: "10px",
-                                          cursor: "pointer",
-                                          border: "1.5px solid",
-                                          borderColor: isSelected
-                                            ? "#7c3aed"
-                                            : isDark
-                                            ? "rgba(255,255,255,0.06)"
-                                            : "rgba(0,0,0,0.06)",
-                                          bgcolor: isSelected
-                                            ? isDark
-                                              ? "rgba(124,58,237,0.16)"
-                                              : "rgba(124,58,237,0.08)"
-                                            : isDark
-                                            ? "rgba(255,255,255,0.015)"
-                                            : "#ffffff",
-                                          boxShadow: isSelected
-                                            ? "0 4px 14px rgba(124,58,237,0.2)"
-                                            : "none",
-                                          transition: "all 0.2s ease",
-                                          "&:hover": {
-                                            borderColor: isSelected ? "#7c3aed" : theme.palette.primary.light,
+                                <TextField
+                                  size="small"
+                                  placeholder="Search member..."
+                                  value={memberSearchTerm}
+                                  onChange={(e) => setMemberSearchTerm(e.target.value)}
+                                  slotProps={{
+                                    input: {
+                                      startAdornment: (
+                                        <InputAdornment position="start">
+                                          <SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                                        </InputAdornment>
+                                      ),
+                                    },
+                                  }}
+                                  sx={{
+                                    mb: 1.5,
+                                    "& .MuiOutlinedInput-root": {
+                                      height: 36,
+                                      fontSize: "0.82rem",
+                                      borderRadius: "8px",
+                                    },
+                                  }}
+                                />
+
+                                {/* Scrollable Member List */}
+                                <Box
+                                  sx={{
+                                    maxHeight: 380,
+                                    overflowY: "auto",
+                                    pr: 0.5,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 1,
+                                    "&::-webkit-scrollbar": { width: 5 },
+                                    "&::-webkit-scrollbar-thumb": {
+                                      bgcolor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
+                                      borderRadius: 3,
+                                    },
+                                  }}
+                                >
+                                  {searchedMembers.length === 0 ? (
+                                    <Box sx={{ py: 4, textAlign: "center" }}>
+                                      <Typography variant="caption" color="text.secondary">
+                                        No members found matching &quot;{memberSearchTerm}&quot;
+                                      </Typography>
+                                    </Box>
+                                  ) : (
+                                    searchedMembers.map((m, idx) => {
+                                      const mId = m.memberId || m.MemberId || idx;
+                                      const isSelected = String(activeSelectedMember?.memberId || activeSelectedMember?.MemberId || 0) === String(mId);
+                                      const exp = Number(m.totalExpectedAmount || 0);
+                                      const paid = Number(m.totalPaidAmount || 0);
+                                      const pen = Math.max(0, exp - paid);
+
+                                      return (
+                                        <Box
+                                          key={mId}
+                                          onClick={() => setSelectedReportMemberId(mId)}
+                                          sx={{
+                                            p: 1.25,
+                                            px: 1.5,
+                                            borderRadius: "10px",
+                                            cursor: "pointer",
+                                            border: "1.5px solid",
+                                            borderColor: isSelected
+                                              ? "#7c3aed"
+                                              : isDark
+                                                ? "rgba(255,255,255,0.06)"
+                                                : "rgba(0,0,0,0.06)",
                                             bgcolor: isSelected
                                               ? isDark
-                                                ? "rgba(124,58,237,0.2)"
-                                                : "rgba(124,58,237,0.12)"
+                                                ? "rgba(124,58,237,0.16)"
+                                                : "rgba(124,58,237,0.08)"
                                               : isDark
-                                              ? "rgba(255,255,255,0.04)"
-                                              : "rgba(0,0,0,0.02)",
-                                          },
-                                        }}
-                                      >
-                                        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-                                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                                            <Typography
-                                              variant="body2"
-                                              fontWeight={isSelected ? 800 : 700}
-                                              noWrap
+                                                ? "rgba(255,255,255,0.015)"
+                                                : "#ffffff",
+                                            boxShadow: isSelected
+                                              ? "0 4px 14px rgba(124,58,237,0.2)"
+                                              : "none",
+                                            transition: "all 0.2s ease",
+                                            "&:hover": {
+                                              borderColor: isSelected ? "#7c3aed" : theme.palette.primary.light,
+                                              bgcolor: isSelected
+                                                ? isDark
+                                                  ? "rgba(124,58,237,0.2)"
+                                                  : "rgba(124,58,237,0.12)"
+                                                : isDark
+                                                  ? "rgba(255,255,255,0.04)"
+                                                  : "rgba(0,0,0,0.02)",
+                                            },
+                                          }}
+                                        >
+                                          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                                              <Typography
+                                                variant="body2"
+                                                fontWeight={isSelected ? 800 : 700}
+                                                noWrap
+                                                sx={{
+                                                  fontSize: "0.84rem",
+                                                  color: isSelected ? "primary.main" : "text.primary",
+                                                }}
+                                              >
+                                                {m.memberName}
+                                              </Typography>
+                                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem" }}>
+                                                {m.department || "Member"} • Paid ₹{paid.toLocaleString()}
+                                              </Typography>
+                                            </Box>
+                                            <Chip
+                                              size="small"
+                                              label={pen === 0 ? "Paid ✓" : `₹${pen.toLocaleString()} Due`}
                                               sx={{
-                                                fontSize: "0.84rem",
-                                                color: isSelected ? "primary.main" : "text.primary",
+                                                height: 20,
+                                                fontSize: "0.66rem",
+                                                fontWeight: 800,
+                                                bgcolor: pen === 0 ? alpha("#10b981", 0.12) : alpha("#ef4444", 0.12),
+                                                color: pen === 0 ? "#10b981" : "#ef4444",
+                                                border: `1px solid ${pen === 0 ? alpha("#10b981", 0.3) : alpha("#ef4444", 0.3)}`,
                                               }}
-                                            >
-                                              {m.memberName}
-                                            </Typography>
-                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem" }}>
-                                              {m.department || "Member"} • Paid ₹{paid.toLocaleString()}
-                                            </Typography>
-                                          </Box>
-                                          <Chip
-                                            size="small"
-                                            label={pen === 0 ? "Paid ✓" : `₹${pen.toLocaleString()} Due`}
-                                            sx={{
-                                              height: 20,
-                                              fontSize: "0.66rem",
-                                              fontWeight: 800,
-                                              bgcolor: pen === 0 ? alpha("#10b981", 0.12) : alpha("#ef4444", 0.12),
-                                              color: pen === 0 ? "#10b981" : "#ef4444",
-                                              border: `1px solid ${pen === 0 ? alpha("#10b981", 0.3) : alpha("#ef4444", 0.3)}`,
-                                            }}
-                                          />
-                                        </Stack>
-                                      </Box>
-                                    );
-                                  })
-                                )}
+                                            />
+                                          </Stack>
+                                        </Box>
+                                      );
+                                    })
+                                  )}
+                                </Box>
                               </Box>
-                            </Box>
-                          </Grid>
+                            </Grid>
 
-                          {/* Right Column: Financial Bar Chart for the Selected Member */}
-                          <Grid size={{ xs: 12, md: 7.5, lg: 8 }}>
-                            <FinancialBarChart
-                              totalExpected={selectedMemberBarEvents[0]?.expected || reportTotals.totalExpected}
-                              totalCollected={selectedMemberBarEvents[0]?.collected || reportTotals.totalCollected}
-                              totalPending={selectedMemberBarEvents[0]?.pending || reportTotals.totalPending}
-                              totalExpenses={0}
-                              totalRemaining={selectedMemberBarEvents[0]?.remaining || reportTotals.totalRemaining}
-                              events={reportBarEvents}
-                              isMember={isMember}
-                              showPieChart={false}
-                            />
+                            {/* Right Column: Financial Bar Chart for the Selected Member */}
+                            <Grid size={{ xs: 12, md: 7.5, lg: 8 }}>
+                              <FinancialBarChart
+                                totalExpected={selectedMemberBarEvents[0]?.expected || reportTotals.totalExpected}
+                                totalCollected={selectedMemberBarEvents[0]?.collected || reportTotals.totalCollected}
+                                totalPending={selectedMemberBarEvents[0]?.pending || reportTotals.totalPending}
+                                totalExpenses={0}
+                                totalRemaining={selectedMemberBarEvents[0]?.remaining || reportTotals.totalRemaining}
+                                events={reportBarEvents}
+                                isMember={isMember}
+                                showPieChart={false}
+                              />
+                            </Grid>
                           </Grid>
-                        </Grid>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <FinancialBarChart
-                      totalExpected={reportTotals.totalExpected}
-                      totalCollected={reportTotals.totalCollected}
-                      totalPending={reportTotals.totalPending}
-                      totalExpenses={reportTotals.totalExpenses}
-                      totalRemaining={reportTotals.totalRemaining}
-                      events={reportBarEvents}
-                      isMember={isMember}
-                    />
-                  )}
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <FinancialBarChart
+                        totalExpected={reportTotals.totalExpected}
+                        totalCollected={reportTotals.totalCollected}
+                        totalPending={reportTotals.totalPending}
+                        totalExpenses={reportTotals.totalExpenses}
+                        totalRemaining={reportTotals.totalRemaining}
+                        events={reportBarEvents}
+                        isMember={isMember}
+                      />
+                    )}
+                  </Grid>
                 </Grid>
-              </Grid>
+              )}
 
               {/* Data Tables Section */}
               <Box sx={{ mt: 1 }}>
@@ -1452,7 +1881,15 @@ export default function ReportsPage({ mode = "event" }) {
                   <AppDataTable title="Event Collections" columns={eventColumns} data={filteredEventCollections} loading={false} />
                 )}
                 {mode === "member" && (
-                  <AppDataTable title="Member Contributions" columns={memberColumns} data={filteredMemberContributions} loading={false} />
+                  <AppDataTable title={isMember ? "My Contribution History" : "Member Contributions"} columns={memberColumns} data={filteredMemberContributions} loading={false} />
+                )}
+                {mode === "payment-history" && (
+                  <AppDataTable
+                    title={isMember ? "My Payment Transactions" : "Event Payment Audit"}
+                    columns={paymentHistoryColumns}
+                    data={filteredPaymentHistory}
+                    loading={false}
+                  />
                 )}
                 {mode === "pending" && (
                   <AppDataTable title="Pending Dues & Defaulters" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />

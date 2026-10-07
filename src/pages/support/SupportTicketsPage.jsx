@@ -26,6 +26,7 @@ import {
   Image as ImageIcon,
   ZoomIn as ZoomInIcon,
   QuestionAnswer as ReplyActionIcon,
+  RestartAlt as RestartAltIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -1021,8 +1022,8 @@ export default function SupportTicketsPage() {
         }
         filterPanel={
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 160 }}>
+            <Grid size={{ xs: 12 }} sx={{ display: "flex", alignItems: "flex-end", gap: 1.5, flexWrap: "wrap" }}>
+              <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
                 <AppSelect
                   label="Select Ticket Type"
                   value={filterType}
@@ -1035,7 +1036,7 @@ export default function SupportTicketsPage() {
                   fullWidth
                 />
               </Box>
-              <Box sx={{ minWidth: 160 }}>
+              <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
                 <AppSelect
                   label="Select Priority"
                   value={filterPriority}
@@ -1048,7 +1049,7 @@ export default function SupportTicketsPage() {
                   fullWidth
                 />
               </Box>
-              <Box sx={{ minWidth: 160 }}>
+              <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
                 <AppSelect
                   label="Select Status"
                   value={filterStatus}
@@ -1061,52 +1062,57 @@ export default function SupportTicketsPage() {
                   fullWidth
                 />
               </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                startIcon={<FilterListIcon />}
-                onClick={() => {
-                  setAppliedType(filterType);
-                  setAppliedPriority(filterPriority);
-                  setAppliedStatus(filterStatus);
-                }}
-                sx={{
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                }}
-              >
-                Filter
-              </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setFilterType("ALL");
-                  setFilterPriority("ALL");
-                  setFilterStatus("ALL");
-                  setAppliedType("ALL");
-                  setAppliedPriority("ALL");
-                  setAppliedStatus("ALL");
-                }}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)",
-                  },
-                }}
-              >
-                Clear Filter
-              </AppButton>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<FilterListIcon />}
+                  onClick={() => {
+                    setAppliedType(filterType);
+                    setAppliedPriority(filterPriority);
+                    setAppliedStatus(filterStatus);
+                  }}
+                  sx={{
+                    height: 34,
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Filter
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  startIcon={<RestartAltIcon />}
+                  onClick={() => {
+                    setFilterType("ALL");
+                    setFilterPriority("ALL");
+                    setFilterStatus("ALL");
+                    setAppliedType("ALL");
+                    setAppliedPriority("ALL");
+                    setAppliedStatus("ALL");
+                  }}
+                  sx={{
+                    color: "#ef4444",
+                    borderColor: "rgba(239, 68, 68, 0.4)",
+                    height: 34,
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                    "&:hover": {
+                      borderColor: "#ef4444",
+                      bgcolor: "rgba(239, 68, 68, 0.05)",
+                    },
+                  }}
+                >
+                  Clear Filter
+                </AppButton>
+              </Box>
             </Grid>
           </Grid>
         }
