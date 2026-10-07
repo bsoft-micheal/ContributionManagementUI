@@ -187,7 +187,7 @@ export function validateIndianMobile(value) {
 
 /**
  * Comprehensive email validation ensuring standard email formatting,
- * no forbidden characters/patterns, valid domain structure, and max 25 characters.
+ * no forbidden characters/patterns, valid domain structure, and max 250 characters.
  * @param {string} value The email address to validate.
  * @returns {string} Error message if invalid, or empty string if valid.
  */
@@ -197,9 +197,9 @@ export function validateEmail(value) {
   }
   const strVal = String(value).trim();
 
-  // 1. Length constraint: maximum 25 characters
-  if (strVal.length > 25) {
-    return "Email cannot exceed 25 characters";
+  // 1. Length constraint: maximum 250 characters
+  if (strVal.length > 250) {
+    return "Email cannot exceed 250 characters";
   }
 
   // 2. Spaces not allowed

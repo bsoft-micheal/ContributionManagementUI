@@ -16,6 +16,7 @@ export default function AppInput({
   restrictType,
   maxLength,
   startAdornment,
+  endAdornment,
   InputProps = {},
   ...props
 }) {
@@ -146,6 +147,11 @@ export default function AppInput({
           startAdornment: startAdornment ? (
             <InputAdornment position="start" sx={{ mr: 0.5 }}>
               {startAdornment}
+            </InputAdornment>
+          ) : undefined,
+          endAdornment: endAdornment ? (
+            <InputAdornment position="end" sx={{ ml: 0.5 }}>
+              {endAdornment}
             </InputAdornment>
           ) : undefined,
           ...InputProps,

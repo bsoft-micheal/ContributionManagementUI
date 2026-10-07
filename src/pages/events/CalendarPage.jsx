@@ -19,6 +19,7 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import AddIcon from "@mui/icons-material/Add";
 import CakeRoundedIcon from "@mui/icons-material/CakeRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import CelebrationRoundedIcon from "@mui/icons-material/CelebrationRounded";
@@ -280,9 +281,8 @@ export default function CalendarPage({ isEmbedded = false }) {
       matchedCelebrants = monthMatches.length > 0 ? monthMatches : pMembers;
     }
 
-    const textToSearch = `${eventItem.eventName || ""} ${
-      eventItem.description || ""
-    }`.toLowerCase();
+    const textToSearch = `${eventItem.eventName || ""} ${eventItem.description || ""
+      }`.toLowerCase();
     const nameMatches = activeMembers.filter((m) => {
       if (!m.name || !m.dateOfBirth) return false;
       const lowerName = m.name.toLowerCase().trim();
@@ -639,15 +639,11 @@ export default function CalendarPage({ isEmbedded = false }) {
     return list;
   }, [activeMembers, filteredEvents, filters]);
 
-  // Check if current view is Birthday vs another category (e.g. Farewell)
-  const isBirthdayView =
-    (categoryFilter || "").toLowerCase().includes("birthday");
-
-  // Cache for detailed event details and contributions when filtering by specific category (e.g. Farewell)
+  // Cache for detailed event details and contributions
   const [detailedEventsMap, setDetailedEventsMap] = useState({});
 
   useEffect(() => {
-    if (!isBirthdayView && filteredEvents.length > 0) {
+    if (filteredEvents.length > 0) {
       filteredEvents.forEach(async (ev) => {
         if (!ev.eventId) return;
         if (detailedEventsMap[ev.eventId]) return;
@@ -672,15 +668,14 @@ export default function CalendarPage({ isEmbedded = false }) {
         }
       });
     }
-  }, [isBirthdayView, filteredEvents, detailedEventsMap]);
+  }, [filteredEvents, detailedEventsMap]);
 
-  // Extract participants for the selected category (e.g. Farewell) - Strictly NO DOB!
-  const categoryParticipants = useMemo(() => {
-    if (isBirthdayView) return [];
+  // Helper to extract active participants for non-birthday events
+  const getParticipantsForNonBirthdayEvent = (ev, detailed) => {
+    const list = [];
+    const seen = new Set();
 
-    const map = new Map();
-
-    const addParticipant = (memberObj, eventInfo) => {
+    const addParticipant = (memberObj) => {
       if (!memberObj) return;
       const memId = memberObj.memberId || memberObj.id;
       const memName = (
@@ -691,7 +686,6 @@ export default function CalendarPage({ isEmbedded = false }) {
       if (!memName && !memId) return;
 
       // Strictly ACTIVE accounts only!
-      // Check if this member is inactive, exited, or deleted in the master members directory
       const matchedMaster = (members || []).find(
         (m) =>
           (memId && String(m.memberId) === String(memId)) ||
@@ -709,72 +703,179 @@ export default function CalendarPage({ isEmbedded = false }) {
       }
 
       const dedupeKey = memId ? `id:${memId}` : memName.toLowerCase();
-      if (!map.has(dedupeKey)) {
-        // Find in active members array to get latest type/details
+      if (!seen.has(dedupeKey)) {
+        seen.add(dedupeKey);
         const fullMem = activeMembers.find(
           (m) =>
             (memId && String(m.memberId) === String(memId)) ||
             (m.name && m.name.toLowerCase().trim() === memName.toLowerCase())
         );
 
-        map.set(dedupeKey, {
+        list.push({
           memberId: memId || fullMem?.memberId || dedupeKey,
           name: fullMem?.name || memName,
           type: fullMem?.workType || fullMem?.type || fullMem?.memberType || memberObj.workType || memberObj.type || memberObj.roleName || "Member",
-          eventName: eventInfo?.eventName || eventInfo?.eventTypeName || categoryFilter,
-          eventDate: eventInfo?.eventDate ? dayjs(eventInfo.eventDate).format("DD MMM") : null,
         });
       }
     };
 
-    for (const ev of filteredEvents) {
-      const detailed = detailedEventsMap[ev.eventId] || ev;
-
-      // 1. From detailed.participants array
-      if (Array.isArray(detailed.participants) && detailed.participants.length > 0) {
-        for (const p of detailed.participants) {
-          if (typeof p === "object" && p !== null) {
-            addParticipant(p, detailed);
-          } else if (typeof p === "number" || typeof p === "string") {
-            const m = activeMembers.find((mem) => String(mem.memberId) === String(p));
-            if (m) addParticipant(m, detailed);
-          }
-        }
-      }
-
-      // 2. From detailed.participantIds array
-      if (Array.isArray(detailed.participantIds) && detailed.participantIds.length > 0) {
-        for (const pId of detailed.participantIds) {
-          const m = activeMembers.find((mem) => String(mem.memberId) === String(pId));
-          if (m) addParticipant(m, detailed);
-        }
-      }
-
-      // 3. From contributions (all members who contributed to this event)
-      if (Array.isArray(detailed.contributions) && detailed.contributions.length > 0) {
-        for (const c of detailed.contributions) {
-          const m = activeMembers.find((mem) => String(mem.memberId) === String(c.memberId));
-          if (m) {
-            addParticipant(m, detailed);
-          } else if (c.memberName || c.name) {
-            addParticipant(c, detailed);
-          }
-        }
-      }
-
-      // 4. Any name matches from description or eventName (e.g. "Farewell for Michael")
-      const textToScan = `${detailed.eventName || ""} ${detailed.description || ""}`.toLowerCase();
-      for (const m of activeMembers) {
-        if (!m.name) continue;
-        const lowerName = m.name.toLowerCase().trim();
-        if (textToScan.includes(lowerName)) {
-          addParticipant(m, detailed);
+    // 1. From detailed.participants array
+    if (Array.isArray(detailed?.participants) && detailed.participants.length > 0) {
+      for (const p of detailed.participants) {
+        if (typeof p === "object" && p !== null) {
+          addParticipant(p);
+        } else if (typeof p === "number" || typeof p === "string") {
+          const m = activeMembers.find((mem) => String(mem.memberId) === String(p));
+          if (m) addParticipant(m);
         }
       }
     }
 
-    return Array.from(map.values());
-  }, [isBirthdayView, filteredEvents, detailedEventsMap, members, activeMembers, categoryFilter]);
+    // 2. From detailed.participantIds array
+    if (Array.isArray(detailed?.participantIds) && detailed.participantIds.length > 0) {
+      for (const pId of detailed.participantIds) {
+        const m = activeMembers.find((mem) => String(mem.memberId) === String(pId));
+        if (m) addParticipant(m);
+      }
+    }
+
+    // 3. From contributions
+    if (Array.isArray(detailed?.contributions) && detailed.contributions.length > 0) {
+      for (const c of detailed.contributions) {
+        const m = activeMembers.find((mem) => String(mem.memberId) === String(c.memberId));
+        if (m) {
+          addParticipant(m);
+        } else if (c.memberName || c.name) {
+          addParticipant(c);
+        }
+      }
+    }
+
+    // 4. Any name matches from description or eventName (e.g. "Farewell for Michael")
+    const textToScan = `${detailed?.eventName || ev?.eventName || ""} ${detailed?.description || ev?.description || ""}`.toLowerCase();
+    for (const m of activeMembers) {
+      if (!m.name) continue;
+      const lowerName = m.name.toLowerCase().trim();
+      if (textToScan.includes(lowerName)) {
+        addParticipant(m);
+      }
+    }
+
+    return list;
+  };
+
+  // Compile Unified Sidebar Items (Birthdays + All Scheduled Events & Participants)
+  const unifiedSidebarItems = useMemo(() => {
+    const today = dayjs().startOf("day");
+    const targetMonth = filters.month === 0 ? dayjs().month() + 1 : filters.month;
+    const targetYear = filters.year === 0 ? dayjs().year() : filters.year;
+
+    const calculateEventStatus = (dateStr) => {
+      if (!dateStr) return "upcoming";
+      const evDate = dayjs(dateStr).startOf("day");
+      if (evDate.isBefore(today, "day")) return "completed";
+      if (evDate.isSame(today, "day")) return "today";
+      return "upcoming";
+    };
+
+    const isAll = !categoryFilter || categoryFilter === "ALL";
+    const isOnlyBirthday = !isAll && (categoryFilter || "").toLowerCase().includes("birthday");
+
+    const items = [];
+    const seenItemKeys = new Set();
+
+    // 1. Birthday celebrants (if ALL or Birthday category)
+    if (isAll || isOnlyBirthday) {
+      birthdayMembers.forEach((mem) => {
+        const itemKey = `bday-${mem.memberId}-${mem.dayOfMonth}`;
+        if (!seenItemKeys.has(itemKey)) {
+          seenItemKeys.add(itemKey);
+          items.push({
+            id: itemKey,
+            memberId: mem.memberId,
+            name: mem.name,
+            type: mem.type,
+            category: "Birthday",
+            categoryLabel: "Birthday",
+            formattedDate: mem.formattedDate,
+            dayOfMonth: mem.dayOfMonth,
+            status: mem.status,
+            isBirthday: true,
+            celebrant: mem,
+          });
+        }
+      });
+    }
+
+    // 2. Non-Birthday events & participants (if ALL or specific non-birthday category)
+    if (!isOnlyBirthday) {
+      filteredEvents.forEach((ev) => {
+        const isBday =
+          ev.eventTypeName?.toLowerCase().includes("birthday") ||
+          ev.eventName?.toLowerCase().includes("birthday");
+        if (isBday) return;
+
+        const evDate = dayjs(ev.eventDate);
+        if (filters.month !== 0 && evDate.month() + 1 !== targetMonth) return;
+        if (filters.year !== 0 && evDate.year() !== targetYear) return;
+
+        const detailed = detailedEventsMap[ev.eventId] || ev;
+        const eventCategory = ev.eventTypeName || ev.eventName || "Event";
+        const dayOfMonth = evDate.date();
+        const formattedDate = evDate.format("DD MMM");
+        const status = calculateEventStatus(ev.eventDate);
+
+        // Extract participants for this non-birthday event
+        const participants = getParticipantsForNonBirthdayEvent(ev, detailed);
+
+        if (participants.length > 0) {
+          participants.forEach((p) => {
+            const itemKey = `event-part-${ev.eventId}-${p.memberId}`;
+            if (!seenItemKeys.has(itemKey)) {
+              seenItemKeys.add(itemKey);
+              items.push({
+                id: itemKey,
+                memberId: p.memberId,
+                name: p.name,
+                type: p.type || "Member",
+                eventName: ev.eventName || eventCategory,
+                category: eventCategory,
+                categoryLabel: eventCategory,
+                formattedDate,
+                dayOfMonth,
+                status,
+                isBirthday: false,
+                eventItem: detailed || ev,
+              });
+            }
+          });
+        } else {
+          // If no specific participant members found, display the event itself
+          const itemKey = `event-${ev.eventId}`;
+          if (!seenItemKeys.has(itemKey)) {
+            seenItemKeys.add(itemKey);
+            items.push({
+              id: itemKey,
+              name: ev.eventName || eventCategory,
+              type: eventCategory,
+              eventName: ev.eventName || eventCategory,
+              category: eventCategory,
+              categoryLabel: eventCategory,
+              formattedDate,
+              dayOfMonth,
+              status,
+              isBirthday: false,
+              eventItem: detailed || ev,
+            });
+          }
+        }
+      });
+    }
+
+    // Sort all items chronologically by day of month (1st to 31st)
+    items.sort((a, b) => a.dayOfMonth - b.dayOfMonth);
+    return items;
+  }, [categoryFilter, birthdayMembers, filteredEvents, detailedEventsMap, filters, members, activeMembers]);
 
 
 
@@ -868,21 +969,6 @@ export default function CalendarPage({ isEmbedded = false }) {
               <Grid size={{ xs: 6, sm: 3, md: 2 }}>
                 <AppSelect
                   size="small"
-                  label="Month"
-                  value={filters.month}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      month: Number(e.target.value),
-                    }))
-                  }
-                  options={monthOptions}
-                  fullWidth
-                />
-              </Grid>
-              <Grid size={{ xs: 6, sm: 3, md: 2 }}>
-                <AppSelect
-                  size="small"
                   label="Year"
                   value={filters.year}
                   onChange={(e) =>
@@ -895,17 +981,32 @@ export default function CalendarPage({ isEmbedded = false }) {
                   fullWidth
                 />
               </Grid>
+              <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+                <AppSelect
+                  size="small"
+                  label="Month"
+                  value={filters.month}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      month: Number(e.target.value),
+                    }))
+                  }
+                  options={monthOptions}
+                  fullWidth
+                />
+              </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <AppSelect
                   size="small"
-                  label="Event Name"
+                  label="Event Type"
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
                   options={categoryOptions}
                   fullWidth
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 12, md: 5 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <AppInput
                   size="small"
                   label="Search"
@@ -1107,15 +1208,15 @@ export default function CalendarPage({ isEmbedded = false }) {
                             isToday
                               ? "2px solid #7c3aed"
                               : theme.palette.mode === "dark"
-                              ? "1px solid rgba(255, 255, 255, 0.10)"
-                              : "1px solid rgba(124, 58, 237, 0.15)",
+                                ? "1px solid rgba(255, 255, 255, 0.10)"
+                                : "1px solid rgba(124, 58, 237, 0.15)",
                           borderRadius: "10px",
                           opacity: isDifferentMonth ? 0.35 : 1,
                           bgcolor: isToday
                             ? (theme) =>
-                                theme.palette.mode === "dark"
-                                  ? "rgba(124, 58, 237, 0.15)"
-                                  : "rgba(124, 58, 237, 0.05)"
+                              theme.palette.mode === "dark"
+                                ? "rgba(124, 58, 237, 0.15)"
+                                : "rgba(124, 58, 237, 0.05)"
                             : "background.paper",
                           cursor: hasWriteAccess ? "pointer" : "default",
                           display: "flex",
@@ -1123,12 +1224,12 @@ export default function CalendarPage({ isEmbedded = false }) {
                           transition: "all 0.15s ease",
                           "&:hover": hasWriteAccess
                             ? {
-                                bgcolor: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "rgba(255, 255, 255, 0.04)"
-                                    : "#f8fafc",
-                                borderColor: "#7c3aed",
-                              }
+                              bgcolor: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(255, 255, 255, 0.04)"
+                                  : "#f8fafc",
+                              borderColor: "#7c3aed",
+                            }
                             : {},
                         }}
                       >
@@ -1224,7 +1325,7 @@ export default function CalendarPage({ isEmbedded = false }) {
                             return (
                               <Tooltip
                                 key={item.key}
-                                title={`${item.displayName} • ${statusText}${isPaymentPending ? " • Payment Pending" : ""}`}
+                                title={`${item.displayName} • ${statusText}`}
                                 arrow
                                 placement="top"
                               >
@@ -1248,8 +1349,8 @@ export default function CalendarPage({ isEmbedded = false }) {
                                           ? "rgba(236, 72, 153, 0.2)"
                                           : "rgba(236, 72, 153, 0.08)"
                                         : theme.palette.mode === "dark"
-                                        ? typeInfo.darkBg
-                                        : typeInfo.bg,
+                                          ? typeInfo.darkBg
+                                          : typeInfo.bg,
                                     border: (theme) =>
                                       isBirthdayItem && isTodayDay
                                         ? "1.5px solid #ec4899"
@@ -1335,20 +1436,20 @@ export default function CalendarPage({ isEmbedded = false }) {
                                               isBirthdayItem && isTodayDay
                                                 ? "rgba(236, 72, 153, 0.15)"
                                                 : isBirthdayItem && isPastDay
-                                                ? "rgba(34, 197, 94, 0.15)"
-                                                : "rgba(124, 58, 237, 0.1)",
+                                                  ? "rgba(34, 197, 94, 0.15)"
+                                                  : "rgba(124, 58, 237, 0.1)",
                                             color: (theme) =>
                                               isBirthdayItem && isTodayDay
                                                 ? "#db2777"
                                                 : isBirthdayItem && isPastDay
-                                                ? "#16a34a"
-                                                : "#7c3aed",
+                                                  ? "#16a34a"
+                                                  : "#7c3aed",
                                             border: (theme) =>
                                               isBirthdayItem && isTodayDay
                                                 ? "1px solid rgba(236, 72, 153, 0.3)"
                                                 : isBirthdayItem && isPastDay
-                                                ? "1px solid rgba(34, 197, 94, 0.25)"
-                                                : "1px solid rgba(124, 58, 237, 0.2)",
+                                                  ? "1px solid rgba(34, 197, 94, 0.25)"
+                                                  : "1px solid rgba(124, 58, 237, 0.2)",
                                             borderRadius: "10px",
                                             px: 0.6,
                                             py: "1px",
@@ -1362,58 +1463,14 @@ export default function CalendarPage({ isEmbedded = false }) {
                                             ? isTodayDay
                                               ? "Today 🎉"
                                               : isPastDay
-                                              ? "Completed ✓"
-                                              : "Upcoming"
+                                                ? "Completed ✓"
+                                                : "Upcoming"
                                             : item.categoryLabel}
                                         </Box>
                                       </Box>
                                     </Box>
                                   </Box>
 
-                                  {/* Bottom Row: Payment Pending Badge */}
-                                  {isPaymentPending && (
-                                    <Box
-                                      sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 0.35,
-                                        bgcolor: (theme) =>
-                                          theme.palette.mode === "dark"
-                                            ? "rgba(245, 158, 11, 0.2)"
-                                            : "#fef3c7",
-                                        color: (theme) =>
-                                          theme.palette.mode === "dark" ? "#fde68a" : "#d97706",
-                                        border: (theme) =>
-                                          theme.palette.mode === "dark"
-                                            ? "1px solid rgba(245, 158, 11, 0.35)"
-                                            : "1px solid #fde68a",
-                                        borderRadius: "6px",
-                                        px: 0.6,
-                                        py: "2px",
-                                        mt: 0.1,
-                                      }}
-                                    >
-                                      <WarningAmberRoundedIcon
-                                        sx={{
-                                          fontSize: "0.74rem",
-                                          color: (theme) =>
-                                            theme.palette.mode === "dark" ? "#fbbf24" : "#d97706",
-                                          flexShrink: 0,
-                                        }}
-                                      />
-                                      <Typography
-                                        sx={{
-                                          fontSize: "0.62rem",
-                                          fontWeight: 700,
-                                          color: "inherit",
-                                          lineHeight: 1.1,
-                                          whiteSpace: "nowrap",
-                                        }}
-                                      >
-                                        Payment Pending
-                                      </Typography>
-                                    </Box>
-                                  )}
                                 </Box>
                               </Tooltip>
                             );
@@ -1464,7 +1521,11 @@ export default function CalendarPage({ isEmbedded = false }) {
                 }}
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {isBirthdayView ? (
+                  {!categoryFilter || categoryFilter === "ALL" ? (
+                    <CalendarMonthRoundedIcon
+                      sx={{ color: "#7c3aed", fontSize: "1.25rem" }}
+                    />
+                  ) : (categoryFilter || "").toLowerCase().includes("birthday") ? (
                     <CakeRoundedIcon
                       sx={{ color: "#ec4899", fontSize: "1.25rem" }}
                     />
@@ -1482,19 +1543,23 @@ export default function CalendarPage({ isEmbedded = false }) {
                       letterSpacing: "-0.01em",
                     }}
                   >
-                    {isBirthdayView
-                      ? "Birthday Members List"
-                      : `${getEventTypeInfo(categoryFilter).label || categoryFilter} Participants`}
+                    {!categoryFilter || categoryFilter === "ALL"
+                      ? "Event Members List"
+                      : (categoryFilter || "").toLowerCase().includes("birthday")
+                        ? "Birthday Members List"
+                        : `${getEventTypeInfo(categoryFilter).label || categoryFilter} Members List`}
                   </Typography>
                 </Box>
                 <Box
                   sx={{
                     bgcolor: (theme) =>
-                      isBirthdayView
-                        ? theme.palette.mode === "dark"
-                          ? "rgba(255, 255, 255, 0.15)"
-                          : "primary.main"
-                        : getEventTypeInfo(categoryFilter).color || "primary.main",
+                      !categoryFilter || categoryFilter === "ALL"
+                        ? "primary.main"
+                        : (categoryFilter || "").toLowerCase().includes("birthday")
+                          ? theme.palette.mode === "dark"
+                            ? "rgba(255, 255, 255, 0.15)"
+                            : "primary.main"
+                          : getEventTypeInfo(categoryFilter).color || "primary.main",
                     color: "#ffffff",
                     borderRadius: "10px",
                     px: 1,
@@ -1503,13 +1568,11 @@ export default function CalendarPage({ isEmbedded = false }) {
                     fontWeight: 800,
                   }}
                 >
-                  {isBirthdayView
-                    ? birthdayMembers.length
-                    : categoryParticipants.length}
+                  {unifiedSidebarItems.length}
                 </Box>
               </Box>
 
-              {/* Sidebar Items: Birthday Members or Category Participants (NO DOB) */}
+              {/* Sidebar Items: Chronologically Sorted All/Category Members */}
               <Box
                 sx={{
                   p: 2,
@@ -1525,89 +1588,150 @@ export default function CalendarPage({ isEmbedded = false }) {
                   },
                 }}
               >
-                {!isBirthdayView ? (
-                  /* ─── Non-Birthday Category Participants List (NO DOB) ─── */
-                  categoryParticipants.length === 0 ? (
-                    <Box sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
-                      <Typography sx={{ fontSize: "2rem", mb: 1 }}>
-                        {getEventTypeInfo(categoryFilter).emoji || "👏"}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight={700}
-                        sx={{ color: "text.primary", fontSize: "0.85rem" }}
-                      >
-                        No {categoryFilter} participants in {displayedMonthName}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: "block", mt: 0.5, fontSize: "0.75rem" }}
-                      >
-                        Participants assigned to {categoryFilter} events will appear here
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <Stack spacing={1.2}>
-                      {categoryParticipants.map((p) => {
-                        const catInfo = getEventTypeInfo(categoryFilter);
-                        return (
-                          <Paper
-                            key={p.memberId}
-                            elevation={0}
-                            sx={{
-                              p: 1.2,
-                              px: 1.4,
-                              borderRadius: "10px",
-                              border: (theme) =>
-                                theme.palette.mode === "dark"
+                {unifiedSidebarItems.length === 0 ? (
+                  <Box sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
+                    <Typography sx={{ fontSize: "2rem", mb: 1 }}>
+                      {!categoryFilter || categoryFilter === "ALL"
+                        ? "🗓️"
+                        : (categoryFilter || "").toLowerCase().includes("birthday")
+                          ? "🎂"
+                          : getEventTypeInfo(categoryFilter).emoji || "👏"}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      fontWeight={700}
+                      sx={{ color: "text.primary", fontSize: "0.85rem" }}
+                    >
+                      {!categoryFilter || categoryFilter === "ALL"
+                        ? `No events or birthdays in ${displayedMonthName}`
+                        : (categoryFilter || "").toLowerCase().includes("birthday")
+                          ? `No birthdays in ${displayedMonthName}`
+                          : `No ${categoryFilter} members in ${displayedMonthName}`}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", mt: 0.5, fontSize: "0.75rem" }}
+                    >
+                      {!categoryFilter || categoryFilter === "ALL"
+                        ? "Events and birthdays for this month will appear here automatically"
+                        : `Members and events for ${categoryFilter} will appear here`}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Stack spacing={1.2}>
+                    {unifiedSidebarItems.map((item) => {
+                      const isToday = item.status === "today";
+                      const isCompleted = item.status === "completed";
+                      const isUpcoming = item.status === "upcoming";
+                      const isBirthday = item.isBirthday;
+                      const catInfo = getEventTypeInfo(item.category);
+
+                      return (
+                        <Paper
+                          key={item.id}
+                          elevation={0}
+                          onClick={(e) => {
+                            if (isBirthday && isToday && item.celebrant) {
+                              launchPaperBlast(e.clientX, e.clientY, 100);
+                              setCelebrantsForCelebration([item.celebrant]);
+                              setBdayCelebrationOpen(true);
+                            } else if (item.eventItem) {
+                              handleEventClick(item.eventItem);
+                            }
+                          }}
+                          sx={{
+                            p: 1.2,
+                            px: 1.4,
+                            borderRadius: "10px",
+                            border: (theme) =>
+                              isBirthday && isToday
+                                ? "2px solid #ec4899"
+                                : theme.palette.mode === "dark"
                                   ? "1.5px solid rgba(255, 255, 255, 0.12)"
-                                  : "1.5px solid rgba(124, 58, 237, 0.18)",
-                              bgcolor: "background.paper",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              transition: "all 0.15s ease",
-                              "&:hover": {
-                                borderColor: catInfo.color || "primary.main",
-                                transform: "translateY(-1px)",
-                                boxShadow: (theme) =>
-                                  theme.palette.mode === "dark"
+                                  : isBirthday
+                                    ? "1.5px solid rgba(124, 58, 237, 0.18)"
+                                    : `1.5px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
+                            bgcolor: (theme) =>
+                              isBirthday && isToday
+                                ? theme.palette.mode === "dark"
+                                  ? "rgba(236, 72, 153, 0.12)"
+                                  : "rgba(236, 72, 153, 0.05)"
+                                : "background.paper",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            transition: "all 0.15s ease",
+                            cursor: (isBirthday && isToday) || item.eventItem ? "pointer" : "default",
+                            animation: isBirthday && isToday ? "festiveGlow 3s infinite ease-in-out" : "none",
+                            opacity: isCompleted ? 0.88 : 1,
+                            "&:hover": {
+                              borderColor: isBirthday && isToday ? "#ec4899" : catInfo.color || "primary.main",
+                              transform: "translateY(-1px)",
+                              boxShadow:
+                                isBirthday && isToday
+                                  ? "0 4px 14px rgba(236, 72, 153, 0.3)"
+                                  : theme.palette.mode === "dark"
                                     ? "0 3px 12px rgba(0, 0, 0, 0.3)"
                                     : "0 3px 8px rgba(124, 58, 237, 0.12)",
-                              },
-                            }}
-                          >
-                            {/* Member Initial Avatar + Name + Type (Strictly NO DOB) */}
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, minWidth: 0 }}>
-                              <Box
-                                sx={{
-                                  width: 34,
-                                  height: 34,
-                                  borderRadius: "50%",
-                                  bgcolor: (theme) =>
-                                    theme.palette.mode === "dark"
+                            },
+                          }}
+                        >
+                          {/* Member Initial / Icon Avatar + Name + Subtitle */}
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, minWidth: 0 }}>
+                            <Box
+                              sx={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: "50%",
+                                bgcolor: (theme) =>
+                                  isBirthday
+                                    ? isToday
+                                      ? "rgba(236, 72, 153, 0.2)"
+                                      : theme.palette.mode === "dark"
+                                        ? "rgba(255, 255, 255, 0.08)"
+                                        : "rgba(236, 72, 153, 0.12)"
+                                    : theme.palette.mode === "dark"
                                       ? "rgba(255, 255, 255, 0.08)"
                                       : catInfo.bg || "rgba(245, 158, 11, 0.1)",
-                                  color: (theme) =>
-                                    theme.palette.mode === "dark"
+                                color: (theme) =>
+                                  isBirthday
+                                    ? isToday
+                                      ? "#db2777"
+                                      : theme.palette.mode === "dark"
+                                        ? "#ffffff"
+                                        : "#db2777"
+                                    : theme.palette.mode === "dark"
                                       ? "#ffffff"
                                       : catInfo.color || "primary.main",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontWeight: 800,
-                                  fontSize: "0.82rem",
-                                  border: (theme) =>
-                                    theme.palette.mode === "dark"
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: 800,
+                                fontSize: "0.82rem",
+                                border: (theme) =>
+                                  isBirthday
+                                    ? isToday
+                                      ? "1.5px solid #ec4899"
+                                      : theme.palette.mode === "dark"
+                                        ? "1px solid rgba(255, 255, 255, 0.18)"
+                                        : "1px solid rgba(236, 72, 153, 0.25)"
+                                    : theme.palette.mode === "dark"
                                       ? "1px solid rgba(255, 255, 255, 0.18)"
                                       : `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {p.name.charAt(0).toUpperCase()}
-                              </Box>
-                              <Box sx={{ minWidth: 0 }}>
+                                flexShrink: 0,
+                              }}
+                            >
+                              {isBirthday
+                                ? isToday
+                                  ? "🎂"
+                                  : item.name.charAt(0).toUpperCase()
+                                : item.name
+                                  ? item.name.charAt(0).toUpperCase()
+                                  : catInfo.emoji || "💐"}
+                            </Box>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                                 <Typography
                                   variant="body2"
                                   fontWeight={700}
@@ -1620,380 +1744,181 @@ export default function CalendarPage({ isEmbedded = false }) {
                                     textOverflow: "ellipsis",
                                   }}
                                 >
-                                  {p.name}
+                                  {item.name}
                                 </Typography>
-                                {p.type && (
+                                {isBirthday && isToday && (
                                   <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{ fontSize: "0.7rem", display: "block" }}
+                                    component="span"
+                                    sx={{
+                                      fontSize: "0.85rem",
+                                      display: "inline-block",
+                                      animation: "bouncePopper 1.5s infinite ease-in-out",
+                                    }}
                                   >
-                                    {p.type}
+                                    🎉
                                   </Typography>
                                 )}
                               </Box>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ fontSize: "0.7rem", display: "block", lineHeight: 1.2, mt: 0.1 }}
+                              >
+                                {!categoryFilter || categoryFilter === "ALL"
+                                  ? isBirthday
+                                    ? `${item.type || "Member"}`
+                                    : `${item.type || "Member"} • ${catInfo.emoji || ""} ${item.category}`
+                                  : item.type || item.eventName || item.category}
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          {/* Right Side: Date Pill & Status Badge */}
+                          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.4, flexShrink: 0 }}>
+                            {/* Date Pill */}
+                            <Box
+                              sx={{
+                                bgcolor: (theme) =>
+                                  isToday
+                                    ? "rgba(236, 72, 153, 0.15)"
+                                    : theme.palette.mode === "dark"
+                                      ? "rgba(255, 255, 255, 0.12)"
+                                      : isBirthday
+                                        ? "rgba(124, 58, 237, 0.08)"
+                                        : catInfo.bg || "rgba(245, 158, 11, 0.08)",
+                                color: (theme) =>
+                                  isToday
+                                    ? "#db2777"
+                                    : theme.palette.mode === "dark"
+                                      ? "#ffffff"
+                                      : isBirthday
+                                        ? "#4a3f6b"
+                                        : catInfo.color || "text.primary",
+                                border: (theme) =>
+                                  isToday
+                                    ? "1px solid rgba(236, 72, 153, 0.35)"
+                                    : theme.palette.mode === "dark"
+                                      ? "1px solid rgba(255, 255, 255, 0.2)"
+                                      : isBirthday
+                                        ? "1px solid rgba(124, 58, 237, 0.2)"
+                                        : `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
+                                borderRadius: "6px",
+                                px: 0.9,
+                                py: 0.15,
+                                fontWeight: 800,
+                                fontSize: "0.72rem",
+                                whiteSpace: "nowrap",
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              {item.formattedDate}
                             </Box>
 
-                            {/* Event Date badge (Event date only, NO DOB!) */}
-                            {p.eventDate && (
-                              <Box
+                            {/* Status Chip: Completed / Today 🎉 / Upcoming */}
+                            {isCompleted && (
+                              <Chip
+                                size="small"
+                                icon={
+                                  <CheckCircleRoundedIcon
+                                    sx={{ fontSize: "0.75rem !important", color: "#16a34a !important" }}
+                                  />
+                                }
+                                label="Completed"
                                 sx={{
+                                  height: 20,
+                                  fontSize: "0.64rem",
+                                  fontWeight: 700,
                                   bgcolor: (theme) =>
                                     theme.palette.mode === "dark"
-                                      ? "rgba(255, 255, 255, 0.12)"
-                                      : catInfo.bg || "rgba(245, 158, 11, 0.08)",
-                                  color: (theme) =>
-                                    theme.palette.mode === "dark" ? "#ffffff" : catInfo.color || "text.primary",
-                                  border: (theme) =>
-                                    theme.palette.mode === "dark"
-                                      ? "1px solid rgba(255, 255, 255, 0.2)"
-                                      : `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
-                                  borderRadius: "6px",
-                                  px: 0.9,
-                                  py: 0.2,
-                                  fontWeight: 800,
-                                  fontSize: "0.7rem",
-                                  whiteSpace: "nowrap",
-                                  lineHeight: 1.2,
+                                      ? "rgba(22, 163, 74, 0.18)"
+                                      : "rgba(22, 163, 74, 0.08)",
+                                  color: "#16a34a",
+                                  border: "1px solid rgba(22, 163, 74, 0.28)",
+                                  "& .MuiChip-label": { px: 0.5 },
+                                  "& .MuiChip-icon": { ml: 0.4, mr: -0.3 },
                                 }}
-                              >
-                                {p.eventDate}
-                              </Box>
+                              />
                             )}
-                          </Paper>
-                        );
-                      })}
-                    </Stack>
-                  )
-                ) : (
-                  /* ─── Birthday Members List (existing) ─── */
-                  birthdayMembers.length === 0 ? (
-                    <Box sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
-                      <Typography sx={{ fontSize: "2rem", mb: 1 }}>🎂</Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight={700}
-                        sx={{ color: "text.primary", fontSize: "0.85rem" }}
-                      >
-                        No birthdays in {displayedMonthName}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: "block", mt: 0.5, fontSize: "0.75rem" }}
-                      >
-                        Member birthdays for this month will appear here automatically
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <Stack spacing={1.2}>
-                      {birthdayMembers.map((mem) => {
-                        const isToday = mem.status === "today";
-                        const isCompleted = mem.status === "completed";
-                        const isUpcoming = mem.status === "upcoming";
 
-                        return (
-                          <Paper
-                            key={mem.memberId}
-                            elevation={0}
-                            onClick={(e) => {
-                              if (isToday) {
-                                launchPaperBlast(e.clientX, e.clientY, 100);
-                                setCelebrantsForCelebration([mem]);
-                                setBdayCelebrationOpen(true);
-                              }
-                            }}
-                            sx={{
-                              p: 1.2,
-                              px: 1.4,
-                              borderRadius: "10px",
-                              border: (theme) =>
-                                isToday
-                                  ? "2px solid #ec4899"
-                                  : theme.palette.mode === "dark"
-                                  ? "1.5px solid rgba(255, 255, 255, 0.12)"
-                                  : "1.5px solid rgba(124, 58, 237, 0.18)",
-                              bgcolor: (theme) =>
-                                isToday
-                                  ? theme.palette.mode === "dark"
-                                    ? "rgba(236, 72, 153, 0.12)"
-                                    : "rgba(236, 72, 153, 0.05)"
-                                  : "background.paper",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              transition: "all 0.15s ease",
-                              cursor: isToday ? "pointer" : "default",
-                              animation: isToday ? "festiveGlow 3s infinite ease-in-out" : "none",
-                              opacity: isCompleted ? 0.88 : 1,
-                              "&:hover": {
-                                borderColor: isToday ? "#ec4899" : "primary.main",
-                                transform: "translateY(-1px)",
-                                boxShadow: isToday
-                                  ? "0 4px 14px rgba(236, 72, 153, 0.3)"
-                                  : "0 3px 8px rgba(124, 58, 237, 0.12)",
-                              },
-                            }}
-                          >
-                            {/* Member Initial Avatar + Name + Type */}
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, minWidth: 0 }}>
-                              <Box
-                                sx={{
-                                  width: 34,
-                                  height: 34,
-                                  borderRadius: "50%",
-                                  bgcolor: (theme) =>
-                                    isToday
-                                      ? "rgba(236, 72, 153, 0.2)"
-                                      : theme.palette.mode === "dark"
-                                      ? "rgba(255, 255, 255, 0.08)"
-                                      : "rgba(236, 72, 153, 0.12)",
-                                  color: (theme) =>
-                                    isToday
-                                      ? "#db2777"
-                                      : theme.palette.mode === "dark"
-                                      ? "#ffffff"
-                                      : "#db2777",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontWeight: 800,
-                                  fontSize: "0.82rem",
-                                  border: (theme) =>
-                                    isToday
-                                      ? "1.5px solid #ec4899"
-                                      : theme.palette.mode === "dark"
-                                      ? "1px solid rgba(255, 255, 255, 0.18)"
-                                      : "1px solid rgba(236, 72, 153, 0.25)",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {isToday ? "🎂" : mem.name.charAt(0).toUpperCase()}
-                              </Box>
-                              <Box sx={{ minWidth: 0 }}>
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                  <Typography
-                                    variant="body2"
-                                    fontWeight={700}
+                            {isUpcoming && (
+                              <Chip
+                                size="small"
+                                icon={
+                                  <ScheduleRoundedIcon
                                     sx={{
-                                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
-                                      fontSize: "0.84rem",
-                                      lineHeight: 1.2,
-                                      whiteSpace: "nowrap",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
+                                      fontSize: "0.75rem !important",
+                                      color: (theme) =>
+                                        theme.palette.mode === "dark" ? "#c4b5fd !important" : "#7c3aed !important",
                                     }}
-                                  >
-                                    {mem.name}
-                                  </Typography>
-                                  {isToday && (
-                                    <Typography
-                                      component="span"
-                                      sx={{
-                                        fontSize: "0.85rem",
+                                  />
+                                }
+                                label={!categoryFilter || categoryFilter === "ALL" || isBirthday ? "Upcoming" : item.categoryLabel}
+                                sx={{
+                                  height: 20,
+                                  fontSize: "0.64rem",
+                                  fontWeight: 700,
+                                  bgcolor: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "rgba(124, 58, 237, 0.22)"
+                                      : "rgba(124, 58, 237, 0.08)",
+                                  color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#7c3aed"),
+                                  border: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "1px solid rgba(196, 181, 253, 0.3)"
+                                      : "1px solid rgba(124, 58, 237, 0.28)",
+                                  "& .MuiChip-label": { px: 0.5 },
+                                  "& .MuiChip-icon": { ml: 0.4, mr: -0.3 },
+                                }}
+                              />
+                            )}
+
+                            {isToday && (
+                              <Tooltip title={isBirthday ? "Today's Birthday! Click to blast confetti! 🎊" : "Event is Today! 🎯"} arrow placement="left">
+                                <Chip
+                                  size="small"
+                                  icon={
+                                    <span
+                                      style={{
+                                        fontSize: "0.8rem",
                                         display: "inline-block",
-                                        animation: "bouncePopper 1.5s infinite ease-in-out",
+                                        animation: "bouncePopper 1.2s infinite ease-in-out",
                                       }}
                                     >
                                       🎉
-                                    </Typography>
-                                  )}
-                                </Box>
-                                {mem.type && (
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{ fontSize: "0.7rem", display: "block" }}
-                                  >
-                                    {mem.type}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Box>
-
-                            {/* Right Side: Birth Date Pill & Status Badge */}
-                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.4, flexShrink: 0 }}>
-                              {/* Birth Date Pill */}
-                              <Box
-                                sx={{
-                                  bgcolor: (theme) =>
-                                    isToday
-                                      ? "rgba(236, 72, 153, 0.15)"
-                                      : theme.palette.mode === "dark"
-                                      ? "rgba(255, 255, 255, 0.12)"
-                                      : "rgba(124, 58, 237, 0.08)",
-                                  color: (theme) =>
-                                    isToday
-                                      ? "#db2777"
-                                      : theme.palette.mode === "dark"
-                                      ? "#ffffff"
-                                      : "#4a3f6b",
-                                  border: (theme) =>
-                                    isToday
-                                      ? "1px solid rgba(236, 72, 153, 0.35)"
-                                      : theme.palette.mode === "dark"
-                                      ? "1px solid rgba(255, 255, 255, 0.2)"
-                                      : "1px solid rgba(124, 58, 237, 0.2)",
-                                  borderRadius: "6px",
-                                  px: 0.9,
-                                  py: 0.15,
-                                  fontWeight: 800,
-                                  fontSize: "0.72rem",
-                                  whiteSpace: "nowrap",
-                                  lineHeight: 1.2,
-                                }}
-                              >
-                                {mem.formattedDate}
-                              </Box>
-
-                              {/* Status Chip: Completed / Today 🎉 / Upcoming */}
-                              {isCompleted && (
-                                <Chip
-                                  size="small"
-                                  icon={
-                                    <CheckCircleRoundedIcon
-                                      sx={{ fontSize: "0.75rem !important", color: "#16a34a !important" }}
-                                    />
+                                    </span>
                                   }
-                                  label="Completed"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: "0.64rem",
-                                    fontWeight: 700,
-                                    bgcolor: (theme) =>
-                                      theme.palette.mode === "dark"
-                                        ? "rgba(22, 163, 74, 0.18)"
-                                        : "rgba(22, 163, 74, 0.08)",
-                                    color: "#16a34a",
-                                    border: "1px solid rgba(22, 163, 74, 0.28)",
-                                    "& .MuiChip-label": { px: 0.5 },
-                                    "& .MuiChip-icon": { ml: 0.4, mr: -0.3 },
-                                  }}
-                                />
-                              )}
-
-                              {isUpcoming && (
-                                <Chip
-                                  size="small"
-                                  icon={
-                                    <ScheduleRoundedIcon
-                                      sx={{
-                                        fontSize: "0.75rem !important",
-                                        color: (theme) =>
-                                          theme.palette.mode === "dark" ? "#c4b5fd !important" : "#7c3aed !important",
-                                      }}
-                                    />
-                                  }
-                                  label="Upcoming"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: "0.64rem",
-                                    fontWeight: 700,
-                                    bgcolor: (theme) =>
-                                      theme.palette.mode === "dark"
-                                        ? "rgba(124, 58, 237, 0.22)"
-                                        : "rgba(124, 58, 237, 0.08)",
-                                    color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#7c3aed"),
-                                    border: (theme) =>
-                                      theme.palette.mode === "dark"
-                                        ? "1px solid rgba(196, 181, 253, 0.3)"
-                                        : "1px solid rgba(124, 58, 237, 0.28)",
-                                    "& .MuiChip-label": { px: 0.5 },
-                                    "& .MuiChip-icon": { ml: 0.4, mr: -0.3 },
-                                  }}
-                                />
-                              )}
-
-                              {isToday && (
-                                <Tooltip title="Today's Birthday! Click to blast confetti! 🎊" arrow placement="left">
-                                  <Chip
-                                    size="small"
-                                    icon={
-                                      <span
-                                        style={{
-                                          fontSize: "0.8rem",
-                                          display: "inline-block",
-                                          animation: "bouncePopper 1.2s infinite ease-in-out",
-                                        }}
-                                      >
-                                        🎉
-                                      </span>
-                                    }
-                                    label="Today"
-                                    onClick={(e) => {
+                                  label="Today"
+                                  onClick={(e) => {
+                                    if (isBirthday && item.celebrant) {
                                       e.stopPropagation();
                                       launchPaperBlast(e.clientX, e.clientY, 100);
-                                      setCelebrantsForCelebration([mem]);
+                                      setCelebrantsForCelebration([item.celebrant]);
                                       setBdayCelebrationOpen(true);
-                                    }}
-                                    sx={{
-                                      height: 22,
-                                      fontSize: "0.68rem",
-                                      fontWeight: 800,
-                                      background: "linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)",
-                                      color: "#ffffff",
-                                      boxShadow: "0 2px 6px rgba(236, 72, 153, 0.45)",
-                                      cursor: "pointer",
-                                      animation: "pulseToday 2s infinite ease-in-out",
-                                      "& .MuiChip-label": { px: 0.6 },
-                                      "& .MuiChip-icon": { ml: 0.5, mr: -0.2 },
-                                      "&:hover": {
-                                        transform: "scale(1.06)",
-                                      },
-                                    }}
-                                  />
-                                </Tooltip>
-                              )}
-
-                              {/* Payment Pending Badge in Sidebar */}
-                              {isItemPaymentPending({ celebrant: mem, memberId: mem.memberId, colorType: "Birthday" }) && (
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.3,
-                                    bgcolor: (theme) =>
-                                      theme.palette.mode === "dark"
-                                        ? "rgba(245, 158, 11, 0.2)"
-                                        : "#fef3c7",
-                                    color: (theme) =>
-                                      theme.palette.mode === "dark" ? "#fde68a" : "#d97706",
-                                    border: (theme) =>
-                                      theme.palette.mode === "dark"
-                                        ? "1px solid rgba(245, 158, 11, 0.35)"
-                                        : "1px solid #fde68a",
-                                    borderRadius: "5px",
-                                    px: 0.6,
-                                    py: "1.5px",
+                                    }
                                   }}
-                                >
-                                  <WarningAmberRoundedIcon
-                                    sx={{
-                                      fontSize: "0.7rem",
-                                      color: (theme) =>
-                                        theme.palette.mode === "dark" ? "#fbbf24" : "#d97706",
-                                      flexShrink: 0,
-                                    }}
-                                  />
-                                  <Typography
-                                    sx={{
-                                      fontSize: "0.6rem",
-                                      fontWeight: 700,
-                                      color: "inherit",
-                                      lineHeight: 1.1,
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    Payment Pending
-                                  </Typography>
-                                </Box>
-                              )}
-                            </Box>
-                          </Paper>
-                        );
-                      })}
-                    </Stack>
-                  )
+                                  sx={{
+                                    height: 22,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 800,
+                                    background: "linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)",
+                                    color: "#ffffff",
+                                    boxShadow: "0 2px 6px rgba(236, 72, 153, 0.45)",
+                                    cursor: isBirthday ? "pointer" : "default",
+                                    animation: "pulseToday 2s infinite ease-in-out",
+                                    "& .MuiChip-label": { px: 0.6 },
+                                    "& .MuiChip-icon": { ml: 0.5, mr: -0.2 },
+                                    "&:hover": {
+                                      transform: "scale(1.06)",
+                                    },
+                                  }}
+                                />
+                              </Tooltip>
+                            )}
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
                 )}
               </Box>
             </Grid>

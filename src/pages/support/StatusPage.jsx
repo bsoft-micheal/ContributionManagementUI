@@ -23,7 +23,7 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
 import {
   getStatusesAsync,
-  getModulesAsync,
+  getAllModuleAsync,
   createStatusAsync,
   updateStatusAsync,
   deleteStatusAsync,
@@ -32,20 +32,9 @@ import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
-export const DEFAULT_MODULES = [
-  "Support Ticket",
-  "Expense",
-  "Events",
-  "Contributions / Payments",
-  "Members",
-  "Exit Process",
-  "Budget Calculations",
-  "General",
-];
-
 const initialStatusForm = {
   statusName: "",
-  module: "Support Ticket",
+  module: "",
   isActive: true,
 };
 
@@ -57,7 +46,7 @@ export default function StatusPage() {
 
   // ==================== Status State ====================
   const [items, setItems] = useState([]);
-  const [dbModules, setDbModules] = useState(DEFAULT_MODULES);
+  const [dbModules, setDbModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -82,7 +71,7 @@ export default function StatusPage() {
     try {
       const [statusData, modulesData] = await Promise.all([
         getStatusesAsync(),
-        getModulesAsync().catch(() => []),
+        getAllModuleAsync().catch(() => []),
       ]);
       setItems(Array.isArray(statusData) ? statusData : []);
       if (Array.isArray(modulesData) && modulesData.length > 0) {
@@ -95,13 +84,42 @@ export default function StatusPage() {
     }
   }
 
-  // Combined dynamic modules list
+  const EXCLUDED_MODULES = new Set(["events", "contribution"]);
+
+  const NAVIGATION_MODULES = [
+    "Budget Calculation",
+    "Calculation",
+    "Calendar",
+    "Contributions",
+    "Dashboard",
+    "Event",
+    "Event Types",
+    "Exit Process",
+    "Expense",
+    "Finance",
+    "Gallery",
+    "General",
+    "Payment History",
+    "Reports",
+    "Roles",
+    "Settings",
+    "Status",
+    "Support Ticket",
+    "Tools",
+    "Types",
+    "User Rights",
+    "Users",
+  ];
+
+  // Combined dynamic module list from backend navigation_menus
   const availableModules = useMemo(() => {
-    const set = new Set(DEFAULT_MODULES);
-    (dbModules || []).forEach((m) => m && set.add(m));
-    (items || []).forEach((s) => s.module && set.add(s.module));
-    return Array.from(set).sort();
-  }, [dbModules, items]);
+    const rawList = Array.isArray(dbModules) && dbModules.length > 0
+      ? dbModules.filter(Boolean)
+      : NAVIGATION_MODULES;
+    const filtered = rawList.filter((m) => !EXCLUDED_MODULES.has((m || "").trim().toLowerCase()));
+    const unique = Array.from(new Set(filtered));
+    return unique.sort();
+  }, [dbModules]);
 
   // Filter dropdown options
   const moduleFilterOptions = useMemo(() => [
@@ -428,7 +446,7 @@ export default function StatusPage() {
             onClick={() => {
               setForm({
                 ...initialStatusForm,
-                module: appliedModule !== "ALL" ? appliedModule : "Support Ticket",
+                module: appliedModule !== "ALL" ? appliedModule : (availableModules[0] || ""),
               });
               setErrors({});
               setDialogOpen(true);

@@ -27,6 +27,7 @@ import {
   deleteBudgetCalculationAsync,
 } from "../../services/budgetCalculationService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getExpensesAsync } from "../../services/expenseService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { COMMON_STRINGS, TOAST_MESSAGES } from "../../constants";
@@ -70,11 +71,33 @@ export default function BudgetCalculationsPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [budgetData, typesData] = await Promise.all([
+      const [budgetData, typesData, expensesData] = await Promise.all([
         getBudgetCalculationsAsync(),
         getEventTypesAsync().catch(() => []),
+        getExpensesAsync().catch(() => []),
       ]);
-      setItems(Array.isArray(budgetData) ? budgetData : []);
+
+      const expenseList = Array.isArray(expensesData) ? expensesData : [];
+      const processedItems = (Array.isArray(budgetData) ? budgetData : []).map((item) => {
+        const itemClean = (item.expenseItem || "").trim().toLowerCase();
+        const catClean = (item.category || "").trim().toLowerCase();
+        const inExpenses = expenseList.some((ex) => {
+          const desc = (ex.description || "").toLowerCase();
+          const cat = (ex.category || "").toLowerCase();
+          const eventName = (ex.eventName || "").toLowerCase();
+          return (
+            (itemClean && desc.includes(itemClean)) ||
+            (catClean && cat === catClean && eventName.includes(itemClean))
+          );
+        });
+        return {
+          ...item,
+          isReferred: inExpenses,
+          IsReferred: inExpenses,
+        };
+      });
+
+      setItems(processedItems);
       setEventTypes(Array.isArray(typesData) ? typesData : []);
     } catch (error) {
       toast.error(error, "Failed to load budget calculations");
@@ -136,9 +159,12 @@ export default function BudgetCalculationsPage() {
         required: true,
         label: fieldRequired,
         customValidate: (val) => {
-          const num = Number(String(val).replace(/[^0-9]/g, ""));
-          if (val === "" || val === undefined || val === null || isNaN(num) || num < 0) {
+          if (val === "" || val === undefined || val === null || String(val).trim() === "") {
             return fieldRequired;
+          }
+          const num = Number(String(val).replace(/[^0-9]/g, ""));
+          if (isNaN(num) || num <= 0) {
+            return "Rate must be greater than 0";
           }
           if (num > 1000000) {
             return "Rate cannot exceed 1,000,000";

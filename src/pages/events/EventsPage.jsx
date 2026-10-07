@@ -722,7 +722,7 @@ export default function EventsPage() {
                 width: "100%",
               }}
             >
-              <Box sx={{ width: { xs: "100%", sm: 100 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 125, md: 135 } }}>
                 <AppSelect
                   label="Year"
                   value={filterYear}
@@ -733,7 +733,7 @@ export default function EventsPage() {
                   placeholder="Select Year"
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 130 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 165, md: 175 } }}>
                 <AppSelect
                   label="Month"
                   value={filterMonth}
@@ -744,7 +744,7 @@ export default function EventsPage() {
                   placeholder="Select Month"
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 155 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
                 <AppSelect
                   label="Event Type"
                   value={filterEventType}
@@ -755,7 +755,7 @@ export default function EventsPage() {
                   placeholder="Select Event Type"
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 175 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
                 <AppSelect
                   label="Event"
                   value={filterEvent}
