@@ -346,6 +346,7 @@ export default function AppDataTable({
   filterPanel,
   allowExport = true,
   searchPlaceholder = "Search by username...",
+  initialRowsPerPage = 15,
 }) {
   const theme = useTheme();
   const { isLoading: globalLoading } = useNavigationLoading();
@@ -356,7 +357,7 @@ export default function AppDataTable({
   const textSecondary = theme.palette.text.secondary;
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(15);
+  const [rowsPerPage, setRowsPerPage] = useState(initialRowsPerPage);
   const [orderBy, setOrderBy] = useState("");
   const [order, setOrder] = useState("asc");
   const [search, setSearch] = useState("");

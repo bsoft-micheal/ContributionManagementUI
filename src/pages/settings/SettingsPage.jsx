@@ -122,7 +122,7 @@ const isGuid = (val) => Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 const initialSettings = {
   // General & Notifications
   orgName: "Unit 1A Residents Association",
-  birthdayMembersExempt: true,
+  birthdayMembersExempt: false,
   allowedMultipleEvent: false,
   allowMultipleEvents: false,
   enableEmailNotif: true,
@@ -176,7 +176,7 @@ export default function SettingsPage() {
           birthdayMembersExempt:
             parsed.birthdayMembersExempt !== undefined
               ? parsed.birthdayMembersExempt
-              : true,
+              : false,
           allowedMultipleEvent:
             parsed.allowedMultipleEvent !== undefined
               ? Boolean(parsed.allowedMultipleEvent)
@@ -689,7 +689,7 @@ export default function SettingsPage() {
               ? data.birthdayMembersExempt
               : localBirthdayMembersExempt !== undefined
                 ? localBirthdayMembersExempt
-                : true;
+                : false;
 
           const resolvedAllowedMultipleEvent =
             data.allowedMultipleEvent !== undefined

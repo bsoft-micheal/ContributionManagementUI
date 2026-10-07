@@ -584,8 +584,9 @@ export default function UsersPage() {
         (targetUser.username && String(targetUser.username).trim() !== "") ||
         targetUser.createMemberProfile === true
       );
-      if (hasLoginAccount) {
-        toast.error("Users with a login account (username and password) cannot be deleted.");
+      const isReferred = Boolean(targetUser.isReferred || targetUser.IsReferred);
+      if (hasLoginAccount || isReferred) {
+        toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
         return;
       }
     }
@@ -597,10 +598,15 @@ export default function UsersPage() {
     if (!userToDelete) return;
     try {
       await deleteUserAsync(userToDelete);
-      toast.success("Deleted successfully");
+      toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       loadData();
     } catch (err) {
-      toast.error(err, "Failed to delete");
+      const rawMsg = err.response?.data?.message || err.response?.data?.title || err.message || "";
+      if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete|login account/i.test(rawMsg)) {
+        toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
+      } else {
+        toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+      }
     } finally {
       setDeleteConfirmOpen(false);
       setUserToDelete(null);
@@ -883,9 +889,11 @@ export default function UsersPage() {
                 (row.username && String(row.username).trim() !== "") ||
                 row.createMemberProfile === true
               );
-              const isDeleteAllowed = canDeleteUser && !hasLoginAccount;
-              const deleteTooltip = hasLoginAccount
-                ? "Cannot delete: user has an active login account (username/password)"
+              const isReferred = Boolean(row.isReferred || row.IsReferred);
+              const isDeleteBlocked = hasLoginAccount || isReferred;
+              const isDeleteAllowed = canDeleteUser && !isDeleteBlocked;
+              const deleteTooltip = isDeleteBlocked
+                ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE
                 : canDeleteUser
                 ? "Delete User"
                 : "Disabled";

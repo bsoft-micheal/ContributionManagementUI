@@ -13,6 +13,7 @@ export default function AppMultiSelect({
   error = false,
   helperText = "",
   required = false,
+  maxHeight = 145, // Defaults to ~5 rows of chips
   ...props
 }) {
   const theme = useTheme();
@@ -40,9 +41,14 @@ export default function AppMultiSelect({
   };
 
   const handleRemoveValue = (valToRemove, event) => {
-    event.stopPropagation(); // Avoid triggering open dropdown list!
-    const newValues = value.filter((v) => v !== valToRemove);
-    onChange({ target: { value: newValues } });
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    const newValues = (value || []).filter((v) => v !== valToRemove);
+    if (onChange) {
+      onChange({ target: { value: newValues } });
+    }
   };
 
   return (
@@ -95,7 +101,43 @@ export default function AppMultiSelect({
               );
             }
             return (
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 0.6,
+                  alignItems: "center",
+                  width: "100%",
+                  maxHeight: `${maxHeight}px`,
+                  overflowY: "auto",
+                  pr: 0.5,
+                  py: 0.2,
+                  boxSizing: "border-box",
+                  "&::-webkit-scrollbar": {
+                    width: "5px",
+                  },
+                  "&::-webkit-scrollbar-track": {
+                    background: "transparent",
+                  },
+                  "&::-webkit-scrollbar-thumb": {
+                    backgroundColor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(167, 139, 250, 0.45)"
+                        : "rgba(124, 58, 237, 0.4)",
+                    borderRadius: "4px",
+                  },
+                  "&::-webkit-scrollbar-thumb:hover": {
+                    backgroundColor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(167, 139, 250, 0.7)"
+                        : "rgba(124, 58, 237, 0.65)",
+                  },
+                }}
+                onMouseDown={(e) => {
+                  // Prevent dropdown menu from unintentionally toggling when scrolling chips
+                  e.stopPropagation();
+                }}
+              >
                 {selected
                   .filter((val) => val !== "select-all")
                   .map((val) => {
@@ -110,10 +152,10 @@ export default function AppMultiSelect({
                           bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.35)" : "#4a3f6b",
                           color: "#ffffff",
                           borderRadius: "50px",
-                          px: 2.2,
-                          py: 0.6,
-                          fontSize: "0.78rem",
-                          fontWeight: 700,
+                          px: 1.4,
+                          py: 0.4,
+                          fontSize: "0.74rem",
+                          fontWeight: 600,
                           lineHeight: 1.2,
                           cursor: "default",
                           transition: "all 0.15s ease",
@@ -122,10 +164,16 @@ export default function AppMultiSelect({
                           },
                         }}
                       >
-                        {labelText}
+                        <span>{labelText}</span>
                         <Box
                           component="span"
-                          onClick={(e) => handleRemoveValue(val, e)}
+                          role="button"
+                          aria-label="Remove"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleRemoveValue(val, e);
+                          }}
                           onMouseDown={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
@@ -135,19 +183,22 @@ export default function AppMultiSelect({
                             alignItems: "center",
                             justifyContent: "center",
                             ml: 0.8,
-                            width: 14,
-                            height: 14,
+                            width: 15,
+                            height: 15,
                             borderRadius: "50%",
-                            border: "1.5px solid rgba(255, 255, 255, 0.8)",
-                            color: "rgba(255, 255, 255, 0.9)",
-                            fontSize: "8px",
+                            border: "1.2px solid rgba(255, 255, 255, 0.8)",
+                            color: "rgba(255, 255, 255, 0.95)",
+                            fontSize: "8.5px",
                             fontWeight: "bold",
                             lineHeight: 1,
                             cursor: "pointer",
+                            flexShrink: 0,
+                            transition: "all 0.12s ease",
                             "&:hover": {
-                              bgcolor: "rgba(255, 255, 255, 0.25)",
+                              bgcolor: "#ef4444",
+                              borderColor: "#ef4444",
                               color: "#ffffff",
-                              borderColor: "#ffffff",
+                              transform: "scale(1.15)",
                             },
                           }}
                         >
@@ -167,17 +218,26 @@ export default function AppMultiSelect({
             bgcolor: "background.paper",
             borderRadius: "8px",
             minHeight: size === "small" ? 36 : 42,
-            height: "auto !important",
+            maxHeight: `${maxHeight + 20}px !important`,
+            overflow: "hidden",
             "& .MuiSelect-select": {
               display: "flex",
               flexWrap: "wrap",
-              gap: 0.5,
-              py: size === "small" ? "5px !important" : "7px !important",
-              pr: "40px !important",
+              gap: 0.6,
+              py: size === "small" ? "6px !important" : "8px !important",
+              pr: "38px !important",
               minHeight: size === "small" ? "26px" : "32px",
-              height: "auto !important",
+              maxHeight: `${maxHeight + 10}px !important`,
+              overflowY: "auto !important",
               boxSizing: "border-box",
-              alignItems: "center",
+              alignItems: "flex-start",
+              "&::-webkit-scrollbar": {
+                width: "5px",
+              },
+              "&::-webkit-scrollbar-thumb": {
+                backgroundColor: "rgba(124, 58, 237, 0.35)",
+                borderRadius: "4px",
+              },
             },
             "& fieldset": {
               borderColor: (theme) => error

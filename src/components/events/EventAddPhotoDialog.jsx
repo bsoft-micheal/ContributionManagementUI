@@ -71,8 +71,11 @@ export default function EventAddPhotoDialog({
 
     const initialEventDate = event.eventDate ? dayjs(event.eventDate) : dayjs();
 
+    const rawDefaultTitle = `${event.eventName || "Event"} Celebration Photos`;
+    const cleanDefaultTitle = rawDefaultTitle.replace(/[^A-Za-z\s]/g, "").slice(0, 50);
+
     setForm({
-      title: `${event.eventName || "Event"} Celebration Photos`,
+      title: cleanDefaultTitle,
       eventName: event.eventName || "",
       category: initialCat,
       takenDate: initialEventDate.isValid() ? initialEventDate : dayjs(),
@@ -256,8 +259,17 @@ export default function EventAddPhotoDialog({
   };
 
   const handleSave = async () => {
+    const filed = "This field is required";
     const newErrors = {};
-    if (!form.title || !form.title.trim()) newErrors.title = "Title is required";
+
+    if (!form.title || !form.title.trim()) {
+      newErrors.title = filed;
+    } else if (!/^[A-Za-z\s]+$/.test(form.title.trim())) {
+      newErrors.title = "Only letters and spaces are allowed";
+    } else if (form.title.trim().length > 50) {
+      newErrors.title = "Title must be at most 50 characters";
+    }
+
     if (!form.category) newErrors.category = "Event Type is required";
     if (!form.eventName) newErrors.eventName = "Event Name is required";
 
@@ -372,8 +384,10 @@ export default function EventAddPhotoDialog({
               label="Title"
               placeholder="e.g. Birthday celebration moments"
               value={form.title}
+              maxLength={50}
               onChange={(e) => {
-                setForm((c) => ({ ...c, title: e.target.value }));
+                const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, "").slice(0, 50);
+                setForm((c) => ({ ...c, title: sanitized }));
                 if (errors.title) setErrors((p) => ({ ...p, title: "" }));
               }}
               error={!!errors.title}

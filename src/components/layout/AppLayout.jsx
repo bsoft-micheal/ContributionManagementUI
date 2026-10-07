@@ -926,7 +926,7 @@ export default function AppLayout() {
                   setProfileForm((prev) => ({ ...prev, email: e.target.value }));
                   if (profileErrors.email) setProfileErrors((prev) => ({ ...prev, email: "" }));
                 }}
-                maxLength={100}
+                maxLength={25}
                 error={!!profileErrors.email}
                 helperText={profileErrors.email}
                 required
