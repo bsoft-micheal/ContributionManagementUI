@@ -64,13 +64,13 @@ export const ToastProvider = ({ children }) => {
     setOpen(false);
   };
 
-  const shadowColor = severity === "success" ? "rgba(22, 163, 74, 0.2)" : 
-                    severity === "error" ? "rgba(220, 38, 38, 0.2)" : 
-                    "rgba(74, 63, 107, 0.15)";
+  const shadowColor = severity === "success" ? "rgba(22, 163, 74, 0.2)" :
+    severity === "error" ? "rgba(220, 38, 38, 0.2)" :
+      "rgba(74, 63, 107, 0.15)";
 
   const bgColor = severity === "success" ? "#16a34a" : // Sightly deeper green
-                  severity === "error" ? "#dc2626" : 
-                  severity === "warning" ? "#ca8a04" : "#4a3f6b";
+    severity === "error" ? "#dc2626" :
+      severity === "warning" ? "#ca8a04" : "#4a3f6b";
 
   return (
     <ToastContext.Provider value={{ showToast }}>
@@ -93,7 +93,7 @@ export const ToastProvider = ({ children }) => {
             boxShadow: `0 8px 24px ${shadowColor}`,
             bgcolor: `${bgColor} !important`,
             color: "#ffffff",
-            "& .MuiAlert-icon": { 
+            "& .MuiAlert-icon": {
               color: "#ffffff",
               fontSize: "1.4rem",
               mr: 1.5,
@@ -113,20 +113,20 @@ export const ToastProvider = ({ children }) => {
           }}
         >
           <Box>
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                display: "block", 
-                fontWeight: 900, 
-                fontSize: "0.78rem", 
+            <Typography
+              variant="caption"
+              sx={{
+                display: "block",
+                fontWeight: 900,
+                fontSize: "0.78rem",
                 letterSpacing: "0.05em",
                 mb: 0.2,
                 color: "#ffffff"
               }}
             >
-              {severity === "success" ? "Success" : 
-               severity === "error" ? "Error" : 
-               severity === "warning" ? "Warning" : "Information"}
+              {severity === "success" ? "Success" :
+                severity === "error" ? "Error" :
+                  severity === "warning" ? "Warning" : "Information"}
             </Typography>
             <Typography variant="inherit" sx={{ display: "block", color: "rgba(255,255,255,0.95)" }}>
               {message}

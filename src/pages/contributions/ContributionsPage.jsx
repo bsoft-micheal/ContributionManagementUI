@@ -26,6 +26,7 @@ import {
   FactCheckOutlined as StatusUpdateIcon,
   ConfirmationNumberOutlined as TicketIcon,
   SupportAgent as SupportAgentIcon,
+  InfoOutlined as InfoIcon,
 } from "@mui/icons-material";
 import SubmitPaymentModal from "../../components/payments/SubmitPaymentModal";
 import AppTextArea from "../../components/common/AppTextArea";
@@ -817,30 +818,11 @@ export default function ContributionsPage() {
   };
 
   const modalStatusOptions = useMemo(() => {
-    const set = new Set();
-    const list = [];
-    (dbStatuses || [])
-      .filter((s) => s.isActive !== false)
-      .forEach((s) => {
-        const name = s.statusName || s.name || s.status_name;
-        if (name && !set.has(name.toLowerCase())) {
-          set.add(name.toLowerCase());
-          list.push({ label: name, value: name });
-        }
-      });
-    if (list.length === 0) {
-      return [
-        { label: "Paid", value: "Paid" },
-        { label: "Pending", value: "Pending" },
-        { label: "Verified", value: "Verified" },
-        { label: "Rejected", value: "Rejected" },
-        { label: "Closed", value: "Closed" },
-      ];
-    }
-    if (!set.has("paid")) list.unshift({ label: "Paid", value: "Paid" });
-    if (!set.has("pending")) list.push({ label: "Pending", value: "Pending" });
-    return list;
-  }, [dbStatuses]);
+    return [
+      { label: "Paid", value: "Paid" },
+      { label: "Pending", value: "Pending" },
+    ];
+  }, []);
 
   const renderStatusBadge = (status) => {
     let color = "#b45309";
@@ -1193,29 +1175,13 @@ export default function ContributionsPage() {
         const displayAmount = isPaid ? 0 : eventAmount;
 
         return (
-          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.8, justifyContent: "flex-end" }}>
-            <Typography
-              variant="body2"
-              fontWeight={700}
-              color={isPaid ? "success.main" : "inherit"}
-            >
-              ₹{displayAmount.toLocaleString()}
-            </Typography>
-            {isPaid && (
-              <Chip
-                label="Paid"
-                size="small"
-                sx={{
-                  height: 18,
-                  fontSize: "0.62rem",
-                  fontWeight: 800,
-                  bgcolor: "rgba(22, 163, 74, 0.12)",
-                  color: "#16a34a",
-                  border: "1px solid rgba(22, 163, 74, 0.3)",
-                }}
-              />
-            )}
-          </Box>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            color={isPaid ? "success.main" : "inherit"}
+          >
+            ₹{displayAmount.toLocaleString()}
+          </Typography>
         );
       }
     },
@@ -1788,15 +1754,6 @@ export default function ContributionsPage() {
                   auditRemarks
                 )
               }
-              sx={{
-                bgcolor:
-                  (statusChangeValue || statusModalRow?.paymentStatus) === "Closed" ||
-                    (statusChangeValue || statusModalRow?.paymentStatus) === "Paid"
-                    ? "#16a34a !important"
-                    : (statusChangeValue || statusModalRow?.paymentStatus) === "Verified"
-                      ? "#0284c7 !important"
-                      : undefined,
-              }}
             >
               Save
             </AppButton>
@@ -1815,24 +1772,17 @@ export default function ContributionsPage() {
                 gap: 1.8,
               }}
             >
-              <Box>
-                <Typography
-                  variant="caption"
-                  fontWeight={800}
-                  color="primary.main"
-                  sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.72rem" }}
-                >
-                  Authority Status Update • {statusModalRow.memberName}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.78rem" }}>
-                  Event: <strong>{statusModalRow.eventName || events.find((e) => e.eventId === statusModalRow.eventId)?.eventName || "Current Event"}</strong> • Amount: <strong>₹{Number(statusModalRow.amount || 0).toLocaleString("en-IN")}</strong>
-                </Typography>
-              </Box>
+
 
               {/* Submitted Payment Details Summary Card */}
               {(() => {
                 const matchedTx = findContributionTransaction(statusModalRow);
-                const paidAmt = Number(statusModalRow?.amount || statusModalRow?.paidAmount || matchedTx?.amount || 0);
+                const cashAmt = Number(matchedTx?.cashAmount || statusModalRow?.cashAmount || 0);
+                const upiAmt = Number(matchedTx?.upiAmount || statusModalRow?.upiAmount || 0);
+                const splitSum = cashAmt + upiAmt;
+                const paidAmt = splitSum > 0
+                  ? splitSum
+                  : Number(statusModalRow?.totalReceivedAmount || statusModalRow?.paidAmount || matchedTx?.amount || statusModalRow?.amount || 0);
                 const modeStr = statusModalRow?.paymentMode || matchedTx?.paymentMode || "Cash";
                 const utrVal = statusModalRow?.utrNumber || statusModalRow?.referenceNo || statusModalRow?.utr || matchedTx?.utr || matchedTx?.transactionRef || matchedTx?.referenceNo || "--";
                 const dateVal = statusModalRow?.paymentDate || matchedTx?.paymentDate || matchedTx?.createdOn;
@@ -1840,10 +1790,33 @@ export default function ContributionsPage() {
                 const scopeVal = statusModalRow?.paymentScope || matchedTx?.paymentScope || (paidAmt > 100 ? "All Outstanding" : "Current Event");
                 const notesVal = statusModalRow?.notes || matchedTx?.notes || "";
                 const createdByVal = statusModalRow?.createdBy || statusModalRow?.recordedBy || matchedTx?.createdBy || matchedTx?.memberName || "Member";
-                const cashAmt = matchedTx?.cashAmount || statusModalRow?.cashAmount;
-                const upiAmt = matchedTx?.upiAmount || statusModalRow?.upiAmount;
                 const rawImgs = statusModalRow?.screenshots || matchedTx?.screenshots || statusModalRow?.screenshot || matchedTx?.screenshot;
                 const proofImgs = Array.isArray(rawImgs) ? rawImgs : (rawImgs ? [rawImgs] : []);
+
+                const primaryEvName = statusModalRow?.eventName || (events.find((e) => e.eventId === statusModalRow?.eventId)?.eventName) || "Current Event";
+                const currentEvAmt = Number(statusModalRow?.amount || statusModalRow?.currentEventDue || 0);
+
+                const eventBreakdownItems = [];
+                if (currentEvAmt > 0) {
+                  eventBreakdownItems.push(`${primaryEvName}: ₹${currentEvAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                } else {
+                  eventBreakdownItems.push(`${primaryEvName}: ₹${paidAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                }
+
+                const prevArrears = Number(statusModalRow?.previousArrears || matchedTx?.previousArrears || (paidAmt > currentEvAmt && currentEvAmt > 0 ? paidAmt - currentEvAmt : 0));
+                const arrearItems = statusModalRow?.previousUnpaidItems || statusModalRow?.arrearBreakdown || matchedTx?.arrearBreakdown || [];
+
+                if (arrearItems.length > 0) {
+                  arrearItems.forEach((item) => {
+                    const name = item.eventName || item.title || item.eventCategory || "Previous Event";
+                    const amt = Number(item.dueAmount || item.amount || item.due || 0);
+                    if (amt > 0) {
+                      eventBreakdownItems.push(`${name}: ₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                    }
+                  });
+                } else if (prevArrears > 0 && paidAmt > currentEvAmt) {
+                  eventBreakdownItems.push(`Previous Arrears: ₹${prevArrears.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                }
 
                 return (
                   <Paper
@@ -1881,9 +1854,43 @@ export default function ContributionsPage() {
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
                           Total Received Amount
                         </Typography>
-                        <Typography variant="subtitle2" fontWeight={900} color="success.main" sx={{ fontSize: "1rem" }}>
-                          ₹{paidAmt.toLocaleString("en-IN")}
-                        </Typography>
+                        <Tooltip
+                          arrow
+                          enterDelay={100}
+                          title={
+                            <Box sx={{ p: 0.5 }}>
+                              <Typography variant="caption" fontWeight={800} sx={{ display: "block", mb: 0.5, textDecoration: "underline", color: "#93c5fd" }}>
+                                Event Payment Breakdown:
+                              </Typography>
+                              {eventBreakdownItems.map((itemStr, idx) => (
+                                <Typography key={idx} variant="caption" sx={{ display: "block", fontSize: "0.72rem", py: 0.1 }}>
+                                  • {itemStr}
+                                </Typography>
+                              ))}
+                              <Typography variant="caption" fontWeight={800} sx={{ display: "block", mt: 0.5, pt: 0.5, borderTop: "1px solid rgba(255,255,255,0.2)" }}>
+                                Total Received: ₹{paidAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </Typography>
+                            </Box>
+                          }
+                        >
+                          <Typography
+                            variant="subtitle2"
+                            fontWeight={900}
+                            color="success.main"
+                            sx={{
+                              fontSize: "1rem",
+                              cursor: "help",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.4,
+                              textDecoration: "underline dotted",
+                              textUnderlineOffset: "3px",
+                            }}
+                          >
+                            ₹{paidAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <InfoIcon sx={{ fontSize: 13, opacity: 0.7 }} />
+                          </Typography>
+                        </Tooltip>
                       </Grid>
 
                       <Grid size={{ xs: 6, sm: 3 }}>
