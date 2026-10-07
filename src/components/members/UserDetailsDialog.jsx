@@ -99,9 +99,32 @@ export default function UserDetailsDialog({ open, onClose, user }) {
             </Typography>
             <Box sx={{ mt: 0.4, display: "flex", flexWrap: "wrap", gap: 0.6, alignItems: "center" }}>
               {(() => {
-                const assignedRoles = (Array.isArray(user.roles) && user.roles.length > 0)
-                  ? user.roles
-                  : (user.roleName ? [user.roleName] : ["Member"]);
+                const hasLoginAccount = Boolean(
+                  (user.username && String(user.username).trim() !== "") &&
+                  (
+                    user.roleId ||
+                    (user.role && user.role !== "--" && user.role !== "None" && String(user.role).trim() !== "") ||
+                    (user.roleName && user.roleName !== "--" && user.roleName !== "None" && String(user.roleName).trim() !== "") ||
+                    (Array.isArray(user.roles) && user.roles.length > 0) ||
+                    (Array.isArray(user.primaryRoles) && user.primaryRoles.length > 0) ||
+                    (Array.isArray(user.roleIds) && user.roleIds.length > 0) ||
+                    (Array.isArray(user.primaryRoleIds) && user.primaryRoleIds.length > 0)
+                  )
+                );
+
+                const assignedRoles = hasLoginAccount
+                  ? ((Array.isArray(user.roles) && user.roles.length > 0)
+                      ? user.roles
+                      : (user.roleName && user.roleName !== "None" ? [user.roleName] : []))
+                  : [];
+
+                if (assignedRoles.length === 0) {
+                  return (
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                      --
+                    </Typography>
+                  );
+                }
 
                 return assignedRoles.map((r, idx) => {
                   const style = getRoleStyle(r);

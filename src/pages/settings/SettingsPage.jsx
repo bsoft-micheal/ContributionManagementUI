@@ -69,6 +69,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import {
   getSystemSettingsAsync,
   updateSystemSettings,
+  updateSystemSettingsAsync,
   getAllPaymentQrSettingsAsync,
   savePaymentQrSettingAsync,
   triggerHangfireRemindersAsync,
@@ -147,11 +148,12 @@ const initialSettings = {
   enable2faAdmin: false,
 
   // Payment QR
-  qrReceiverName: "Daniel A",
-  qrUpiId: "danielrobertanto604@okicici",
+  qrReceiverName: "",
+  qrUpiId: "",
   qrMode: "generated", // "generated" | "uploaded"
   qrPreviewAmount: "",
   qrImage: null,
+  paymentQrConfigs: {},
 };
 
 export default function SettingsPage() {
@@ -220,23 +222,23 @@ export default function SettingsPage() {
 
   const fileInputRef = useRef(null);
 
-  // Per-event-type Payment QR State
+  // Per-event-type Payment QR State (strictly dynamically persisted from Database)
   const [eventPaymentQrConfigs, setEventPaymentQrConfigs] = useState(() => {
-    const configs = getAllPaymentQrConfigs();
-    let modified = false;
-    const sanitized = { ...configs };
-    Object.keys(sanitized).forEach((key) => {
-      if (sanitized[key]?.previewAmount === "100") {
-        sanitized[key] = { ...sanitized[key], previewAmount: "" };
-        modified = true;
+    try {
+      const raw = localStorage.getItem(EVENT_QR_STORAGE_KEY);
+      if (raw) {
+        // Purge any legacy hardcoded mock configs if present
+        if (raw.includes("johnsycharles3") || raw.includes("sylvester@okicici") || raw.includes("Michael@okicici")) {
+          localStorage.removeItem(EVENT_QR_STORAGE_KEY);
+          return {};
+        }
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          return parsed;
+        }
       }
-    });
-    if (modified) {
-      try {
-        localStorage.setItem(EVENT_QR_STORAGE_KEY, JSON.stringify(sanitized));
-      } catch (e) { }
-    }
-    return sanitized;
+    } catch { }
+    return {};
   });
   const [selectedQrEventType, setSelectedQrEventType] = useState("");
 
@@ -351,21 +353,22 @@ export default function SettingsPage() {
         const typeName = c.eventTypeName || c.name || "";
         if (typeName && !processedTypes.has(typeName.toLowerCase())) {
           processedTypes.add(typeName.toLowerCase());
-          const config = getPaymentQrConfig(typeName);
-          const hasUpi = Boolean(config.upiId && config.upiId.trim());
+          const matchKey = Object.keys(eventPaymentQrConfigs).find((k) => k.toLowerCase() === typeName.toLowerCase());
+          const config = matchKey ? eventPaymentQrConfigs[matchKey] : null;
+          const hasUpi = Boolean(config && config.upiId && config.upiId.trim());
           rows.push({
             id: c.eventTypeId || typeName,
             eventTypeId: c.eventTypeId,
             eventTypeName: typeName,
-            receiverName: config.receiverName || config.qrReceiverName || "",
-            upiId: config.upiId || config.qrUpiId || "",
-            previewAmount: config.previewAmount || "",
-            qrMode: config.qrMode || "generated",
-            qrImage: config.qrImage || null,
-            isConfigured: Boolean(config.isConfigured && hasUpi),
-            isActive: config.isActive !== false,
-            createdBy: (!isGuid(config.createdBy) && config.createdBy) || (!isGuid(c.createdBy || c.CreatedBy) && (c.createdBy || c.CreatedBy)) || "--",
-            createdOn: config.createdOn || config.createdAt || c.createdAt || c.createdOn || null,
+            receiverName: config?.receiverName || config?.qrReceiverName || "",
+            upiId: config?.upiId || config?.qrUpiId || "",
+            previewAmount: config?.previewAmount || "",
+            qrMode: config?.qrMode || "generated",
+            qrImage: config?.qrImage || null,
+            isConfigured: hasUpi,
+            isActive: config ? config.isActive !== false : false,
+            createdBy: (!isGuid(config?.createdBy) && config?.createdBy) || "--",
+            createdOn: config?.createdOn || config?.createdAt || null,
           });
         }
       });
@@ -374,7 +377,7 @@ export default function SettingsPage() {
     Object.keys(eventPaymentQrConfigs).forEach((k) => {
       if (k && !processedTypes.has(k.toLowerCase())) {
         processedTypes.add(k.toLowerCase());
-        const config = getPaymentQrConfig(k);
+        const config = eventPaymentQrConfigs[k] || {};
         const hasUpi = Boolean(config.upiId && config.upiId.trim());
         rows.push({
           id: k,
@@ -384,7 +387,7 @@ export default function SettingsPage() {
           previewAmount: config.previewAmount || "",
           qrMode: config.qrMode || "generated",
           qrImage: config.qrImage || null,
-          isConfigured: Boolean(config.isConfigured && hasUpi),
+          isConfigured: hasUpi,
           isActive: config.isActive !== false,
           createdBy: (!isGuid(config.createdBy) && config.createdBy) || "--",
           createdOn: config.createdOn || config.createdAt || null,
@@ -697,17 +700,8 @@ export default function SettingsPage() {
                   ? Boolean(localAllowedMultipleEvent)
                   : false;
 
-          const isPlaceholderUpi =
-            !data.qrUpiId ||
-            data.qrUpiId.toLowerCase() === "unit1a@okaxis" ||
-            data.qrUpiId.toLowerCase() === "name@okaxis";
-
-          const isPlaceholderReceiver =
-            !data.qrReceiverName ||
-            data.qrReceiverName.toLowerCase().includes("unit 1a");
-
-          const cleanUpiId = isPlaceholderUpi ? "danielrobertanto604@okicici" : data.qrUpiId;
-          const cleanReceiver = isPlaceholderReceiver ? "Daniel A" : data.qrReceiverName;
+          const cleanUpiId = data.qrUpiId || "";
+          const cleanReceiver = data.qrReceiverName || "";
 
           const merged = {
             ...initialSettings,
@@ -733,35 +727,24 @@ export default function SettingsPage() {
           loadTemplateForCategoryAndType(localSelectedCategoryId, "initial", merged, categoriesList);
           localStorage.setItem("cm_system_settings", JSON.stringify(merged));
 
-          // Fetch per-event-type QR settings from backend API
-          try {
-            const qrList = await getAllPaymentQrSettingsAsync();
-            if (Array.isArray(qrList) && qrList.length > 0) {
-              const loadedMap = {};
-              qrList.forEach((item) => {
-                const norm = normalizeEventTypeName(item.eventType || item.eventTypeId);
-                if (norm) {
-                  loadedMap[norm] = {
-                    receiverName: item.receiverName || item.qrReceiverName || "",
-                    upiId: item.upiId || item.qrUpiId || "",
-                    qrMode: item.qrCodeMode || item.qrMode || "generated",
-                    qrImage: item.qrCodeImage || item.qrImage || null,
-                    previewAmount: item.previewAmount || "",
-                    isActive: item.isActive !== undefined ? item.isActive : true,
-                  };
-                }
-              });
-              setEventPaymentQrConfigs((prev) => {
-                const updated = { ...prev, ...loadedMap };
-                try {
-                  localStorage.setItem("cm_event_payment_qr_configs", JSON.stringify(updated));
-                } catch (e) { }
-                return updated;
-              });
+          // Fetch per-event-type QR settings from backend database system settings
+          let loadedMap = {};
+          const rawConfigs = data.paymentQrConfigs || data.PaymentQrConfigs;
+          if (rawConfigs) {
+            if (typeof rawConfigs === "string") {
+              try {
+                loadedMap = JSON.parse(rawConfigs);
+              } catch {
+                loadedMap = {};
+              }
+            } else if (typeof rawConfigs === "object") {
+              loadedMap = { ...rawConfigs };
             }
-          } catch {
-            // Per-event QR settings error handled silently
           }
+          setEventPaymentQrConfigs(loadedMap);
+          try {
+            localStorage.setItem("cm_event_payment_qr_configs", JSON.stringify(loadedMap));
+          } catch (e) { }
         }
       } catch {
         toast.error("Failed to load system settings");
@@ -1041,28 +1024,26 @@ export default function SettingsPage() {
         previewAmount: configToSave.previewAmount ? String(configToSave.previewAmount).trim() : "",
         qrImage: effectiveQrImage,
         isActive: true,
+        createdOn: new Date().toISOString(),
+        createdBy: authState?.user?.fullName || authState?.user?.username || "Admin",
       };
 
       // 1. Save in local per-event-type storage & update state (isolated per event type)
       const updatedAll = savePaymentQrConfigForEventType(selectedQrEventType, updatedConfig);
       setEventPaymentQrConfigs(updatedAll);
 
-      // 2. Persist to backend API with eventType and eventTypeId
-      const foundCat = categoriesList.find((c) => (c.eventTypeName || c.name || "").toLowerCase() === selectedQrEventType.toLowerCase());
-      await savePaymentQrSettingAsync({
-        eventType: selectedQrEventType,
-        eventTypeId: foundCat?.eventTypeId || null,
-        receiverName: updatedConfig.receiverName,
-        upiId: updatedConfig.upiId,
-        qrCodeMode: updatedConfig.qrMode,
-        qrCodeImage: updatedConfig.qrImage,
-        previewAmount: updatedConfig.previewAmount,
-        isActive: true,
-      });
+      // 2. Persist to Database table and update app settings state
+      const updatedSettings = {
+        ...settings,
+        paymentQrConfigs: updatedAll,
+        PaymentQrConfigs: updatedAll,
+      };
+      await persistSettings(updatedSettings);
 
-      toast.success(`Payment QR settings for "${selectedQrEventType}" saved successfully!`);
-    } catch {
-      toast.error(`Failed to save payment QR settings for "${selectedQrEventType}"`);
+      toast.success(`Payment QR settings for "${selectedQrEventType}" saved to database successfully!`);
+    } catch (err) {
+      console.error("Failed to save payment QR settings:", err);
+      toast.error(err?.response?.data?.message || `Failed to save payment QR settings for "${selectedQrEventType}"`);
     }
   };
 

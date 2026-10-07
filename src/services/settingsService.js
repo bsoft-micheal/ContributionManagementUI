@@ -76,20 +76,52 @@ export const resetSystemSettingsAsync = async () => {
 };
 
 export const getAllPaymentQrSettingsAsync = async () => {
-  return [];
+  try {
+    const settings = await getSystemSettingsAsync();
+    const rawConfigs = settings?.paymentQrConfigs || settings?.PaymentQrConfigs;
+    if (rawConfigs) {
+      if (typeof rawConfigs === "string") {
+        return JSON.parse(rawConfigs);
+      }
+      return rawConfigs;
+    }
+  } catch { }
+  return {};
 };
 
 export const getPaymentQrSettingByEventTypeAsync = async (eventType) => {
-  return null;
+  try {
+    const all = await getAllPaymentQrSettingsAsync();
+    if (eventType && all[eventType]) return all[eventType];
+    const key = Object.keys(all).find((k) => k.toLowerCase() === (eventType || "").toLowerCase());
+    return key ? all[key] : null;
+  } catch {
+    return null;
+  }
 };
 
 export const savePaymentQrSettingAsync = async (data) => {
   try {
-    return await updateSystemSettingsAsync({
-      qrReceiverName: data.receiverName || data.qrReceiverName,
-      qrUpiId: data.upiId || data.qrUpiId,
-      qrImage: data.qrCodeImage || data.qrImage,
-    });
+    const current = (await getAllPaymentQrSettingsAsync()) || {};
+    const eventType = data.eventType;
+    if (eventType) {
+      const updated = {
+        ...current,
+        [eventType]: {
+          receiverName: data.receiverName || data.qrReceiverName || "",
+          upiId: data.upiId || data.qrUpiId || "",
+          qrMode: data.qrCodeMode || data.qrMode || "generated",
+          qrImage: data.qrCodeImage || data.qrImage || null,
+          isActive: data.isActive !== false,
+          createdOn: new Date().toISOString(),
+        },
+      };
+      return await updateSystemSettingsAsync({
+        paymentQrConfigs: updated,
+        PaymentQrConfigs: updated,
+      });
+    }
+    return null;
   } catch {
     return null;
   }

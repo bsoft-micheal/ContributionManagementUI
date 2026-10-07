@@ -2187,13 +2187,13 @@ export default function EventFormPage() {
                     CALCULATION SUMMARY
                   </Typography>
 
-                  {/* 2-Column Table */}
+                  {/* 3-Column Table */}
                   <Box sx={{ width: "100%", mb: 1 }}>
                     {/* Header Row */}
                     <Box
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: "1.2fr 2fr",
+                        gridTemplateColumns: "1.1fr 1.7fr 0.9fr",
                         gap: 1.5,
                         pb: 0.8,
                         borderBottom: "1px solid",
@@ -2202,10 +2202,12 @@ export default function EventFormPage() {
                         fontWeight: 700,
                         fontSize: "0.78rem",
                         color: "#64748b",
+                        alignItems: "center",
                       }}
                     >
                       <Box>Expense</Box>
                       <Box>Calculation</Box>
+                      <Box sx={{ textAlign: "right" }}>Total</Box>
                     </Box>
 
                     {/* Table Rows */}
@@ -2214,7 +2216,7 @@ export default function EventFormPage() {
                         key={item.budgetCalculationId || item.expenseItem || idx}
                         sx={{
                           display: "grid",
-                          gridTemplateColumns: "1.2fr 2fr",
+                          gridTemplateColumns: "1.1fr 1.7fr 0.9fr",
                           gap: 1.5,
                           py: 0.6,
                           borderBottom: "1px solid",
@@ -2242,6 +2244,17 @@ export default function EventFormPage() {
                           }}
                         >
                           {item.calcFormula || item.calcText || `₹${item.amount}`}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          sx={{
+                            color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                            fontSize: "0.82rem",
+                            textAlign: "right",
+                          }}
+                        >
+                          ₹{(item.amount || 0).toLocaleString("en-IN")}
                         </Typography>
                       </Box>
                     ))}
