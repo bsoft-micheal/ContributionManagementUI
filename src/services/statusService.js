@@ -10,9 +10,24 @@ export const getStatusesAsync = async (activeOnly = false, module = "") => {
   return result || [];
 };
 
+export const getAllModuleAsync = async () => {
+  try {
+    const result = await getApi("/statuses/getAllModuleAsync");
+    if (Array.isArray(result) && result.length > 0) return result;
+  } catch (e) {
+    // fallback
+  }
+  try {
+    const result = await getApi("/statuses/getModulesAsync");
+    if (Array.isArray(result) && result.length > 0) return result;
+  } catch (e) {
+    // fallback
+  }
+  return [];
+};
+
 export const getModulesAsync = async () => {
-  const result = await getApi("/statuses/getModulesAsync");
-  return result || [];
+  return await getAllModuleAsync();
 };
 
 export const getStatusByIdAsync = async (id) => {

@@ -17,6 +17,8 @@ export default function AppSelect({
   required = false,
   startAdornment,
   allowClear = true,
+  clearable = true,
+  onClear,
   InputProps = {},
   ...props
 }) {

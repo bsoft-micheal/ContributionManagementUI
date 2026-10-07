@@ -75,6 +75,7 @@ const initialForm = {
 export default function SupportTicketsPage() {
   const toast = useAppToast();
   const { authState } = useAuth();
+  const { addNotification } = useNotifications();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
 
@@ -126,6 +127,7 @@ export default function SupportTicketsPage() {
   const [loading, setLoading] = useState(true);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingTicket, setEditingTicket] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [ticketToDelete, setTicketToDelete] = useState(null);
@@ -557,7 +559,6 @@ export default function SupportTicketsPage() {
     const newErrors = {};
     if (!form.memberName) newErrors.memberName = "Member Name is required";
     if (!form.ticketType) newErrors.ticketType = "Ticket Type is required";
-    if (!form.description || !form.description.trim()) newErrors.description = "Description is required";
     if (!form.attachment && (!editingTicket || !editingTicket.attachment)) {
       newErrors.attachment = "Attachment is required";
     }
@@ -569,6 +570,7 @@ export default function SupportTicketsPage() {
     }
 
     try {
+      setIsSaving(true);
       let resolvedMemberId = form.memberId;
       if (!resolvedMemberId && form.memberName) {
         const matched = membersList.find((m) => (m.name || m.memberName) === form.memberName);
@@ -606,15 +608,21 @@ export default function SupportTicketsPage() {
 
         const actualTicketNo = created?.ticketNo || newTicketNo;
 
-        // Trigger notification for Authority/Admin
-        addNotification({
-          type: "TICKET_RAISED",
-          title: `Support Ticket Raised: ${actualTicketNo}`,
-          message: `Member ${form.memberName || authState?.fullName || "User"} raised support ticket #${actualTicketNo}.`,
-          ticketNo: actualTicketNo,
-          targetRole: "Authority",
-          link: "/support-tickets",
-        });
+        // Trigger notification for Authority/Admin safely
+        try {
+          if (typeof addNotification === "function") {
+            addNotification({
+              type: "TICKET_RAISED",
+              title: `Support Ticket Raised: ${actualTicketNo}`,
+              message: `Member ${form.memberName || authState?.fullName || "User"} raised support ticket #${actualTicketNo}.`,
+              ticketNo: actualTicketNo,
+              targetRole: "Authority",
+              link: "/support-tickets",
+            });
+          }
+        } catch {
+          // Non-critical notification failure
+        }
 
         toast.success(TOAST_MESSAGES.SUPPORT.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
       }
@@ -626,6 +634,8 @@ export default function SupportTicketsPage() {
       await fetchTicketsFromDb();
     } catch (err) {
       toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1116,6 +1126,7 @@ export default function SupportTicketsPage() {
           <Stack direction="row" spacing={1.5}>
             <AppButton
               variant="outlined"
+              disabled={isSaving}
               onClick={() => {
                 setDialogOpen(false);
                 setEditingTicket(null);
@@ -1124,7 +1135,12 @@ export default function SupportTicketsPage() {
             >
               Cancel
             </AppButton>
-            <AppButton variant="contained" onClick={handleSaveTicket}>
+            <AppButton
+              variant="contained"
+              loading={isSaving}
+              disabled={isSaving}
+              onClick={handleSaveTicket}
+            >
               {editingTicket ? "Update" : "Save"}
             </AppButton>
           </Stack>
@@ -1363,7 +1379,6 @@ export default function SupportTicketsPage() {
               error={!!errors.description}
               helperText={errors.description}
               minRows={3}
-              required
             />
           </Grid>
         </Grid>

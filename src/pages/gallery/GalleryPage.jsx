@@ -1082,8 +1082,8 @@ export default function GalleryPage() {
               maxLength={50}
               onChange={(e) => {
                 const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, "").slice(0, 50);
-                setForm((c) => ({ ...c, title: sanitized }));
-                if (errors.title) setErrors((p) => ({ ...p, title: "" }));
+                setForm((c) => (c.title === sanitized ? c : { ...c, title: sanitized }));
+                if (errors.title) setErrors((p) => (p.title ? { ...p, title: "" } : p));
               }}
               error={!!errors.title}
               helperText={errors.title}
