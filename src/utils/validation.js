@@ -38,6 +38,11 @@ export const VALIDATION_PATTERNS = {
     pattern: /^[^0-9]*$/,
     message: "Only letters and special characters are allowed (no numbers)",
     sanitize: (val) => val.replace(/[0-9]/g, "")
+  },
+  phone: {
+    pattern: /^[0-9]*$/,
+    message: "Only numbers are allowed",
+    sanitize: (val) => val.replace(/[^0-9]/g, "")
   }
 };
 
@@ -88,6 +93,20 @@ export function validateField(value, config = {}) {
     return "Please enter a valid email address";
   }
 
+  // 2.1. Mobile format check (strictly 10 digits starting with 6–9)
+  if (config.phone || config.indianMobile) {
+    const mobileRegex = /^[6-9]\d{9}$/;
+    if (!mobileRegex.test(strVal)) {
+      if (strVal.length !== 10) {
+        return "Mobile number must be exactly 10 digits";
+      }
+      if (!/^[6-9]/.test(strVal)) {
+        return "Mobile number must start with 6, 7, 8, or 9";
+      }
+      return "Enter a valid 10-digit mobile number starting with 6–9";
+    }
+  }
+
   // 3. Pattern / Character check
   if (type && VALIDATION_PATTERNS[type]) {
     const rule = VALIDATION_PATTERNS[type];
@@ -132,6 +151,29 @@ export function validateField(value, config = {}) {
     return customValidate(value);
   }
 
+  return "";
+}
+
+/**
+ * Validates an Indian mobile number (strictly 10 digits starting with 6–9).
+ * @param {string} value The mobile number string.
+ * @returns {string} Error message, or empty string if valid.
+ */
+export function validateIndianMobile(value) {
+  if (!value || !String(value).trim()) {
+    return "Mobile number is required";
+  }
+  const strVal = String(value).trim();
+  const mobileRegex = /^[6-9]\d{9}$/;
+  if (!mobileRegex.test(strVal)) {
+    if (strVal.length !== 10) {
+      return "Mobile number must be exactly 10 digits";
+    }
+    if (!/^[6-9]/.test(strVal)) {
+      return "Mobile number must start with 6, 7, 8, or 9";
+    }
+    return "Enter a valid 10-digit mobile number starting with 6–9";
+  }
   return "";
 }
 

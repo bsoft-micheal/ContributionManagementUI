@@ -17,10 +17,10 @@ import {
 } from "@mui/material";
 import {
   Close as CloseIcon,
-  PostAdd as AddIcon,
   ReceiptLong as ReceiptIcon,
   OpenInNew as OpenInNewIcon,
   Image as ImageIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -31,7 +31,7 @@ import { getExpensesAsync } from "../../services/expenseService";
 import { getImageUrl } from "../../services/apiClient";
 import { useAppToast } from "../common/AppToast";
 
-export default function EventExpensesDialog({ open, onClose, event }) {
+export default function EventExpensesDialog({ open, onClose, event, onAddExpenseClick }) {
   const navigate = useNavigate();
   const toast = useAppToast();
   const [expenses, setExpenses] = useState([]);
@@ -100,18 +100,6 @@ export default function EventExpensesDialog({ open, onClose, event }) {
     return getImageUrl(`/expense_attachments/${filePath}`);
   };
 
-  const handleAddExpenseClick = () => {
-    onClose();
-    navigate("/expense", {
-      state: {
-        openAddExpense: true,
-        eventName: event?.eventName,
-        category: event?.eventTypeName || event?.category,
-        eventId: event?.eventId,
-      },
-    });
-  };
-
   const handleOpenInExpensePage = () => {
     onClose();
     navigate("/expense", {
@@ -131,27 +119,37 @@ export default function EventExpensesDialog({ open, onClose, event }) {
         maxWidth="md"
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ width: "100%" }}>
-            <AppButton
-              variant="outlined"
-              size="small"
-              startIcon={<OpenInNewIcon />}
-              onClick={handleOpenInExpensePage}
-            >
-              Open in Expense Page
-            </AppButton>
-            <Stack direction="row" spacing={1}>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              {onAddExpenseClick && (
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    onClose();
+                    onAddExpenseClick(event);
+                  }}
+                  sx={{
+                    bgcolor: "#342b54 !important",
+                    color: "#ffffff !important",
+                    "&:hover": { bgcolor: "#241d3b !important" },
+                  }}
+                >
+                  Add Expense
+                </AppButton>
+              )}
               <AppButton
-                variant="contained"
+                variant="outlined"
                 size="small"
-                startIcon={<AddIcon />}
-                onClick={handleAddExpenseClick}
+                startIcon={<OpenInNewIcon />}
+                onClick={handleOpenInExpensePage}
               >
-                Add Expense
+                Open in Expense Page
               </AppButton>
-              <AppButton variant="outlined" size="small" onClick={onClose}>
-                Close
-              </AppButton>
-            </Stack>
+            </Box>
+            <AppButton variant="outlined" size="small" onClick={onClose}>
+              Close
+            </AppButton>
           </Stack>
         }
       >
@@ -237,12 +235,28 @@ export default function EventExpensesDialog({ open, onClose, event }) {
               <Typography variant="body1" fontWeight={700} sx={{ color: "text.primary", mb: 0.5 }}>
                 No expenses recorded for this event yet
               </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
-                Click below to add the first expense for {event?.eventName}.
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                There are currently no expenses recorded for {event?.eventName}.
               </Typography>
-              <AppButton variant="contained" size="small" startIcon={<AddIcon />} onClick={handleAddExpenseClick}>
-                Add Expense
-              </AppButton>
+              {onAddExpenseClick && (
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    onClose();
+                    onAddExpenseClick(event);
+                  }}
+                  sx={{
+                    mt: 2,
+                    bgcolor: "#342b54 !important",
+                    color: "#ffffff !important",
+                    "&:hover": { bgcolor: "#241d3b !important" },
+                  }}
+                >
+                  Add Expense
+                </AppButton>
+              )}
             </Box>
           ) : (
             <Box sx={{ overflowX: "auto", maxHeight: expenses.length > 6 ? 260 : "none", overflowY: expenses.length > 6 ? "auto" : "visible" }}>

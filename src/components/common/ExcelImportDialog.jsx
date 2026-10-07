@@ -23,6 +23,7 @@ import {
 } from "@mui/icons-material";
 import AppDialog from "./AppDialog";
 import AppButton from "./AppButton";
+import { useAppToast } from "./AppToast";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import dayjs from "dayjs";
@@ -37,6 +38,7 @@ export default function ExcelImportDialog({
   templateValidations = {},
   validateRow = () => ({ error: null, parsed: {} }),
 }) {
+  const toast = useAppToast();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [parsedRows, setParsedRows] = useState([]); // { raw, error, parsed }
@@ -91,8 +93,20 @@ export default function ExcelImportDialog({
         });
 
         setParsedRows(processed);
+
+        const invalidRows = processed.filter((r) => r.error);
+        if (invalidRows.length > 0) {
+          if (invalidRows.length === 1) {
+            toast.error(invalidRows[0].error);
+          } else {
+            toast.error(`Found ${invalidRows.length} invalid row(s). ${invalidRows[0].error}`);
+          }
+        } else if (processed.length > 0) {
+          toast.success(`Excel sheet validated successfully! ${processed.length} valid record(s) ready.`);
+        }
       } catch (err) {
         setParsedRows([{ rowNumber: 1, raw: {}, error: "Failed to read Excel file. Please ensure it is a valid format.", parsed: {} }]);
+        toast.error("Failed to read Excel file. Please ensure it is a valid .xlsx or .xls file.");
       } finally {
         setLoading(false);
       }
@@ -223,6 +237,15 @@ export default function ExcelImportDialog({
       .filter((row) => !row.error)
       .map((row) => row.parsed);
     
+    if (validData.length === 0) {
+      toast.error("Cannot import: All rows contain validation errors. Please check the credentials and upload a corrected file.");
+      return;
+    }
+
+    if (invalidCount > 0) {
+      toast.warning(`Importing ${validCount} valid record(s). ${invalidCount} invalid row(s) were skipped.`);
+    }
+
     onImport(validData);
     handleClear();
     onClose();
@@ -404,7 +427,7 @@ export default function ExcelImportDialog({
 
               {invalidCount > 0 ? (
                 <Alert
-                  severity="warning"
+                  severity="error"
                   icon={<ErrorIcon />}
                   sx={{
                     borderRadius: "8px",
@@ -412,10 +435,23 @@ export default function ExcelImportDialog({
                   }}
                 >
                   <Typography variant="body2" fontWeight={700}>
-                    Spreadsheet contains {invalidCount} invalid row(s).
+                    Spreadsheet contains {invalidCount} invalid row(s) with credential or format errors:
                   </Typography>
-                  <Typography variant="caption" display="block" sx={{ opacity: 0.9, mt: 0.5 }}>
-                    Invalid rows (highlighted in red) will be skipped during import. You can confirm import to save the {validCount} valid record(s), or clear and upload a corrected file.
+                  <Box sx={{ mt: 1, maxHeight: 115, overflowY: "auto", pr: 0.5 }}>
+                    {parsedRows
+                      .filter((r) => r.error)
+                      .map((r, i) => (
+                        <Typography
+                          key={i}
+                          variant="caption"
+                          sx={{ display: "block", color: "error.dark", fontWeight: 700, mb: 0.3 }}
+                        >
+                          • {r.error}
+                        </Typography>
+                      ))}
+                  </Box>
+                  <Typography variant="caption" display="block" sx={{ opacity: 0.9, mt: 0.8, fontStyle: "italic" }}>
+                    Invalid rows (highlighted in red below) will be skipped during import. You can confirm import to save the {validCount} valid record(s), or clear and upload a corrected file.
                   </Typography>
                 </Alert>
               ) : (
