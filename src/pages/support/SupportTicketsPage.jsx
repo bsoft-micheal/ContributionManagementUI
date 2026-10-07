@@ -73,6 +73,7 @@ const initialForm = {
 };
 
 export default function SupportTicketsPage() {
+  const toast = useAppToast();
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
@@ -832,23 +833,6 @@ export default function SupportTicketsPage() {
       ),
     },
     {
-      label: "Subject",
-      key: "subject",
-      render: (row) => (
-        <Typography
-          variant="body2"
-          sx={{
-            maxWidth: 220,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {row.subject}
-        </Typography>
-      ),
-    },
-    {
       label: "Priority",
       key: "priority",
       render: (row) => {
@@ -1008,7 +992,7 @@ export default function SupportTicketsPage() {
                   memberId: loggedIn.id || "",
                   relatedEvent: defaultEventName,
                   eventType: defaultEventType,
-                  ticketType: firstTicketType || "Payment Issue",
+                  ticketType: "",
                   status: firstStatus,
                   description: "",
                 });
@@ -1241,7 +1225,7 @@ export default function SupportTicketsPage() {
               required
             />
           </Grid>
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="caption" fontWeight={700} sx={{ color: (t) => t.palette.mode === "dark" ? "#e2e8f0" : "#334155" }}>

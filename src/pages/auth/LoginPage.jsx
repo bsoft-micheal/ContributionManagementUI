@@ -13,13 +13,14 @@ import logo from "../../assets/logo.png";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { getRightsForPath, getFirstAccessiblePath } from "../../utils/rightsHelper";
 
 export default function LoginPage() {
   const theme = useTheme();
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const { isAuthenticated, login, verifyTwoFactor } = useAuth();
+  const { isAuthenticated, authState, login, verifyTwoFactor, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useAppToast();
@@ -60,10 +61,29 @@ export default function LoginPage() {
   // If already authenticated, redirect to destination
   useEffect(() => {
     if (isAuthenticated) {
+      // 1. Explicit switch/logout parameter in URL
+      const params = new URLSearchParams(location.search);
+      if (params.get("switch") === "true" || params.get("logout") === "true") {
+        logout();
+        return;
+      }
+
+      const activeRole = authState?.role || authState?.roleName;
+      const firstAllowed = getFirstAccessiblePath(activeRole);
+
+      // 2. If all permissions are denied (user is locked out), clear the session so the login form displays!
+      if (!firstAllowed) {
+        logout();
+        toast.error("Your account has no accessible permissions. Please log in with an authorized account.");
+        return;
+      }
+
       const destination = getRedirectDestination();
-      navigate(destination, { replace: true });
+      const destRights = getRightsForPath(destination, activeRole);
+      const target = destRights.deny ? firstAllowed : destination;
+      navigate(target, { replace: true });
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authState]);
 
   // ── Show session-expired toast when redirected by idle timer ─────────────────
   useEffect(() => {

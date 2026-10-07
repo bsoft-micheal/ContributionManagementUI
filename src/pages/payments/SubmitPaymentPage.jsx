@@ -186,27 +186,11 @@ export default function SubmitPaymentPage() {
 
   // Dynamic statuses loaded directly from Support Status Master database table
   const modalStatusOptions = useMemo(() => {
-    const set = new Set();
-    const list = [];
-    (dbStatuses || [])
-      .filter((s) => s.isActive !== false)
-      .forEach((s) => {
-        const name = s.statusName || s.name || s.status_name;
-        if (name && !set.has(name.toLowerCase())) {
-          set.add(name.toLowerCase());
-          list.push({ label: name, value: name });
-        }
-      });
-    if (list.length === 0) {
-      return [
-        { label: "Pending", value: "Pending" },
-        { label: "Verified", value: "Verified" },
-        { label: "Rejected", value: "Rejected" },
-        { label: "Closed", value: "Closed" },
-      ];
-    }
-    return list;
-  }, [dbStatuses]);
+    return [
+      { label: "Paid", value: "Paid" },
+      { label: "Pending", value: "Pending" },
+    ];
+  }, []);
 
   const handleStatusUpdate = async (txn, newStatus, customNotes) => {
     const target = txn || statusModalTxn;
@@ -571,7 +555,7 @@ export default function SubmitPaymentPage() {
       };
 
       const res = await submitPaymentProofAsync(payload);
-      toast.success("Payment submission recorded and synchronized with Contribution ledger successfully!");
+      toast.success("Payment submission successfully!");
 
       addNotification({
         type: "PAYMENT_PENDING",
@@ -1129,14 +1113,6 @@ export default function SubmitPaymentPage() {
                   auditRemarks
                 )
               }
-              sx={{
-                bgcolor:
-                  (statusChangeValue || statusModalTxn?.status) === "Closed"
-                    ? "#16a34a !important"
-                    : (statusChangeValue || statusModalTxn?.status) === "Verified"
-                      ? "#0284c7 !important"
-                      : undefined,
-              }}
             >
               Save
             </AppButton>
@@ -1155,16 +1131,7 @@ export default function SubmitPaymentPage() {
                 gap: 1.8,
               }}
             >
-              <Box>
-                <Typography
-                  variant="caption"
-                  fontWeight={800}
-                  color="primary.main"
-                  sx={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.72rem" }}
-                >
-                  Authority Status Update (From Support Status Master)
-                </Typography>
-              </Box>
+
 
               <Grid container spacing={2} alignItems="center">
                 <Grid size={{ xs: 12, sm: 6 }}>

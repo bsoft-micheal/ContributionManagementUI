@@ -50,6 +50,12 @@ const CANONICAL_SUBMODULE_ORDER = {
     "Calendar",
     "Gallery"
   ],
+  "Support Ticket": [
+    "",
+    "Support Ticket",
+    "Types",
+    "Status"
+  ],
   Tools: [
     "",
     "Users",
@@ -62,6 +68,27 @@ const CANONICAL_SUBMODULE_ORDER = {
     "Exit Process",
     "Settings"
   ]
+};
+
+const isProtectedAdminFeature = (r) => {
+  if (!r) return false;
+  const subMod = String(r.subModule || "").toLowerCase().trim();
+  const page = String(r.page || "").toLowerCase().trim();
+  const action = String(r.action || "").toLowerCase().trim();
+  const featId = Number(r.featureID || r.featureId || r.FeatureID || r.FeatureId);
+  return (
+    subMod === "user rights" ||
+    subMod === "roles" ||
+    page === "user rights" ||
+    page === "roles" ||
+    page === "/user-rights" ||
+    page === "/roles" ||
+    action === "user rights" ||
+    action === "roles" ||
+    featId === 16 ||
+    featId === 15 ||
+    featId === 13
+  );
 };
 
 export default function UserRightsPage() {
@@ -178,7 +205,7 @@ export default function UserRightsPage() {
             else if (subModuleVal.includes("User Rights")) subModuleVal = "User Rights";
             else if (subModuleVal.includes("Status")) subModuleVal = "Status";
             else if (subModuleVal.includes("Setting")) subModuleVal = "Settings";
-            else if (subModuleVal.includes("Ticket")) subModuleVal = "Support Tickets";
+            else if (subModuleVal.includes("Ticket")) subModuleVal = "Support Ticket";
           }
         }
 
@@ -264,30 +291,61 @@ export default function UserRightsPage() {
     if (!selectedRoleName) return;
     const numAccessType = Number(newAccessType);
     const strAccess = numAccessType === 3 ? "deny" : (numAccessType === 1 ? "readOnly" : "readWrite");
+    const isAdmin = String(selectedRoleName).trim().toLowerCase() === "admin";
 
     setRights(prev => {
       const currentList = prev[selectedRoleName] || [];
       const targetRow = currentList.find(r => r._uid === uid);
       if (!targetRow) return prev;
 
+      // ── Admin Protection: block Deny on User Rights / Roles ──────────────
+      if (isAdmin && numAccessType === 3 && isProtectedAdminFeature(targetRow)) {
+        setTimeout(() => {
+          toast.error("Access denied is not allowed for 'User Rights' or 'Roles' on Admin role.");
+        }, 0);
+        // Revert just this row to Read/Write
+        const reverted = currentList.map(r =>
+          r._uid === uid ? { ...r, accessType: 2, access: "readWrite" } : r
+        );
+        return { ...prev, [selectedRoleName]: reverted };
+      }
+
       const targetModule = targetRow.module;
       const targetSubModule = targetRow.subModule;
       const isMasterRow = (!targetRow.subModule || targetRow.subModule.trim() === "") && (!targetRow.action || targetRow.action.trim() === "");
       const isSubModuleMaster = targetRow.subModule && targetRow.subModule.trim() !== "" && (!targetRow.action || targetRow.action.trim() === "");
 
+      let blockedCount = 0;
+
       const updated = currentList.map(r => {
+        const wouldDeny = numAccessType === 3;
         if (isMasterRow && r.module === targetModule) {
-          // Master module row selection: cascade to all sub-modules and actions under this module
+          if (isAdmin && wouldDeny && isProtectedAdminFeature(r)) {
+            blockedCount++;
+            return { ...r, accessType: 2, access: "readWrite" };
+          }
           return { ...r, accessType: numAccessType, access: strAccess };
         } else if (isSubModuleMaster && r.module === targetModule && r.subModule === targetSubModule) {
-          // Sub-module header row: cascade to all actions under this sub-module
+          if (isAdmin && wouldDeny && isProtectedAdminFeature(r)) {
+            blockedCount++;
+            return { ...r, accessType: 2, access: "readWrite" };
+          }
           return { ...r, accessType: numAccessType, access: strAccess };
         } else if (r._uid === uid) {
-          // Individual action row: update individual row
+          if (isAdmin && wouldDeny && isProtectedAdminFeature(r)) {
+            blockedCount++;
+            return { ...r, accessType: 2, access: "readWrite" };
+          }
           return { ...r, accessType: numAccessType, access: strAccess };
         }
         return r;
       });
+
+      if (blockedCount > 0) {
+        setTimeout(() => {
+          toast.error("Access denied is not allowed for 'User Rights' or 'Roles' on Admin role.");
+        }, 0);
+      }
 
       return { ...prev, [selectedRoleName]: updated };
     });
@@ -306,6 +364,25 @@ export default function UserRightsPage() {
       return;
     }
 
+    // ── Admin Protection: sanitise any Deny on protected features before saving ──
+    const isAdmin = String(selectedRoleName).trim().toLowerCase() === "admin";
+    let adminLockoutReverted = false;
+    const sanitisedRows = currentRows.map(r => {
+      const typeVal = Number(r.accessType) || (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2));
+      if (isAdmin && typeVal === 3 && isProtectedAdminFeature(r)) {
+        adminLockoutReverted = true;
+        return { ...r, accessType: 2, access: "readWrite" };
+      }
+      return r;
+    });
+
+    if (adminLockoutReverted) {
+      toast.error("Access denied is not allowed for 'User Rights' or 'Roles' on Admin role. Reverted to Read/Write.");
+      setRights(prev => ({ ...prev, [selectedRoleName]: sanitisedRows }));
+    }
+
+    const rowsToSave = adminLockoutReverted ? sanitisedRows : currentRows;
+
     setSaving(true);
     try {
       const selectedRoleObj = roles.find(r => r.roleName === selectedRoleName);
@@ -313,7 +390,7 @@ export default function UserRightsPage() {
       const payload = {
         roleId: selectedRoleObj?.roleId || undefined,
         roleName: selectedRoleName,
-        rights: currentRows.map(r => {
+        rights: rowsToSave.map(r => {
           const typeVal = Number(r.accessType) || (r.access === "deny" ? 3 : (r.access === "readOnly" ? 1 : 2));
           const strVal = typeVal === 3 ? "deny" : (typeVal === 1 ? "readOnly" : "readWrite");
           const pageVal = (r.action && r.action.trim() !== "" ? r.action : (r.page || r.subModule || r.module || "")).trim();
@@ -339,11 +416,11 @@ export default function UserRightsPage() {
       try {
         const stored = localStorage.getItem("projectRightsConfig");
         const parsed = stored ? JSON.parse(stored) : {};
-        parsed[selectedRoleName] = currentRows;
-        parsed[selectedRoleName.toLowerCase()] = currentRows;
+        parsed[selectedRoleName] = rowsToSave;
+        parsed[selectedRoleName.toLowerCase()] = rowsToSave;
         const activeUserRole = authState?.role || authState?.roleName || "";
         if (activeUserRole && selectedRoleName.toLowerCase() === activeUserRole.toLowerCase()) {
-          parsed["current"] = currentRows;
+          parsed["current"] = rowsToSave;
         }
         localStorage.setItem("projectRightsConfig", JSON.stringify(parsed));
         window.dispatchEvent(new CustomEvent("rightsUpdated", { detail: { roleName: selectedRoleName } }));
@@ -507,6 +584,7 @@ export default function UserRightsPage() {
         columns={columns}
         data={filteredRows}
         loading={loading}
+        allowPagination={false}
         filterPanel={
           <Grid container spacing={3} alignItems="center">
             <Grid size={{ xs: 12, md: 3.5 }}>

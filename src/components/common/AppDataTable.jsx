@@ -345,6 +345,7 @@ export default function AppDataTable({
   actions,
   filterPanel,
   allowExport = true,
+  allowPagination = true,
   searchPlaceholder = "Search by username...",
   initialRowsPerPage = 15,
 }) {
@@ -498,10 +499,12 @@ export default function AppDataTable({
     return result;
   }, [data, search, columnFilters, orderBy, order]);
 
-  const paginatedData = processedData.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  const paginatedData = allowPagination
+    ? processedData.slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage
+      )
+    : processedData;
 
   // Re-order columns so pinned left are first, then normal (Action first), then pinned right, then filter by visibility
   const orderedColumns = useMemo(() => {
@@ -1168,10 +1171,10 @@ export default function AppDataTable({
                     >
                       {column.label === "#" || column.label === "S.No" || column.label === "S.No." || column.key === "sNo" || column.type === "index" ? (
                         <Typography variant="body2" sx={{ fontSize: "inherit", fontWeight: 700, color: "inherit" }}>
-                          {page * rowsPerPage + rowIndex + 1}
+                          {allowPagination ? page * rowsPerPage + rowIndex + 1 : rowIndex + 1}
                         </Typography>
                       ) : column.render ? (
-                        column.render(row, rowIndex, page * rowsPerPage + rowIndex + 1)
+                        column.render(row, rowIndex, allowPagination ? page * rowsPerPage + rowIndex + 1 : rowIndex + 1)
                       ) : (
                         <Typography
                           variant="body2"
@@ -1208,124 +1211,126 @@ export default function AppDataTable({
       </Box>
 
       {/* ── 4. Custom Footer / Pagination (Mockup matching) ──────────────── */}
-      <Box
-        sx={{
-          px: 3,
-          py: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderTop: `1px solid ${borderColor}`,
-          bgcolor: surface,
-          flexWrap: "wrap",
-          gap: 2
-        }}
-      >
-        {/* Left Pagination metrics */}
-        <Stack direction="row" alignItems="center" spacing={2}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      {allowPagination && (
+        <Box
+          sx={{
+            px: 3,
+            py: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderTop: `1px solid ${borderColor}`,
+            bgcolor: surface,
+            flexWrap: "wrap",
+            gap: 2
+          }}
+        >
+          {/* Left Pagination metrics */}
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: textSecondary, fontSize: "0.75rem" }}>
+                Rows per page:
+              </Typography>
+              <Select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setPage(0);
+                }}
+                size="small"
+                sx={{
+                  height: 28,
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                  "& .MuiSelect-select": { py: 0.5, px: 1 },
+                  "& fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(0,0,0,0.1)" },
+                }}
+              >
+                {[5, 10, 15, 25, 50].map((val) => (
+                  <MenuItem key={val} value={val} sx={{ fontSize: "0.75rem" }}>
+                    {val}
+                  </MenuItem>
+                ))}
+              </Select>
+            </Box>
             <Typography variant="caption" sx={{ fontWeight: 600, color: textSecondary, fontSize: "0.75rem" }}>
-              Rows per page:
+              Rows {totalRows} • Page {page + 1} of {totalPages}
             </Typography>
-            <Select
-              value={rowsPerPage}
-              onChange={(e) => {
-                setRowsPerPage(Number(e.target.value));
-                setPage(0);
-              }}
+          </Stack>
+
+          {/* Right Pagination buttons */}
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <IconButton
               size="small"
+              disabled={page === 0}
+              onClick={() => setPage(0)}
               sx={{
-                height: 28,
-                fontSize: "0.75rem",
-                fontWeight: 600,
-                color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
-                "& .MuiSelect-select": { py: 0.5, px: 1 },
-                "& fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(0,0,0,0.1)" },
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
+                borderRadius: "4px",
+                p: 0.5,
+                color: "inherit"
               }}
             >
-              {[5, 10, 15, 25, 50].map((val) => (
-                <MenuItem key={val} value={val} sx={{ fontSize: "0.75rem" }}>
-                  {val}
-                </MenuItem>
-              ))}
-            </Select>
-          </Box>
-          <Typography variant="caption" sx={{ fontWeight: 600, color: textSecondary, fontSize: "0.75rem" }}>
-            Rows {totalRows} • Page {page + 1} of {totalPages}
-          </Typography>
-        </Stack>
-
-        {/* Right Pagination buttons */}
-        <Stack direction="row" alignItems="center" spacing={0.5}>
-          <IconButton
-            size="small"
-            disabled={page === 0}
-            onClick={() => setPage(0)}
-            sx={{
-              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
-              borderRadius: "4px",
-              p: 0.5,
-              color: "inherit"
-            }}
-          >
-            <FirstPageIcon sx={{ fontSize: "1.1rem" }} />
-          </IconButton>
-          <Button
-            size="small"
-            disabled={page === 0}
-            onClick={() => setPage(prev => prev - 1)}
-            sx={{
-              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
-              borderRadius: "4px",
-              color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              textTransform: "none",
-              px: 1.5,
-              minWidth: "unset",
-              height: 28,
-              "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
-            }}
-          >
-            Prev
-          </Button>
-          <Typography variant="caption" sx={{ mx: 1.5, fontWeight: 700, fontSize: "0.75rem", color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b" }}>
-            {page + 1} / {totalPages}
-          </Typography>
-          <Button
-            size="small"
-            disabled={page >= totalPages - 1}
-            onClick={() => setPage(prev => prev + 1)}
-            sx={{
-              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
-              borderRadius: "4px",
-              color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              textTransform: "none",
-              px: 1.5,
-              minWidth: "unset",
-              height: 28,
-              "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
-            }}
-          >
-            Next
-          </Button>
-          <IconButton
-            size="small"
-            disabled={page >= totalPages - 1}
-            onClick={() => setPage(totalPages - 1)}
-            sx={{
-              border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
-              borderRadius: "4px",
-              p: 0.5,
-              color: "inherit"
-            }}
-          >
-            <LastPageIcon sx={{ fontSize: "1.1rem" }} />
-          </IconButton>
-        </Stack>
-      </Box>
+              <FirstPageIcon sx={{ fontSize: "1.1rem" }} />
+            </IconButton>
+            <Button
+              size="small"
+              disabled={page === 0}
+              onClick={() => setPage(prev => prev - 1)}
+              sx={{
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
+                borderRadius: "4px",
+                color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                textTransform: "none",
+                px: 1.5,
+                minWidth: "unset",
+                height: 28,
+                "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
+              }}
+            >
+              Prev
+            </Button>
+            <Typography variant="caption" sx={{ mx: 1.5, fontWeight: 700, fontSize: "0.75rem", color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b" }}>
+              {page + 1} / {totalPages}
+            </Typography>
+            <Button
+              size="small"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage(prev => prev + 1)}
+              sx={{
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
+                borderRadius: "4px",
+                color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                textTransform: "none",
+                px: 1.5,
+                minWidth: "unset",
+                height: 28,
+                "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
+              }}
+            >
+              Next
+            </Button>
+            <IconButton
+              size="small"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage(totalPages - 1)}
+              sx={{
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
+                borderRadius: "4px",
+                p: 0.5,
+                color: "inherit"
+              }}
+            >
+              <LastPageIcon sx={{ fontSize: "1.1rem" }} />
+            </IconButton>
+          </Stack>
+        </Box>
+      )}
     </Paper>
   );
 }

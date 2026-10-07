@@ -1,6 +1,8 @@
 import { MenuItem, TextField, Box, Typography, InputAdornment, IconButton } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { useTheme } from "@mui/material/styles";
+import ClearIcon from "@mui/icons-material/Clear";
+import { useState, useEffect, useMemo } from "react";
 
 export default function AppSelect({
   label,
@@ -14,9 +16,7 @@ export default function AppSelect({
   helperText = "",
   required = false,
   startAdornment,
-  clearable = false,
-  allowClear = false,
-  onClear,
+  allowClear = true,
   InputProps = {},
   ...props
 }) {
@@ -29,12 +29,32 @@ export default function AppSelect({
       ? `Select ${label.replace(/[*:]/g, "").trim()}...`
       : "Select an option...";
 
-  const hasEmptyOption = options.some((o) => o.value === "");
+  const uniqueOptions = useMemo(() => {
+    const map = new Map();
+    (options || []).forEach((opt) => {
+      if (opt && opt.value !== undefined && opt.value !== null) {
+        const valStr = String(opt.value);
+        if (!map.has(valStr)) {
+          map.set(valStr, opt);
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [options]);
+
+  const hasEmptyOption = uniqueOptions.some((o) => o.value === "");
   const hasValueOption =
     value === "" ||
     value === undefined ||
     value === null ||
-    options.some((o) => String(o.value) === String(value));
+    uniqueOptions.some((o) => String(o.value) === String(value));
+
+  const handleClear = (e) => {
+    e.stopPropagation();
+    if (onChange) {
+      onChange({ target: { name: props.name || "", value: "" } });
+    }
+  };
 
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
@@ -69,7 +89,7 @@ export default function AppSelect({
         SelectProps={{
           displayEmpty: true,
           renderValue: (selected) => {
-            const found = options.find(
+            const found = uniqueOptions.find(
               (o) => String(o?.value ?? "").toLowerCase() === String(selected ?? "").toLowerCase()
             );
             if (found) return found.label;
@@ -239,9 +259,9 @@ export default function AppSelect({
             {value}
           </MenuItem>
         )}
-        {options.map((option) => (
+        {uniqueOptions.map((option, idx) => (
           <MenuItem
-            key={option.value}
+            key={`${option.value}_${idx}`}
             value={option.value}
             disabled={Boolean(option.disabled)}
             sx={{ fontSize: "0.85rem", py: 1 }}

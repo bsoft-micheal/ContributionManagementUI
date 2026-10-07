@@ -9,9 +9,9 @@ function getParentPageFeatureId(actionFeatureId) {
   if (id >= 31 && id <= 35) return 4;   // Event
   if (id >= 54 && id <= 57) return 4;   // Event (Add Photos, View Photos, Add Expense, View Expense)
   if (id >= 36 && id <= 40) return 6;   // Gallery
-  if (id >= 41 && id <= 43) return 8;   // Contribution
+  if ((id >= 41 && id <= 43) || id === 58) return 8;   // Contribution (41-43, 58)
   if (id >= 44 && id <= 48) return 11;  // Expense
-  if ((id >= 49 && id <= 53) || id === 58) return 12;  // Support Ticket
+  if (id >= 49 && id <= 53) return 12;  // Support Ticket
   if (id === 59 || id === 60 || id === 82) return 23; // Reports
   return null;
 }
@@ -137,13 +137,19 @@ export function getRightsForFeatureId(featureId, roleName) {
   const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
   const roleLower = String(resolvedName).trim().toLowerCase();
   const isAdminOrOrg = roleLower === "admin" || roleLower === "organizer";
+  const numericFeatureId = Number(featureId);
+
+  // Super-admin safety failsafe: Admin always has access to User Rights management to prevent lockout
+  if (roleLower === "admin" && (numericFeatureId === 16 || numericFeatureId === 13)) {
+    return { read: true, write: true, deny: false };
+  }
+
   const roleRights = getActiveRoleRights(resolvedName);
 
   if (!roleRights) {
     return { read: true, write: isAdminOrOrg, deny: false };
   }
 
-  const numericFeatureId = Number(featureId);
   let matchedRight = null;
 
   if (numericFeatureId > 0) {
@@ -174,11 +180,57 @@ export function getRightsForFeatureId(featureId, roleName) {
  */
 export function getRightsForPath(path, roleName) {
   const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
+  const roleLower = String(resolvedName).trim().toLowerCase();
+
+  // Super-admin safety failsafe: Admin always has access to /user-rights to prevent lockout
+  if (roleLower === "admin" && (path === "/user-rights" || path === "/roles")) {
+    return { read: true, write: true, deny: false };
+  }
+
   const featureId = getFeatureIdForPath(path);
   if (featureId) {
     return getRightsForFeatureId(featureId, resolvedName);
   }
   return getRightsForPage(path, resolvedName);
+}
+
+/**
+ * Returns the first accessible route for a given role, or null if all routes are denied.
+ */
+export function getFirstAccessiblePath(roleName) {
+  const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
+  const roleLower = String(resolvedName).trim().toLowerCase();
+
+  // If Dashboard "/" is accessible, it's always the primary landing page
+  const rootRights = getRightsForPath("/", resolvedName);
+  if (!rootRights.deny && (rootRights.read || rootRights.write)) {
+    return "/";
+  }
+
+  // If Admin and Dashboard is denied, default to /user-rights failsafe
+  if (roleLower === "admin") {
+    return "/user-rights";
+  }
+
+  // Candidate paths from navigationItems
+  const candidatePaths = [];
+  for (const item of navigationItems) {
+    if (item.path && item.path !== "/") candidatePaths.push(item.path);
+    if (item.children) {
+      for (const child of item.children) {
+        if (child.path && child.path !== "/") candidatePaths.push(child.path);
+      }
+    }
+  }
+
+  for (const p of candidatePaths) {
+    const rights = getRightsForPath(p, resolvedName);
+    if (!rights.deny && (rights.read || rights.write)) {
+      return p;
+    }
+  }
+
+  return null;
 }
 
 export function getRightsForPage(pageName, roleName) {
