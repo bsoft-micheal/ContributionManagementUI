@@ -166,6 +166,28 @@ export default function UserRightsPage() {
         let moduleVal = (r.module || r.Module || "").trim();
         let subModuleVal = (r.subModule || r.SubModule || "").trim();
         let actionVal = (r.action || r.Action || "").trim();
+        const featId = Number(r.featureID || r.FeatureID || r.featureId || r.FeatureId || 0);
+
+        // Canonical Feature ID Action overrides
+        const FEATURE_ACTION_MAP = {
+          // Users
+          24: "View", 25: "Add", 26: "Edit", 27: "Delete",
+          // Events
+          31: "View", 32: "Add", 33: "Edit", 34: "Delete",
+          54: "Add Photos", 55: "View Photos", 56: "Add Expense", 57: "View Expense",
+          // Gallery
+          36: "View", 37: "Add", 38: "Edit", 39: "Delete",
+          // Contribution
+          41: "Submit", 42: "Update", 43: "Support", 58: "Verify support Ticket",
+          // Expense (ParentID 11)
+          44: "View", 45: "Verify", 46: "Edit", 47: "Delete", 48: "Add",
+          // Support Ticket (ParentID 12)
+          49: "Add", 50: "View", 51: "Verify", 52: "Edit", 53: "Delete",
+        };
+
+        if (FEATURE_ACTION_MAP[featId]) {
+          actionVal = FEATURE_ACTION_MAP[featId];
+        }
 
         // Title Case module names
         const modLower = moduleVal.toLowerCase();

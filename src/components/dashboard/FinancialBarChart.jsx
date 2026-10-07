@@ -68,10 +68,12 @@ export default function FinancialBarChart({
   totalRemaining = 0,
   events = [],
   isMember = false,
+  isReportsPage = false,
   showPieChart = true,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const isReportsMember = isMember && isReportsPage;
 
   const [hoveredBar, setHoveredBar] = useState(null);
   const [hoveredSlice, setHoveredSlice] = useState(null);
@@ -85,10 +87,10 @@ export default function FinancialBarChart({
     const expn = Math.max(0, Number(totalExpenses || 0));
     const bal = Number(totalRemaining || 0);
 
-    return [
+    const items = [
       {
         id: "expected",
-        label: "Total Expected",
+        label: isReportsMember ? "My Expected" : "Total Expected",
         value: exp,
         formattedValue: `₹${exp.toLocaleString("en-IN")}`,
         color: "#6366f1", // Indigo / Purple
@@ -101,7 +103,7 @@ export default function FinancialBarChart({
       },
       {
         id: "collected",
-        label: isMember ? "Total Paid" : "Total Collections",
+        label: isReportsMember ? "My Paid" : (isMember ? "Total Paid" : "Total Collections"),
         value: col,
         formattedValue: `₹${col.toLocaleString("en-IN")}`,
         color: "#10b981", // Emerald Green
@@ -109,12 +111,12 @@ export default function FinancialBarChart({
           ? "linear-gradient(180deg, #34d399 0%, #10b981 100%)"
           : "linear-gradient(180deg, #34d399 0%, #10b981 100%)",
         icon: <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />,
-        helper: "Total funds collected into treasury",
-        statusText: "Collections",
+        helper: isMember ? "Total contributions paid" : "Total funds collected into treasury",
+        statusText: isMember ? "Paid" : "Collections",
       },
       {
         id: "pending",
-        label: "Total Pending",
+        label: isReportsMember ? "My Pending" : "Total Pending",
         value: pen,
         formattedValue: `₹${pen.toLocaleString("en-IN")}`,
         color: "#f43f5e", // Rose Red
@@ -125,37 +127,44 @@ export default function FinancialBarChart({
         helper: "Unpaid / outstanding contributions",
         statusText: "Outstanding",
       },
-      {
-        id: "expenses",
-        label: "Total Expenses",
-        value: expn,
-        formattedValue: `₹${expn.toLocaleString("en-IN")}`,
-        color: "#f59e0b", // Amber / Warm Orange
-        bgGradient: isDark
-          ? "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)"
-          : "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)",
-        icon: <ReceiptLongIcon sx={{ fontSize: 16 }} />,
-        helper: "Actual expenses incurred",
-        statusText: "Spent",
-      },
-      {
-        id: "balance",
-        label: "Balance Amount",
-        value: bal,
-        formattedValue: `₹${bal.toLocaleString("en-IN")}`,
-        color: bal >= 0 ? "#06b6d4" : "#f43f5e", // Mild Cyan / Rose
-        bgGradient: bal >= 0
-          ? isDark
-            ? "linear-gradient(180deg, #38bdf8 0%, #06b6d4 100%)"
-            : "linear-gradient(180deg, #38bdf8 0%, #06b6d4 100%)"
-          : isDark
-            ? "linear-gradient(180deg, #fb7185 0%, #f43f5e 100%)"
-            : "linear-gradient(180deg, #fb7185 0%, #f43f5e 100%)",
-        icon: <SavingsIcon sx={{ fontSize: 16 }} />,
-        helper: bal >= 0 ? "Net surplus remaining" : "Deficit budget warning",
-        statusText: bal >= 0 ? "Surplus ✓" : "Deficit ⚠",
-      },
     ];
+
+    if (!isReportsMember) {
+      items.push(
+        {
+          id: "expenses",
+          label: "Total Expenses",
+          value: expn,
+          formattedValue: `₹${expn.toLocaleString("en-IN")}`,
+          color: "#f59e0b", // Amber / Warm Orange
+          bgGradient: isDark
+            ? "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)"
+            : "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)",
+          icon: <ReceiptLongIcon sx={{ fontSize: 16 }} />,
+          helper: "Actual expenses incurred",
+          statusText: "Spent",
+        },
+        {
+          id: "balance",
+          label: "Balance Amount",
+          value: bal,
+          formattedValue: `₹${bal.toLocaleString("en-IN")}`,
+          color: bal >= 0 ? "#06b6d4" : "#f43f5e", // Mild Cyan / Rose
+          bgGradient: bal >= 0
+            ? isDark
+              ? "linear-gradient(180deg, #38bdf8 0%, #06b6d4 100%)"
+              : "linear-gradient(180deg, #38bdf8 0%, #06b6d4 100%)"
+            : isDark
+              ? "linear-gradient(180deg, #fb7185 0%, #f43f5e 100%)"
+              : "linear-gradient(180deg, #fb7185 0%, #f43f5e 100%)",
+          icon: <SavingsIcon sx={{ fontSize: 16 }} />,
+          helper: bal >= 0 ? "Net surplus remaining" : "Deficit budget warning",
+          statusText: bal >= 0 ? "Surplus ✓" : "Deficit ⚠",
+        }
+      );
+    }
+
+    return items;
   }, [totalExpected, totalCollected, totalPending, totalExpenses, totalRemaining, isMember, isDark]);
 
   // ─── 2. Scale & Y-Axis Ticks for Bar Chart ──────────────────────────────────
@@ -219,13 +228,21 @@ export default function FinancialBarChart({
       const expn = Math.max(0, Number(totalExpenses || 0));
       const bal = Math.max(0, Number(totalRemaining || 0));
 
-      rawItems = [
-        { id: "p-expct", label: "Expected", value: exp, formattedValue: `₹${exp.toLocaleString("en-IN")}`, color: "#6366f1" },
-        { id: "p-col", label: isMember ? "Paid" : "Collections", value: col, formattedValue: `₹${col.toLocaleString("en-IN")}`, color: "#10b981" },
-        { id: "p-pen", label: "Pending", value: pen, formattedValue: `₹${pen.toLocaleString("en-IN")}`, color: "#f43f5e" },
-        { id: "p-exp", label: "Expenses", value: expn, formattedValue: `₹${expn.toLocaleString("en-IN")}`, color: "#f59e0b" },
-        { id: "p-bal", label: "Balance", value: bal, formattedValue: `₹${bal.toLocaleString("en-IN")}`, color: "#06b6d4" },
-      ];
+      if (isReportsMember) {
+        rawItems = [
+          { id: "p-expct", label: "My Expected", value: exp, formattedValue: `₹${exp.toLocaleString("en-IN")}`, color: "#6366f1" },
+          { id: "p-col", label: "My Paid", value: col, formattedValue: `₹${col.toLocaleString("en-IN")}`, color: "#10b981" },
+          { id: "p-pen", label: "My Pending", value: pen, formattedValue: `₹${pen.toLocaleString("en-IN")}`, color: "#f43f5e" },
+        ];
+      } else {
+        rawItems = [
+          { id: "p-expct", label: "Expected", value: exp, formattedValue: `₹${exp.toLocaleString("en-IN")}`, color: "#6366f1" },
+          { id: "p-col", label: "Collections", value: col, formattedValue: `₹${col.toLocaleString("en-IN")}`, color: "#10b981" },
+          { id: "p-pen", label: "Pending", value: pen, formattedValue: `₹${pen.toLocaleString("en-IN")}`, color: "#f43f5e" },
+          { id: "p-exp", label: "Expenses", value: expn, formattedValue: `₹${expn.toLocaleString("en-IN")}`, color: "#f59e0b" },
+          { id: "p-bal", label: "Balance", value: bal, formattedValue: `₹${bal.toLocaleString("en-IN")}`, color: "#06b6d4" },
+        ];
+      }
     }
 
     const totalVal = rawItems.reduce((acc, item) => acc + item.value, 0);

@@ -27,6 +27,7 @@ import {
   ZoomIn as ZoomInIcon,
   QuestionAnswer as ReplyActionIcon,
   RestartAlt as RestartAltIcon,
+  Save as SaveIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -85,12 +86,12 @@ export default function SupportTicketsPage() {
 
   // Action-level feature IDs from navigation_menus (parent_id=12):
   // 49=Add support, 50=View details, 51=Verify, 52=Edit, 53=Delete
-  const canViewTicket = isAdminOrOrg || hasActionPermission("View details", 50, authState?.role).canView;
-  const canAddTicket = (isAdminOrOrg || hasActionPermission("Add support", 49, authState?.role).canExecute) && hasWriteAccess;
-  const canEditTicket = (isAdminOrOrg || hasActionPermission("Edit", 52, authState?.role).canExecute) && hasWriteAccess;
-  const canDeleteTicket = (isAdminOrOrg || hasActionPermission("Delete", 53, authState?.role).canExecute) && hasWriteAccess;
-  const canVerifyTicket = (isAdminOrOrg || hasActionPermission("Verify", 51, authState?.role).canExecute) && hasWriteAccess;
-  const canExportTicket = isAdminOrOrg || hasActionPermission("Export Support Ticket", 50, authState?.role).canExecute;
+  const canViewTicket = hasActionPermission("View details", 50, authState?.role).canView;
+  const canAddTicket = hasActionPermission("Add support", 49, authState?.role).canExecute;
+  const canEditTicket = hasActionPermission("Edit", 52, authState?.role).canExecute;
+  const canDeleteTicket = hasActionPermission("Delete", 53, authState?.role).canExecute;
+  const canVerifyTicket = hasActionPermission("Verify", 51, authState?.role).canExecute;
+  const canExportTicket = hasActionPermission("Export Support Ticket", 50, authState?.role).canExecute;
 
   const getLoggedInMember = () => {
     const rawName = (
@@ -219,6 +220,7 @@ export default function SupportTicketsPage() {
   const [replyTicket, setReplyTicket] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [replyStatus, setReplyStatus] = useState("In Progress");
+  const [replyErrors, setReplyErrors] = useState({});
 
   // Filter state inside AppDataTable filterPanel
   const [filterType, setFilterType] = useState("ALL");
@@ -424,6 +426,18 @@ export default function SupportTicketsPage() {
     ];
   }, [dbStatuses]);
 
+  // Specific status options for Verify Support Ticket modal (Pending & Verified)
+  const ticketVerifyStatusOptions = useMemo(() => {
+    const list = [
+      { label: "Pending", value: "Pending" },
+      { label: "Verified", value: "Verified" },
+    ];
+    if (replyTicket?.status && !["Pending", "Verified"].includes(replyTicket.status) && replyTicket.status !== "Paid") {
+      list.unshift({ label: replyTicket.status, value: replyTicket.status });
+    }
+    return list;
+  }, [replyTicket?.status]);
+
   // Dynamically derive priority options strictly from DB priorities table
   const priorityOptions = useMemo(() => {
     const list = Array.isArray(dbPriorities)
@@ -557,9 +571,9 @@ export default function SupportTicketsPage() {
     const newErrors = {};
     if (!form.memberName) newErrors.memberName = "Member Name is required";
     if (!form.ticketType) newErrors.ticketType = "Ticket Type is required";
-    if (!form.description || !form.description.trim()) newErrors.description = "Description is required";
+    if (!form.description || !form.description.trim()) newErrors.description = "This field is required";
     if (!form.attachment && (!editingTicket || !editingTicket.attachment)) {
-      newErrors.attachment = "Attachment is required";
+      newErrors.attachment = "This field is required";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -633,12 +647,22 @@ export default function SupportTicketsPage() {
     if (!replyTicket || !canVerifyTicket) return;
     const ticketId = replyTicket.ticketId || replyTicket.id;
     const hasNote = replyText && replyText.trim().length > 0;
-    const statusChanged = replyStatus !== replyTicket.status;
+    const statusChanged = Boolean(replyStatus && replyStatus !== replyTicket.status);
 
+    const newErrors = {};
+    if (!replyStatus) {
+      newErrors.replyStatus = "Update Status is required";
+    }
     if (!hasNote && !statusChanged) {
-      toast.error("Please enter a reply note or select a new status.");
+      newErrors.replyText = "Resolution notes or new status update is required";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setReplyErrors(newErrors);
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS || "This field is required");
       return;
     }
+    setReplyErrors({});
 
     try {
       if (hasNote) {
@@ -664,6 +688,7 @@ export default function SupportTicketsPage() {
       setReplyDialogOpen(false);
       setReplyTicket(null);
       setReplyText("");
+      setReplyErrors({});
       await fetchTicketsFromDb();
     } catch (err) {
       toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
@@ -1111,7 +1136,7 @@ export default function SupportTicketsPage() {
           setErrors({});
         }}
         title={editingTicket ? "Edit Support Ticket" : "Add Support Ticket"}
-        maxWidth="md"
+        maxWidth="sm"
         actions={
           <Stack direction="row" spacing={1.5}>
             <AppButton
@@ -1390,7 +1415,7 @@ export default function SupportTicketsPage() {
           setReplyText("");
         }}
         title="Support Ticket Details"
-        maxWidth="md"
+        maxWidth="sm"
         actions={
           <AppButton variant="contained" onClick={() => setViewDialogOpen(false)}>
             Close
@@ -1623,6 +1648,7 @@ export default function SupportTicketsPage() {
           setReplyDialogOpen(false);
           setReplyTicket(null);
           setReplyText("");
+          setReplyErrors({});
         }}
         title="Verify Support Ticket"
         maxWidth="sm"
@@ -1634,16 +1660,17 @@ export default function SupportTicketsPage() {
                 setReplyDialogOpen(false);
                 setReplyTicket(null);
                 setReplyText("");
+                setReplyErrors({});
               }}
             >
               Cancel
             </AppButton>
             <AppButton
               variant="contained"
-              startIcon={<SendIcon />}
+              startIcon={<SaveIcon />}
               onClick={handleSendReply}
             >
-              Update Ticket
+              Save
             </AppButton>
           </Stack>
         }
@@ -1720,8 +1747,13 @@ export default function SupportTicketsPage() {
                 <AppSelect
                   label="Update Status"
                   value={replyStatus}
-                  onChange={(e) => setReplyStatus(e.target.value)}
-                  options={statusOptions.filter((o) => o.value !== "ALL")}
+                  onChange={(e) => {
+                    setReplyStatus(e.target.value);
+                    if (replyErrors.replyStatus) setReplyErrors((prev) => ({ ...prev, replyStatus: "" }));
+                  }}
+                  options={ticketVerifyStatusOptions}
+                  error={!!replyErrors.replyStatus}
+                  helperText={replyErrors.replyStatus || ""}
                   required
                 />
               </Grid>
@@ -1730,7 +1762,12 @@ export default function SupportTicketsPage() {
                   label="Resolution Notes / Reply Message"
                   placeholder="Type resolution notes or reply message..."
                   value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
+                  onChange={(e) => {
+                    setReplyText(e.target.value);
+                    if (replyErrors.replyText) setReplyErrors((prev) => ({ ...prev, replyText: "" }));
+                  }}
+                  error={!!replyErrors.replyText}
+                  helperText={replyErrors.replyText || ""}
                   minRows={3}
                 />
               </Grid>
