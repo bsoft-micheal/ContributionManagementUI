@@ -5,11 +5,12 @@ export const TOAST_MESSAGES = {
     SAVED_SUCCESS: "Saved successfully",
     CREATED_SUCCESS: "Created successfully",
     UPDATED_SUCCESS: "Updated successfully",
-    DELETED_SUCCESS: "Deleted successfully",
+    DELETED_SUCCESS: "Record deleted successfully.",
+    RECORD_IN_USE: "Refered",
     STATUS_UPDATED_SUCCESS: "Status updated successfully",
     OPERATION_SUCCESS: "Operation completed successfully",
     SAVE_FAILED: "Failed to save",
-    DELETE_FAILED: "Failed to delete",
+    DELETE_FAILED: "Unable to delete the record. Please try again.",
     UPDATE_FAILED: "Failed to update",
     FETCH_FAILED: "Failed to load data",
     STATUS_UPDATE_FAILED: "Failed to update status",
@@ -37,7 +38,7 @@ export const TOAST_MESSAGES = {
     SAVED_SUCCESS: "Member saved successfully",
     CREATED_SUCCESS: "Member created successfully",
     UPDATED_SUCCESS: "Member updated successfully",
-    DELETED_SUCCESS: "Member deleted successfully",
+    DELETED_SUCCESS: "Record deleted successfully.",
     STATUS_UPDATED: "Member status updated successfully",
     EMAIL_EXISTS: "Member with this email already exists",
     IMPORT_SUCCESS: "Members imported successfully",
@@ -48,14 +49,14 @@ export const TOAST_MESSAGES = {
     SAVED_SUCCESS: "Role saved successfully",
     CREATED_SUCCESS: "Role created successfully",
     UPDATED_SUCCESS: "Role updated successfully",
-    DELETED_SUCCESS: "Role deleted successfully",
+    DELETED_SUCCESS: "Record deleted successfully.",
     NAME_EXISTS: "Role name already exists"
   },
   EVENT_TYPES: {
     SAVED_SUCCESS: "Saved successfully",
     CREATED_SUCCESS: "Category created successfully",
     UPDATED_SUCCESS: "Category updated successfully",
-    DELETED_SUCCESS: "Deleted successfully",
+    DELETED_SUCCESS: "Record deleted successfully.",
     STATUS_UPDATED: "Category status updated successfully",
     STATUS_UPDATE_FAILED: "Failed to update status"
   },
@@ -63,14 +64,14 @@ export const TOAST_MESSAGES = {
     SAVED_SUCCESS: "Event saved successfully",
     CREATED_SUCCESS: "Event created successfully",
     UPDATED_SUCCESS: "Event updated successfully",
-    DELETED_SUCCESS: "Event deleted successfully",
+    DELETED_SUCCESS: "Record deleted successfully.",
     STATUS_UPDATED: "Event status updated successfully",
     PARTICIPANTS_UPDATED: "Participants updated successfully"
   },
   CONTRIBUTIONS: {
     SAVED_SUCCESS: "Contribution saved successfully",
     UPDATED_SUCCESS: "Contribution updated successfully",
-    DELETED_SUCCESS: "Contribution deleted successfully",
+    DELETED_SUCCESS: "Record deleted successfully.",
     STATUS_UPDATED: "Payment status updated successfully",
     RECEIPT_DOWNLOADED: "Receipt downloaded successfully"
   },
@@ -78,7 +79,7 @@ export const TOAST_MESSAGES = {
     SAVED_SUCCESS: "Expense saved successfully",
     CREATED_SUCCESS: "Expense created successfully",
     UPDATED_SUCCESS: "Expense updated successfully",
-    DELETED_SUCCESS: "Expense deleted successfully",
+    DELETED_SUCCESS: "Record deleted successfully.",
     STATUS_UPDATED: "Expense status updated successfully",
     APPROVED_SUCCESS: "Expense approved successfully",
     REJECTED_SUCCESS: "Expense rejected successfully",
@@ -88,13 +89,13 @@ export const TOAST_MESSAGES = {
     SAVED_SUCCESS: "Payment transaction saved successfully",
     VERIFIED_SUCCESS: "Payment verified successfully",
     REJECTED_SUCCESS: "Payment rejected successfully",
-    DELETED_SUCCESS: "Payment record deleted successfully"
+    DELETED_SUCCESS: "Record deleted successfully."
   },
   SUPPORT: {
     SAVED_SUCCESS: "Support ticket saved successfully",
     CREATED_SUCCESS: "Support ticket created successfully",
     UPDATED_SUCCESS: "Support ticket updated successfully",
-    DELETED_SUCCESS: "Support ticket deleted successfully",
+    DELETED_SUCCESS: "Record deleted successfully.",
     STATUS_UPDATED: "Ticket status updated successfully",
     RESOLVED_SUCCESS: "Ticket marked as resolved successfully"
   },
@@ -106,12 +107,12 @@ export const TOAST_MESSAGES = {
   GALLERY: {
     SAVED_SUCCESS: "Photo uploaded successfully",
     UPDATED_SUCCESS: "Photo details updated successfully",
-    DELETED_SUCCESS: "Photo deleted successfully"
+    DELETED_SUCCESS: "Record deleted successfully."
   },
   BUDGET: {
     SAVED_SUCCESS: "Budget calculation saved successfully",
     UPDATED_SUCCESS: "Budget calculation updated successfully",
-    DELETED_SUCCESS: "Budget calculation deleted successfully"
+    DELETED_SUCCESS: "Record deleted successfully."
   }
 };
 

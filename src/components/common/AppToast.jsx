@@ -4,25 +4,59 @@ import { Snackbar, Alert, AlertTitle, Slide, Box, Typography } from "@mui/materi
 const ToastContext = createContext();
 
 export const extractErrorMessage = (err, fallback = "An unexpected error occurred.") => {
-  if (!err) return fallback;
-  if (typeof err === "string") return err;
-  if (typeof err === "object") {
+  let rawMsg = "";
+  if (!err) rawMsg = fallback;
+  else if (typeof err === "string") rawMsg = err;
+  else if (typeof err === "object") {
     // Axios / Backend JSON responses
     if (err.response?.data) {
       const data = err.response.data;
-      if (typeof data === "string") return data;
-      if (data.message) return data.message;
-      if (data.title) return data.title;
-      if (data.detail) return data.detail;
-      if (data.error) return data.error;
-      if (data.errors && typeof data.errors === "object") {
+      if (typeof data === "string") rawMsg = data;
+      else if (data.message) rawMsg = data.message;
+      else if (data.title) rawMsg = data.title;
+      else if (data.detail) rawMsg = data.detail;
+      else if (data.error) rawMsg = data.error;
+      else if (data.errors && typeof data.errors === "object") {
         const errorList = Object.values(data.errors).flat();
-        if (errorList.length > 0) return errorList.join(", ");
+        if (errorList.length > 0) rawMsg = errorList.join(", ");
       }
     }
-    if (err.message) return err.message;
+    if (!rawMsg && err.message) rawMsg = err.message;
   }
-  return String(err || fallback);
+  
+  const str = String(rawMsg || fallback).trim();
+
+  // Sanitize internal database / EF Core exceptions
+  if (
+    str.includes("database operation was expected to affect") ||
+    str.includes("DbUpdateConcurrencyException") ||
+    str.includes("optimistic concurrency") ||
+    str.includes("go.microsoft.com/fwlink")
+  ) {
+    return "The record was modified or deleted by another operation. Please refresh and try again.";
+  }
+
+  if (
+    str.includes("23503") ||
+    str.toLowerCase().includes("foreign key") ||
+    str.toLowerCase().includes("reference constraint")
+  ) {
+    return "Record cannot be modified or deleted because it is referenced in other records.";
+  }
+
+  if (
+    str.includes("23505") ||
+    str.toLowerCase().includes("unique constraint") ||
+    str.toLowerCase().includes("duplicate key")
+  ) {
+    return "A record with this information already exists.";
+  }
+
+  if (str.includes("Microsoft.EntityFrameworkCore") || str.includes("Npgsql.") || str.includes("System.Data.")) {
+    return "Unable to save changes to the database. Please try again.";
+  }
+
+  return str;
 };
 
 /**
@@ -88,8 +122,10 @@ export const ToastProvider = ({ children }) => {
           severity={severity}
           variant="filled"
           sx={{
-            minWidth: "240px",
-            borderRadius: "4px", // More rectangular like the image
+            minWidth: "260px",
+            maxWidth: { xs: "90vw", sm: "480px" },
+            wordBreak: "break-word",
+            borderRadius: "6px",
             boxShadow: `0 8px 24px ${shadowColor}`,
             bgcolor: `${bgColor} !important`,
             color: "#ffffff",
@@ -103,7 +139,7 @@ export const ToastProvider = ({ children }) => {
               p: 0,
               fontSize: "0.82rem",
               fontWeight: 500,
-              lineHeight: 1.2
+              lineHeight: 1.35
             },
             "& .MuiAlert-action": {
               alignItems: "flex-start",

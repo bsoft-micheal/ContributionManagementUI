@@ -702,7 +702,7 @@ export default function UserFormPage() {
                   placeholder="Enter email address"
                   value={form.email}
                   onChange={(e) => fieldChange("email", e.target.value)}
-                  maxLength={100}
+                  maxLength={25}
                   error={!!errors.email}
                   helperText={errors.email}
                   required

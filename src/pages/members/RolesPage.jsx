@@ -93,8 +93,12 @@ export default function RolesPage() {
         toast.success(TOAST_MESSAGES.ROLES.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        const errorMsg = error.response?.data?.message || error.response?.data?.title || error.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED;
-        toast.error(errorMsg);
+        const rawMsg = error.response?.data?.message || error.response?.data?.title || error.message || "";
+        if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete/i.test(rawMsg)) {
+          toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
+        } else {
+          toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        }
       } finally {
         setDeleteConfirmOpen(false);
         setRoleToDelete(null);
@@ -119,7 +123,7 @@ export default function RolesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this role is assigned to users or members" : (hasWriteAccess ? "Delete Role" : "Disabled")}>
+          <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Role" : "Disabled")}>
             <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
