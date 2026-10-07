@@ -356,9 +356,12 @@ export function AuthProvider({ children }) {
     return data;
   }
 
+  const isRefreshingRef = useRef(false);
+
   const refreshRights = async (roleName) => {
     const targetRole = roleName || authState?.role || authState?.roleName;
-    if (!targetRole) return;
+    if (!targetRole || isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
 
     try {
       const { data: resData } = await apiClient.get(`/user-rights/getUserRightAsyncByRole/${targetRole}`);
@@ -395,7 +398,7 @@ export function AuthProvider({ children }) {
 
       setAuthState((prev) => {
         if (!prev) return prev;
-        const updated = { ...prev, rights: processed, _updatedAt: Date.now() };
+        const updated = { ...prev, rights: processed };
         sessionStorage.setItem("teamContributionAuth", JSON.stringify(updated));
         if (localStorage.getItem("teamContributionRememberMe") === "true") {
           localStorage.setItem("teamContributionAuth", JSON.stringify(updated));
@@ -404,24 +407,29 @@ export function AuthProvider({ children }) {
       });
     } catch {
       // ignore background refresh error
+    } finally {
+      isRefreshingRef.current = false;
     }
   };
 
   useEffect(() => {
+    let timeoutId = null;
     const handleRightsUpdated = (e) => {
-      const roleToRefresh = e?.detail?.roleName || authState?.role || authState?.roleName;
+      const roleToRefresh = e?.detail?.roleName;
       if (roleToRefresh) {
-        refreshRights(roleToRefresh);
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          refreshRights(roleToRefresh);
+        }, 300);
       }
     };
 
     window.addEventListener("rightsUpdated", handleRightsUpdated);
-    window.addEventListener("storage", handleRightsUpdated);
     return () => {
+      if (timeoutId) clearTimeout(timeoutId);
       window.removeEventListener("rightsUpdated", handleRightsUpdated);
-      window.removeEventListener("storage", handleRightsUpdated);
     };
-  }, [authState?.role, authState?.roleName]);
+  }, []);
 
   return (
     <AuthContext.Provider

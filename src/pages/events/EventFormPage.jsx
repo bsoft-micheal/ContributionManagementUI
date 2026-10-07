@@ -59,6 +59,7 @@ import dayjs from "dayjs";
 
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
+import AppMultiSelect from "../../components/common/AppMultiSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppTextArea from "../../components/common/AppTextArea";
 import AppButton from "../../components/common/AppButton";
@@ -479,15 +480,10 @@ export default function EventFormPage() {
           setTotalMembers(activeMems.length);
           setExempt(getDefaultBirthdayExempt());
 
-          const initialTypeName = bdayType?.eventTypeName || typesData?.[0]?.eventTypeName || "Event";
-          const isInitialBday = initialTypeName.toLowerCase().includes("birthday");
-
           setForm({
-            eventName: isInitialBday
-              ? `${defaultDate.format("MMMM")} Birthday Celebration`
-              : `${defaultDate.format("MMMM")} ${initialTypeName} Celebration`,
-            eventTypeId: defaultTypeId,
-            eventTypeIds: defaultTypeId ? [defaultTypeId] : [],
+            eventName: "",
+            eventTypeId: "",
+            eventTypeIds: [],
             eventDate: defaultDate,
             description: "",
             baseAmount: "",
@@ -1310,41 +1306,42 @@ export default function EventFormPage() {
           )}
         </Box>
 
-        {/* Main Body with Unified 3-Card Layout for ALL Event Types */}
-        <Box sx={{ p: { xs: 2, sm: 3 } }}>
-          <Grid container spacing={2.5}>
-            {/* Top-Left Card: Event Configuration */}
-            <Grid size={{ xs: 12, lg: 7 }}>
+        {/* Main Body with Balanced 2-Column Enterprise Layout */}
+        <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+          <Grid container spacing={2} alignItems="stretch">
+            {/* Left Panel: Event Configuration (~65% width) */}
+            <Grid size={{ xs: 12, lg: 7.8 }}>
               <Box
                 sx={{
                   bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
                   border: "1px solid",
                   borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
-                  borderRadius: "14px",
-                  p: { xs: 2, sm: 2.5 },
-                  boxShadow: "0 4px 18px rgba(74, 63, 107, 0.03)",
+                  borderRadius: "12px",
+                  p: { xs: 2, sm: 2.4 },
+                  boxShadow: "0 2px 12px rgba(74, 63, 107, 0.03)",
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
                 }}
               >
-                {/* Card Header */}
+                {/* Panel Header */}
                 <Box
                   sx={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    mb: 1.5,
+                    mb: 1.8,
                     flexWrap: "wrap",
-                    gap: 1.5,
+                    gap: 1,
                   }}
                 >
                   <Typography
                     variant="h6"
-                    fontWeight={800}
+                    fontWeight={700}
                     sx={{
                       fontSize: "1.05rem",
                       color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
+                      letterSpacing: "0.01em",
                     }}
                   >
                     Event Configuration
@@ -1390,138 +1387,36 @@ export default function EventFormPage() {
                 </Box>
 
                 {/* Form Grid */}
-                <Grid container spacing={2}>
+                <Grid container spacing={1.75}>
                   {/* Row 1: Event Type(s) & Event Name */}
                   <Grid size={{ xs: 12, sm: 6 }}>
                     {allowMultipleEvents ? (
-                      <FormControl fullWidth size="small" error={!!errors.eventTypeId}>
-                        <InputLabel
-                          id="event-types-multi-label"
-                          sx={{
-                            fontSize: "0.85rem",
-                            fontWeight: 600,
-                            color: "text.secondary",
-                            "&.Mui-focused": { color: "#7c3aed" },
-                          }}
-                        >
-                          Event Types *
-                        </InputLabel>
-                        <Select
-                          labelId="event-types-multi-label"
-                          multiple
-                          value={
-                            form.eventTypeIds && form.eventTypeIds.length > 0
-                              ? form.eventTypeIds
-                              : form.eventTypeId
-                                ? [form.eventTypeId]
-                                : []
-                          }
-                          onChange={(e) => {
-                            const val =
-                              typeof e.target.value === "string"
-                                ? e.target.value.split(",")
-                                : e.target.value;
-                            handleMultiTypeChange(val);
-                          }}
-                          input={<OutlinedInput label="Event Types *" />}
-                          renderValue={(selected) => (
-                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6 }}>
-                              {selected.map((val) => {
-                                const typeObj = eventTypes.find((t) => t.eventTypeId === val);
-                                const label = typeObj?.eventTypeName || val;
-                                return (
-                                  <Chip
-                                    key={val}
-                                    label={label}
-                                    size="small"
-                                    onDelete={(e) => {
-                                      e.stopPropagation();
-                                      const remaining = (form.eventTypeIds || []).filter(
-                                        (id) => id !== val
-                                      );
-                                      handleMultiTypeChange(remaining);
-                                    }}
-                                    sx={{
-                                      height: 24,
-                                      fontSize: "0.75rem",
-                                      fontWeight: 700,
-                                      bgcolor: (theme) =>
-                                        theme.palette.mode === "dark"
-                                          ? "rgba(124, 58, 237, 0.2)"
-                                          : "#f5f3ff",
-                                      color: (theme) =>
-                                        theme.palette.mode === "dark" ? "#c4b5fd" : "#6d28d9",
-                                      border: "1px solid",
-                                      borderColor: (theme) =>
-                                        theme.palette.mode === "dark"
-                                          ? "rgba(124, 58, 237, 0.4)"
-                                          : "#ddd6fe",
-                                      "& .MuiChip-deleteIcon": {
-                                        color: "#7c3aed",
-                                        fontSize: "14px",
-                                        "&:hover": { color: "#ef4444" },
-                                      },
-                                    }}
-                                  />
-                                );
-                              })}
-                            </Box>
-                          )}
-                          sx={{
-                            borderRadius: "8px",
-                            minHeight: 40,
-                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                              borderColor: "#7c3aed",
-                            },
-                          }}
-                        >
-                          {eventTypes.map((type) => {
-                            const isSelected = (form.eventTypeIds || []).includes(type.eventTypeId);
-                            return (
-                              <MenuItem
-                                key={type.eventTypeId}
-                                value={type.eventTypeId}
-                                sx={{
-                                  py: 0.8,
-                                  px: 1.5,
-                                  fontSize: "0.85rem",
-                                  fontWeight: isSelected ? 700 : 500,
-                                  bgcolor: isSelected
-                                    ? "rgba(124, 58, 237, 0.08) !important"
-                                    : "transparent",
-                                  "&:hover": { bgcolor: "rgba(124, 58, 237, 0.04)" },
-                                }}
-                              >
-                                <Checkbox
-                                  checked={isSelected}
-                                  size="small"
-                                  sx={{
-                                    p: 0.5,
-                                    mr: 1,
-                                    color: "#94a3b8",
-                                    "&.Mui-checked": { color: "#7c3aed" },
-                                  }}
-                                />
-                                <ListItemText
-                                  primary={type.eventTypeName}
-                                  primaryTypographyProps={{
-                                    fontSize: "0.85rem",
-                                    fontWeight: isSelected ? 700 : 500,
-                                  }}
-                                />
-                              </MenuItem>
-                            );
-                          })}
-                        </Select>
-                        {errors.eventTypeId && (
-                          <FormHelperText sx={{ color: "#ef4444", fontSize: "0.75rem", mt: 0.5 }}>
-                            {errors.eventTypeId}
-                          </FormHelperText>
-                        )}
-                      </FormControl>
+                      <AppMultiSelect
+                        label="Event Types"
+                        placeholder="Select EventType"
+                        value={
+                          form.eventTypeIds && form.eventTypeIds.length > 0
+                            ? form.eventTypeIds
+                            : form.eventTypeId
+                              ? [form.eventTypeId]
+                              : []
+                        }
+                        onChange={(e) => {
+                          const val =
+                            typeof e.target.value === "string"
+                              ? e.target.value.split(",")
+                              : e.target.value;
+                          handleMultiTypeChange(val);
+                        }}
+                        options={typeOptions}
+                        error={!!errors.eventTypeId}
+                        helperText={errors.eventTypeId}
+                        required
+                      />
                     ) : (
                       <AppSelect
                         label="Event Type"
+                        placeholder="Select EventType"
                         value={form.eventTypeId}
                         onChange={(e) => handleTypeChange(e.target.value)}
                         options={typeOptions}
@@ -1547,7 +1442,7 @@ export default function EventFormPage() {
                     />
                   </Grid>
 
-                  {/* Row 2: Event Date & Total Active Members (Read Only / Auto-calculated) */}
+                  {/* Row 2: Event Date & Total Active Members */}
                   <Grid size={{ xs: 12, sm: 6 }}>
                     {isBirthday && selectedTypes.length === 1 ? (
                       <AppInput
@@ -1566,7 +1461,7 @@ export default function EventFormPage() {
                         placeholder="Auto calculated"
                         sx={{
                           "& .MuiOutlinedInput-root": {
-                            minHeight: 34,
+                            minHeight: 38,
                             height: "auto",
                             py: 0.6,
                             px: 1,
@@ -1578,8 +1473,8 @@ export default function EventFormPage() {
                           "& textarea": {
                             fontSize: "0.82rem",
                             fontWeight: 600,
-                            lineHeight: 1.45,
-                            maxHeight: 52,
+                            lineHeight: 1.4,
+                            maxHeight: 48,
                             overflowY: "auto !important",
                             cursor: "default",
                             color: (theme) =>
@@ -1616,7 +1511,7 @@ export default function EventFormPage() {
                     />
                   </Grid>
 
-                  {/* Row 3: Office Members & WFH Members (Read Only / Auto-calculated) */}
+                  {/* Row 3: Office Members & WFH Members */}
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <AppInput
                       label={isBirthday ? "Office Birthday Members" : "Office Members"}
@@ -1637,73 +1532,94 @@ export default function EventFormPage() {
                     />
                   </Grid>
 
-                  {/* Row 4: Contribution Amount fields for each non-Birthday event type */}
-                  {nonBirthdaySelectedTypes.length > 0 &&
-                    nonBirthdaySelectedTypes.map((type) => {
-                      const rawVal =
-                        otherEventAmounts[type.eventTypeId] !== undefined
-                          ? otherEventAmounts[type.eventTypeId]
-                          : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
-                      const numVal = Number(String(rawVal).replace(/[^0-9]/g, "")) || 0;
-                      const splitPerPerson = total > 0 && numVal > 0 ? Math.ceil(numVal / total) : 0;
-                      const fieldError =
-                        errors[`baseAmount_${type.eventTypeId}`] ||
-                        (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
-
-                      return (
-                        <Grid
-                          size={{ xs: 12, sm: nonBirthdaySelectedTypes.length > 1 ? 6 : 6 }}
-                          key={type.eventTypeId}
+                  {/* Subsection: Additional Event Contributions */}
+                  {nonBirthdaySelectedTypes.length > 0 && (
+                    <>
+                      <Grid size={{ xs: 12 }}>
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          sx={{
+                            display: "block",
+                            fontSize: "0.8rem",
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                            mt: 0.5,
+                          }}
                         >
-                          <AppInput
-                            label={`${type.eventTypeName} Contribution Amount`}
-                            placeholder={`Enter total ${type.eventTypeName.toLowerCase()} budget (₹)`}
-                            required
-                            fullWidth
-                            value={formatBaseAmount(rawVal)}
-                            onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
-                            startAdornment={
-                              <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
-                                ₹
-                              </Typography>
-                            }
-                            endAdornment={
-                              numVal > 0 && total > 0 ? (
-                                <Chip
-                                  label={`₹${splitPerPerson.toLocaleString("en-IN")}/person`}
-                                  size="small"
-                                  sx={{
-                                    fontWeight: 700,
-                                    fontSize: "0.72rem",
-                                    height: 22,
-                                    bgcolor: "rgba(14, 165, 233, 0.1)",
-                                    color: "#0284c7",
-                                    border: "1px solid rgba(14, 165, 233, 0.25)",
-                                  }}
-                                />
-                              ) : null
-                            }
-                            error={!!fieldError}
-                            helperText={
-                              fieldError ||
-                              (numVal > 0 && total > 0
-                                ? `Total ₹${numVal.toLocaleString("en-IN")} split equally across ${total} members (₹${splitPerPerson.toLocaleString("en-IN")} each)`
-                                : `Enter total amount for ${type.eventTypeName} to split equally among ${total} members`)
-                            }
-                          />
-                        </Grid>
-                      );
-                    })}
+                          Additional Event Contributions
+                        </Typography>
+                      </Grid>
+
+                      {nonBirthdaySelectedTypes.map((type) => {
+                        const rawVal =
+                          otherEventAmounts[type.eventTypeId] !== undefined
+                            ? otherEventAmounts[type.eventTypeId]
+                            : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
+                        const numVal = Number(String(rawVal).replace(/[^0-9]/g, "")) || 0;
+                        const splitPerPerson = total > 0 && numVal > 0 ? Math.ceil(numVal / total) : 0;
+                        const fieldError =
+                          errors[`baseAmount_${type.eventTypeId}`] ||
+                          (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
+
+                        return (
+                          <Grid
+                            size={{ xs: 12, sm: nonBirthdaySelectedTypes.length > 1 ? 6 : 6 }}
+                            key={type.eventTypeId}
+                          >
+                            <AppInput
+                              label={`${type.eventTypeName} Contribution Amount`}
+                              placeholder={`Enter total ${type.eventTypeName.toLowerCase()} budget (₹)`}
+                              required
+                              fullWidth
+                              value={formatBaseAmount(rawVal)}
+                              onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
+                              startAdornment={
+                                <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
+                                  ₹
+                                </Typography>
+                              }
+                              endAdornment={
+                                numVal > 0 && total > 0 ? (
+                                  <Chip
+                                    label={`₹${splitPerPerson.toLocaleString("en-IN")}/person`}
+                                    size="small"
+                                    sx={{
+                                      fontWeight: 700,
+                                      fontSize: "0.72rem",
+                                      height: 22,
+                                      bgcolor: "rgba(14, 165, 233, 0.1)",
+                                      color: "#0284c7",
+                                      border: "1px solid rgba(14, 165, 233, 0.25)",
+                                    }}
+                                  />
+                                ) : null
+                              }
+                              error={!!fieldError}
+                              helperText={
+                                fieldError ||
+                                (numVal > 0 && total > 0
+                                  ? `Total ₹${numVal.toLocaleString("en-IN")} split equally across ${total} members (₹${splitPerPerson.toLocaleString("en-IN")} each)`
+                                  : `Total ${type.eventTypeName} budget to be divided among eligible members.`)
+                              }
+                            />
+                          </Grid>
+                        );
+                      })}
+                    </>
+                  )}
                 </Grid>
 
-                {/* Row 4: Identified Celebrants (for Birthday) or Active Participants (for other Events) */}
+                {/* Identified Celebrants (for Birthday) or Active Participants (for other Events) */}
                 {isBirthday ? (
                   monthCelebrants.length > 0 && (
                     <Box
                       sx={{
-                        mt: 1.5,
-                        p: 1.5,
-                        borderRadius: "10px",
+                        mt: 1.8,
+                        p: 1.4,
+                        borderRadius: "8px",
                         bgcolor: (theme) =>
                           theme.palette.mode === "dark"
                             ? "rgba(14, 165, 233, 0.06)"
@@ -1719,30 +1635,30 @@ export default function EventFormPage() {
                         variant="caption"
                         fontWeight={700}
                         sx={{
-                          fontSize: "0.82rem",
+                          fontSize: "0.8rem",
                           color: (theme) =>
                             theme.palette.mode === "dark" ? "#38bdf8" : "#0f172a",
                           display: "block",
-                          mb: 0.8,
+                          mb: 0.6,
                         }}
                       >
                         Identified Celebrants in {dayjs(form.eventDate).format("MMMM")} ({monthCelebrants.length}):
                       </Typography>
-                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px 8px" }}>
                         {monthCelebrants.map((m) => {
                           const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
                           return (
                             <Chip
                               key={m.memberId}
-                              label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""
-                                }`}
+                              label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""}`}
                               size="small"
                               sx={{
                                 fontWeight: 600,
-                                fontSize: "0.76rem",
-                                borderRadius: "16px",
-                                py: 0.5,
-                                px: 0.5,
+                                fontSize: "0.75rem",
+                                height: 24,
+                                borderRadius: "6px",
+                                py: 0.3,
+                                px: 0.4,
                                 bgcolor: isWfh ? "#ede9fe" : "#e0f2fe",
                                 color: isWfh ? "#7c3aed" : "#0284c7",
                                 border: "1px solid",
@@ -1760,9 +1676,9 @@ export default function EventFormPage() {
                   activeMembers.length > 0 && (
                     <Box
                       sx={{
-                        mt: 1.5,
-                        p: 1.5,
-                        borderRadius: "10px",
+                        mt: 1.8,
+                        p: 1.4,
+                        borderRadius: "8px",
                         bgcolor: (theme) =>
                           theme.palette.mode === "dark"
                             ? "rgba(124, 58, 237, 0.06)"
@@ -1781,16 +1697,16 @@ export default function EventFormPage() {
                           justifyContent: "space-between",
                           flexWrap: "wrap",
                           gap: 1,
-                          mb: 1.2,
+                          mb: 0.8,
                         }}
                       >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
-                          <PeopleIcon sx={{ color: "#7c3aed", fontSize: "1.15rem" }} />
+                          <PeopleIcon sx={{ color: "#7c3aed", fontSize: "1.1rem" }} />
                           <Typography
                             variant="caption"
                             fontWeight={700}
                             sx={{
-                              fontSize: "0.82rem",
+                              fontSize: "0.8rem",
                               color: (theme) =>
                                 theme.palette.mode === "dark" ? "#c4b5fd" : "#0f172a",
                             }}
@@ -1803,14 +1719,14 @@ export default function EventFormPage() {
                           <Button
                             size="small"
                             variant="text"
-                            startIcon={<ResetIcon sx={{ fontSize: "0.95rem !important" }} />}
+                            startIcon={<ResetIcon sx={{ fontSize: "0.9rem !important" }} />}
                             onClick={handleSelectAllParticipants}
                             sx={{
                               fontSize: "0.74rem",
                               fontWeight: 700,
                               textTransform: "none",
                               py: 0.2,
-                              px: 1,
+                              px: 0.8,
                               color: "#7c3aed",
                               borderRadius: "6px",
                               "&:hover": {
@@ -1823,21 +1739,20 @@ export default function EventFormPage() {
                         )}
                       </Box>
 
-                      {/* Participating Member Chips with Remove Icon */}
+                      {/* Participating Member Chips */}
                       <Box
                         sx={{
                           display: "flex",
                           flexWrap: "wrap",
-                          gap: 1,
-                          maxHeight: 140,
+                          gap: "6px 8px",
+                          maxHeight: 120,
                           overflowY: "auto",
-                          p: 0.5,
                         }}
                       >
                         {participatingMembers.length === 0 ? (
                           <Typography
                             variant="caption"
-                            sx={{ color: "text.secondary", fontStyle: "italic", py: 1 }}
+                            sx={{ color: "text.secondary", fontStyle: "italic", py: 0.5 }}
                           >
                             No members selected. Click on excluded members below or click "Select All".
                           </Typography>
@@ -1849,9 +1764,9 @@ export default function EventFormPage() {
                                 key={m.memberId}
                                 icon={
                                   isWfh ? (
-                                    <WfhIcon sx={{ fontSize: "0.9rem !important", color: "#9333ea !important" }} />
+                                    <WfhIcon sx={{ fontSize: "0.85rem !important", color: "#9333ea !important" }} />
                                   ) : (
-                                    <OfficeIcon sx={{ fontSize: "0.9rem !important", color: "#0284c7 !important" }} />
+                                    <OfficeIcon sx={{ fontSize: "0.85rem !important", color: "#0284c7 !important" }} />
                                   )
                                 }
                                 label={`${m.name} (${isWfh ? "WFH" : "Office"})`}
@@ -1860,7 +1775,7 @@ export default function EventFormPage() {
                                 deleteIcon={
                                   <CloseRoundedIcon
                                     sx={{
-                                      fontSize: "0.95rem !important",
+                                      fontSize: "0.9rem !important",
                                       color: isWfh ? "#9333ea !important" : "#0284c7 !important",
                                       "&:hover": { color: "#ef4444 !important" },
                                     }}
@@ -1868,10 +1783,9 @@ export default function EventFormPage() {
                                 }
                                 sx={{
                                   fontWeight: 600,
-                                  fontSize: "0.76rem",
-                                  borderRadius: "16px",
-                                  py: 0.5,
-                                  px: 0.5,
+                                  fontSize: "0.74rem",
+                                  height: 24,
+                                  borderRadius: "6px",
                                   bgcolor: isWfh ? "#f5f3ff" : "#f0f9ff",
                                   color: isWfh ? "#7c3aed" : "#0369a1",
                                   border: "1px solid",
@@ -1883,17 +1797,17 @@ export default function EventFormPage() {
                         )}
                       </Box>
 
-                      {/* Excluded Members (Click to add back) */}
+                      {/* Excluded Members */}
                       {excludedMembers.length > 0 && (
-                        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px dashed #cbd5e1" }}>
+                        <Box sx={{ mt: 1.2, pt: 1, borderTop: "1px dashed #cbd5e1" }}>
                           <Typography
                             variant="caption"
                             sx={{
-                              fontSize: "0.74rem",
+                              fontSize: "0.72rem",
                               color: "#64748b",
                               fontWeight: 600,
                               display: "block",
-                              mb: 0.8,
+                              mb: 0.6,
                             }}
                           >
                             Excluded Members ({excludedMembers.length}) — Click to add back:
@@ -1902,8 +1816,8 @@ export default function EventFormPage() {
                             sx={{
                               display: "flex",
                               flexWrap: "wrap",
-                              gap: 0.8,
-                              maxHeight: 90,
+                              gap: "4px 6px",
+                              maxHeight: 80,
                               overflowY: "auto",
                             }}
                           >
@@ -1912,15 +1826,15 @@ export default function EventFormPage() {
                               return (
                                 <Chip
                                   key={m.memberId}
-                                  icon={<AddIcon sx={{ fontSize: "0.85rem !important", color: "#64748b !important" }} />}
+                                  icon={<AddIcon sx={{ fontSize: "0.8rem !important", color: "#64748b !important" }} />}
                                   label={`${m.name} (${isWfh ? "WFH" : "Office"})`}
                                   size="small"
                                   onClick={() => handleAddParticipant(m.memberId)}
                                   sx={{
                                     fontWeight: 500,
-                                    fontSize: "0.74rem",
-                                    borderRadius: "6px",
-                                    py: 0.4,
+                                    fontSize: "0.72rem",
+                                    height: 22,
+                                    borderRadius: "4px",
                                     bgcolor: "rgba(148, 163, 184, 0.1)",
                                     color: "#64748b",
                                     border: "1px dashed #cbd5e1",
@@ -1941,9 +1855,8 @@ export default function EventFormPage() {
                   )
                 )}
 
-
-                {/* Optional Description */}
-                <Box sx={{ mt: 1.5 }}>
+                {/* Description */}
+                <Box sx={{ mt: 1.8 }}>
                   <AppTextArea
                     label="Description"
                     placeholder="Enter optional description..."
@@ -1963,9 +1876,9 @@ export default function EventFormPage() {
                         "& .MuiOutlinedInput-input": {
                           py: 0.2,
                           px: 0.4,
-                          pb: 2,
-                          minHeight: 36,
-                          maxHeight: 56,
+                          pb: 1.8,
+                          minHeight: 38,
+                          maxHeight: 52,
                           fontSize: "0.82rem",
                           lineHeight: 1.35,
                         },
@@ -1976,16 +1889,16 @@ export default function EventFormPage() {
               </Box>
             </Grid>
 
-            {/* Top-Right Card: Calculated Event Summary */}
-            <Grid size={{ xs: 12, lg: 5 }}>
+            {/* Right Panel: Calculated Event Summary (~35% width) */}
+            <Grid size={{ xs: 12, lg: 4.2 }}>
               <Box
                 sx={{
                   bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
                   border: "1px solid",
                   borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
-                  borderRadius: "14px",
+                  borderRadius: "12px",
                   p: { xs: 2, sm: 2.2 },
-                  boxShadow: "0 2px 12px rgba(0, 0, 0, 0.03)",
+                  boxShadow: "0 2px 12px rgba(74, 63, 107, 0.03)",
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
@@ -1993,38 +1906,40 @@ export default function EventFormPage() {
                 }}
               >
                 <Box>
-                  {/* Card Header */}
+                  {/* Panel Header */}
                   <Typography
                     variant="h6"
-                    fontWeight={800}
+                    fontWeight={700}
                     sx={{
                       fontSize: "1.02rem",
                       color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
-                      mb: 0.8,
+                      mb: 1,
+                      letterSpacing: "0.01em",
                     }}
                   >
                     Calculated Event Summary
                   </Typography>
 
-                  {/* 6-Row Vertical Metric List */}
+                  {/* Summary Metric Rows */}
                   <Box sx={{ display: "flex", flexDirection: "column" }}>
-                    {/* Row 1: Birthday Members / Total Members */}
+                    {/* Row 1 */}
                     <Box
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        py: 0.8,
+                        minHeight: 36,
+                        py: 0.6,
                         borderBottom: "1px solid",
                         borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
                       }}
                     >
-                      <Typography sx={{ fontSize: "0.86rem", color: "#64748b", fontWeight: 500 }}>
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
                         {isBirthday ? "Birthday Members" : "Total Members"}
                       </Typography>
                       <Typography
                         sx={{
-                          fontSize: "0.92rem",
+                          fontSize: "0.9rem",
                           fontWeight: 700,
                           color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
                         }}
@@ -2033,23 +1948,24 @@ export default function EventFormPage() {
                       </Typography>
                     </Box>
 
-                    {/* Row 2: Office / WFH */}
+                    {/* Row 2 */}
                     <Box
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        py: 0.8,
+                        minHeight: 36,
+                        py: 0.6,
                         borderBottom: "1px solid",
                         borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
                       }}
                     >
-                      <Typography sx={{ fontSize: "0.86rem", color: "#64748b", fontWeight: 500 }}>
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
                         Office / WFH
                       </Typography>
                       <Typography
                         sx={{
-                          fontSize: "0.92rem",
+                          fontSize: "0.9rem",
                           fontWeight: 700,
                           color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
                         }}
@@ -2058,23 +1974,24 @@ export default function EventFormPage() {
                       </Typography>
                     </Box>
 
-                    {/* Row 3: Eligible Contributors */}
+                    {/* Row 3 */}
                     <Box
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        py: 0.8,
+                        minHeight: 36,
+                        py: 0.6,
                         borderBottom: "1px solid",
                         borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
                       }}
                     >
-                      <Typography sx={{ fontSize: "0.86rem", color: "#64748b", fontWeight: 500 }}>
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
                         Eligible Contributors
                       </Typography>
                       <Typography
                         sx={{
-                          fontSize: "0.92rem",
+                          fontSize: "0.9rem",
                           fontWeight: 700,
                           color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
                         }}
@@ -2083,23 +2000,24 @@ export default function EventFormPage() {
                       </Typography>
                     </Box>
 
-                    {/* Row 4: Planned Budget */}
+                    {/* Row 4 */}
                     <Box
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        py: 0.8,
+                        minHeight: 36,
+                        py: 0.6,
                         borderBottom: "1px solid",
                         borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
                       }}
                     >
-                      <Typography sx={{ fontSize: "0.86rem", color: "#64748b", fontWeight: 500 }}>
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
                         Planned Budget
                       </Typography>
                       <Typography
                         sx={{
-                          fontSize: "0.92rem",
+                          fontSize: "0.9rem",
                           fontWeight: 700,
                           color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
                         }}
@@ -2108,19 +2026,20 @@ export default function EventFormPage() {
                       </Typography>
                     </Box>
 
-                    {/* Row 5: Contribution / Member */}
+                    {/* Row 5 */}
                     <Box
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        py: 0.8,
+                        minHeight: 38,
+                        py: 0.6,
                         borderBottom: "1px solid",
                         borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
                       }}
                     >
                       <Box>
-                        <Typography sx={{ fontSize: "0.86rem", color: "#64748b", fontWeight: 500 }}>
+                        <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
                           Contribution / Member
                         </Typography>
                         {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0 && (
@@ -2129,26 +2048,27 @@ export default function EventFormPage() {
                           </Typography>
                         )}
                       </Box>
-                      <Typography sx={{ fontSize: "1rem", fontWeight: 800, color: "#0284c7" }}>
+                      <Typography sx={{ fontSize: "0.98rem", fontWeight: 800, color: "#0284c7" }}>
                         ₹{contributionPerMember.toLocaleString("en-IN")}
                       </Typography>
                     </Box>
 
-                    {/* Row 6: Expected Collection */}
+                    {/* Row 6 */}
                     <Box
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        py: 0.8,
+                        minHeight: 36,
+                        py: 0.6,
                       }}
                     >
-                      <Typography sx={{ fontSize: "0.86rem", color: "#64748b", fontWeight: 500 }}>
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
                         Expected Collection
                       </Typography>
                       <Typography
                         sx={{
-                          fontSize: "0.92rem",
+                          fontSize: "0.9rem",
                           fontWeight: 700,
                           color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
                         }}
@@ -2159,105 +2079,122 @@ export default function EventFormPage() {
                   </Box>
                 </Box>
 
-                {/* Separate Section: Calculation Summary Details */}
+                {/* Calculation Summary Details Section - Extended Box Size */}
                 <Box
                   sx={{
                     mt: 2,
-                    p: 1.5,
+                    p: { xs: 1.8, sm: 2.2 },
                     bgcolor: (theme) =>
                       theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
                     border: "1px solid",
                     borderColor: (theme) =>
                       theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
                     borderRadius: "10px",
+                    flexGrow: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
                   }}
                 >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: "block",
-                      fontWeight: 700,
-                      color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7"),
-                      fontSize: "0.76rem",
-                      mb: 1,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                    }}
-                  >
-                    CALCULATION SUMMARY
-                  </Typography>
-
-                  {/* 3-Column Table */}
-                  <Box sx={{ width: "100%", mb: 1 }}>
-                    {/* Header Row */}
-                    <Box
+                  <Box>
+                    <Typography
+                      variant="caption"
                       sx={{
-                        display: "grid",
-                        gridTemplateColumns: "1.1fr 1.7fr 0.9fr",
-                        gap: 1.5,
-                        pb: 0.8,
-                        borderBottom: "1px solid",
-                        borderColor: (theme) =>
-                          theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
-                        fontWeight: 700,
-                        fontSize: "0.78rem",
-                        color: "#64748b",
-                        alignItems: "center",
+                        display: "block",
+                        fontWeight: 800,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7"),
+                        fontSize: "0.8rem",
+                        mb: 1.2,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
                       }}
                     >
-                      <Box>Expense</Box>
-                      <Box>Calculation</Box>
-                      <Box sx={{ textAlign: "right" }}>Total</Box>
-                    </Box>
+                      CALCULATION SUMMARY
+                    </Typography>
 
-                    {/* Table Rows */}
-                    {computedBudgetItems.map((item, idx) => (
+                    {/* 3-Column Table */}
+                    <Box sx={{ width: "100%", mb: 1.2 }}>
+                      {/* Header Row */}
                       <Box
-                        key={item.budgetCalculationId || item.expenseItem || idx}
                         sx={{
                           display: "grid",
-                          gridTemplateColumns: "1.1fr 1.7fr 0.9fr",
-                          gap: 1.5,
-                          py: 0.6,
+                          gridTemplateColumns: "35% 45% 20%",
+                          gap: 1.2,
+                          pb: 0.8,
                           borderBottom: "1px solid",
                           borderColor: (theme) =>
-                            theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9",
+                            theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
+                          fontWeight: 700,
                           fontSize: "0.8rem",
+                          color: "#64748b",
                           alignItems: "center",
                         }}
                       >
-                        <Typography
-                          variant="body2"
-                          fontWeight={600}
-                          sx={{
-                            color: (theme) => (theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b"),
-                            fontSize: "0.8rem",
-                          }}
-                        >
-                          {item.expenseItem}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: (theme) => (theme.palette.mode === "dark" ? "#94a3b8" : "#475569"),
-                            fontSize: "0.8rem",
-                          }}
-                        >
-                          {item.calcFormula || item.calcText || `₹${item.amount}`}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          fontWeight={700}
-                          sx={{
-                            color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
-                            fontSize: "0.82rem",
-                            textAlign: "right",
-                          }}
-                        >
-                          ₹{(item.amount || 0).toLocaleString("en-IN")}
-                        </Typography>
+                        <Box>Expense</Box>
+                        <Box>Calculation</Box>
+                        <Box sx={{ textAlign: "right" }}>Total</Box>
                       </Box>
-                    ))}
+
+                      {/* Table Rows */}
+                      {computedBudgetItems.length === 0 ? (
+                        <Box sx={{ py: 2.5, textAlign: "center" }}>
+                          <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>
+                            Select an event type to view calculation details
+                          </Typography>
+                        </Box>
+                      ) : (
+                        computedBudgetItems.map((item, idx) => (
+                          <Box
+                            key={item.budgetCalculationId || item.expenseItem || idx}
+                            sx={{
+                              display: "grid",
+                              gridTemplateColumns: "35% 45% 20%",
+                              gap: 1.2,
+                              py: 0.8,
+                              minHeight: 34,
+                              borderBottom: "1px solid",
+                              borderColor: (theme) =>
+                                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9",
+                              fontSize: "0.82rem",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              fontWeight={600}
+                              sx={{
+                                color: (theme) => (theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b"),
+                                fontSize: "0.82rem",
+                                lineHeight: 1.3,
+                              }}
+                            >
+                              {item.expenseItem}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: (theme) => (theme.palette.mode === "dark" ? "#94a3b8" : "#475569"),
+                                fontSize: "0.8rem",
+                                lineHeight: 1.3,
+                              }}
+                            >
+                              {item.calcFormula || item.calcText || `₹${item.amount}`}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={700}
+                              sx={{
+                                color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                                fontSize: "0.84rem",
+                                textAlign: "right",
+                              }}
+                            >
+                              ₹{(item.amount || 0).toLocaleString("en-IN")}
+                            </Typography>
+                          </Box>
+                        ))
+                      )}
+                    </Box>
                   </Box>
 
                   {/* Total Planned Budget Footer */}
@@ -2266,7 +2203,8 @@ export default function EventFormPage() {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      pt: 1,
+                      pt: 1.2,
+                      mt: 1,
                       borderTop: "1px dashed",
                       borderColor: (theme) =>
                         theme.palette.mode === "dark" ? "divider" : "#cbd5e1",
@@ -2275,7 +2213,7 @@ export default function EventFormPage() {
                     <Typography
                       sx={{
                         fontWeight: 700,
-                        fontSize: "0.82rem",
+                        fontSize: "0.85rem",
                         color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
                       }}
                     >
@@ -2284,7 +2222,7 @@ export default function EventFormPage() {
                     <Typography
                       sx={{
                         fontWeight: 800,
-                        fontSize: "0.95rem",
+                        fontSize: "0.98rem",
                         color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
                       }}
                     >
@@ -2296,22 +2234,36 @@ export default function EventFormPage() {
             </Grid>
           </Grid>
 
-          {/* Bottom Action Footer */}
-          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 1.5, mt: 2.5 }}>
+          {/* Bottom Action Footer Centered */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 2,
+              mt: 2,
+              pt: 1.75,
+              pb: 0.5,
+              borderTop: "1px solid",
+              borderColor: (theme) =>
+                theme.palette.mode === "dark" ? "divider" : "#e8e5f2",
+            }}
+          >
             <AppButton
               variant="outlined"
               onClick={() => navigate("/events")}
               disabled={saving}
               sx={{
-                minWidth: 100,
+                minWidth: 120,
                 borderRadius: "8px",
-                px: 3,
-                py: 0.75,
+                px: 3.5,
+                py: 0.85,
+                minHeight: 40,
                 borderColor: (theme) =>
                   theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#d8d8e5",
                 color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
                 fontWeight: 600,
-                fontSize: "0.85rem",
+                fontSize: "0.88rem",
                 "&:hover": {
                   borderColor: "#4a3f6b",
                 },
@@ -2329,12 +2281,13 @@ export default function EventFormPage() {
                   bgcolor: "#342b54 !important",
                   color: "#ffffff !important",
                   "&:hover": { bgcolor: "#241d3b !important" },
-                  minWidth: 110,
+                  minWidth: 130,
                   borderRadius: "8px",
-                  px: 3.2,
-                  py: 0.75,
+                  px: 3.8,
+                  py: 0.85,
+                  minHeight: 40,
                   fontWeight: 600,
-                  fontSize: "0.85rem",
+                  fontSize: "0.88rem",
                 }}
               >
                 {saving ? "Saving..." : isEdit ? "Update" : "Save"}

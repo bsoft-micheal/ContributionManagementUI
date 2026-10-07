@@ -18,16 +18,6 @@ import {
   VisibilityOff,
   PersonAdd as PersonAddIcon,
   Edit as EditIcon,
-  PersonRounded as PersonRoundedIcon,
-  PersonOutlineRounded as PersonOutlineRoundedIcon,
-  MailOutlineRounded as MailOutlineRoundedIcon,
-  PhoneOutlined as PhoneOutlinedIcon,
-  WcRounded as WcRoundedIcon,
-  CalendarMonthRounded as CalendarMonthRoundedIcon,
-  BusinessCenterRounded as BusinessCenterRoundedIcon,
-  GroupsRounded as GroupsRoundedIcon,
-  ShieldOutlined as ShieldOutlinedIcon,
-  LockOutlined as LockOutlinedIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import dayjs from "dayjs";
@@ -41,7 +31,7 @@ import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
-import { validateForm } from "../../utils/validation";
+import { validateForm, validateIndianMobile } from "../../utils/validation";
 import {
   getUsersAsync,
   createUserAsync,
@@ -77,7 +67,7 @@ const initialForm = {
   isActive: true,
 };
 
-function FormSectionCard({ icon, title, subtitle, children, sx = {} }) {
+function FormSectionCard({ title, subtitle, children, sx = {} }) {
   return (
     <Box
       sx={{
@@ -95,52 +85,32 @@ function FormSectionCard({ icon, title, subtitle, children, sx = {} }) {
       }}
     >
       {/* Section Header */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.2, mb: 1.4 }}>
-        <Box
+      <Box sx={{ mb: 1.4 }}>
+        <Typography
+          variant="subtitle2"
+          fontWeight={700}
           sx={{
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            bgcolor: (theme) =>
-              theme.palette.mode === "dark"
-                ? "rgba(255, 255, 255, 0.08)"
-                : "#1e1b4b",
-            color: "#ffffff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
+            fontSize: "0.88rem",
+            color: (theme) =>
+              theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+            lineHeight: 1.2,
           }}
         >
-          {icon}
-        </Box>
-        <Box>
+          {title}
+        </Typography>
+        {subtitle && (
           <Typography
-            variant="subtitle2"
-            fontWeight={700}
+            variant="caption"
             sx={{
-              fontSize: "0.88rem",
-              color: (theme) =>
-                theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
-              lineHeight: 1.2,
+              fontSize: "0.75rem",
+              color: "text.secondary",
+              display: "block",
+              mt: 0.2,
             }}
           >
-            {title}
+            {subtitle}
           </Typography>
-          {subtitle && (
-            <Typography
-              variant="caption"
-              sx={{
-                fontSize: "0.75rem",
-                color: "text.secondary",
-                display: "block",
-                mt: 0.2,
-              }}
-            >
-              {subtitle}
-            </Typography>
-          )}
-        </Box>
+        )}
       </Box>
 
       {/* Section Content */}
@@ -392,7 +362,7 @@ export default function UserFormPage() {
       createMemberProfile: checked,
       ...(checked
         ? {
-            username: prev.username || (prev.email ? prev.email.split("@")[0] : ""),
+            username: prev.username || "",
           }
         : {
             enableMultipleRoles: false,
@@ -460,7 +430,6 @@ export default function UserFormPage() {
     const schema = {
       fullName: { required: true, type: "letteronly", min: 2, max: 100, label: "Full Name" },
       email: { required: true, email: true, label: "Email" },
-      phone: { required: true, type: "numberonly", min: 10, max: 10, label: "Phone Number" },
       gender: { required: true, label: "Gender" },
       workType: { required: true, label: "Work Type" },
       dateOfBirth: { required: true, label: "Date of Birth" },
@@ -472,6 +441,12 @@ export default function UserFormPage() {
     }
 
     const e = validateForm(form, schema);
+
+    // Validate Indian mobile number
+    const phoneErr = validateIndianMobile(form.phone);
+    if (phoneErr) {
+      e.phone = phoneErr;
+    }
 
     if (form.createMemberProfile && form.enableMultipleRoles) {
       if (!form.secondaryRoles || form.secondaryRoles.length === 0) {
@@ -491,11 +466,6 @@ export default function UserFormPage() {
       if (form.newPassword && form.confirmPassword && form.newPassword !== form.confirmPassword) {
         e.confirmPassword = "Passwords do not match";
       }
-    }
-
-    const cleanPhone = String(form.phone || "").replace(/\D/g, "");
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      e.phone = "Mobile number must be exactly 10 digits";
     }
 
     if (form.dateOfBirth) {
@@ -535,7 +505,6 @@ export default function UserFormPage() {
     const resolvedUsername = isAccess && form.username
       ? form.username.trim()
       : form.username?.trim() || null;
-    const cleanPhone = String(form.phone || "").replace(/\D/g, "");
 
     if (!form.userId) {
       if (users.some((u) => u.email && u.email.trim().toLowerCase() === emailLower)) {
@@ -552,11 +521,7 @@ export default function UserFormPage() {
         toast.error("This username is already taken");
         return;
       }
-      if (cleanPhone && users.some((u) => u.phone && String(u.phone).replace(/\D/g, "") === cleanPhone)) {
-        setErrors((prev) => ({ ...prev, phone: "This mobile number is already registered" }));
-        toast.error("This mobile number is already registered");
-        return;
-      }
+      // Note: Duplicate mobile number is allowed per system requirements
     } else {
       if (users.some((u) => u.userId !== form.userId && u.email && u.email.trim().toLowerCase() === emailLower)) {
         setErrors((prev) => ({ ...prev, email: "This email is already registered" }));
@@ -577,15 +542,20 @@ export default function UserFormPage() {
         toast.error("This username is already taken");
         return;
       }
-      if (
-        cleanPhone &&
-        users.some(
-          (u) => u.userId !== form.userId && u.phone && String(u.phone).replace(/\D/g, "") === cleanPhone
-        )
-      ) {
-        setErrors((prev) => ({ ...prev, phone: "This mobile number is already registered" }));
-        toast.error("This mobile number is already registered");
-        return;
+      // Note: Duplicate mobile number is allowed per system requirements
+    }
+
+    // Show toaster if mobile number already exists, but proceed with saving
+    const cleanPhoneDigits = String(form.phone || "").replace(/\D/g, "").slice(-10);
+    if (cleanPhoneDigits) {
+      const isPhoneDuplicate = users.some(
+        (u) =>
+          u.phone &&
+          String(u.phone).replace(/\D/g, "").slice(-10) === cleanPhoneDigits &&
+          (!form.userId || u.userId !== form.userId)
+      );
+      if (isPhoneDuplicate) {
+        toast.info("Mobile number already exists");
       }
     }
 
@@ -709,10 +679,7 @@ export default function UserFormPage() {
         <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
 
           {/* ── SECTION 1 — Basic Information ──────────────────────────── */}
-          <FormSectionCard
-            icon={<PersonRoundedIcon sx={{ fontSize: "1.1rem" }} />}
-            title="Basic Information"
-          >
+          <FormSectionCard title="Basic Information">
             <Grid container spacing={1.6}>
               {/* Row 1 */}
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -725,11 +692,6 @@ export default function UserFormPage() {
                   maxLength={100}
                   error={!!errors.fullName}
                   helperText={errors.fullName}
-                  startAdornment={
-                    <PersonOutlineRoundedIcon
-                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                    />
-                  }
                   required
                 />
               </Grid>
@@ -743,11 +705,6 @@ export default function UserFormPage() {
                   maxLength={100}
                   error={!!errors.email}
                   helperText={errors.email}
-                  startAdornment={
-                    <MailOutlineRoundedIcon
-                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                    />
-                  }
                   required
                 />
               </Grid>
@@ -755,18 +712,13 @@ export default function UserFormPage() {
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <AppInput
                   label="Phone Number"
-                  placeholder="Enter 10-digit phone number"
+                  placeholder="Enter 10-digit mobile number"
                   value={form.phone}
                   onChange={(e) => fieldChange("phone", e.target.value)}
                   restrictType="numberonly"
                   maxLength={10}
                   error={!!errors.phone}
                   helperText={errors.phone}
-                  startAdornment={
-                    <PhoneOutlinedIcon
-                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                    />
-                  }
                   required
                 />
               </Grid>
@@ -781,11 +733,6 @@ export default function UserFormPage() {
                   options={GENDER_OPTIONS}
                   error={!!errors.gender}
                   helperText={errors.gender}
-                  startAdornment={
-                    <WcRoundedIcon
-                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                    />
-                  }
                   required
                 />
               </Grid>
@@ -798,11 +745,6 @@ export default function UserFormPage() {
                   maxDate={dayjs().subtract(18, "year")}
                   error={!!errors.dateOfBirth}
                   helperText={errors.dateOfBirth}
-                  startAdornment={
-                    <CalendarMonthRoundedIcon
-                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                    />
-                  }
                   required
                 />
               </Grid>
@@ -814,11 +756,6 @@ export default function UserFormPage() {
                   onChange={(newVal) => fieldChange("joiningDate", newVal)}
                   error={!!errors.joiningDate}
                   helperText={errors.joiningDate}
-                  startAdornment={
-                    <CalendarMonthRoundedIcon
-                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                    />
-                  }
                   required
                 />
               </Grid>
@@ -826,10 +763,7 @@ export default function UserFormPage() {
           </FormSectionCard>
 
           {/* ── SECTION 2 — Work Details ──────────────────────────────── */}
-          <FormSectionCard
-            icon={<BusinessCenterRoundedIcon sx={{ fontSize: "1.1rem" }} />}
-            title="Work Details"
-          >
+          <FormSectionCard title="Work Details">
             <Grid container spacing={1.6}>
               {/* Left Column: Work Type (reduced to 1/3 width) */}
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -841,11 +775,6 @@ export default function UserFormPage() {
                   options={typeOptions}
                   error={!!errors.workType}
                   helperText={errors.workType}
-                  startAdornment={
-                    <GroupsRoundedIcon
-                      sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                    />
-                  }
                   required
                 />
               </Grid>
@@ -973,10 +902,7 @@ export default function UserFormPage() {
 
           {/* ── SECTION 3 — Role Assignment (only shown when Create Login Account is checked) ── */}
           {form.createMemberProfile && (
-            <FormSectionCard
-              icon={<ShieldOutlinedIcon sx={{ fontSize: "1.1rem" }} />}
-              title="Role Assignment"
-            >
+            <FormSectionCard title="Role Assignment">
               <Grid container spacing={1.6}>
                 {form.enableMultipleRoles ? (
                   <>
@@ -1017,11 +943,6 @@ export default function UserFormPage() {
                         }
                         error={!!errors.primaryRole}
                         helperText={errors.primaryRole}
-                        startAdornment={
-                          <ShieldOutlinedIcon
-                            sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                          />
-                        }
                         required
                       />
                     </Grid>
@@ -1037,11 +958,6 @@ export default function UserFormPage() {
                       options={userRolesList}
                       error={!!errors.roleName}
                       helperText={errors.roleName}
-                      startAdornment={
-                        <ShieldOutlinedIcon
-                          sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                        />
-                      }
                       required
                     />
                   </Grid>
@@ -1052,10 +968,7 @@ export default function UserFormPage() {
 
           {/* ── SECTION 4 — Login Credentials ────────────────────────── */}
           {form.createMemberProfile && (
-            <FormSectionCard
-              icon={<LockOutlinedIcon sx={{ fontSize: "1.1rem" }} />}
-              title="Login Credentials"
-            >
+            <FormSectionCard title="Login Credentials">
               <Grid container spacing={1.6}>
                 {/* Username */}
                 <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -1069,11 +982,6 @@ export default function UserFormPage() {
                     autoComplete="off"
                     error={!!errors.username}
                     helperText={errors.username}
-                    startAdornment={
-                      <PersonOutlineRoundedIcon
-                        sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                      />
-                    }
                     required
                   />
                 </Grid>
@@ -1083,7 +991,7 @@ export default function UserFormPage() {
                   <AppInput
                     label={
                       isEdit
-                        ? "New Password (leave blank to keep current)"
+                        ? "New Password "
                         : "Password"
                     }
                     placeholder={
@@ -1099,11 +1007,6 @@ export default function UserFormPage() {
                     error={!!errors.newPassword}
                     helperText={errors.newPassword}
                     required={!isEdit}
-                    startAdornment={
-                      <LockOutlinedIcon
-                        sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                      />
-                    }
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
@@ -1142,11 +1045,6 @@ export default function UserFormPage() {
                     error={!!errors.confirmPassword}
                     helperText={errors.confirmPassword}
                     required={!isEdit || !!form.newPassword}
-                    startAdornment={
-                      <LockOutlinedIcon
-                        sx={{ color: "#94a3b8", fontSize: "1.1rem" }}
-                      />
-                    }
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
