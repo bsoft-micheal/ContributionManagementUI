@@ -87,8 +87,8 @@ export default function AppPageLoader({ fullScreen = false, text = "Loading..." 
             src={logoImg}
             alt="Contribution Management Logo"
             sx={{
-              width: { xs: 75, sm: 85 },
-              height: { xs: 75, sm: 85 },
+              width: { xs: 138, sm: 158 },
+              height: { xs: 138, sm: 158 },
               objectFit: "contain",
               userSelect: "none",
               pointerEvents: "none",
