@@ -10,7 +10,7 @@ export default function AppButton({
   startIcon,
   endIcon,
   disabled,
-  disabledTooltip = "Disabled",
+  disabledTooltip = null,
   tooltip,
   ...props
 }) {
@@ -86,11 +86,11 @@ export default function AppButton({
     </Button>
   );
 
-  // If disabled, wrap in Tooltip with "Disabled" indicator and a span wrapper for pointer events
-  if (isBtnDisabled) {
+  // If disabled and an explicit tooltip is specified, wrap in Tooltip
+  if (isBtnDisabled && disabledTooltip) {
     return (
-      <Tooltip title={disabledTooltip || "Disabled"} arrow placement="top">
-        <span style={{ display: "inline-flex", cursor: "not-allowed", verticalAlign: "middle" }}>
+      <Tooltip title={disabledTooltip} arrow placement="top">
+        <span style={{ display: "inline-flex", width: props.fullWidth ? "100%" : "auto", cursor: "not-allowed", verticalAlign: "middle" }}>
           {buttonElement}
         </span>
       </Tooltip>

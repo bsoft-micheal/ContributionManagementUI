@@ -1044,17 +1044,17 @@ export default function DashboardPage() {
   // Table columns (Dashboard tab)
   const columns = [
     {
-      label: "Event Name", key: "eventName",
-      render: (row) => row.eventName || "--",
-    },
-    {
-      label: "Category", key: "eventTypeName",
+      label: "Event Type", key: "eventTypeName",
       render: (row) => (
         <Chip label={row.eventTypeName} size="small" sx={{
           bgcolor: isDark ? alpha(theme.palette.primary.main, 0.18) : alpha(theme.palette.primary.main, 0.10),
           color: "primary.main", fontWeight: 700,
         }} />
       ),
+    },
+    {
+      label: "Event Name", key: "eventName",
+      render: (row) => row.eventName || "--",
     },
     { label: "Event Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
     {

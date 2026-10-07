@@ -44,6 +44,31 @@ export default function AppSelect({
     return Array.from(map.values());
   }, [options]);
 
+  const isDefaultOrAllValue = useMemo(() => {
+    if (!value) return true;
+    const strVal = String(value).trim().toLowerCase();
+    if (
+      strVal === "" ||
+      strVal === "all" ||
+      strVal.startsWith("all_") ||
+      strVal === "all events" ||
+      strVal === "all event types"
+    ) {
+      return true;
+    }
+    const foundOpt = uniqueOptions.find((o) => String(o.value).toLowerCase() === strVal);
+    if (foundOpt && String(foundOpt.label || "").trim().toLowerCase().startsWith("all ")) {
+      return true;
+    }
+    return false;
+  }, [value, uniqueOptions]);
+
+  const showClearButton =
+    (clearable || allowClear || Boolean(onClear)) &&
+    Boolean(value) &&
+    !isDefaultOrAllValue &&
+    !props.disabled;
+
   const hasEmptyOption = uniqueOptions.some((o) => o.value === "");
   const hasValueOption =
     value === "" ||
@@ -137,7 +162,7 @@ export default function AppSelect({
             color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             "& .MuiSelect-select": {
               py: size === "small" ? 0.7 : 1,
-              pr: (clearable || allowClear || Boolean(onClear)) && Boolean(value) ? "52px !important" : "28px !important",
+              pr: showClearButton ? "52px !important" : "28px !important",
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             },
             "& .MuiSelect-nativeInput": {
@@ -202,7 +227,7 @@ export default function AppSelect({
               {startAdornment}
             </InputAdornment>
           ) : undefined,
-          endAdornment: (clearable || allowClear || Boolean(onClear)) && Boolean(value) && !props.disabled ? (
+          endAdornment: showClearButton ? (
             <InputAdornment
               position="end"
               sx={{

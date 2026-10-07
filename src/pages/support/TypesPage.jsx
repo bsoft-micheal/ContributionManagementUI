@@ -597,7 +597,7 @@ export default function TypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Ticket Type" : "Disabled")}>
+          <Tooltip title={row.isReferred || row.IsReferred ? "It's Refered" : (hasWriteAccess ? "Delete Ticket Type" : "Disabled")}>
             <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"

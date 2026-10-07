@@ -684,8 +684,8 @@ export default function ReportsPage({ mode = "event" }) {
 
   /* ── Column Definitions ── */
   const eventColumns = [
-    { label: "Event Name", key: "eventName", render: (r) => r.eventName || "--" },
     { label: "Event Type", key: "eventTypeName", render: (r) => r.eventTypeName || "General" },
+    { label: "Event Name", key: "eventName", render: (r) => r.eventName || "--" },
     { label: "Event Date", key: "eventDate", render: (r) => formatGridDate(r.eventDate) },
     { label: "Expected Amount", key: "expectedAmount", align: "right", render: (r) => INR(r.expectedAmount) },
     { label: "Paid Amount", key: "paidAmount", align: "right", render: (r) => INR(r.paidAmount) },
@@ -702,6 +702,46 @@ export default function ReportsPage({ mode = "event" }) {
     },
   ];
 
+  const getMemberEventType = (r) => {
+    if (filters.eventType && filters.eventType !== "ALL") {
+      return filters.eventType;
+    }
+    if (Array.isArray(r.events) && r.events.length > 0) {
+      const types = Array.from(
+        new Set(
+          r.events
+            .map((e) => e.categoryName || e.eventTypeName || e.eventType || e.category)
+            .filter(Boolean)
+        )
+      );
+      if (types.length > 0) return types.join(", ");
+    }
+    return r.eventTypeName || r.categoryName || r.eventType || "All Event Types";
+  };
+
+  const getMemberEventName = (r) => {
+    if (filters.event && filters.event !== "ALL") {
+      return filters.event;
+    }
+    if (Array.isArray(r.events) && r.events.length > 0) {
+      let filteredEvs = r.events;
+      if (filters.eventType && filters.eventType !== "ALL") {
+        filteredEvs = filteredEvs.filter(
+          (e) => (e.categoryName || e.eventTypeName || e.eventType || "General").trim().toLowerCase() === filters.eventType.trim().toLowerCase()
+        );
+      }
+      const names = Array.from(
+        new Set(
+          filteredEvs
+            .map((e) => e.eventName || e.name || e.title)
+            .filter(Boolean)
+        )
+      );
+      if (names.length > 0) return names.join(", ");
+    }
+    return r.eventName || r.relatedEvent || r.name || "All Events";
+  };
+
   const memberColumns = [
     {
       label: "Member Name",
@@ -714,6 +754,24 @@ export default function ReportsPage({ mode = "event" }) {
           onClick={() => openBreakdownModal(r, "all")}
         >
           {r.memberName}
+        </Typography>
+      ),
+    },
+    {
+      label: "Event Type",
+      key: "eventType",
+      render: (r) => (
+        <Typography variant="body2" fontWeight={600} color="text.secondary">
+          {getMemberEventType(r)}
+        </Typography>
+      ),
+    },
+    {
+      label: "Event Name",
+      key: "eventName",
+      render: (r) => (
+        <Typography variant="body2" fontWeight={600}>
+          {getMemberEventName(r)}
         </Typography>
       ),
     },
@@ -1031,6 +1089,31 @@ export default function ReportsPage({ mode = "event" }) {
   /* ── Dynamic Event Data for ExecutiveFinancialBarChart ── */
   const reportBarEvents = useMemo(() => {
     if (mode === "member") {
+      if (isMember) {
+        const myData = (filteredMemberContributions ?? [])[0] || {};
+        const events = myData.events || [];
+        if (events.length > 0) {
+          return events.map((ev, idx) => {
+            const exp = Number(ev.expectedAmount || ev.amount || 0);
+            const col = Number(ev.paidAmount || 0);
+            const pen = Math.max(0, exp - col);
+            return {
+              id: ev.eventId || ev.contributionId || `my-ev-${idx}`,
+              label: ev.eventName || `Event ${idx + 1}`,
+              totalExpectedAmount: exp,
+              expectedAmount: exp,
+              collectedAmount: col,
+              expected: exp,
+              collected: col,
+              pending: pen,
+              expense: 0,
+              remaining: exp - col,
+              eventTypeName: ev.categoryName || ev.eventTypeName || "General",
+              date: ev.eventDate || ev.paymentDate || null,
+            };
+          });
+        }
+      }
       return (filteredMemberContributions ?? []).map((m, idx) => {
         const exp = Number(m.totalExpectedAmount || 0);
         const col = Number(m.totalPaidAmount || 0);
@@ -1666,7 +1749,8 @@ export default function ReportsPage({ mode = "event" }) {
                         totalRemaining={reportTotals.totalRemaining}
                         events={reportBarEvents}
                         isMember={true}
-                        showPieChart={false}
+                        isReportsPage={true}
+                        showPieChart={true}
                       />
                     ) : mode === "member" ? (
                       <Card
