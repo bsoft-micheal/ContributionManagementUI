@@ -216,7 +216,12 @@ export default function TypesPage() {
         toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadTicketTypes();
       } catch (error) {
-        toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        const rawMsg = error.response?.data?.message || error.response?.data?.title || error.message || "";
+        if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete/i.test(rawMsg)) {
+          toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
+        } else {
+          toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        }
       } finally {
         setTicketTypeDeleteConfirmOpen(false);
         setTicketTypeToDelete(null);
@@ -306,7 +311,12 @@ export default function TypesPage() {
         toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadWorkTypes();
       } catch (error) {
-        toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        const rawMsg = error.response?.data?.message || error.response?.data?.title || error.message || "";
+        if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete/i.test(rawMsg)) {
+          toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
+        } else {
+          toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        }
       } finally {
         setWorkTypeDeleteConfirmOpen(false);
         setWorkTypeToDelete(null);
@@ -372,10 +382,10 @@ export default function TypesPage() {
 
       if (priorityForm.priorityId) {
         await updatePriorityAsync(priorityForm.priorityId, payload);
-        toast.success("Priority updated successfully!");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       } else {
         await createPriorityAsync(payload);
-        toast.success("Priority created successfully!");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       }
 
       setPriorityDialogOpen(false);
@@ -383,7 +393,7 @@ export default function TypesPage() {
       setPriorityErrors({});
       loadPriorities();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save priority");
+      toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
   }
 
@@ -396,10 +406,15 @@ export default function TypesPage() {
     if (!priorityToDelete) return;
     try {
       await deletePriorityAsync(priorityToDelete);
-      toast.success("Priority deleted successfully!");
+      toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       loadPriorities();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to delete priority");
+      const rawMsg = error.response?.data?.message || error.response?.data?.title || error.message || "";
+      if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete/i.test(rawMsg)) {
+        toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
+      } else {
+        toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+      }
     } finally {
       setPriorityDeleteConfirmOpen(false);
       setPriorityToDelete(null);
@@ -469,10 +484,10 @@ export default function TypesPage() {
 
       if (paymentModeForm.paymentModeId) {
         await updatePaymentModeAsync(paymentModeForm.paymentModeId, payload);
-        toast.success("Payment mode updated successfully!");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       } else {
         await createPaymentModeAsync(payload);
-        toast.success("Payment mode created successfully!");
+        toast.success(TOAST_MESSAGES.GENERAL.SAVED_SUCCESS);
       }
 
       setPaymentModeDialogOpen(false);
@@ -500,15 +515,15 @@ export default function TypesPage() {
     if (!paymentModeToDelete) return;
     try {
       await deletePaymentModeAsync(paymentModeToDelete);
-      toast.success("Payment mode deleted successfully!");
+      toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       loadPaymentModes();
     } catch (error) {
-      const errMsg =
-        error.response?.data?.message ||
-        (error.response?.status === 404 ? "Payment Modes API not running (404). Please restart backend." : null) ||
-        error.message ||
-        "Failed to delete payment mode";
-      toast.error(errMsg);
+      const rawMsg = error.response?.data?.message || error.response?.data?.title || error.message || "";
+      if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete/i.test(rawMsg)) {
+        toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
+      } else {
+        toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+      }
     } finally {
       setPaymentModeDeleteConfirmOpen(false);
       setPaymentModeToDelete(null);
@@ -725,7 +740,7 @@ export default function TypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this work type is assigned to active members" : (hasWriteAccess ? "Delete Work Type" : "Disabled")}>
+          <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Work Type" : "Disabled")}>
             <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
@@ -868,7 +883,7 @@ export default function TypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this priority is assigned to support tickets" : (hasWriteAccess ? "Delete Priority" : "Disabled")}>
+          <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Priority" : "Disabled")}>
             <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"
@@ -1003,7 +1018,7 @@ export default function TypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this payment mode is used in transactions or contributions" : (hasWriteAccess ? "Delete Payment Mode" : "Disabled")}>
+          <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Payment Mode" : "Disabled")}>
             <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton
                 size="small"

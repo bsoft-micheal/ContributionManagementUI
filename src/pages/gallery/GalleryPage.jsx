@@ -292,8 +292,10 @@ export default function GalleryPage() {
     if (location.state?.openAddPhoto) {
       const { eventName, category, eventDate } = location.state;
       setEditingPhoto(null);
+      const rawTitle = eventName ? `${eventName} Photos` : "";
+      const cleanTitle = rawTitle.replace(/[^A-Za-z\s]/g, "").slice(0, 50);
       setForm({
-        title: eventName ? `${eventName} Photos` : "",
+        title: cleanTitle,
         eventName: eventName || "",
         category: category || "",
         takenDate: eventDate ? dayjs(eventDate) : dayjs(),
@@ -707,10 +709,30 @@ export default function GalleryPage() {
   };
 
   const handleSavePhoto = async () => {
+    const filed = "This field is required";
+    const schema = {
+      title: {
+        required: true,
+        type: "letteronly",
+        min: 2,
+        max: 50,
+        label: "Photo Title",
+      },
+      category: { required: true, label: filed },
+      eventName: { required: true, label: filed },
+    };
+
     const newErrors = {};
-    if (!form.title || !form.title.trim()) newErrors.title = "Title is required";
-    if (!form.category) newErrors.category = "Event Type is required";
-    if (!form.eventName) newErrors.eventName = "Event Name is required";
+    if (!form.title || !form.title.trim()) {
+      newErrors.title = filed;
+    } else if (!/^[A-Za-z\s]+$/.test(form.title.trim())) {
+      newErrors.title = "Only letters and spaces are allowed";
+    } else if (form.title.trim().length > 50) {
+      newErrors.title = "Photo Title must be at most 50 characters";
+    }
+
+    if (!form.category) newErrors.category = filed;
+    if (!form.eventName) newErrors.eventName = filed;
 
     const existingCount = getExistingPhotoCountForEvent(form.eventName, editingPhoto);
     const maxAllowed = Math.max(0, 5 - existingCount);
@@ -1057,8 +1079,10 @@ export default function GalleryPage() {
               label="Photo Title"
               placeholder="Enter the Title"
               value={form.title}
+              maxLength={50}
               onChange={(e) => {
-                setForm((c) => ({ ...c, title: e.target.value }));
+                const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, "").slice(0, 50);
+                setForm((c) => ({ ...c, title: sanitized }));
                 if (errors.title) setErrors((p) => ({ ...p, title: "" }));
               }}
               error={!!errors.title}

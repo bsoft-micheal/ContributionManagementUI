@@ -29,7 +29,7 @@ import {
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
-import { COMMON_STRINGS } from "../../constants";
+import { COMMON_STRINGS, TOAST_MESSAGES } from "../../constants";
 
 const formatRateAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -196,10 +196,15 @@ export default function BudgetCalculationsPage() {
     if (itemToDelete) {
       try {
         await deleteBudgetCalculationAsync(itemToDelete);
-        toast.success("Deleted successfully");
+        toast.success(TOAST_MESSAGES.BUDGET.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        toast.error(error, "Failed to delete");
+        const rawMsg = error.response?.data?.message || error.response?.data?.title || error.message || "";
+        if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete/i.test(rawMsg)) {
+          toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
+        } else {
+          toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        }
       } finally {
         setDeleteConfirmOpen(false);
         setItemToDelete(null);
@@ -220,10 +225,10 @@ export default function BudgetCalculationsPage() {
         isActive: !itemToToggle.isActive,
       };
       await updateBudgetCalculationAsync(itemToToggle.budgetCalculationId, payload);
-      toast.success("Status updated successfully");
+      toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadData();
     } catch (err) {
-      toast.error(err, "Failed to update status");
+      toast.error(err, TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
     } finally {
       setStatusConfirmOpen(false);
       setItemToToggle(null);
@@ -272,7 +277,7 @@ export default function BudgetCalculationsPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this item is referenced in expense records" : (hasWriteAccess ? "Delete Expense Item" : "")}>
+          <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Expense Item" : "")}>
             <span>
               <IconButton
                 size="small"

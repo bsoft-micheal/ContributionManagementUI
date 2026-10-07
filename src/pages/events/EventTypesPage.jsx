@@ -107,7 +107,12 @@ export default function EventTypesPage() {
         toast.success(TOAST_MESSAGES.EVENT_TYPES.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        toast.error(error, TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        const rawMsg = error.response?.data?.message || error.response?.data?.title || error.message || "";
+        if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete/i.test(rawMsg)) {
+          toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
+        } else {
+          toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+        }
       } finally {
         setDeleteConfirmOpen(false);
         setTypeToDelete(null);
@@ -169,7 +174,7 @@ export default function EventTypesPage() {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={row.isReferred || row.IsReferred ? "Cannot delete: this event type is referenced in events, budget rules, or expenses" : (hasWriteAccess ? "Delete Category" : "Disabled")}>
+          <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Category" : "Disabled")}>
             <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)} onClick={() => handleDeleteRequest(row.eventTypeId)}>
                 <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess && !(row.isReferred || row.IsReferred) ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8") }} />
@@ -383,9 +388,9 @@ export default function EventTypesPage() {
                 sx={{ mt: 2.5, display: "flex", flexDirection: "column", gap: 2, pt: 2, borderTop: (theme) => `1px solid ${theme.palette.divider}` }}
               >
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
+                  <Grid size={{ xs: 12 }}>
                     <AppInput
-                      label="Tenure Criteria (Years)"
+                      label="Criteria (Years)"
                       placeholder="e.g. 1"
                       fullWidth
                       value={form.tenureThresholdYears}
@@ -393,12 +398,12 @@ export default function EventTypesPage() {
                         const val = e.target.value.replace(/[^0-9.]/g, "");
                         setForm((f) => ({ ...f, tenureThresholdYears: val }));
                       }}
-                      helperText="Threshold in years (e.g., 1 yr)"
+                      
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <AppInput
-                      label="New Entrant Share (%)"
+                      label="New Share (%)"
                       placeholder="e.g. 50"
                       fullWidth
                       value={form.newEntrantSharePercentage}
@@ -409,7 +414,7 @@ export default function EventTypesPage() {
                       helperText="Discounted share percentage"
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <AppInput
                       label="Standard Share (%)"
                       placeholder="e.g. 100"
@@ -423,15 +428,6 @@ export default function EventTypesPage() {
                     />
                   </Grid>
                 </Grid>
-
-                <AppInput
-                  label="Rule Description / Note"
-                  placeholder="e.g. 50% for new entrants with less than 1 year tenure"
-                  fullWidth
-                  value={form.ruleDescription}
-                  onChange={(e) => setForm((f) => ({ ...f, ruleDescription: e.target.value }))}
-                  maxLength={100}
-                />
               </Box>
             )}
 

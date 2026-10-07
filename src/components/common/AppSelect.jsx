@@ -1,4 +1,5 @@
 import { MenuItem, TextField, Box, Typography, InputAdornment, IconButton } from "@mui/material";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { useTheme } from "@mui/material/styles";
 import ClearIcon from "@mui/icons-material/Clear";
 import { useState, useEffect, useMemo } from "react";
@@ -134,7 +135,7 @@ export default function AppSelect({
             color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             "& .MuiSelect-select": {
               py: size === "small" ? 0.7 : 1,
-              pr: allowClear && value ? "48px !important" : "28px !important",
+              pr: (clearable || allowClear || Boolean(onClear)) && Boolean(value) ? "52px !important" : "28px !important",
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             },
             "& .MuiSelect-nativeInput": {
@@ -199,22 +200,48 @@ export default function AppSelect({
               {startAdornment}
             </InputAdornment>
           ) : undefined,
-          endAdornment: allowClear && value && !props.disabled ? (
-            <InputAdornment position="end" sx={{ position: "absolute", right: 28, zIndex: 2 }}>
+          endAdornment: (clearable || allowClear || Boolean(onClear)) && Boolean(value) && !props.disabled ? (
+            <InputAdornment
+              position="end"
+              sx={{
+                position: "absolute",
+                right: 26,
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 2,
+              }}
+            >
               <IconButton
                 size="small"
-                onClick={handleClear}
-                aria-label="Clear selection"
+                aria-label="clear selection"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  if (onClear) {
+                    onClear();
+                  } else if (onChange) {
+                    onChange({ target: { value: "" } });
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
                 sx={{
-                  p: 0.2,
-                  color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 0, 0, 0.45)",
+                  p: 0.25,
+                  color: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.6)" : "#64748b",
                   "&:hover": {
-                    color: "error.main",
-                    bgcolor: "transparent",
+                    color: (theme) =>
+                      theme.palette.mode === "dark" ? "#ffffff" : "#0f172a",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(255, 255, 255, 0.1)"
+                        : "rgba(0, 0, 0, 0.06)",
                   },
                 }}
               >
-                <ClearIcon sx={{ fontSize: 15 }} />
+                <CloseRoundedIcon sx={{ fontSize: "0.95rem" }} />
               </IconButton>
             </InputAdornment>
           ) : undefined,

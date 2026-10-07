@@ -48,7 +48,7 @@ import EventAddPhotoDialog from "../../components/events/EventAddPhotoDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 
-const getEventCategories = (row) => {
+const getEventCategories = (row, allEventTypes = []) => {
   const set = new Set();
 
   const primaryType = row.eventTypeName || row.category || row.categoryName || row.eventType;
@@ -67,20 +67,37 @@ const getEventCategories = (row) => {
     row.categories.forEach((c) => c && set.add(String(c).trim()));
   }
 
-  const name = String(row.eventName || "").toLowerCase();
-  if (name.includes("birthday")) set.add("Birthday");
-  if (name.includes("farewell")) set.add("Farewell");
-  if (name.includes("outing") || name.includes("team outing")) set.add("Team Outing");
+  // If multiple events were created, match event types against allEventTypes using eventName
+  if (Array.isArray(allEventTypes) && allEventTypes.length > 0 && row.eventName) {
+    const eventNameLower = String(row.eventName).toLowerCase();
+    allEventTypes.forEach((typeObj) => {
+      const typeName = (typeObj.eventTypeName || typeObj.name || "").trim();
+      if (!typeName) return;
+      const typeNameLower = typeName.toLowerCase();
+      if (eventNameLower.includes(typeNameLower)) {
+        set.add(typeName);
+      }
+    });
+  }
 
-  const list = Array.from(set);
-  return list.length > 0 ? list : ["General"];
+  // Fallback only if no explicit event type was provided
+  if (set.size === 0) {
+    const name = String(row.eventName || "").toLowerCase();
+    if (name.includes("birthday")) set.add("Birthday");
+    if (name.includes("farewell")) set.add("Farewell");
+    if (name.includes("christmas outing")) set.add("Christmas Outing");
+    else if (name.includes("outing")) set.add("Outing");
+    if (set.size === 0) set.add("General");
+  }
+
+  return Array.from(set);
 };
 
 const getCategoryChipConfig = (catName) => {
   const norm = String(catName || "").toLowerCase().trim();
   if (norm.includes("birthday")) {
     return {
-      label: "Birthday",
+      label: catName,
       color: "#7c3aed",
       bgcolor: "rgba(124, 58, 237, 0.12)",
       borderColor: "rgba(124, 58, 237, 0.3)",
@@ -88,7 +105,7 @@ const getCategoryChipConfig = (catName) => {
   }
   if (norm.includes("farewell")) {
     return {
-      label: "Farewell",
+      label: catName,
       color: "#0284c7",
       bgcolor: "rgba(2, 132, 199, 0.12)",
       borderColor: "rgba(2, 132, 199, 0.3)",
@@ -96,7 +113,7 @@ const getCategoryChipConfig = (catName) => {
   }
   if (norm.includes("outing")) {
     return {
-      label: "Team Outing",
+      label: catName,
       color: "#059669",
       bgcolor: "rgba(5, 150, 105, 0.12)",
       borderColor: "rgba(5, 150, 105, 0.3)",
@@ -442,7 +459,10 @@ export default function EventsPage() {
       label: "Action",
       sx: { width: 245, minWidth: 245 },
       render: (row) => {
-        const isDeletable = canDeleteEvent && Number(row.totalPaidAmount || row.paidAmount || 0) === 0;
+        const paidAmount = Number(row.totalPaidAmount || row.collectedAmount || row.paidAmount || 0);
+        const hasPaidAmount = paidAmount > 0;
+        const isEditable = canEditEvent && !hasPaidAmount;
+        const isDeletable = canDeleteEvent && !hasPaidAmount;
         return (
           <Box sx={{ display: "flex", gap: 0.4, alignItems: "center" }}>
             <Tooltip title={canViewEvent ? "View Details" : "Disabled"}>
@@ -460,19 +480,35 @@ export default function EventsPage() {
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title={canEditEvent ? "Edit Event" : "Disabled"}>
-              <span style={{ display: "inline-flex", cursor: !canEditEvent ? "not-allowed" : "pointer" }}>
+            <Tooltip
+              title={
+                !canEditEvent
+                  ? "Disabled"
+                  : hasPaidAmount
+                  ? "Cannot edit event after payments have been received"
+                  : "Edit Event"
+              }
+            >
+              <span style={{ display: "inline-flex", cursor: !isEditable ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
                   sx={{ p: 0.3 }}
-                  disabled={!canEditEvent}
+                  disabled={!isEditable}
                   onClick={() => navigate(`/events/edit/${row.eventId}`)}
                 >
-                  <EditIcon sx={{ fontSize: "1.1rem", color: canEditEvent ? actionIconColor : "#94a3b8" }} />
+                  <EditIcon sx={{ fontSize: "1.1rem", color: isEditable ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title={isDeletable ? "Delete Event" : "Disabled"}>
+            <Tooltip
+              title={
+                !canDeleteEvent
+                  ? "Disabled"
+                  : hasPaidAmount
+                  ? "Cannot delete event after payments have been received"
+                  : "Delete Event"
+              }
+            >
               <span style={{ display: "inline-flex", cursor: !isDeletable ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
@@ -557,7 +593,7 @@ export default function EventsPage() {
       label: "Event Type / Event Date",
       key: "eventTypeName",
       render: (row) => {
-        const categories = getEventCategories(row);
+        const categories = getEventCategories(row, eventTypes);
 
         return (
           <Box sx={{ py: 0.3, display: "flex", flexDirection: "column", gap: 0.8 }}>

@@ -13,13 +13,20 @@ export const VALIDATION_PATTERNS = {
     sanitize: (val) => val.replace(/[^0-9]/g, "")
   },
   decimalonly: {
-    pattern: /^[0-9]*\.?[0-9]*$/,
-    message: "Only numbers and decimal point are allowed",
+    pattern: /^[0-9]*\.?[0-9]{0,2}$/,
+    message: "Only numbers and decimal point (up to 2 decimal places) are allowed",
     sanitize: (val) => {
-      const clean = String(val).replace(/[^0-9.]/g, "");
+      let clean = String(val).replace(/[^0-9.]/g, "");
       const parts = clean.split(".");
       if (parts.length > 2) {
-        return parts[0] + "." + parts.slice(1).join("");
+        clean = parts[0] + "." + parts.slice(1).join("");
+      }
+      if (clean.includes(".")) {
+        const [w, d] = clean.split(".");
+        clean = w + "." + d.slice(0, 2);
+      }
+      if (clean.length > 10) {
+        clean = clean.slice(0, 10);
       }
       return clean;
     }
@@ -86,11 +93,12 @@ export function validateField(value, config = {}) {
     return config.requiredMessage || "This field is required";
   }
 
-  if (!strVal) return ""; // Not required and empty: valid
-
   // 2. Email format check
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strVal)) {
-    return "Please enter a valid email address";
+  if (email || config.type === "email") {
+    const emailErr = validateEmail(strVal);
+    if (emailErr) {
+      return emailErr;
+    }
   }
 
   // 2.1. Mobile format check (strictly 10 digits starting with 6–9)
@@ -161,7 +169,7 @@ export function validateField(value, config = {}) {
  */
 export function validateIndianMobile(value) {
   if (!value || !String(value).trim()) {
-    return "Mobile number is required";
+    return "This field is required";
   }
   const strVal = String(value).trim();
   const mobileRegex = /^[6-9]\d{9}$/;
@@ -174,6 +182,111 @@ export function validateIndianMobile(value) {
     }
     return "Enter a valid 10-digit mobile number starting with 6–9";
   }
+  return "";
+}
+
+/**
+ * Comprehensive email validation ensuring standard email formatting,
+ * no forbidden characters/patterns, valid domain structure, and max 25 characters.
+ * @param {string} value The email address to validate.
+ * @returns {string} Error message if invalid, or empty string if valid.
+ */
+export function validateEmail(value) {
+  if (!value || !String(value).trim()) {
+    return "";
+  }
+  const strVal = String(value).trim();
+
+  // 1. Length constraint: maximum 25 characters
+  if (strVal.length > 25) {
+    return "Email cannot exceed 25 characters";
+  }
+
+  // 2. Spaces not allowed
+  if (/\s/.test(strVal)) {
+    return "Email cannot contain spaces";
+  }
+
+  // 3. Disallowed special characters: ", (, ), ,, :, ;, <, >, [, ], $, #, %, *
+  const disallowedSpecialChars = /["(),:;<>[\]$#%*]/;
+  if (disallowedSpecialChars.test(strVal)) {
+    return "Email contains invalid special characters";
+  }
+
+  // 4. @ symbol checks
+  const atParts = strVal.split("@");
+  if (atParts.length === 1) {
+    return "Email must contain an '@' symbol";
+  }
+  if (atParts.length > 2) {
+    return "Email cannot contain multiple '@' symbols";
+  }
+
+  const [localPart, domainPart] = atParts;
+
+  // 5. Local part (before @) checks
+  if (!localPart) {
+    return "Email is missing local part before '@'";
+  }
+  if (localPart.startsWith(".")) {
+    return "Email cannot start with a dot";
+  }
+  if (localPart.endsWith(".")) {
+    return "Email cannot end with a dot before '@'";
+  }
+  if (localPart.includes("..")) {
+    return "Email cannot contain consecutive dots";
+  }
+  // Local part character allowance: letters, numbers, and standard safe punctuation . _ - +
+  if (!/^[a-zA-Z0-9._+-]+$/.test(localPart)) {
+    return "Email contains invalid characters";
+  }
+
+  // 6. Domain part (after @) checks
+  if (!domainPart) {
+    return "Email is missing domain after '@'";
+  }
+  if (domainPart.startsWith(".") || domainPart.endsWith(".")) {
+    return "Email domain cannot start or end with a dot";
+  }
+  if (domainPart.includes("..")) {
+    return "Email domain cannot contain consecutive dots";
+  }
+
+  // Domain labels check
+  const domainLabels = domainPart.split(".");
+  if (domainLabels.length < 2) {
+    return "Email domain must include a top-level domain (e.g., .com)";
+  }
+
+  // Check top-level domain (TLD) - last part after dot must be letters only and >= 2 chars
+  const tld = domainLabels[domainLabels.length - 1];
+  if (!/^[a-zA-Z]{2,}$/.test(tld)) {
+    return "Email has an invalid top-level domain (e.g., .com, .org)";
+  }
+
+  // Check domain labels: letters, numbers, hyphens only. No underscores (exam_ple.com is invalid), no special chars
+  for (const label of domainLabels) {
+    if (!label) {
+      return "Email domain format is invalid";
+    }
+    if (label.startsWith("-") || label.endsWith("-")) {
+      return "Domain labels cannot start or end with a hyphen";
+    }
+    if (label.includes("_")) {
+      return "Email domain cannot contain underscore ('_')";
+    }
+    if (!/^[a-zA-Z0-9-]+$/.test(label)) {
+      return "Email domain contains invalid characters";
+    }
+  }
+
+  // 7. Strict overall standard email regex check
+  const strictEmailRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9._+-]*[a-zA-Z0-9])?@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+  if (!strictEmailRegex.test(strVal)) {
+    return "Please enter a valid email address";
+  }
+
   return "";
 }
 

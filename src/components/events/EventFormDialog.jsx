@@ -85,7 +85,7 @@ const getDefaultBirthdayExempt = () => {
   } catch {
     // Setting read error ignored
   }
-  return true;
+  return false;
 };
 
 const getAllowMultipleEventsSetting = () => {
@@ -540,7 +540,7 @@ export default function EventFormDialog({
           setOfficeBirthdays(offCount);
           setWfhBirthdays(wfhCount);
           setTotalMembers(activeMembers.length);
-          setExempt(true);
+          setExempt(settingsData?.birthdayMembersExempt !== undefined ? Boolean(settingsData.birthdayMembersExempt) : getDefaultBirthdayExempt());
           setSelectedParticipantIds(pIds.length > 0 ? pIds : allActiveIds);
 
           const eventTypeIdsList =
@@ -561,7 +561,9 @@ export default function EventFormDialog({
             eventTypeId: detailedEvent.eventTypeId || "",
             eventTypeIds: eventTypeIdsList,
             eventDate: currentEventDate,
-            description: detailedEvent.description || "",
+            description: (detailedEvent.description && !detailedEvent.description.startsWith("Birthday celebration (") && !detailedEvent.description.includes("Planned Budget:"))
+              ? detailedEvent.description
+              : "",
             baseAmount: initialBaseAmount,
             participantIds: pIds,
           });
@@ -582,7 +584,7 @@ export default function EventFormDialog({
           setOfficeBirthdays(offCount);
           setWfhBirthdays(wfhCount);
           setTotalMembers(activeMembers.length);
-          setExempt(getDefaultBirthdayExempt());
+          setExempt(settingsData?.birthdayMembersExempt !== undefined ? Boolean(settingsData.birthdayMembersExempt) : getDefaultBirthdayExempt());
           setSelectedParticipantIds(allActiveIds);
 
           setForm({
@@ -900,12 +902,7 @@ export default function EventFormDialog({
           eventTypeIds: resolvedEventTypeIds,
           eventDate: dayjs(form.eventDate).hour(12).toISOString(),
           eventDates: celebrantDatesCsv || null,
-          description:
-            form.description?.trim() ||
-            `Birthday celebration (${office} Office, ${wfh} WFH)${celebrantsSummary ? ` for ${celebrantsSummary}` : ""
-            }. Planned Budget: ₹${plannedBudget.toLocaleString(
-              "en-IN"
-            )}, Contribution/member: ₹${contributionPerMember}`,
+          description: form.description?.trim() || "",
           baseAmount: plannedBudget > 0 ? plannedBudget : 0,
           participantIds: chosenParticipantIds,
           contributionOverrides: contributionOverrides,
@@ -958,7 +955,7 @@ export default function EventFormDialog({
         }
 
         await createEventAsync(payload);
-        toast.success("Event created successfully! Notification emails dispatched to contributors.");
+        toast.success("Event created successfully");
       }
 
       if (onSaveSuccess) {
