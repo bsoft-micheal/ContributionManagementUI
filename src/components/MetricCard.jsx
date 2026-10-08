@@ -1,7 +1,14 @@
 import React from "react";
-import { Box, Card, CardContent, Stack, Typography } from "@mui/material";
+import { Box, Card, CardContent, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { toPascalCase } from "../utils/textHelper";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
+import CreditCardRoundedIcon from "@mui/icons-material/CreditCardRounded";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import BalanceRoundedIcon from "@mui/icons-material/BalanceRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 
 export default function MetricCard({
   label,
@@ -13,6 +20,7 @@ export default function MetricCard({
   onClick,
   clickable = false,
   actionText,
+  icon,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -26,6 +34,20 @@ export default function MetricCard({
             accent === "warning.main" ? "#f59e0b" :
               accent === "info.main" ? "#3b82f6" : accent;
 
+  // Resolve icon automatically if not passed
+  const resolvedIcon = React.useMemo(() => {
+    if (icon) return icon;
+    const l = (label || "").toLowerCase();
+    if (l.includes("expected")) return <GroupsRoundedIcon sx={{ fontSize: 16 }} />;
+    if (l.includes("collect") || l.includes("paid")) return <SavingsRoundedIcon sx={{ fontSize: 16 }} />;
+    if (l.includes("pending") || l.includes("unpaid") || l.includes("due")) return <CreditCardRoundedIcon sx={{ fontSize: 16 }} />;
+    if (l.includes("expense")) return <AccountBalanceWalletRoundedIcon sx={{ fontSize: 16 }} />;
+    if (l.includes("balance") || l.includes("remaining")) return <BalanceRoundedIcon sx={{ fontSize: 16 }} />;
+    if (l.includes("event")) return <CalendarMonthRoundedIcon sx={{ fontSize: 16 }} />;
+    if (l.includes("member") || l.includes("defaulter")) return <GroupsRoundedIcon sx={{ fontSize: 16 }} />;
+    return <TrendingUpRoundedIcon sx={{ fontSize: 16 }} />;
+  }, [icon, label]);
+
   return (
     <Card
       onClick={isInteractive ? onClick : undefined}
@@ -34,105 +56,110 @@ export default function MetricCard({
       onKeyDown={isInteractive ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick?.(); } } : undefined}
       sx={{
         height: "100%",
+        minHeight: { xs: 104, sm: 112 },
         display: "flex",
         flexDirection: "column",
-        borderRadius: 2,
+        borderRadius: "12px",
         transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
         position: "relative",
         overflow: "hidden",
         cursor: isInteractive ? "pointer" : "default",
         userSelect: isInteractive ? "none" : "auto",
-        border: `1px solid ${isDark ? alpha(resolvedAccent, 0.2) : alpha(resolvedAccent, 0.12)}`,
+        border: `1px solid ${isDark ? alpha(resolvedAccent, 0.28) : alpha(resolvedAccent, 0.2)}`,
         background: isDark
-          ? `linear-gradient(145deg, ${alpha(resolvedAccent, 0.05)} 0%, rgba(23, 27, 45, 0.7) 100%)`
-          : `linear-gradient(180deg, #ffffff 0%, ${alpha(resolvedAccent, 0.02)} 100%)`,
+          ? `linear-gradient(145deg, ${alpha(resolvedAccent, 0.12)} 0%, rgba(20, 24, 40, 0.95) 100%)`
+          : `linear-gradient(180deg, ${alpha(resolvedAccent, 0.05)} 0%, #ffffff 100%)`,
         boxShadow: isDark
           ? "0 4px 16px rgba(0, 0, 0, 0.25)"
-          : "0 2px 10px rgba(0, 0, 0, 0.03)",
+          : `0 2px 8px ${alpha(resolvedAccent, 0.05)}`,
         "&:hover": {
-          transform: isInteractive ? "translateY(-3px)" : "translateY(-2px)",
+          transform: isInteractive ? "translateY(-2px)" : "none",
           boxShadow: isDark
-            ? `0 10px 24px -4px rgba(0, 0, 0, 0.4), 0 0 0 1px ${alpha(resolvedAccent, 0.35)}`
-            : `0 10px 24px -4px ${alpha(resolvedAccent, 0.12)}, 0 0 0 1px ${alpha(resolvedAccent, 0.25)}`,
+            ? `0 8px 20px -4px rgba(0, 0, 0, 0.4), 0 0 0 1px ${alpha(resolvedAccent, 0.35)}`
+            : `0 8px 20px -4px ${alpha(resolvedAccent, 0.14)}, 0 0 0 1px ${alpha(resolvedAccent, 0.25)}`,
           ...(isInteractive && {
             "& .metric-action-text": {
               opacity: 1,
-              transform: "translateX(0)",
+              transform: "translateX(2px)",
             },
           }),
         },
         "&:active": isInteractive ? {
           transform: "translateY(-1px)",
         } : {},
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 2.5,
-          background: `linear-gradient(90deg, ${resolvedAccent} 0%, ${alpha(resolvedAccent, 0.25)} 100%)`,
-        },
       }}
     >
       <CardContent
         sx={{
-          p: { xs: 1.25, sm: 1.5 },
-          "&:last-child": { pb: { xs: 1.25, sm: 1.5 } },
+          p: { xs: 1.2, sm: 1.35 },
+          "&:last-child": { pb: { xs: 1.2, sm: 1.35 } },
           flex: 1,
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
         }}
       >
-        <Stack spacing={0.35}>
-          <Box>
-            <Typography
-              component="div"
-              sx={{
-                fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                fontWeight: 700,
-                letterSpacing: "0.01em",
-                textTransform: "none",
-                fontSize: "0.76rem",
-                lineHeight: 1.3,
-                display: "block",
-                color: isDark ? "rgba(255, 255, 255, 0.88)" : "#1e293b",
-              }}
-            >
-              {toPascalCase(label)}
-            </Typography>
-            <Typography
-              component="div"
-              sx={{
-                color: valueColor || (isDark ? "#ffffff" : "#0f172a"),
-                fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                fontWeight: 700,
-                fontSize: { xs: "1.05rem", sm: "1.125rem", md: "1.18rem" },
-                letterSpacing: "-0.015em",
-                mt: 0.35,
-                lineHeight: 1.25,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-              title={typeof value === "string" ? value : undefined}
-            >
-              {value}
-            </Typography>
+        {/* Top Header: Circular Icon Badge + Label */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: isDark ? alpha(resolvedAccent, 0.24) : alpha(resolvedAccent, 0.14),
+              color: resolvedAccent,
+              flexShrink: 0,
+            }}
+          >
+            {resolvedIcon}
           </Box>
-        </Stack>
+          <Typography
+            component="div"
+            sx={{
+              fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontWeight: 600,
+              fontSize: { xs: "0.72rem", sm: "0.76rem" },
+              lineHeight: 1.2,
+              color: isDark ? "rgba(255, 255, 255, 0.76)" : "#475569",
+              wordBreak: "break-word",
+            }}
+          >
+            {toPascalCase(label)}
+          </Typography>
+        </Box>
 
-        {Boolean(actionText) && (
+        {/* Middle Value */}
+        <Typography
+          component="div"
+          sx={{
+            color: valueColor || (isDark ? "#ffffff" : "#0f172a"),
+            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            fontWeight: 800,
+            fontSize: { xs: "1.32rem", sm: "1.44rem" },
+            letterSpacing: "-0.02em",
+            my: { xs: 0.5, sm: 0.65 },
+            lineHeight: 1.15,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+          title={typeof value === "string" ? value : undefined}
+        >
+          {value}
+        </Typography>
+
+        {/* Bottom Action Link */}
+        {Boolean(actionText) ? (
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
               justifyContent: "flex-end",
-              gap: 0.75,
-              mt: 0.85,
-              pt: 0.75,
-              borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"}`,
+              mt: "auto",
+              pt: 0.25,
             }}
           >
             <Typography
@@ -141,10 +168,9 @@ export default function MetricCard({
               sx={{
                 color: resolvedAccent,
                 fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                fontSize: "0.7rem",
+                fontSize: { xs: "0.68rem", sm: "0.72rem" },
                 fontWeight: 600,
-                opacity: isInteractive ? { xs: 0.95, sm: 0.85 } : 0.85,
-                transform: isInteractive ? { xs: "none", sm: "translateX(2px)" } : "none",
+                opacity: isInteractive ? { xs: 0.95, sm: 0.9 } : 0.85,
                 transition: "all 0.2s ease",
                 display: "inline-flex",
                 alignItems: "center",
@@ -156,6 +182,8 @@ export default function MetricCard({
               {actionText}
             </Typography>
           </Box>
+        ) : (
+          <Box sx={{ minHeight: 14 }} />
         )}
       </CardContent>
     </Card>

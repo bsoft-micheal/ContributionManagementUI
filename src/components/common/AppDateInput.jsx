@@ -326,16 +326,6 @@ export default function AppDateInput({
             clearable: clearable,
             ...customSlotProps.field,
           },
-          textField: {
-            size: size,
-            error: error,
-            helperText: helperText,
-            ...(InputProps ? { InputProps } : {}),
-            ...(inputProps ? { inputProps } : {}),
-            ...(InputLabelProps ? { InputLabelProps } : {}),
-            ...(FormHelperTextProps ? { FormHelperTextProps } : {}),
-            ...customSlotProps.textField,
-          },
           openPickerButton: {
             size: "small",
             sx: {

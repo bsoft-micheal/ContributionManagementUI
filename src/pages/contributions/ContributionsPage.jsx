@@ -123,12 +123,14 @@ export default function ContributionsPage() {
   const [previewImageSrc, setPreviewImageSrc] = useState(null);
 
   const [events, setEvents] = useState([]);
+  const [selectedEventId, setSelectedEventId] = useState("");
+  const [filterEventId, setFilterEventId] = useState("");
   const [eventTypes, setEventTypes] = useState([]);
   const [filterEventType, setFilterEventType] = useState("ALL");
   const [appliedEventType, setAppliedEventType] = useState("ALL");
-  const [selectedEventId, setSelectedEventId] = useState("");
-  const [filterEventId, setFilterEventId] = useState("");
-  const [contributions, setContributions] = useState([]);
+  const [rawContributions, setRawContributions] = useState([]);
+
+  // --- All remaining useState declarations (must be before any useEffect/useMemo that references them) ---
   const [dialogOpen, setDialogOpen] = useState(false);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [selectedContributionForQr, setSelectedContributionForQr] = useState(null);
@@ -152,6 +154,55 @@ export default function ContributionsPage() {
     amount: "",
     arrearBreakdown: [],
   });
+
+  // --- Effects & Memos (all state is declared above, so no TDZ errors) ---
+  useEffect(() => {
+    if (!selectedEventId) {
+      setRawContributions([]);
+      return;
+    }
+
+    let isMounted = true;
+    async function loadContributions() {
+      try {
+        let rawData = [];
+        if (selectedEventId !== "ALL") {
+          rawData = await getContributionsByEventAsync(selectedEventId);
+        } else {
+          let freshAll = allContributions;
+          if (!freshAll || freshAll.length === 0) {
+            freshAll = await reloadAllContributions();
+          }
+
+          if (appliedEventType && appliedEventType !== "ALL") {
+            const matchingEventIds = new Set(
+              (events || [])
+                .filter((e) => isMatchingEventType(e, appliedEventType))
+                .map((e) => String(e.eventId || e.id))
+            );
+            rawData = (freshAll || []).filter(
+              (c) =>
+                matchingEventIds.has(String(c.eventId)) ||
+                (c.categoryName && c.categoryName.toLowerCase() === appliedEventType.toLowerCase())
+            );
+          } else {
+            rawData = freshAll || [];
+          }
+        }
+
+        if (isMounted) {
+          setRawContributions(Array.isArray(rawData) ? rawData : []);
+        }
+      } catch (error) {
+        if (isMounted) toast.error("Failed to load contributions.");
+      }
+    }
+
+    loadContributions();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedEventId, appliedEventType]);
 
   const getMemberEventAmount = (c, activeEv) => {
     const directAmt = Number(c?.amount || 0);
@@ -363,6 +414,11 @@ export default function ContributionsPage() {
     return enriched;
   };
 
+  // contributions is derived from rawContributions via enrichContributions (defined above)
+  const contributions = useMemo(() => {
+    return enrichContributions(rawContributions, allContributions, events, transactions);
+  }, [rawContributions, allContributions, events, transactions]);
+
   const handleOpenSubmitPaymentModal = (row) => {
     const evId = row?.eventId || selectedEventId || "";
     const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(evId));
@@ -458,61 +514,7 @@ export default function ContributionsPage() {
     return () => window.removeEventListener("contribution_updated", handleUpdate);
   }, []);
 
-  useEffect(() => {
-    if (!selectedEventId) {
-      setContributions([]);
-      return;
-    }
 
-    async function loadContributions() {
-      try {
-        let rawData = [];
-        if (selectedEventId !== "ALL") {
-          rawData = await getContributionsByEventAsync(selectedEventId);
-        } else {
-          let freshAll = allContributions;
-          if (!freshAll || freshAll.length === 0) {
-            freshAll = await reloadAllContributions();
-          }
-
-          if (appliedEventType && appliedEventType !== "ALL") {
-            const matchingEventIds = new Set(
-              (events || [])
-                .filter((e) => isMatchingEventType(e, appliedEventType))
-                .map((e) => String(e.eventId || e.id))
-            );
-            rawData = (freshAll || []).filter(
-              (c) =>
-                matchingEventIds.has(String(c.eventId)) ||
-                (c.categoryName && c.categoryName.toLowerCase() === appliedEventType.toLowerCase())
-            );
-          } else {
-            rawData = freshAll || [];
-          }
-        }
-
-        const enrichedData = enrichContributions(rawData, allContributions, events, transactions);
-        setContributions(enrichedData);
-      } catch (error) {
-        toast.error("Failed to load contributions.");
-      }
-    }
-
-    loadContributions();
-  }, [selectedEventId, appliedEventType, allContributions, events, transactions]);
-
-  useEffect(() => {
-    const handleContributionUpdated = async () => {
-      try {
-        const txRes = await getPaymentTransactionsAsync();
-        if (Array.isArray(txRes)) setTransactions(txRes);
-      } catch { }
-      await reloadAllContributions();
-    };
-
-    window.addEventListener("contribution_updated", handleContributionUpdated);
-    return () => window.removeEventListener("contribution_updated", handleContributionUpdated);
-  }, []);
 
   const handleAmountChange = (val) => {
     setPayment((prev) => {
@@ -737,8 +739,7 @@ export default function ContributionsPage() {
           );
         }
       }
-      const enriched = enrichContributions(eventData, allData, events, transactions);
-      setContributions(enriched);
+      setRawContributions(eventData);
     } catch (error) {
       const apiErrorMsg =
         error.response?.data?.message ||
@@ -875,7 +876,7 @@ export default function ContributionsPage() {
     const isMarkingPaid = ["paid", "verified", "closed", "completed"].includes(String(newStatus).toLowerCase());
 
     // Optimistically update the current table row immediately
-    setContributions((prev) =>
+    setRawContributions((prev) =>
       prev.map((c) => {
         if (
           (target.contributionId && c.contributionId === target.contributionId) ||
@@ -977,7 +978,7 @@ export default function ContributionsPage() {
           }
         }
         const enriched = enrichContributions(freshData, freshAll, events, transactions);
-        setContributions(enriched);
+        setRawContributions(enriched);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update contribution status");
@@ -1723,7 +1724,7 @@ export default function ContributionsPage() {
               }
             }
             const enriched = enrichContributions(freshData, freshAll, events, transactions);
-            setContributions(enriched);
+            setRawContributions(enriched);
           }
         }}
       />

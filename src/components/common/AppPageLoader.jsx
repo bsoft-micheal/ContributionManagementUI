@@ -3,7 +3,7 @@ import { Box, CircularProgress, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import logoImg from "../../assets/logo_image.png";
 
-export default function AppPageLoader({ fullScreen = false, text = "Loading..." }) {
+export default function AppPageLoader({ fullScreen = false, text = "Loading...", opaque = false }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const purpleColor = isDark ? "#a78bfa" : "#6355a4";
@@ -24,9 +24,15 @@ export default function AppPageLoader({ fullScreen = false, text = "Loading..." 
         alignItems: "center",
         justifyContent: "center",
         bgcolor: fullScreen
-          ? (isDark ? "rgba(18, 22, 40, 0.4)" : "rgba(255, 255, 255, 0.4)")
+          ? opaque
+            ? isDark
+              ? "rgba(18, 22, 40, 0.96)"
+              : "rgba(248, 250, 252, 0.96)"
+            : isDark
+            ? "rgba(18, 22, 40, 0.4)"
+            : "rgba(255, 255, 255, 0.4)"
           : "transparent",
-        backdropFilter: fullScreen ? "blur(3px)" : "none",
+        backdropFilter: fullScreen ? (opaque ? "blur(8px)" : "blur(3px)") : "none",
         pointerEvents: "auto",
         transition: "opacity 0.2s ease-in-out",
       }}

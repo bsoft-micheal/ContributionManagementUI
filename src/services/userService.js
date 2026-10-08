@@ -50,6 +50,11 @@ export const updateProfileAsync = async (data) => {
   return await putApi("/users/updateProfileAsync", data);
 };
 
+export const changePasswordAsync = async (data) => {
+  return await postApi("/users/changePasswordAsync", data);
+};
+
 export const switchRoleAsync = async (data) => {
   return await postApi("/users/switchRoleAsync", data);
 };
+

@@ -45,7 +45,7 @@ import AppImageUpload from "../common/AppImageUpload";
 import { useAppToast } from "../common/AppToast";
 import { validateForm } from "../../utils/validation";
 import { getImageUrl } from "../../services/apiClient";
-import { getProfileAsync } from "../../services/userService";
+import { getProfileAsync, changePasswordAsync } from "../../services/userService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
 import { useThemeMode } from "../../contexts/ThemeModeContext";
 import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
@@ -74,7 +74,7 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [flyoutAnchorEl, setFlyoutAnchorEl] = useState(null);
   const [activeFlyoutItem, setActiveFlyoutItem] = useState(null);
-  const { authState, logout, updateProfile, switchRole } = useAuth();
+  const { authState, logout, updateProfile, switchRole, isSwitchingRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useAppToast();
@@ -212,10 +212,56 @@ export default function AppLayout() {
     dateOfBirth: null,
     joiningDate: null,
     roleName: "",
-    password: "",
-    confirmPassword: "",
   });
   const [profileErrors, setProfileErrors] = useState({});
+
+  // Change Password Dialog States
+  const [changePasswordDialogOpen, setChangePasswordDialogOpen] = useState(false);
+  const [changePasswordForm, setChangePasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [changePasswordErrors, setChangePasswordErrors] = useState({});
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Clear and prevent browser password manager autofill on Change Password dialog open
+  useEffect(() => {
+    if (changePasswordDialogOpen) {
+      setChangePasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setChangePasswordErrors({});
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+
+      const t1 = setTimeout(() => {
+        setChangePasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+      }, 50);
+
+      const t2 = setTimeout(() => {
+        setChangePasswordForm((prev) => ({
+          ...prev,
+          currentPassword: "",
+        }));
+      }, 150);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [changePasswordDialogOpen]);
 
   const hoverTimeoutRef = useRef(null);
 
@@ -330,8 +376,6 @@ export default function AppLayout() {
               dateOfBirth: profile.dateOfBirth ? dayjs(profile.dateOfBirth) : null,
               joiningDate: profile.joiningDate ? dayjs(profile.joiningDate) : null,
               roleName: profile.roleName || authState?.role || "",
-              password: "",
-              confirmPassword: "",
             });
             setProfileErrors({});
             return;
@@ -354,8 +398,6 @@ export default function AppLayout() {
             dateOfBirth: authState.dateOfBirth ? dayjs(authState.dateOfBirth) : null,
             joiningDate: authState.joiningDate ? dayjs(authState.joiningDate) : null,
             roleName: authState.role || "",
-            password: "",
-            confirmPassword: "",
           });
           setProfileErrors({});
         }
@@ -386,19 +428,6 @@ export default function AppLayout() {
       errors.dateOfBirth = requiredMsg;
     }
 
-    if (!profileForm.joiningDate || !dayjs(profileForm.joiningDate).isValid()) {
-      errors.joiningDate = requiredMsg;
-    }
-
-    if (profileForm.password) {
-      if (profileForm.password.length < 6) {
-        errors.password = "Password must be at least 6 characters";
-      }
-      if (profileForm.password !== profileForm.confirmPassword) {
-        errors.confirmPassword = "Passwords do not match";
-      }
-    }
-
     if (Object.keys(errors).length > 0) {
       setProfileErrors(errors);
       toast.error("Please fill all the required fields correctly");
@@ -417,8 +446,6 @@ export default function AppLayout() {
         memberType: selectedWorkType,
         dateOfBirth: profileForm.dateOfBirth ? dayjs(profileForm.dateOfBirth).toISOString() : undefined,
         joiningDate: profileForm.joiningDate ? dayjs(profileForm.joiningDate).toISOString() : undefined,
-        roleName: profileForm.roleName,
-        password: profileForm.password || undefined,
       });
 
       toast.success("Profile updated successfully!");
@@ -428,10 +455,72 @@ export default function AppLayout() {
     }
   };
 
+  const handleChangePassword = async () => {
+    const errs = {};
+    const curPass = changePasswordForm.currentPassword?.trim();
+    const newPass = changePasswordForm.newPassword?.trim();
+    const confPass = changePasswordForm.confirmPassword?.trim();
+
+    const requiredMsg = "This field is required";
+
+    if (!curPass) {
+      errs.currentPassword = requiredMsg;
+    }
+
+    if (!newPass) {
+      errs.newPassword = requiredMsg;
+    } else if (newPass.length !== 8) {
+      errs.newPassword = "Password must be exactly 8 characters";
+    } else if (newPass === curPass) {
+      errs.newPassword = "New password must be different from current password";
+    }
+
+    if (!confPass) {
+      errs.confirmPassword = requiredMsg;
+    } else if (newPass !== confPass) {
+      errs.confirmPassword = "Passwords do not match";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setChangePasswordErrors(errs);
+      if (!curPass || !newPass || !confPass) {
+        toast.error("This field is required");
+      } else if (errs.newPassword) {
+        toast.error(errs.newPassword);
+      } else if (errs.confirmPassword) {
+        toast.error(errs.confirmPassword);
+      } else {
+        toast.error("This field is required");
+      }
+      return;
+    }
+
+    setChangePasswordLoading(true);
+    try {
+      await changePasswordAsync({
+        currentPassword: changePasswordForm.currentPassword,
+        newPassword: changePasswordForm.newPassword,
+        confirmPassword: changePasswordForm.confirmPassword,
+      });
+      toast.success("Password changed successfully!");
+      setChangePasswordDialogOpen(false);
+      setChangePasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setChangePasswordErrors({});
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Failed to change password";
+      toast.error(msg);
+      if (msg.toLowerCase().includes("current password")) {
+        setChangePasswordErrors({ currentPassword: msg });
+      }
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
+
 
   const handleLogout = async () => {
     await logout();
-    navigate("/login");
+    navigate("/login", { replace: true, state: null });
   };
 
   const isChildActive = (item) => {
@@ -776,7 +865,12 @@ export default function AppLayout() {
           <MenuItem
             onClick={() => {
               setProfileMenuAnchor(null);
-              setProfileDialogOpen(true);
+              setChangePasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+              setChangePasswordErrors({});
+              setShowCurrentPassword(false);
+              setShowNewPassword(false);
+              setShowConfirmPassword(false);
+              setChangePasswordDialogOpen(true);
             }}
             sx={{ fontSize: "0.85rem", fontWeight: 600, py: 1, gap: 1.5 }}
           >
@@ -803,6 +897,9 @@ export default function AppLayout() {
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+      {/* Role Switching Fullscreen Transition Loader */}
+      {isSwitchingRole && <AppPageLoader fullScreen opaque text="Switching role..." />}
+
       {/* Mobile hamburger */}
       <Box sx={{ display: { xs: "flex", md: "none" }, position: "fixed", top: 12, left: 12, zIndex: 1300 }}>
         {!mobileOpen && (
@@ -969,7 +1066,7 @@ export default function AppLayout() {
             </Box>
           </Box>
 
-          {/* Row 3: Date of Birth & Joining Date */}
+          {/* Row 3: Date of Birth & Role */}
           <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
             <Box sx={{ flex: 1 }}>
               <AppDateInput
@@ -985,23 +1082,6 @@ export default function AppLayout() {
               />
             </Box>
             <Box sx={{ flex: 1 }}>
-              <AppDateInput
-                label="Joining Date"
-                value={profileForm.joiningDate}
-                onChange={(newValue) => {
-                  setProfileForm((prev) => ({ ...prev, joiningDate: newValue }));
-                  if (profileErrors.joiningDate) setProfileErrors((prev) => ({ ...prev, joiningDate: "" }));
-                }}
-                error={!!profileErrors.joiningDate}
-                helperText={profileErrors.joiningDate}
-                required
-              />
-            </Box>
-          </Box>
-
-          {/* Row 4: Role & Member Type */}
-          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
-            <Box sx={{ flex: 1 }}>
               <AppInput
                 label="Role"
                 value={profileForm.roleName || authState?.role || "Member"}
@@ -1009,59 +1089,138 @@ export default function AppLayout() {
                 helperText="System role is managed by administrator"
               />
             </Box>
-            <Box sx={{ flex: 1 }}>
-              <AppSelect
-                label="Work Type"
-                value={profileForm.workType || profileForm.memberType || workTypeOptions[0]?.value || "Office"}
-                onChange={(e) => {
-                  setProfileForm((prev) => ({ ...prev, workType: e.target.value, memberType: e.target.value }));
-                  if (profileErrors.workType) setProfileErrors((prev) => ({ ...prev, workType: "" }));
-                  if (profileErrors.memberType) setProfileErrors((prev) => ({ ...prev, memberType: "" }));
-                }}
-                options={workTypeOptions}
-                placeholder="Select work type"
-                error={!!profileErrors.workType || !!profileErrors.memberType}
-                helperText={profileErrors.workType || profileErrors.memberType}
-              />
-            </Box>
           </Box>
+        </Box>
+      </AppDialog>
 
-          <Divider sx={{ my: 0.5, borderColor: "rgba(74, 63, 107, 0.08)" }} />
+      {/* ── Change Password Dialog ────────────────────────────────────────── */}
+      <AppDialog
+        open={changePasswordDialogOpen}
+        onClose={() => setChangePasswordDialogOpen(false)}
+        title="Change Password"
+        maxWidth="xs"
+        showCloseIcon={false}
+        actions={
+          <>
+            <AppButton variant="outlined" onClick={() => setChangePasswordDialogOpen(false)}>
+              Cancel
+            </AppButton>
+            <AppButton
+              variant="contained"
+              onClick={handleChangePassword}
+              loading={changePasswordLoading}
+              sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}
+            >
+              Update
+            </AppButton>
+          </>
+        }
+      >
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2.2, pt: 1, pb: 1, position: "relative" }}>
+          {/* Browser autofill decoy to prevent password manager from auto-loading credentials */}
+          <div style={{ position: "absolute", opacity: 0, height: 0, width: 0, overflow: "hidden", pointerEvents: "none" }} aria-hidden="true">
+            <input type="text" name="decoy_username" tabIndex={-1} autoComplete="username" />
+            <input type="password" name="decoy_password" tabIndex={-1} autoComplete="current-password" />
+          </div>
 
-          <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ letterSpacing: "0.05em", mt: -1 }}>
-            Change Password (Optional)
-          </Typography>
+          <AppInput
+            label="Current Password"
+            type={showCurrentPassword ? "text" : "password"}
+            value={changePasswordForm.currentPassword}
+            maxLength={20}
+            placeholder="Enter current password"
+            name="current_password_unautofill"
+            autoComplete="new-password"
+            onChange={(e) => {
+              const val = e.target.value;
+              setChangePasswordForm((prev) => ({ ...prev, currentPassword: val }));
+              if (changePasswordErrors.currentPassword) {
+                setChangePasswordErrors((prev) => ({ ...prev, currentPassword: "" }));
+              }
+            }}
+            error={!!changePasswordErrors.currentPassword}
+            helperText={changePasswordErrors.currentPassword}
+            required
+            endAdornment={
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  onClick={() => setShowCurrentPassword((prev) => !prev)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  edge="end"
+                  aria-label="toggle current password visibility"
+                >
+                  {showCurrentPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                </IconButton>
+              </InputAdornment>
+            }
+          />
 
-          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
-            <Box sx={{ flex: 1 }}>
-              <AppInput
-                label="New Password"
-                type="password"
-                value={profileForm.password}
-                onChange={(e) => {
-                  setProfileForm((prev) => ({ ...prev, password: e.target.value }));
-                  if (profileErrors.password) setProfileErrors((prev) => ({ ...prev, password: "" }));
-                }}
-                maxLength={50}
-                error={!!profileErrors.password}
-                helperText={profileErrors.password}
-              />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <AppInput
-                label="Confirm Password"
-                type="password"
-                value={profileForm.confirmPassword}
-                onChange={(e) => {
-                  setProfileForm((prev) => ({ ...prev, confirmPassword: e.target.value }));
-                  if (profileErrors.confirmPassword) setProfileErrors((prev) => ({ ...prev, confirmPassword: "" }));
-                }}
-                maxLength={50}
-                error={!!profileErrors.confirmPassword}
-                helperText={profileErrors.confirmPassword}
-              />
-            </Box>
-          </Box>
+          <AppInput
+            label="New Password"
+            type={showNewPassword ? "text" : "password"}
+            value={changePasswordForm.newPassword}
+            maxLength={8}
+            placeholder="Enter 8 characters"
+            name="new_password_unautofill"
+            autoComplete="new-password"
+            onChange={(e) => {
+              const val = e.target.value;
+              setChangePasswordForm((prev) => ({ ...prev, newPassword: val }));
+              if (changePasswordErrors.newPassword) {
+                setChangePasswordErrors((prev) => ({ ...prev, newPassword: "" }));
+              }
+            }}
+            error={!!changePasswordErrors.newPassword}
+            helperText={changePasswordErrors.newPassword || "8 characters"}
+            required
+            endAdornment={
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  edge="end"
+                  aria-label="toggle new password visibility"
+                >
+                  {showNewPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                </IconButton>
+              </InputAdornment>
+            }
+          />
+
+          <AppInput
+            label="Confirm Password"
+            type={showConfirmPassword ? "text" : "password"}
+            value={changePasswordForm.confirmPassword}
+            maxLength={8}
+            placeholder="Re-enter 8 characters"
+            name="confirm_password_unautofill"
+            autoComplete="new-password"
+            onChange={(e) => {
+              const val = e.target.value;
+              setChangePasswordForm((prev) => ({ ...prev, confirmPassword: val }));
+              if (changePasswordErrors.confirmPassword) {
+                setChangePasswordErrors((prev) => ({ ...prev, confirmPassword: "" }));
+              }
+            }}
+            error={!!changePasswordErrors.confirmPassword}
+            helperText={changePasswordErrors.confirmPassword}
+            required
+            endAdornment={
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  edge="end"
+                  aria-label="toggle confirm password visibility"
+                >
+                  {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                </IconButton>
+              </InputAdornment>
+            }
+          />
         </Box>
       </AppDialog>
 
