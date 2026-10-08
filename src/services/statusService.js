@@ -1,9 +1,8 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const getStatusesAsync = async (activeOnly = false, module = "") => {
+export const getStatusesAsync = async (activeOnly = false) => {
   const params = new URLSearchParams();
   if (activeOnly) params.append("activeOnly", "true");
-  if (module && module !== "ALL") params.append("module", module);
   const queryStr = params.toString();
   const url = queryStr ? `/statuses/getAllStatusAsync?${queryStr}` : "/statuses/getAllStatusAsync";
   const result = await getApi(url);
@@ -11,23 +10,11 @@ export const getStatusesAsync = async (activeOnly = false, module = "") => {
 };
 
 export const getAllModuleAsync = async () => {
-  try {
-    const result = await getApi("/statuses/getAllModuleAsync");
-    if (Array.isArray(result) && result.length > 0) return result;
-  } catch (e) {
-    // fallback
-  }
-  try {
-    const result = await getApi("/statuses/getModulesAsync");
-    if (Array.isArray(result) && result.length > 0) return result;
-  } catch (e) {
-    // fallback
-  }
   return [];
 };
 
 export const getModulesAsync = async () => {
-  return await getAllModuleAsync();
+  return [];
 };
 
 export const getStatusByIdAsync = async (id) => {

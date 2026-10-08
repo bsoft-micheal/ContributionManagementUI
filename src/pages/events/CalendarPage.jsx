@@ -343,7 +343,7 @@ export default function CalendarPage({ isEmbedded = false }) {
 
   const categoryOptions = useMemo(() => {
     const set = new Set();
-    const list = [{ label: "All Categories", value: "ALL" }];
+    const list = [{ label: "All Events", value: "ALL" }];
 
     // 1. From eventTypes loaded from backend API
     (eventTypes || []).forEach((t) => {

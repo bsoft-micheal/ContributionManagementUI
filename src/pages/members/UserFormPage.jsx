@@ -30,6 +30,7 @@ import AppMultiSelect from "../../components/common/AppMultiSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   validateForm,
   validateIndianMobile,
