@@ -438,8 +438,8 @@ export default function UserFormPage() {
 
     if (form.createMemberProfile) {
       schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: "Username" };
-      schema.newPassword = { required: true, min: 6, max: 50, label: isEdit ? "New Password" : "Password" };
-      schema.confirmPassword = { required: true, min: 6, max: 50, label: isEdit ? "Confirm New Password" : "Confirm Password" };
+        schema.newPassword = { required: true, min: 6, max: 50, label: isEdit ? "New Password" : "Password" };
+        schema.confirmPassword = { required: true, min: 6, max: 50, label: isEdit ? "Confirm New Password" : "Confirm Password" };
     }
 
     if (form.createMemberProfile && !form.enableMultipleRoles) {

@@ -86,15 +86,30 @@ export default function AppButton({
     </Button>
   );
 
-  // If disabled and an explicit tooltip is specified, wrap in Tooltip
-  if (isBtnDisabled && disabledTooltip) {
-    return (
-      <Tooltip title={disabledTooltip} arrow placement="top">
-        <span style={{ display: "inline-flex", width: props.fullWidth ? "100%" : "auto", cursor: "not-allowed", verticalAlign: "middle" }}>
-          {buttonElement}
-        </span>
-      </Tooltip>
+  // If disabled, wrap in a container to show not-allowed cursor and optional tooltip
+  if (isBtnDisabled) {
+    const tipTitle = disabledTooltip|| tooltip || "Disabled";
+    const wrappedBtn = (
+      <span
+        style={{
+          display: props.fullWidth ? "flex" : "inline-flex",
+          width: props.fullWidth ? "100%" : "auto",
+          cursor: "not-allowed",
+          verticalAlign: "middle",
+        }}
+      >
+        {buttonElement}
+      </span>
     );
+
+    if (tipTitle) {
+      return (
+        <Tooltip title={tipTitle} arrow placement="top">
+          {wrappedBtn}
+        </Tooltip>
+      );
+    }
+    return wrappedBtn;
   }
 
   // If active with explicit tooltip
