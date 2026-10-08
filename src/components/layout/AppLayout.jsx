@@ -396,8 +396,8 @@ export default function AppLayout() {
     }
 
     if (profileForm.password) {
-      if (profileForm.password.length < 6) {
-        errors.password = "Password must be at least 6 characters";
+      if (profileForm.password.length < 8) {
+        errors.password = "Password must be at least 8 characters";
       }
       if (profileForm.password !== profileForm.confirmPassword) {
         errors.confirmPassword = "Passwords do not match";

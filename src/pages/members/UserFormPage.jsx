@@ -30,9 +30,12 @@ import AppMultiSelect from "../../components/common/AppMultiSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
-import { useAuth } from "../../contexts/AuthContext";
-import { validateForm, validateIndianMobile } from "../../utils/validation";
 import {
+  validateForm,
+  validateIndianMobile,
+  validatePassword,
+  validateConfirmPassword,
+} from "../../utils/validation";
   getUsersAsync,
   createUserAsync,
   updateUserAsync,
@@ -362,6 +365,45 @@ export default function UserFormPage() {
     }
 
     setForm((prev) => ({ ...prev, [field]: value }));
+
+    if (field === "newPassword") {
+      const pwErr = validatePassword(value, {
+        username: form.username,
+        email: form.email,
+        isRequired: Boolean(form.createMemberProfile),
+      });
+      setErrors((prev) => {
+        const nextErrors = { ...prev, newPassword: pwErr };
+        if (form.confirmPassword) {
+          nextErrors.confirmPassword = validateConfirmPassword(form.confirmPassword, value, {
+            isRequired: Boolean(form.createMemberProfile),
+          });
+        }
+        return nextErrors;
+      });
+      return;
+    }
+
+    if (field === "confirmPassword") {
+      const cpwErr = validateConfirmPassword(value, form.newPassword, {
+        isRequired: Boolean(form.createMemberProfile),
+      });
+      setErrors((prev) => ({ ...prev, confirmPassword: cpwErr }));
+      return;
+    }
+
+    if (field === "username" || field === "email") {
+      if (form.newPassword) {
+        const pwErr = validatePassword(form.newPassword, {
+          username: field === "username" ? value : form.username,
+          email: field === "email" ? value : form.email,
+          isRequired: Boolean(form.createMemberProfile),
+        });
+        setErrors((prev) => ({ ...prev, [field]: "", newPassword: pwErr }));
+        return;
+      }
+    }
+
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -469,8 +511,6 @@ export default function UserFormPage() {
 
     if (form.createMemberProfile) {
       schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: "Username" };
-        schema.newPassword = { required: true, min: 6, max: 50, label: isEdit ? "New Password" : "Password" };
-        schema.confirmPassword = { required: true, min: 6, max: 50, label: isEdit ? "Confirm New Password" : "Confirm Password" };
     }
 
     if (form.createMemberProfile && !form.enableMultipleRoles) {
@@ -478,6 +518,24 @@ export default function UserFormPage() {
     }
 
     const e = validateForm(form, schema);
+
+    if (form.createMemberProfile) {
+      const pwErr = validatePassword(form.newPassword, {
+        username: form.username,
+        email: form.email,
+        isRequired: true,
+      });
+      if (pwErr) {
+        e.newPassword = pwErr;
+      }
+
+      const cpwErr = validateConfirmPassword(form.confirmPassword, form.newPassword, {
+        isRequired: true,
+      });
+      if (cpwErr) {
+        e.confirmPassword = cpwErr;
+      }
+    }
 
     // Validate Indian mobile number
     const phoneErr = validateIndianMobile(form.phone);
@@ -493,12 +551,6 @@ export default function UserFormPage() {
         e.primaryRole = "This field is required";
       } else if (form.secondaryRoles && !form.secondaryRoles.includes(form.primaryRole)) {
         e.primaryRole = "Primary Role must be one of the selected Secondary Roles";
-      }
-    }
-
-    if (form.createMemberProfile) {
-      if (form.newPassword && form.confirmPassword && form.newPassword !== form.confirmPassword) {
-        e.confirmPassword = "Passwords do not match";
       }
     }
 
@@ -1018,13 +1070,13 @@ export default function UserFormPage() {
                     }
                     placeholder={
                       isEdit
-                        ? "Enter new password (min 6 characters)"
-                        : "Enter password (min 6 characters)"
+                        ? "Enter new password (min 8 characters)"
+                        : "Enter password (min 8 characters)"
                     }
                     type={showPassword ? "text" : "password"}
                     value={form.newPassword}
                     onChange={(e) => fieldChange("newPassword", e.target.value)}
-                    maxLength={50}
+                    maxLength={64}
                     autoComplete="new-password"
                     error={!!errors.newPassword}
                     helperText={errors.newPassword}
@@ -1062,7 +1114,7 @@ export default function UserFormPage() {
                     onChange={(e) =>
                       fieldChange("confirmPassword", e.target.value)
                     }
-                    maxLength={50}
+                    maxLength={64}
                     autoComplete="new-password"
                     error={!!errors.confirmPassword}
                     helperText={errors.confirmPassword}
