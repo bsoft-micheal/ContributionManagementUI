@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Card, FormControlLabel, Link, Stack, Switch, TextField, Typography, IconButton, InputAdornment } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
 import { useLocation, useNavigate, Link as RouterLink } from "react-router-dom";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import logo from "../../assets/logo.png";
+import logo from "../../assets/image (2).png";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -324,18 +321,19 @@ export default function LoginPage() {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3 }}>
               <Box
                 sx={{
-                  width: 42,
-                  height: 42,
+                  width: 44,
+                  height: 44,
                   borderRadius: "10px",
-                  bgcolor: "#ffffff",
+                  border: "1.5px solid rgba(74, 63, 107, 0.15)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 4px 14px rgba(74, 63, 107, 0.1), inset 0 0 0 1px rgba(74, 63, 107, 0.05)",
-                  p: 0.6,
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  p: 0,
                 }}
               >
-                <img src={logo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                <img src={logo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </Box>
               <Stack spacing={0} sx={{ textAlign: "left" }}>
                 <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: "0.875rem", letterSpacing: "0.02em", lineHeight: 1.15 }}>
