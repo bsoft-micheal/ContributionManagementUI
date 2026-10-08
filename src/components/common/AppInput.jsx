@@ -1,5 +1,8 @@
-import { TextField, Box, Typography, InputAdornment } from "@mui/material";
+import { useState } from "react";
+import { TextField, Box, Typography, InputAdornment, IconButton } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { sanitizeInput } from "../../utils/validation";
 
 export default function AppInput({
@@ -21,6 +24,32 @@ export default function AppInput({
   ...props
 }) {
   const theme = useTheme();
+  const [showPassword, setShowPassword] = useState(false);
+
+  const isPasswordType = type === "password";
+  const effectiveType = isPasswordType ? (showPassword ? "text" : "password") : type;
+
+  const defaultPasswordAdornment = isPasswordType && !endAdornment && !InputProps.endAdornment ? (
+    <InputAdornment position="end" sx={{ ml: 0.5 }}>
+      <IconButton
+        size="small"
+        onClick={() => setShowPassword((prev) => !prev)}
+        onMouseDown={(e) => e.preventDefault()}
+        edge="end"
+        aria-label={showPassword ? "Hide password" : "Show password"}
+        sx={{
+          color: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.7)" : "#64748b"),
+          p: 0.5,
+        }}
+      >
+        {showPassword ? (
+          <VisibilityOff sx={{ fontSize: "1.1rem" }} />
+        ) : (
+          <Visibility sx={{ fontSize: "1.1rem" }} />
+        )}
+      </IconButton>
+    </InputAdornment>
+  ) : undefined;
 
   const handleInputChange = (e) => {
     let val = e.target.value;
@@ -69,7 +98,7 @@ export default function AppInput({
       <TextField
         value={value}
         onChange={handleInputChange}
-        type={type}
+        type={effectiveType}
         fullWidth={fullWidth}
         placeholder={effectivePlaceholder}
         variant="outlined"
@@ -153,7 +182,7 @@ export default function AppInput({
             <InputAdornment position="end" sx={{ ml: 0.5 }}>
               {endAdornment}
             </InputAdornment>
-          ) : undefined,
+          ) : defaultPasswordAdornment,
           ...InputProps,
         }}
         {...props}
@@ -161,3 +190,4 @@ export default function AppInput({
     </Box>
   );
 }
+

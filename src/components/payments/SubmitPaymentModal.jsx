@@ -745,10 +745,20 @@ export default function SubmitPaymentModal({
     let sanitized = value;
     if (field === "amount") {
       const targetAmt = Number(formData.amount) || 0;
+      const otherRowsSum = Math.round(
+        splitRows
+          .filter((r) => r.id !== id)
+          .reduce((sum, r) => sum + (Number(r.amount) || 0), 0) * 100
+      ) / 100;
+
+      const maxAllowedForThisRow = Math.max(0, Math.round((targetAmt - otherRowsSum) * 100) / 100);
       const numVal = Number(sanitized);
-      if (targetAmt > 0 && !isNaN(numVal) && numVal > targetAmt) {
-        // Automatically clamp to target total due amount so user cannot enter more than due
-        sanitized = String(targetAmt);
+
+      if (targetAmt > 0 && !isNaN(numVal) && numVal > maxAllowedForThisRow) {
+        // Automatically clamp to the max remaining unallocated amount available for this row
+        sanitized = String(maxAllowedForThisRow);
+      } else if (numVal < 0) {
+        sanitized = "0";
       } else if (sanitized.length > 10) {
         sanitized = sanitized.slice(0, 10);
       }
@@ -1429,15 +1439,6 @@ export default function SubmitPaymentModal({
                         : "#dc2626",
                   }}
                 />
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={handleQuickSplitEvenly}
-                  startIcon={<ResetIcon sx={{ fontSize: 14 }} />}
-                  sx={{ fontSize: "0.7rem", py: 0.3, px: 1, textTransform: "none", borderRadius: "8px" }}
-                >
-                  Split Evenly
-                </Button>
                 <Button
                   size="small"
                   variant="contained"
