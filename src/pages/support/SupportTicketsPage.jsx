@@ -1253,6 +1253,8 @@ export default function SupportTicketsPage() {
                 if (errors.ticketType) setErrors((p) => ({ ...p, ticketType: "" }));
               }}
               options={ticketTypeOptions.filter((o) => o.value !== "ALL")}
+              error={Boolean(errors.ticketType)}
+              helperText={errors.ticketType}
               required
             />
           </Grid>
