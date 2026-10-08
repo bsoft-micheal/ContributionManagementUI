@@ -14,6 +14,7 @@ import apiClient from "../../services/apiClient";
 import { exportSheets } from "../../utils/exportToExcel";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
+import AppDateInput from "../../components/common/AppDateInput";
 import AppButton from "../../components/common/AppButton";
 import AppPieChart from "../../components/common/AppPieChart";
 import ExecutiveFinancialBarChart from "../../components/dashboard/ExecutiveFinancialBarChart";
@@ -361,13 +362,13 @@ export default function ReportsPage({ mode = "event" }) {
 
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
-  const [filterYear, setFilterYear] = useState(dayjs().year());
+  const [filterFromDate, setFilterFromDate] = useState(dayjs().startOf("month"));
+  const [filterToDate, setFilterToDate] = useState(dayjs().endOf("month"));
   const [filterEventType, setFilterEventType] = useState("ALL");
   const [filterEvent, setFilterEvent] = useState("ALL");
   const [filters, setFilters] = useState({
-    month: dayjs().month() + 1,
-    year: dayjs().year(),
+    fromDate: dayjs().startOf("month"),
+    toDate: dayjs().endOf("month"),
     eventType: "ALL",
     event: "ALL",
   });
@@ -488,11 +489,25 @@ export default function ReportsPage({ mode = "event" }) {
     }
   };
 
+  const isDateInRange = useCallback((dateStr, fromDate, toDate) => {
+    if (!dateStr) return true;
+    const d = dayjs(dateStr);
+    if (!d.isValid()) return true;
+
+    if (fromDate && dayjs(fromDate).isValid()) {
+      if (d.isBefore(dayjs(fromDate).startOf("day"))) return false;
+    }
+    if (toDate && dayjs(toDate).isValid()) {
+      if (d.isAfter(dayjs(toDate).endOf("day"))) return false;
+    }
+    return true;
+  }, []);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const params = { month: filters.month === 0 ? null : filters.month, year: filters.year === 0 ? null : filters.year };
+        const params = { month: null, year: null };
         const { data: res } = await apiClient.get("/reports/getSummaryReportAsync", { params });
         setReport(res?.data !== undefined ? res.data : res);
       } catch {
@@ -502,7 +517,7 @@ export default function ReportsPage({ mode = "event" }) {
       }
     }
     load();
-  }, [filters]);
+  }, []);
 
   /* Options */
   const monthOptions = [
@@ -609,6 +624,14 @@ export default function ReportsPage({ mode = "event" }) {
   /* Filtered Collections */
   const filteredEventCollections = useMemo(() => {
     let list = report?.eventCollections ?? [];
+
+    if (filters.fromDate || filters.toDate) {
+      list = list.filter((e) => {
+        const d = e.eventDate || e.createdAt || e.CreatedOn;
+        return isDateInRange(d, filters.fromDate, filters.toDate);
+      });
+    }
+
     if (filters.eventType && filters.eventType !== "ALL") {
       list = list.filter((e) => (e.eventTypeName || "General").trim().toLowerCase() === filters.eventType.trim().toLowerCase());
     }
@@ -616,7 +639,7 @@ export default function ReportsPage({ mode = "event" }) {
       list = list.filter((e) => (e.eventName || "").trim().toLowerCase() === filters.event.trim().toLowerCase());
     }
     return list;
-  }, [report?.eventCollections, filters.eventType, filters.event]);
+  }, [report?.eventCollections, filters, isDateInRange]);
 
   const filteredMemberContributions = useMemo(() => {
     let list = report?.memberContributionHistory ?? [];
@@ -625,18 +648,49 @@ export default function ReportsPage({ mode = "event" }) {
       list = list.filter((m) => isCurrentMember(m));
     }
 
-    if ((filters.eventType && filters.eventType !== "ALL") || (filters.event && filters.event !== "ALL")) {
-      list = list.filter((m) => {
+    const hasDateFilter = Boolean(filters.fromDate || filters.toDate);
+    const hasTypeFilter = Boolean(filters.eventType && filters.eventType !== "ALL");
+    const hasEventFilter = Boolean(filters.event && filters.event !== "ALL");
+
+    if (hasDateFilter || hasTypeFilter || hasEventFilter) {
+      list = list.map((m) => {
         const events = m.events || [];
-        return events.some((ev) => {
-          const matchType = !filters.eventType || filters.eventType === "ALL" || (ev.categoryName || "General").trim().toLowerCase() === filters.eventType.trim().toLowerCase();
-          const matchEv = !filters.event || filters.event === "ALL" || (ev.eventName || "").trim().toLowerCase() === filters.event.trim().toLowerCase();
-          return matchType && matchEv;
+        const filteredEvents = events.filter((ev) => {
+          const evDate = ev.eventDate || ev.paymentDate || ev.createdAt || ev.CreatedOn;
+          const matchDate = isDateInRange(evDate, filters.fromDate, filters.toDate);
+          const matchType = !hasTypeFilter || (ev.categoryName || ev.eventTypeName || "General").trim().toLowerCase() === filters.eventType.trim().toLowerCase();
+          const matchEv = !hasEventFilter || (ev.eventName || "").trim().toLowerCase() === filters.event.trim().toLowerCase();
+          return matchDate && matchType && matchEv;
         });
+
+        if (hasDateFilter || hasTypeFilter || hasEventFilter) {
+          const exp = filteredEvents.reduce((s, e) => s + Number(e.expectedAmount || e.amount || 0), 0);
+          const paid = filteredEvents.reduce((s, e) => s + Number(e.paidAmount || ((e.paymentStatus || "").toLowerCase() === "paid" ? (e.expectedAmount || e.amount || 0) : 0)), 0);
+          const paidCount = filteredEvents.filter((e) => (e.paymentStatus || "").toLowerCase() === "paid").length;
+          const pendingCount = filteredEvents.length - paidCount;
+
+          return {
+            ...m,
+            events: filteredEvents,
+            totalExpectedAmount: exp,
+            totalPaidAmount: paid,
+            paidEventsCount: paidCount,
+            pendingEventsCount: pendingCount,
+          };
+        }
+
+        return {
+          ...m,
+          events: filteredEvents,
+        };
       });
+
+      if (hasDateFilter || hasEventFilter) {
+        list = list.filter((m) => (m.events && m.events.length > 0) || (m.totalExpectedAmount > 0));
+      }
     }
     return list;
-  }, [report?.memberContributionHistory, filters.eventType, filters.event, isMember, isCurrentMember]);
+  }, [report?.memberContributionHistory, filters, isMember, isCurrentMember, isDateInRange]);
 
   /* Filtered Payment History (Event Type & Event against) */
   const filteredPaymentHistory = useMemo(() => {
@@ -653,17 +707,10 @@ export default function ReportsPage({ mode = "event" }) {
       });
     }
 
-    // Year & Month filter
-    if (filters.year && filters.year !== 0) {
+    if (filters.fromDate || filters.toDate) {
       list = list.filter((t) => {
         const d = t.paymentDate || t.PaymentDate || t.createdOn || t.CreatedOn || t.createdAt;
-        return d ? dayjs(d).year() === Number(filters.year) : true;
-      });
-    }
-    if (filters.month && filters.month !== 0) {
-      list = list.filter((t) => {
-        const d = t.paymentDate || t.PaymentDate || t.createdOn || t.CreatedOn || t.createdAt;
-        return d ? dayjs(d).month() + 1 === Number(filters.month) : true;
+        return isDateInRange(d, filters.fromDate, filters.toDate);
       });
     }
 
@@ -677,7 +724,7 @@ export default function ReportsPage({ mode = "event" }) {
       const matchEv = !filters.event || filters.event === "ALL" || tEventName === filters.event.trim().toLowerCase();
       return matchType && matchEv;
     });
-  }, [paymentTransactions, isMember, currentUserId, currentUserName, filters, eventsList]);
+  }, [paymentTransactions, isMember, currentUserId, currentUserName, filters, eventsList, isDateInRange]);
 
   /* Rupee formatter */
   const INR = (n) => "\u20B9" + Number(n || 0).toLocaleString();
@@ -1405,7 +1452,7 @@ export default function ReportsPage({ mode = "event" }) {
 
   const handleExport = () => {
     if (!canExport || !hasData) {
-      toast.warning("No records available to export.");
+      toast.warning("Record not found");
       return;
     }
     try {
@@ -1479,9 +1526,17 @@ export default function ReportsPage({ mode = "event" }) {
   };
 
   const periodLabel = useMemo(() => {
-    let text = filters.month === 0
-      ? `All Months, ${filters.year}`
-      : `${dayjs().month(filters.month - 1).format("MMMM")} ${filters.year}`;
+    let text = "";
+    if (filters.fromDate && filters.toDate) {
+      text = `${dayjs(filters.fromDate).format("DD/MM/YYYY")} - ${dayjs(filters.toDate).format("DD/MM/YYYY")}`;
+    } else if (filters.fromDate) {
+      text = `From ${dayjs(filters.fromDate).format("DD/MM/YYYY")}`;
+    } else if (filters.toDate) {
+      text = `Up to ${dayjs(filters.toDate).format("DD/MM/YYYY")}`;
+    } else {
+      text = "All Time";
+    }
+
     if (filters.event && filters.event !== "ALL") {
       text += ` • ${filters.event}`;
     } else if (filters.eventType && filters.eventType !== "ALL") {
@@ -1580,7 +1635,7 @@ export default function ReportsPage({ mode = "event" }) {
               size="small"
               variant="contained"
               disabled={!canExport || !hasData || loading}
-              disabledTooltip={!canExport ? "You don't have permission to export" : "No records available to export"}
+              disabledTooltip={!canExport ? "You don't have permission to export" : "Record not found"}
               onClick={handleExport}
               startIcon={<FileDownloadIcon sx={{ fontSize: 18 }} />}
               sx={{
@@ -1644,23 +1699,25 @@ export default function ReportsPage({ mode = "event" }) {
                 gap: 1.2,
               }}
             >
-              <Box sx={{ width: { xs: "100%", sm: 125, md: 135 } }}>
-                <AppSelect
-                  label="Year"
-                  value={filterYear}
-                  onChange={(e) => setFilterYear(Number(e.target.value))}
-                  options={yearOptions}
+              <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+                <AppDateInput
+                  label="From Date"
+                  placeholder="From Date"
+                  value={filterFromDate}
+                  onChange={(val) => setFilterFromDate(val)}
+                  clearable
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 165, md: 175 } }}>
-                <AppSelect
-                  label="Month"
-                  value={filterMonth}
-                  onChange={(e) => setFilterMonth(Number(e.target.value))}
-                  options={monthOptions}
+              <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+                <AppDateInput
+                  label="To Date"
+                  placeholder="To Date"
+                  value={filterToDate}
+                  onChange={(val) => setFilterToDate(val)}
+                  clearable
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
                 <AppSelect
                   label="Event Type"
                   value={filterEventType}
@@ -1668,7 +1725,7 @@ export default function ReportsPage({ mode = "event" }) {
                   options={eventTypeOptions}
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
                 <AppSelect
                   label="Event"
                   value={filterEvent}
@@ -1681,7 +1738,7 @@ export default function ReportsPage({ mode = "event" }) {
                   variant="contained"
                   size="small"
                   startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
-                  onClick={() => setFilters({ month: filterMonth, year: filterYear, eventType: filterEventType, event: filterEvent })}
+                  onClick={() => setFilters({ fromDate: filterFromDate, toDate: filterToDate, eventType: filterEventType, event: filterEvent })}
                   sx={{
                     height: 34,
                     minHeight: 34,
@@ -1698,13 +1755,11 @@ export default function ReportsPage({ mode = "event" }) {
                     size="small"
                     startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
                     onClick={() => {
-                      const m = dayjs().month() + 1;
-                      const y = dayjs().year();
-                      setFilterMonth(m);
-                      setFilterYear(y);
+                      setFilterFromDate(null);
+                      setFilterToDate(null);
                       setFilterEventType("ALL");
                       setFilterEvent("ALL");
-                      setFilters({ month: m, year: y, eventType: "ALL", event: "ALL" });
+                      setFilters({ fromDate: null, toDate: null, eventType: "ALL", event: "ALL" });
                     }}
                     sx={{
                       height: 34,
@@ -1770,35 +1825,9 @@ export default function ReportsPage({ mode = "event" }) {
               >
                 <EventIcon sx={{ fontSize: 32 }} />
               </Box>
-              <Typography variant="h6" fontWeight={700} sx={{ mb: 1, color: "text.primary", fontSize: "1.1rem" }}>
-                No Record
+              <Typography variant="h6" fontWeight={700} sx={{ color: "text.primary", fontSize: "1.05rem" }}>
+                Record not found
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 440, mx: "auto", mb: 2.5, fontSize: "0.85rem" }}>
-                No events or contribution records found for the selected period.
-              </Typography>
-              <AppButton
-                variant="outlined"
-                size="small"
-                startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
-                onClick={() => {
-                  const m = dayjs().month() + 1;
-                  const y = dayjs().year();
-                  setFilterMonth(m);
-                  setFilterYear(y);
-                  setFilterEventType("ALL");
-                  setFilterEvent("ALL");
-                  setFilters({ month: m, year: y, eventType: "ALL", event: "ALL" });
-                }}
-                sx={{
-                  borderRadius: "8px",
-                  fontWeight: 600,
-                  px: 2,
-                  color: "primary.main",
-                  borderColor: "primary.main",
-                }}
-              >
-                Reset Filter
-              </AppButton>
             </Card>
           ) : (
             <Stack spacing={3}>
@@ -2174,7 +2203,7 @@ export default function ReportsPage({ mode = "event" }) {
                     size="small"
                     variant="outlined"
                     disabled={modalLoading || (memberEvents || []).length === 0}
-                    disabledTooltip="No records available to export"
+                    disabledTooltip="Record not found"
                     startIcon={<FileDownloadIcon sx={{ fontSize: 16 }} />}
                     onClick={handleExportMemberEvents}
                     sx={{ height: 32, fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap" }}
