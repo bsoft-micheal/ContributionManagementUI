@@ -88,7 +88,9 @@ export default function AppButton({
 
   // If disabled, wrap in a container to show not-allowed cursor and optional tooltip
   if (isBtnDisabled) {
-    const tipTitle = disabledTooltip|| tooltip || "Disabled";
+    const tipTitle = (disabledTooltip === false || disabledTooltip === "")
+      ? null
+      : (disabledTooltip || tooltip || "Disabled");
     const wrappedBtn = (
       <span
         style={{

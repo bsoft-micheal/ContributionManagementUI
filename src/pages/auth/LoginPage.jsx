@@ -604,6 +604,7 @@ export default function LoginPage() {
                   type="submit"
                   size="medium"
                   disabled={loading || (showOtpField && isLockedOut)}
+                  disabledTooltip={false}
                   fullWidth
                   sx={{
                     height: 36,
@@ -639,6 +640,7 @@ export default function LoginPage() {
                     variant="outlined"
                     size="large"
                     disabled={loading}
+                    disabledTooltip={false}
                     fullWidth
                     onClick={() => {
                       setShowOtpField(false);
