@@ -5,7 +5,6 @@ import {
   Grid,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import UpdateRoundedIcon from "@mui/icons-material/UpdateRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 import TrendingDownRoundedIcon from "@mui/icons-material/TrendingDownRounded";
 import dayjs from "dayjs";
@@ -20,9 +19,11 @@ import { updateBudgetCalculationRateAsync } from "../../services/budgetCalculati
 
 const formatRateAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
-  const cleanVal = String(value).replace(/[^0-9]/g, "");
+  const cleanVal = String(value).replace(/[^0-9]/g, "").slice(0, 8);
   if (!cleanVal) return "";
-  return Number(cleanVal).toLocaleString("en-US");
+  const num = Number(cleanVal);
+  if (isNaN(num)) return "";
+  return num.toLocaleString("en-US");
 };
 
 export default function RateUpdateModal({
@@ -52,9 +53,14 @@ export default function RateUpdateModal({
   if (!item) return null;
 
   const currentRateNum = Number(item.rate ?? 0);
-  const newRateNum = newRate === "" ? null : Number(String(newRate).replace(/[^0-9]/g, ""));
+  const newRateNum = newRate === "" ? null : Number(String(newRate).replace(/[^0-9]/g, "").slice(0, 8));
   
-  const isRateChanged = newRateNum !== null && !isNaN(newRateNum) && newRateNum !== currentRateNum;
+  const isRateChanged =
+    newRateNum !== null &&
+    !isNaN(newRateNum) &&
+    newRateNum !== currentRateNum &&
+    newRateNum <= 10000000 &&
+    !errors.newRate;
   const isIncrease = newRateNum !== null && newRateNum > currentRateNum;
   const isDecrease = newRateNum !== null && newRateNum < currentRateNum;
   
@@ -139,13 +145,12 @@ export default function RateUpdateModal({
       title={`Update Rate - ${item.expenseItem || "Expense Item"}`}
       maxWidth="sm"
       actions={
-        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, width: "100%" }}>
+        <Box sx={{ display: "flex", justifyContent: "center", gap: 1.5, width: "100%" }}>
           <AppButton variant="outlined" onClick={onClose} disabled={submitting}>
             Cancel
           </AppButton>
           <AppButton
             variant="contained"
-            startIcon={<UpdateRoundedIcon />}
             onClick={handleUpdate}
             disabled={submitting}
             sx={{
@@ -233,9 +238,14 @@ export default function RateUpdateModal({
               fullWidth
               value={formatRateAmount(newRate)}
               onChange={(e) => {
-                const raw = e.target.value.replace(/[^0-9]/g, "");
+                const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
                 setNewRate(raw);
-                if (errors.newRate) setErrors((p) => ({ ...p, newRate: "" }));
+                const num = raw === "" ? null : Number(raw);
+                let err = "";
+                if (num !== null && num > 10000000) {
+                  err = "Rate cannot exceed 10,000,000";
+                }
+                setErrors((p) => ({ ...p, newRate: err }));
               }}
               required
               error={!!errors.newRate}

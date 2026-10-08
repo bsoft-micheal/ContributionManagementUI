@@ -73,8 +73,25 @@ body {
 
 /* ── Text selection ───────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(124, 58, 237, 0.18);
-  color: inherit;
+  background: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+::-moz-selection {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+input::selection,
+textarea::selection {
+  background: #b6b0b0 !important;
+  color: #0f172a !important;
+}
+
+input::-moz-selection,
+textarea::-moz-selection {
+  background: #ffffff !important;
+  color: #0f172a !important;
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────────────── */
@@ -251,4 +268,16 @@ span:has(> .Mui-disabled),
   font-size: 0.72rem !important;
   height: 26px !important;
   min-height: 26px !important;
+}
+
+/* ── Override Browser Autofill (Saved Passwords & Inputs) to Light White ─ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+  transition: background-color 5000s ease-in-out 0s !important;
 }

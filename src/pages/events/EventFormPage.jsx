@@ -125,7 +125,7 @@ const sanitizeDecimalAmount = (value) => {
 
 const sanitizeEventName = (value) => {
   if (!value) return "";
-  return String(value).replace(/[^a-zA-Z\s]/g, "").slice(0, 50);
+  return String(value).replace(/[^a-zA-Z\s]/g, "").slice(0, 250);
 };
 
 const initialForm = {
@@ -338,6 +338,7 @@ export default function EventFormPage({
   const [budgetItemsList, setBudgetItemsList] = useState([]);
   const [allowMultipleEvents, setAllowMultipleEvents] = useState(false);
   const [hasPayments, setHasPayments] = useState(false);
+  const [isCustomEventName, setIsCustomEventName] = useState(false);
 
   const isMemberActive = (m) => {
     const active =
@@ -549,6 +550,7 @@ export default function EventFormPage({
             setHasPayments(true);
           }
 
+          setIsCustomEventName(Boolean(detailedEvent.eventName));
           setForm({
             eventId: detailedEvent.eventId || id,
             eventName: detailedEvent.eventName || "",
@@ -580,6 +582,7 @@ export default function EventFormPage({
           setWfhBirthdays(wfhCount);
           setTotalMembers(activeMems.length);
           setExempt(settingsData?.birthdayMembersExempt !== undefined ? Boolean(settingsData.birthdayMembersExempt) : getDefaultBirthdayExempt());
+          setIsCustomEventName(false);
 
           setForm({
             eventName: "",
@@ -1072,7 +1075,7 @@ export default function EventFormPage({
     const isNewBday = newTypeName.toLowerCase().includes("birthday");
 
     let updatedName = form.eventName;
-    if (!isEdit) {
+    if (!isEdit && !isCustomEventName) {
       const monthStr = dayjs(form.eventDate).format("MMMM");
       updatedName = isNewBday
         ? `${monthStr} Birthday Celebration`
@@ -1129,7 +1132,7 @@ export default function EventFormPage({
     );
 
     let updatedName = form.eventName;
-    if (!isEdit) {
+    if (!isEdit && !isCustomEventName) {
       const monthStr = dayjs(form.eventDate).format("MMMM");
       if (selectedTypesList.length === 0) {
         updatedName = `${monthStr} Celebration`;
@@ -1227,7 +1230,7 @@ export default function EventFormPage({
     const newMonth = dayjs(newDate).month();
 
     let newEventName = form.eventName;
-    if (!isEdit) {
+    if (!isEdit && !isCustomEventName) {
       const monthStr = dayjs(newDate).format("MMMM");
       if (selectedTypes.length <= 1) {
         newEventName = isBirthday
@@ -1699,8 +1702,18 @@ export default function EventFormPage({
                     value={form.eventName}
                     onChange={(e) => {
                       const filtered = sanitizeEventName(e.target.value);
+                      const cleanVal = filtered.trim();
                       setForm((c) => ({ ...c, eventName: filtered }));
-                      if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
+                      setIsCustomEventName(Boolean(cleanVal));
+                      let nameErr = "";
+                      if (!cleanVal) {
+                        nameErr = "This field is required";
+                      } else if (cleanVal.length < 3) {
+                        nameErr = "Event Name must be at least 3 characters";
+                      } else if (cleanVal.length > 250) {
+                        nameErr = "Event Name cannot exceed 250 characters";
+                      }
+                      setErrors((p) => ({ ...p, eventName: nameErr }));
                     }}
                     inputProps={{ maxLength: 250 }}
                     error={!!errors.eventName}
