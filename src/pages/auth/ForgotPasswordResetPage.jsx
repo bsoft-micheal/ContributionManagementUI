@@ -58,9 +58,9 @@ export default function ForgotPasswordResetPage() {
       toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
-    if (newPassword.length < 6) {
-      setPasswordError("Password must be at least 6 characters long.");
-      toast.error("Password must be at least 6 characters long.");
+    if (newPassword.length < 8) {
+      setPasswordError("Password must be at least 8 characters long.");
+      toast.error("Password must be at least 8 characters long.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -90,7 +90,7 @@ export default function ForgotPasswordResetPage() {
     }
   };
 
-  const isLengthValid = newPassword.length >= 6;
+  const isLengthValid = newPassword.length >= 8;
   const hasUppercase = /[A-Z]/.test(newPassword);
   const hasNumber = /[0-9]/.test(newPassword);
   const passwordsMatch = newPassword && newPassword === confirmPassword;

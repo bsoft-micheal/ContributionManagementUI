@@ -399,20 +399,20 @@ export default function EventsPage() {
 
   const summaryTotals = useMemo(() => {
     const totalExpected = (displayedEvents || []).reduce((sum, e) => {
-      const exp = Number(e.totalExpectedAmount) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
-      return sum + exp;
+      const exp = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
+      return sum + Math.round(exp);
     }, 0);
     const totalCollected = (displayedEvents || []).reduce((sum, e) => {
-      return sum + Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
+      return sum + Math.round(Number(e.collectedAmount ?? e.totalPaidAmount ?? 0));
     }, 0);
     const totalPending = (displayedEvents || []).reduce((sum, e) => {
-      const exp = Number(e.totalExpectedAmount) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
+      const exp = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
       const col = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
       const pen = Number(e.pendingAmount !== undefined ? e.pendingAmount : (exp - col));
-      return sum + pen;
+      return sum + Math.round(pen);
     }, 0);
     const totalExpenses = (displayedEvents || []).reduce((sum, e) => {
-      return sum + Number(e.expenseAmount || 0);
+      return sum + Math.round(Number(e.expenseAmount || 0));
     }, 0);
     const totalBalance = totalCollected - totalExpenses;
 
@@ -676,10 +676,8 @@ export default function EventsPage() {
       key: "totalExpectedAmount",
       align: "right",
       render: (row) => {
-        const val = Number(row.totalExpectedAmount) > 0
-          ? Number(row.totalExpectedAmount)
-          : Number(row.baseAmount || 0);
-        return `₹${val.toLocaleString("en-IN")}`;
+        const val = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
+        return `₹${Math.round(val).toLocaleString("en-IN")}`;
       }
     },
     {

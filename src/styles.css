@@ -175,19 +175,80 @@ body {
   }
 }
 
-/* ── Global Disabled Elements Hover Cursor ───────────────────────────────── */
+/* ── Global Disabled Elements Hover Cursor & DatePicker Disabled Days ───── */
 button:disabled,
 button[disabled],
 .MuiButtonBase-root.Mui-disabled,
 .MuiButton-root.Mui-disabled,
 .MuiIconButton-root.Mui-disabled,
+.MuiPickersDay-root.Mui-disabled,
+.MuiPickersDay-root:disabled,
+.MuiPickersYear-root.Mui-disabled,
+.MuiPickersYear-yearButton.Mui-disabled,
+.MuiPickersYear-yearButton:disabled,
+.MuiPickersMonth-root.Mui-disabled,
+.MuiPickersMonth-monthButton.Mui-disabled,
+.MuiPickersMonth-monthButton:disabled,
 .Mui-disabled,
 [disabled] {
   cursor: not-allowed !important;
+  pointer-events: auto !important;
 }
 
 span:has(> button:disabled),
 span:has(> .Mui-disabled),
 .disabled-wrapper {
   cursor: not-allowed !important;
+}
+
+.MuiPickersDay-root.Mui-disabled,
+.MuiPickersDay-root:disabled,
+.MuiPickersYear-yearButton.Mui-disabled,
+.MuiPickersYear-yearButton:disabled,
+.MuiPickersMonth-monthButton.Mui-disabled,
+.MuiPickersMonth-monthButton:disabled {
+  pointer-events: auto !important;
+  cursor: not-allowed !important;
+  opacity: 0.35 !important;
+}
+
+.MuiPickersDay-root.Mui-disabled:hover,
+.MuiPickersDay-root:disabled:hover,
+.MuiPickersYear-yearButton.Mui-disabled:hover,
+.MuiPickersYear-yearButton:disabled:hover,
+.MuiPickersMonth-monthButton.Mui-disabled:hover,
+.MuiPickersMonth-monthButton:disabled:hover {
+  cursor: not-allowed !important;
+  background-color: transparent !important;
+}
+
+/* ── DatePicker Year & Month typography & compact sizing ─────────────────── */
+.MuiDateCalendar-root {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: 260px !important;
+}
+
+.MuiPickersFadeTransitionGroup-root {
+  height: auto !important;
+  min-height: auto !important;
+}
+
+.MuiPickersYear-yearButton,
+.MuiPickersYear-root button,
+.MuiYearCalendar-root button,
+.MuiDateCalendar-root .MuiPickersYear-root button {
+  font-size: 0.68rem !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  line-height: 24px !important;
+}
+
+.MuiPickersMonth-monthButton,
+.MuiPickersMonth-root button,
+.MuiMonthCalendar-root button,
+.MuiDateCalendar-root .MuiPickersMonth-root button {
+  font-size: 0.72rem !important;
+  height: 26px !important;
+  min-height: 26px !important;
 }

@@ -49,9 +49,12 @@ import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import UserDetailsDialog from "../../components/members/UserDetailsDialog";
-import SwitchRoleDialog from "../../components/members/SwitchRoleDialog";
-import { validateForm, validateIndianMobile } from "../../utils/validation";
 import {
+  validateForm,
+  validateIndianMobile,
+  validatePassword,
+  validateConfirmPassword,
+} from "../../utils/validation";
   getUsersAsync,
   createUserAsync,
   updateUserAsync,
@@ -367,6 +370,45 @@ export default function UsersPage() {
 
   function fieldChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+
+    if (field === "newPassword") {
+      const pwErr = validatePassword(value, {
+        username: form.username,
+        email: form.email,
+        isRequired: Boolean(form.createMemberProfile),
+      });
+      setErrors((prev) => {
+        const nextErrors = { ...prev, newPassword: pwErr };
+        if (form.confirmPassword) {
+          nextErrors.confirmPassword = validateConfirmPassword(form.confirmPassword, value, {
+            isRequired: Boolean(form.createMemberProfile),
+          });
+        }
+        return nextErrors;
+      });
+      return;
+    }
+
+    if (field === "confirmPassword") {
+      const cpwErr = validateConfirmPassword(value, form.newPassword, {
+        isRequired: Boolean(form.createMemberProfile),
+      });
+      setErrors((prev) => ({ ...prev, confirmPassword: cpwErr }));
+      return;
+    }
+
+    if (field === "username" || field === "email") {
+      if (form.newPassword) {
+        const pwErr = validatePassword(form.newPassword, {
+          username: field === "username" ? value : form.username,
+          email: field === "email" ? value : form.email,
+          isRequired: Boolean(form.createMemberProfile),
+        });
+        setErrors((prev) => ({ ...prev, [field]: "", newPassword: pwErr }));
+        return;
+      }
+    }
+
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -389,11 +431,27 @@ export default function UsersPage() {
 
     if (form.createMemberProfile) {
       schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: "Username" };
-      schema.newPassword = { required: true, min: 6, max: 50, label: "Password" };
-      schema.confirmPassword = { required: true, min: 6, max: 50, label: "Confirm Password" };
     }
 
     const e = validateForm(form, schema);
+
+    if (form.createMemberProfile) {
+      const pwErr = validatePassword(form.newPassword, {
+        username: form.username,
+        email: form.email,
+        isRequired: true,
+      });
+      if (pwErr) {
+        e.newPassword = pwErr;
+      }
+
+      const cpwErr = validateConfirmPassword(form.confirmPassword, form.newPassword, {
+        isRequired: true,
+      });
+      if (cpwErr) {
+        e.confirmPassword = cpwErr;
+      }
+    }
 
     // Validate Indian mobile number
     const phoneErr = validateIndianMobile(form.phone);
@@ -410,12 +468,6 @@ export default function UsersPage() {
       }
       if (form.primaryRole && form.secondaryRole && form.primaryRole === form.secondaryRole) {
         e.secondaryRole = "Secondary Role must be different from Primary Role";
-      }
-    }
-
-    if (form.createMemberProfile) {
-      if (form.newPassword && form.confirmPassword && form.newPassword !== form.confirmPassword) {
-        e.confirmPassword = "Passwords do not match";
       }
     }
 

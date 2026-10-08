@@ -8,6 +8,7 @@ import {
   ToggleOn as ToggleOnIcon,
   ToggleOff as ToggleOffIcon,
   FilterList as FilterListIcon,
+  HistoryRounded as HistoryRoundedIcon,
 } from "@mui/icons-material";
 
 import { useAppToast } from "../../components/common/AppToast";
@@ -20,6 +21,8 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
+import RateUpdateModal from "../../components/events/RateUpdateModal";
+import RateHistoryModal from "../../components/events/RateHistoryModal";
 import {
   getBudgetCalculationsAsync,
   createBudgetCalculationAsync,
@@ -54,6 +57,10 @@ export default function BudgetCalculationsPage() {
   const [eventTypes, setEventTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [rateUpdateModalOpen, setRateUpdateModalOpen] = useState(false);
+  const [rateUpdateItem, setRateUpdateItem] = useState(null);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyItem, setHistoryItem] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
@@ -281,25 +288,15 @@ export default function BudgetCalculationsPage() {
       label: "Action",
       render: (row) => (
         <Box sx={{ display: "flex", gap: 0.2, alignItems: "center" }}>
-          <Tooltip title={hasWriteAccess ? "Edit Expense Item" : ""}>
+          <Tooltip title={hasWriteAccess ? "Edit Rate" : ""}>
             <span>
               <IconButton
                 size="small"
                 sx={{ p: 0.3 }}
                 disabled={!hasWriteAccess}
                 onClick={() => {
-                  const matched = eventTypes.find(
-                    (t) =>
-                      (row.eventTypeId && t.eventTypeId === row.eventTypeId) ||
-                      (row.category && t.eventTypeName.toLowerCase() === row.category.toLowerCase())
-                  );
-                  setForm({
-                    ...row,
-                    category: matched?.eventTypeName || row.category || "",
-                    eventTypeId: matched?.eventTypeId || row.eventTypeId || "",
-                  });
-                  setErrors({});
-                  setDialogOpen(true);
+                  setRateUpdateItem(row);
+                  setRateUpdateModalOpen(true);
                 }}
               >
                 <EditIcon
@@ -318,6 +315,28 @@ export default function BudgetCalculationsPage() {
               </IconButton>
             </span>
           </Tooltip>
+
+          <Tooltip title="View Rate History">
+            <span>
+              <IconButton
+                size="small"
+                sx={{ p: 0.3 }}
+                onClick={() => {
+                  setHistoryItem(row);
+                  setHistoryModalOpen(true);
+                }}
+              >
+                <HistoryRoundedIcon
+                  sx={{
+                    fontSize: "1.15rem",
+                    color: (theme) =>
+                      theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
+
           <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Expense Item" : "")}>
             <span>
               <IconButton
@@ -543,6 +562,7 @@ export default function BudgetCalculationsPage() {
         }
       />
 
+      {/* Add New Budget Calculation Dialog */}
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
@@ -642,6 +662,27 @@ export default function BudgetCalculationsPage() {
           )}
         </Box>
       </AppDialog>
+
+      {/* Update Rate Modal */}
+      <RateUpdateModal
+        open={rateUpdateModalOpen}
+        onClose={() => {
+          setRateUpdateModalOpen(false);
+          setRateUpdateItem(null);
+        }}
+        item={rateUpdateItem}
+        onSuccess={loadData}
+      />
+
+      {/* Rate History Modal */}
+      <RateHistoryModal
+        open={historyModalOpen}
+        onClose={() => {
+          setHistoryModalOpen(false);
+          setHistoryItem(null);
+        }}
+        item={historyItem}
+      />
 
       <AppConfirmDialog
         open={deleteConfirmOpen}

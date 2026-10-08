@@ -306,3 +306,131 @@ export function validateForm(formData, schema = {}) {
   });
   return errors;
 }
+
+const COMMON_WEAK_PASSWORDS = new Set([
+  "password@123",
+  "12345678",
+  "admin@123",
+  "admin@1234",
+  "password@1",
+  "password123",
+  "qwerty@123",
+  "welcome@123",
+  "p@ssword123",
+  "p@ssw0rd123",
+  "letmein@123",
+  "pass@123",
+]);
+
+/**
+ * Validates a password against comprehensive enterprise security requirements:
+ * - Minimum 8 characters, maximum 64 characters
+ * - At least 1 uppercase, 1 lowercase, 1 number, 1 special character
+ * - No internal spaces (leading/trailing spaces trimmed)
+ * - Cannot match username or email local-part
+ * - Disallows common weak passwords
+ * @param {string} rawPassword Raw input password.
+ * @param {object} options Options including username, email, isRequired.
+ * @returns {string} Validation error message or empty string if valid.
+ */
+export function validatePassword(rawPassword, options = {}) {
+  const {
+    username = "",
+    email = "",
+    isRequired = true,
+  } = options;
+
+  if (rawPassword === undefined || rawPassword === null || rawPassword === "") {
+    return isRequired ? "Password is required." : "";
+  }
+
+  const trimmed = String(rawPassword).trim();
+  if (!trimmed) {
+    return isRequired ? "Password is required." : "";
+  }
+
+  // 1. Internal spaces
+  if (/\s/.test(trimmed)) {
+    return "Password must not contain spaces.";
+  }
+
+  // 2. Maximum length
+  if (trimmed.length > 64) {
+    return "Password must not exceed 64 characters.";
+  }
+
+  // 3. Minimum length
+  if (trimmed.length < 8) {
+    return "Password must contain at least 8 characters.";
+  }
+
+  // 4. Uppercase letter
+  if (!/[A-Z]/.test(trimmed)) {
+    return "Include at least one uppercase letter.";
+  }
+
+  // 5. Lowercase letter
+  if (!/[a-z]/.test(trimmed)) {
+    return "Include at least one lowercase letter.";
+  }
+
+  // 6. Number
+  if (!/[0-9]/.test(trimmed)) {
+    return "Include at least one number.";
+  }
+
+  // 7. Special character
+  if (!/[^A-Za-z0-9]/.test(trimmed)) {
+    return "Include at least one special character.";
+  }
+
+  // 8. Same as username
+  if (username && String(username).trim()) {
+    if (trimmed.toLowerCase() === String(username).trim().toLowerCase()) {
+      return "Password must not be the same as the username.";
+    }
+  }
+
+  // 9. Same as email local-part
+  if (email && String(email).trim()) {
+    const localPart = String(email).trim().split("@")[0].toLowerCase();
+    if (localPart && trimmed.toLowerCase() === localPart) {
+      return "Password must not be the same as the username.";
+    }
+  }
+
+  // 10. Common weak passwords
+  if (COMMON_WEAK_PASSWORDS.has(trimmed.toLowerCase())) {
+    return "This password is too common or weak. Please choose a stronger password.";
+  }
+
+  return "";
+}
+
+/**
+ * Validates confirm password against the password.
+ * @param {string} rawConfirmPassword Raw confirm password input.
+ * @param {string} rawPassword Raw password input.
+ * @param {object} options Options including isRequired.
+ * @returns {string} Error message or empty string.
+ */
+export function validateConfirmPassword(rawConfirmPassword, rawPassword, options = {}) {
+  const { isRequired = true } = options;
+
+  if (rawConfirmPassword === undefined || rawConfirmPassword === null || rawConfirmPassword === "") {
+    return isRequired || (rawPassword && String(rawPassword).trim()) ? "Confirm password is required." : "";
+  }
+
+  const trimmedConfirm = String(rawConfirmPassword).trim();
+  const trimmedPassword = String(rawPassword ?? "").trim();
+
+  if (!trimmedConfirm) {
+    return isRequired || trimmedPassword ? "Confirm password is required." : "";
+  }
+
+  if (trimmedConfirm !== trimmedPassword) {
+    return "Password and confirm password do not match.";
+  }
+
+  return "";
+}
