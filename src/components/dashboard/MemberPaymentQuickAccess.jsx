@@ -815,23 +815,6 @@ export default function MemberPaymentQuickAccess({
           alignItems={{ sm: "center" }}
           sx={{ mb: 2 }}
         >
-          <TextField
-            size="small"
-            placeholder={statusFilter === "expense" ? "Search expense category, event, or description…" : "Search member, phone, or event…"}
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            sx={{ flex: 1, minWidth: { xs: "100%", sm: 200 } }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-
           <Box sx={{ minWidth: { xs: "100%", sm: 165 } }}>
             <AppSelect
               size="small"
@@ -856,6 +839,23 @@ export default function MemberPaymentQuickAccess({
               options={eventOptions}
             />
           </Box>
+
+          <TextField
+            size="small"
+            placeholder={statusFilter === "expense" ? "Search expense category, event, or description…" : "Search member, phone, or event…"}
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            sx={{ flex: 1, minWidth: { xs: "100%", sm: 200 } }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
         </Stack>
 
         {/* Content Table / Loading State */}

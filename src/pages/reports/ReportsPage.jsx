@@ -1386,8 +1386,28 @@ export default function ReportsPage({ mode = "event" }) {
         { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
       ];
 
+  const hasData = useMemo(() => {
+    if (mode === "payment-history") {
+      return (filteredPaymentHistory || []).length > 0;
+    }
+    if (mode === "member") {
+      if (isMember) {
+        const myData = (filteredMemberContributions || [])[0];
+        return (myData?.events || []).length > 0;
+      }
+      return (filteredMemberContributions || []).length > 0;
+    }
+    if (mode === "pending") {
+      return (report?.pendingDues || []).length > 0;
+    }
+    return (filteredEventCollections || []).length > 0;
+  }, [mode, filteredPaymentHistory, filteredMemberContributions, report?.pendingDues, filteredEventCollections, isMember]);
+
   const handleExport = () => {
-    if (!canExport) return;
+    if (!canExport || !hasData) {
+      toast.warning("No records available to export.");
+      return;
+    }
     try {
       if (mode === "payment-history") {
         const paymentExport = (filteredPaymentHistory ?? []).map((t) => {
@@ -1559,7 +1579,8 @@ export default function ReportsPage({ mode = "event" }) {
             <AppButton
               size="small"
               variant="contained"
-              disabled={!canExport}
+              disabled={!canExport || !hasData || loading}
+              disabledTooltip={!canExport ? "You don't have permission to export" : "No records available to export"}
               onClick={handleExport}
               startIcon={<FileDownloadIcon sx={{ fontSize: 18 }} />}
               sx={{
@@ -1721,6 +1742,64 @@ export default function ReportsPage({ mode = "event" }) {
             ) : (
               <Box sx={{ minHeight: 300 }} />
             )
+          ) : !hasData ? (
+            <Card
+              sx={{
+                p: { xs: 5, sm: 7 },
+                textAlign: "center",
+                borderRadius: "16px",
+                bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#ffffff",
+                border: "1px solid",
+                borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                boxShadow: isDark ? "none" : "0 4px 16px rgba(0,0,0,0.03)",
+                my: 2,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  bgcolor: isDark ? "rgba(124, 58, 237, 0.15)" : "rgba(124, 58, 237, 0.08)",
+                  color: "#7c3aed",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  mb: 2,
+                }}
+              >
+                <EventIcon sx={{ fontSize: 32 }} />
+              </Box>
+              <Typography variant="h6" fontWeight={700} sx={{ mb: 1, color: "text.primary", fontSize: "1.1rem" }}>
+                No Record
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 440, mx: "auto", mb: 2.5, fontSize: "0.85rem" }}>
+                No events or contribution records found for the selected period.
+              </Typography>
+              <AppButton
+                variant="outlined"
+                size="small"
+                startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
+                onClick={() => {
+                  const m = dayjs().month() + 1;
+                  const y = dayjs().year();
+                  setFilterMonth(m);
+                  setFilterYear(y);
+                  setFilterEventType("ALL");
+                  setFilterEvent("ALL");
+                  setFilters({ month: m, year: y, eventType: "ALL", event: "ALL" });
+                }}
+                sx={{
+                  borderRadius: "8px",
+                  fontWeight: 600,
+                  px: 2,
+                  color: "primary.main",
+                  borderColor: "primary.main",
+                }}
+              >
+                Reset Filter
+              </AppButton>
+            </Card>
           ) : (
             <Stack spacing={3}>
 
@@ -2094,6 +2173,8 @@ export default function ReportsPage({ mode = "event" }) {
                   <AppButton
                     size="small"
                     variant="outlined"
+                    disabled={modalLoading || (memberEvents || []).length === 0}
+                    disabledTooltip="No records available to export"
                     startIcon={<FileDownloadIcon sx={{ fontSize: 16 }} />}
                     onClick={handleExportMemberEvents}
                     sx={{ height: 32, fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap" }}
