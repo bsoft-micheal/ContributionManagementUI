@@ -72,6 +72,19 @@ export default function EventTypesPage() {
       return;
     }
 
+    const trimmedName = form.eventTypeName?.trim().toLowerCase();
+    const isDuplicate = types.some(
+      (t) =>
+        t.eventTypeName &&
+        t.eventTypeName.trim().toLowerCase() === trimmedName &&
+        (!form.eventTypeId || t.eventTypeId !== form.eventTypeId)
+    );
+    if (isDuplicate) {
+      setErrors((prev) => ({ ...prev, eventTypeName: "Category Name already exists" }));
+      toast.error("A category with this name already exists");
+      return;
+    }
+
     try {
       const payload = {
         ...form,

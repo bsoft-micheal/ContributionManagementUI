@@ -51,7 +51,7 @@ import { useThemeMode } from "../../contexts/ThemeModeContext";
 import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 import AppPageLoader from "../common/AppPageLoader";
 import dayjs from "dayjs";
-import logo from "../../assets/logo.png";
+import logo from "../../assets/image (2).png";
 
 const drawerWidth = 240;
 
@@ -596,14 +596,14 @@ export default function AppLayout() {
         </Box>
 
         <Box sx={{
-          width: 40, height: 40, borderRadius: "10px",
-          bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "#ffffff", display: "flex",
+          width: 46, height: 46, borderRadius: "10px",
+          border: "1.5px solid #ffffff",
+          display: "flex",
           alignItems: "center", justifyContent: "center",
           overflow: "hidden", flexShrink: 0,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(74,63,107,0.1)",
-          p: 0.5
+          p: 0
         }}>
-          <img src={logo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          <img src={logo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </Box>
         <Box>
           <Typography variant="body2" sx={{ fontWeight: 900, color: SIDEBAR.activeText, lineHeight: 1, fontSize: "0.95rem", letterSpacing: "0.02em" }}>

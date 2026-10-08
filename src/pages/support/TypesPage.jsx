@@ -184,6 +184,19 @@ export default function TypesPage() {
       return;
     }
 
+    const trimmedName = ticketTypeForm.typeName.trim().toLowerCase();
+    const isDuplicate = ticketTypes.some(
+      (t) =>
+        t.typeName &&
+        t.typeName.trim().toLowerCase() === trimmedName &&
+        (!ticketTypeForm.ticketTypeId || t.ticketTypeId !== ticketTypeForm.ticketTypeId)
+    );
+    if (isDuplicate) {
+      setTicketTypeErrors((prev) => ({ ...prev, typeName: "Ticket Type already exists" }));
+      toast.error("A Ticket Type with this name already exists");
+      return;
+    }
+
     try {
       const payload = {
         typeName: ticketTypeForm.typeName.trim(),
@@ -279,6 +292,19 @@ export default function TypesPage() {
       return;
     }
 
+    const trimmedWorkTypeName = workTypeForm.workTypeName.trim().toLowerCase();
+    const isDuplicateWorkType = workTypes.some(
+      (w) =>
+        w.workTypeName &&
+        w.workTypeName.trim().toLowerCase() === trimmedWorkTypeName &&
+        (!workTypeForm.workTypeId || w.workTypeId !== workTypeForm.workTypeId)
+    );
+    if (isDuplicateWorkType) {
+      setWorkTypeErrors((prev) => ({ ...prev, workTypeName: "Work Type already exists" }));
+      toast.error("A Work Type with this name already exists");
+      return;
+    }
+
     try {
       const payload = {
         workTypeName: workTypeForm.workTypeName.trim(),
@@ -371,6 +397,19 @@ export default function TypesPage() {
     if (Object.keys(newErrors).length > 0) {
       setPriorityErrors(newErrors);
       toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
+      return;
+    }
+
+    const trimmedPriorityName = priorityForm.priorityName.trim().toLowerCase();
+    const isDuplicatePriority = priorities.some(
+      (p) =>
+        p.priorityName &&
+        p.priorityName.trim().toLowerCase() === trimmedPriorityName &&
+        (!priorityForm.priorityId || p.priorityId !== priorityForm.priorityId)
+    );
+    if (isDuplicatePriority) {
+      setPriorityErrors((prev) => ({ ...prev, priorityName: "Priority already exists" }));
+      toast.error("A Priority with this name already exists");
       return;
     }
 
@@ -473,6 +512,19 @@ export default function TypesPage() {
     if (Object.keys(newErrors).length > 0) {
       setPaymentModeErrors(newErrors);
       toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
+      return;
+    }
+
+    const trimmedPaymentModeName = paymentModeForm.paymentModeName.trim().toLowerCase();
+    const isDuplicatePaymentMode = paymentModes.some(
+      (p) =>
+        p.paymentModeName &&
+        p.paymentModeName.trim().toLowerCase() === trimmedPaymentModeName &&
+        (!paymentModeForm.paymentModeId || p.paymentModeId !== paymentModeForm.paymentModeId)
+    );
+    if (isDuplicatePaymentMode) {
+      setPaymentModeErrors((prev) => ({ ...prev, paymentModeName: "Payment Mode already exists" }));
+      toast.error("A Payment Mode with this name already exists");
       return;
     }
 

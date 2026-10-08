@@ -61,6 +61,19 @@ export default function RolesPage() {
       return;
     }
 
+    const trimmedName = form.roleName?.trim().toLowerCase();
+    const isDuplicate = roles.some(
+      (r) =>
+        r.roleName &&
+        r.roleName.trim().toLowerCase() === trimmedName &&
+        (!form.roleId || r.roleId !== form.roleId)
+    );
+    if (isDuplicate) {
+      setErrors((prev) => ({ ...prev, roleName: "Role name already exists" }));
+      toast.error("A role with this name already exists");
+      return;
+    }
+
     try {
       const payload = {
         ...form,

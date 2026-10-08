@@ -436,6 +436,12 @@ export default function UserFormPage() {
       joiningDate: { required: true, label: "Joining Date" },
     };
 
+    if (form.createMemberProfile) {
+      schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: "Username" };
+      schema.newPassword = { required: true, min: 6, max: 50, label: isEdit ? "New Password" : "Password" };
+      schema.confirmPassword = { required: true, min: 6, max: 50, label: isEdit ? "Confirm New Password" : "Confirm Password" };
+    }
+
     if (form.createMemberProfile && !form.enableMultipleRoles) {
       schema.roleName = { required: true, label: "Primary Role" };
     }
@@ -450,19 +456,16 @@ export default function UserFormPage() {
 
     if (form.createMemberProfile && form.enableMultipleRoles) {
       if (!form.secondaryRoles || form.secondaryRoles.length === 0) {
-        e.secondaryRoles = "At least one role must be selected in Secondary Roles";
+        e.secondaryRoles = "This field is required";
       }
       if (!form.primaryRole) {
-        e.primaryRole = "Primary Role is required";
+        e.primaryRole = "This field is required";
       } else if (form.secondaryRoles && !form.secondaryRoles.includes(form.primaryRole)) {
         e.primaryRole = "Primary Role must be one of the selected Secondary Roles";
       }
     }
 
     if (form.createMemberProfile) {
-      if (!form.userId && !form.newPassword) {
-        e.newPassword = "Password is required";
-      }
       if (form.newPassword && form.confirmPassword && form.newPassword !== form.confirmPassword) {
         e.confirmPassword = "Passwords do not match";
       }
@@ -545,19 +548,7 @@ export default function UserFormPage() {
       // Note: Duplicate mobile number is allowed per system requirements
     }
 
-    // Show toaster if mobile number already exists, but proceed with saving
-    const cleanPhoneDigits = String(form.phone || "").replace(/\D/g, "").slice(-10);
-    if (cleanPhoneDigits) {
-      const isPhoneDuplicate = users.some(
-        (u) =>
-          u.phone &&
-          String(u.phone).replace(/\D/g, "").slice(-10) === cleanPhoneDigits &&
-          (!form.userId || u.userId !== form.userId)
-      );
-      if (isPhoneDuplicate) {
-        toast.info("Mobile number already exists");
-      }
-    }
+
 
     setSaving(true);
     try {
@@ -991,12 +982,12 @@ export default function UserFormPage() {
                   <AppInput
                     label={
                       isEdit
-                        ? "New Password "
+                        ? "New Password"
                         : "Password"
                     }
                     placeholder={
                       isEdit
-                        ? "Enter new password (optional)"
+                        ? "Enter new password (min 6 characters)"
                         : "Enter password (min 6 characters)"
                     }
                     type={showPassword ? "text" : "password"}
@@ -1006,7 +997,7 @@ export default function UserFormPage() {
                     autoComplete="new-password"
                     error={!!errors.newPassword}
                     helperText={errors.newPassword}
-                    required={!isEdit}
+                    required
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
@@ -1044,7 +1035,7 @@ export default function UserFormPage() {
                     autoComplete="new-password"
                     error={!!errors.confirmPassword}
                     helperText={errors.confirmPassword}
-                    required={!isEdit || !!form.newPassword}
+                    required
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">

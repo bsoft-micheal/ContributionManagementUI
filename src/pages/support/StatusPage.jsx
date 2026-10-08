@@ -156,6 +156,21 @@ export default function StatusPage() {
       return;
     }
 
+    const trimmedName = form.statusName.trim().toLowerCase();
+    const trimmedMod = (form.module || "General").trim().toLowerCase();
+    const isDuplicate = items.some(
+      (item) =>
+        item.statusName &&
+        item.statusName.trim().toLowerCase() === trimmedName &&
+        (item.module || "General").trim().toLowerCase() === trimmedMod &&
+        (!form.statusId || item.statusId !== form.statusId)
+    );
+    if (isDuplicate) {
+      setErrors((prev) => ({ ...prev, statusName: "Status name already exists for this module" }));
+      toast.error("A status with this name already exists for this module");
+      return;
+    }
+
     try {
       const payload = {
         statusName: form.statusName.trim(),
