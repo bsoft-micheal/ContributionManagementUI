@@ -1218,7 +1218,7 @@ export default function DashboardPage() {
               md: "repeat(3, minmax(0, 1fr))",
               lg: "repeat(6, minmax(0, 1fr))",
             },
-            gap: { xs: 1.5, sm: 2 },
+            gap: { xs: 1, sm: 1.25 },
           }}
         >
           <MetricCard
@@ -1253,12 +1253,12 @@ export default function DashboardPage() {
             label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Balance Amount"}
             value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
             accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
-            actionText="Net Balance"
+            actionText="Net Balance →"
           />
           <MetricCard
             label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
             value={events.length}
-            accent="#3b82f6"
+            accent="#8b5cf6"
             onClick={() => navigate("/events")}
             actionText="View Events →"
           />

@@ -13,7 +13,7 @@ export default function ProtectedRoute({ children, roles = [] }) {
   const navigate = useNavigate();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace />;
   }
 
   const activeRole = authState?.role || authState?.roleName;

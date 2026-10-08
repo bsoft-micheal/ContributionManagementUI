@@ -51,6 +51,8 @@ export function AuthProvider({ children }) {
     return null;
   });
 
+  const [isSwitchingRole, setIsSwitchingRole] = useState(false);
+
   // ── Sync auth state cleanup when logged out ──────────────────────────────────
   useEffect(() => {
     if (!authState) {
@@ -188,6 +190,7 @@ export function AuthProvider({ children }) {
   };
 
   const switchRole = async (targetRole) => {
+    setIsSwitchingRole(true);
     let payload = {};
     if (typeof targetRole === "object" && targetRole !== null) {
       payload = {
@@ -203,53 +206,61 @@ export function AuthProvider({ children }) {
       }
     }
 
-    const { data: resData } = await apiClient.post("/auth/switchRoleAsync", payload, { hideLoader: true });
-    const data = (resData && resData.data !== undefined) ? resData.data : resData;
+    try {
+      const { data: resData } = await apiClient.post("/auth/switchRoleAsync", payload);
+      const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
-    if (data.rights && data.role) {
-      const savedRights = localStorage.getItem("projectRightsConfig");
-      let rightsMap = savedRights ? JSON.parse(savedRights) : {};
+      if (data.rights && data.role) {
+        const savedRights = localStorage.getItem("projectRightsConfig");
+        let rightsMap = savedRights ? JSON.parse(savedRights) : {};
 
-      const processedRights = data.rights.map((r, idx) => {
-        let typeVal = r.accessType ?? r.AccessType;
-        if (typeVal === undefined || typeVal === null || isNaN(Number(typeVal)) || Number(typeVal) === 0) {
-          const str = String(r.access || r.Access || "").toLowerCase().replace(/[\s_-]/g, "");
-          typeVal = (str === "deny" || str === "3") ? 3 : ((str === "readonly" || str === "1") ? 1 : 2);
-        }
-        return {
-          id: idx + 1,
-          featureId: r.featureID ?? r.featureId ?? r.FeatureID ?? r.FeatureId,
-          module: r.module || r.Module || "",
-          subModule: r.subModule || r.SubModule || "",
-          action: r.action || r.Action || "",
-          page: r.page || r.Page || "",
-          access: r.access || r.Access || (Number(typeVal) === 3 ? "deny" : (Number(typeVal) === 1 ? "readOnly" : "readWrite")),
-          accessType: Number(typeVal)
-        };
-      });
-
-      rightsMap[data.role] = processedRights;
-      rightsMap[data.role.toLowerCase()] = processedRights;
-      if (Array.isArray(data.roles)) {
-        data.roles.forEach((r) => {
-          rightsMap[r] = processedRights;
-          rightsMap[r.toLowerCase()] = processedRights;
+        const processedRights = data.rights.map((r, idx) => {
+          let typeVal = r.accessType ?? r.AccessType;
+          if (typeVal === undefined || typeVal === null || isNaN(Number(typeVal)) || Number(typeVal) === 0) {
+            const str = String(r.access || r.Access || "").toLowerCase().replace(/[\s_-]/g, "");
+            typeVal = (str === "deny" || str === "3") ? 3 : ((str === "readonly" || str === "1") ? 1 : 2);
+          }
+          return {
+            id: idx + 1,
+            featureId: r.featureID ?? r.featureId ?? r.FeatureID ?? r.FeatureId,
+            module: r.module || r.Module || "",
+            subModule: r.subModule || r.SubModule || "",
+            action: r.action || r.Action || "",
+            page: r.page || r.Page || "",
+            access: r.access || r.Access || (Number(typeVal) === 3 ? "deny" : (Number(typeVal) === 1 ? "readOnly" : "readWrite")),
+            accessType: Number(typeVal)
+          };
         });
-      }
-      rightsMap["current"] = processedRights;
-      localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
-    }
 
-    if (data.token) {
-      sessionStorage.setItem("teamContributionAuth", JSON.stringify(data));
-      if (localStorage.getItem("teamContributionRememberMe") === "true") {
-        localStorage.setItem("teamContributionAuth", JSON.stringify(data));
+        rightsMap[data.role] = processedRights;
+        rightsMap[data.role.toLowerCase()] = processedRights;
+        if (Array.isArray(data.roles)) {
+          data.roles.forEach((r) => {
+            rightsMap[r] = processedRights;
+            rightsMap[r.toLowerCase()] = processedRights;
+          });
+        }
+        rightsMap["current"] = processedRights;
+        localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));
       }
-      apiClient.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
-    }
 
-    setAuthState(data);
-    return data;
+      if (data.token) {
+        sessionStorage.setItem("teamContributionAuth", JSON.stringify(data));
+        if (localStorage.getItem("teamContributionRememberMe") === "true") {
+          localStorage.setItem("teamContributionAuth", JSON.stringify(data));
+        }
+        apiClient.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+      }
+
+      setAuthState(data);
+      window.dispatchEvent(new Event("rightsUpdated"));
+      navigate("/", { replace: true });
+      // Fraction of a second buffer to ensure the old role is cleared and the new role UI renders seamlessly
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      return data;
+    } finally {
+      setIsSwitchingRole(false);
+    }
   };
 
   const logout = async () => {
@@ -442,6 +453,7 @@ export function AuthProvider({ children }) {
         updateProfile,
         fetchProfile,
         refreshRights,
+        isSwitchingRole,
         isAuthenticated: Boolean(authState?.token),
       }}
     >

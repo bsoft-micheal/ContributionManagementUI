@@ -125,7 +125,12 @@ export default function AppInput({
                 color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
                 opacity: 1,
                 fontWeight: 400,
-              }
+              },
+              "&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus": {
+                WebkitBoxShadow: (theme) => `0 0 0 1000px ${theme.palette.background.paper} inset !important`,
+                WebkitTextFillColor: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+                transition: "background-color 5000s ease-in-out 0s",
+              },
             },
             "& fieldset": {
               borderColor: (theme) => error
@@ -171,7 +176,11 @@ export default function AppInput({
         }}
         error={error}
         helperText={helperText}
-        inputProps={{ maxLength, ...props.inputProps }}
+        inputProps={{
+          maxLength,
+          autoComplete: props.autoComplete || props.inputProps?.autoComplete || "off",
+          ...props.inputProps,
+        }}
         InputProps={{
           startAdornment: startAdornment ? (
             <InputAdornment position="start" sx={{ mr: 0.5 }}>

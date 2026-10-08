@@ -1305,12 +1305,12 @@ export default function ReportsPage({ mode = "event" }) {
       const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
       const remaining = exp - totalExp;
       return [
-        { label: "Total Expected", value: INR(exp), accent: "#6366f1" },
-        { label: "Total Collected", value: INR(paid), accent: "#10b981" },
-        { label: "Total Pending", value: INR(pend), accent: "#f43f5e" },
-        { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b" },
-        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e" },
-        { label: "Total Events", value: ev.length, accent: "#3b82f6" },
+        { label: "Total Expected", value: INR(exp), accent: "#6366f1", actionText: "All Events →" },
+        { label: "Total Collected", value: INR(paid), accent: "#10b981", actionText: "Total Collected →" },
+        { label: "Total Pending", value: INR(pend), accent: "#f43f5e", actionText: "View Unpaid →" },
+        { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b", actionText: "Expenses →" },
+        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: "Net Balance →" },
+        { label: "Total Events", value: ev.length, accent: "#8b5cf6", actionText: "View Events →" },
       ];
     }
     if (mode === "member") {
@@ -1323,10 +1323,10 @@ export default function ReportsPage({ mode = "event" }) {
         const myData = mb[0] || {};
         const totalEvents = (myData.events || []).length || (Number(myData.paidEventsCount || 0) + Number(myData.pendingEventsCount || 0));
         return [
-          { label: "My Expected", value: INR(exp), accent: "#6366f1" },
-          { label: "My Paid", value: INR(paid), accent: "#10b981" },
-          { label: "My Pending", value: INR(pend), accent: "#f43f5e" },
-          { label: "Total Events", value: totalEvents, accent: "#3b82f6" },
+          { label: "My Expected", value: INR(exp), accent: "#6366f1", actionText: "My Expected →" },
+          { label: "My Paid", value: INR(paid), accent: "#10b981", actionText: "My Payments →" },
+          { label: "My Pending", value: INR(pend), accent: "#f43f5e", actionText: "View Unpaid →" },
+          { label: "Total Events", value: totalEvents, accent: "#8b5cf6", actionText: "View Events →" },
         ];
       }
 
@@ -1334,12 +1334,12 @@ export default function ReportsPage({ mode = "event" }) {
       const totalExp = ev.reduce((s, e) => s + Number(e.expenseAmount || 0), 0);
       const remaining = exp - totalExp;
       return [
-        { label: "Total Expected", value: INR(exp), accent: "#6366f1" },
-        { label: "Total Collected", value: INR(paid), accent: "#10b981" },
-        { label: "Total Pending", value: INR(pend), accent: "#f43f5e" },
-        { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b" },
-        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e" },
-        { label: "Total Members", value: mb.length, accent: "#3b82f6" },
+        { label: "Total Expected", value: INR(exp), accent: "#6366f1", actionText: "All Members →" },
+        { label: "Total Collected", value: INR(paid), accent: "#10b981", actionText: "Total Collected →" },
+        { label: "Total Pending", value: INR(pend), accent: "#f43f5e", actionText: "View Unpaid →" },
+        { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b", actionText: "Expenses →" },
+        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: "Net Balance →" },
+        { label: "Total Members", value: mb.length, accent: "#8b5cf6", actionText: "All Members →" },
       ];
     }
     if (mode === "pending") {
@@ -1349,11 +1349,11 @@ export default function ReportsPage({ mode = "event" }) {
       const crit = du.filter((d) => d.daysOverdue > 30).length;
       const mod = du.filter((d) => d.daysOverdue >= 15 && d.daysOverdue <= 30).length;
       return [
-        { label: "Total Pending Dues", value: INR(total), accent: "#f43f5e" },
-        { label: "Pending Records", value: du.length, accent: "#f59e0b" },
-        { label: "Unique Defaulters", value: uniq, accent: "#f43f5e" },
-        { label: "Critical (>30 Days)", value: crit, accent: "#f43f5e" },
-        { label: "Moderate (15-30 Days)", value: mod, accent: "#f59e0b" },
+        { label: "Total Pending Dues", value: INR(total), accent: "#f43f5e", actionText: "Pending Dues →" },
+        { label: "Pending Records", value: du.length, accent: "#f59e0b", actionText: "Records →" },
+        { label: "Unique Defaulters", value: uniq, accent: "#f43f5e", actionText: "Defaulters →" },
+        { label: "Critical (>30 Days)", value: crit, accent: "#f43f5e", actionText: "Critical →" },
+        { label: "Moderate (15-30 Days)", value: mod, accent: "#f59e0b", actionText: "Moderate →" },
       ];
     }
     return [];
@@ -1726,7 +1726,7 @@ export default function ReportsPage({ mode = "event" }) {
 
               {/* KPI Cards Grid */}
               {mode !== "payment-history" && kpiCards.length > 0 && (
-                <Grid container spacing={2}>
+                <Grid container spacing={1.25}>
                   {kpiCards.map((card) => (
                     <Grid key={card.label} size={{ xs: 12, sm: 6, md: 4, lg: kpiCards.length === 6 ? 2 : Math.max(3, Math.floor(12 / kpiCards.length)) }}>
                       <MetricCard {...card} />

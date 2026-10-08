@@ -32,11 +32,27 @@ export default function ForgotPasswordPage() {
   const [emailError, setEmailError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const validateEmailFormat = (val) => {
+    const trimmed = val ? val.trim() : "";
+    if (!trimmed) {
+      return "Email address is required.";
+    }
+    if (trimmed.length > 254) {
+      return "Email address cannot exceed 254 characters.";
+    }
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(trimmed)) {
+      return "Please enter a valid email address.";
+    }
+    return "";
+  };
+
   const handleRequestOtp = async (e) => {
     e.preventDefault();
-    if (!email.trim()) {
-      setEmailError(COMMON_STRINGS.VALIDATION.REQUIRED || "Email address is required.");
-      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
+    const errorMsg = validateEmailFormat(email);
+    if (errorMsg) {
+      setEmailError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
@@ -49,7 +65,8 @@ export default function ForgotPasswordPage() {
       localStorage.setItem("recovery_email", email.trim());
       navigate("/forgot-password/verify", { state: { email: email.trim() } });
     } catch (error) {
-      toast.error(error.response?.data?.message ?? "Failed to request password reset OTP. Please check your email.");
+      const serverMsg = error.response?.data?.message || error.response?.data?.title || error.response?.data?.errors?.Email?.[0];
+      toast.error(serverMsg ?? "Failed to request password reset OTP. Please check your email.");
     } finally {
       setLoading(false);
     }
@@ -203,6 +220,7 @@ export default function ForgotPasswordPage() {
                   placeholder="Enter registered email"
                   required
                   type="email"
+                  maxLength={254}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
