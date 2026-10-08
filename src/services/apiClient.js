@@ -9,12 +9,15 @@ apiClient.interceptors.request.use((config) => {
   const currentPath = (window.location.pathname || "").toLowerCase();
 
   const isAuthPageOrEndpoint =
+    Boolean(config.hideLoader) ||
     currentPath === "/login" ||
     currentPath.startsWith("/forgot-password") ||
     url.includes("/auth/login") ||
     url.includes("/auth/forgot-password") ||
     url.includes("/auth/verify-2fa") ||
-    url.includes("/logout");
+    url.includes("/logout") ||
+    url.includes("switchrole") ||
+    url.includes("switchroleasync");
 
   if (isAuthPageOrEndpoint) {
     config.hideLoader = true;

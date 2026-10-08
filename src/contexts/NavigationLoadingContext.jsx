@@ -54,7 +54,7 @@ export function NavigationLoadingProvider({ children }) {
   const currentPath = (window.location.pathname || "").toLowerCase();
   const isAuthPage = currentPath === "/login" || currentPath.startsWith("/forgot-password");
 
-  const isLoading = !isAuthPage && (customLoading || routeLoading || apiActiveCount > 0);
+  const isLoading = !isAuthPage && (customLoading || routeLoading);
 
   return (
     <NavigationLoadingContext.Provider
@@ -62,6 +62,7 @@ export function NavigationLoadingProvider({ children }) {
         isLoading,
         showLoader,
         hideLoader,
+        loadingMessage: message,
         setLoadingMessage: setMessage,
       }}
     >

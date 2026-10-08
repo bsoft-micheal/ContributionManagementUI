@@ -53,7 +53,7 @@ const initialForm = {
   email: "",
   phone: "",
   gender: "",
-  workType: "",
+  workType: "Office",
   dateOfBirth: dayjs().subtract(18, "year"),
   joiningDate: dayjs(),
   createMemberProfile: false,
@@ -330,6 +330,37 @@ export default function UserFormPage() {
   }
 
   function fieldChange(field, value) {
+    if (field === "joiningDate") {
+      const isJoiningToday =
+        value &&
+        dayjs(value).isValid() &&
+        dayjs(value).isSame(dayjs(), "day");
+
+      setForm((prev) => {
+        // If joining date is today, automatically change work type to "Office"
+        // If some other day and previous workType was auto-set from today, clear it so user can select manually
+        let nextWorkType = prev.workType;
+        if (isJoiningToday) {
+          nextWorkType = "Office";
+        } else if (prev.joiningDate && dayjs(prev.joiningDate).isSame(dayjs(), "day")) {
+          nextWorkType = "";
+        }
+        return {
+          ...prev,
+          joiningDate: value,
+          workType: nextWorkType,
+        };
+      });
+
+      if (errors.joiningDate) {
+        setErrors((prev) => ({ ...prev, joiningDate: "" }));
+      }
+      if (isJoiningToday && errors.workType) {
+        setErrors((prev) => ({ ...prev, workType: "" }));
+      }
+      return;
+    }
+
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));

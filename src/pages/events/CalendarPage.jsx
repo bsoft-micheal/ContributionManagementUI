@@ -935,19 +935,7 @@ export default function CalendarPage({ isEmbedded = false }) {
             >
               Event Calendar
             </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: "rgba(255, 255, 255, 0.75)",
-                fontSize: "0.74rem",
-                display: "block",
-                lineHeight: 1.2,
-                mt: 0.1,
-              }}
-            >
-            </Typography>
           </Box>
-
         </Box>
 
         <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>

@@ -27,6 +27,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Alert,
+  Dialog,
 } from "@mui/material";
 import { useTheme, styled } from "@mui/material/styles";
 import {
@@ -261,8 +263,17 @@ const getItemStyle = (name = "") => {
   };
 };
 
-export default function EventFormPage() {
-  const { id } = useParams();
+export default function EventFormPage({
+  isDialog = false,
+  open = true,
+  onClose,
+  event: propEvent,
+  eventTypes: propEventTypes,
+  members: propMembers,
+  onSaveSuccess,
+}) {
+  const routeParams = useParams();
+  const routeId = routeParams?.id;
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -270,6 +281,7 @@ export default function EventFormPage() {
   const { authState } = useAuth();
   const { canEdit, readOnly } = useAccessByLocation();
 
+  const id = isDialog ? (propEvent?.eventId || propEvent?.id || null) : routeId;
   const isEdit = Boolean(id);
 
   // Granular Action Permissions
@@ -277,6 +289,7 @@ export default function EventFormPage() {
   const canEditEvent = hasActionPermission("Edit Event", 33, authState?.role).canExecute && canEdit;
 
   useEffect(() => {
+    if (isDialog) return;
     if (!isEdit && !canAddEvent) {
       toast.error("Access Denied: You do not have permission to add events.");
       navigate("/events");
@@ -287,7 +300,7 @@ export default function EventFormPage() {
       navigate("/events");
       return;
     }
-  }, [isEdit, canAddEvent, canEditEvent]);
+  }, [isDialog, isEdit, canAddEvent, canEditEvent]);
 
   const [form, setForm] = useState(initialForm);
   const [otherEventAmounts, setOtherEventAmounts] = useState({});
@@ -348,13 +361,18 @@ export default function EventFormPage() {
 
   // Load initial dropdown data and event details if in edit mode
   useEffect(() => {
+    if (isDialog && !open) return;
     let isMounted = true;
     async function initData() {
       setLoading(true);
       try {
         const [typesData, usersData, budgetData, settingsData] = await Promise.all([
-          getEventTypesAsync(isEdit),
-          getUsersAsync().catch(() => getMembersAsync()),
+          (propEventTypes && propEventTypes.length > 0)
+            ? Promise.resolve(propEventTypes)
+            : getEventTypesAsync(isEdit),
+          (propMembers && propMembers.length > 0)
+            ? Promise.resolve(propMembers)
+            : getUsersAsync().catch(() => getMembersAsync()),
           getBudgetCalculationsAsync().catch(() => []),
           getSystemSettingsAsync().catch(() => null),
         ]);
@@ -397,7 +415,9 @@ export default function EventFormPage() {
 
         if (id) {
           // Edit existing event
-          const detailedEvent = await getEventByIdAsync(id);
+          const detailedEvent = propEvent?.eventName && propEvent?.eventId === id
+            ? propEvent
+            : await getEventByIdAsync(id);
           if (!isMounted) return;
 
           const pIds =
@@ -498,7 +518,7 @@ export default function EventFormPage() {
           });
         } else {
           // Creating a new event
-          const defaultDate = dayjs();
+          const defaultDate = propEvent?.eventDate ? dayjs(propEvent.eventDate) : dayjs();
           const targetMonth = defaultDate.month();
           const celebrantsInMonth = activeMems.filter(
             (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
@@ -524,6 +544,9 @@ export default function EventFormPage() {
             baseAmount: "",
             participantIds: activeMems.map((m) => m.memberId),
           });
+          setOtherEventAmounts({});
+          setErrors({});
+          setHasPayments(false);
         }
       } catch {
         toast.error("Failed to load event details");
@@ -536,7 +559,7 @@ export default function EventFormPage() {
     return () => {
       isMounted = false;
     };
-  }, [id, location.pathname, location.key]);
+  }, [id, isDialog, open, location?.pathname, location?.key, propEvent]);
 
   // Selected event types list
   const selectedTypes = useMemo(() => {
@@ -1152,6 +1175,17 @@ export default function EventFormPage() {
       });
     }
 
+    if (isBirthday) {
+      const bdayBudgetAmount = computedBudgetItems
+        .filter((i) => i.category === "Birthday")
+        .reduce((sum, i) => sum + i.amount, 0);
+
+      if (plannedBudget <= 0 || bdayBudgetAmount <= 0) {
+        toast.error("Birthday event cannot be saved with ₹0. Please configure budget calculation rates or add valid expenses.");
+        return;
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
@@ -1277,7 +1311,12 @@ export default function EventFormPage() {
         toast.success("Event created successfully");
       }
 
-      navigate("/events");
+      if (isDialog) {
+        if (onSaveSuccess) onSaveSuccess();
+        if (onClose) onClose();
+      } else {
+        navigate("/events");
+      }
     } catch (error) {
       let errMsg = error.response?.data?.message;
       if (!errMsg && error.response?.data?.errors) {
@@ -1293,66 +1332,71 @@ export default function EventFormPage() {
     }
   };
 
+  const handleCancel = () => {
+    if (isDialog) {
+      if (onClose) onClose();
+    } else {
+      navigate("/events");
+    }
+  };
+
   const typeOptions = eventTypes.map((t) => ({
     label: t.eventTypeName,
     value: t.eventTypeId,
   }));
 
   if (loading) {
+    if (isDialog) {
+      return (
+        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+          <Box sx={{ p: 5, display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <CircularProgress size={32} sx={{ color: "#4a3f6b" }} />
+          </Box>
+        </Dialog>
+      );
+    }
     return <div className="page-shell" />;
   }
 
-  return (
-    <div className="page-shell">
-      <Paper
-        elevation={0}
+  const formContent = (
+    <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
+      {/* Top Header Banner */}
+      <Box
         sx={{
-          border:
-            theme.palette.mode === "dark"
-              ? `1px solid ${theme.palette.divider}`
-              : "1px solid rgba(74, 63, 107, 0.08)",
-          borderRadius: "14px",
-          overflow: "hidden",
-          bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#f8f7fc"),
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
+          bgcolor: "#45386d",
+          color: "#ffffff",
+          px: { xs: 2, sm: 3 },
+          py: 1.4,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          minHeight: 52,
         }}
       >
-        {/* Top Header Banner */}
-        <Box
-          sx={{
-            bgcolor: "#45386d",
-            color: "#ffffff",
-            px: { xs: 2, sm: 3 },
-            py: 1.4,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            minHeight: 52,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Tooltip title="Back to Events">
-              <IconButton
-                size="small"
-                onClick={() => navigate("/events")}
-                sx={{
-                  color: "#ffffff",
-                  p: 0.5,
-                  "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)" },
-                }}
-              >
-                <ArrowBackIcon sx={{ fontSize: "1.25rem" }} />
-              </IconButton>
-            </Tooltip>
-            <Typography
-              variant="subtitle1"
-              fontWeight={700}
-              sx={{ fontSize: "1.05rem", letterSpacing: "0.01em", color: "#ffffff" }}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Tooltip title={isDialog ? "Close" : "Back to Events"}>
+            <IconButton
+              size="small"
+              onClick={handleCancel}
+              sx={{
+                color: "#ffffff",
+                p: 0.5,
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)" },
+              }}
             >
-              {isEdit ? "Edit Event" : "Add Event"}
-            </Typography>
-          </Box>
+              <ArrowBackIcon sx={{ fontSize: "1.25rem" }} />
+            </IconButton>
+          </Tooltip>
+          <Typography
+            variant="subtitle1"
+            fontWeight={700}
+            sx={{ fontSize: "1.05rem", letterSpacing: "0.01em", color: "#ffffff" }}
+          >
+            {isEdit ? "Edit Event" : "Add Event"}
+          </Typography>
+        </Box>
 
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           {allowMultipleEvents && (
             <Chip
               icon={<MultiIcon sx={{ fontSize: "0.85rem !important", color: "#ffffff !important" }} />}
@@ -1367,10 +1411,30 @@ export default function EventFormPage() {
               }}
             />
           )}
+          {isDialog && (
+            <IconButton
+              size="small"
+              onClick={onClose}
+              sx={{
+                color: "#ffffff",
+                p: 0.5,
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)" },
+              }}
+            >
+              <CloseRoundedIcon sx={{ fontSize: "1.25rem" }} />
+            </IconButton>
+          )}
         </Box>
+      </Box>
 
-        {/* Main Body with Balanced 2-Column Enterprise Layout */}
-        <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+      {/* Main Body with Balanced 2-Column Enterprise Layout */}
+      <Box
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          maxHeight: isDialog ? "calc(90vh - 60px)" : "none",
+          overflowY: isDialog ? "auto" : "visible",
+        }}
+      >
           <Grid container spacing={2} alignItems="stretch">
             {/* Left Panel: Event Configuration */}
             <Grid size={{ xs: 12, lg: 7.4 }}>
@@ -2238,6 +2302,21 @@ export default function EventFormPage() {
                       ₹{plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                     </Typography>
                   </Box>
+
+                  {isBirthday && (plannedBudget <= 0 || bdayBudget <= 0) && (
+                    <Alert
+                      severity="warning"
+                      sx={{
+                        mt: 1.5,
+                        py: 0.5,
+                        fontSize: "0.78rem",
+                        borderRadius: "8px",
+                        "& .MuiAlert-message": { lineHeight: 1.4 },
+                      }}
+                    >
+                      Birthday event budget is ₹0. Please configure rates in Settings &gt; Budget Calculations before saving.
+                    </Alert>
+                  )}
                 </Box>
               </Box>
             </Grid>
@@ -2260,7 +2339,7 @@ export default function EventFormPage() {
           >
             <AppButton
               variant="outlined"
-              onClick={() => navigate("/events")}
+              onClick={handleCancel}
               disabled={saving}
               sx={{
                 minWidth: 120,
@@ -2278,7 +2357,7 @@ export default function EventFormPage() {
                 },
               }}
             >
-              {readOnly ? "Back to Events" : "Cancel"}
+              {readOnly ? (isDialog ? "Close" : "Back to Events") : "Cancel"}
             </AppButton>
             {canEdit && (
               <Tooltip title={isEdit && hasPayments ? "Cannot edit event after payments have been received" : ""}>
@@ -2308,6 +2387,49 @@ export default function EventFormPage() {
             )}
           </Box>
         </Box>
+      </Box>
+  );
+
+  if (isDialog) {
+    if (!open) return null;
+    return (
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "16px",
+            bgcolor: (theme) => (theme.palette.mode === "dark" ? "#1e1a2e" : "#f8f7fc"),
+            overflow: "hidden",
+            boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+            m: { xs: 1, sm: 2 },
+            maxHeight: "92vh",
+          },
+        }}
+      >
+        {formContent}
+      </Dialog>
+    );
+  }
+
+  return (
+    <div className="page-shell">
+      <Paper
+        elevation={0}
+        sx={{
+          border:
+            theme.palette.mode === "dark"
+              ? `1px solid ${theme.palette.divider}`
+              : "1px solid rgba(74, 63, 107, 0.08)",
+          borderRadius: "14px",
+          overflow: "hidden",
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#f8f7fc"),
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
+        }}
+      >
+        {formContent}
       </Paper>
     </div>
   );

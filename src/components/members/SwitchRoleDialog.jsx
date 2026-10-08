@@ -14,11 +14,13 @@ import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppToast } from "../common/AppToast";
+import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 import { updateUserAsync, getUserByIdAsync, getProfileAsync } from "../../services/userService";
 
 export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess }) {
   const theme = useTheme();
   const { authState, switchRole, fetchProfile } = useAuth();
+  const { showLoader, hideLoader } = useNavigationLoading();
   const toast = useAppToast();
   const [selectedRole, setSelectedRole] = useState("");
   const [switching, setSwitching] = useState(false);
@@ -136,6 +138,7 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
     }
 
     setSwitching(true);
+    showLoader("Switching role...");
     try {
       if (targetUser && targetUser.userId && targetUser.userId !== authState?.userId) {
         // If an admin is switching role for another user in the table:
@@ -164,6 +167,9 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
       toast.error(msg);
     } finally {
       setSwitching(false);
+      setTimeout(() => {
+        hideLoader();
+      }, 300);
     }
   };
 

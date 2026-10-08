@@ -203,7 +203,7 @@ export function AuthProvider({ children }) {
       }
     }
 
-    const { data: resData } = await apiClient.post("/auth/switchRoleAsync", payload);
+    const { data: resData } = await apiClient.post("/auth/switchRoleAsync", payload, { hideLoader: true });
     const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
     if (data.rights && data.role) {
