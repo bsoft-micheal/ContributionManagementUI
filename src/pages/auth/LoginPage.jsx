@@ -31,31 +31,7 @@ export default function LoginPage() {
   const [mfaStatusMessage, setMfaStatusMessage] = useState("");
   const [isLockedOut, setIsLockedOut] = useState(false);
 
-  // Calculate redirect destination after login
-  const getRedirectDestination = () => {
-    // 1. From location.state?.from (object or string)
-    if (location.state?.from) {
-      if (typeof location.state.from === "string") {
-        return location.state.from;
-      }
-      if (location.state.from.pathname) {
-        const path = location.state.from.pathname;
-        const search = location.state.from.search || "";
-        const hash = location.state.from.hash || "";
-        const targetPath = (path === "/confirm-payment" || path === "/payment-submission") ? "/payments" : path;
-        return `${targetPath}${search}${hash}`;
-      }
-    }
-    // 2. From query parameters ?redirect=... or ?returnUrl=...
-    const params = new URLSearchParams(location.search);
-    const redirectParam = params.get("redirect") || params.get("returnUrl") || params.get("from");
-    if (redirectParam) {
-      return decodeURIComponent(redirectParam);
-    }
-    return "/";
-  };
-
-  // If already authenticated, redirect to destination
+  // If already authenticated, redirect to Dashboard landing page
   useEffect(() => {
     if (isAuthenticated) {
       // 1. Explicit switch/logout parameter in URL
@@ -75,9 +51,9 @@ export default function LoginPage() {
         return;
       }
 
-      const destination = getRedirectDestination();
-      const destRights = getRightsForPath(destination, activeRole);
-      const target = destRights.deny ? firstAllowed : destination;
+      // Always land on Dashboard "/" (or first allowed route if "/" is restricted)
+      const destRights = getRightsForPath("/", activeRole);
+      const target = destRights.deny ? firstAllowed : "/";
       navigate(target, { replace: true });
     }
   }, [isAuthenticated, authState]);
@@ -119,8 +95,7 @@ export default function LoginPage() {
         setIsLockedOut(false);
         toast.info(TOAST_MESSAGES.AUTH.TWO_FACTOR_REQUIRED || "Please check OTP code in Authenticator app.");
       } else {
-        const destination = getRedirectDestination();
-        navigate(destination, { replace: true });
+        navigate("/", { replace: true });
       }
     } catch (error) {
       const errorMsg =
@@ -163,8 +138,7 @@ export default function LoginPage() {
       await verifyTwoFactor(resolvedEmail || form.email, otp, keepSignedIn);
       setMfaStatusMessage("");
       setIsLockedOut(false);
-      const destination = getRedirectDestination();
-      navigate(destination, { replace: true });
+      navigate("/", { replace: true });
     } catch (error) {
       const msg = error.response?.data?.message ?? "Invalid OTP code.";
       setMfaStatusMessage(msg);

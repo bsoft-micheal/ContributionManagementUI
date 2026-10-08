@@ -158,10 +158,10 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
           roleName: targetRoleName,
         });
       } else {
+        onClose();
         await switchRole(targetRoleName);
       }
       if (onSuccess) onSuccess(targetRoleName);
-      onClose();
     } catch (err) {
       const msg = err.response?.data?.message || err.message || "Failed to switch role";
       toast.error(msg);
