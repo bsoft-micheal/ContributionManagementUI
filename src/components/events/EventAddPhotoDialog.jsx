@@ -266,8 +266,8 @@ export default function EventAddPhotoDialog({
       newErrors.title = filed;
     } else if (!/^[A-Za-z\s]+$/.test(form.title.trim())) {
       newErrors.title = "Only letters and spaces are allowed";
-    } else if (form.title.trim().length > 50) {
-      newErrors.title = "Title must be at most 50 characters";
+    } else if (form.title.trim().length > 250) {
+      newErrors.title = "Title must be at most 250 characters";
     }
 
     if (!form.category) newErrors.category = "Event Type is required";
@@ -384,9 +384,9 @@ export default function EventAddPhotoDialog({
               label="Title"
               placeholder="e.g. Birthday celebration moments"
               value={form.title}
-              maxLength={50}
+              maxLength={250}
               onChange={(e) => {
-                const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, "").slice(0, 50);
+                const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, "").slice(0, 250);
                 setForm((c) => ({ ...c, title: sanitized }));
                 if (errors.title) setErrors((p) => ({ ...p, title: "" }));
               }}

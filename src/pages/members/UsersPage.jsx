@@ -49,12 +49,14 @@ import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import ExcelImportDialog from "../../components/common/ExcelImportDialog";
 import UserDetailsDialog from "../../components/members/UserDetailsDialog";
+import SwitchRoleDialog from "../../components/members/SwitchRoleDialog";
 import {
   validateForm,
   validateIndianMobile,
   validatePassword,
   validateConfirmPassword,
 } from "../../utils/validation";
+import {
   getUsersAsync,
   createUserAsync,
   updateUserAsync,
