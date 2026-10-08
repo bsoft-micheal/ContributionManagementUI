@@ -270,6 +270,13 @@ export default function ForgotPasswordResetPage() {
                           <LockRoundedIcon sx={{ color: "#7c3aed", fontSize: "1.2rem" }} />
                         </InputAdornment>
                       ),
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton onClick={() => setShowPassword((p) => !p)} edge="end" size="small">
+                            {showPassword ? <VisibilityOff sx={{ fontSize: "1.1rem" }} /> : <Visibility sx={{ fontSize: "1.1rem" }} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
                     }}
                   />
 
