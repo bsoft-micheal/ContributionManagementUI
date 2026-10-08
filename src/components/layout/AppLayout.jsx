@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Avatar,
   Box,
@@ -13,6 +13,7 @@ import {
   ListItemText,
   Paper,
   Popper,
+  Stack,
   Tooltip,
   Typography,
   Alert,
@@ -30,6 +31,8 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import SwitchRoleDialog from "../members/SwitchRoleDialog";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
@@ -232,10 +235,46 @@ export default function AppLayout() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [newPasswordAnchorEl, setNewPasswordAnchorEl] = useState(null);
+
+  // Live password validation against the 4 policy rules
+  const newPassVal = changePasswordForm.newPassword || "";
+  const passwordValidation = useMemo(() => {
+    return {
+      hasLowerAndUpper: /[a-z]/.test(newPassVal) && /[A-Z]/.test(newPassVal),
+      hasNumber: /[0-9]/.test(newPassVal),
+      hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(newPassVal),
+      hasMinLength: newPassVal.length >= 8,
+    };
+  }, [newPassVal]);
+
+  const passwordRules = useMemo(() => [
+    {
+      id: "case",
+      label: "Lowercase & Uppercase",
+      met: passwordValidation.hasLowerAndUpper,
+    },
+    {
+      id: "number",
+      label: "Number (0-9)",
+      met: passwordValidation.hasNumber,
+    },
+    {
+      id: "special",
+      label: "Special Character (!@#$%^&*)",
+      met: passwordValidation.hasSpecial,
+    },
+    {
+      id: "length",
+      label: "Atleast 8 Character",
+      met: passwordValidation.hasMinLength,
+    },
+  ], [passwordValidation]);
 
   // Clear and prevent browser password manager autofill on Change Password dialog open
   useEffect(() => {
     if (changePasswordDialogOpen) {
+      setNewPasswordAnchorEl(null);
       setChangePasswordForm({
         currentPassword: "",
         newPassword: "",
@@ -487,8 +526,14 @@ export default function AppLayout() {
 
     if (!newPass) {
       errs.newPassword = requiredMsg;
-    } else if (newPass.length !== 8) {
-      errs.newPassword = "Password must be exactly 8 characters";
+    } else if (newPass.length < 8) {
+      errs.newPassword = "Password must be at least 8 characters";
+    } else if (!passwordValidation.hasLowerAndUpper) {
+      errs.newPassword = "Password must contain lowercase and uppercase letters";
+    } else if (!passwordValidation.hasNumber) {
+      errs.newPassword = "Password must contain at least one number (0-9)";
+    } else if (!passwordValidation.hasSpecial) {
+      errs.newPassword = "Password must contain at least one special character (!@#$%^&*)";
     } else if (newPass === curPass) {
       errs.newPassword = "New password must be different from current password";
     }
@@ -527,8 +572,10 @@ export default function AppLayout() {
     } catch (err) {
       const msg = err.response?.data?.message || err.message || "Failed to change password";
       toast.error(msg);
-      if (msg.toLowerCase().includes("current password")) {
-        setChangePasswordErrors({ currentPassword: msg });
+      if (msg.toLowerCase().includes("current password") || msg.toLowerCase().includes("incorrect")) {
+        setChangePasswordErrors((prev) => ({ ...prev, currentPassword: msg }));
+      } else if (msg.toLowerCase().includes("new password")) {
+        setChangePasswordErrors((prev) => ({ ...prev, newPassword: msg }));
       }
     } finally {
       setChangePasswordLoading(false);
@@ -1117,7 +1164,7 @@ export default function AppLayout() {
         onClose={() => setChangePasswordDialogOpen(false)}
         title="Change Password"
         maxWidth="xs"
-        showCloseIcon={false}
+        showCloseIcon={true}
         actions={
           <>
             <AppButton variant="outlined" onClick={() => setChangePasswordDialogOpen(false)}>
@@ -1174,38 +1221,46 @@ export default function AppLayout() {
             }
           />
 
-          <AppInput
-            label="New Password"
-            type={showNewPassword ? "text" : "password"}
-            value={changePasswordForm.newPassword}
-            maxLength={8}
-            placeholder="Enter 8 characters"
-            name="new_password_unautofill"
-            autoComplete="new-password"
-            onChange={(e) => {
-              const val = e.target.value;
-              setChangePasswordForm((prev) => ({ ...prev, newPassword: val }));
-              if (changePasswordErrors.newPassword) {
-                setChangePasswordErrors((prev) => ({ ...prev, newPassword: "" }));
+          <Box
+            ref={(node) => {
+              if (node && node !== newPasswordAnchorEl) {
+                setNewPasswordAnchorEl(node);
               }
             }}
-            error={!!changePasswordErrors.newPassword}
-            helperText={changePasswordErrors.newPassword || "8 characters"}
-            required
-            endAdornment={
-              <InputAdornment position="end">
-                <IconButton
-                  size="small"
-                  onClick={() => setShowNewPassword((prev) => !prev)}
-                  onMouseDown={(e) => e.preventDefault()}
-                  edge="end"
-                  aria-label="toggle new password visibility"
-                >
-                  {showNewPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                </IconButton>
-              </InputAdornment>
-            }
-          />
+          >
+            <AppInput
+              label="New Password"
+              type={showNewPassword ? "text" : "password"}
+              value={changePasswordForm.newPassword}
+              maxLength={8}
+              placeholder="Enter 8 characters"
+              name="new_password_unautofill"
+              autoComplete="new-password"
+              onChange={(e) => {
+                const val = e.target.value;
+                setChangePasswordForm((prev) => ({ ...prev, newPassword: val }));
+                if (changePasswordErrors.newPassword) {
+                  setChangePasswordErrors((prev) => ({ ...prev, newPassword: "" }));
+                }
+              }}
+              error={!!changePasswordErrors.newPassword}
+              helperText={changePasswordErrors.newPassword || "8 characters"}
+              required
+              endAdornment={
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    edge="end"
+                    aria-label="toggle new password visibility"
+                  >
+                    {showNewPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              }
+            />
+          </Box>
 
           <AppInput
             label="Confirm Password"
@@ -1241,6 +1296,102 @@ export default function AppLayout() {
           />
         </Box>
       </AppDialog>
+
+      {/* ── Password Validation Requirements Speech Bubble Popper ────────── */}
+      <Popper
+        open={Boolean(changePasswordDialogOpen && newPasswordAnchorEl)}
+        anchorEl={newPasswordAnchorEl}
+        placement="right"
+        modifiers={[
+          {
+            name: "offset",
+            options: {
+              offset: [0, 16],
+            },
+          },
+          {
+            name: "preventOverflow",
+            options: {
+              boundary: "viewport",
+              padding: 12,
+            },
+          },
+        ]}
+        sx={{
+          zIndex: (theme) => theme.zIndex.modal + 10,
+          pointerEvents: "none",
+        }}
+      >
+        <Paper
+          elevation={4}
+          sx={{
+            position: "relative",
+            bgcolor: (theme) => theme.palette.mode === "dark" ? "#1e2235" : "#ffffff",
+            borderRadius: "14px",
+            py: 2,
+            px: 2.5,
+            border: "1px solid",
+            borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "#e2e8f0",
+            boxShadow: (theme) => theme.palette.mode === "dark"
+              ? "0 10px 30px rgba(0, 0, 0, 0.6)"
+              : "0 10px 30px rgba(0, 0, 0, 0.10)",
+            minWidth: 235,
+            ml: 1.5,
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              top: "50%",
+              left: "-7px",
+              transform: "translateY(-50%) rotate(45deg)",
+              width: 14,
+              height: 14,
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "#1e2235" : "#ffffff",
+              borderLeft: "1px solid",
+              borderBottom: "1px solid",
+              borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "#e2e8f0",
+            },
+          }}
+        >
+          <Stack spacing={1.35}>
+            {passwordRules.map((rule) => (
+              <Box key={rule.id} sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+                {rule.met ? (
+                  <CheckCircleOutlineRoundedIcon
+                    sx={{
+                      fontSize: 19,
+                      color: "#10b981",
+                      flexShrink: 0,
+                      transition: "all 0.25s ease",
+                    }}
+                  />
+                ) : (
+                  <ErrorOutlineRoundedIcon
+                    sx={{
+                      fontSize: 19,
+                      color: "#ef4444",
+                      flexShrink: 0,
+                      transition: "all 0.25s ease",
+                    }}
+                  />
+                )}
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    color: (theme) => theme.palette.mode === "dark" ? "#f1f5f9" : "#334155",
+                    lineHeight: 1.25,
+                    whiteSpace: "nowrap",
+                    transition: "color 0.25s ease",
+                  }}
+                >
+                  {rule.label}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+        </Paper>
+      </Popper>
 
       <SwitchRoleDialog
         open={switchRoleDialogOpen}
