@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import logoImg from "../../assets/logo_image.png";
+import logoImg from "../../assets/loader_image.png";
 
 export default function AppPageLoader({ fullScreen = false, text = "Loading...", opaque = false }) {
   const theme = useTheme();

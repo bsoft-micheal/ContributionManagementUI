@@ -79,7 +79,7 @@ export default function AppLayout() {
   const location = useLocation();
   const toast = useAppToast();
   const { isDark, toggleMode } = useThemeMode();
-  const { isLoading } = useNavigationLoading();
+  const { isLoading, loadingMessage, showLoader, hideLoader } = useNavigationLoading();
 
   const SIDEBAR = React.useMemo(() => {
     if (theme.palette.mode === "dark") {
@@ -175,12 +175,17 @@ export default function AppLayout() {
       ) || userAssignedRoles[0];
 
       if (targetRole && targetRole.trim().toLowerCase() !== currentRole) {
+        showLoader("Switching role...");
         try {
           await switchRole(targetRole);
           toast.success(`Switched to ${targetRole} role`);
         } catch (err) {
           const msg = err?.response?.data?.message || err?.message || "Failed to switch role";
           toast.error(msg);
+        } finally {
+          setTimeout(() => {
+            hideLoader();
+          }, 300);
         }
       }
       return;
@@ -426,6 +431,19 @@ export default function AppLayout() {
 
     if (!profileForm.dateOfBirth || !dayjs(profileForm.dateOfBirth).isValid()) {
       errors.dateOfBirth = requiredMsg;
+    }
+
+    if (!profileForm.joiningDate || !dayjs(profileForm.joiningDate).isValid()) {
+      errors.joiningDate = requiredMsg;
+    }
+
+    if (profileForm.password) {
+      if (profileForm.password.length < 8) {
+        errors.password = "Password must be at least 8 characters";
+      }
+      if (profileForm.password !== profileForm.confirmPassword) {
+        errors.confirmPassword = "Passwords do not match";
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -961,7 +979,7 @@ export default function AppLayout() {
           position: "relative",
         }}
       >
-        {isLoading && <AppPageLoader fullScreen={true} text="Loading..." />}
+        {isLoading && <AppPageLoader fullScreen={true} text={loadingMessage || "Loading..."} />}
         <Outlet />
       </Box>
 

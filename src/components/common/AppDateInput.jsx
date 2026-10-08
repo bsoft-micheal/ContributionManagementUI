@@ -7,11 +7,164 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { usePickerContext } from "@mui/x-date-pickers/hooks";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ArrowDropDownRoundedIcon from "@mui/icons-material/ArrowDropDownRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
 import dayjs from "dayjs";
+
+/**
+ * Custom action bar with "Today" button (with icon) on left, Cancel & OK on right
+ */
+function CustomActionBar({ onSetToday, onCancel, onAccept, onSelectToday, className }) {
+  const {
+    setValueToToday,
+    acceptValueChanges,
+    cancelValueChanges,
+  } = usePickerContext();
+
+  const handleTodayClick = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (setValueToToday) {
+      setValueToToday();
+    }
+    if (onSelectToday) {
+      onSelectToday();
+    }
+    if (onSetToday) {
+      onSetToday();
+    }
+    if (acceptValueChanges) {
+      acceptValueChanges();
+    } else if (onAccept) {
+      onAccept();
+    }
+  };
+
+  const handleCancelClick = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (cancelValueChanges) {
+      cancelValueChanges();
+    } else if (onCancel) {
+      onCancel();
+    }
+  };
+
+  const handleOkClick = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (acceptValueChanges) {
+      acceptValueChanges();
+    } else if (onAccept) {
+      onAccept();
+    }
+  };
+
+  return (
+    <Box
+      className={className}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        px: 2,
+        pb: 1.5,
+        pt: 0.8,
+        borderTop: (theme) =>
+          theme.palette.mode === "dark"
+            ? "1px solid rgba(255, 255, 255, 0.08)"
+            : "1px solid rgba(74, 63, 107, 0.08)",
+      }}
+    >
+      {/* Today button with Today icon */}
+      <Button
+        size="small"
+        startIcon={<TodayRoundedIcon sx={{ fontSize: "1.05rem" }} />}
+        onClick={handleTodayClick}
+        sx={{
+          textTransform: "none",
+          fontWeight: 700,
+          fontSize: "0.82rem",
+          color: (theme) =>
+            theme.palette.mode === "dark" ? "#a78bfa" : "#6355a4",
+          borderRadius: "8px",
+          px: 1.2,
+          py: 0.4,
+          "&:hover": {
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark"
+                ? "rgba(167, 139, 250, 0.12)"
+                : "rgba(99, 85, 164, 0.08)",
+          },
+        }}
+      >
+        Today
+      </Button>
+
+      {/* Right side: Cancel & OK buttons */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+        <Button
+          size="small"
+          onClick={handleCancelClick}
+          sx={{
+            textTransform: "none",
+            fontWeight: 600,
+            fontSize: "0.82rem",
+            color: (theme) =>
+              theme.palette.mode === "dark" ? "#94a3b8" : "#64748b",
+            borderRadius: "8px",
+            px: 1.2,
+            py: 0.4,
+            "&:hover": {
+              bgcolor: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "rgba(255, 255, 255, 0.08)"
+                  : "rgba(0, 0, 0, 0.05)",
+            },
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          size="small"
+          onClick={handleOkClick}
+          sx={{
+            textTransform: "none",
+            fontWeight: 700,
+            fontSize: "0.82rem",
+            color: (theme) =>
+              theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark"
+                ? "rgba(255, 255, 255, 0.12)"
+                : "rgba(74, 63, 107, 0.08)",
+            borderRadius: "8px",
+            px: 1.4,
+            py: 0.4,
+            "&:hover": {
+              bgcolor: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "rgba(255, 255, 255, 0.2)"
+                  : "rgba(74, 63, 107, 0.15)",
+            },
+          }}
+        >
+          OK
+        </Button>
+      </Box>
+    </Box>
+  );
+}
 
 /**
  * Custom Material calendar header matching the user's design:
@@ -318,6 +471,7 @@ export default function AppDateInput({
         }
         slots={{
           calendarHeader: CustomCalendarHeader,
+          actionBar: CustomActionBar,
           openPickerIcon: CalendarMonthRoundedIcon,
           ...props.slots,
         }}
@@ -355,27 +509,9 @@ export default function AppDateInput({
             ...customSlotProps.openPickerButton,
           },
           actionBar: {
-            actions: ["cancel", "accept"],
-            sx: {
-              justifyContent: "flex-end",
-              px: 2,
-              pb: 1.5,
-              pt: 0.5,
-              "& .MuiButton-root": {
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: "0.82rem",
-                color: (theme) =>
-                  theme.palette.mode === "dark" ? "#c4bde0" : "#5c4b82",
-                borderRadius: "8px",
-                px: 1.5,
-                "&:hover": {
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(196, 189, 224, 0.1)"
-                      : "rgba(92, 75, 130, 0.08)",
-                },
-              },
+            actions: ["today", "cancel", "accept"],
+            onSelectToday: () => {
+              handleChange(dayjs());
             },
             ...customSlotProps.actionBar,
           },

@@ -27,6 +27,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Alert,
+  Dialog,
 } from "@mui/material";
 import { useTheme, styled } from "@mui/material/styles";
 import {
@@ -259,10 +261,40 @@ const getItemStyle = (name = "") => {
     icon: <ReceiptIcon sx={{ color: "#fff", fontSize: "1.05rem" }} />,
     bg: "#6366f1", // Indigo
   };
-};
+function extractContribAmounts(description) {
+  if (!description) return { cleanDesc: "", amounts: null };
+  const match = description.match(/<!--contrib:(.*?)-->/);
+  if (match) {
+    try {
+      const amounts = JSON.parse(match[1]);
+      const cleanDesc = description.replace(/<!--contrib:.*?-->/g, "").trim();
+      return { cleanDesc, amounts };
+    } catch {
+      // Ignore parse error
+    }
+  }
+  return { cleanDesc: description, amounts: null };
+}
 
-export default function EventFormPage() {
-  const { id } = useParams();
+function formatDescriptionWithContrib(userDesc, amountsObj) {
+  const clean = (userDesc || "").replace(/<!--contrib:.*?-->/g, "").trim();
+  if (amountsObj && Object.keys(amountsObj).length > 0) {
+    return `${clean}${clean ? " " : ""}<!--contrib:${JSON.stringify(amountsObj)}-->`;
+  }
+  return clean;
+}
+
+export default function EventFormPage({
+  isDialog = false,
+  open = true,
+  onClose,
+  event: propEvent,
+  eventTypes: propEventTypes,
+  members: propMembers,
+  onSaveSuccess,
+}) {
+  const routeParams = useParams();
+  const routeId = routeParams?.id;
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -270,6 +302,7 @@ export default function EventFormPage() {
   const { authState } = useAuth();
   const { canEdit, readOnly } = useAccessByLocation();
 
+  const id = isDialog ? (propEvent?.eventId || propEvent?.id || null) : routeId;
   const isEdit = Boolean(id);
 
   // Granular Action Permissions
@@ -277,6 +310,7 @@ export default function EventFormPage() {
   const canEditEvent = hasActionPermission("Edit Event", 33, authState?.role).canExecute && canEdit;
 
   useEffect(() => {
+    if (isDialog) return;
     if (!isEdit && !canAddEvent) {
       toast.error("Access Denied: You do not have permission to add events.");
       navigate("/events");
@@ -287,10 +321,12 @@ export default function EventFormPage() {
       navigate("/events");
       return;
     }
-  }, [isEdit, canAddEvent, canEditEvent]);
+  }, [isDialog, isEdit, canAddEvent, canEditEvent]);
 
   const [form, setForm] = useState(initialForm);
   const [otherEventAmounts, setOtherEventAmounts] = useState({});
+  const [customItemAmounts, setCustomItemAmounts] = useState({});
+  const [extraExpenseItems, setExtraExpenseItems] = useState([]);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -348,13 +384,18 @@ export default function EventFormPage() {
 
   // Load initial dropdown data and event details if in edit mode
   useEffect(() => {
+    if (isDialog && !open) return;
     let isMounted = true;
     async function initData() {
       setLoading(true);
       try {
         const [typesData, usersData, budgetData, settingsData] = await Promise.all([
-          getEventTypesAsync(isEdit),
-          getUsersAsync().catch(() => getMembersAsync()),
+          (propEventTypes && propEventTypes.length > 0)
+            ? Promise.resolve(propEventTypes)
+            : getEventTypesAsync(isEdit),
+          (propMembers && propMembers.length > 0)
+            ? Promise.resolve(propMembers)
+            : getUsersAsync().catch(() => getMembersAsync()),
           getBudgetCalculationsAsync().catch(() => []),
           getSystemSettingsAsync().catch(() => null),
         ]);
@@ -397,7 +438,9 @@ export default function EventFormPage() {
 
         if (id) {
           // Edit existing event
-          const detailedEvent = await getEventByIdAsync(id);
+          const detailedEvent = propEvent?.eventName && propEvent?.eventId === id
+            ? propEvent
+            : await getEventByIdAsync(id);
           if (!isMounted) return;
 
           const pIds =
@@ -436,31 +479,52 @@ export default function EventFormPage() {
               (t) => eventTypeIdsList.includes(t.eventTypeId) && t.eventTypeName?.toLowerCase().includes("birthday")
             );
 
-          let initialBaseAmount = "";
-          if (!isEditBday) {
-            if (detailedEvent.contributions && detailedEvent.contributions.length > 0 && detailedEvent.contributions[0].amount > 0) {
-              initialBaseAmount = String(detailedEvent.contributions[0].amount);
-            } else if (
-              detailedEvent.baseAmount !== undefined &&
-              detailedEvent.baseAmount !== null &&
-              Number(detailedEvent.baseAmount) > 0
-            ) {
-              const pCount = pIds.length || 1;
-              initialBaseAmount = String(
-                pCount > 1 && detailedEvent.baseAmount > 1000
-                  ? Math.round(detailedEvent.baseAmount / pCount)
-                  : detailedEvent.baseAmount
-              );
-            }
-          }
+          let savedBaseAmount = Math.round(Number(detailedEvent.baseAmount || 0));
+          let initialBaseAmount = savedBaseAmount > 0 ? String(savedBaseAmount) : "";
+
+          const { cleanDesc, amounts: savedContribAmounts } = extractContribAmounts(detailedEvent.description);
 
           const editNonBdays = (typesData || []).filter(
             (t) => eventTypeIdsList.includes(t.eventTypeId) && !t.eventTypeName?.toLowerCase().includes("birthday")
           );
-          if (editNonBdays.length === 1 && (detailedEvent.baseAmount || initialBaseAmount)) {
-            setOtherEventAmounts({
-              [editNonBdays[0].eventTypeId]: String(detailedEvent.baseAmount || initialBaseAmount),
+
+          if (savedContribAmounts && Object.keys(savedContribAmounts).length > 0) {
+            setOtherEventAmounts(savedContribAmounts);
+            if (editNonBdays.length === 1 && savedContribAmounts[editNonBdays[0].eventTypeId] !== undefined) {
+              initialBaseAmount = String(savedContribAmounts[editNonBdays[0].eventTypeId]);
+            }
+          } else if (editNonBdays.length === 1 && savedBaseAmount > 0) {
+            const type = editNonBdays[0];
+            const typeName = type.eventTypeName || "Event";
+            const typeMasterItems = activeBudgetItems.filter((b) => {
+              if (b.isActive === false) return false;
+              if (type.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === type.eventTypeId.toLowerCase()) {
+                return true;
+              }
+              const cat = (b.category || "").toLowerCase().trim();
+              return cat === typeName.toLowerCase() || cat.includes(typeName.toLowerCase());
             });
+
+            const masterTotal = typeMasterItems.reduce((sum, item) => {
+              const rate = Number(item.rate) || 0;
+              return sum + (activeMems.length * rate);
+            }, 0);
+
+            let netContribAmount = savedBaseAmount;
+            if (masterTotal > 0 && savedBaseAmount > masterTotal) {
+              netContribAmount = Math.max(0, savedBaseAmount - masterTotal);
+            }
+            setOtherEventAmounts({
+              [type.eventTypeId]: String(netContribAmount),
+            });
+            initialBaseAmount = String(netContribAmount);
+          } else if (editNonBdays.length > 1 && savedBaseAmount > 0) {
+            const splitPerType = Math.round(savedBaseAmount / editNonBdays.length);
+            const initialMap = {};
+            editNonBdays.forEach((t) => {
+              initialMap[t.eventTypeId] = String(splitPerType);
+            });
+            setOtherEventAmounts(initialMap);
           }
 
           const paidAmount = Number(
@@ -489,8 +553,8 @@ export default function EventFormPage() {
             eventTypeId: detailedEvent.eventTypeId || defaultTypeId,
             eventTypeIds: eventTypeIdsList,
             eventDate: currentEventDate,
-            description: (detailedEvent.description && !detailedEvent.description.startsWith("Birthday celebration (") && !detailedEvent.description.includes("Planned Budget:"))
-              ? detailedEvent.description
+            description: (cleanDesc && !cleanDesc.startsWith("Birthday celebration (") && !cleanDesc.includes("Planned Budget:"))
+              ? cleanDesc
               : "",
             status: detailedEvent.status || "Planned",
             baseAmount: initialBaseAmount,
@@ -498,7 +562,7 @@ export default function EventFormPage() {
           });
         } else {
           // Creating a new event
-          const defaultDate = dayjs();
+          const defaultDate = propEvent?.eventDate ? dayjs(propEvent.eventDate) : dayjs();
           const targetMonth = defaultDate.month();
           const celebrantsInMonth = activeMems.filter(
             (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
@@ -524,6 +588,9 @@ export default function EventFormPage() {
             baseAmount: "",
             participantIds: activeMems.map((m) => m.memberId),
           });
+          setOtherEventAmounts({});
+          setErrors({});
+          setHasPayments(false);
         }
       } catch {
         toast.error("Failed to load event details");
@@ -536,7 +603,7 @@ export default function EventFormPage() {
     return () => {
       isMounted = false;
     };
-  }, [id, location.pathname, location.key]);
+  }, [id, isDialog, open, location?.pathname, location?.key, propEvent]);
 
   // Selected event types list
   const selectedTypes = useMemo(() => {
@@ -759,18 +826,23 @@ export default function EventFormPage() {
         return cat === "birthday" || cat.includes("birthday");
       });
 
-      bdayMasterItems.forEach((item) => {
+      const effectiveBdayItems = bdayMasterItems.length > 0
+        ? bdayMasterItems
+        : [{ budgetCalculationId: "default_cake", expenseItem: "Cake", rate: 300, category: "Birthday" }];
+
+      effectiveBdayItems.forEach((item) => {
+        const itemKey = `bday_${item.budgetCalculationId || item.expenseItem}`;
         const name = (item.expenseItem || "").toLowerCase();
         const rate = Number(item.rate) || 0;
         let calcText = "";
         let calcFormula = "";
-        let amount = 0;
+        let autoAmount = 0;
         let formulaPart = "";
 
         if (name.includes("cake")) {
           calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
           calcFormula = `Office Celebrants × ₹${rate.toLocaleString("en-IN")}`;
-          amount = office * rate;
+          autoAmount = office * rate;
           formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
         } else if (
           name.includes("gift") ||
@@ -780,71 +852,147 @@ export default function EventFormPage() {
         ) {
           calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
           calcFormula = `Total Celebrants × ₹${rate.toLocaleString("en-IN")}`;
-          amount = bdays * rate;
+          autoAmount = bdays * rate;
           formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
         } else {
           if (puffsFactor > 0) {
-            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""
-              }`;
+            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`;
             calcFormula = `Active Members × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`;
-            amount = total * rate * puffsFactor;
+            autoAmount = total * rate * puffsFactor;
           } else {
             calcText = "WFH only → Not provided";
             calcFormula = "WFH only → Not provided";
-            amount = 0;
+            autoAmount = 0;
           }
-          formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString(
-            "en-IN"
-          )})`;
+          formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString("en-IN")})`;
         }
+
+        const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
+        const amount = isManual ? (Number(customItemAmounts[itemKey]) || 0) : autoAmount;
 
         items.push({
           ...item,
+          key: itemKey,
           category: "Birthday",
           rate,
+          autoAmount,
+          amount,
+          isManual,
           calcText,
           calcFormula,
-          amount,
-          formulaPart,
+          formulaPart: isManual ? `${item.expenseItem} (Manual: ₹${amount.toLocaleString("en-IN")})` : formulaPart,
         });
       });
     }
 
-    // 2. Non-Birthday Event items (each other selected event type has its own total budget)
+    // 2. Non-Birthday Event items (each other selected event type)
     nonBirthdaySelectedTypes.forEach((type) => {
       const typeName = type.eventTypeName || "Event";
+      const typeMasterItems = budgetItemsList.filter((b) => {
+        if (b.isActive === false) return false;
+        if (type.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === type.eventTypeId.toLowerCase()) {
+          return true;
+        }
+        const cat = (b.category || "").toLowerCase().trim();
+        return cat === typeName.toLowerCase() || cat.includes(typeName.toLowerCase());
+      });
+
+      // 1. Add all master items configured for this event type
+      if (typeMasterItems.length > 0) {
+        typeMasterItems.forEach((item) => {
+          const itemKey = `type_${type.eventTypeId}_${item.budgetCalculationId || item.expenseItem}`;
+          const rate = Number(item.rate) || 0;
+          const autoAmount = total * rate;
+          const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
+          const amount = isManual ? (Number(customItemAmounts[itemKey]) || 0) : autoAmount;
+          const calcFormula = `Active Members (${total}) × ₹${rate.toLocaleString("en-IN")}`;
+          const calcText = `${total} × ₹${rate.toLocaleString("en-IN")}`;
+
+          items.push({
+            ...item,
+            key: itemKey,
+            category: typeName,
+            rate,
+            autoAmount,
+            amount,
+            isManual,
+            calcText,
+            calcFormula,
+            formulaPart: isManual
+              ? `${item.expenseItem} (Manual: ₹${amount.toLocaleString("en-IN")})`
+              : `${item.expenseItem} (${total} × ₹${rate.toLocaleString("en-IN")})`,
+            isOtherEvent: true,
+          });
+        });
+      }
+
+      // 2. Add the Event Contribution Amount entered in the form
       const rawVal = otherEventAmounts[type.eventTypeId] !== undefined
         ? otherEventAmounts[type.eventTypeId]
-        : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
-      const totalAmount = parseFloat(String(rawVal)) || 0;
-      const splitPerPerson = total > 0 && totalAmount > 0 ? (totalAmount / total) : 0;
+        : (nonBirthdaySelectedTypes.length === 1 && typeMasterItems.length === 0 ? form.baseAmount : "");
+      const numVal = parseFloat(String(rawVal)) || 0;
 
-      const formattedTotal = totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-      const formattedSplit = splitPerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+      // Include contribution amount if entered, or if there are no master items configured
+      if (numVal > 0 || typeMasterItems.length === 0) {
+        const itemKey = `type_${type.eventTypeId}_contrib`;
+        const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
+        const amount = isManual ? (Number(customItemAmounts[itemKey]) || 0) : numVal;
+        const splitPerPerson = total > 0 && amount > 0 ? (amount / total) : 0;
 
-      const calcText = totalAmount > 0
-        ? `₹${formattedTotal} Total ÷ ${total} Members = ₹${formattedSplit}/person`
-        : "Enter Total Event Budget";
+        const formattedTotal = amount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        const formattedSplit = splitPerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-      const calcFormula = totalAmount > 0
-        ? `Active Members × ₹${formattedSplit}`
-        : "₹0";
+        const calcText = amount > 0
+          ? `₹${formattedTotal} Total ÷ ${total} Members = ₹${formattedSplit}/person`
+          : "Enter Total Event Budget";
 
-      const formulaPart = totalAmount > 0
-        ? `${typeName} (₹${formattedTotal} ÷ ${total} Members = ₹${formattedSplit}/person)`
-        : `${typeName}: ₹0`;
+        const calcFormula = amount > 0
+          ? `Active Members × ₹${formattedSplit}`
+          : "₹0";
+
+        const formulaPart = amount > 0
+          ? `${typeName} Contribution (₹${formattedTotal} ÷ ${total} Members = ₹${formattedSplit}/person)`
+          : `${typeName}: ₹0`;
+
+        items.push({
+          id: `${type.eventTypeId}_contrib`,
+          key: itemKey,
+          expenseItem: `${typeName} Contribution`,
+          category: typeName,
+          rate: amount,
+          autoAmount: numVal,
+          amount,
+          isManual,
+          calcText,
+          calcFormula,
+          formulaPart,
+          isOtherEvent: true,
+          splitPerPerson,
+        });
+      }
+    });
+
+    // 3. Extra custom items added by user
+    extraExpenseItems.forEach((extra) => {
+      const itemKey = `extra_${extra.id}`;
+      const amount = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== ""
+        ? (Number(customItemAmounts[itemKey]) || 0)
+        : (Number(extra.amount) || 0);
 
       items.push({
-        id: type.eventTypeId,
-        expenseItem: `${typeName} Celebration (Total Budget)`,
-        category: typeName,
-        rate: totalAmount,
-        calcText,
-        calcFormula,
-        amount: totalAmount,
-        formulaPart,
+        id: extra.id,
+        key: itemKey,
+        expenseItem: extra.name,
+        category: "Custom",
+        rate: amount,
+        autoAmount: Number(extra.amount) || 0,
+        amount,
+        isManual: true,
+        isCustom: true,
+        calcText: `Custom Expense: ₹${amount.toLocaleString("en-IN")}`,
+        calcFormula: "Custom Expense",
+        formulaPart: `${extra.name} (₹${amount.toLocaleString("en-IN")})`,
         isOtherEvent: true,
-        splitPerPerson,
       });
     });
 
@@ -860,6 +1008,8 @@ export default function EventFormPage() {
     puffsFactor,
     otherEventAmounts,
     form.baseAmount,
+    customItemAmounts,
+    extraExpenseItems,
   ]);
 
   const bdayBudget = useMemo(
@@ -882,21 +1032,18 @@ export default function EventFormPage() {
   const birthdaySharePerPerson = birthdayEligibleCount > 0 ? (bdayBudget / birthdayEligibleCount) : 0;
   const otherEventsSharePerPerson = total > 0 ? (otherEventsBudget / total) : 0;
 
-  const plannedBudget = computedBudgetItems.reduce((acc, curr) => acc + curr.amount, 0);
+  const plannedBudget = Math.round(computedBudgetItems.reduce((acc, curr) => acc + Math.round(curr.amount || 0), 0));
 
   const contributionPerMember = useMemo(() => {
     if (isBirthday && exempt && celebrantCount > 0) {
-      return birthdaySharePerPerson + otherEventsSharePerPerson;
+      return Math.round(birthdaySharePerPerson + otherEventsSharePerPerson);
     }
-    return total > 0 ? (plannedBudget / total) : 0;
+    return total > 0 ? Math.round(plannedBudget / total) : 0;
   }, [isBirthday, exempt, celebrantCount, birthdaySharePerPerson, otherEventsSharePerPerson, plannedBudget, total]);
 
   const expectedCollection = useMemo(() => {
-    if (isBirthday && exempt && celebrantCount > 0) {
-      return (birthdayEligibleCount * birthdaySharePerPerson) + (total * otherEventsSharePerPerson);
-    }
     return plannedBudget;
-  }, [isBirthday, exempt, celebrantCount, birthdayEligibleCount, birthdaySharePerPerson, total, otherEventsSharePerPerson, plannedBudget]);
+  }, [plannedBudget]);
 
   const dynamicFormulaText = computedBudgetItems
     .map((i) => i.formulaPart)
@@ -1146,10 +1293,27 @@ export default function EventFormPage() {
           ? otherEventAmounts[t.eventTypeId]
           : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
         const num = parseFloat(String(val)) || 0;
-        if (num <= 0) {
+        const hasMasterItems = computedBudgetItems.some(
+          (i) =>
+            (i.category || "").toLowerCase() === (t.eventTypeName || "").toLowerCase() &&
+            !i.key.includes("_contrib") &&
+            i.amount > 0
+        );
+        if (num <= 0 && !hasMasterItems) {
           newErrors[`baseAmount_${t.eventTypeId}`] = `Contribution amount is required for ${t.eventTypeName}`;
         }
       });
+    }
+
+    if (isBirthday) {
+      const bdayBudgetAmount = computedBudgetItems
+        .filter((i) => i.category === "Birthday")
+        .reduce((sum, i) => sum + i.amount, 0);
+
+      if (plannedBudget <= 0 || bdayBudgetAmount <= 0) {
+        toast.error("Birthday event cannot be saved with ₹0. Please configure budget calculation rates or add valid expenses.");
+        return;
+      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -1170,19 +1334,19 @@ export default function EventFormPage() {
         : participatingMembers.map((m) => m.memberId);
       const contributionOverrides = [];
 
-      const bdayBudget = computedBudgetItems
+      const bdayBudget = Math.round(computedBudgetItems
         .filter((i) => i.category === "Birthday")
-        .reduce((sum, i) => sum + i.amount, 0);
-      const otherEventsBudget = computedBudgetItems
+        .reduce((sum, i) => sum + Math.round(i.amount || 0), 0));
+      const otherEventsBudget = Math.round(computedBudgetItems
         .filter((i) => i.category !== "Birthday")
-        .reduce((sum, i) => sum + i.amount, 0);
+        .reduce((sum, i) => sum + Math.round(i.amount || 0), 0));
 
       const celebrantIds = monthCelebrants.map((m) => m.memberId);
       const birthdayEligibleCount = isBirthday
         ? (exempt ? Math.max(0, finalParticipantIds.length - celebrantIds.length) : finalParticipantIds.length)
         : 0;
-      const birthdaySharePerPerson = birthdayEligibleCount > 0 ? Math.ceil(bdayBudget / birthdayEligibleCount) : 0;
-      const otherEventsSharePerPerson = finalParticipantIds.length > 0 ? Math.ceil(otherEventsBudget / finalParticipantIds.length) : 0;
+      const birthdaySharePerPerson = birthdayEligibleCount > 0 ? Math.round(bdayBudget / birthdayEligibleCount) : 0;
+      const otherEventsSharePerPerson = finalParticipantIds.length > 0 ? Math.round(otherEventsBudget / finalParticipantIds.length) : 0;
 
       if (isBirthday && exempt && celebrantIds.length > 0) {
         finalParticipantIds.forEach((mId) => {
@@ -1201,13 +1365,28 @@ export default function EventFormPage() {
           }
         });
       } else {
-        // Everyone pays total contribution per member
+        const baseShare = finalParticipantIds.length > 0 ? Math.round(plannedBudget / finalParticipantIds.length) : 0;
         finalParticipantIds.forEach((mId) => {
           contributionOverrides.push({
             memberId: mId,
-            amount: contributionPerMember,
+            amount: baseShare,
           });
         });
+      }
+
+      // Distribute any 1 rupee rounding difference so sum(contributionOverrides) === plannedBudget exactly
+      const sumOverrides = contributionOverrides.reduce((s, o) => s + o.amount, 0);
+      let remainder = plannedBudget - sumOverrides;
+      if (remainder !== 0) {
+        const step = remainder > 0 ? 1 : -1;
+        let remCount = Math.abs(remainder);
+        for (let i = 0; i < contributionOverrides.length && remCount > 0; i++) {
+          const item = contributionOverrides[i];
+          if (!celebrantIds.includes(item.memberId)) {
+            item.amount += step;
+            remCount--;
+          }
+        }
       }
 
       const celebrantsSummary = isBirthday
@@ -1231,13 +1410,15 @@ export default function EventFormPage() {
           ? [form.eventTypeId]
           : [];
 
+      const finalDescription = formatDescriptionWithContrib(form.description?.trim(), otherEventAmounts);
+
       const payload = {
         eventName: form.eventName.trim(),
         eventTypeId: finalTypeIds[0] || form.eventTypeId,
         eventTypeIds: finalTypeIds,
         eventDate: dayjs(form.eventDate).hour(12).toISOString(),
         eventDates: isBirthday ? (celebrantDatesCsv || null) : null,
-        description: form.description?.trim() || "",
+        description: finalDescription,
         status: form.status || "Planned",
         baseAmount: plannedBudget,
         participantIds:
@@ -1277,7 +1458,12 @@ export default function EventFormPage() {
         toast.success("Event created successfully");
       }
 
-      navigate("/events");
+      if (isDialog) {
+        if (onSaveSuccess) onSaveSuccess();
+        if (onClose) onClose();
+      } else {
+        navigate("/events");
+      }
     } catch (error) {
       let errMsg = error.response?.data?.message;
       if (!errMsg && error.response?.data?.errors) {
@@ -1293,66 +1479,71 @@ export default function EventFormPage() {
     }
   };
 
+  const handleCancel = () => {
+    if (isDialog) {
+      if (onClose) onClose();
+    } else {
+      navigate("/events");
+    }
+  };
+
   const typeOptions = eventTypes.map((t) => ({
     label: t.eventTypeName,
     value: t.eventTypeId,
   }));
 
   if (loading) {
+    if (isDialog) {
+      return (
+        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+          <Box sx={{ p: 5, display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <CircularProgress size={32} sx={{ color: "#4a3f6b" }} />
+          </Box>
+        </Dialog>
+      );
+    }
     return <div className="page-shell" />;
   }
 
-  return (
-    <div className="page-shell">
-      <Paper
-        elevation={0}
+  const formContent = (
+    <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
+      {/* Top Header Banner */}
+      <Box
         sx={{
-          border:
-            theme.palette.mode === "dark"
-              ? `1px solid ${theme.palette.divider}`
-              : "1px solid rgba(74, 63, 107, 0.08)",
-          borderRadius: "14px",
-          overflow: "hidden",
-          bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#f8f7fc"),
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
+          bgcolor: "#45386d",
+          color: "#ffffff",
+          px: { xs: 2, sm: 3 },
+          py: 1.4,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          minHeight: 52,
         }}
       >
-        {/* Top Header Banner */}
-        <Box
-          sx={{
-            bgcolor: "#45386d",
-            color: "#ffffff",
-            px: { xs: 2, sm: 3 },
-            py: 1.4,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            minHeight: 52,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Tooltip title="Back to Events">
-              <IconButton
-                size="small"
-                onClick={() => navigate("/events")}
-                sx={{
-                  color: "#ffffff",
-                  p: 0.5,
-                  "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)" },
-                }}
-              >
-                <ArrowBackIcon sx={{ fontSize: "1.25rem" }} />
-              </IconButton>
-            </Tooltip>
-            <Typography
-              variant="subtitle1"
-              fontWeight={700}
-              sx={{ fontSize: "1.05rem", letterSpacing: "0.01em", color: "#ffffff" }}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Tooltip title={isDialog ? "Close" : "Back to Events"}>
+            <IconButton
+              size="small"
+              onClick={handleCancel}
+              sx={{
+                color: "#ffffff",
+                p: 0.5,
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)" },
+              }}
             >
-              {isEdit ? "Edit Event" : "Add Event"}
-            </Typography>
-          </Box>
+              <ArrowBackIcon sx={{ fontSize: "1.25rem" }} />
+            </IconButton>
+          </Tooltip>
+          <Typography
+            variant="subtitle1"
+            fontWeight={700}
+            sx={{ fontSize: "1.05rem", letterSpacing: "0.01em", color: "#ffffff" }}
+          >
+            {isEdit ? "Edit Event" : "Add Event"}
+          </Typography>
+        </Box>
 
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           {allowMultipleEvents && (
             <Chip
               icon={<MultiIcon sx={{ fontSize: "0.85rem !important", color: "#ffffff !important" }} />}
@@ -1367,10 +1558,30 @@ export default function EventFormPage() {
               }}
             />
           )}
+          {isDialog && (
+            <IconButton
+              size="small"
+              onClick={onClose}
+              sx={{
+                color: "#ffffff",
+                p: 0.5,
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)" },
+              }}
+            >
+              <CloseRoundedIcon sx={{ fontSize: "1.25rem" }} />
+            </IconButton>
+          )}
         </Box>
+      </Box>
 
-        {/* Main Body with Balanced 2-Column Enterprise Layout */}
-        <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+      {/* Main Body with Balanced 2-Column Enterprise Layout */}
+      <Box
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          maxHeight: isDialog ? "calc(90vh - 60px)" : "none",
+          overflowY: isDialog ? "auto" : "visible",
+        }}
+      >
           <Grid container spacing={2} alignItems="stretch">
             {/* Left Panel: Event Configuration */}
             <Grid size={{ xs: 12, lg: 7.4 }}>
@@ -1631,6 +1842,13 @@ export default function EventFormPage() {
                           errors[`baseAmount_${type.eventTypeId}`] ||
                           (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
 
+                        const hasMasterItems = computedBudgetItems.some(
+                          (i) =>
+                            (i.category || "").toLowerCase() === (type.eventTypeName || "").toLowerCase() &&
+                            !i.key.includes("_contrib") &&
+                            i.amount > 0
+                        );
+
                         return (
                           <Grid
                             size={{ xs: 12, sm: nonBirthdaySelectedTypes.length > 1 ? 6 : 6 }}
@@ -1639,7 +1857,7 @@ export default function EventFormPage() {
                             <AppInput
                               label={`${type.eventTypeName} Contribution Amount`}
                               placeholder={`Enter total ${type.eventTypeName.toLowerCase()} budget (₹)`}
-                              required
+                              required={!hasMasterItems}
                               fullWidth
                               value={rawVal}
                               onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
@@ -1651,22 +1869,6 @@ export default function EventFormPage() {
                                 <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
                                   ₹
                                 </Typography>
-                              }
-                              endAdornment={
-                                numVal > 0 && total > 0 ? (
-                                  <Chip
-                                    label={`₹${splitPerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/person`}
-                                    size="small"
-                                    sx={{
-                                      fontWeight: 700,
-                                      fontSize: "0.72rem",
-                                      height: 22,
-                                      bgcolor: "rgba(14, 165, 233, 0.1)",
-                                      color: "#0284c7",
-                                      border: "1px solid rgba(14, 165, 233, 0.25)",
-                                    }}
-                                  />
-                                ) : null
                               }
                               error={!!fieldError}
                               helperText={fieldError || ""}
@@ -2171,7 +2373,25 @@ export default function EventFormPage() {
                                       theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
                                   }}
                                 >
-                                  {item.expenseItem}
+                                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                    <span>{item.expenseItem}</span>
+                                    {item.isCustom && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setExtraExpenseItems((prev) => prev.filter((x) => x.id !== item.id));
+                                          setCustomItemAmounts((prev) => {
+                                            const copy = { ...prev };
+                                            delete copy[item.key];
+                                            return copy;
+                                          });
+                                        }}
+                                        sx={{ p: 0.2, color: "#ef4444" }}
+                                      >
+                                        <CloseRoundedIcon sx={{ fontSize: "0.95rem" }} />
+                                      </IconButton>
+                                    )}
+                                  </Box>
                                 </TableCell>
                                 <TableCell
                                   sx={{
@@ -2189,14 +2409,60 @@ export default function EventFormPage() {
                                   sx={{
                                     fontWeight: 700,
                                     fontSize: "0.8rem",
-                                    py: 0.85,
+                                    py: 0.5,
                                     px: 1.5,
                                     textAlign: "left",
                                     color: (theme) =>
                                       theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b",
                                   }}
                                 >
-                                  ₹{(item.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Typography
+                                      sx={{
+                                        fontWeight: 700,
+                                        fontSize: "0.82rem",
+                                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                                      }}
+                                    >
+                                      ₹
+                                    </Typography>
+                                    <OutlinedInput
+                                      size="small"
+                                      value={
+                                        customItemAmounts[item.key] !== undefined
+                                          ? customItemAmounts[item.key]
+                                          : (item.amount !== undefined ? item.amount : "")
+                                      }
+                                      onChange={(e) => {
+                                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                                        setCustomItemAmounts((prev) => ({
+                                          ...prev,
+                                          [item.key]: val,
+                                        }));
+                                      }}
+                                      placeholder="0"
+                                      sx={{
+                                        width: "100%",
+                                        maxWidth: 95,
+                                        height: 28,
+                                        bgcolor: (theme) =>
+                                          theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "#ffffff",
+                                        borderRadius: "4px",
+                                        fontSize: "0.8rem",
+                                        fontWeight: 700,
+                                        "& input": { py: 0.2, px: 0.8, textAlign: "right" },
+                                        "& fieldset": {
+                                          borderColor: item.isManual
+                                            ? "#8b5cf6"
+                                            : (theme) =>
+                                                theme.palette.mode === "dark"
+                                                  ? "rgba(255,255,255,0.2)"
+                                                  : "rgba(74,63,107,0.25)",
+                                          borderWidth: item.isManual ? "1.5px" : "1px",
+                                        },
+                                      }}
+                                    />
+                                  </Box>
                                 </TableCell>
                               </TableRow>
                             ))
@@ -2204,6 +2470,37 @@ export default function EventFormPage() {
                         </TableBody>
                       </Table>
                     </TableContainer>
+
+                    {/* Table Sub-actions: Reset if manual override */}
+                    {Object.keys(customItemAmounts).length > 0 && (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          alignItems: "center",
+                          mb: 0.5,
+                          px: 0.5,
+                        }}
+                      >
+                        <Button
+                          size="small"
+                          startIcon={<ResetIcon sx={{ fontSize: "0.85rem" }} />}
+                          onClick={() => {
+                            setCustomItemAmounts({});
+                          }}
+                          sx={{
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            color: "#94a3b8",
+                            p: 0,
+                            textTransform: "none",
+                            "&:hover": { color: "#ef4444", bgcolor: "transparent" },
+                          }}
+                        >
+                          Reset Calculations
+                        </Button>
+                      </Box>
+                    )}
                   </Box>
 
                   {/* Total Planned Budget Footer */}
@@ -2238,6 +2535,21 @@ export default function EventFormPage() {
                       ₹{plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                     </Typography>
                   </Box>
+
+                  {isBirthday && (plannedBudget <= 0 || bdayBudget <= 0) && (
+                    <Alert
+                      severity="warning"
+                      sx={{
+                        mt: 1.5,
+                        py: 0.5,
+                        fontSize: "0.78rem",
+                        borderRadius: "8px",
+                        "& .MuiAlert-message": { lineHeight: 1.4 },
+                      }}
+                    >
+                      Birthday event budget is ₹0. Please configure rates in Settings &gt; Budget Calculations before saving.
+                    </Alert>
+                  )}
                 </Box>
               </Box>
             </Grid>
@@ -2260,7 +2572,7 @@ export default function EventFormPage() {
           >
             <AppButton
               variant="outlined"
-              onClick={() => navigate("/events")}
+              onClick={handleCancel}
               disabled={saving}
               sx={{
                 minWidth: 120,
@@ -2278,7 +2590,7 @@ export default function EventFormPage() {
                 },
               }}
             >
-              {readOnly ? "Back to Events" : "Cancel"}
+              {readOnly ? (isDialog ? "Close" : "Back to Events") : "Cancel"}
             </AppButton>
             {canEdit && (
               <Tooltip title={isEdit && hasPayments ? "Cannot edit event after payments have been received" : ""}>
@@ -2308,6 +2620,49 @@ export default function EventFormPage() {
             )}
           </Box>
         </Box>
+      </Box>
+  );
+
+  if (isDialog) {
+    if (!open) return null;
+    return (
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "16px",
+            bgcolor: (theme) => (theme.palette.mode === "dark" ? "#1e1a2e" : "#f8f7fc"),
+            overflow: "hidden",
+            boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+            m: { xs: 1, sm: 2 },
+            maxHeight: "92vh",
+          },
+        }}
+      >
+        {formContent}
+      </Dialog>
+    );
+  }
+
+  return (
+    <div className="page-shell">
+      <Paper
+        elevation={0}
+        sx={{
+          border:
+            theme.palette.mode === "dark"
+              ? `1px solid ${theme.palette.divider}`
+              : "1px solid rgba(74, 63, 107, 0.08)",
+          borderRadius: "14px",
+          overflow: "hidden",
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#f8f7fc"),
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
+        }}
+      >
+        {formContent}
       </Paper>
     </div>
   );

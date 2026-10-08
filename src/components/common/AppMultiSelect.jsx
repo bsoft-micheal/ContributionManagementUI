@@ -113,6 +113,7 @@ export default function AppMultiSelect({
                   pr: 0.5,
                   py: 0.2,
                   boxSizing: "border-box",
+                  cursor: "pointer",
                   "&::-webkit-scrollbar": {
                     width: "5px",
                   },
@@ -132,10 +133,6 @@ export default function AppMultiSelect({
                         ? "rgba(167, 139, 250, 0.7)"
                         : "rgba(124, 58, 237, 0.65)",
                   },
-                }}
-                onMouseDown={(e) => {
-                  // Prevent dropdown menu from unintentionally toggling when scrolling chips
-                  e.stopPropagation();
                 }}
               >
                 {selected
@@ -157,7 +154,7 @@ export default function AppMultiSelect({
                           fontSize: "0.74rem",
                           fontWeight: 600,
                           lineHeight: 1.2,
-                          cursor: "default",
+                          cursor: "pointer",
                           transition: "all 0.15s ease",
                           "&:hover": {
                             bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.5)" : "#3b325c",

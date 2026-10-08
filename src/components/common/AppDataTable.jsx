@@ -768,7 +768,8 @@ export default function AppDataTable({
             startIcon={<ColumnsIcon sx={{ fontSize: "1rem" }} />}
             sx={{
               color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-              borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(74, 63, 107, 0.3)",
+              borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.3)" : "rgba(74, 63, 107, 0.45)",
+              borderWidth: "1.5px",
               fontSize: "0.75rem",
               fontWeight: 700,
               textTransform: "none",
@@ -777,6 +778,7 @@ export default function AppDataTable({
               borderRadius: "4px",
               "&:hover": {
                 borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                borderWidth: "1.5px",
                 bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
               },
             }}
@@ -790,7 +792,7 @@ export default function AppDataTable({
               sx={{
                 color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
                 p: 0.6,
-                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid rgba(74, 63, 107, 0.2)",
+                border: theme.palette.mode === "dark" ? "1.5px solid rgba(255, 255, 255, 0.3)" : "1.5px solid rgba(74, 63, 107, 0.45)",
                 borderRadius: "4px",
                 height: 32,
                 width: 32,
@@ -817,7 +819,7 @@ export default function AppDataTable({
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <SearchIcon sx={{ fontSize: "1rem", color: "#8b81b3" }} />
+                  <SearchIcon sx={{ fontSize: "1.1rem", color: theme.palette.mode === "dark" ? "#a78bfa" : "#4a3f6b" }} />
                 </InputAdornment>
               ),
               sx: {
@@ -825,11 +827,28 @@ export default function AppDataTable({
                 width: { xs: "100%", sm: 200 },
                 fontSize: "0.78rem",
                 borderRadius: "4px",
-                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
-                color: "inherit",
-                "& fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(74, 63, 107, 0.2)" },
-                "&:hover fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25)" : "rgba(74, 63, 107, 0.4)" },
-                "&.Mui-focused fieldset": { borderColor: theme.palette.mode === "dark" ? theme.palette.primary.main : "#4a3f6b" },
+                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#ffffff",
+                color: theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+                "& input": {
+                  fontWeight: 600,
+                  "&::placeholder": {
+                    color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.6)" : "rgba(74, 63, 107, 0.7)",
+                    opacity: 1,
+                    fontWeight: 500,
+                  },
+                },
+                "& fieldset": {
+                  borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.3)" : "rgba(74, 63, 107, 0.45)",
+                  borderWidth: "1.5px",
+                },
+                "&:hover fieldset": {
+                  borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  borderWidth: "1.5px",
+                },
+                "&.Mui-focused fieldset": {
+                  borderColor: theme.palette.mode === "dark" ? theme.palette.primary.main : "#4a3f6b",
+                  borderWidth: "2px",
+                },
               },
             }}
           />
@@ -1241,10 +1260,17 @@ export default function AppDataTable({
                 sx={{
                   height: 28,
                   fontSize: "0.75rem",
-                  fontWeight: 600,
-                  color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                  fontWeight: 700,
+                  color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
                   "& .MuiSelect-select": { py: 0.5, px: 1 },
-                  "& fieldset": { borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(0,0,0,0.1)" },
+                  "& fieldset": {
+                    borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.3)" : "rgba(74, 63, 107, 0.45)",
+                    borderWidth: "1.5px",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                    borderWidth: "1.5px",
+                  },
                 }}
               >
                 {[5, 10, 15, 25, 50].map((val) => (
@@ -1254,63 +1280,140 @@ export default function AppDataTable({
                 ))}
               </Select>
             </Box>
-            <Typography variant="caption" sx={{ fontWeight: 600, color: textSecondary, fontSize: "0.75rem" }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: theme.palette.mode === "dark" ? "#d6dbef" : "#4a3f6b", fontSize: "0.75rem" }}>
               Rows {totalRows} • Page {page + 1} of {totalPages}
             </Typography>
           </Stack>
 
           {/* Right Pagination buttons */}
-          <Stack direction="row" alignItems="center" spacing={0.5}>
+          <Stack direction="row" alignItems="center" spacing={0.8}>
             <IconButton
               size="small"
               disabled={page === 0}
               onClick={() => setPage(0)}
               sx={{
-                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
-                borderRadius: "4px",
+                border: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "1.5px solid rgba(255, 255, 255, 0.4)"
+                    : "1.5px solid #4a3f6b",
+                borderRadius: "6px",
                 p: 0.5,
-                color: "inherit"
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                "&:hover": {
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "#ffffff" : "#3b325c",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.12)"
+                      : "rgba(74, 63, 107, 0.1)",
+                },
+                "&.Mui-disabled, &:disabled": {
+                  border: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "1.5px solid rgba(255, 255, 255, 0.2) !important"
+                      : "1.5px solid rgba(74, 63, 107, 0.35) !important",
+                  color: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.45) !important"
+                      : "rgba(74, 63, 107, 0.5) !important",
+                  opacity: "1 !important",
+                },
               }}
             >
-              <FirstPageIcon sx={{ fontSize: "1.1rem" }} />
+              <FirstPageIcon sx={{ fontSize: "1.15rem" }} />
             </IconButton>
             <Button
               size="small"
               disabled={page === 0}
-              onClick={() => setPage(prev => prev - 1)}
+              onClick={() => setPage((prev) => prev - 1)}
               sx={{
-                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
-                borderRadius: "4px",
-                color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
-                fontSize: "0.7rem",
-                fontWeight: 700,
+                border: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "1.5px solid rgba(255, 255, 255, 0.4)"
+                    : "1.5px solid #4a3f6b",
+                borderRadius: "6px",
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                fontSize: "0.78rem",
+                fontWeight: 800,
                 textTransform: "none",
-                px: 1.5,
+                px: 1.8,
                 minWidth: "unset",
-                height: 28,
-                "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
+                height: 30,
+                "&:hover": {
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "#ffffff" : "#3b325c",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.12)"
+                      : "rgba(74, 63, 107, 0.1)",
+                },
+                "&.Mui-disabled, &:disabled": {
+                  border: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "1.5px solid rgba(255, 255, 255, 0.2) !important"
+                      : "1.5px solid rgba(74, 63, 107, 0.35) !important",
+                  color: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.45) !important"
+                      : "rgba(74, 63, 107, 0.5) !important",
+                  opacity: "1 !important",
+                },
               }}
             >
               Prev
             </Button>
-            <Typography variant="caption" sx={{ mx: 1.5, fontWeight: 700, fontSize: "0.75rem", color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b" }}>
+            <Typography
+              variant="caption"
+              sx={{
+                mx: 1.5,
+                fontWeight: 900,
+                fontSize: "0.85rem",
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+                letterSpacing: "0.02em",
+              }}
+            >
               {page + 1} / {totalPages}
             </Typography>
             <Button
               size="small"
               disabled={page >= totalPages - 1}
-              onClick={() => setPage(prev => prev + 1)}
+              onClick={() => setPage((prev) => prev + 1)}
               sx={{
-                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
-                borderRadius: "4px",
-                color: theme.palette.mode === "dark" ? "#ffffff" : "#334155",
-                fontSize: "0.7rem",
-                fontWeight: 700,
+                border: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "1.5px solid rgba(255, 255, 255, 0.4)"
+                    : "1.5px solid #4a3f6b",
+                borderRadius: "6px",
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                fontSize: "0.78rem",
+                fontWeight: 800,
                 textTransform: "none",
-                px: 1.5,
+                px: 1.8,
                 minWidth: "unset",
-                height: 28,
-                "&:disabled": { color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1" }
+                height: 30,
+                "&:hover": {
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "#ffffff" : "#3b325c",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.12)"
+                      : "rgba(74, 63, 107, 0.1)",
+                },
+                "&.Mui-disabled, &:disabled": {
+                  border: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "1.5px solid rgba(255, 255, 255, 0.2) !important"
+                      : "1.5px solid rgba(74, 63, 107, 0.35) !important",
+                  color: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.45) !important"
+                      : "rgba(74, 63, 107, 0.5) !important",
+                  opacity: "1 !important",
+                },
               }}
             >
               Next
@@ -1320,13 +1423,36 @@ export default function AppDataTable({
               disabled={page >= totalPages - 1}
               onClick={() => setPage(totalPages - 1)}
               sx={{
-                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(224, 224, 224, 0.8)",
-                borderRadius: "4px",
+                border: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "1.5px solid rgba(255, 255, 255, 0.4)"
+                    : "1.5px solid #4a3f6b",
+                borderRadius: "6px",
                 p: 0.5,
-                color: "inherit"
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                "&:hover": {
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "#ffffff" : "#3b325c",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.12)"
+                      : "rgba(74, 63, 107, 0.1)",
+                },
+                "&.Mui-disabled, &:disabled": {
+                  border: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "1.5px solid rgba(255, 255, 255, 0.2) !important"
+                      : "1.5px solid rgba(74, 63, 107, 0.35) !important",
+                  color: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.45) !important"
+                      : "rgba(74, 63, 107, 0.5) !important",
+                  opacity: "1 !important",
+                },
               }}
             >
-              <LastPageIcon sx={{ fontSize: "1.1rem" }} />
+              <LastPageIcon sx={{ fontSize: "1.15rem" }} />
             </IconButton>
           </Stack>
         </Box>

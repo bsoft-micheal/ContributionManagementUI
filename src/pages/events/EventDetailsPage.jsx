@@ -136,7 +136,7 @@ export default function EventDetailsPage() {
       <PageHeader
         eyebrow={eventDetails.eventTypeName}
         title={eventDetails.eventName}
-        description={`${eventDetails.description || ""} Scheduled for ${
+        description={`${(eventDetails.description || "").replace(/<!--contrib:.*?-->/g, "").trim()} Scheduled for ${
           eventDetails.eventDates
             ? String(eventDetails.eventDates)
                 .split(",")
