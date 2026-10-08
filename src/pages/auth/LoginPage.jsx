@@ -6,7 +6,7 @@ import { useLocation, useNavigate, Link as RouterLink } from "react-router-dom";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import logo from "../../assets/image (2).png";
+import logo from "../../assets/logo_image.png";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";

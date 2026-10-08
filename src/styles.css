@@ -174,3 +174,20 @@ body {
     transform: scale(1.2) rotate(180deg);
   }
 }
+
+/* ── Global Disabled Elements Hover Cursor ───────────────────────────────── */
+button:disabled,
+button[disabled],
+.MuiButtonBase-root.Mui-disabled,
+.MuiButton-root.Mui-disabled,
+.MuiIconButton-root.Mui-disabled,
+.Mui-disabled,
+[disabled] {
+  cursor: not-allowed !important;
+}
+
+span:has(> button:disabled),
+span:has(> .Mui-disabled),
+.disabled-wrapper {
+  cursor: not-allowed !important;
+}

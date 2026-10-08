@@ -51,7 +51,7 @@ import { useThemeMode } from "../../contexts/ThemeModeContext";
 import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 import AppPageLoader from "../common/AppPageLoader";
 import dayjs from "dayjs";
-import logo from "../../assets/image (2).png";
+import logo from "../../assets/logo_image.png";
 
 const drawerWidth = 240;
 
