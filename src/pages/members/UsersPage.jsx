@@ -389,13 +389,8 @@ export default function UsersPage() {
 
     if (form.createMemberProfile) {
       schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: "Username" };
-      if (!form.userId) {
-        schema.newPassword = { required: true, min: 6, max: 50, label: "Password" };
-        schema.confirmPassword = { required: true, min: 6, max: 50, label: "Confirm Password" };
-      } else if (form.newPassword) {
-        schema.newPassword = { required: false, min: 6, max: 50, label: "Password" };
-        schema.confirmPassword = { required: true, min: 6, max: 50, label: "Confirm Password" };
-      }
+      schema.newPassword = { required: true, min: 6, max: 50, label: "Password" };
+      schema.confirmPassword = { required: true, min: 6, max: 50, label: "Confirm Password" };
     }
 
     const e = validateForm(form, schema);
@@ -408,10 +403,10 @@ export default function UsersPage() {
 
     if (form.enableMultipleRoles) {
       if (!form.primaryRole) {
-        e.primaryRole = "Primary Role is required";
+        e.primaryRole = "This field is required";
       }
       if (!form.secondaryRole) {
-        e.secondaryRole = "Secondary Role is required";
+        e.secondaryRole = "This field is required";
       }
       if (form.primaryRole && form.secondaryRole && form.primaryRole === form.secondaryRole) {
         e.secondaryRole = "Secondary Role must be different from Primary Role";
@@ -490,19 +485,7 @@ export default function UsersPage() {
       }
     }
 
-    // Show toaster if mobile number already exists, but proceed with saving
-    const cleanPhoneDigits = String(form.phone || "").replace(/\D/g, "").slice(-10);
-    if (cleanPhoneDigits) {
-      const isPhoneDuplicate = users.some(
-        (u) =>
-          u.phone &&
-          String(u.phone).replace(/\D/g, "").slice(-10) === cleanPhoneDigits &&
-          (!form.userId || u.userId !== form.userId)
-      );
-      if (isPhoneDuplicate) {
-        toast.info("Mobile number already exists");
-      }
-    }
+
 
     setSaving(true);
     try {
@@ -580,13 +563,14 @@ export default function UsersPage() {
     if (!canDeleteUser) return;
     const targetUser = typeof user === "object" ? user : users.find((u) => u.userId === user);
     if (targetUser) {
-      const hasLoginAccount = Boolean(
+      const isInUse = Boolean(
+        targetUser.isReferred ||
+        targetUser.IsReferred ||
         (targetUser.username && String(targetUser.username).trim() !== "") ||
         targetUser.createMemberProfile === true
       );
-      const isReferred = Boolean(targetUser.isReferred || targetUser.IsReferred);
-      if (hasLoginAccount || isReferred) {
-        toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
+      if (isInUse) {
+        toast.error("This record cannot be deleted because it is currently in use.");
         return;
       }
     }
@@ -598,15 +582,10 @@ export default function UsersPage() {
     if (!userToDelete) return;
     try {
       await deleteUserAsync(userToDelete);
-      toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
+      toast.success("Deleted successfully");
       loadData();
     } catch (err) {
-      const rawMsg = err.response?.data?.message || err.response?.data?.title || err.message || "";
-      if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete|login account/i.test(rawMsg)) {
-        toast.error(TOAST_MESSAGES.GENERAL.RECORD_IN_USE);
-      } else {
-        toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
-      }
+      toast.error(err, "Failed to delete");
     } finally {
       setDeleteConfirmOpen(false);
       setUserToDelete(null);
@@ -885,15 +864,15 @@ export default function UsersPage() {
               </span>
             </Tooltip>
             {(() => {
-              const hasLoginAccount = Boolean(
+              const isInUse = Boolean(
+                row.isReferred ||
+                row.IsReferred ||
                 (row.username && String(row.username).trim() !== "") ||
                 row.createMemberProfile === true
               );
-              const isReferred = Boolean(row.isReferred || row.IsReferred);
-              const isDeleteBlocked = hasLoginAccount || isReferred;
-              const isDeleteAllowed = canDeleteUser && !isDeleteBlocked;
-              const deleteTooltip = isDeleteBlocked
-                ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE
+              const isDeleteAllowed = canDeleteUser && !isInUse;
+              const deleteTooltip = isInUse
+                ? "This record cannot be deleted because it is currently in use."
                 : canDeleteUser
                 ? "Delete User"
                 : "Disabled";
@@ -907,7 +886,17 @@ export default function UsersPage() {
                       disabled={!isDeleteAllowed}
                       onClick={() => handleDeleteRequest(row)}
                     >
-                      <DeleteIcon sx={{ fontSize: "1.05rem", color: isDeleteAllowed ? actionIconColor : "#94a3b8" }} />
+                      <DeleteIcon
+                        sx={{
+                          fontSize: "1.05rem",
+                          color: (theme) =>
+                            isDeleteAllowed
+                              ? actionIconColor
+                              : theme.palette.mode === "dark"
+                              ? "rgba(255, 255, 255, 0.45)"
+                              : "#94a3b8",
+                        }}
+                      />
                     </IconButton>
                   </span>
                 </Tooltip>
