@@ -715,7 +715,7 @@ export default function GalleryPage() {
         required: true,
         type: "letteronly",
         min: 2,
-        max: 50,
+        max: 250,
         label: "Photo Title",
       },
       category: { required: true, label: filed },
@@ -727,8 +727,8 @@ export default function GalleryPage() {
       newErrors.title = filed;
     } else if (!/^[A-Za-z\s]+$/.test(form.title.trim())) {
       newErrors.title = "Only letters and spaces are allowed";
-    } else if (form.title.trim().length > 50) {
-      newErrors.title = "Photo Title must be at most 50 characters";
+    } else if (form.title.trim().length > 250) {
+      newErrors.title = "Photo Title must be at most 250 characters";
     }
 
     if (!form.category) newErrors.category = filed;
@@ -1079,9 +1079,9 @@ export default function GalleryPage() {
               label="Photo Title"
               placeholder="Enter the Title"
               value={form.title}
-              maxLength={50}
+              maxLength={250}
               onChange={(e) => {
-                const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, "").slice(0, 50);
+                const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, "").slice(0, 250);
                 setForm((c) => (c.title === sanitized ? c : { ...c, title: sanitized }));
                 if (errors.title) setErrors((p) => (p.title ? { ...p, title: "" } : p));
               }}

@@ -261,6 +261,8 @@ const getItemStyle = (name = "") => {
     icon: <ReceiptIcon sx={{ color: "#fff", fontSize: "1.05rem" }} />,
     bg: "#6366f1", // Indigo
   };
+};
+
 function extractContribAmounts(description) {
   if (!description) return { cleanDesc: "", amounts: null };
   const match = description.match(/<!--contrib:(.*?)-->/);
@@ -1266,7 +1268,7 @@ export default function EventFormPage({
         required: true,
         type: "letteronly",
         min: 3,
-        max: 50,
+        max: 250,
         label: "Event Name",
       },
       eventDate: { required: true, label: filed },
@@ -1714,7 +1716,7 @@ export default function EventFormPage({
                         setForm((c) => ({ ...c, eventName: filtered }));
                         if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
                       }}
-                      inputProps={{ maxLength: 50 }}
+                      inputProps={{ maxLength: 250 }}
                       error={!!errors.eventName}
                       helperText={errors.eventName}
                     />
