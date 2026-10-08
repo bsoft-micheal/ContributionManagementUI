@@ -1546,20 +1546,6 @@ export default function EventFormPage({
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          {allowMultipleEvents && (
-            <Chip
-              icon={<MultiIcon sx={{ fontSize: "0.85rem !important", color: "#ffffff !important" }} />}
-              label={`Multiple Events Mode (${selectedTypes.length} Selected)`}
-              size="small"
-              sx={{
-                bgcolor: "rgba(255, 255, 255, 0.15)",
-                color: "#ffffff",
-                fontWeight: 700,
-                fontSize: "0.75rem",
-                border: "1px solid rgba(255, 255, 255, 0.25)",
-              }}
-            />
-          )}
           {isDialog && (
             <IconButton
               size="small"
@@ -1584,1045 +1570,1045 @@ export default function EventFormPage({
           overflowY: isDialog ? "auto" : "visible",
         }}
       >
-          <Grid container spacing={2} alignItems="stretch">
-            {/* Left Panel: Event Configuration */}
-            <Grid size={{ xs: 12, lg: 7.4 }}>
+        <Grid container spacing={2} alignItems="stretch">
+          {/* Left Panel: Event Configuration */}
+          <Grid size={{ xs: 12, lg: 7.4 }}>
+            <Box
+              sx={{
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
+                border: "1px solid",
+                borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
+                borderRadius: "12px",
+                p: { xs: 2, sm: 2.4 },
+                boxShadow: "0 2px 12px rgba(74, 63, 107, 0.03)",
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {/* Panel Header */}
               <Box
                 sx={{
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
-                  border: "1px solid",
-                  borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
-                  borderRadius: "12px",
-                  p: { xs: 2, sm: 2.4 },
-                  boxShadow: "0 2px 12px rgba(74, 63, 107, 0.03)",
-                  height: "100%",
                   display: "flex",
-                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  mb: 1.8,
+                  flexWrap: "wrap",
+                  gap: 1,
                 }}
               >
-                {/* Panel Header */}
+                <Typography
+                  variant="h6"
+                  fontWeight={700}
+                  sx={{
+                    fontSize: "1.05rem",
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  Event Configuration
+                </Typography>
+
                 <Box
+                  onClick={() => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
                   sx={{
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "space-between",
-                    mb: 1.8,
-                    flexWrap: "wrap",
-                    gap: 1,
+                    gap: 0.8,
+                    cursor: "pointer",
+                    userSelect: "none",
                   }}
                 >
-                  <Typography
-                    variant="h6"
-                    fontWeight={700}
+                  <Checkbox
+                    checked={Boolean(allowMultipleEvents)}
+                    onChange={(e) => handleToggleAllowMultipleEvents(e.target.checked)}
+                    onClick={(e) => e.stopPropagation()}
+                    size="small"
                     sx={{
-                      fontSize: "1.05rem",
-                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
-                      letterSpacing: "0.01em",
-                    }}
-                  >
-                    Event Configuration
-                  </Typography>
-
-                  <Box
-                    onClick={() => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.8,
-                      cursor: "pointer",
-                      userSelect: "none",
-                    }}
-                  >
-                    <Checkbox
-                      checked={Boolean(allowMultipleEvents)}
-                      onChange={(e) => handleToggleAllowMultipleEvents(e.target.checked)}
-                      onClick={(e) => e.stopPropagation()}
-                      size="small"
-                      sx={{
-                        p: 0.2,
-                        transform: "scale(0.85)",
+                      p: 0.2,
+                      transform: "scale(0.85)",
+                      color: "#4a3f6b",
+                      "&.Mui-checked": {
                         color: "#4a3f6b",
-                        "&.Mui-checked": {
-                          color: "#4a3f6b",
-                        },
-                      }}
-                    />
-                    <Typography
-                      variant="body2"
-                      fontWeight={600}
-                      sx={{
-                        color: (theme) =>
-                          theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
-                        fontSize: "0.82rem",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      Allow Multiple Events
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {/* Form Grid */}
-                <Grid container spacing={1.75}>
-                  {/* Row 1: Event Type(s) & Event Name */}
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    {allowMultipleEvents ? (
-                      <AppMultiSelect
-                        label="Event Types"
-                        placeholder="Select EventType"
-                        value={
-                          form.eventTypeIds && form.eventTypeIds.length > 0
-                            ? form.eventTypeIds
-                            : form.eventTypeId
-                              ? [form.eventTypeId]
-                              : []
-                        }
-                        onChange={(e) => {
-                          const val =
-                            typeof e.target.value === "string"
-                              ? e.target.value.split(",")
-                              : e.target.value;
-                          handleMultiTypeChange(val);
-                        }}
-                        options={typeOptions}
-                        error={!!errors.eventTypeId}
-                        helperText={errors.eventTypeId}
-                        required
-                      />
-                    ) : (
-                      <AppSelect
-                        label="Event Type"
-                        placeholder="Select EventType"
-                        value={form.eventTypeId}
-                        onChange={(e) => handleTypeChange(e.target.value)}
-                        clearable
-                        options={typeOptions}
-                        error={!!errors.eventTypeId}
-                        helperText={errors.eventTypeId}
-                        required
-                      />
-                    )}
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label="Event Name"
-                      placeholder="Enter event name"
-                      required
-                      fullWidth
-                      value={form.eventName}
-                      onChange={(e) => {
-                        const filtered = sanitizeEventName(e.target.value);
-                        setForm((c) => ({ ...c, eventName: filtered }));
-                        if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
-                      }}
-                      inputProps={{ maxLength: 250 }}
-                      error={!!errors.eventName}
-                      helperText={errors.eventName}
-                    />
-                  </Grid>
-
-                  {/* Row 2: Event Date & Total Active Members */}
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    {isBirthday && selectedTypes.length === 1 ? (
-                      <AppInput
-                        label="Event Date"
-                        required
-                        value={
-                          celebrantDatesCsv ||
-                          (form.eventDate
-                            ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
-                            : "Auto calculated")
-                        }
-                        disabled
-                        multiline
-                        minRows={1}
-                        maxRows={2}
-                        placeholder="Auto calculated"
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            minHeight: 38,
-                            height: "auto",
-                            py: 0.6,
-                            px: 1,
-                            bgcolor: (theme) =>
-                              theme.palette.mode === "dark"
-                                ? "rgba(255, 255, 255, 0.05)"
-                                : "#f8fafd",
-                          },
-                          "& textarea": {
-                            fontSize: "0.82rem",
-                            fontWeight: 600,
-                            lineHeight: 1.4,
-                            maxHeight: 48,
-                            overflowY: "auto !important",
-                            cursor: "default",
-                            color: (theme) =>
-                              theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
-                            "&::-webkit-scrollbar": {
-                              width: "4px",
-                            },
-                            "&::-webkit-scrollbar-thumb": {
-                              backgroundColor: "rgba(124, 58, 237, 0.35)",
-                              borderRadius: "4px",
-                            },
-                          },
-                        }}
-                      />
-                    ) : (
-                      <AppDateInput
-                        label="Event Date"
-                        required
-                        value={form.eventDate}
-                        onChange={handleDateChange}
-                        error={!!errors.eventDate}
-                        helperText={errors.eventDate}
-                      />
-                    )}
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label="Total Active Members"
-                      placeholder="Auto calculated"
-                      type="text"
-                      value={totalMembers}
-                      disabled
-                    />
-                  </Grid>
-
-                  {/* Row 3: Office Members & WFH Members */}
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label={isBirthday ? "Office Birthday Members" : "Office Members"}
-                      placeholder="Auto calculated"
-                      type="text"
-                      value={isBirthday ? officeBirthdays : officeMembers}
-                      disabled
-                    />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label={isBirthday ? "WFH Birthday Members" : "WFH Members"}
-                      placeholder="Auto calculated"
-                      type="text"
-                      value={isBirthday ? wfhBirthdays : wfhMembers}
-                      disabled
-                    />
-                  </Grid>
-
-                  {/* Subsection: Additional Event Contributions */}
-                  {nonBirthdaySelectedTypes.length > 0 && (
-                    <>
-                      <Grid size={{ xs: 12 }}>
-                        <Typography
-                          variant="caption"
-                          fontWeight={700}
-                          sx={{
-                            display: "block",
-                            fontSize: "0.8rem",
-                            color: (theme) =>
-                              theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em",
-                            mt: 0.5,
-                          }}
-                        >
-                          Additional Event Contributions
-                        </Typography>
-                      </Grid>
-
-                      {nonBirthdaySelectedTypes.map((type) => {
-                        const rawVal =
-                          otherEventAmounts[type.eventTypeId] !== undefined
-                            ? otherEventAmounts[type.eventTypeId]
-                            : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
-                        const numVal = parseFloat(String(rawVal)) || 0;
-                        const splitPerPerson = total > 0 && numVal > 0 ? (numVal / total) : 0;
-                        const fieldError =
-                          errors[`baseAmount_${type.eventTypeId}`] ||
-                          (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
-
-                        const hasMasterItems = computedBudgetItems.some(
-                          (i) =>
-                            (i.category || "").toLowerCase() === (type.eventTypeName || "").toLowerCase() &&
-                            !i.key.includes("_contrib") &&
-                            i.amount > 0
-                        );
-
-                        return (
-                          <Grid
-                            size={{ xs: 12, sm: nonBirthdaySelectedTypes.length > 1 ? 6 : 6 }}
-                            key={type.eventTypeId}
-                          >
-                            <AppInput
-                              label={`${type.eventTypeName} Contribution Amount`}
-                              placeholder={`Enter total ${type.eventTypeName.toLowerCase()} budget (₹)`}
-                              required={!hasMasterItems}
-                              fullWidth
-                              value={rawVal}
-                              onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
-                              inputProps={{
-                                maxLength: 10,
-                                inputMode: "decimal",
-                              }}
-                              startAdornment={
-                                <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
-                                  ₹
-                                </Typography>
-                              }
-                              error={!!fieldError}
-                              helperText={fieldError || ""}
-                            />
-                          </Grid>
-                        );
-                      })}
-                    </>
-                  )}
-
-                  {/* Participating Members MultiSelect (for non-birthday events or multiple event mode) */}
-                  {hasSelectedType && !isBirthday && (
-                    <Grid size={{ xs: 12 }}>
-                      <AppMultiSelect
-                        label="Participating Members"
-                        placeholder="Select Participating Members"
-                        value={selectedParticipantIds}
-                        onChange={(e) => {
-                          const val =
-                            typeof e.target.value === "string"
-                              ? e.target.value.split(",")
-                              : e.target.value;
-                          setSelectedParticipantIds(val);
-                        }}
-                        options={memberOptions}
-                        maxHeight={145}
-                        required
-                      />
-                    </Grid>
-                  )}
-                </Grid>
-
-                {/* Identified Celebrants (for Birthday events) */}
-                {hasSelectedType && isBirthday && monthCelebrants.length > 0 && (
-                  <Box
-                    sx={{
-                      mt: 1.8,
-                      p: 1.4,
-                      borderRadius: "8px",
-                      bgcolor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(14, 165, 233, 0.06)"
-                          : "#f8fafd",
-                      border: "1px solid",
-                      borderColor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(14, 165, 233, 0.2)"
-                          : "#e2e8f0",
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      fontWeight={700}
-                      sx={{
-                        fontSize: "0.8rem",
-                        color: (theme) =>
-                          theme.palette.mode === "dark" ? "#38bdf8" : "#0f172a",
-                        display: "block",
-                        mb: 0.6,
-                      }}
-                    >
-                      Identified Celebrants in {dayjs(form.eventDate).format("MMMM")} ({monthCelebrants.length}):
-                    </Typography>
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px 8px" }}>
-                      {monthCelebrants.map((m) => {
-                        const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
-                        return (
-                          <Chip
-                            key={m.memberId}
-                            label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""}`}
-                            size="small"
-                            sx={{
-                              fontWeight: 600,
-                              fontSize: "0.75rem",
-                              height: 24,
-                              borderRadius: "6px",
-                              py: 0.3,
-                              px: 0.4,
-                              bgcolor: isWfh ? "#ede9fe" : "#e0f2fe",
-                              color: isWfh ? "#7c3aed" : "#0284c7",
-                              border: "1px solid",
-                              borderColor: isWfh
-                                ? "rgba(124, 58, 237, 0.25)"
-                                : "rgba(2, 132, 199, 0.25)",
-                            }}
-                          />
-                        );
-                      })}
-                    </Box>
-                  </Box>
-                )}
-
-                {/* Description */}
-                <Box sx={{ mt: 1.8 }}>
-                  <AppTextArea
-                    label="Description"
-                    placeholder="Enter optional description..."
-                    value={form.description}
-                    onChange={(e) => {
-                      if (e.target.value.length <= 500) {
-                        setForm((f) => ({ ...f, description: e.target.value }));
-                      }
-                    }}
-                    maxLength={500}
-                    minRows={2}
-                    maxRows={3}
-                    fullWidth
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        p: 0.8,
-                        "& .MuiOutlinedInput-input": {
-                          py: 0.2,
-                          px: 0.4,
-                          pb: 1.8,
-                          minHeight: 38,
-                          maxHeight: 52,
-                          fontSize: "0.82rem",
-                          lineHeight: 1.35,
-                        },
                       },
                     }}
                   />
-                </Box>
-              </Box>
-            </Grid>
-
-            {/* Right Panel: Calculated Event Summary */}
-            <Grid size={{ xs: 12, lg: 4.6 }}>
-              <Box
-                sx={{
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
-                  border: "1px solid",
-                  borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
-                  borderRadius: "12px",
-                  p: { xs: 2, sm: 2.2 },
-                  boxShadow: "0 2px 12px rgba(74, 63, 107, 0.03)",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Box>
-                  {/* Panel Header */}
                   <Typography
-                    variant="h6"
-                    fontWeight={700}
+                    variant="body2"
+                    fontWeight={600}
                     sx={{
-                      fontSize: "1.02rem",
-                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
-                      mb: 1,
-                      letterSpacing: "0.01em",
+                      color: (theme) =>
+                        theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
+                      fontSize: "0.82rem",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    Calculated Event Summary
+                    Allow Multiple Events
                   </Typography>
-
-                  {/* Summary Metric Rows */}
-                  <Box sx={{ display: "flex", flexDirection: "column" }}>
-                    {/* Row 1 */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        minHeight: 36,
-                        py: 0.6,
-                        borderBottom: "1px solid",
-                        borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
-                      }}
-                    >
-                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
-                        {isBirthday ? "Birthday Members" : "Total Members"}
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: "0.9rem",
-                          fontWeight: 700,
-                          color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
-                        }}
-                      >
-                        {isBirthday ? bdays : total}
-                      </Typography>
-                    </Box>
-
-                    {/* Row 2 */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        minHeight: 36,
-                        py: 0.6,
-                        borderBottom: "1px solid",
-                        borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
-                      }}
-                    >
-                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
-                        Office / WFH
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: "0.9rem",
-                          fontWeight: 700,
-                          color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
-                        }}
-                      >
-                        {isBirthday ? `${office} / ${wfh}` : `${officeMembers} / ${wfhMembers}`}
-                      </Typography>
-                    </Box>
-
-                    {/* Row 3 */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        minHeight: 36,
-                        py: 0.6,
-                        borderBottom: "1px solid",
-                        borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
-                      }}
-                    >
-                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
-                        Eligible Contributors
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: "0.9rem",
-                          fontWeight: 700,
-                          color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
-                        }}
-                      >
-                        {eligible}
-                      </Typography>
-                    </Box>
-
-                    {/* Row 4 */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        minHeight: 36,
-                        py: 0.6,
-                        borderBottom: "1px solid",
-                        borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
-                      }}
-                    >
-                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
-                        Planned Budget
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: "0.9rem",
-                          fontWeight: 700,
-                          color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
-                        }}
-                      >
-                        ₹{plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                      </Typography>
-                    </Box>
-
-                    {/* Row 5 */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        minHeight: 38,
-                        py: 0.6,
-                        borderBottom: "1px solid",
-                        borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
-                      }}
-                    >
-                      <Box>
-                        <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
-                          Contribution / Member
-                        </Typography>
-                        {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0 && (
-                          <Typography sx={{ fontSize: "0.72rem", color: "#6366f1", fontWeight: 600 }}>
-                            Celebrants: ₹{otherEventsSharePerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                          </Typography>
-                        )}
-                      </Box>
-                      <Typography sx={{ fontSize: "0.98rem", fontWeight: 800, color: "#0284c7" }}>
-                        ₹{contributionPerMember.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                      </Typography>
-                    </Box>
-
-                    {/* Row 6 */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        minHeight: 36,
-                        py: 0.6,
-                      }}
-                    >
-                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
-                        Expected Collection
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: "0.9rem",
-                          fontWeight: 700,
-                          color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
-                        }}
-                      >
-                        ₹{expectedCollection.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                      </Typography>
-                    </Box>
-                  </Box>
                 </Box>
+              </Box>
 
-                {/* Calculation Summary Details Section - Extended Box Size */}
+              {/* Form Grid */}
+              <Grid container spacing={1.75}>
+                {/* Row 1: Event Type(s) & Event Name */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  {allowMultipleEvents ? (
+                    <AppMultiSelect
+                      label="Event Types"
+                      placeholder="Select EventType"
+                      value={
+                        form.eventTypeIds && form.eventTypeIds.length > 0
+                          ? form.eventTypeIds
+                          : form.eventTypeId
+                            ? [form.eventTypeId]
+                            : []
+                      }
+                      onChange={(e) => {
+                        const val =
+                          typeof e.target.value === "string"
+                            ? e.target.value.split(",")
+                            : e.target.value;
+                        handleMultiTypeChange(val);
+                      }}
+                      options={typeOptions}
+                      error={!!errors.eventTypeId}
+                      helperText={errors.eventTypeId}
+                      required
+                    />
+                  ) : (
+                    <AppSelect
+                      label="Event Type"
+                      placeholder="Select EventType"
+                      value={form.eventTypeId}
+                      onChange={(e) => handleTypeChange(e.target.value)}
+                      clearable
+                      options={typeOptions}
+                      error={!!errors.eventTypeId}
+                      helperText={errors.eventTypeId}
+                      required
+                    />
+                  )}
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppInput
+                    label="Event Name"
+                    placeholder="Enter event name"
+                    required
+                    fullWidth
+                    value={form.eventName}
+                    onChange={(e) => {
+                      const filtered = sanitizeEventName(e.target.value);
+                      setForm((c) => ({ ...c, eventName: filtered }));
+                      if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
+                    }}
+                    inputProps={{ maxLength: 250 }}
+                    error={!!errors.eventName}
+                    helperText={errors.eventName}
+                  />
+                </Grid>
+
+                {/* Row 2: Event Date & Total Active Members */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  {isBirthday && selectedTypes.length === 1 ? (
+                    <AppInput
+                      label="Event Date"
+                      required
+                      value={
+                        celebrantDatesCsv ||
+                        (form.eventDate
+                          ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
+                          : "Auto calculated")
+                      }
+                      disabled
+                      multiline
+                      minRows={1}
+                      maxRows={2}
+                      placeholder="Auto calculated"
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          minHeight: 38,
+                          height: "auto",
+                          py: 0.6,
+                          px: 1,
+                          bgcolor: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(255, 255, 255, 0.05)"
+                              : "#f8fafd",
+                        },
+                        "& textarea": {
+                          fontSize: "0.82rem",
+                          fontWeight: 600,
+                          lineHeight: 1.4,
+                          maxHeight: 48,
+                          overflowY: "auto !important",
+                          cursor: "default",
+                          color: (theme) =>
+                            theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                          "&::-webkit-scrollbar": {
+                            width: "4px",
+                          },
+                          "&::-webkit-scrollbar-thumb": {
+                            backgroundColor: "rgba(124, 58, 237, 0.35)",
+                            borderRadius: "4px",
+                          },
+                        },
+                      }}
+                    />
+                  ) : (
+                    <AppDateInput
+                      label="Event Date"
+                      required
+                      value={form.eventDate}
+                      onChange={handleDateChange}
+                      error={!!errors.eventDate}
+                      helperText={errors.eventDate}
+                    />
+                  )}
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppInput
+                    label="Total Active Members"
+                    placeholder="Auto calculated"
+                    type="text"
+                    value={totalMembers}
+                    disabled
+                  />
+                </Grid>
+
+                {/* Row 3: Office Members & WFH Members */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppInput
+                    label={isBirthday ? "Office Birthday Members" : "Office Members"}
+                    placeholder="Auto calculated"
+                    type="text"
+                    value={isBirthday ? officeBirthdays : officeMembers}
+                    disabled
+                  />
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <AppInput
+                    label={isBirthday ? "WFH Birthday Members" : "WFH Members"}
+                    placeholder="Auto calculated"
+                    type="text"
+                    value={isBirthday ? wfhBirthdays : wfhMembers}
+                    disabled
+                  />
+                </Grid>
+
+                {/* Subsection: Additional Event Contributions */}
+                {nonBirthdaySelectedTypes.length > 0 && (
+                  <>
+                    <Grid size={{ xs: 12 }}>
+                      <Typography
+                        variant="caption"
+                        fontWeight={700}
+                        sx={{
+                          display: "block",
+                          fontSize: "0.8rem",
+                          color: (theme) =>
+                            theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          mt: 0.5,
+                        }}
+                      >
+                        Additional Event Contributions
+                      </Typography>
+                    </Grid>
+
+                    {nonBirthdaySelectedTypes.map((type) => {
+                      const rawVal =
+                        otherEventAmounts[type.eventTypeId] !== undefined
+                          ? otherEventAmounts[type.eventTypeId]
+                          : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
+                      const numVal = parseFloat(String(rawVal)) || 0;
+                      const splitPerPerson = total > 0 && numVal > 0 ? (numVal / total) : 0;
+                      const fieldError =
+                        errors[`baseAmount_${type.eventTypeId}`] ||
+                        (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
+
+                      const hasMasterItems = computedBudgetItems.some(
+                        (i) =>
+                          (i.category || "").toLowerCase() === (type.eventTypeName || "").toLowerCase() &&
+                          !i.key.includes("_contrib") &&
+                          i.amount > 0
+                      );
+
+                      return (
+                        <Grid
+                          size={{ xs: 12, sm: nonBirthdaySelectedTypes.length > 1 ? 6 : 6 }}
+                          key={type.eventTypeId}
+                        >
+                          <AppInput
+                            label={`${type.eventTypeName} Contribution Amount`}
+                            placeholder={`Enter total ${type.eventTypeName.toLowerCase()} budget (₹)`}
+                            required={!hasMasterItems}
+                            fullWidth
+                            value={rawVal}
+                            onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
+                            inputProps={{
+                              maxLength: 10,
+                              inputMode: "decimal",
+                            }}
+                            startAdornment={
+                              <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
+                                ₹
+                              </Typography>
+                            }
+                            error={!!fieldError}
+                            helperText={fieldError || ""}
+                          />
+                        </Grid>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* Participating Members MultiSelect (for non-birthday events or multiple event mode) */}
+                {hasSelectedType && !isBirthday && (
+                  <Grid size={{ xs: 12 }}>
+                    <AppMultiSelect
+                      label="Participating Members"
+                      placeholder="Select Participating Members"
+                      value={selectedParticipantIds}
+                      onChange={(e) => {
+                        const val =
+                          typeof e.target.value === "string"
+                            ? e.target.value.split(",")
+                            : e.target.value;
+                        setSelectedParticipantIds(val);
+                      }}
+                      options={memberOptions}
+                      maxHeight={145}
+                      required
+                    />
+                  </Grid>
+                )}
+              </Grid>
+
+              {/* Identified Celebrants (for Birthday events) */}
+              {hasSelectedType && isBirthday && monthCelebrants.length > 0 && (
                 <Box
                   sx={{
-                    mt: 2,
-                    p: { xs: 1.8, sm: 2.2 },
+                    mt: 1.8,
+                    p: 1.4,
+                    borderRadius: "8px",
                     bgcolor: (theme) =>
-                      theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                      theme.palette.mode === "dark"
+                        ? "rgba(14, 165, 233, 0.06)"
+                        : "#f8fafd",
                     border: "1px solid",
                     borderColor: (theme) =>
-                      theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
-                    borderRadius: "10px",
-                    flexGrow: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
+                      theme.palette.mode === "dark"
+                        ? "rgba(14, 165, 233, 0.2)"
+                        : "#e2e8f0",
                   }}
                 >
-                  <Box>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        display: "block",
-                        fontWeight: 800,
-                        color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7"),
-                        fontSize: "0.82rem",
-                        mb: 1.2,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      CALCULATION SUMMARY
-                    </Typography>
-
-                    {/* Calculation Summary Table */}
-                    <TableContainer
-                      sx={{
-                        width: "100%",
-                        mb: 1.2,
-                        borderRadius: "6px",
-                        border: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "1px solid rgba(255, 255, 255, 0.1)"
-                            : "1px solid rgba(224, 224, 224, 0.9)",
-                        bgcolor: (theme) =>
-                          theme.palette.mode === "dark" ? "background.paper" : "#ffffff",
-                        overflowX: "auto",
-                      }}
-                    >
-                      <Table size="small" aria-label="calculation summary table">
-                        <TableHead>
-                          <TableRow
-                            sx={{
-                              bgcolor: (theme) =>
-                                theme.palette.mode === "dark"
-                                  ? "rgba(255, 255, 255, 0.05)"
-                                  : "#eef4f8",
-                            }}
-                          >
-                            <TableCell
-                              sx={{
-                                fontWeight: 800,
-                                fontSize: "0.75rem",
-                                color: (theme) =>
-                                  theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
-                                py: 1,
-                                px: 1.5,
-                                width: "30%",
-                                borderRight: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "1px solid rgba(255, 255, 255, 0.08)"
-                                    : "1px solid rgba(224, 224, 224, 0.8)",
-                                borderBottom: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "1px solid rgba(255, 255, 255, 0.1)"
-                                    : "1px solid rgba(224, 224, 224, 1)",
-                              }}
-                            >
-                              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                <span>Expense</span>
-                                <Typography variant="caption" sx={{ fontSize: "0.85rem", color: "inherit", opacity: 0.5 }}>⋮</Typography>
-                              </Box>
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 800,
-                                fontSize: "0.75rem",
-                                color: (theme) =>
-                                  theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
-                                py: 1,
-                                px: 1.5,
-                                width: "45%",
-                                borderRight: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "1px solid rgba(255, 255, 255, 0.08)"
-                                    : "1px solid rgba(224, 224, 224, 0.8)",
-                                borderBottom: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "1px solid rgba(255, 255, 255, 0.1)"
-                                    : "1px solid rgba(224, 224, 224, 1)",
-                              }}
-                            >
-                              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                <span>Calculation</span>
-                                <Typography variant="caption" sx={{ fontSize: "0.85rem", color: "inherit", opacity: 0.5 }}>⋮</Typography>
-                              </Box>
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 800,
-                                fontSize: "0.75rem",
-                                color: (theme) =>
-                                  theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
-                                py: 1,
-                                px: 1.5,
-                                width: "25%",
-                                textAlign: "left",
-                                borderRight: "none",
-                                borderBottom: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "1px solid rgba(255, 255, 255, 0.1)"
-                                    : "1px solid rgba(224, 224, 224, 1)",
-                              }}
-                            >
-                              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                <span>Total</span>
-                                <Typography variant="caption" sx={{ fontSize: "0.85rem", color: "inherit", opacity: 0.5 }}>⋮</Typography>
-                              </Box>
-                            </TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {computedBudgetItems.length === 0 ? (
-                            <TableRow>
-                              <TableCell
-                                colSpan={3}
-                                align="center"
-                                sx={{
-                                  py: 2.5,
-                                  fontSize: "0.8rem",
-                                  color: "text.secondary",
-                                  borderBottom: "none",
-                                }}
-                              >
-                                Select an event type to view calculation details
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            computedBudgetItems.map((item, idx) => (
-                              <TableRow
-                                key={item.budgetCalculationId || item.expenseItem || idx}
-                                sx={{
-                                  bgcolor: (theme) =>
-                                    idx % 2 === 1
-                                      ? theme.palette.mode === "dark"
-                                        ? "rgba(255,255,255,0.015)"
-                                        : "#fafafa"
-                                      : theme.palette.mode === "dark"
-                                      ? "rgba(255,255,255,0.03)"
-                                      : "#ffffff",
-                                  "&:hover": {
-                                    bgcolor: (theme) =>
-                                      theme.palette.mode === "dark"
-                                        ? "rgba(255, 255, 255, 0.05)"
-                                        : "#f5f7fa",
-                                  },
-                                  "& td": {
-                                    borderRight: (theme) =>
-                                      theme.palette.mode === "dark"
-                                        ? "1px solid rgba(255, 255, 255, 0.08)"
-                                        : "1px solid rgba(224, 224, 224, 0.8)",
-                                    borderBottom: (theme) =>
-                                      theme.palette.mode === "dark"
-                                        ? "1px solid rgba(255, 255, 255, 0.08)"
-                                        : "1px solid rgba(224, 224, 224, 0.8)",
-                                  },
-                                  "& td:last-child": { borderRight: "none" },
-                                }}
-                              >
-                                <TableCell
-                                  sx={{
-                                    fontWeight: 600,
-                                    fontSize: "0.78rem",
-                                    py: 0.85,
-                                    px: 1.5,
-                                    color: (theme) =>
-                                      theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
-                                  }}
-                                >
-                                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                    <span>{item.expenseItem}</span>
-                                    {item.isCustom && (
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => {
-                                          setExtraExpenseItems((prev) => prev.filter((x) => x.id !== item.id));
-                                          setCustomItemAmounts((prev) => {
-                                            const copy = { ...prev };
-                                            delete copy[item.key];
-                                            return copy;
-                                          });
-                                        }}
-                                        sx={{ p: 0.2, color: "#ef4444" }}
-                                      >
-                                        <CloseRoundedIcon sx={{ fontSize: "0.95rem" }} />
-                                      </IconButton>
-                                    )}
-                                  </Box>
-                                </TableCell>
-                                <TableCell
-                                  sx={{
-                                    fontSize: "0.78rem",
-                                    py: 0.85,
-                                    px: 1.5,
-                                    color: (theme) =>
-                                      theme.palette.mode === "dark" ? "#94a3b8" : "#475569",
-                                    wordBreak: "break-word",
-                                  }}
-                                >
-                                  {item.calcFormula || item.calcText || `₹${item.amount}`}
-                                </TableCell>
-                                <TableCell
-                                  sx={{
-                                    fontWeight: 700,
-                                    fontSize: "0.8rem",
-                                    py: 0.5,
-                                    px: 1.5,
-                                    textAlign: "left",
-                                    color: (theme) =>
-                                      theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b",
-                                  }}
-                                >
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                    <Typography
-                                      sx={{
-                                        fontWeight: 700,
-                                        fontSize: "0.82rem",
-                                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
-                                      }}
-                                    >
-                                      ₹
-                                    </Typography>
-                                    <OutlinedInput
-                                      size="small"
-                                      value={
-                                        customItemAmounts[item.key] !== undefined
-                                          ? customItemAmounts[item.key]
-                                          : (item.amount !== undefined ? item.amount : "")
-                                      }
-                                      onChange={(e) => {
-                                        const val = e.target.value.replace(/[^0-9.]/g, "");
-                                        setCustomItemAmounts((prev) => ({
-                                          ...prev,
-                                          [item.key]: val,
-                                        }));
-                                      }}
-                                      placeholder="0"
-                                      sx={{
-                                        width: "100%",
-                                        maxWidth: 95,
-                                        height: 28,
-                                        bgcolor: (theme) =>
-                                          theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "#ffffff",
-                                        borderRadius: "4px",
-                                        fontSize: "0.8rem",
-                                        fontWeight: 700,
-                                        "& input": { py: 0.2, px: 0.8, textAlign: "right" },
-                                        "& fieldset": {
-                                          borderColor: item.isManual
-                                            ? "#8b5cf6"
-                                            : (theme) =>
-                                                theme.palette.mode === "dark"
-                                                  ? "rgba(255,255,255,0.2)"
-                                                  : "rgba(74,63,107,0.25)",
-                                          borderWidth: item.isManual ? "1.5px" : "1px",
-                                        },
-                                      }}
-                                    />
-                                  </Box>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-
-                    {/* Table Sub-actions: Reset if manual override */}
-                    {Object.keys(customItemAmounts).length > 0 && (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "flex-end",
-                          alignItems: "center",
-                          mb: 0.5,
-                          px: 0.5,
-                        }}
-                      >
-                        <Button
+                  <Typography
+                    variant="caption"
+                    fontWeight={700}
+                    sx={{
+                      fontSize: "0.8rem",
+                      color: (theme) =>
+                        theme.palette.mode === "dark" ? "#38bdf8" : "#0f172a",
+                      display: "block",
+                      mb: 0.6,
+                    }}
+                  >
+                    Identified Celebrants in {dayjs(form.eventDate).format("MMMM")} ({monthCelebrants.length}):
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px 8px" }}>
+                    {monthCelebrants.map((m) => {
+                      const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+                      return (
+                        <Chip
+                          key={m.memberId}
+                          label={`${m.name} (${isWfh ? "WFH" : "Office"}) - ${m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMM") : ""}`}
                           size="small"
-                          startIcon={<ResetIcon sx={{ fontSize: "0.85rem" }} />}
-                          onClick={() => {
-                            setCustomItemAmounts({});
-                          }}
                           sx={{
-                            fontSize: "0.72rem",
                             fontWeight: 600,
-                            color: "#94a3b8",
-                            p: 0,
-                            textTransform: "none",
-                            "&:hover": { color: "#ef4444", bgcolor: "transparent" },
+                            fontSize: "0.75rem",
+                            height: 24,
+                            borderRadius: "6px",
+                            py: 0.3,
+                            px: 0.4,
+                            bgcolor: isWfh ? "#ede9fe" : "#e0f2fe",
+                            color: isWfh ? "#7c3aed" : "#0284c7",
+                            border: "1px solid",
+                            borderColor: isWfh
+                              ? "rgba(124, 58, 237, 0.25)"
+                              : "rgba(2, 132, 199, 0.25)",
                           }}
-                        >
-                          Reset Calculations
-                        </Button>
-                      </Box>
-                    )}
+                        />
+                      );
+                    })}
                   </Box>
+                </Box>
+              )}
 
-                  {/* Total Planned Budget Footer */}
+              {/* Description */}
+              <Box sx={{ mt: 1.8 }}>
+                <AppTextArea
+                  label="Description"
+                  placeholder="Enter optional description..."
+                  value={form.description}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 500) {
+                      setForm((f) => ({ ...f, description: e.target.value }));
+                    }
+                  }}
+                  maxLength={500}
+                  minRows={2}
+                  maxRows={3}
+                  fullWidth
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      p: 0.8,
+                      "& .MuiOutlinedInput-input": {
+                        py: 0.2,
+                        px: 0.4,
+                        pb: 1.8,
+                        minHeight: 38,
+                        maxHeight: 52,
+                        fontSize: "0.82rem",
+                        lineHeight: 1.35,
+                      },
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+          </Grid>
+
+          {/* Right Panel: Calculated Event Summary */}
+          <Grid size={{ xs: 12, lg: 4.6 }}>
+            <Box
+              sx={{
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
+                border: "1px solid",
+                borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
+                borderRadius: "12px",
+                p: { xs: 2, sm: 2.2 },
+                boxShadow: "0 2px 12px rgba(74, 63, 107, 0.03)",
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+              }}
+            >
+              <Box>
+                {/* Panel Header */}
+                <Typography
+                  variant="h6"
+                  fontWeight={700}
+                  sx={{
+                    fontSize: "1.02rem",
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
+                    mb: 1,
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  Calculated Event Summary
+                </Typography>
+
+                {/* Summary Metric Rows */}
+                <Box sx={{ display: "flex", flexDirection: "column" }}>
+                  {/* Row 1 */}
                   <Box
                     sx={{
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      pt: 1.2,
-                      mt: 1,
-                      borderTop: "1px dashed",
-                      borderColor: (theme) =>
-                        theme.palette.mode === "dark" ? "divider" : "#cbd5e1",
+                      minHeight: 36,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
                     }}
                   >
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: "0.85rem",
-                        color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
-                      }}
-                    >
-                      Total Planned Budget
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      {isBirthday ? "Birthday Members" : "Total Members"}
                     </Typography>
                     <Typography
                       sx={{
-                        fontWeight: 800,
-                        fontSize: "0.98rem",
-                        color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      {isBirthday ? bdays : total}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 2 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      Office / WFH
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      {isBirthday ? `${office} / ${wfh}` : `${officeMembers} / ${wfhMembers}`}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 3 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      Eligible Contributors
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      {eligible}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 4 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      Planned Budget
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
                       }}
                     >
                       ₹{plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                     </Typography>
                   </Box>
 
-                  {isBirthday && (plannedBudget <= 0 || bdayBudget <= 0) && (
-                    <Alert
-                      severity="warning"
-                      sx={{
-                        mt: 1.5,
-                        py: 0.5,
-                        fontSize: "0.78rem",
-                        borderRadius: "8px",
-                        "& .MuiAlert-message": { lineHeight: 1.4 },
-                      }}
-                    >
-                      Birthday event budget is ₹0. Please configure rates in Settings &gt; Budget Calculations before saving.
-                    </Alert>
-                  )}
-                </Box>
-              </Box>
-            </Grid>
-          </Grid>
-
-          {/* Bottom Action Footer Centered */}
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: 2,
-              mt: 2,
-              pt: 1.75,
-              pb: 0.5,
-              borderTop: "1px solid",
-              borderColor: (theme) =>
-                theme.palette.mode === "dark" ? "divider" : "#e8e5f2",
-            }}
-          >
-            <AppButton
-              variant="outlined"
-              onClick={handleCancel}
-              disabled={saving}
-              sx={{
-                minWidth: 120,
-                borderRadius: "8px",
-                px: 3.5,
-                py: 0.85,
-                minHeight: 40,
-                borderColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#d8d8e5",
-                color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
-                fontWeight: 600,
-                fontSize: "0.88rem",
-                "&:hover": {
-                  borderColor: "#4a3f6b",
-                },
-              }}
-            >
-              {readOnly ? (isDialog ? "Close" : "Back to Events") : "Cancel"}
-            </AppButton>
-            {canEdit && (
-              <Tooltip title={isEdit && hasPayments ? "Cannot edit event after payments have been received" : ""}>
-                <span>
-                  <AppButton
-                    variant="contained"
-                    startIcon={<SaveIcon sx={{ fontSize: "1.1rem" }} />}
-                    onClick={handleSubmit}
-                    disabled={saving || (isEdit && hasPayments)}
+                  {/* Row 5 */}
+                  <Box
                     sx={{
-                      bgcolor: isEdit && hasPayments ? "#94a3b8 !important" : "#342b54 !important",
-                      color: "#ffffff !important",
-                      "&:hover": { bgcolor: isEdit && hasPayments ? "#94a3b8 !important" : "#241d3b !important" },
-                      minWidth: 130,
-                      borderRadius: "8px",
-                      px: 3.8,
-                      py: 0.85,
-                      minHeight: 40,
-                      fontWeight: 600,
-                      fontSize: "0.88rem",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 38,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
                     }}
                   >
-                    {saving ? "Saving..." : isEdit ? "Update" : "Save"}
-                  </AppButton>
-                </span>
-              </Tooltip>
-            )}
-          </Box>
+                    <Box>
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                        Contribution / Member
+                      </Typography>
+                      {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0 && (
+                        <Typography sx={{ fontSize: "0.72rem", color: "#6366f1", fontWeight: 600 }}>
+                          Celebrants: ₹{otherEventsSharePerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Typography sx={{ fontSize: "0.98rem", fontWeight: 800, color: "#0284c7" }}>
+                      ₹{contributionPerMember.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 6 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      Expected Collection
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      ₹{expectedCollection.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+
+              {/* Calculation Summary Details Section - Extended Box Size */}
+              <Box
+                sx={{
+                  mt: 2,
+                  p: { xs: 1.8, sm: 2.2 },
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                  border: "1px solid",
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
+                  borderRadius: "10px",
+                  flexGrow: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Box>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      fontWeight: 800,
+                      color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7"),
+                      fontSize: "0.82rem",
+                      mb: 1.2,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    CALCULATION SUMMARY
+                  </Typography>
+
+                  {/* Calculation Summary Table */}
+                  <TableContainer
+                    sx={{
+                      width: "100%",
+                      mb: 1.2,
+                      borderRadius: "6px",
+                      border: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "1px solid rgba(255, 255, 255, 0.1)"
+                          : "1px solid rgba(224, 224, 224, 0.9)",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark" ? "background.paper" : "#ffffff",
+                      overflowX: "auto",
+                    }}
+                  >
+                    <Table size="small" aria-label="calculation summary table">
+                      <TableHead>
+                        <TableRow
+                          sx={{
+                            bgcolor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(255, 255, 255, 0.05)"
+                                : "#eef4f8",
+                          }}
+                        >
+                          <TableCell
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: "0.75rem",
+                              color: (theme) =>
+                                theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                              py: 1,
+                              px: 1.5,
+                              width: "30%",
+                              borderRight: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "1px solid rgba(255, 255, 255, 0.08)"
+                                  : "1px solid rgba(224, 224, 224, 0.8)",
+                              borderBottom: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "1px solid rgba(255, 255, 255, 0.1)"
+                                  : "1px solid rgba(224, 224, 224, 1)",
+                            }}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <span>Expense</span>
+                              <Typography variant="caption" sx={{ fontSize: "0.85rem", color: "inherit", opacity: 0.5 }}>⋮</Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: "0.75rem",
+                              color: (theme) =>
+                                theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                              py: 1,
+                              px: 1.5,
+                              width: "45%",
+                              borderRight: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "1px solid rgba(255, 255, 255, 0.08)"
+                                  : "1px solid rgba(224, 224, 224, 0.8)",
+                              borderBottom: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "1px solid rgba(255, 255, 255, 0.1)"
+                                  : "1px solid rgba(224, 224, 224, 1)",
+                            }}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <span>Calculation</span>
+                              <Typography variant="caption" sx={{ fontSize: "0.85rem", color: "inherit", opacity: 0.5 }}>⋮</Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: "0.75rem",
+                              color: (theme) =>
+                                theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                              py: 1,
+                              px: 1.5,
+                              width: "25%",
+                              textAlign: "left",
+                              borderRight: "none",
+                              borderBottom: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "1px solid rgba(255, 255, 255, 0.1)"
+                                  : "1px solid rgba(224, 224, 224, 1)",
+                            }}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <span>Total</span>
+                              <Typography variant="caption" sx={{ fontSize: "0.85rem", color: "inherit", opacity: 0.5 }}>⋮</Typography>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {computedBudgetItems.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={3}
+                              align="center"
+                              sx={{
+                                py: 2.5,
+                                fontSize: "0.8rem",
+                                color: "text.secondary",
+                                borderBottom: "none",
+                              }}
+                            >
+                              Select an event type to view calculation details
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          computedBudgetItems.map((item, idx) => (
+                            <TableRow
+                              key={item.budgetCalculationId || item.expenseItem || idx}
+                              sx={{
+                                bgcolor: (theme) =>
+                                  idx % 2 === 1
+                                    ? theme.palette.mode === "dark"
+                                      ? "rgba(255,255,255,0.015)"
+                                      : "#fafafa"
+                                    : theme.palette.mode === "dark"
+                                      ? "rgba(255,255,255,0.03)"
+                                      : "#ffffff",
+                                "&:hover": {
+                                  bgcolor: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "rgba(255, 255, 255, 0.05)"
+                                      : "#f5f7fa",
+                                },
+                                "& td": {
+                                  borderRight: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "1px solid rgba(255, 255, 255, 0.08)"
+                                      : "1px solid rgba(224, 224, 224, 0.8)",
+                                  borderBottom: (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "1px solid rgba(255, 255, 255, 0.08)"
+                                      : "1px solid rgba(224, 224, 224, 0.8)",
+                                },
+                                "& td:last-child": { borderRight: "none" },
+                              }}
+                            >
+                              <TableCell
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: "0.78rem",
+                                  py: 0.85,
+                                  px: 1.5,
+                                  color: (theme) =>
+                                    theme.palette.mode === "dark" ? "#e2e8f0" : "#334155",
+                                }}
+                              >
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <span>{item.expenseItem}</span>
+                                  {item.isCustom && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        setExtraExpenseItems((prev) => prev.filter((x) => x.id !== item.id));
+                                        setCustomItemAmounts((prev) => {
+                                          const copy = { ...prev };
+                                          delete copy[item.key];
+                                          return copy;
+                                        });
+                                      }}
+                                      sx={{ p: 0.2, color: "#ef4444" }}
+                                    >
+                                      <CloseRoundedIcon sx={{ fontSize: "0.95rem" }} />
+                                    </IconButton>
+                                  )}
+                                </Box>
+                              </TableCell>
+                              <TableCell
+                                sx={{
+                                  fontSize: "0.78rem",
+                                  py: 0.85,
+                                  px: 1.5,
+                                  color: (theme) =>
+                                    theme.palette.mode === "dark" ? "#94a3b8" : "#475569",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {item.calcFormula || item.calcText || `₹${item.amount}`}
+                              </TableCell>
+                              <TableCell
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: "0.8rem",
+                                  py: 0.5,
+                                  px: 1.5,
+                                  textAlign: "left",
+                                  color: (theme) =>
+                                    theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b",
+                                }}
+                              >
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                  <Typography
+                                    sx={{
+                                      fontWeight: 700,
+                                      fontSize: "0.82rem",
+                                      color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                                    }}
+                                  >
+                                    ₹
+                                  </Typography>
+                                  <OutlinedInput
+                                    size="small"
+                                    value={
+                                      customItemAmounts[item.key] !== undefined
+                                        ? customItemAmounts[item.key]
+                                        : (item.amount !== undefined ? item.amount : "")
+                                    }
+                                    onChange={(e) => {
+                                      const val = e.target.value.replace(/[^0-9.]/g, "");
+                                      setCustomItemAmounts((prev) => ({
+                                        ...prev,
+                                        [item.key]: val,
+                                      }));
+                                    }}
+                                    placeholder="0"
+                                    sx={{
+                                      width: "100%",
+                                      maxWidth: 95,
+                                      height: 28,
+                                      bgcolor: (theme) =>
+                                        theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "#ffffff",
+                                      borderRadius: "4px",
+                                      fontSize: "0.8rem",
+                                      fontWeight: 700,
+                                      "& input": { py: 0.2, px: 0.8, textAlign: "right" },
+                                      "& fieldset": {
+                                        borderColor: item.isManual
+                                          ? "#8b5cf6"
+                                          : (theme) =>
+                                            theme.palette.mode === "dark"
+                                              ? "rgba(255,255,255,0.2)"
+                                              : "rgba(74,63,107,0.25)",
+                                        borderWidth: item.isManual ? "1.5px" : "1px",
+                                      },
+                                    }}
+                                  />
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+
+                  {/* Table Sub-actions: Reset if manual override */}
+                  {Object.keys(customItemAmounts).length > 0 && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        alignItems: "center",
+                        mb: 0.5,
+                        px: 0.5,
+                      }}
+                    >
+                      <Button
+                        size="small"
+                        startIcon={<ResetIcon sx={{ fontSize: "0.85rem" }} />}
+                        onClick={() => {
+                          setCustomItemAmounts({});
+                        }}
+                        sx={{
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          color: "#94a3b8",
+                          p: 0,
+                          textTransform: "none",
+                          "&:hover": { color: "#ef4444", bgcolor: "transparent" },
+                        }}
+                      >
+                        Reset Calculations
+                      </Button>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Total Planned Budget Footer */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    pt: 1.2,
+                    mt: 1,
+                    borderTop: "1px dashed",
+                    borderColor: (theme) =>
+                      theme.palette.mode === "dark" ? "divider" : "#cbd5e1",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "0.85rem",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
+                    }}
+                  >
+                    Total Planned Budget
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: "0.98rem",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
+                    }}
+                  >
+                    ₹{plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </Typography>
+                </Box>
+
+                {isBirthday && (plannedBudget <= 0 || bdayBudget <= 0) && (
+                  <Alert
+                    severity="warning"
+                    sx={{
+                      mt: 1.5,
+                      py: 0.5,
+                      fontSize: "0.78rem",
+                      borderRadius: "8px",
+                      "& .MuiAlert-message": { lineHeight: 1.4 },
+                    }}
+                  >
+                    Birthday event budget is ₹0. Please configure rates in Settings &gt; Budget Calculations before saving.
+                  </Alert>
+                )}
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
+
+        {/* Bottom Action Footer Centered */}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 2,
+            mt: 2,
+            pt: 1.75,
+            pb: 0.5,
+            borderTop: "1px solid",
+            borderColor: (theme) =>
+              theme.palette.mode === "dark" ? "divider" : "#e8e5f2",
+          }}
+        >
+          <AppButton
+            variant="outlined"
+            onClick={handleCancel}
+            disabled={saving}
+            sx={{
+              minWidth: 120,
+              borderRadius: "8px",
+              px: 3.5,
+              py: 0.85,
+              minHeight: 40,
+              borderColor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#d8d8e5",
+              color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
+              fontWeight: 600,
+              fontSize: "0.88rem",
+              "&:hover": {
+                borderColor: "#4a3f6b",
+              },
+            }}
+          >
+            {readOnly ? (isDialog ? "Close" : "Back to Events") : "Cancel"}
+          </AppButton>
+          {canEdit && (
+            <Tooltip title={isEdit && hasPayments ? "Cannot edit event after payments have been received" : ""}>
+              <span>
+                <AppButton
+                  variant="contained"
+                  startIcon={<SaveIcon sx={{ fontSize: "1.1rem" }} />}
+                  onClick={handleSubmit}
+                  disabled={saving || (isEdit && hasPayments)}
+                  sx={{
+                    bgcolor: isEdit && hasPayments ? "#94a3b8 !important" : "#342b54 !important",
+                    color: "#ffffff !important",
+                    "&:hover": { bgcolor: isEdit && hasPayments ? "#94a3b8 !important" : "#241d3b !important" },
+                    minWidth: 130,
+                    borderRadius: "8px",
+                    px: 3.8,
+                    py: 0.85,
+                    minHeight: 40,
+                    fontWeight: 600,
+                    fontSize: "0.88rem",
+                  }}
+                >
+                  {saving ? "Saving..." : isEdit ? "Update" : "Save"}
+                </AppButton>
+              </span>
+            </Tooltip>
+          )}
         </Box>
       </Box>
+    </Box>
   );
 
   if (isDialog) {
