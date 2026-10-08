@@ -182,14 +182,29 @@ export default function BudgetCalculationsPage() {
       return;
     }
 
+    const selectedCategory =
+      form.category?.trim() || eventTypes[0]?.eventTypeName || "Birthday";
+    const matchedType = eventTypes.find(
+      (t) =>
+        (form.eventTypeId && t.eventTypeId === form.eventTypeId) ||
+        t.eventTypeName.toLowerCase() === selectedCategory.toLowerCase()
+    );
+    const categoryName = matchedType ? matchedType.eventTypeName : selectedCategory;
+    const targetItemName = form.expenseItem?.trim().toLowerCase();
+
+    const isDuplicate = items.some(
+      (it) =>
+        it.expenseItem &&
+        it.expenseItem.trim().toLowerCase() === targetItemName &&
+        (it.category || "").trim().toLowerCase() === categoryName.toLowerCase() &&
+        (!form.budgetCalculationId || it.budgetCalculationId !== form.budgetCalculationId)
+    );
+    if (isDuplicate) {
+      setErrors((prev) => ({ ...prev, expenseItem: "Expense item already exists for this event type" }));
+      toast.error("Expense item already exists for this event type");
+      return;
+    }
     try {
-      const selectedCategory =
-        form.category?.trim() || eventTypes[0]?.eventTypeName || "Birthday";
-      const matchedType = eventTypes.find(
-        (t) =>
-          (form.eventTypeId && t.eventTypeId === form.eventTypeId) ||
-          t.eventTypeName.toLowerCase() === selectedCategory.toLowerCase()
-      );
       const payload = {
         ...form,
         category: matchedType ? matchedType.eventTypeName : selectedCategory,
