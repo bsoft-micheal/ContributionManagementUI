@@ -616,18 +616,18 @@ export default function UserFormPage() {
       joiningDate: { required: true, label: "Joining Date" },
     };
 
+    if (form.createMemberProfile && !form.enableMultipleRoles) {
+      schema.roleName = { required: true, label: "Primary Role" };
+    }
+
+    const e = validateForm(form, schema);
+
     if (form.createMemberProfile) {
       const userErr = validateUsername(form.username, { isRequired: true });
       if (userErr) {
         e.username = userErr;
       }
     }
-
-    if (form.createMemberProfile && !form.enableMultipleRoles) {
-      schema.roleName = { required: true, label: "Primary Role" };
-    }
-
-    const e = validateForm(form, schema);
 
     if (form.createMemberProfile) {
       const pwErr = validatePassword(form.newPassword, {
