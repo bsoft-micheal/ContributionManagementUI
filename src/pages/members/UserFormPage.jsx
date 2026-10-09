@@ -817,7 +817,7 @@ export default function UserFormPage() {
           boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
         }}
       >
-        {/* ── 1. Page Header Bar ────────────────────────────────────────── */}
+        {/* ── 1. Page Header Bar ───────────────── */}
         <Box
           sx={{
             bgcolor: "#45386d",
@@ -1291,18 +1291,10 @@ export default function UserFormPage() {
             </AppButton>
             <AppButton
               variant="contained"
-              startIcon={<SaveIcon sx={{ fontSize: "1.15rem" }} />}
               disabled={saving}
               onClick={handleSubmit}
               sx={{
                 px: 3.5,
-                py: 0.8,
-                borderRadius: "8px",
-                fontWeight: 600,
-                fontSize: "0.85rem",
-                bgcolor: "#342b54 !important",
-                color: "#ffffff !important",
-                "&:hover": { bgcolor: "#241d3b !important" },
               }}
             >
               {saving ? "Saving…" : "Save"}
