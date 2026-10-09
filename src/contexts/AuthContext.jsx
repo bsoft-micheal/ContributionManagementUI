@@ -96,11 +96,12 @@ export function AuthProvider({ children }) {
     const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
     // Save fetched menu rights dynamically to local storage for immediate routing and access control enforcement
-    if (data.rights && data.role) {
+    if (data.role) {
       const savedRights = localStorage.getItem("projectRightsConfig");
       let rightsMap = savedRights ? JSON.parse(savedRights) : {};
 
-      const processedRights = data.rights.map((r, idx) => {
+      const rawRights = Array.isArray(data.rights) ? data.rights : [];
+      const processedRights = rawRights.map((r, idx) => {
         let typeVal = r.accessType ?? r.AccessType;
         if (typeVal === undefined || typeVal === null || isNaN(Number(typeVal)) || Number(typeVal) === 0) {
           const str = String(r.access || r.Access || "").toLowerCase().replace(/[\s_-]/g, "");
@@ -151,11 +152,12 @@ export function AuthProvider({ children }) {
     const resData = response.data;
     const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
-    if (data.rights && data.role) {
+    if (data.role) {
       const savedRights = localStorage.getItem("projectRightsConfig");
       let rightsMap = savedRights ? JSON.parse(savedRights) : {};
 
-      const processed = data.rights.map((r, idx) => ({
+      const rawRights = Array.isArray(data.rights) ? data.rights : [];
+      const processed = rawRights.map((r, idx) => ({
         id: idx + 1,
         featureId: r.featureID ?? r.featureId,
         module: r.module,
@@ -210,11 +212,13 @@ export function AuthProvider({ children }) {
       const { data: resData } = await apiClient.post("/auth/switchRoleAsync", payload);
       const data = (resData && resData.data !== undefined) ? resData.data : resData;
 
-      if (data.rights && data.role) {
+      const targetRoleName = data.role || data.activeRole || (typeof targetRole === "string" ? targetRole : (targetRole?.roleName || ""));
+      if (targetRoleName) {
         const savedRights = localStorage.getItem("projectRightsConfig");
         let rightsMap = savedRights ? JSON.parse(savedRights) : {};
 
-        const processedRights = data.rights.map((r, idx) => {
+        const rawRights = Array.isArray(data.rights) ? data.rights : [];
+        const processedRights = rawRights.map((r, idx) => {
           let typeVal = r.accessType ?? r.AccessType;
           if (typeVal === undefined || typeVal === null || isNaN(Number(typeVal)) || Number(typeVal) === 0) {
             const str = String(r.access || r.Access || "").toLowerCase().replace(/[\s_-]/g, "");
@@ -232,13 +236,11 @@ export function AuthProvider({ children }) {
           };
         });
 
-        rightsMap[data.role] = processedRights;
-        rightsMap[data.role.toLowerCase()] = processedRights;
-        if (Array.isArray(data.roles)) {
-          data.roles.forEach((r) => {
-            rightsMap[r] = processedRights;
-            rightsMap[r.toLowerCase()] = processedRights;
-          });
+        rightsMap[targetRoleName] = processedRights;
+        rightsMap[targetRoleName.toLowerCase()] = processedRights;
+        if (data.role && data.role !== targetRoleName) {
+          rightsMap[data.role] = processedRights;
+          rightsMap[data.role.toLowerCase()] = processedRights;
         }
         rightsMap["current"] = processedRights;
         localStorage.setItem("projectRightsConfig", JSON.stringify(rightsMap));

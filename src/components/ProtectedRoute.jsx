@@ -5,7 +5,7 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { useAuth } from "../contexts/AuthContext";
-import { getRightsForPath, getFirstAccessiblePath } from "../utils/rightsHelper";
+import { getRightsForPath, getFirstAccessiblePath, hasRoleAssignedRights } from "../utils/rightsHelper";
 
 export default function ProtectedRoute({ children, roles = [] }) {
   const { isAuthenticated, authState, logout } = useAuth();
@@ -23,7 +23,13 @@ export default function ProtectedRoute({ children, roles = [] }) {
     return <Navigate to="/" replace />;
   }
 
-  // 2. Dynamic rights mapping checks from configurator
+  // 2. Unassigned role check: let AppLayout render NoPermissionsBlankSheet
+  const isUnassigned = !hasRoleAssignedRights(activeRole);
+  if (isUnassigned) {
+    return children;
+  }
+
+  // 3. Dynamic rights mapping checks from configurator
   const rights = getRightsForPath(location.pathname, activeRole);
   if (rights.deny) {
     // If current route is denied, check if any other route is accessible for this user
