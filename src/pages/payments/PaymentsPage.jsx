@@ -160,7 +160,12 @@ export default function PaymentsPage() {
           paymentDate: t.paymentDate || "",
           paymentMode: t.paymentMode || "",
           utr: t.utr || "-",
-          status: t.status || "Pending",
+          status:
+            t.status && t.status !== "Pending"
+              ? t.status
+              : t.verifiedBy && t.verifiedBy !== "-" && t.verifiedBy !== "--"
+              ? "Verified"
+              : t.status || "Pending",
           verifiedBy: t.verifiedBy || "-",
           verifiedOn: t.verifiedOn || "-",
           notes: t.notes || "",
@@ -180,7 +185,37 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     loadBackendData();
-    const handleUpdate = () => {
+    const handleUpdate = (e) => {
+      // Optimistic patch: immediately reflect status change in UI
+      const detail = e?.detail || {};
+      const verifiedIds = Array.isArray(detail.verifiedTransactionIds)
+        ? detail.verifiedTransactionIds
+        : [];
+      const verifiedStatus = detail.status || "Verified";
+      const target = detail.target || {};
+
+      setTransactions((prev) =>
+        prev.map((t) => {
+          const isIdMatch =
+            verifiedIds.includes(t.transactionId) || verifiedIds.includes(t.id);
+          const isTargetMatch =
+            target.memberName &&
+            target.eventName &&
+            t.memberName?.trim().toLowerCase() === target.memberName?.trim().toLowerCase() &&
+            t.eventName?.trim().toLowerCase() === target.eventName?.trim().toLowerCase();
+
+          if (isIdMatch || isTargetMatch) {
+            return {
+              ...t,
+              status: verifiedStatus,
+              verifiedBy: detail.verifier || (t.verifiedBy && t.verifiedBy !== "-" ? t.verifiedBy : "Verified"),
+            };
+          }
+          return t;
+        })
+      );
+
+      // Then reload from server to get accurate persisted data
       loadBackendData();
     };
     window.addEventListener("contribution_updated", handleUpdate);
@@ -248,7 +283,7 @@ export default function PaymentsPage() {
 
     const st = String(status || "").toLowerCase().trim();
 
-    if (st === "verified" || st === "closed") {
+    if (st === "verified" || st === "closed" || st === "paid") {
       bg = "rgba(22, 163, 74, 0.1)";
       color = "#16a34a";
       border = "rgba(22, 163, 74, 0.25)";
@@ -289,7 +324,7 @@ export default function PaymentsPage() {
           display: "inline-block",
         }}
       >
-        {status}
+        {st === "paid" ? "Verified" : (status || "Pending")}
       </Typography>
     );
   };
@@ -562,16 +597,7 @@ export default function PaymentsPage() {
         columns={columns}
         data={filteredTransactions}
         loading={loading}
-        actions={
-          <AppButton
-            variant="contained"
-            disabled={!canSubmitPayment}
-            startIcon={<AddIcon />}
-            onClick={() => setSubmitModalOpen(true)}
-          >
-            Submit Payment
-          </AppButton>
-        }
+
         filterPanel={
           <Grid container spacing={2} alignItems="center">
             <Grid

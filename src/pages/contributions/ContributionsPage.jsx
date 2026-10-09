@@ -219,7 +219,7 @@ export default function ContributionsPage() {
     const base = Number(activeEv.baseAmount || activeEv.totalExpectedAmount || 0);
     const count = Number(activeEv.participantCount || (activeEv.participants && activeEv.participants.length) || 0);
     if (count > 0 && base > 0) {
-      return Math.round(base / count);
+      return Number((base / count).toFixed(2));
     }
     return base > 0 ? base : 0;
   };
@@ -262,14 +262,35 @@ export default function ContributionsPage() {
     }) || null;
   };
 
+  const findAllContributionTransactions = (c, tList = transactions, fallbackEvId = selectedEventId) => {
+    if (!c || !Array.isArray(tList) || tList.length === 0) return [];
+    const targetMemberId = c.memberId || c.userId;
+    const targetMemberName = c.memberName;
+    const targetEventId = c.eventId || fallbackEvId;
+    const targetEventName = c.eventName || (events || []).find(e => String(e.eventId || e.id) === String(targetEventId))?.eventName;
+
+    return tList.filter((t) => {
+      const tMemberId = t.userId || t.memberId;
+      const tMemberName = t.memberName;
+      const memberMatch = isSameText(targetMemberId, tMemberId) || isSameText(targetMemberName, tMemberName);
+      if (!memberMatch) return false;
+
+      const tEventId = t.eventId;
+      const tEventName = t.eventName;
+      const idMatch = isSameText(targetEventId, tEventId);
+      const nameMatch = isMatchingEventName(targetEventName, tEventName);
+      return idMatch || nameMatch;
+    });
+  };
+
   const hasContributionPayment = (c, tx = null) => {
     if (!c) return false;
     const matchedTx = tx !== null ? tx : findContributionTransaction(c);
 
     // Direct contribution payment indicators
     const mode = String(c.paymentMode || "").trim().toLowerCase();
-    const hasValidMode = Boolean(mode && mode !== "none" && mode !== "-");
-    const hasDate = Boolean(c.paymentDate);
+    const hasValidMode = Boolean(mode && mode !== "none" && mode !== "-" && mode !== "0");
+    const hasDate = Boolean(c.paymentDate && !String(c.paymentDate).includes("0001-01-01"));
     if (hasDate && hasValidMode) return true;
     if (mode === "split" || mode.includes("split")) return true;
 
@@ -912,8 +933,8 @@ export default function ContributionsPage() {
     const totalDue = Number(target.totalDue || target.amount || matchedTxnForValidation?.amount || 0);
     const actualReceived = hasSubmittedProof ? Number(matchedTxnForValidation?.amount || target.paidAmount || totalDue) : 0;
 
-    if (isMarkingPaid && actualReceived <= 0 && totalDue > 0) {
-      toast.error("Valid payment proof or amount is required to Verify/Mark as Paid. Please submit a payment first.");
+    if (actualReceived <= 0) {
+      toast.error("Received amount is ₹0. You cannot update the status until payment is received.");
       return;
     }
 
@@ -943,23 +964,29 @@ export default function ContributionsPage() {
     try {
       setStatusSaving(true);
 
-      const matchedTxn = findContributionTransaction(target);
+      let freshTxns = transactions;
+      try {
+        const txRes = await getPaymentTransactionsAsync();
+        if (Array.isArray(txRes)) {
+          setTransactions(txRes);
+          freshTxns = txRes;
+        }
+      } catch { }
 
-      if (matchedTxn && (matchedTxn.transactionId || matchedTxn.id)) {
-        await verifyPaymentTransactionAsync(matchedTxn.transactionId || matchedTxn.id, {
-          status: newStatus,
-          verifiedBy: verifier,
-          notes: noteText,
-        });
-      } else if (isMarkingPaid) {
-        await recordPaymentAsync({
-          eventId: target.eventId,
-          memberId: target.memberId,
-          amount: Number(target.amount || target.totalAccumulated || 0),
-          paymentMode: target.paymentMode && target.paymentMode !== "None" ? target.paymentMode : "Cash",
-          paymentDate: new Date().toISOString(),
-          notes: noteText,
-        });
+      const matchedTxns = findAllContributionTransactions(target, freshTxns);
+      const statusToSend = isMarkingPaid ? "Verified" : newStatus;
+
+      if (matchedTxns.length > 0) {
+        await Promise.all(
+          matchedTxns.map((txn) => {
+            const txnId = txn.transactionId || txn.id;
+            return verifyPaymentTransactionAsync(txnId, {
+              status: statusToSend,
+              verifiedBy: verifier,
+              notes: noteText,
+            });
+          })
+        );
       } else {
         await createPaymentTransactionAsync({
           eventId: target.eventId,
@@ -968,36 +995,57 @@ export default function ContributionsPage() {
           eventName: target.eventName || events.find((e) => e.eventId === target.eventId)?.eventName || "Contribution",
           amount: Number(target.amount || target.totalAccumulated || 0),
           paymentMode: target.paymentMode && target.paymentMode !== "None" ? target.paymentMode : "Cash",
-          status: newStatus,
+          status: statusToSend,
           notes: noteText,
           paymentDate: new Date().toISOString(),
         });
       }
 
-      toast.success(`Contribution status updated to ${newStatus} successfully!`);
+      toast.success(`Contribution status updated to ${statusToSend} successfully!`);
       if (addNotification) {
         addNotification({
           type: "PAYMENT_STATUS_UPDATED",
           title: "Contribution Status Updated",
-          message: `${target.memberName}'s contribution status updated to ${newStatus}.`,
+          message: `${target.memberName}'s contribution status updated to ${statusToSend}.`,
           link: "/contributions",
         });
       }
-
-      window.dispatchEvent(
-        new CustomEvent("contribution_updated", {
-          detail: { action: "verify", status: newStatus, target },
-        })
-      );
 
       setStatusModalOpen(false);
       setStatusModalRow(null);
       setAuditRemarks("");
 
+      // Fetch latest transactions — critical: use this for both state + enrichment
+      let latestTxns = freshTxns;
       try {
-        const txRes = await getPaymentTransactionsAsync();
-        if (Array.isArray(txRes)) setTransactions(txRes);
+        const txRes2 = await getPaymentTransactionsAsync();
+        if (Array.isArray(txRes2)) {
+          // Patch the verified transactions optimistically in case backend has slight delay
+          const patchedTxns = txRes2.map((t) => {
+            const wasVerified = matchedTxns.some(
+              (m) => (m.transactionId || m.id) === (t.transactionId || t.id)
+            );
+            if (wasVerified) {
+              return { ...t, status: statusToSend, verifiedBy: verifier };
+            }
+            return t;
+          });
+          setTransactions(patchedTxns);
+          latestTxns = patchedTxns;
+        }
       } catch { }
+
+      // Dispatch AFTER updating local state so PaymentsPage gets consistent data
+      window.dispatchEvent(
+        new CustomEvent("contribution_updated", {
+          detail: {
+            action: "verify",
+            status: statusToSend,
+            target,
+            verifiedTransactionIds: matchedTxns.map((t) => t.transactionId || t.id),
+          },
+        })
+      );
 
       const freshAll = await reloadAllContributions();
       if (selectedEventId) {
@@ -1019,7 +1067,8 @@ export default function ContributionsPage() {
             );
           }
         }
-        const enriched = enrichContributions(freshData, freshAll, events, transactions);
+        // Use latestTxns (not stale `transactions` state) for enrichment
+        const enriched = enrichContributions(freshData, freshAll, events, latestTxns);
         setRawContributions(enriched);
       }
     } catch (err) {
@@ -1034,6 +1083,8 @@ export default function ContributionsPage() {
       label: "Action",
       render: (row) => {
         const isPaidRow = isContributionPaid(row) || String(row?.paymentStatus || row?.status || "").toLowerCase() === "paid";
+        const isVerifiedRow = isContributionVerified(row) || ["paid", "verified", "closed", "completed"].includes(String(row?.paymentStatus || row?.status || "").toLowerCase());
+
         return (
           <Box sx={{ display: "flex", gap: 0.6, alignItems: "center" }}>
             {canAddContribution && (
@@ -1058,28 +1109,31 @@ export default function ContributionsPage() {
             )}
 
             {canUpdateContribution && (
-              <Tooltip title="Authority Status Update">
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setStatusModalRow(row);
-                    setStatusChangeValue(row.paymentStatus || "Paid");
-                    setAuditRemarks("");
-                    setStatusModalOpen(true);
-                  }}
-                  sx={{
-                    p: 0.4,
-                    color: "#16a34a",
-                    bgcolor: "rgba(22, 163, 74, 0.08)",
-                    borderRadius: "6px",
-                    "&:hover": {
-                      bgcolor: "rgba(22, 163, 74, 0.18)",
-                      color: "#15803d",
-                    },
-                  }}
-                >
-                  <StatusUpdateIcon sx={{ fontSize: "1.15rem" }} />
-                </IconButton>
+              <Tooltip title={isVerifiedRow ? "Already Verified" : "Authority Status Update"}>
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={isVerifiedRow}
+                    onClick={() => {
+                      setStatusModalRow(row);
+                      setStatusChangeValue(row.paymentStatus || "Paid");
+                      setAuditRemarks("");
+                      setStatusModalOpen(true);
+                    }}
+                    sx={{
+                      p: 0.4,
+                      color: isVerifiedRow ? "#9ca3af" : "#16a34a",
+                      bgcolor: isVerifiedRow ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.08)",
+                      borderRadius: "6px",
+                      "&:hover": {
+                        bgcolor: isVerifiedRow ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.18)",
+                        color: isVerifiedRow ? "#9ca3af" : "#15803d",
+                      },
+                    }}
+                  >
+                    <StatusUpdateIcon sx={{ fontSize: "1.15rem" }} />
+                  </IconButton>
+                </span>
               </Tooltip>
             )}
 
@@ -1269,7 +1323,7 @@ export default function ContributionsPage() {
             fontWeight={700}
             color={isPaid ? "success.main" : "inherit"}
           >
-            ₹{displayAmount.toLocaleString()}
+            ₹{Number(displayAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </Typography>
         );
       }
@@ -1292,15 +1346,15 @@ export default function ContributionsPage() {
             {arrearsList.map((item, idx) => (
               <Box key={idx} sx={{ display: "flex", justifyContent: "space-between", gap: 1.5, fontSize: "0.72rem", py: 0.2 }}>
                 <span style={{ color: "#e2e8f0" }}>• {item.eventName || "Event"}</span>
-                <span style={{ fontWeight: 800, color: "#fff" }}>₹{Number(item.amount || 0).toLocaleString()}</span>
+                <span style={{ fontWeight: 800, color: "#fff" }}>₹{Number(item.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </Box>
             ))}
             <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.2)", mt: 0.5, pt: 0.3, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "0.75rem", color: "#fca5a5" }}>
               <span>Total Arrears:</span>
-              <span>₹{displayArrears.toLocaleString()}</span>
+              <span>₹{Number(displayArrears).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </Box>
           </Box>
-        ) : (displayArrears > 0 ? `Total Arrears: ₹${displayArrears.toLocaleString()}` : "No previous arrears");
+        ) : (displayArrears > 0 ? `Total Arrears: ₹${Number(displayArrears).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "No previous arrears");
 
         return (
           <Tooltip title={tooltipContent} arrow enterDelay={150}>
@@ -1314,7 +1368,7 @@ export default function ContributionsPage() {
                 display: "inline-block",
               }}
             >
-              ₹{displayArrears.toLocaleString()}
+              ₹{Number(displayArrears).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Typography>
           </Tooltip>
         );
@@ -1331,7 +1385,7 @@ export default function ContributionsPage() {
         const currentDue = (isPaid || submitted) ? 0 : getContributionOutstanding(row, activeEv);
         const prevArrears = (isPaid || submitted) ? 0 : (row.previousUnpaid || 0);
         const due = currentDue + prevArrears;
-        return `₹${due.toLocaleString()}`;
+        return `₹${Number(due).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }
     },
     {
@@ -1828,25 +1882,53 @@ export default function ContributionsPage() {
         title="Authority Status Update"
         maxWidth="md"
         actions={
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppButton variant="outlined" onClick={() => setStatusModalOpen(false)}>
-              Close
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              loading={statusSaving}
-              onClick={() =>
-                handleStatusUpdate(
-                  statusModalRow,
-                  statusChangeValue || statusModalRow?.paymentStatus,
-                  auditRemarks
-                )
-              }
-            >
-              Save
-            </AppButton>
-          </Stack>
+          (() => {
+            const matchedTx = statusModalRow ? findContributionTransaction(statusModalRow) : null;
+            const rawStatus = statusModalRow?.paymentStatus;
+            const isPaidOrVerified =
+              rawStatus === 2 ||
+              rawStatus === "Paid" ||
+              String(rawStatus).toLowerCase() === "paid" ||
+              String(rawStatus).toLowerCase() === "verified" ||
+              String(matchedTx?.status || "").toLowerCase() === "verified";
+
+            const cashAmt = Number(matchedTx?.cashAmount || statusModalRow?.cashAmount || 0);
+            const upiAmt = Number(matchedTx?.upiAmount || statusModalRow?.upiAmount || 0);
+            const splitSum = cashAmt + upiAmt;
+
+            const hasSubmittedProof = Boolean(matchedTx || (statusModalRow?.paymentMode && statusModalRow?.paymentMode !== "-" && statusModalRow?.paymentMode !== "None") || statusModalRow?.utrNumber);
+
+            const totalDueAmt = Number(statusModalRow?.totalDue || statusModalRow?.amount || matchedTx?.amount || 0);
+            const actualReceivedAmt = isPaidOrVerified
+              ? (splitSum > 0 ? splitSum : Number(statusModalRow?.totalReceivedAmount || statusModalRow?.paidAmount || matchedTx?.amount || statusModalRow?.amount || 0))
+              : (hasSubmittedProof ? Number(matchedTx?.amount || statusModalRow?.paidAmount || totalDueAmt) : 0);
+
+            const isZeroAmount = actualReceivedAmt <= 0;
+
+            return (
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <AppButton variant="outlined" onClick={() => setStatusModalOpen(false)}>
+                  Close
+                </AppButton>
+                <AppButton
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  loading={statusSaving}
+                  disabled={isZeroAmount}
+                  disabledTooltip={isZeroAmount ? "Cannot save: amount is ₹0.00" : ""}
+                  onClick={() =>
+                    handleStatusUpdate(
+                      statusModalRow,
+                      statusChangeValue || statusModalRow?.paymentStatus,
+                      auditRemarks
+                    )
+                  }
+                >
+                  Save
+                </AppButton>
+              </Stack>
+            );
+          })()
         }
       >
         {statusModalRow && (
@@ -1961,19 +2043,27 @@ export default function ContributionsPage() {
                           arrow
                           enterDelay={100}
                           title={
-                            <Box sx={{ p: 0.5 }}>
-                              <Typography variant="caption" fontWeight={800} sx={{ display: "block", mb: 0.5, textDecoration: "underline", color: "#93c5fd" }}>
-                                Event Payment Breakdown:
-                              </Typography>
-                              {eventBreakdownItems.map((itemStr, idx) => (
-                                <Typography key={idx} variant="caption" sx={{ display: "block", fontSize: "0.72rem", py: 0.1 }}>
-                                  • {itemStr}
+                            actualReceivedAmt <= 0 ? (
+                              <Box sx={{ p: 0.5 }}>
+                                <Typography variant="caption" fontWeight={800} sx={{ display: "block", color: "#fca5a5" }}>
+                                  Money Not Received
                                 </Typography>
-                              ))}
-                              <Typography variant="caption" fontWeight={800} sx={{ display: "block", mt: 0.5, pt: 0.5, borderTop: "1px solid rgba(255,255,255,0.2)" }}>
-                                {isPaidOrVerified ? "Total Received" : "Received"}: ₹{actualReceivedAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </Typography>
-                            </Box>
+                              </Box>
+                            ) : (
+                              <Box sx={{ p: 0.5 }}>
+                                <Typography variant="caption" fontWeight={800} sx={{ display: "block", mb: 0.5, textDecoration: "underline", color: "#93c5fd" }}>
+                                  Event Payment Breakdown:
+                                </Typography>
+                                {eventBreakdownItems.map((itemStr, idx) => (
+                                  <Typography key={idx} variant="caption" sx={{ display: "block", fontSize: "0.72rem", py: 0.1 }}>
+                                    • {itemStr}
+                                  </Typography>
+                                ))}
+                                <Typography variant="caption" fontWeight={800} sx={{ display: "block", mt: 0.5, pt: 0.5, borderTop: "1px solid rgba(255,255,255,0.2)" }}>
+                                  {isPaidOrVerified ? "Total Received" : "Received"}: ₹{actualReceivedAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Typography>
+                              </Box>
+                            )
                           }
                         >
                           <Typography

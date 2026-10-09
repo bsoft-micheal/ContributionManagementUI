@@ -76,12 +76,21 @@ export default function LoginPage() {
     }
 
     const newErrors = {};
-    if (!form.email?.trim()) newErrors.email = COMMON_STRINGS.VALIDATION.USERNAME_OR_EMAIL_REQUIRED || COMMON_STRINGS.VALIDATION.REQUIRED;
-    if (!form.password?.trim()) newErrors.password = COMMON_STRINGS.VALIDATION.PASSWORD_REQUIRED || COMMON_STRINGS.VALIDATION.REQUIRED;
+    if (!form.email?.trim()) {
+      newErrors.email = COMMON_STRINGS.VALIDATION.USERNAME_OR_EMAIL_REQUIRED || COMMON_STRINGS.VALIDATION.REQUIRED;
+    } else if (form.email.trim().length > 250) {
+      newErrors.email = "Username or Email must not exceed 250 characters";
+    }
+
+    if (!form.password) {
+      newErrors.password = COMMON_STRINGS.VALIDATION.PASSWORD_REQUIRED || COMMON_STRINGS.VALIDATION.REQUIRED;
+    } else if (form.password.length < 8 || form.password.length > 12) {
+      newErrors.password = "Password must be between 8 and 12 characters";
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
+      toast.error("Please fix the validation errors to proceed");
       return;
     }
 
@@ -366,6 +375,7 @@ export default function LoginPage() {
                         helperText={errors.email}
                         placeholder={COMMON_STRINGS.AUTH.USERNAME_OR_EMAIL_PLACEHOLDER}
                         size="small"
+                        inputProps={{ maxLength: 250 }}
                         sx={{
                           "& .MuiOutlinedInput-root": {
                             borderRadius: "6px",
@@ -426,6 +436,7 @@ export default function LoginPage() {
                         helperText={errors.password}
                         placeholder={COMMON_STRINGS.AUTH.PASSWORD_PLACEHOLDER}
                         size="small"
+                        inputProps={{ minLength: 8, maxLength: 12 }}
                         InputProps={{
                           endAdornment: (
                             <InputAdornment position="end">

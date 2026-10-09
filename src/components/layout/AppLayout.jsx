@@ -245,7 +245,7 @@ export default function AppLayout() {
       hasLowerAndUpper: /[a-z]/.test(newPassVal) && /[A-Z]/.test(newPassVal),
       hasNumber: /[0-9]/.test(newPassVal),
       hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(newPassVal),
-      hasMinLength: newPassVal.length >= 8,
+      hasMinLength: newPassVal.length >= 8 && newPassVal.length <= 12,
       passwordsMatch: Boolean(newPassVal && confPassVal && newPassVal === confPassVal),
     };
   }, [newPassVal, confPassVal]);
@@ -268,7 +268,7 @@ export default function AppLayout() {
     },
     {
       id: "length",
-      label: "Atleast 8 Character",
+      label: "8 to 12 Characters",
       met: passwordValidation.hasMinLength,
     },
     {
@@ -533,8 +533,8 @@ export default function AppLayout() {
 
     if (!newPass) {
       errs.newPassword = requiredMsg;
-    } else if (newPass.length < 8) {
-      errs.newPassword = "Password must be at least 8 characters";
+    } else if (newPass.length < 8 || newPass.length > 12) {
+      errs.newPassword = "Password must be between 8 and 12 characters";
     } else if (!passwordValidation.hasLowerAndUpper) {
       errs.newPassword = "Password must contain lowercase and uppercase letters";
     } else if (!passwordValidation.hasNumber) {
@@ -1240,8 +1240,8 @@ export default function AppLayout() {
               label="New Password"
               type={showNewPassword ? "text" : "password"}
               value={changePasswordForm.newPassword}
-              maxLength={30}
-              placeholder="Enter at least 8 characters"
+              maxLength={12}
+              placeholder="Enter 8 to 12 characters"
               name="new_password_unautofill"
               autoComplete="new-password"
               onChange={(e) => {
@@ -1273,7 +1273,7 @@ export default function AppLayout() {
               label="Confirm Password"
               type={showConfirmPassword ? "text" : "password"}
               value={changePasswordForm.confirmPassword}
-              maxLength={30}
+              maxLength={12}
               placeholder="Re-enter password"
               name="confirm_password_unautofill"
               autoComplete="new-password"
