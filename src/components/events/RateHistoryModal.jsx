@@ -208,7 +208,6 @@ export default function RateHistoryModal({
                   },
                 }}
               >
-                <TableCell width={40} align="center">#</TableCell>
                 <TableCell>Rate (₹)</TableCell>
                 <TableCell>Change</TableCell>
                 <TableCell>Effective From</TableCell>
@@ -220,7 +219,7 @@ export default function RateHistoryModal({
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                     <CircularProgress size={28} />
                     <Typography variant="caption" sx={{ display: "block", mt: 1 }}>
                       Loading rate history...
@@ -229,13 +228,12 @@ export default function RateHistoryModal({
                 </TableRow>
               ) : historyList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4, color: "text.secondary" }}>
                     No rate history records found.
                   </TableCell>
                 </TableRow>
               ) : (
                 paginatedList.map((row, index) => {
-                  const seqNumber = historyList.length - (page * rowsPerPage + index);
                   const isIncrease = row.changeType === "INCREASE";
                   const isDecrease = row.changeType === "DECREASE";
                   const isInitial = row.changeType === "INITIAL";
@@ -248,11 +246,6 @@ export default function RateHistoryModal({
                         "&:last-child td, &:last-child th": { border: 0 },
                       }}
                     >
-                      <TableCell align="center">
-                        <Typography variant="caption" fontWeight={700} color="text.secondary">
-                          {seqNumber}
-                        </Typography>
-                      </TableCell>
 
                       <TableCell>
                         <Typography

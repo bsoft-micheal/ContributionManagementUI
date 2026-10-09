@@ -212,9 +212,9 @@ export function createAppTheme(mode = "light") {
         dark: "#15803d",
       },
       error: {
-        main: "#dc2626",
+        main: "#ef4444",
         light: "#f87171",
-        dark: "#b91c1c",
+        dark: "#dc2626",
       },
       background: {
         default: tokens.background,
@@ -424,8 +424,8 @@ export function createAppTheme(mode = "light") {
             letterSpacing: "0.005em",
             color: mode === "dark" ? "#cbd5e1 !important" : "#334155 !important",
             "&.Mui-error": {
-              color: "#dc2626 !important",
-              fontWeight: 600,
+              color: mode === "dark" ? "#f87171 !important" : "#ef4444 !important",
+              fontWeight: 500,
             },
             "&.Mui-disabled": {
               color: mode === "dark" ? "#cbd5e1 !important" : "#334155 !important",

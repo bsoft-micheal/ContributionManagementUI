@@ -141,6 +141,9 @@ export default function UserFormPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [hasExistingLogin, setHasExistingLogin] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
@@ -206,6 +209,16 @@ export default function UserFormPage() {
           toast.error("User not found.");
           navigate("/users");
         }
+      } else {
+        setHasExistingLogin(false);
+        setIsChangingPassword(false);
+        setForm({
+          ...initialForm,
+          workType:
+            loadedWorkTypes.length > 0
+              ? loadedWorkTypes[0].workTypeName || loadedWorkTypes[0].name
+              : "Office",
+        });
       }
     } catch (error) {
       toast.error("Failed to load user form data.");
@@ -225,6 +238,16 @@ export default function UserFormPage() {
           String(rId).toLowerCase()
       );
       return found ? found.roleName || found.name : "";
+    };
+
+    // Valid role names currently existing in master data
+    const validMasterRoleNames = new Set(
+      (loadedRoles || []).map((r) => (r.roleName || r.name || "").trim().toLowerCase()).filter(Boolean)
+    );
+
+    const isRoleValid = (name) => {
+      if (!name) return false;
+      return validMasterRoleNames.has(name.trim().toLowerCase());
     };
 
     // 1. Extract primary role
@@ -251,12 +274,17 @@ export default function UserFormPage() {
       pRole = String(row.Role).trim();
     }
 
+    if (pRole && validMasterRoleNames.size > 0 && !isRoleValid(pRole)) {
+      pRole = "";
+    }
+
     // 2. Extract secondary/all roles
     const assignedRolesSet = new Set();
     const addRoleName = (val) => {
       if (!val || typeof val !== "string") return;
       const clean = val.trim();
       if (!clean || clean === "--" || clean === "None") return;
+      if (validMasterRoleNames.size > 0 && !isRoleValid(clean)) return; // Exclude deleted/inactive roles
       for (const item of assignedRolesSet) {
         if (item.toLowerCase() === clean.toLowerCase()) return;
       }
@@ -282,15 +310,21 @@ export default function UserFormPage() {
 
     if (!pRole && sRolesList.length > 0) {
       pRole = sRolesList[0];
+    } else if (!pRole && loadedRoles.length > 0) {
+      pRole = loadedRoles[0].roleName || loadedRoles[0].name || "";
     }
 
-    // 3. Determine login access flag
+    // 3. Determine login access flag and existing login presence
     const hasUsername = Boolean(row.username && String(row.username).trim() !== "");
     const hasAccess = Boolean(
       row.createMemberProfile === true ||
       row.enableUserAccess === true ||
       (hasUsername && (pRole || sRolesList.length > 0 || row.roleId || row.RoleId))
     );
+
+    const existingLogin = Boolean(hasAccess && hasUsername);
+    setHasExistingLogin(existingLogin);
+    setIsChangingPassword(false);
 
     // 4. Determine multiple roles flag
     const hasMultiple = Boolean(
@@ -394,6 +428,16 @@ export default function UserFormPage() {
       }
       case "newPassword": {
         if (!currentForm.createMemberProfile) return "";
+        const shouldReqPassword =
+          (!hasExistingLogin && Boolean(currentForm.createMemberProfile)) ||
+          (hasExistingLogin && isChangingPassword);
+        if (!shouldReqPassword) return "";
+
+        const customReqMsg = hasExistingLogin ? "New password is required." : "Password is required.";
+        if (!value || !String(value).trim()) {
+          return customReqMsg;
+        }
+
         return validatePassword(value, {
           username: currentForm.username,
           email: currentForm.email,
@@ -402,6 +446,11 @@ export default function UserFormPage() {
       }
       case "confirmPassword": {
         if (!currentForm.createMemberProfile) return "";
+        const shouldReqPassword =
+          (!hasExistingLogin && Boolean(currentForm.createMemberProfile)) ||
+          (hasExistingLogin && isChangingPassword);
+        if (!shouldReqPassword) return "";
+
         return validateConfirmPassword(value, currentForm.newPassword, {
           isRequired: true,
         });
@@ -499,10 +548,16 @@ export default function UserFormPage() {
       if (field === "dateOfBirth" && updatedForm.joiningDate) {
         nextErrors.joiningDate = validateSingleField("joiningDate", updatedForm.joiningDate, updatedForm);
       }
-      if (field === "newPassword" && updatedForm.confirmPassword) {
-        nextErrors.confirmPassword = validateSingleField("confirmPassword", updatedForm.confirmPassword, updatedForm);
+      if (field === "newPassword") {
+        if (updatedForm.confirmPassword) {
+          nextErrors.confirmPassword = validateSingleField("confirmPassword", updatedForm.confirmPassword, updatedForm);
+        }
       }
-      if ((field === "username" || field === "email") && updatedForm.newPassword) {
+      const shouldReqPassword =
+        (!hasExistingLogin && Boolean(updatedForm.createMemberProfile)) ||
+        (hasExistingLogin && isChangingPassword);
+
+      if ((field === "username" || field === "email") && shouldReqPassword && updatedForm.newPassword) {
         nextErrors.newPassword = validateSingleField("newPassword", updatedForm.newPassword, updatedForm);
       }
       if (field === "secondaryRoles" && updatedForm.primaryRole) {
@@ -629,14 +684,23 @@ export default function UserFormPage() {
       }
     }
 
-    if (form.createMemberProfile) {
-      const pwErr = validatePassword(form.newPassword, {
-        username: form.username,
-        email: form.email,
-        isRequired: true,
-      });
-      if (pwErr) {
-        e.newPassword = pwErr;
+    const shouldReqPassword =
+      (!hasExistingLogin && Boolean(form.createMemberProfile)) ||
+      (hasExistingLogin && isChangingPassword);
+
+    if (form.createMemberProfile && shouldReqPassword) {
+      const customReqMsg = hasExistingLogin ? "New password is required." : "Password is required.";
+      if (!form.newPassword || !String(form.newPassword).trim()) {
+        e.newPassword = customReqMsg;
+      } else {
+        const pwErr = validatePassword(form.newPassword, {
+          username: form.username,
+          email: form.email,
+          isRequired: true,
+        });
+        if (pwErr) {
+          e.newPassword = pwErr;
+        }
       }
 
       const cpwErr = validateConfirmPassword(form.confirmPassword, form.newPassword, {
@@ -717,7 +781,6 @@ export default function UserFormPage() {
         toast.error("Username already exists.");
         return;
       }
-      // Note: Duplicate mobile number is allowed per system requirements
     } else {
       if (users.some((u) => u.userId !== form.userId && u.email && u.email.trim().toLowerCase() === emailLower)) {
         setErrors((prev) => ({ ...prev, email: "This email is already registered" }));
@@ -738,14 +801,10 @@ export default function UserFormPage() {
         toast.error("Username already exists.");
         return;
       }
-      // Note: Duplicate mobile number is allowed per system requirements
     }
-
-
 
     setSaving(true);
     try {
-      const isAccess = Boolean(form.createMemberProfile);
       const isMultiple = Boolean(isAccess && form.enableMultipleRoles);
       const primaryRolesList = isAccess
         ? (isMultiple ? [form.primaryRole].filter(Boolean) : [form.roleName].filter(Boolean))
@@ -779,8 +838,12 @@ export default function UserFormPage() {
         isActive: Boolean(form.isActive),
       };
 
-      if (isAccess && form.newPassword) {
-        payload.password = form.newPassword;
+      const shouldReqPassword =
+        (!hasExistingLogin && isAccess) ||
+        (hasExistingLogin && isChangingPassword);
+
+      if (isAccess && shouldReqPassword && form.newPassword && form.newPassword.trim()) {
+        payload.password = form.newPassword.trim();
       }
 
       if (form.userId) {
@@ -977,23 +1040,28 @@ export default function UserFormPage() {
                 >
                   {/* Create Login Account */}
                   <Box
-                    onClick={() =>
-                      handleToggleCreateMemberProfile(!form.createMemberProfile)
-                    }
+                    onClick={() => {
+                      if (!hasExistingLogin) {
+                        handleToggleCreateMemberProfile(!form.createMemberProfile);
+                      }
+                    }}
                     sx={{
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 0.8,
-                      cursor: "pointer",
+                      cursor: hasExistingLogin ? "default" : "pointer",
                       userSelect: "none",
                       width: "fit-content",
                     }}
                   >
                     <Checkbox
                       checked={Boolean(form.createMemberProfile)}
-                      onChange={(e) =>
-                        handleToggleCreateMemberProfile(e.target.checked)
-                      }
+                      disabled={hasExistingLogin}
+                      onChange={(e) => {
+                        if (!hasExistingLogin) {
+                          handleToggleCreateMemberProfile(e.target.checked);
+                        }
+                      }}
                       onClick={(e) => e.stopPropagation()}
                       size="small"
                       sx={{
@@ -1004,6 +1072,12 @@ export default function UserFormPage() {
                             : "#4a3f6b",
                         "&.Mui-checked": {
                           color: "#4a3f6b",
+                        },
+                        "&.Mui-disabled": {
+                          color: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(255, 255, 255, 0.35)"
+                              : "#94a3b8",
                         },
                       }}
                     />
@@ -1170,85 +1244,208 @@ export default function UserFormPage() {
                   />
                 </Grid>
 
-                {/* Password */}
-                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                  <AppInput
-                    label={
-                      isEdit
-                        ? "New Password"
-                        : "Password"
-                    }
-                    placeholder={
-                      isEdit
-                        ? "Enter new password (8–12 characters)"
-                        : "Enter password (8–12 characters)"
-                    }
-                    type={showPassword ? "text" : "password"}
-                    value={form.newPassword}
-                    onChange={(e) => fieldChange("newPassword", e.target.value)}
-                    maxLength={12}
-                    autoComplete="new-password"
-                    error={!!errors.newPassword}
-                    helperText={errors.newPassword}
-                    required
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            size="small"
-                            onClick={() => setShowPassword((v) => !v)}
-                            edge="end"
-                            sx={{ color: "#94a3b8" }}
-                          >
-                            {showPassword ? (
-                              <VisibilityOff sx={{ fontSize: "1.1rem" }} />
-                            ) : (
-                              <Visibility sx={{ fontSize: "1.1rem" }} />
-                            )}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
+                {/* For Existing Login User when NOT changing password: Show masked password + Change Password button */}
+                {hasExistingLogin && !isChangingPassword ? (
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column" }}>
+                      <Typography
+                        variant="caption"
+                        fontWeight={600}
+                        sx={{
+                          mb: 0.6,
+                          fontSize: "0.78rem",
+                          color: (theme) =>
+                            theme.palette.mode === "dark" ? "#cbd5e1" : "#475569",
+                        }}
+                      >
+                        Password
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          px: 1.5,
+                          height: 40,
+                          border: "1px solid",
+                          borderColor: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(255, 255, 255, 0.15)"
+                              : "#d8d8e5",
+                          borderRadius: "8px",
+                          bgcolor: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(255, 255, 255, 0.03)"
+                              : "#f8fafc",
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            letterSpacing: "0.25em",
+                            fontSize: "1.1rem",
+                            color: "text.secondary",
+                            userSelect: "none",
+                            lineHeight: 1,
+                            fontWeight: 700,
+                          }}
+                        >
+                          ••••••••
+                        </Typography>
+                        <AppButton
+                          variant="outlined"
+                          size="small"
+                          onClick={() => {
+                            setIsChangingPassword(true);
+                            setErrors((prev) => ({
+                              ...prev,
+                              newPassword: "",
+                              confirmPassword: "",
+                            }));
+                          }}
+                          sx={{
+                            py: 0.3,
+                            px: 1.2,
+                            fontSize: "0.75rem",
+                            minWidth: "auto",
+                            height: 28,
+                            borderRadius: "6px",
+                            borderColor: "#4a3f6b",
+                            color: "#4a3f6b",
+                            fontWeight: 600,
+                            "&:hover": {
+                              bgcolor: "rgba(74, 63, 107, 0.08)",
+                              borderColor: "#4a3f6b",
+                            },
+                          }}
+                        >
+                          Change Password
+                        </AppButton>
+                      </Box>
+                    </Box>
+                  </Grid>
+                ) : (
+                  <>
+                    {/* Password */}
+                    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                      <AppInput
+                        label={
+                          hasExistingLogin
+                            ? "New Password"
+                            : "Password"
+                        }
+                        placeholder={
+                          hasExistingLogin
+                            ? "Enter new password (8–12 characters)"
+                            : "Enter password (8–12 characters)"
+                        }
+                        type={showPassword ? "text" : "password"}
+                        value={form.newPassword}
+                        onChange={(e) => fieldChange("newPassword", e.target.value)}
+                        maxLength={12}
+                        autoComplete="new-password"
+                        error={!!errors.newPassword}
+                        helperText={errors.newPassword}
+                        required
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={() => setShowPassword((v) => !v)}
+                                edge="end"
+                                sx={{ color: "#94a3b8" }}
+                              >
+                                {showPassword ? (
+                                  <VisibilityOff sx={{ fontSize: "1.1rem" }} />
+                                ) : (
+                                  <Visibility sx={{ fontSize: "1.1rem" }} />
+                                )}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
 
-                {/* Confirm Password */}
-                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                  <AppInput
-                    label={
-                      isEdit ? "Confirm New Password" : "Confirm Password"
-                    }
-                    placeholder="Re-enter password"
-                    type={showConfirm ? "text" : "password"}
-                    value={form.confirmPassword}
-                    onChange={(e) =>
-                      fieldChange("confirmPassword", e.target.value)
-                    }
-                    maxLength={12}
-                    autoComplete="new-password"
-                    error={!!errors.confirmPassword}
-                    helperText={errors.confirmPassword}
-                    required
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
+                    {/* Confirm Password */}
+                    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                      <AppInput
+                        label={
+                          hasExistingLogin
+                            ? "Confirm New Password"
+                            : "Confirm Password"
+                        }
+                        placeholder="Re-enter password"
+                        type={showConfirm ? "text" : "password"}
+                        value={form.confirmPassword}
+                        onChange={(e) =>
+                          fieldChange("confirmPassword", e.target.value)
+                        }
+                        maxLength={12}
+                        autoComplete="new-password"
+                        error={!!errors.confirmPassword}
+                        helperText={errors.confirmPassword}
+                        required
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={() => setShowConfirm((v) => !v)}
+                                edge="end"
+                                sx={{ color: "#94a3b8" }}
+                              >
+                                {showConfirm ? (
+                                  <VisibilityOff sx={{ fontSize: "1.1rem" }} />
+                                ) : (
+                                  <Visibility sx={{ fontSize: "1.1rem" }} />
+                                )}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+
+                    {hasExistingLogin && isChangingPassword && (
+                      <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: "flex", justifyContent: "flex-start", mt: 0.5 }}>
+                          <AppButton
+                            variant="text"
                             size="small"
-                            onClick={() => setShowConfirm((v) => !v)}
-                            edge="end"
-                            sx={{ color: "#94a3b8" }}
+                            onClick={() => {
+                              setIsChangingPassword(false);
+                              setForm((prev) => ({
+                                ...prev,
+                                newPassword: "",
+                                confirmPassword: "",
+                              }));
+                              setErrors((prev) => ({
+                                ...prev,
+                                newPassword: "",
+                                confirmPassword: "",
+                              }));
+                            }}
+                            sx={{
+                              fontSize: "0.78rem",
+                              color: "text.secondary",
+                              textTransform: "none",
+                              p: 0,
+                              minWidth: "auto",
+                              "&:hover": {
+                                color: "error.main",
+                                bgcolor: "transparent",
+                                textDecoration: "underline",
+                              },
+                            }}
                           >
-                            {showConfirm ? (
-                              <VisibilityOff sx={{ fontSize: "1.1rem" }} />
-                            ) : (
-                              <Visibility sx={{ fontSize: "1.1rem" }} />
-                            )}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
+                            Cancel Password Change
+                          </AppButton>
+                        </Box>
+                      </Grid>
+                    )}
+                  </>
+                )}
               </Grid>
             </FormSectionCard>
           )}

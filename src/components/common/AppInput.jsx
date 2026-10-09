@@ -89,7 +89,7 @@ export default function AppInput({
         >
           {label}
           {required && (
-            <Box component="span" sx={{ color: "#d32f2f", ml: 0.5, fontSize: "1rem", lineHeight: 0 }}>
+            <Box component="span" sx={{ color: (theme) => theme.palette.mode === "dark" ? "#f87171" : "#ef4444", ml: 0.5, fontSize: "1rem", lineHeight: 0 }}>
               *
             </Box>
           )}
@@ -136,7 +136,7 @@ export default function AppInput({
             },
             "& fieldset": {
               borderColor: (theme) => error
-                ? theme.palette.error.main
+                ? (theme.palette.mode === "dark" ? "#f87171" : "#ef4444")
                 : theme.palette.mode === "dark"
                   ? "rgba(231, 235, 247, 0.25)"
                   : "rgba(74, 63, 107, 0.28)",
@@ -144,7 +144,7 @@ export default function AppInput({
             },
             "&:hover fieldset": {
               borderColor: (theme) => error
-                ? theme.palette.error.main
+                ? (theme.palette.mode === "dark" ? "#f87171" : "#ef4444")
                 : theme.palette.mode === "dark"
                   ? "rgba(157, 140, 230, 0.75)"
                   : "#6f5bd3",
@@ -152,7 +152,7 @@ export default function AppInput({
             },
             "&.Mui-focused fieldset": {
               borderColor: (theme) => error
-                ? theme.palette.error.main
+                ? (theme.palette.mode === "dark" ? "#f87171" : "#ef4444")
                 : theme.palette.mode === "dark"
                   ? "#9d8ce6"
                   : "#6f5bd3",
@@ -172,7 +172,7 @@ export default function AppInput({
             fontSize: "0.75rem",
             fontWeight: 400,
             mt: 0.5,
-            color: (theme) => error ? "#dc2626 !important" : (theme.palette.mode === "dark" ? "#cbd5e1 !important" : "#334155 !important"),
+            color: (theme) => error ? (theme.palette.mode === "dark" ? "#f87171 !important" : "#ef4444 !important") : (theme.palette.mode === "dark" ? "#cbd5e1 !important" : "#334155 !important"),
           },
           transition: "all 0.2s ease",
         }}
