@@ -2419,24 +2419,30 @@ export default function EventFormPage({
                                         ? customItemAmounts[item.key]
                                         : (item.amount !== undefined ? item.amount : "")
                                     }
-                                    onChange={(e) => {
-                                      const val = e.target.value.replace(/[^0-9.]/g, "");
-                                      setCustomItemAmounts((prev) => ({
-                                        ...prev,
-                                        [item.key]: val,
-                                      }));
-                                    }}
+                                    readOnly={true}
+                                    disabled={true}
                                     placeholder="0"
                                     sx={{
                                       width: "100%",
                                       maxWidth: 95,
                                       height: 28,
                                       bgcolor: (theme) =>
-                                        theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "#ffffff",
+                                        theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f1f5f9",
                                       borderRadius: "4px",
                                       fontSize: "0.8rem",
                                       fontWeight: 700,
-                                      "& input": { py: 0.2, px: 0.8, textAlign: "right" },
+                                      cursor: "not-allowed",
+                                      "& input": {
+                                        py: 0.2,
+                                        px: 0.8,
+                                        textAlign: "right",
+                                        cursor: "not-allowed",
+                                        color: (theme) =>
+                                          theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+                                        WebkitTextFillColor: (theme) =>
+                                          theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+                                        opacity: "1 !important",
+                                      },
                                       "& fieldset": {
                                         borderColor: item.isManual
                                           ? "#8b5cf6"
