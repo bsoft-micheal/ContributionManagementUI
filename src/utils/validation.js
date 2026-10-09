@@ -50,6 +50,11 @@ export const VALIDATION_PATTERNS = {
     pattern: /^[0-9]*$/,
     message: "Only numbers are allowed",
     sanitize: (val) => val.replace(/[^0-9]/g, "")
+  },
+  username: {
+    pattern: /^[A-Za-z][A-Za-z0-9._]{2,28}[A-Za-z0-9]$/,
+    message: "Username can contain only letters, numbers, dot and underscore.",
+    sanitize: (val) => val.replace(/[^A-Za-z0-9._]/g, "")
   }
 };
 
@@ -208,7 +213,7 @@ export function validateEmail(value) {
   }
 
   // 3. Disallowed special characters: ", (, ), ,, :, ;, <, >, [, ], $, #, %, *
-  const disallowedSpecialChars = /["(),:;<>[\]$#%*]/;
+  const disallowedSpecialChars = /["(),:;<>[\\\]$#%*]/;
   if (disallowedSpecialChars.test(strVal)) {
     return "Email contains invalid special characters";
   }
@@ -323,6 +328,67 @@ const COMMON_WEAK_PASSWORDS = new Set([
 ]);
 
 /**
+ * Comprehensive username validation following application rules:
+ * 1. Required: "Username is required."
+ * 2. Minimum length 4: "Username must be at least 4 characters."
+ * 3. Maximum length 30: "Username must not exceed 30 characters."
+ * 4. Must start with a letter: "Username must start with a letter."
+ * 5. Allowed characters: A-Z, a-z, 0-9, dot (.), underscore (_). "Username can contain only letters, numbers, dot and underscore."
+ * 6. Spaces not allowed: "Username must not contain spaces."
+ * 7. Must end with a letter or number: "Username must end with a letter or number."
+ * 8. No consecutive special characters (.., __, ._, _.): "Username contains invalid consecutive special characters."
+ * @param {string} value Raw username input.
+ * @param {object} options Options including isRequired.
+ * @returns {string} Error message or empty string if valid.
+ */
+export function validateUsername(value, options = {}) {
+  const { isRequired = true } = options;
+
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return isRequired ? "Username is required." : "";
+  }
+
+  const strVal = String(value).trim();
+
+  // 1. Spaces not allowed anywhere
+  if (/\s/.test(strVal)) {
+    return "Username must not contain spaces.";
+  }
+
+  // 2. Minimum length: 4 characters
+  if (strVal.length < 4) {
+    return "Username must be at least 4 characters.";
+  }
+
+  // 3. Maximum length: 30 characters
+  if (strVal.length > 30) {
+    return "Username must not exceed 30 characters.";
+  }
+
+  // 4. Must start with a letter (A-Z, a-z)
+  if (!/^[A-Za-z]/.test(strVal)) {
+    return "Username must start with a letter.";
+  }
+
+  // 5. Allowed characters only: A-Z, a-z, 0-9, dot (.), underscore (_)
+  if (/[^A-Za-z0-9._]/.test(strVal)) {
+    return "Username can contain only letters, numbers, dot and underscore.";
+  }
+
+  // 6. Must end with a letter or number
+  if (/[._]$/.test(strVal)) {
+    return "Username must end with a letter or number.";
+  }
+
+  // 7. No consecutive special characters (.., __, ._, _.)
+  if (/[._]{2,}/.test(strVal)) {
+    return "Username contains invalid consecutive special characters.";
+  }
+
+  return "";
+}
+
+/**
  * Validates a password against comprehensive enterprise security requirements:
  * - Minimum 8 characters, maximum 64 characters
  * - At least 1 uppercase, 1 lowercase, 1 number, 1 special character
@@ -355,8 +421,8 @@ export function validatePassword(rawPassword, options = {}) {
   }
 
   // 2. Maximum length
-  if (trimmed.length > 64) {
-    return "Password must not exceed 64 characters.";
+  if (trimmed.length > 12) {
+    return "Password must not exceed 12 characters.";
   }
 
   // 3. Minimum length

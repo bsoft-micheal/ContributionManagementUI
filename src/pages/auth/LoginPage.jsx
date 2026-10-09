@@ -388,6 +388,13 @@ export default function LoginPage() {
                             "& input": {
                               py: 0.75,
                               px: 1.5,
+                              "&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus, &:-webkit-autofill:active": {
+                                WebkitBoxShadow: "0 0 0 1000px #ffffff inset !important",
+                                boxShadow: "0 0 0 1000px #ffffff inset !important",
+                                WebkitTextFillColor: "#0f172a !important",
+                                caretColor: "#0f172a !important",
+                                borderRadius: "6px",
+                              },
                             },
                           },
                           "& .MuiFormHelperText-root.Mui-error": {
@@ -471,6 +478,13 @@ export default function LoginPage() {
                             "& input": {
                               py: 0.75,
                               px: 1.5,
+                              "&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus, &:-webkit-autofill:active": {
+                                WebkitBoxShadow: "0 0 0 1000px #ffffff inset !important",
+                                boxShadow: "0 0 0 1000px #ffffff inset !important",
+                                WebkitTextFillColor: "#0f172a !important",
+                                caretColor: "#0f172a !important",
+                                borderRadius: "6px",
+                              },
                             },
                           },
                           "& .MuiFormHelperText-root.Mui-error": {
@@ -503,9 +517,9 @@ export default function LoginPage() {
                         sx={{
                           fontSize: "0.8rem",
                           fontWeight: 700,
-                          color: "#7c3aed",
+                          color: "#ffffff",
                           textDecoration: "none",
-                          "&:hover": { textDecoration: "underline" },
+                          "&:hover": { textDecoration: "underline", color: "#ffffff" },
                         }}
                       >
                         {COMMON_STRINGS.AUTH.FORGOT_PASSWORD}
