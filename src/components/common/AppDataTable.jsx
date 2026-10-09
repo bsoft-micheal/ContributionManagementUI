@@ -1372,7 +1372,7 @@ export default function AppDataTable({
                 color: (theme) =>
                   theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
                 fontSize: "0.78rem",
-                fontWeight: 800,
+                fontWeight: 900,
                 textTransform: "none",
                 px: 1.8,
                 minWidth: "unset",
@@ -1407,7 +1407,7 @@ export default function AppDataTable({
                 fontWeight: 900,
                 fontSize: "0.85rem",
                 color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e",
+                  theme.palette.mode === "dark" ? "#ffffff" : "#918aadff",
                 letterSpacing: "0.02em",
               }}
             >
@@ -1420,7 +1420,7 @@ export default function AppDataTable({
               sx={{
                 border: (theme) =>
                   theme.palette.mode === "dark"
-                    ? "1.5px solid rgba(255, 255, 255, 0.4)"
+                    ? "1.5px solid rgba(2, 2, 2, 0.4)"
                     : "1.5px solid #4a3f6b",
                 borderRadius: "6px",
                 color: (theme) =>
@@ -1466,7 +1466,7 @@ export default function AppDataTable({
                 borderRadius: "6px",
                 p: 0.5,
                 color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  theme.palette.mode === "dark" ? "#252121ff" : "#4a3f6b",
                 "&:hover": {
                   borderColor: (theme) =>
                     theme.palette.mode === "dark" ? "#ffffff" : "#3b325c",
