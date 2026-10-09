@@ -38,7 +38,8 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../contexts/AuthContext";
 import { navigationItems } from "../../config/menuConfig";
-import { getRightsForPath } from "../../utils/rightsHelper";
+import { getRightsForPath, hasRoleAssignedRights } from "../../utils/rightsHelper";
+import NoPermissionsBlankSheet from "../common/NoPermissionsBlankSheet";
 import AppDialog from "../common/AppDialog";
 import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
@@ -83,6 +84,9 @@ export default function AppLayout() {
   const toast = useAppToast();
   const { isDark, toggleMode } = useThemeMode();
   const { isLoading, loadingMessage, showLoader, hideLoader } = useNavigationLoading();
+
+  const activeRole = authState?.role || authState?.roleName;
+  const isUnassignedRole = !hasRoleAssignedRights(activeRole);
 
   const SIDEBAR = React.useMemo(() => {
     if (theme.palette.mode === "dark") {
@@ -780,7 +784,24 @@ export default function AppLayout() {
 
       {/* ── Nav Items ─────────────────────────────────────────────────────── */}
       <List sx={{ px: 1.5, flexGrow: 1, py: 0 }}>
-        {navigationItems.map((item) => renderNavItem(item))}
+        {isUnassignedRole ? (
+          <Box sx={{ px: 1.5, py: 3, textAlign: "center" }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "rgba(255, 255, 255, 0.45)",
+                fontSize: "0.75rem",
+                fontWeight: 500,
+                display: "block",
+                lineHeight: 1.4,
+              }}
+            >
+              No permissions assigned
+            </Typography>
+          </Box>
+        ) : (
+          navigationItems.map((item) => renderNavItem(item))
+        )}
       </List>
 
       <Divider sx={{ borderColor: SIDEBAR.divider, mx: 2, mt: 1 }} />
@@ -1034,7 +1055,14 @@ export default function AppLayout() {
         }}
       >
         {isLoading && <AppPageLoader fullScreen={true} text={loadingMessage || "Loading..."} />}
-        <Outlet />
+        {isUnassignedRole && location.pathname !== "/user-rights" ? (
+          <NoPermissionsBlankSheet
+            roleName={activeRole}
+            onSwitchRole={() => setSwitchRoleDialogOpen(true)}
+          />
+        ) : (
+          <Outlet />
+        )}
       </Box>
 
       {/* ── Profile Dialog ────────────────────────────────────────────────── */}

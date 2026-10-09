@@ -348,6 +348,7 @@ export default function AppDataTable({
   allowPagination = true,
   searchPlaceholder = "Search by username...",
   initialRowsPerPage = 15,
+  emptyMessage,
 }) {
   const theme = useTheme();
   const { isLoading: globalLoading } = useNavigationLoading();
@@ -1256,7 +1257,7 @@ export default function AppDataTable({
                   sx={{ py: 6 }}
                 >
                   <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                    No records found.
+                    {emptyMessage || "No records found."}
                   </Typography>
                 </TableCell>
               </TableRow>

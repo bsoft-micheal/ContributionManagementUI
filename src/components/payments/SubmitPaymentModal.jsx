@@ -922,6 +922,7 @@ export default function SubmitPaymentModal({
       setSubmitting(true);
       let finalMode = formData.paymentMode;
       let finalUtr = formData.utr.trim();
+      let structuredSplits = [];
       let cashTotal = 0;
       let upiTotal = 0;
 
@@ -933,11 +934,17 @@ export default function SubmitPaymentModal({
           .filter((r) => !String(r.mode || "").toLowerCase().includes("cash"))
           .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
         finalMode = "Split";
-        const combinedUtrs = splitRows
-          .filter((r) => r.utr && r.utr.trim())
-          .map((r) => `${r.mode}: ${r.utr.trim()}`)
-          .join("; ");
-        finalUtr = combinedUtrs ? (combinedUtrs.length > 95 ? combinedUtrs.slice(0, 92) + "..." : combinedUtrs) : "SPLIT";
+        finalUtr = "SPLIT";
+        structuredSplits = splitRows.map((r) => {
+          const isRowCash = String(r.mode || "").toLowerCase().includes("cash");
+          const cashNoteVal = isRowCash ? (r.notes?.trim() || r.utr?.trim() || null) : null;
+          return {
+            mode: r.mode.trim(),
+            amount: Number(r.amount),
+            utr: isRowCash ? null : (r.utr ? r.utr.trim() : null),
+            notes: cashNoteVal,
+          };
+        });
       } else {
         const isCash = String(formData.paymentMode || "").toLowerCase().includes("cash");
         finalUtr = formData.utr.trim() || (isCash ? "CASH" : "-");
@@ -974,6 +981,7 @@ export default function SubmitPaymentModal({
         screenshot: screenshotsList[0] || formData.screenshot || null,
         screenshots: screenshotsList.length > 0 ? screenshotsList : null,
         notes: combinedNotes || null,
+        splits: structuredSplits.length > 0 ? structuredSplits : undefined,
       };
 
       const res = await submitPaymentProofAsync(payload);
