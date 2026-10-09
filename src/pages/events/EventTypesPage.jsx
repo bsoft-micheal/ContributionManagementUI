@@ -64,6 +64,14 @@ export default function EventTypesPage() {
     const schema = {
       eventTypeName: { required: true, type: "letteronly", min: 2, max: 50, label: requiredLabel }
     };
+
+    if (form.hasTenureRule) {
+      schema.tenureThresholdYears = {
+        required: true,
+        label: requiredLabel,
+      };
+    }
+
     const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
@@ -406,12 +414,18 @@ export default function EventTypesPage() {
                       label="Criteria (Years)"
                       placeholder="e.g. 1"
                       fullWidth
+                      required={form.hasTenureRule}
+                      maxLength={2}
                       value={form.tenureThresholdYears}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
                         setForm((f) => ({ ...f, tenureThresholdYears: val }));
+                        if (errors.tenureThresholdYears) {
+                          setErrors((prev) => ({ ...prev, tenureThresholdYears: "" }));
+                        }
                       }}
-                      
+                      error={Boolean(errors.tenureThresholdYears)}
+                      helperText={errors.tenureThresholdYears}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6 }}>

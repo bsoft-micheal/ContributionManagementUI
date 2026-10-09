@@ -144,6 +144,8 @@ export function savePaymentQrConfigForEventType(eventType, config) {
     qrImage: config.qrImage || null,
     previewAmount: config.previewAmount || "",
     isActive: config.isActive !== undefined ? config.isActive : true,
+    isDeleted: config.isDeleted !== undefined ? config.isDeleted : false,
+    IsDeleted: config.IsDeleted !== undefined ? config.IsDeleted : false,
   };
 
   try {

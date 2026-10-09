@@ -242,7 +242,7 @@ export default function SettingsPage() {
   });
   const [selectedQrEventType, setSelectedQrEventType] = useState("");
 
-  // Dynamically derive event type options from categoriesList (getEventTypesAsync) and saved configs - NO HARDCODING!
+  // Dynamically derive event type options strictly from active categoriesList
   const qrEventTypeOptions = useMemo(() => {
     const list = [];
     if (Array.isArray(categoriesList) && categoriesList.length > 0) {
@@ -251,14 +251,8 @@ export default function SettingsPage() {
         if (name && !list.includes(name)) list.push(name);
       });
     }
-    // Also include any previously configured event types from eventPaymentQrConfigs
-    Object.keys(eventPaymentQrConfigs).forEach((k) => {
-      if (k && !list.some((existing) => existing.toLowerCase() === k.toLowerCase())) {
-        list.push(k);
-      }
-    });
     return list.map((t) => ({ label: t, value: t }));
-  }, [categoriesList, eventPaymentQrConfigs]);
+  }, [categoriesList]);
 
   // Ensure selectedQrEventType is initialized to the first available event type
   useEffect(() => {
@@ -355,45 +349,26 @@ export default function SettingsPage() {
           processedTypes.add(typeName.toLowerCase());
           const matchKey = Object.keys(eventPaymentQrConfigs).find((k) => k.toLowerCase() === typeName.toLowerCase());
           const config = matchKey ? eventPaymentQrConfigs[matchKey] : null;
-          const hasUpi = Boolean(config && config.upiId && config.upiId.trim());
+          const isDeleted = Boolean(config && (config.isDeleted || config.IsDeleted));
+          const hasUpi = Boolean(config && config.upiId && config.upiId.trim() && !isDeleted);
           rows.push({
             id: c.eventTypeId || typeName,
             eventTypeId: c.eventTypeId,
             eventTypeName: typeName,
-            receiverName: config?.receiverName || config?.qrReceiverName || "",
-            upiId: config?.upiId || config?.qrUpiId || "",
-            previewAmount: config?.previewAmount || "",
-            qrMode: config?.qrMode || "generated",
-            qrImage: config?.qrImage || null,
+            receiverName: isDeleted ? "" : (config?.receiverName || config?.qrReceiverName || ""),
+            upiId: isDeleted ? "" : (config?.upiId || config?.qrUpiId || ""),
+            previewAmount: isDeleted ? "" : (config?.previewAmount || ""),
+            qrMode: isDeleted ? "generated" : (config?.qrMode || "generated"),
+            qrImage: isDeleted ? null : (config?.qrImage || null),
             isConfigured: hasUpi,
-            isActive: config ? config.isActive !== false : false,
+            isDeleted: isDeleted,
+            isActive: isDeleted ? false : (config ? config.isActive !== false : false),
             createdBy: (!isGuid(config?.createdBy) && config?.createdBy) || "--",
             createdOn: config?.createdOn || config?.createdAt || null,
           });
         }
       });
     }
-
-    Object.keys(eventPaymentQrConfigs).forEach((k) => {
-      if (k && !processedTypes.has(k.toLowerCase())) {
-        processedTypes.add(k.toLowerCase());
-        const config = eventPaymentQrConfigs[k] || {};
-        const hasUpi = Boolean(config.upiId && config.upiId.trim());
-        rows.push({
-          id: k,
-          eventTypeName: k,
-          receiverName: config.receiverName || config.qrReceiverName || "",
-          upiId: config.upiId || config.qrUpiId || "",
-          previewAmount: config.previewAmount || "",
-          qrMode: config.qrMode || "generated",
-          qrImage: config.qrImage || null,
-          isConfigured: hasUpi,
-          isActive: config.isActive !== false,
-          createdBy: (!isGuid(config.createdBy) && config.createdBy) || "--",
-          createdOn: config.createdOn || config.createdAt || null,
-        });
-      }
-    });
 
     return rows;
   }, [categoriesList, eventPaymentQrConfigs]);
@@ -418,9 +393,9 @@ export default function SettingsPage() {
                   }}
                   sx={{
                     p: 0.4,
-                    bgcolor: isSelected ? "rgba(2, 132, 199, 0.15)" : "transparent",
-                    color: isSelected ? "#0284c7" : "inherit",
-                    "&:hover": { bgcolor: "rgba(2, 132, 199, 0.2)", color: "#0284c7" },
+                    bgcolor: isSelected ? "rgba(74, 63, 107, 0.15)" : "transparent",
+                    color: isSelected ? "#4a3f6b" : "inherit",
+                    "&:hover": { bgcolor: "rgba(74, 63, 107, 0.2)", color: "#4a3f6b" },
                   }}
                 >
                   <EditOutlinedIcon sx={{ fontSize: 16 }} />
@@ -431,9 +406,24 @@ export default function SettingsPage() {
                   <IconButton
                     size="small"
                     onClick={() => copyToClipboard(row.upiId, `UPI ID (${row.eventTypeName})`)}
-                    sx={{ p: 0.4, "&:hover": { color: "#0284c7" } }}
+                    sx={{ p: 0.4, "&:hover": { color: "#4a3f6b" } }}
                   >
                     <ContentCopyOutlinedIcon sx={{ fontSize: 15 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {row.isConfigured && (
+                <Tooltip title={`Delete Payment QR for ${row.eventTypeName}`}>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleDeletePaymentQr(row.eventTypeName)}
+                    sx={{
+                      p: 0.4,
+                      color: "#dc2626",
+                      "&:hover": { bgcolor: "rgba(220, 38, 38, 0.1)" },
+                    }}
+                  >
+                    <DeleteOutlineOutlinedIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
               )}
@@ -465,8 +455,8 @@ export default function SettingsPage() {
                   height: 18,
                   fontSize: "0.62rem",
                   fontWeight: 700,
-                  bgcolor: "rgba(2, 132, 199, 0.12)",
-                  color: "#0284c7",
+                  bgcolor: "rgba(74, 63, 107, 0.12)",
+                  color: "#4a3f6b",
                 }}
               />
             )}
@@ -484,7 +474,7 @@ export default function SettingsPage() {
                 fontFamily: "monospace",
                 fontSize: "0.82rem",
                 fontWeight: 650,
-                color: "#0284c7",
+                color: "#4a3f6b",
               }}
             >
               {row.upiId}
@@ -527,7 +517,7 @@ export default function SettingsPage() {
             <Chip
               label="Dynamic UPI QR"
               size="small"
-              sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: "rgba(2, 132, 199, 0.12)", color: "#0284c7" }}
+              sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: "rgba(74, 63, 107, 0.12)", color: "#4a3f6b" }}
             />
           );
         },
@@ -828,6 +818,10 @@ export default function SettingsPage() {
       toast.error("Organization Name is required.");
       return;
     }
+    if (settings.orgName.length > 250) {
+      toast.error("Organization Name cannot exceed 250 characters.");
+      return;
+    }
     if (!settings.otpExpiry || Number(settings.otpExpiry) <= 0) {
       toast.error("Please enter a valid OTP Expiry in minutes.");
       return;
@@ -1006,9 +1000,17 @@ export default function SettingsPage() {
       toast.error(`QR Receiver Name is required for ${selectedQrEventType}.`);
       return;
     }
+    if (configToSave.receiverName.length > 150) {
+      toast.error(`QR Receiver Name cannot exceed 150 characters.`);
+      return;
+    }
     const upiCheck = validateUpiId(configToSave.upiId);
     if (!upiCheck.isValid) {
       toast.error(upiCheck.error || `Please enter a valid UPI ID for ${selectedQrEventType}.`);
+      return;
+    }
+    if (configToSave.upiId && configToSave.upiId.length > 50) {
+      toast.error(`UPI ID cannot exceed 50 characters.`);
       return;
     }
 
@@ -1024,6 +1026,8 @@ export default function SettingsPage() {
         previewAmount: configToSave.previewAmount ? String(configToSave.previewAmount).trim() : "",
         qrImage: effectiveQrImage,
         isActive: true,
+        isDeleted: false,
+        IsDeleted: false,
         createdOn: new Date().toISOString(),
         createdBy: authState?.user?.fullName || authState?.user?.username || "Admin",
       };
@@ -1040,10 +1044,44 @@ export default function SettingsPage() {
       };
       await persistSettings(updatedSettings);
 
-      toast.success(`Payment QR settings for "${selectedQrEventType}" saved to database successfully!`);
+      toast.success(`Payment QR saved`);
     } catch (err) {
       console.error("Failed to save payment QR settings:", err);
       toast.error(err?.response?.data?.message || `Failed to save payment QR settings for "${selectedQrEventType}"`);
+    }
+  };
+
+  const handleDeletePaymentQr = async (eventTypeName) => {
+    if (!eventTypeName) return;
+    try {
+      const deletedConfig = {
+        receiverName: "",
+        upiId: "",
+        qrMode: "generated",
+        qrImage: null,
+        previewAmount: "",
+        isActive: false,
+        isConfigured: false,
+        isDeleted: true,
+        IsDeleted: true,
+        deletedOn: new Date().toISOString(),
+        deletedBy: authState?.user?.fullName || authState?.user?.username || "Admin",
+      };
+
+      const updatedAll = savePaymentQrConfigForEventType(eventTypeName, deletedConfig);
+      setEventPaymentQrConfigs(updatedAll);
+
+      const updatedSettings = {
+        ...settings,
+        paymentQrConfigs: updatedAll,
+        PaymentQrConfigs: updatedAll,
+      };
+      await persistSettings(updatedSettings);
+
+      toast.success(`Payment QR for "${eventTypeName}" deleted successfully.`);
+    } catch (err) {
+      console.error("Failed to delete payment QR settings:", err);
+      toast.error(err?.response?.data?.message || `Failed to delete payment QR settings for "${eventTypeName}"`);
     }
   };
 
@@ -1185,11 +1223,11 @@ export default function SettingsPage() {
                       width: 38,
                       height: 38,
                       borderRadius: "10px",
-                      bgcolor: "rgba(2, 132, 199, 0.1)",
+                      bgcolor: "rgba(74, 63, 107, 0.1)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      color: "#0284c7",
+                      color: "#4a3f6b",
                     }}
                   >
                     <SettingsOutlinedIcon fontSize="small" />
@@ -1210,7 +1248,8 @@ export default function SettingsPage() {
                     <AppInput
                       label="Organization Name"
                       value={settings.orgName}
-                      onChange={(e) => handleChange("orgName", e.target.value)}
+                      maxLength={250}
+                      onChange={(e) => handleChange("orgName", e.target.value.slice(0, 250))}
                       placeholder="e.g. Unit 1A Residents Association"
                     />
                   </Box>
@@ -1226,11 +1265,11 @@ export default function SettingsPage() {
                         width: 38,
                         height: 38,
                         borderRadius: "10px",
-                        bgcolor: "rgba(2, 132, 199, 0.1)",
+                        bgcolor: "rgba(74, 63, 107, 0.1)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        color: "#0284c7",
+                        color: "#4a3f6b",
                       }}
                     >
                       <LockResetOutlinedIcon fontSize="small" />
@@ -1249,7 +1288,8 @@ export default function SettingsPage() {
                         <AppInput
                           label="Forgot Password OTP Expiry (minutes)"
                           value={settings.otpExpiry}
-                          onChange={(e) => handleChange("otpExpiry", e.target.value)}
+                          maxLength={8}
+                          onChange={(e) => handleChange("otpExpiry", e.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
                           restrictType="numberonly"
                           placeholder="e.g. 10"
                           required
@@ -1264,7 +1304,8 @@ export default function SettingsPage() {
                         <AppInput
                           label="Max Retry Attempts"
                           value={settings.maxRetry}
-                          onChange={(e) => handleChange("maxRetry", e.target.value)}
+                          maxLength={2}
+                          onChange={(e) => handleChange("maxRetry", e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
                           restrictType="numberonly"
                           placeholder="e.g. 3"
                           required
@@ -1312,13 +1353,9 @@ export default function SettingsPage() {
                 <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center" }}>
                   <AppButton
                     variant="contained"
-                    startIcon={<SaveOutlinedIcon />}
                     onClick={handleSaveGeneral}
                     sx={{
-                      bgcolor: "#0284c7 !important",
-                      "&:hover": { bgcolor: "#0369a1 !important" },
-                      px: 3,
-                      py: 1,
+                      px: 3.5,
                       fontWeight: 700,
                     }}
                   >
@@ -1406,10 +1443,10 @@ export default function SettingsPage() {
                             sx={{
                               fontSize: "0.75rem",
                               height: 32,
-                              borderColor: "#0284c7",
-                              color: "#0284c7",
+                              borderColor: "#4a3f6b",
+                              color: "#4a3f6b",
                               fontWeight: 700,
-                              "&:hover": { borderColor: "#0369a1", bgcolor: "rgba(2,132,199,0.06)" },
+                              "&:hover": { borderColor: "#3b325c", bgcolor: "rgba(74,63,107,0.06)" },
                             }}
                           >
                             Send Test Email
@@ -1455,9 +1492,9 @@ export default function SettingsPage() {
                                 color: "text.secondary",
                                 border: `1px solid ${theme.palette.divider}`,
                                 "&.Mui-selected": {
-                                  bgcolor: "#0284c7",
+                                  bgcolor: "#4a3f6b",
                                   color: "#ffffff",
-                                  "&:hover": { bgcolor: "#0369a1" },
+                                  "&:hover": { bgcolor: "#3b325c" },
                                 },
                               },
                             }}
@@ -1508,7 +1545,7 @@ export default function SettingsPage() {
                         >
                           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                              <ScheduleOutlinedIcon sx={{ fontSize: 19, color: "#0284c7" }} />
+                              <ScheduleOutlinedIcon sx={{ fontSize: 19, color: "#4a3f6b" }} />
                               <Typography variant="subtitle2" fontWeight={800} sx={{ fontSize: "0.85rem" }}>
                                 Automated Monthly &amp; Recurring Reminder Settings
                               </Typography>
@@ -1520,9 +1557,9 @@ export default function SettingsPage() {
                                 height: 22,
                                 fontSize: "0.7rem",
                                 fontWeight: 700,
-                                bgcolor: "rgba(2, 132, 199, 0.1)",
-                                color: "#0284c7",
-                                border: "1px solid rgba(2, 132, 199, 0.2)",
+                                bgcolor: "rgba(74, 63, 107, 0.08)",
+                                color: "#4a3f6b",
+                                border: "1px solid rgba(74, 63, 107, 0.2)",
                               }}
                             />
                           </Box>
@@ -1551,9 +1588,11 @@ export default function SettingsPage() {
                               <AppInput
                                 label="Reminder Interval"
                                 value={settings.reminderIntervalValue !== undefined && settings.reminderIntervalValue !== null ? settings.reminderIntervalValue : (settings.reminderIntervalDays ?? "10")}
+                                maxLength={8}
                                 onChange={(e) => {
-                                  handleChange("reminderIntervalValue", e.target.value);
-                                  handleChange("reminderIntervalDays", e.target.value);
+                                  const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
+                                  handleChange("reminderIntervalValue", val);
+                                  handleChange("reminderIntervalDays", val);
                                 }}
                                 restrictType="numberonly"
                                 placeholder="e.g. 10"
@@ -1575,7 +1614,11 @@ export default function SettingsPage() {
                               <AppInput
                                 label="Maximum Reminders Allowed"
                                 value={settings.maxReminders !== undefined && settings.maxReminders !== null ? settings.maxReminders : "3"}
-                                onChange={(e) => handleChange("maxReminders", e.target.value)}
+                                maxLength={2}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
+                                  handleChange("maxReminders", val);
+                                }}
                                 restrictType="numberonly"
                                 placeholder="e.g. 3"
                               />
@@ -1608,9 +1651,9 @@ export default function SettingsPage() {
                               startIcon={<OpenInNewOutlinedIcon sx={{ fontSize: 16 }} />}
                               onClick={() => window.open(window.location.protocol + "//" + window.location.hostname + ":5111/hangfire", "_blank")}
                               sx={{
-                                borderColor: "#0284c7",
-                                color: "#0284c7",
-                                "&:hover": { bgcolor: "rgba(2,132,199,0.06)", borderColor: "#0369a1" },
+                                borderColor: "#4a3f6b",
+                                color: "#4a3f6b",
+                                "&:hover": { bgcolor: "rgba(74,63,107,0.06)", borderColor: "#3b325c" },
                                 fontSize: "0.75rem",
                                 fontWeight: 600,
                               }}
@@ -1626,12 +1669,9 @@ export default function SettingsPage() {
                     <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center", gap: 2 }}>
                       <AppButton
                         variant="contained"
-                        startIcon={<SaveOutlinedIcon />}
                         onClick={handleSaveEmailTemplate}
                         sx={{
-                          bgcolor: "#0284c7 !important",
-                          "&:hover": { bgcolor: "#0369a1 !important" },
-                          px: 3,
+                          px: 3.5,
                           fontWeight: 700,
                         }}
                       >
@@ -1658,11 +1698,11 @@ export default function SettingsPage() {
                           width: 38,
                           height: 38,
                           borderRadius: "10px",
-                          bgcolor: "rgba(2, 132, 199, 0.1)",
+                          bgcolor: "rgba(74, 63, 107, 0.1)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          color: "#0284c7",
+                          color: "#4a3f6b",
                         }}
                       >
                         <VisibilityOutlinedIcon fontSize="small" />
@@ -1696,7 +1736,7 @@ export default function SettingsPage() {
                       <Typography
                         variant="body2"
                         fontWeight={750}
-                        sx={{ mt: 0.3, color: "#0284c7", wordBreak: "break-word" }}
+                        sx={{ mt: 0.3, color: "#4a3f6b", wordBreak: "break-word" }}
                       >
                         {liveSubject || "Contribution Notice - Birthday"}
                       </Typography>
@@ -1936,7 +1976,8 @@ export default function SettingsPage() {
                             <AppInput
                               label={`Receiver Name (${selectedQrEventType})`}
                               value={currentQrConfig.receiverName || ""}
-                              onChange={(e) => handleQrFieldChange("receiverName", e.target.value)}
+                              maxLength={150}
+                              onChange={(e) => handleQrFieldChange("receiverName", e.target.value.slice(0, 150))}
                               placeholder={`e.g. ${selectedQrEventType} Lead`}
                               required
                               size="small"
@@ -1948,7 +1989,8 @@ export default function SettingsPage() {
                             <AppInput
                               label={`UPI ID (${selectedQrEventType})`}
                               value={currentQrConfig.upiId || ""}
-                              onChange={(e) => handleQrFieldChange("upiId", e.target.value)}
+                              maxLength={50}
+                              onChange={(e) => handleQrFieldChange("upiId", e.target.value.slice(0, 50))}
                               placeholder={`e.g. name@okaxis`}
                               required
                               size="small"
@@ -2082,7 +2124,7 @@ export default function SettingsPage() {
                                 </Box>
                               ) : (
                                 <>
-                                  <CloudUploadOutlinedIcon sx={{ fontSize: 24, color: "#0284c7" }} />
+                                  <CloudUploadOutlinedIcon sx={{ fontSize: 24, color: "#4a3f6b" }} />
                                   <Typography variant="body2" sx={{ display: "block", fontWeight: 700, fontSize: "0.76rem", mt: 0.3 }}>
                                     Click to upload static QR code image for {selectedQrEventType}
                                   </Typography>
@@ -2098,18 +2140,13 @@ export default function SettingsPage() {
                     </Box>
 
                     {/* Save Button for Payment QR Settings */}
-                    <Box sx={{ mt: 2.5, pt: 1.5, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "flex-start" }}>
+                    <Box sx={{ mt: 2.5, pt: 1.5, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center" }}>
                       <AppButton
                         variant="contained"
-                        startIcon={<SaveOutlinedIcon />}
                         onClick={handleSavePaymentQr}
                         sx={{
-                          bgcolor: "#1e1a2e !important",
-                          "&:hover": { bgcolor: "#2d2448 !important" },
-                          px: 2.5,
-                          py: 0.6,
+                          px: 3.5,
                           fontWeight: 700,
-                          fontSize: "0.8rem",
                         }}
                       >
                         Save
@@ -2136,11 +2173,11 @@ export default function SettingsPage() {
                             width: 38,
                             height: 38,
                             borderRadius: "10px",
-                            bgcolor: "rgba(2, 132, 199, 0.1)",
+                            bgcolor: "rgba(74, 63, 107, 0.1)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            color: "#0284c7",
+                            color: "#4a3f6b",
                           }}
                         >
                           <QrCodeScannerOutlinedIcon fontSize="small" />
