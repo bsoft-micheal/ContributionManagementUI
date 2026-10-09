@@ -313,6 +313,7 @@ export default function ForgotPasswordResetPage() {
                     type="submit"
                     size="large"
                     disabled={loading || !isLengthValid || !hasUppercase || !hasNumber || !passwordsMatch}
+                    disabledTooltip={false}
                     fullWidth
                     sx={{
                       py: 1.1,

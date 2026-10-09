@@ -46,6 +46,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 import VerifySupportTicketModal from "../../components/support/VerifySupportTicketModal";
 import {
   getSupportTicketsAsync,
@@ -138,6 +139,38 @@ export default function SupportTicketsPage() {
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+
+  const savedFormRef = useRef(null);
+
+  const isFormDirty = React.useCallback(() => {
+    if (!dialogOpen || !savedFormRef.current) return false;
+    const s = savedFormRef.current;
+
+    if ((form.memberName || "").trim() !== (s.memberName || "").trim()) return true;
+    if ((form.eventType || "").trim() !== (s.eventType || "").trim()) return true;
+    if ((form.relatedEvent || "").trim() !== (s.relatedEvent || "").trim()) return true;
+    if ((form.ticketType || "").trim() !== (s.ticketType || "").trim()) return true;
+    if ((form.priority || "").trim() !== (s.priority || "").trim()) return true;
+    if ((form.description || "").trim() !== (s.description || "").trim()) return true;
+
+    // Compare attachment
+    if ((form.attachment || "") !== (s.attachment || "")) return true;
+    if ((form.attachmentName || "") !== (s.attachmentName || "")) return true;
+
+    return false;
+  }, [dialogOpen, form]);
+
+  const handleCloseDialog = React.useCallback(() => {
+    setDialogOpen(false);
+    setEditingTicket(null);
+    setErrors({});
+    savedFormRef.current = null;
+  }, []);
+
+  const { handleCancelRequest, UnsavedChangesDialog } = useUnsavedChanges({
+    isDirty: isFormDirty,
+    onQuit: handleCloseDialog,
+  });
 
   // Image attachment & preview states
   const fileInputRef = useRef(null);
@@ -530,7 +563,7 @@ export default function SupportTicketsPage() {
     );
     const derivedType = matchedEvent?.eventTypeName || matchedEvent?.categoryName || matchedEvent?.eventType || "";
 
-    setForm({
+    const editFormData = {
       memberName: row.memberName || "",
       memberId: row.memberId || "",
       eventType: derivedType,
@@ -541,7 +574,9 @@ export default function SupportTicketsPage() {
       description: row.description || "",
       attachment: row.attachment || "",
       attachmentName: row.attachment ? `${row.ticketNo || "ticket"}_attachment.png` : "",
-    });
+    };
+    setForm(editFormData);
+    savedFormRef.current = editFormData;
     setErrors({});
     setDialogOpen(true);
   };
@@ -645,6 +680,7 @@ export default function SupportTicketsPage() {
       setDialogOpen(false);
       setEditingTicket(null);
       setForm(initialForm);
+      savedFormRef.current = null;
       setErrors({});
       await fetchTicketsFromDb();
     } catch (err) {
@@ -1021,8 +1057,7 @@ export default function SupportTicketsPage() {
                 const defaultEventName = defaultEvent ? (defaultEvent.eventName || defaultEvent.name || defaultEvent.title || "") : "";
                 const defaultEventType = defaultEvent ? (defaultEvent.eventTypeName || defaultEvent.categoryName || defaultEvent.eventType || "") : "";
 
-                setEditingTicket(null);
-                setForm({
+                const addFormData = {
                   ...initialForm,
                   memberName: loggedIn.name || authState?.fullName || "",
                   memberId: loggedIn.id || "",
@@ -1031,7 +1066,10 @@ export default function SupportTicketsPage() {
                   ticketType: "",
                   status: firstStatus,
                   description: "",
-                });
+                };
+                setEditingTicket(null);
+                setForm(addFormData);
+                savedFormRef.current = addFormData;
                 setErrors({});
                 setDialogOpen(true);
               }}
@@ -1141,11 +1179,7 @@ export default function SupportTicketsPage() {
       {/* Add / Edit Ticket Dialog */}
       <AppDialog
         open={dialogOpen}
-        onClose={() => {
-          setDialogOpen(false);
-          setEditingTicket(null);
-          setErrors({});
-        }}
+        onClose={() => handleCancelRequest(handleCloseDialog)}
         title={editingTicket ? "Edit Support Ticket" : "Add Support Ticket"}
         maxWidth="sm"
         actions={
@@ -1153,11 +1187,7 @@ export default function SupportTicketsPage() {
             <AppButton
               variant="outlined"
               disabled={isSaving}
-              onClick={() => {
-                setDialogOpen(false);
-                setEditingTicket(null);
-                setErrors({});
-              }}
+              onClick={() => handleCancelRequest(handleCloseDialog)}
             >
               Cancel
             </AppButton>
@@ -1724,6 +1754,7 @@ export default function SupportTicketsPage() {
           )}
         </DialogContent>
       </Dialog>
+      <UnsavedChangesDialog />
     </div>
   );
 }
