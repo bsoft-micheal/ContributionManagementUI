@@ -345,7 +345,7 @@ export default function VerifySupportTicketModal({
                 {/* Member Name */}
                 <Grid size={{ xs: 6 }}>
                   <Typography variant="caption" color="text.secondary">
-                    Member Name
+                    User Name
                   </Typography>
                   <Typography variant="body2" fontWeight={700}>
                     {ticketInfo.memberName || "--"}
