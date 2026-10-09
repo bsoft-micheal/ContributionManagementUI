@@ -36,6 +36,7 @@ import {
   validateIndianMobile,
   validatePassword,
   validateConfirmPassword,
+  validateUsername,
 } from "../../utils/validation";
 import {
   getUsersAsync,
@@ -334,6 +335,100 @@ export default function UserFormPage() {
     });
   }
 
+  function validateSingleField(field, value, currentForm) {
+    const strVal = String(value ?? "").trim();
+
+    switch (field) {
+      case "fullName": {
+        if (!strVal) return "This field is required";
+        if (strVal.length < 2) return "Full Name must be at least 2 characters";
+        if (strVal.length > 100) return "Full Name cannot exceed 100 characters";
+        if (!/^[A-Za-z\s]+$/.test(strVal)) return "Only letters and spaces are allowed";
+        return "";
+      }
+      case "email": {
+        if (!strVal) return "This field is required";
+        const emailErr = validateEmail(strVal);
+        return emailErr || "";
+      }
+      case "phone": {
+        if (!strVal) return "This field is required";
+        const phoneErr = validateIndianMobile(strVal);
+        return phoneErr || "";
+      }
+      case "gender": {
+        if (!strVal) return "This field is required";
+        return "";
+      }
+      case "workType": {
+        if (!strVal) return "This field is required";
+        return "";
+      }
+      case "dateOfBirth": {
+        if (!value) return "This field is required";
+        const dobDay = dayjs(value);
+        if (!dobDay.isValid()) return "Invalid date of birth";
+        if (dayjs().diff(dobDay, "year") < 18) return "User must be at least 18 years old";
+        return "";
+      }
+      case "joiningDate": {
+        if (!value) return "This field is required";
+        const joinDay = dayjs(value);
+        if (!joinDay.isValid()) return "Invalid joining date";
+        if (currentForm.dateOfBirth) {
+          const dobDay = dayjs(currentForm.dateOfBirth);
+          if (dobDay.isValid()) {
+            if (joinDay.isBefore(dobDay) || joinDay.isSame(dobDay)) {
+              return "Joining Date must be after Date of Birth";
+            }
+            if (joinDay.diff(dobDay, "year") < 18) {
+              return "Joining Date must be at least 18 years after Date of Birth";
+            }
+          }
+        }
+        return "";
+      }
+      case "username": {
+        if (!currentForm.createMemberProfile) return "";
+        return validateUsername(value, { isRequired: true });
+      }
+      case "newPassword": {
+        if (!currentForm.createMemberProfile) return "";
+        return validatePassword(value, {
+          username: currentForm.username,
+          email: currentForm.email,
+          isRequired: true,
+        });
+      }
+      case "confirmPassword": {
+        if (!currentForm.createMemberProfile) return "";
+        return validateConfirmPassword(value, currentForm.newPassword, {
+          isRequired: true,
+        });
+      }
+      case "roleName": {
+        if (!currentForm.createMemberProfile || currentForm.enableMultipleRoles) return "";
+        if (!strVal) return "This field is required";
+        return "";
+      }
+      case "primaryRole": {
+        if (!currentForm.createMemberProfile || !currentForm.enableMultipleRoles) return "";
+        if (!strVal) return "This field is required";
+        if (currentForm.secondaryRoles && !currentForm.secondaryRoles.includes(strVal)) {
+          return "Primary Role must be one of the selected Secondary Roles";
+        }
+        return "";
+      }
+      case "secondaryRoles": {
+        if (!currentForm.createMemberProfile || !currentForm.enableMultipleRoles) return "";
+        if (!Array.isArray(value) || value.length === 0) return "This field is required";
+        return "";
+      }
+      default:
+        return "";
+    }
+  }
+
   function fieldChange(field, value) {
     if (field === "joiningDate") {
       const isJoiningToday =
@@ -341,93 +436,103 @@ export default function UserFormPage() {
         dayjs(value).isValid() &&
         dayjs(value).isSame(dayjs(), "day");
 
-      setForm((prev) => {
-        // If joining date is today, automatically change work type to "Office"
-        // If some other day and previous workType was auto-set from today, clear it so user can select manually
-        let nextWorkType = prev.workType;
-        if (isJoiningToday) {
-          nextWorkType = "Office";
-        } else if (prev.joiningDate && dayjs(prev.joiningDate).isSame(dayjs(), "day")) {
-          nextWorkType = "";
-        }
-        return {
-          ...prev,
-          joiningDate: value,
-          workType: nextWorkType,
-        };
-      });
+      let nextWorkType = form.workType;
+      if (isJoiningToday && !form.workType) {
+        nextWorkType = "Office";
+      }
 
-      if (errors.joiningDate) {
-        setErrors((prev) => ({ ...prev, joiningDate: "" }));
+      const updatedForm = {
+        ...form,
+        joiningDate: value,
+        workType: nextWorkType,
+      };
+      setForm(updatedForm);
+
+      const joinErr = validateSingleField("joiningDate", value, updatedForm);
+      const workErr = validateSingleField("workType", nextWorkType, updatedForm);
+
+      setErrors((prev) => ({
+        ...prev,
+        joiningDate: joinErr,
+        workType: workErr,
+      }));
+      return;
+    }
+    if (field === "dobAndJoining") {
+      const dobVal = value.dateOfBirth;
+      const joinVal = value.joiningDate;
+      const isJoiningToday = joinVal && dayjs(joinVal).isSame(dayjs(), "day");
+      let nextWorkType = form.workType;
+      if (isJoiningToday && !form.workType) {
+        nextWorkType = "Office";
       }
-      if (isJoiningToday && errors.workType) {
-        setErrors((prev) => ({ ...prev, workType: "" }));
-      }
+
+      const updatedForm = {
+        ...form,
+        dateOfBirth: dobVal,
+        joiningDate: joinVal,
+        workType: nextWorkType,
+      };
+      setForm(updatedForm);
+
+      const dobErr = validateSingleField("dateOfBirth", dobVal, updatedForm);
+      const joinErr = validateSingleField("joiningDate", joinVal, updatedForm);
+      const workErr = validateSingleField("workType", nextWorkType, updatedForm);
+
+      setErrors((prev) => ({
+        ...prev,
+        dateOfBirth: dobErr,
+        joiningDate: joinErr,
+        workType: workErr,
+      }));
       return;
     }
 
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const updatedForm = { ...form, [field]: value };
+    setForm(updatedForm);
 
-    if (field === "newPassword") {
-      const pwErr = validatePassword(value, {
-        username: form.username,
-        email: form.email,
-        isRequired: Boolean(form.createMemberProfile),
-      });
-      setErrors((prev) => {
-        const nextErrors = { ...prev, newPassword: pwErr };
-        if (form.confirmPassword) {
-          nextErrors.confirmPassword = validateConfirmPassword(form.confirmPassword, value, {
-            isRequired: Boolean(form.createMemberProfile),
-          });
-        }
-        return nextErrors;
-      });
-      return;
-    }
+    const errorMsg = validateSingleField(field, value, updatedForm);
 
-    if (field === "confirmPassword") {
-      const cpwErr = validateConfirmPassword(value, form.newPassword, {
-        isRequired: Boolean(form.createMemberProfile),
-      });
-      setErrors((prev) => ({ ...prev, confirmPassword: cpwErr }));
-      return;
-    }
+    setErrors((prev) => {
+      const nextErrors = { ...prev, [field]: errorMsg };
 
-    if (field === "username" || field === "email") {
-      if (form.newPassword) {
-        const pwErr = validatePassword(form.newPassword, {
-          username: field === "username" ? value : form.username,
-          email: field === "email" ? value : form.email,
-          isRequired: Boolean(form.createMemberProfile),
-        });
-        setErrors((prev) => ({ ...prev, [field]: "", newPassword: pwErr }));
-        return;
+      if (field === "dateOfBirth" && updatedForm.joiningDate) {
+        nextErrors.joiningDate = validateSingleField("joiningDate", updatedForm.joiningDate, updatedForm);
       }
-    }
+      if (field === "newPassword" && updatedForm.confirmPassword) {
+        nextErrors.confirmPassword = validateSingleField("confirmPassword", updatedForm.confirmPassword, updatedForm);
+      }
+      if ((field === "username" || field === "email") && updatedForm.newPassword) {
+        nextErrors.newPassword = validateSingleField("newPassword", updatedForm.newPassword, updatedForm);
+      }
+      if (field === "secondaryRoles" && updatedForm.primaryRole) {
+        nextErrors.primaryRole = validateSingleField("primaryRole", updatedForm.primaryRole, updatedForm);
+      }
 
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
-    }
+      return nextErrors;
+    });
   }
 
   function handleSecondaryRolesChange(newSecondaryRoles) {
     const updatedRoles = Array.isArray(newSecondaryRoles) ? newSecondaryRoles : [];
-    setForm((prev) => {
-      let nextPrimary = prev.primaryRole;
-      if (!updatedRoles.includes(nextPrimary)) {
-        nextPrimary = updatedRoles[0] || "";
-      }
-      return {
-        ...prev,
-        secondaryRoles: updatedRoles,
-        primaryRole: nextPrimary,
-      };
-    });
+    let nextPrimary = form.primaryRole;
+    if (!updatedRoles.includes(nextPrimary)) {
+      nextPrimary = updatedRoles[0] || "";
+    }
+    const updatedForm = {
+      ...form,
+      secondaryRoles: updatedRoles,
+      primaryRole: nextPrimary,
+    };
+    setForm(updatedForm);
+
+    const secErr = validateSingleField("secondaryRoles", updatedRoles, updatedForm);
+    const primErr = validateSingleField("primaryRole", nextPrimary, updatedForm);
+
     setErrors((prev) => ({
       ...prev,
-      secondaryRoles: "",
-      primaryRole: "",
+      secondaryRoles: secErr,
+      primaryRole: primErr,
     }));
   }
 
@@ -512,7 +617,10 @@ export default function UserFormPage() {
     };
 
     if (form.createMemberProfile) {
-      schema.username = { required: true, type: "letterandnumber", min: 3, max: 30, label: "Username" };
+      const userErr = validateUsername(form.username, { isRequired: true });
+      if (userErr) {
+        e.username = userErr;
+      }
     }
 
     if (form.createMemberProfile && !form.enableMultipleRoles) {
@@ -605,8 +713,8 @@ export default function UserFormPage() {
         resolvedUsername &&
         users.some((u) => u.username && u.username.trim().toLowerCase() === resolvedUsername.toLowerCase())
       ) {
-        setErrors((prev) => ({ ...prev, username: "This username is already taken" }));
-        toast.error("This username is already taken");
+        setErrors((prev) => ({ ...prev, username: "Username already exists." }));
+        toast.error("Username already exists.");
         return;
       }
       // Note: Duplicate mobile number is allowed per system requirements
@@ -626,8 +734,8 @@ export default function UserFormPage() {
             u.username.trim().toLowerCase() === resolvedUsername.toLowerCase()
         )
       ) {
-        setErrors((prev) => ({ ...prev, username: "This username is already taken" }));
-        toast.error("This username is already taken");
+        setErrors((prev) => ({ ...prev, username: "Username already exists." }));
+        toast.error("Username already exists.");
         return;
       }
       // Note: Duplicate mobile number is allowed per system requirements
@@ -1053,11 +1161,11 @@ export default function UserFormPage() {
                     placeholder="Enter username"
                     value={form.username}
                     onChange={(e) => fieldChange("username", e.target.value)}
-                    restrictType="letterandnumber"
+                    restrictType="username"
                     maxLength={30}
                     autoComplete="off"
                     error={!!errors.username}
-                    helperText={errors.username}
+                    helperText={errors.username || "4–30 characters. Start with a letter. Use letters, numbers, dot or underscore only."}
                     required
                   />
                 </Grid>
@@ -1072,13 +1180,13 @@ export default function UserFormPage() {
                     }
                     placeholder={
                       isEdit
-                        ? "Enter new password (min 8 characters)"
-                        : "Enter password (min 8 characters)"
+                        ? "Enter new password (8–12 characters)"
+                        : "Enter password (8–12 characters)"
                     }
                     type={showPassword ? "text" : "password"}
                     value={form.newPassword}
                     onChange={(e) => fieldChange("newPassword", e.target.value)}
-                    maxLength={64}
+                    maxLength={12}
                     autoComplete="new-password"
                     error={!!errors.newPassword}
                     helperText={errors.newPassword}
@@ -1116,7 +1224,7 @@ export default function UserFormPage() {
                     onChange={(e) =>
                       fieldChange("confirmPassword", e.target.value)
                     }
-                    maxLength={64}
+                    maxLength={12}
                     autoComplete="new-password"
                     error={!!errors.confirmPassword}
                     helperText={errors.confirmPassword}

@@ -126,9 +126,11 @@ export default function AppInput({
                 opacity: 1,
                 fontWeight: 400,
               },
-              "&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus": {
-                WebkitBoxShadow: (theme) => `0 0 0 1000px ${theme.palette.background.paper} inset !important`,
-                WebkitTextFillColor: (theme) => theme.palette.mode === "dark" ? "#ffffff !important" : "#0f172a !important",
+              "&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus, &:-webkit-autofill:active": {
+                WebkitBoxShadow: "0 0 0 1000px #ffffff inset !important",
+                boxShadow: "0 0 0 1000px #ffffff inset !important",
+                WebkitTextFillColor: "#0f172a !important",
+                caretColor: "#0f172a !important",
                 transition: "background-color 5000s ease-in-out 0s",
               },
             },
