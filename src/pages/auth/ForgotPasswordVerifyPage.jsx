@@ -364,6 +364,7 @@ export default function ForgotPasswordVerifyPage() {
                   type="submit"
                   size="large"
                   disabled={loading || timer === 0 || isLocked}
+                  disabledTooltip={false}
                   fullWidth
                   sx={{
                     py: 1.1,

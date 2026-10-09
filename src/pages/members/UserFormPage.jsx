@@ -45,6 +45,7 @@ import {
 } from "../../services/userService";
 import { getRolesAsync } from "../../services/roleService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
+import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 
 const GENDER_OPTIONS = [
   { label: "Male", value: "Male" },
@@ -149,6 +150,52 @@ export default function UserFormPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const savedFormRef = React.useRef(null);
+
+  const isFormDirty = React.useCallback(() => {
+    if (!savedFormRef.current) return false;
+    const s = savedFormRef.current;
+
+    // Compare basic fields
+    if ((form.fullName || "").trim() !== (s.fullName || "").trim()) return true;
+    if ((form.email || "").trim() !== (s.email || "").trim()) return true;
+    if ((form.phone || "").trim() !== (s.phone || "").trim()) return true;
+    if ((form.gender || "") !== (s.gender || "")) return true;
+    if ((form.workType || "") !== (s.workType || "")) return true;
+
+    // Compare dates
+    const dobCurrent = form.dateOfBirth ? dayjs(form.dateOfBirth).format("YYYY-MM-DD") : "";
+    const dobSaved = s.dateOfBirth ? dayjs(s.dateOfBirth).format("YYYY-MM-DD") : "";
+    if (dobCurrent !== dobSaved) return true;
+
+    const joinCurrent = form.joiningDate ? dayjs(form.joiningDate).format("YYYY-MM-DD") : "";
+    const joinSaved = s.joiningDate ? dayjs(s.joiningDate).format("YYYY-MM-DD") : "";
+    if (joinCurrent !== joinSaved) return true;
+
+    // Compare credentials / flags
+    if (Boolean(form.createMemberProfile) !== Boolean(s.createMemberProfile)) return true;
+    if (Boolean(form.enableMultipleRoles) !== Boolean(s.enableMultipleRoles)) return true;
+    if ((form.username || "").trim() !== (s.username || "").trim()) return true;
+    if ((form.primaryRole || "") !== (s.primaryRole || "")) return true;
+    if ((form.roleName || "") !== (s.roleName || "")) return true;
+
+    // Compare secondary roles array
+    const sec1 = Array.isArray(form.secondaryRoles) ? [...form.secondaryRoles].sort().join(",") : "";
+    const sec2 = Array.isArray(s.secondaryRoles) ? [...s.secondaryRoles].sort().join(",") : "";
+    if (sec1 !== sec2) return true;
+
+    // Compare passwords if entered
+    if (form.newPassword && form.newPassword.length > 0) return true;
+    if (form.confirmPassword && form.confirmPassword.length > 0) return true;
+
+    return false;
+  }, [form]);
+
+  const { handleCancelRequest, UnsavedChangesDialog } = useUnsavedChanges({
+    isDirty: isFormDirty,
+    onQuit: () => navigate("/users"),
+  });
+
   const userRolesList = React.useMemo(() => {
     return (roles || []).map((r) => ({
       label: r.roleName || r.name,
@@ -212,13 +259,15 @@ export default function UserFormPage() {
       } else {
         setHasExistingLogin(false);
         setIsChangingPassword(false);
-        setForm({
+        const defaultFormData = {
           ...initialForm,
           workType:
             loadedWorkTypes.length > 0
               ? loadedWorkTypes[0].workTypeName || loadedWorkTypes[0].name
               : "Office",
-        });
+        };
+        setForm(defaultFormData);
+        savedFormRef.current = defaultFormData;
       }
     } catch (error) {
       toast.error("Failed to load user form data.");
@@ -333,7 +382,7 @@ export default function UserFormPage() {
 
     const singleRole = hasAccess ? (pRole || "") : "";
 
-    setForm({
+    const editFormData = {
       userId: row.userId || row.UserId || "",
       fullName: row.fullName || row.FullName || row.name || row.Name || "",
       username: hasAccess ? (row.username || row.Username || "") : "",
@@ -366,7 +415,10 @@ export default function UserFormPage() {
       newPassword: "",
       confirmPassword: "",
       isActive: row.isActive ?? row.IsActive ?? true,
-    });
+    };
+
+    setForm(editFormData);
+    savedFormRef.current = editFormData;
   }
 
   function validateSingleField(field, value, currentForm) {
@@ -897,7 +949,7 @@ export default function UserFormPage() {
             <Tooltip title="Back to Users">
               <IconButton
                 size="small"
-                onClick={() => navigate("/users")}
+                onClick={() => handleCancelRequest(() => navigate("/users"))}
                 sx={{
                   color: "#ffffff",
                   p: 0.5,
@@ -1459,7 +1511,7 @@ export default function UserFormPage() {
           >
             <AppButton
               variant="outlined"
-              onClick={() => navigate("/users")}
+              onClick={() => handleCancelRequest(() => navigate("/users"))}
               disabled={saving}
               sx={{
                 px: 3,
@@ -1494,11 +1546,12 @@ export default function UserFormPage() {
                 px: 3.5,
               }}
             >
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Saving…" : isEdit ? "Update" : "Save"}
             </AppButton>
           </Stack>
         </Box>
       </Paper>
+      <UnsavedChangesDialog />
     </div>
   );
 }

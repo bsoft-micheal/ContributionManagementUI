@@ -11,6 +11,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
+import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 import { getEventTypesAsync, createEventTypeAsync, updateEventTypeAsync, deleteEventTypeAsync } from "../../services/eventTypeService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate, formatCreatedBy } from "../../utils/dateHelper";
@@ -42,6 +43,33 @@ export default function EventTypesPage() {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
+
+  const savedFormRef = React.useRef(null);
+
+  const isFormDirty = React.useCallback(() => {
+    if (!dialogOpen || !savedFormRef.current) return false;
+    const s = savedFormRef.current;
+
+    if ((form.eventTypeName || "").trim() !== (s.eventTypeName || "").trim()) return true;
+    if (Boolean(form.hasTenureRule) !== Boolean(s.hasTenureRule)) return true;
+    if (String(form.tenureThresholdYears ?? "").trim() !== String(s.tenureThresholdYears ?? "").trim()) return true;
+    if (String(form.newEntrantSharePercentage ?? "").trim() !== String(s.newEntrantSharePercentage ?? "").trim()) return true;
+    if (String(form.standardSharePercentage ?? "").trim() !== String(s.standardSharePercentage ?? "").trim()) return true;
+    if (Boolean(form.isActive) !== Boolean(s.isActive)) return true;
+
+    return false;
+  }, [dialogOpen, form]);
+
+  const handleCloseDialog = React.useCallback(() => {
+    setDialogOpen(false);
+    setErrors({});
+    savedFormRef.current = null;
+  }, []);
+
+  const { handleCancelRequest, UnsavedChangesDialog } = useUnsavedChanges({
+    isDirty: isFormDirty,
+    onQuit: handleCloseDialog,
+  });
 
   useEffect(() => {
     loadData();
@@ -110,6 +138,7 @@ export default function EventTypesPage() {
         toast.success(TOAST_MESSAGES.EVENT_TYPES.SAVED_SUCCESS);
       }
       setDialogOpen(false);
+      savedFormRef.current = null;
       loadData();
     } catch (error) {
       toast.error(error, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
@@ -166,19 +195,22 @@ export default function EventTypesPage() {
 
   const handleOpenAddDialog = () => {
     setForm(initialForm);
+    savedFormRef.current = initialForm;
     setErrors({});
     setDialogOpen(true);
   };
 
   const handleOpenEditDialog = (row) => {
-    setForm({
+    const editFormData = {
       ...row,
       hasTenureRule: Boolean(row.hasTenureRule),
       tenureThresholdYears: row.tenureThresholdYears ?? 1,
       newEntrantSharePercentage: row.newEntrantSharePercentage ?? 50,
       standardSharePercentage: row.standardSharePercentage ?? 100,
       ruleDescription: row.ruleDescription ?? "",
-    });
+    };
+    setForm(editFormData);
+    savedFormRef.current = editFormData;
     setErrors({});
     setDialogOpen(true);
   };
@@ -303,13 +335,13 @@ export default function EventTypesPage() {
 
       <AppDialog
         open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
+        onClose={() => handleCancelRequest(handleCloseDialog)}
         title={form.eventTypeId ? "Edit Event Type" : "Add Event Type"}
         actions={
           <>
             <AppButton
               variant="outlined"
-              onClick={() => setDialogOpen(false)}
+              onClick={() => handleCancelRequest(handleCloseDialog)}
               sx={{
                 borderRadius: "8px",
                 px: 3,
@@ -415,10 +447,10 @@ export default function EventTypesPage() {
                       placeholder="e.g. 1"
                       fullWidth
                       required={form.hasTenureRule}
-                      maxLength={2}
+                      maxLength={3}
                       value={form.tenureThresholdYears}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
+                        const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
                         setForm((f) => ({ ...f, tenureThresholdYears: val }));
                         if (errors.tenureThresholdYears) {
                           setErrors((prev) => ({ ...prev, tenureThresholdYears: "" }));
@@ -433,9 +465,10 @@ export default function EventTypesPage() {
                       label="New Share (%)"
                       placeholder="e.g. 50"
                       fullWidth
+                      maxLength={3}
                       value={form.newEntrantSharePercentage}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
                         setForm((f) => ({ ...f, newEntrantSharePercentage: val }));
                       }}
                       helperText="Discounted share percentage"
@@ -446,9 +479,10 @@ export default function EventTypesPage() {
                       label="Standard Share (%)"
                       placeholder="e.g. 100"
                       fullWidth
+                      maxLength={3}
                       value={form.standardSharePercentage}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
                         setForm((f) => ({ ...f, standardSharePercentage: val }));
                       }}
                       helperText="Standard share percentage"
@@ -483,6 +517,7 @@ export default function EventTypesPage() {
         title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
         content={COMMON_STRINGS.DIALOGS.STATUS_CONFIRM_MSG(typeToToggle?.isActive ? "deactivate" : "activate", "category")}
       />
+      <UnsavedChangesDialog />
     </div>
   );
 }

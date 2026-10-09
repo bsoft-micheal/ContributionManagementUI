@@ -40,6 +40,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 import {
   getGalleryPhotosAsync,
   createGalleryPhotoAsync,
@@ -131,6 +132,42 @@ export default function GalleryPage() {
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+
+  const savedFormRef = useRef(null);
+
+  const isFormDirty = React.useCallback(() => {
+    if (!dialogOpen || !savedFormRef.current) return false;
+    const s = savedFormRef.current;
+
+    if ((form.title || "").trim() !== (s.title || "").trim()) return true;
+    if ((form.eventName || "").trim() !== (s.eventName || "").trim()) return true;
+    if ((form.category || "").trim() !== (s.category || "").trim()) return true;
+    if ((form.description || "").trim() !== (s.description || "").trim()) return true;
+
+    // Compare dates
+    const dateCur = form.takenDate ? dayjs(form.takenDate).format("YYYY-MM-DD") : "";
+    const dateSaved = s.takenDate ? dayjs(s.takenDate).format("YYYY-MM-DD") : "";
+    if (dateCur !== dateSaved) return true;
+
+    // Compare images array
+    const imgCur = (form.imageUrls || (form.imageUrl ? [form.imageUrl] : [])).join("|||");
+    const imgSaved = (s.imageUrls || (s.imageUrl ? [s.imageUrl] : [])).join("|||");
+    if (imgCur !== imgSaved) return true;
+
+    return false;
+  }, [dialogOpen, form]);
+
+  const handleCloseDialog = React.useCallback(() => {
+    setDialogOpen(false);
+    setEditingPhoto(null);
+    setErrors({});
+    savedFormRef.current = null;
+  }, []);
+
+  const { handleCancelRequest, UnsavedChangesDialog } = useUnsavedChanges({
+    isDirty: isFormDirty,
+    onQuit: handleCloseDialog,
+  });
 
   // Filter state inside AppDataTable filterPanel
   const [filterEvent, setFilterEvent] = useState("ALL");
@@ -467,7 +504,7 @@ export default function GalleryPage() {
   const handleEditPhoto = (row) => {
     setEditingPhoto(row);
     const rowImages = row.images?.length > 0 ? row.images : (row.imageUrl ? [row.imageUrl] : []);
-    setForm({
+    const editFormData = {
       title: row.title || "",
       eventName: row.eventName || "",
       category: row.category || "",
@@ -475,7 +512,9 @@ export default function GalleryPage() {
       imageUrl: rowImages[0] || "",
       imageUrls: rowImages,
       description: row.description || "",
-    });
+    };
+    setForm(editFormData);
+    savedFormRef.current = editFormData;
     setErrors({});
     setDialogOpen(true);
   };
@@ -799,6 +838,7 @@ export default function GalleryPage() {
       setDialogOpen(false);
       setEditingPhoto(null);
       setForm(initialForm);
+      savedFormRef.current = null;
       setErrors({});
       await fetchPhotosFromDb();
     } catch (err) {
@@ -958,6 +998,7 @@ export default function GalleryPage() {
               onClick={() => {
                 setEditingPhoto(null);
                 setForm(initialForm);
+                savedFormRef.current = initialForm;
                 setErrors({});
                 setDialogOpen(true);
               }}
@@ -1048,22 +1089,14 @@ export default function GalleryPage() {
       {/* Add / Edit Photo Dialog */}
       <AppDialog
         open={dialogOpen}
-        onClose={() => {
-          setDialogOpen(false);
-          setEditingPhoto(null);
-          setErrors({});
-        }}
+        onClose={() => handleCancelRequest(handleCloseDialog)}
         title={editingPhoto ? "Edit Photo" : "Add Photos"}
         maxWidth="md"
         actions={
           <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ width: "100%" }}>
             <AppButton
               variant="outlined"
-              onClick={() => {
-                setDialogOpen(false);
-                setEditingPhoto(null);
-                setErrors({});
-              }}
+              onClick={() => handleCancelRequest(handleCloseDialog)}
             >
               Cancel
             </AppButton>
@@ -1899,6 +1932,7 @@ export default function GalleryPage() {
           );
         })()}
       </AppDialog>
+      <UnsavedChangesDialog />
     </div>
   );
 }

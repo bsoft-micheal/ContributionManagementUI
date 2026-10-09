@@ -52,11 +52,11 @@ export default function ForgotPasswordPage() {
     const errorMsg = validateEmailFormat(email);
     if (errorMsg) {
       setEmailError(errorMsg);
-      toast.error(errorMsg);
       return;
     }
 
     setLoading(true);
+    setEmailError("");
     try {
       await requestForgotPasswordOtpAsync(email.trim());
       toast.success(TOAST_MESSAGES.AUTH.OTP_SENT || "A password reset OTP has been sent to your email!");
@@ -65,8 +65,13 @@ export default function ForgotPasswordPage() {
       localStorage.setItem("recovery_email", email.trim());
       navigate("/forgot-password/verify", { state: { email: email.trim() } });
     } catch (error) {
-      const serverMsg = error.response?.data?.message || error.response?.data?.title || error.response?.data?.errors?.Email?.[0];
-      toast.error(serverMsg ?? "Failed to request password reset OTP. Please check your email.");
+      const serverMsg =
+        error.response?.data?.message ||
+        error.response?.data?.title ||
+        error.response?.data?.errors?.Email?.[0] ||
+        "User not found.";
+      setEmailError(serverMsg);
+      toast.error(serverMsg);
     } finally {
       setLoading(false);
     }
@@ -234,6 +239,7 @@ export default function ForgotPasswordPage() {
                   type="submit"
                   size="large"
                   disabled={loading}
+                  disabledTooltip={false}
                   fullWidth
                   sx={{
                     py: 1.1,

@@ -90,7 +90,7 @@ export default function AppButton({
   if (isBtnDisabled) {
     const tipTitle = (disabledTooltip === false || disabledTooltip === "")
       ? null
-      : (disabledTooltip || tooltip || "Disabled");
+      : (disabledTooltip || tooltip || null);
     const wrappedBtn = (
       <span
         style={{

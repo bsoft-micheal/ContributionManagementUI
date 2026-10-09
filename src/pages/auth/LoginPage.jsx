@@ -528,9 +528,15 @@ export default function LoginPage() {
                         sx={{
                           fontSize: "0.8rem",
                           fontWeight: 700,
-                          color: "#ffffff",
+                          color: (theme) =>
+                            theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                           textDecoration: "none",
-                          "&:hover": { textDecoration: "underline", color: "#ffffff" },
+                          transition: "color 0.2s ease-in-out",
+                          "&:hover": {
+                            textDecoration: "underline",
+                            color: (theme) =>
+                              theme.palette.mode === "dark" ? "#ffffff" : "#2d244f",
+                          },
                         }}
                       >
                         {COMMON_STRINGS.AUTH.FORGOT_PASSWORD}
