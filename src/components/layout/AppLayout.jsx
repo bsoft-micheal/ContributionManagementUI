@@ -237,16 +237,18 @@ export default function AppLayout() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [newPasswordAnchorEl, setNewPasswordAnchorEl] = useState(null);
 
-  // Live password validation against the 4 policy rules
+  // Live password validation against policy rules
   const newPassVal = changePasswordForm.newPassword || "";
+  const confPassVal = changePasswordForm.confirmPassword || "";
   const passwordValidation = useMemo(() => {
     return {
       hasLowerAndUpper: /[a-z]/.test(newPassVal) && /[A-Z]/.test(newPassVal),
       hasNumber: /[0-9]/.test(newPassVal),
       hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(newPassVal),
-      hasMinLength: newPassVal.length >= 8,
+      hasMinLength: newPassVal.length >= 8 && newPassVal.length <= 12,
+      passwordsMatch: Boolean(newPassVal && confPassVal && newPassVal === confPassVal),
     };
-  }, [newPassVal]);
+  }, [newPassVal, confPassVal]);
 
   const passwordRules = useMemo(() => [
     {
@@ -266,8 +268,13 @@ export default function AppLayout() {
     },
     {
       id: "length",
-      label: "Atleast 8 Character",
+      label: "8 to 12 Characters",
       met: passwordValidation.hasMinLength,
+    },
+    {
+      id: "match",
+      label: "Passwords Match",
+      met: passwordValidation.passwordsMatch,
     },
   ], [passwordValidation]);
 
@@ -526,8 +533,8 @@ export default function AppLayout() {
 
     if (!newPass) {
       errs.newPassword = requiredMsg;
-    } else if (newPass.length < 8) {
-      errs.newPassword = "Password must be at least 8 characters";
+    } else if (newPass.length < 8 || newPass.length > 12) {
+      errs.newPassword = "Password must be between 8 and 12 characters";
     } else if (!passwordValidation.hasLowerAndUpper) {
       errs.newPassword = "Password must contain lowercase and uppercase letters";
     } else if (!passwordValidation.hasNumber) {
@@ -1227,13 +1234,14 @@ export default function AppLayout() {
                 setNewPasswordAnchorEl(node);
               }
             }}
+            sx={{ display: "flex", flexDirection: "column", gap: 2.2 }}
           >
             <AppInput
               label="New Password"
               type={showNewPassword ? "text" : "password"}
               value={changePasswordForm.newPassword}
-              maxLength={8}
-              placeholder="Enter 8 characters"
+              maxLength={12}
+              placeholder="Enter 8 to 12 characters"
               name="new_password_unautofill"
               autoComplete="new-password"
               onChange={(e) => {
@@ -1244,7 +1252,7 @@ export default function AppLayout() {
                 }
               }}
               error={!!changePasswordErrors.newPassword}
-              helperText={changePasswordErrors.newPassword || "8 characters"}
+              helperText={changePasswordErrors.newPassword}
               required
               endAdornment={
                 <InputAdornment position="end">
@@ -1260,40 +1268,40 @@ export default function AppLayout() {
                 </InputAdornment>
               }
             />
-          </Box>
 
-          <AppInput
-            label="Confirm Password"
-            type={showConfirmPassword ? "text" : "password"}
-            value={changePasswordForm.confirmPassword}
-            maxLength={8}
-            placeholder="Re-enter 8 characters"
-            name="confirm_password_unautofill"
-            autoComplete="new-password"
-            onChange={(e) => {
-              const val = e.target.value;
-              setChangePasswordForm((prev) => ({ ...prev, confirmPassword: val }));
-              if (changePasswordErrors.confirmPassword) {
-                setChangePasswordErrors((prev) => ({ ...prev, confirmPassword: "" }));
+            <AppInput
+              label="Confirm Password"
+              type={showConfirmPassword ? "text" : "password"}
+              value={changePasswordForm.confirmPassword}
+              maxLength={12}
+              placeholder="Re-enter password"
+              name="confirm_password_unautofill"
+              autoComplete="new-password"
+              onChange={(e) => {
+                const val = e.target.value;
+                setChangePasswordForm((prev) => ({ ...prev, confirmPassword: val }));
+                if (changePasswordErrors.confirmPassword) {
+                  setChangePasswordErrors((prev) => ({ ...prev, confirmPassword: "" }));
+                }
+              }}
+              error={!!changePasswordErrors.confirmPassword}
+              helperText={changePasswordErrors.confirmPassword}
+              required
+              endAdornment={
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    edge="end"
+                    aria-label="toggle confirm password visibility"
+                  >
+                    {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
               }
-            }}
-            error={!!changePasswordErrors.confirmPassword}
-            helperText={changePasswordErrors.confirmPassword}
-            required
-            endAdornment={
-              <InputAdornment position="end">
-                <IconButton
-                  size="small"
-                  onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  onMouseDown={(e) => e.preventDefault()}
-                  edge="end"
-                  aria-label="toggle confirm password visibility"
-                >
-                  {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                </IconButton>
-              </InputAdornment>
-            }
-          />
+            />
+          </Box>
         </Box>
       </AppDialog>
 

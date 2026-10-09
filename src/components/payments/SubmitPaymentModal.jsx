@@ -576,22 +576,38 @@ export default function SubmitPaymentModal({
                 ? (initialPreviousArrears ?? 0)
                 : Number(res.previousArrears ?? res.arrears ?? 0));
 
-            const total = isPaidStatus ? 0 : Number((res.totalDue ?? (currentEvDue + prevArrears)).toFixed(2));
             const baseAmt = Number(
               res.amount || matchedEvent?.amount || matchedEvent?.contributionAmount || (currentEvDue > 0 ? currentEvDue : resolvedFallback)
             );
 
-            const breakdown = (res.arrearBreakdown && res.arrearBreakdown.length > 0)
+            let breakdown = (res.arrearBreakdown && res.arrearBreakdown.length > 0)
               ? res.arrearBreakdown
               : (initialArrearBreakdown || []);
 
+            // Dynamically filter out deleted events from arrear breakdown
+            breakdown = breakdown.filter(item => {
+               const evName = String(item.eventName || "").toLowerCase().trim();
+               const evId = String(item.eventId || "").trim();
+               return (eventsList || []).some(e => 
+                 (evId && String(e.eventId || e.id) === evId) || 
+                 (evName && String(e.eventName || e.title || e.name || "").toLowerCase().trim() === evName)
+               );
+            });
+
+            const filteredPrevArrears = isPaidStatus 
+              ? 0 
+              : breakdown.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+            // Re-evaluate total based on filtered arrears
+            const total = isPaidStatus ? 0 : Number((currentEvDue + filteredPrevArrears).toFixed(2));
+
             setDuesSummary({
               currentEventDue: currentEvDue,
-              previousArrears: prevArrears,
+              previousArrears: filteredPrevArrears,
               totalDue: total,
               status: isPaidStatus ? "Paid" : (isSubmittedProps ? (initialStatus || "Pending") : (res.status || (currentEvDue === 0 && baseAmt > 0 ? "Paid" : "Pending"))),
               baseAmount: baseAmt,
-              arrearBreakdown: prevArrears === 0 ? [] : breakdown,
+              arrearBreakdown: filteredPrevArrears === 0 ? [] : breakdown,
             });
             if (!paymentScope) setPaymentScope(prevArrears > 0 ? "AllOutstanding" : "CurrentEvent");
 
@@ -1745,7 +1761,7 @@ export default function SubmitPaymentModal({
               }}
               placeholder="e.g. Paid via GPay account"
               rows={4}
-              helperText={`${formData.notes.length}/300 chars`}
+              maxLength={300}
             />
           </Grid>
         </Grid>

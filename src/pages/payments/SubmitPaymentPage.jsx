@@ -185,16 +185,42 @@ export default function SubmitPaymentPage() {
   };
 
   // Dynamic statuses loaded directly from Support Status Master database table
-  const modalStatusOptions = useMemo(() => {
+  const getModalStatusOptions = (txn) => {
+    if (!txn) return [{ label: "Pending", value: "Pending" }];
+    const hasProof = Boolean(
+      txn.transactionId ||
+      (txn.paymentMode && txn.paymentMode !== "-" && txn.paymentMode !== "None") ||
+      txn.utrNumber
+    );
+    const totalDue = Number(txn.totalDue || txn.amount || 0);
+    const actualRec = hasProof ? Number(txn.amount || txn.paidAmount || totalDue) : 0;
+
+    if (actualRec <= 0 && totalDue > 0) {
+      return [{ label: "Pending", value: "Pending" }];
+    }
     return [
       { label: "Paid", value: "Paid" },
       { label: "Pending", value: "Pending" },
     ];
-  }, []);
+  };
 
   const handleStatusUpdate = async (txn, newStatus, customNotes) => {
     const target = txn || statusModalTxn;
     if (!target) return;
+
+    const isMarkingPaid = ["paid", "verified", "closed", "completed"].includes(String(newStatus).toLowerCase());
+    const hasSubmittedProof = Boolean(
+      target.transactionId ||
+      (target.paymentMode && target.paymentMode !== "-" && target.paymentMode !== "None") ||
+      target.utrNumber
+    );
+    const totalDue = Number(target.totalDue || target.amount || 0);
+    const actualReceived = hasSubmittedProof ? Number(target.amount || target.paidAmount || totalDue) : 0;
+
+    if (isMarkingPaid && actualReceived <= 0 && totalDue > 0) {
+      toast.error("Valid payment proof or amount is required to Verify/Mark as Paid. Please submit a payment first.");
+      return;
+    }
 
     const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "Admin";
     const noteText = customNotes !== undefined
@@ -1137,9 +1163,9 @@ export default function SubmitPaymentPage() {
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <AppSelect
                     label="Select Status *"
-                    value={statusChangeValue || statusModalTxn?.status || modalStatusOptions[0]?.value || ""}
+                    value={statusChangeValue || statusModalTxn?.status || "Pending"}
                     onChange={(e) => setStatusChangeValue(e.target.value)}
-                    options={modalStatusOptions}
+                    options={getModalStatusOptions(statusModalTxn)}
                     required
                   />
                 </Grid>
