@@ -154,6 +154,8 @@ export default function PaymentsPage() {
         const mapped = txnRes.map((t) => ({
           id: t.txnNumber || t.id,
           transactionId: t.transactionId,
+          parentTxnNumber: t.parentTxnNumber || null,
+          transactionGroupId: t.transactionGroupId || null,
           memberName: t.memberName || "",
           eventName: t.eventName || "",
           amount: t.amount || 0,
@@ -483,22 +485,38 @@ export default function PaymentsPage() {
       label: "Transaction ID",
       key: "id",
       render: (row) => (
-        <Typography
-          variant="body2"
-          fontWeight={700}
-          sx={{
-            color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
-            cursor: "pointer",
-            fontSize: "0.8rem",
-            "&:hover": { textDecoration: "underline" },
-          }}
-          onClick={() => {
-            setSelectedTxn(row);
-            setViewDialogOpen(true);
-          }}
-        >
-          {row.id}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            sx={{
+              color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+              cursor: "pointer",
+              fontSize: "0.8rem",
+              "&:hover": { textDecoration: "underline" },
+            }}
+            onClick={() => {
+              setSelectedTxn(row);
+              setViewDialogOpen(true);
+            }}
+          >
+            {row.id}
+          </Typography>
+          {row.parentTxnNumber && (
+            <Chip
+              label="Split"
+              size="small"
+              sx={{
+                height: 18,
+                fontSize: "0.68rem",
+                fontWeight: 700,
+                bgcolor: "rgba(99, 102, 241, 0.1)",
+                color: "#6366f1",
+                border: "1px solid rgba(99, 102, 241, 0.25)",
+              }}
+            />
+          )}
+        </Box>
       ),
     },
     {
@@ -795,6 +813,24 @@ export default function PaymentsPage() {
               </Box>
               <Box>{renderStatusBadge(selectedTxn.status)}</Box>
             </Box>
+
+            {selectedTxn.parentTxnNumber && (
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: "8px",
+                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(99, 102, 241, 0.1)" : "rgba(99, 102, 241, 0.05)",
+                  border: "1px dashed rgba(99, 102, 241, 0.3)",
+                }}
+              >
+                <Typography variant="caption" sx={{ color: "#6366f1", fontWeight: 700, display: "block" }}>
+                  Multi-Mode Payment Group: {selectedTxn.parentTxnNumber}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: "0.78rem", color: "text.secondary", mt: 0.3 }}>
+                  This transaction is a child breakdown item of payment group {selectedTxn.parentTxnNumber}. Group verification updates all split components together.
+                </Typography>
+              </Box>
+            )}
 
             <Grid container spacing={2}>
               <Grid size={{ xs: 6 }}>
