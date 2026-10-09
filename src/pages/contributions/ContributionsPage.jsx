@@ -930,8 +930,10 @@ export default function ContributionsPage() {
       (target.paymentMode && target.paymentMode !== "-" && target.paymentMode !== "None") ||
       target.utrNumber
     );
-    const totalDue = Number(target.totalDue || target.amount || matchedTxnForValidation?.amount || 0);
-    const actualReceived = hasSubmittedProof ? Number(matchedTxnForValidation?.amount || target.paidAmount || totalDue) : 0;
+    const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(target.eventId || selectedEventId));
+    const evAmt = getMemberEventAmount(target, activeEv);
+    const totalDue = Number(target.totalDue || target.amount || evAmt || matchedTxnForValidation?.amount || 0);
+    const actualReceived = hasSubmittedProof ? Number(matchedTxnForValidation?.amount || target.paidAmount || totalDue || evAmt) : (totalDue > 0 ? totalDue : 0);
 
     if (actualReceived <= 0) {
       toast.error("Received amount is ₹0. You cannot update the status until payment is received.");
@@ -1083,7 +1085,8 @@ export default function ContributionsPage() {
       label: "Action",
       render: (row) => {
         const isPaidRow = isContributionPaid(row) || String(row?.paymentStatus || row?.status || "").toLowerCase() === "paid";
-        const isVerifiedRow = isContributionVerified(row) || ["paid", "verified", "closed", "completed"].includes(String(row?.paymentStatus || row?.status || "").toLowerCase());
+        const matchedTx = findContributionTransaction(row);
+        const isVerifiedRow = isContributionVerified(row, matchedTx);
 
         return (
           <Box sx={{ display: "flex", gap: 0.6, alignItems: "center" }}>
@@ -1898,10 +1901,12 @@ export default function ContributionsPage() {
 
             const hasSubmittedProof = Boolean(matchedTx || (statusModalRow?.paymentMode && statusModalRow?.paymentMode !== "-" && statusModalRow?.paymentMode !== "None") || statusModalRow?.utrNumber);
 
-            const totalDueAmt = Number(statusModalRow?.totalDue || statusModalRow?.amount || matchedTx?.amount || 0);
+            const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId || selectedEventId));
+            const evAmt = getMemberEventAmount(statusModalRow, activeEv);
+            const totalDueAmt = Number(statusModalRow?.totalDue || statusModalRow?.amount || evAmt || matchedTx?.amount || 0);
             const actualReceivedAmt = isPaidOrVerified
-              ? (splitSum > 0 ? splitSum : Number(statusModalRow?.totalReceivedAmount || statusModalRow?.paidAmount || matchedTx?.amount || statusModalRow?.amount || 0))
-              : (hasSubmittedProof ? Number(matchedTx?.amount || statusModalRow?.paidAmount || totalDueAmt) : 0);
+              ? (splitSum > 0 ? splitSum : Number(statusModalRow?.totalReceivedAmount || statusModalRow?.paidAmount || matchedTx?.amount || statusModalRow?.amount || evAmt || 0))
+              : (hasSubmittedProof ? Number(matchedTx?.amount || statusModalRow?.paidAmount || totalDueAmt || evAmt) : (totalDueAmt > 0 ? totalDueAmt : 0));
 
             const isZeroAmount = actualReceivedAmt <= 0;
 
