@@ -41,6 +41,64 @@ function getParentFeatureIdFromActionName(actionName) {
 }
 
 /**
+ * Checks whether a given role has assigned permissions in the system.
+ * Seeded roles (Admin, Organizer, Member) always have assigned rights.
+ * Newly created roles without configured records in role_rights return false.
+ */
+export function hasRoleAssignedRights(roleName) {
+  if (!roleName) return false;
+  const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
+  const cleanName = String(resolvedName).trim();
+  if (!cleanName) return false;
+  const roleLower = cleanName.toLowerCase();
+
+  const savedRights = localStorage.getItem("projectRightsConfig");
+  if (!savedRights) {
+    return roleLower === "admin" || roleLower === "organizer" || roleLower === "member";
+  }
+
+  try {
+    const rightsMap = JSON.parse(savedRights);
+
+    // 1. Direct role key check in map
+    if (rightsMap[cleanName] !== undefined && Array.isArray(rightsMap[cleanName])) {
+      return rightsMap[cleanName].length > 0;
+    }
+    if (rightsMap[roleLower] !== undefined && Array.isArray(rightsMap[roleLower])) {
+      return rightsMap[roleLower].length > 0;
+    }
+    const matchingKey = Object.keys(rightsMap).find(k => k.toLowerCase().trim() === roleLower);
+    if (matchingKey && rightsMap[matchingKey] !== undefined && Array.isArray(rightsMap[matchingKey])) {
+      return rightsMap[matchingKey].length > 0;
+    }
+
+    // 2. Check "current" rights in localStorage if active
+    if (rightsMap["current"] !== undefined && Array.isArray(rightsMap["current"])) {
+      const authUser = (() => {
+        try {
+          const authRaw = sessionStorage.getItem("teamContributionAuth") || localStorage.getItem("teamContributionAuth");
+          return authRaw ? JSON.parse(authRaw) : null;
+        } catch { return null; }
+      })();
+      const activeAuthRole = String(authUser?.role || authUser?.roleName || "").trim().toLowerCase();
+      if (activeAuthRole && activeAuthRole === roleLower) {
+        return rightsMap["current"].length > 0;
+      }
+    }
+
+    // 3. Fallback for seeded roles
+    if (roleLower === "admin" || roleLower === "organizer" || roleLower === "member") {
+      return true;
+    }
+
+    // Newly created roles without rights entries return false
+    return false;
+  } catch {
+    return roleLower === "admin" || roleLower === "organizer" || roleLower === "member";
+  }
+}
+
+/**
  * Extract active role rights from localStorage with unified priority and case resilience:
  * 1. Exact or case-insensitive match for roleName in rightsMap
  * 2. Fallback to rightsMap["current"]
@@ -55,19 +113,19 @@ function getActiveRoleRights(roleName) {
     const roleLower = cleanName.toLowerCase();
 
     if (cleanName) {
-      if (rightsMap[cleanName] && Array.isArray(rightsMap[cleanName]) && rightsMap[cleanName].length > 0) {
+      if (rightsMap[cleanName] !== undefined && Array.isArray(rightsMap[cleanName])) {
         return rightsMap[cleanName];
       }
-      if (rightsMap[roleLower] && Array.isArray(rightsMap[roleLower]) && rightsMap[roleLower].length > 0) {
+      if (rightsMap[roleLower] !== undefined && Array.isArray(rightsMap[roleLower])) {
         return rightsMap[roleLower];
       }
       const matchingKey = Object.keys(rightsMap).find(k => k.toLowerCase().trim() === roleLower);
-      if (matchingKey && Array.isArray(rightsMap[matchingKey]) && rightsMap[matchingKey].length > 0) {
+      if (matchingKey && rightsMap[matchingKey] !== undefined && Array.isArray(rightsMap[matchingKey])) {
         return rightsMap[matchingKey];
       }
     }
 
-    if (rightsMap["current"] && Array.isArray(rightsMap["current"]) && rightsMap["current"].length > 0) {
+    if (rightsMap["current"] !== undefined && Array.isArray(rightsMap["current"])) {
       return rightsMap["current"];
     }
     return null;
@@ -144,6 +202,11 @@ export function getRightsForFeatureId(featureId, roleName) {
     return { read: true, write: true, deny: false };
   }
 
+  // If role has NO permissions assigned in the system:
+  if (!hasRoleAssignedRights(resolvedName)) {
+    return { read: false, write: false, deny: true, unassigned: true };
+  }
+
   const roleRights = getActiveRoleRights(resolvedName);
 
   if (!roleRights) {
@@ -187,6 +250,11 @@ export function getRightsForPath(path, roleName) {
     return { read: true, write: true, deny: false };
   }
 
+  // If role has NO permissions assigned in the system:
+  if (!hasRoleAssignedRights(resolvedName)) {
+    return { read: false, write: false, deny: true, unassigned: true };
+  }
+
   const featureId = getFeatureIdForPath(path);
   if (featureId) {
     return getRightsForFeatureId(featureId, resolvedName);
@@ -200,6 +268,10 @@ export function getRightsForPath(path, roleName) {
 export function getFirstAccessiblePath(roleName) {
   const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
   const roleLower = String(resolvedName).trim().toLowerCase();
+
+  if (!hasRoleAssignedRights(resolvedName)) {
+    return null;
+  }
 
   // If Dashboard "/" is accessible, it's always the primary landing page
   const rootRights = getRightsForPath("/", resolvedName);
@@ -236,6 +308,11 @@ export function getFirstAccessiblePath(roleName) {
 export function getRightsForPage(pageName, roleName) {
   if (!roleName) {
     return { read: false, write: false, deny: true };
+  }
+
+  const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
+  if (!hasRoleAssignedRights(resolvedName)) {
+    return { read: false, write: false, deny: true, unassigned: true };
   }
 
   const featureId = getFeatureIdForPath(pageName);
@@ -290,6 +367,11 @@ export function hasActionPermission(actionName, featureId, roleName) {
   const resolvedName = (typeof roleName === "object" ? (roleName?.role || roleName?.roleName) : roleName) || "";
   const roleLower = String(resolvedName).trim().toLowerCase();
   const isAdminOrOrg = roleLower === "admin" || roleLower === "organizer";
+
+  if (!hasRoleAssignedRights(resolvedName)) {
+    return { canView: false, canExecute: false, isDenied: true, readOnly: false, unassigned: true };
+  }
+
   const roleRights = getActiveRoleRights(resolvedName);
 
   if (!roleRights) {

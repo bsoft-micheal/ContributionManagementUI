@@ -6,13 +6,21 @@ import {
   Typography,
   Grid,
   Chip,
+  Box,
+  Alert,
 } from "@mui/material";
 
 import { useAppToast } from "../../components/common/AppToast";
 import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
-import { FilterList as FilterListIcon, Refresh as RefreshIcon, Save as SaveIcon } from "@mui/icons-material";
+import {
+  FilterList as FilterListIcon,
+  Refresh as RefreshIcon,
+  Save as SaveIcon,
+  LockOutlined as LockOutlinedIcon,
+  AddModerator as AddModeratorIcon,
+} from "@mui/icons-material";
 import { getUserRightsAsync, saveUserRightsAsync } from "../../services/userRightsService";
 import { getRolesAsync } from "../../services/roleService";
 import { formatGridDate } from "../../utils/dateHelper";
@@ -102,17 +110,23 @@ export default function UserRightsPage() {
 
   // rights keyed by roleName → array of right rows
   const [rights, setRights] = useState({});
+  const [unassignedRoles, setUnassignedRoles] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const toast = useAppToast();
   const { authState } = useAuth();
 
+  const currentLoggedInRole = String(authState?.role || authState?.roleName || "").trim().toLowerCase();
+  const canManageRights = currentLoggedInRole === "admin";
+  const hasNoPermissions = Boolean(!loading && selectedRoleName && unassignedRoles.has(selectedRoleName));
+
   const moduleOptions = useMemo(() => {
     const roleRights = rights[selectedRoleName] || [];
     const rawModules = roleRights.map((r) => r.module).filter(Boolean);
     const uniqueModules = Array.from(new Set(rawModules));
-    const sortedModules = uniqueModules.sort((a, b) => {
+    const modulesToUse = uniqueModules.length > 0 ? uniqueModules : CANONICAL_MODULE_ORDER;
+    const sortedModules = [...modulesToUse].sort((a, b) => {
       const idxA = CANONICAL_MODULE_ORDER.indexOf(a);
       const idxB = CANONICAL_MODULE_ORDER.indexOf(b);
       const effA = idxA >= 0 ? idxA : 999;
@@ -150,11 +164,26 @@ export default function UserRightsPage() {
 
   async function fetchRightsForRole(roleName, forceRefresh = false) {
     // return cached if available and not forcing refresh
-    if (!forceRefresh && rights[roleName]) { setLoading(false); return; }
+    if (!forceRefresh && rights[roleName] && rights[roleName].length > 0) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const serverRights = await getUserRightsAsync(roleName);
       const rows = Array.isArray(serverRights) ? serverRights : [];
+      if (rows.length === 0) {
+        setRights((prev) => ({ ...prev, [roleName]: [] }));
+        setUnassignedRoles((prev) => new Set(prev).add(roleName));
+        setLoading(false);
+        return;
+      }
+
+      setUnassignedRoles((prev) => {
+        const next = new Set(prev);
+        next.delete(roleName);
+        return next;
+      });
       // normalise: add a sequential ui id
       const normalised = rows.map((r, i) => {
         let typeVal = r.accessType ?? r.AccessType;
@@ -373,6 +402,54 @@ export default function UserRightsPage() {
     });
   };
 
+  // ── Handle Assign Permissions for unassigned role ───────────────────────
+  const handleAssignPermissions = async () => {
+    if (!selectedRoleName) return;
+    try {
+      setLoading(true);
+      let templateRows = rights["Admin"];
+      if (!templateRows || templateRows.length === 0) {
+        const adminRes = await getUserRightsAsync("Admin");
+        if (Array.isArray(adminRes) && adminRes.length > 0) {
+          templateRows = adminRes;
+        }
+      }
+
+      if (!templateRows || templateRows.length === 0) {
+        toast.error("Unable to load permission template");
+        setLoading(false);
+        return;
+      }
+
+      const selectedRoleObj = roles.find(r => r.roleName === selectedRoleName);
+      const initialized = templateRows.map((r, i) => {
+        const featId = Number(r.featureID || r.FeatureID || r.featureId || r.FeatureId || 0);
+        return {
+          ...r,
+          _uid: i + 1,
+          roleId: selectedRoleObj?.roleId || r.roleId || undefined,
+          role: selectedRoleName,
+          accessType: 3,
+          access: "deny",
+          createdBy: authState?.userName || authState?.name || null,
+          createdAt: new Date().toISOString(),
+        };
+      });
+
+      setRights(prev => ({ ...prev, [selectedRoleName]: initialized }));
+      setUnassignedRoles(prev => {
+        const next = new Set(prev);
+        next.delete(selectedRoleName);
+        return next;
+      });
+      toast.info(`Permissions template loaded for ${selectedRoleName}. Configure rights and click Save.`);
+    } catch {
+      toast.error("Failed to initialize permissions");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ── Handle Save button click ─────────────────────────────────────────────
   const handleSave = async () => {
     if (!selectedRoleName) {
@@ -382,7 +459,7 @@ export default function UserRightsPage() {
 
     const currentRows = rights[selectedRoleName] || [];
     if (currentRows.length === 0) {
-      toast.error("No rights data available to save");
+      toast.error("No permissions assigned to save. Click 'Assign Permissions' first.");
       return;
     }
 
@@ -449,6 +526,12 @@ export default function UserRightsPage() {
       } catch {
         // ignore cache write error
       }
+
+      setUnassignedRoles(prev => {
+        const next = new Set(prev);
+        next.delete(selectedRoleName);
+        return next;
+      });
 
       toast.success("User rights saved successfully");
 
@@ -601,12 +684,53 @@ export default function UserRightsPage() {
 
   return (
     <div className="page-shell">
+      {hasNoPermissions && (
+        <Alert
+          severity="warning"
+          icon={<LockOutlinedIcon sx={{ color: "#d97706" }} />}
+          sx={{
+            mb: 2.5,
+            borderRadius: "10px",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+            backgroundColor: "rgba(245, 158, 11, 0.08)",
+            color: "#92400e",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            display: "flex",
+            alignItems: "center",
+          }}
+          action={
+            canManageRights ? (
+              <AppButton
+                size="small"
+                variant="contained"
+                startIcon={<AddModeratorIcon sx={{ fontSize: 18 }} />}
+                onClick={handleAssignPermissions}
+                sx={{
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  bgcolor: "#31275d",
+                  color: "#fff",
+                  boxShadow: "0 2px 6px rgba(49, 39, 93, 0.25)",
+                  "&:hover": { bgcolor: "#241c46" },
+                }}
+              >
+                Assign Permissions
+              </AppButton>
+            ) : null
+          }
+        >
+          No permissions assigned. Contact your administrator for access.
+        </Alert>
+      )}
+
       <AppDataTable
         title="User Rights"
         columns={columns}
         data={filteredRows}
         loading={loading}
         allowPagination={false}
+        emptyMessage={hasNoPermissions ? "No permissions assigned. Contact your administrator for access." : "No records found."}
         filterPanel={
           <Grid container spacing={3} alignItems="center">
             <Grid size={{ xs: 12, md: 3.5 }}>
@@ -614,7 +738,10 @@ export default function UserRightsPage() {
                 label="Role"
                 placeholder="Select Role"
                 value={filterRoleName}
-                onChange={(e) => setFilterRoleName(e.target.value)}
+                onChange={(e) => {
+                  setFilterRoleName(e.target.value);
+                  setSelectedRoleName(e.target.value);
+                }}
                 options={roles.map(r => ({ label: r.roleName, value: r.roleName }))}
                 required
                 fullWidth

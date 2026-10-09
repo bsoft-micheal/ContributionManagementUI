@@ -212,6 +212,34 @@ export default function ContributionsPage() {
     };
   }, [selectedEventId, appliedEventType]);
 
+  useEffect(() => {
+    const handleContributionUpdated = async () => {
+      let updatedTxns = transactions;
+      try {
+        const txRes = await getPaymentTransactionsAsync();
+        if (Array.isArray(txRes)) {
+          setTransactions(txRes);
+          updatedTxns = txRes;
+        }
+      } catch { }
+      const freshAll = await reloadAllContributions();
+      if (selectedEventId) {
+        let freshData = [];
+        if (selectedEventId !== "ALL") {
+          freshData = await getContributionsByEventAsync(selectedEventId);
+        } else {
+          freshData = freshAll || [];
+        }
+        const enriched = enrichContributions(freshData, freshAll, events, updatedTxns);
+        setRawContributions(enriched);
+      }
+    };
+    window.addEventListener("contribution_updated", handleContributionUpdated);
+    return () => {
+      window.removeEventListener("contribution_updated", handleContributionUpdated);
+    };
+  }, [selectedEventId, events, transactions]);
+
   const getMemberEventAmount = (c, activeEv) => {
     const directAmt = Number(c?.amount || 0);
     if (directAmt > 0) return directAmt;
@@ -236,7 +264,7 @@ export default function ContributionsPage() {
     const s1 = String(name1).trim().toLowerCase();
     const s2 = String(name2).trim().toLowerCase();
     if (!s1 || !s2) return false;
-    return s1 === s2 || s1.startsWith(s2) || s2.startsWith(s1);
+    return s1 === s2;
   };
 
   const findContributionTransaction = (c, tList = transactions, fallbackEvId = selectedEventId) => {
@@ -253,12 +281,13 @@ export default function ContributionsPage() {
       const memberMatch = isSameText(targetMemberId, tMemberId) || isSameText(targetMemberName, tMemberName);
       if (!memberMatch) return false;
 
-      // Event match: MUST strictly match Event ID or Event Name (NEVER cross-match across different events!)
+      // Event match: MUST strictly match Event ID if both present, or exact Event Name
       const tEventId = t.eventId;
       const tEventName = t.eventName;
-      const idMatch = isSameText(targetEventId, tEventId);
-      const nameMatch = isMatchingEventName(targetEventName, tEventName);
-      return idMatch || nameMatch;
+      if (targetEventId && tEventId) {
+        return isSameText(targetEventId, tEventId);
+      }
+      return isMatchingEventName(targetEventName, tEventName);
     }) || null;
   };
 
@@ -277,9 +306,10 @@ export default function ContributionsPage() {
 
       const tEventId = t.eventId;
       const tEventName = t.eventName;
-      const idMatch = isSameText(targetEventId, tEventId);
-      const nameMatch = isMatchingEventName(targetEventName, tEventName);
-      return idMatch || nameMatch;
+      if (targetEventId && tEventId) {
+        return isSameText(targetEventId, tEventId);
+      }
+      return isMatchingEventName(targetEventName, tEventName);
     });
   };
 
@@ -1382,11 +1412,10 @@ export default function ContributionsPage() {
       key: "totalAccumulated",
       align: "right",
       render: (row) => {
-        const isPaid = isContributionPaid(row);
-        const submitted = hasSubmittedPayment(row);
+        const isPaid = isContributionPaid(row) || hasSubmittedPayment(row);
         const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId));
-        const currentDue = (isPaid || submitted) ? 0 : getContributionOutstanding(row, activeEv);
-        const prevArrears = (isPaid || submitted) ? 0 : (row.previousUnpaid || 0);
+        const currentDue = isPaid ? 0 : getContributionOutstanding(row, activeEv);
+        const prevArrears = isPaid ? 0 : (row.previousUnpaid || 0);
         const due = currentDue + prevArrears;
         return `₹${Number(due).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }
@@ -1396,7 +1425,21 @@ export default function ContributionsPage() {
       key: "paymentMode",
       render: (row) => {
         const matchedTx = findContributionTransaction(row);
-        const resolvedMode = (row.paymentMode && row.paymentMode !== "None" && row.paymentMode !== "-") ? row.paymentMode : (matchedTx?.paymentMode || "-");
+        const isPaid = isContributionPaid(row);
+        const hasSubmitted = hasSubmittedPayment(row);
+        let resolvedMode = "-";
+        if (isPaid || hasSubmitted) {
+          if (row.paymentMode && row.paymentMode !== "None" && row.paymentMode !== "-") {
+            resolvedMode = row.paymentMode;
+          } else if (matchedTx?.paymentMode) {
+            resolvedMode = matchedTx.paymentMode;
+          }
+        }
+
+        if (resolvedMode === "-" || resolvedMode === "None") {
+          return <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.8rem" }}>--</Typography>;
+        }
+
         const isSplit = resolvedMode === "Split" || String(resolvedMode).toLowerCase().includes("split");
 
         if (isSplit) {
@@ -1842,9 +1885,13 @@ export default function ContributionsPage() {
         initialStatus={paymentModalContext.paymentStatus}
         initialArrearBreakdown={paymentModalContext.arrearBreakdown}
         onSuccess={async () => {
+          let updatedTxns = transactions;
           try {
             const txRes = await getPaymentTransactionsAsync();
-            if (Array.isArray(txRes)) setTransactions(txRes);
+            if (Array.isArray(txRes)) {
+              setTransactions(txRes);
+              updatedTxns = txRes;
+            }
           } catch { }
           const freshAll = await reloadAllContributions();
           if (selectedEventId) {
@@ -1868,7 +1915,7 @@ export default function ContributionsPage() {
                 freshData = allList;
               }
             }
-            const enriched = enrichContributions(freshData, freshAll, events, transactions);
+            const enriched = enrichContributions(freshData, freshAll, events, updatedTxns);
             setRawContributions(enriched);
           }
         }}
