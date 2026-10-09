@@ -46,6 +46,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import VerifySupportTicketModal from "../../components/support/VerifySupportTicketModal";
 import {
   getSupportTicketsAsync,
   createSupportTicketAsync,
@@ -1399,6 +1400,7 @@ export default function SupportTicketsPage() {
               label="Description"
               placeholder="Explain the issue details or question..."
               value={form.description}
+              maxLength={500}
               onChange={(e) => {
                 setForm((c) => ({ ...c, description: e.target.value }));
                 if (errors.description) setErrors((p) => ({ ...p, description: "" }));
@@ -1659,7 +1661,7 @@ export default function SupportTicketsPage() {
       </AppDialog>
 
       {/* Reply & Update Ticket Status Modal */}
-      <AppDialog
+      <VerifySupportTicketModal
         open={replyDialogOpen}
         onClose={() => {
           setReplyDialogOpen(false);
@@ -1667,131 +1669,11 @@ export default function SupportTicketsPage() {
           setReplyText("");
           setReplyErrors({});
         }}
-        title="Verify Support Ticket"
-        maxWidth="sm"
-        actions={
-          <Stack direction="row" spacing={1.5}>
-            <AppButton
-              variant="outlined"
-              onClick={() => {
-                setReplyDialogOpen(false);
-                setReplyTicket(null);
-                setReplyText("");
-                setReplyErrors({});
-              }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSendReply}
-            >
-              Save
-            </AppButton>
-          </Stack>
-        }
-      >
-        {replyTicket && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {/* Quick Ticket Summary Card */}
-            <Box
-              sx={{
-                p: 2,
-                borderRadius: "10px",
-                bgcolor: (t) =>
-                  t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
-                border: (t) => `1px solid ${t.palette.divider}`,
-              }}
-            >
-              <Grid container spacing={1.5}>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Member Name
-                  </Typography>
-                  <Typography variant="body2" fontWeight={700}>
-                    {replyTicket.memberName || "--"}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Current Status
-                  </Typography>
-                  <Box sx={{ mt: 0.2 }}>
-                    <Chip
-                      label={replyTicket.status}
-                      size="small"
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: "0.72rem",
-                        bgcolor:
-                          replyTicket.status === "Resolved" || replyTicket.status === "Closed"
-                            ? "rgba(22, 163, 74, 0.12)"
-                            : replyTicket.status === "In Progress"
-                              ? "rgba(2, 132, 199, 0.12)"
-                              : "rgba(234, 179, 8, 0.15)",
-                        color:
-                          replyTicket.status === "Resolved" || replyTicket.status === "Closed"
-                            ? "#16a34a"
-                            : replyTicket.status === "In Progress"
-                              ? "#0284c7"
-                              : "#d97706",
-                      }}
-                    />
-                  </Box>
-                </Grid>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Ticket Type
-                  </Typography>
-                  <Typography variant="body2" fontWeight={600}>
-                    {replyTicket.ticketType}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Priority
-                  </Typography>
-                  <Typography variant="body2" fontWeight={600}>
-                    {replyTicket.priority}
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Box>
-
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <AppSelect
-                  label="Update Status"
-                  value={replyStatus}
-                  onChange={(e) => {
-                    setReplyStatus(e.target.value);
-                    if (replyErrors.replyStatus) setReplyErrors((prev) => ({ ...prev, replyStatus: "" }));
-                  }}
-                  options={ticketVerifyStatusOptions}
-                  error={!!replyErrors.replyStatus}
-                  helperText={replyErrors.replyStatus || ""}
-                  required
-                />
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <AppTextArea
-                  label="Resolution Notes / Reply Message"
-                  placeholder="Type resolution notes or reply message..."
-                  value={replyText}
-                  onChange={(e) => {
-                    setReplyText(e.target.value);
-                    if (replyErrors.replyText) setReplyErrors((prev) => ({ ...prev, replyText: "" }));
-                  }}
-                  error={!!replyErrors.replyText}
-                  helperText={replyErrors.replyText || ""}
-                  minRows={3}
-                />
-              </Grid>
-            </Grid>
-          </Box>
-        )}
-      </AppDialog>
+        initialData={replyTicket}
+        onSuccess={() => {
+          fetchTicketsFromDb();
+        }}
+      />
 
       {/* Image Preview / Lightbox Modal */}
       <Dialog

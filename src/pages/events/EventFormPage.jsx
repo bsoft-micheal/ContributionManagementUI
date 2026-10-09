@@ -1037,13 +1037,13 @@ export default function EventFormPage({
   const birthdaySharePerPerson = birthdayEligibleCount > 0 ? (bdayBudget / birthdayEligibleCount) : 0;
   const otherEventsSharePerPerson = total > 0 ? (otherEventsBudget / total) : 0;
 
-  const plannedBudget = Math.round(computedBudgetItems.reduce((acc, curr) => acc + Math.round(curr.amount || 0), 0));
+  const plannedBudget = computedBudgetItems.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
 
   const contributionPerMember = useMemo(() => {
     if (isBirthday && exempt && celebrantCount > 0) {
-      return Math.round(birthdaySharePerPerson + otherEventsSharePerPerson);
+      return birthdaySharePerPerson + otherEventsSharePerPerson;
     }
-    return total > 0 ? Math.round(plannedBudget / total) : 0;
+    return total > 0 ? (plannedBudget / total) : 0;
   }, [isBirthday, exempt, celebrantCount, birthdaySharePerPerson, otherEventsSharePerPerson, plannedBudget, total]);
 
   const expectedCollection = useMemo(() => {
@@ -1339,19 +1339,19 @@ export default function EventFormPage({
         : participatingMembers.map((m) => m.memberId);
       const contributionOverrides = [];
 
-      const bdayBudget = Math.round(computedBudgetItems
+      const bdayBudget = computedBudgetItems
         .filter((i) => i.category === "Birthday")
-        .reduce((sum, i) => sum + Math.round(i.amount || 0), 0));
-      const otherEventsBudget = Math.round(computedBudgetItems
+        .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+      const otherEventsBudget = computedBudgetItems
         .filter((i) => i.category !== "Birthday")
-        .reduce((sum, i) => sum + Math.round(i.amount || 0), 0));
+        .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
 
       const celebrantIds = monthCelebrants.map((m) => m.memberId);
       const birthdayEligibleCount = isBirthday
         ? (exempt ? Math.max(0, finalParticipantIds.length - celebrantIds.length) : finalParticipantIds.length)
         : 0;
-      const birthdaySharePerPerson = birthdayEligibleCount > 0 ? Math.round(bdayBudget / birthdayEligibleCount) : 0;
-      const otherEventsSharePerPerson = finalParticipantIds.length > 0 ? Math.round(otherEventsBudget / finalParticipantIds.length) : 0;
+      const birthdaySharePerPerson = birthdayEligibleCount > 0 ? bdayBudget / birthdayEligibleCount : 0;
+      const otherEventsSharePerPerson = finalParticipantIds.length > 0 ? otherEventsBudget / finalParticipantIds.length : 0;
 
       if (isBirthday && exempt && celebrantIds.length > 0) {
         finalParticipantIds.forEach((mId) => {
@@ -1359,39 +1359,24 @@ export default function EventFormPage({
             // Celebrant is exempt from birthday portion, but pays for other events (e.g. Farewell, Dinner)
             contributionOverrides.push({
               memberId: mId,
-              amount: otherEventsSharePerPerson,
+              amount: parseFloat(otherEventsSharePerPerson.toFixed(2)),
             });
           } else {
             // Non-celebrant pays birthday share + other events share
             contributionOverrides.push({
               memberId: mId,
-              amount: birthdaySharePerPerson + otherEventsSharePerPerson,
+              amount: parseFloat((birthdaySharePerPerson + otherEventsSharePerPerson).toFixed(2)),
             });
           }
         });
       } else {
-        const baseShare = finalParticipantIds.length > 0 ? Math.round(plannedBudget / finalParticipantIds.length) : 0;
+        const baseShare = finalParticipantIds.length > 0 ? plannedBudget / finalParticipantIds.length : 0;
         finalParticipantIds.forEach((mId) => {
           contributionOverrides.push({
             memberId: mId,
-            amount: baseShare,
+            amount: parseFloat(baseShare.toFixed(2)),
           });
         });
-      }
-
-      // Distribute any 1 rupee rounding difference so sum(contributionOverrides) === plannedBudget exactly
-      const sumOverrides = contributionOverrides.reduce((s, o) => s + o.amount, 0);
-      let remainder = plannedBudget - sumOverrides;
-      if (remainder !== 0) {
-        const step = remainder > 0 ? 1 : -1;
-        let remCount = Math.abs(remainder);
-        for (let i = 0; i < contributionOverrides.length && remCount > 0; i++) {
-          const item = contributionOverrides[i];
-          if (!celebrantIds.includes(item.memberId)) {
-            item.amount += step;
-            remCount--;
-          }
-        }
       }
 
       const celebrantsSummary = isBirthday
