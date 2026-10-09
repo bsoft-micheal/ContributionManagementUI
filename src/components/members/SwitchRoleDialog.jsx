@@ -16,6 +16,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useAppToast } from "../common/AppToast";
 import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 import { updateUserAsync, getUserByIdAsync, getProfileAsync } from "../../services/userService";
+import { getRolesAsync } from "../../services/roleService";
 
 export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess }) {
   const theme = useTheme();
@@ -26,25 +27,29 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
   const [switching, setSwitching] = useState(false);
   const [fetchedUserData, setFetchedUserData] = useState(null);
   const [loadingUserRoles, setLoadingUserRoles] = useState(false);
+  const [activeMasterRoles, setActiveMasterRoles] = useState([]);
 
-  // Fetch latest user details on modal open so any recently assigned secondary roles are immediately present
+  // Fetch latest user details and active master roles on modal open
   useEffect(() => {
     if (open) {
       let isMounted = true;
       const loadUserDetails = async () => {
         setLoadingUserRoles(true);
         try {
-          if (targetUser && targetUser.userId && targetUser.userId !== authState?.userId) {
-            const res = await getUserByIdAsync(targetUser.userId);
-            const data = res?.data || res;
-            if (isMounted && data) {
-              setFetchedUserData(data);
-            }
-          } else {
-            const data = fetchProfile ? await fetchProfile() : await getProfileAsync().then((r) => r?.data || r);
-            if (isMounted && data) {
-              setFetchedUserData(data);
-            }
+          const [masterRolesRes, userRes] = await Promise.allSettled([
+            getRolesAsync(),
+            targetUser && targetUser.userId && targetUser.userId !== authState?.userId
+              ? getUserByIdAsync(targetUser.userId)
+              : (fetchProfile ? fetchProfile() : getProfileAsync().then((r) => r?.data || r)),
+          ]);
+
+          if (isMounted && masterRolesRes.status === "fulfilled" && Array.isArray(masterRolesRes.value)) {
+            setActiveMasterRoles(masterRolesRes.value);
+          }
+
+          if (isMounted && userRes.status === "fulfilled" && userRes.value) {
+            const data = userRes.value?.data || userRes.value;
+            setFetchedUserData(data);
           }
         } catch {
           // ignore background load error and fallback to effectiveUser
@@ -58,20 +63,29 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
       };
     } else {
       setFetchedUserData(null);
+      setActiveMasterRoles([]);
     }
   }, [open, targetUser, authState?.userId]);
 
   // Determine effective user data (freshly fetched, or target user or current logged in authState)
   const effectiveUser = fetchedUserData || targetUser || authState;
 
-  // Extract roles list
+  // Extract roles list, filtering against active master roles
   const rolesList = React.useMemo(() => {
     if (!effectiveUser) return [];
+
+    const validMasterSet = new Set(
+      (activeMasterRoles || []).map((r) => (r.roleName || r.name || "").trim().toLowerCase()).filter(Boolean)
+    );
+
     const set = new Set();
     const addRole = (r) => {
       if (!r || typeof r !== "string") return;
       const clean = r.trim();
       if (!clean) return;
+      if (validMasterSet.size > 0 && !validMasterSet.has(clean.toLowerCase())) {
+        return; // Filter out deleted or inactive roles
+      }
       for (const item of set) {
         if (item.toLowerCase() === clean.toLowerCase()) return;
       }
@@ -88,7 +102,7 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
     if (effectiveUser.roleName) addRole(effectiveUser.roleName);
 
     return Array.from(set);
-  }, [effectiveUser]);
+  }, [effectiveUser, activeMasterRoles]);
 
   // Determine currently active role
   const currentActiveRole = targetUser
@@ -111,10 +125,11 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
     if (effectiveUser?.PrimaryRoles && Array.isArray(effectiveUser.PrimaryRoles)) {
       effectiveUser.PrimaryRoles.forEach(addP);
     }
-    if (list.length === 0 && rolesList.length > 0) {
-      list.push(rolesList[0]);
+    const filteredList = list.filter((p) => rolesList.some((r) => r.toLowerCase() === p.toLowerCase()));
+    if (filteredList.length === 0 && rolesList.length > 0) {
+      filteredList.push(rolesList[0]);
     }
-    return list;
+    return filteredList;
   }, [effectiveUser, rolesList]);
 
   useEffect(() => {

@@ -1279,6 +1279,10 @@ export default function EventFormPage({
 
     const newErrors = validateForm(form, schema);
 
+    if (!isEdit && form.eventDate && dayjs(form.eventDate).isBefore(dayjs().startOf("day"))) {
+      newErrors.eventDate = "Cannot create an event for a past date";
+    }
+
     if (allowMultipleEvents) {
       if (!form.eventTypeIds || form.eventTypeIds.length < 2) {
         newErrors.eventTypeId = "Please select at least 2 Event types";
@@ -1758,6 +1762,7 @@ export default function EventFormPage({
                       label="Event Date"
                       required
                       value={form.eventDate}
+                      minDate={!isEdit ? dayjs().startOf("day") : undefined}
                       onChange={handleDateChange}
                       error={!!errors.eventDate}
                       helperText={errors.eventDate}

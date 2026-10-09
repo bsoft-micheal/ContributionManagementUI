@@ -881,6 +881,10 @@ export default function CalendarPage({ isEmbedded = false }) {
 
   const handleDateClick = (day) => {
     if (!hasWriteAccess) return;
+    if (dayjs(day).isBefore(dayjs().startOf("day"))) {
+      toast.error("Cannot create an event for a past date");
+      return;
+    }
     setSelectedEvent({ eventDate: day });
     setDialogOpen(true);
   };
