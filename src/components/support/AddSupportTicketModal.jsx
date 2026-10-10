@@ -267,8 +267,8 @@ export default function AddSupportTicketModal({
   const ticketTypeOptions = useMemo(() => {
     const fromDb = Array.isArray(dbTicketTypes)
       ? dbTicketTypes
-          .filter((t) => t.typeName && t.isActive !== false)
-          .map((t) => ({ label: t.typeName, value: t.typeName }))
+        .filter((t) => t.typeName && t.isActive !== false)
+        .map((t) => ({ label: t.typeName, value: t.typeName }))
       : [];
 
     if (fromDb.length > 0) return fromDb;
@@ -279,8 +279,8 @@ export default function AddSupportTicketModal({
   const priorityOptions = useMemo(() => {
     const fromDb = Array.isArray(dbPriorities)
       ? dbPriorities
-          .filter((p) => p.priorityName && p.isActive !== false)
-          .map((p) => ({ label: p.priorityName, value: p.priorityName }))
+        .filter((p) => p.priorityName && p.isActive !== false)
+        .map((p) => ({ label: p.priorityName, value: p.priorityName }))
       : [];
 
     if (fromDb.length > 0) return fromDb;
@@ -503,8 +503,8 @@ export default function AddSupportTicketModal({
                   const newRelatedEvent = currentMatches
                     ? c.relatedEvent
                     : matchingEvents.length === 1
-                    ? matchingEvents[0].eventName || matchingEvents[0].name || matchingEvents[0].title
-                    : "";
+                      ? matchingEvents[0].eventName || matchingEvents[0].name || matchingEvents[0].title
+                      : "";
 
                   return {
                     ...c,

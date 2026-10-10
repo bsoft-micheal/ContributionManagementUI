@@ -250,7 +250,7 @@ export default function ExpensePage() {
       if (Array.isArray(eventsRes)) setEventsList(eventsRes);
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
-      
+
       let finalStatuses = Array.isArray(statusesRes) && statusesRes.length > 0 ? statusesRes : [];
       if (finalStatuses.length === 0) {
         // Fallback: fetch active statuses and filter locally for module === "Expense"
@@ -401,7 +401,7 @@ export default function ExpensePage() {
     const expected = Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0);
     const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
     const spent = expenses
-      .filter((ex) => 
+      .filter((ex) =>
         (ex.eventName || "").trim().toLowerCase() === form.eventName.trim().toLowerCase() &&
         (!currentExpenseId || (ex.expenseId !== currentExpenseId && ex.id !== currentExpenseId)) &&
         (ex.status || "").toLowerCase() !== "rejected"
@@ -770,12 +770,12 @@ export default function ExpensePage() {
         prev.map((item) =>
           (item.expenseId === expenseId || item.id === expenseId)
             ? {
-                ...item,
-                status: newStatus,
-                approvedBy: approvedByVal,
-                description: updatedDescription,
-                modifiedOn: nowIso,
-              }
+              ...item,
+              status: newStatus,
+              approvedBy: approvedByVal,
+              description: updatedDescription,
+              modifiedOn: nowIso,
+            }
             : item
         )
       );
@@ -1100,28 +1100,28 @@ export default function ExpensePage() {
               disabled={!canAddExpense}
               startIcon={<AddIcon />}
               onClick={() => {
-                    if (!canAddExpense) {
-                      toast.error("You do not have permission to add expenses.");
-                      return;
-                    }
-                    const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
-                    const matched = membersList.find((m) => {
-                      const mName = (m.name || m.memberName || "").trim().toLowerCase();
-                      return mName === currentUserName.trim().toLowerCase();
-                    });
-                    const addFormData = {
-                      ...initialForm,
-                      submittedBy: matched ? (matched.name || matched.memberName) : currentUserName,
-                    };
-                    setEditingExpense(null);
-                    setForm(addFormData);
-                    savedFormRef.current = addFormData;
-                    setErrors({});
-                    setDialogOpen(true);
-                  }}
-                >
-                  Add
-                </AppButton>
+                if (!canAddExpense) {
+                  toast.error("You do not have permission to add expenses.");
+                  return;
+                }
+                const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
+                const matched = membersList.find((m) => {
+                  const mName = (m.name || m.memberName || "").trim().toLowerCase();
+                  return mName === currentUserName.trim().toLowerCase();
+                });
+                const addFormData = {
+                  ...initialForm,
+                  submittedBy: matched ? (matched.name || matched.memberName) : currentUserName,
+                };
+                setEditingExpense(null);
+                setForm(addFormData);
+                savedFormRef.current = addFormData;
+                setErrors({});
+                setDialogOpen(true);
+              }}
+            >
+              Add
+            </AppButton>
           </Stack>
         }
         filterPanel={

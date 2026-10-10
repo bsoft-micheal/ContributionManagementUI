@@ -36,6 +36,7 @@ export default function VerifySupportTicketModal({
   open,
   onClose,
   initialData = null,
+  statuses = null,
   onSuccess,
 }) {
   const toast = useAppToast();
@@ -107,7 +108,7 @@ export default function VerifySupportTicketModal({
       try {
         const [ticketsRes, statusesRes] = await Promise.all([
           getSupportTicketsAsync().catch(() => []),
-          getStatusesAsync(true).catch(() => []),
+          getStatusesAsync(true, "Support Ticket").catch(() => []),
         ]);
         if (!isMounted) return;
 
@@ -217,17 +218,19 @@ export default function VerifySupportTicketModal({
   }, [open, initialData]);
 
   const statusOptions = useMemo(() => {
-    const result = [];
-    const validOptions = ["Pending", "Verified"];
+    const safeStatuses = Array.isArray(statuses) && statuses.length > 0 ? statuses : (Array.isArray(dbStatuses) ? dbStatuses : []);
+    const activeList = safeStatuses
+      .filter((s) => s && s.statusName && s.isActive !== false)
+      .map((s) => ({ label: s.statusName, value: s.statusName }));
 
-    if (ticketInfo?.status && !validOptions.some(opt => opt.toLowerCase() === ticketInfo.status.toLowerCase())) {
-      result.push({ label: ticketInfo.status, value: ticketInfo.status });
+    if (
+      ticketInfo?.status &&
+      !activeList.some((opt) => opt.value.toLowerCase() === String(ticketInfo.status).toLowerCase())
+    ) {
+      return [{ label: String(ticketInfo.status), value: String(ticketInfo.status) }, ...activeList];
     }
-
-    validOptions.forEach(opt => result.push({ label: opt, value: opt }));
-
-    return result;
-  }, [ticketInfo?.status]);
+    return activeList;
+  }, [statuses, dbStatuses, ticketInfo?.status]);
 
   const handleSave = async () => {
     if (!updateStatus) {
@@ -285,9 +288,9 @@ export default function VerifySupportTicketModal({
     } catch (err) {
       toast.error(
         err.response?.data?.message ||
-          err.message ||
-          TOAST_MESSAGES.GENERAL.SAVE_FAILED ||
-          "Failed to update support ticket"
+        err.message ||
+        TOAST_MESSAGES.GENERAL.SAVE_FAILED ||
+        "Failed to update support ticket"
       );
     } finally {
       setIsSaving(false);
@@ -368,18 +371,18 @@ export default function VerifySupportTicketModal({
                           ticketInfo.status === "Resolved" || ticketInfo.status === "Closed"
                             ? "rgba(22, 163, 74, 0.12)"
                             : ticketInfo.status === "In Progress"
-                            ? "rgba(2, 132, 199, 0.12)"
-                            : ticketInfo.status === "Verified"
-                            ? "rgba(16, 185, 129, 0.12)"
-                            : "rgba(234, 179, 8, 0.15)",
+                              ? "rgba(2, 132, 199, 0.12)"
+                              : ticketInfo.status === "Verified"
+                                ? "rgba(16, 185, 129, 0.12)"
+                                : "rgba(234, 179, 8, 0.15)",
                         color:
                           ticketInfo.status === "Resolved" || ticketInfo.status === "Closed"
                             ? "#16a34a"
                             : ticketInfo.status === "In Progress"
-                            ? "#0284c7"
-                            : ticketInfo.status === "Verified"
-                            ? "#059669"
-                            : "#d97706",
+                              ? "#0284c7"
+                              : ticketInfo.status === "Verified"
+                                ? "#059669"
+                                : "#d97706",
                       }}
                     />
                   </Box>

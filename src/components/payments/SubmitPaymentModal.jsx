@@ -127,7 +127,6 @@ export default function SubmitPaymentModal({
   const [isMultiSplit, setIsMultiSplit] = useState(true);
   const [splitRows, setSplitRows] = useState([
     { id: 1, mode: "GPay", amount: "", utr: "" },
-    { id: 2, mode: "Cash", amount: "", utr: "" },
   ]);
   const [activeQrModal, setActiveQrModal] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
@@ -180,6 +179,30 @@ export default function SubmitPaymentModal({
     : (selectedModeObj
         ? selectedModeObj.supportsQr !== false && !selectedModeObj.isCash
         : !isCashMode);
+
+  // Screenshot is mandatory if UPI/online mode is selected (including split with Cash + UPI).
+  // Pure Cash payment means screenshot is optional.
+  const isImageMandatory = useMemo(() => {
+    if (isMultiSplit) {
+      if (!splitRows || splitRows.length === 0) return true;
+      // If ANY row is non-cash (UPI/online), image upload is mandatory.
+      // Pure cash payment (all rows cash) means screenshot is optional.
+      return splitRows.some(
+        (r) => !String(r.mode || "").trim().toLowerCase().includes("cash")
+      );
+    }
+    return !String(formData.paymentMode || "").trim().toLowerCase().includes("cash");
+  }, [isMultiSplit, splitRows, formData.paymentMode]);
+
+  useEffect(() => {
+    if (!isImageMandatory && errors.screenshot) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.screenshot;
+        return next;
+      });
+    }
+  }, [isImageMandatory, errors.screenshot]);
 
   // Resolve QR Config based on Event Category or Event Name
   const resolvedCategory = useMemo(() => {
@@ -418,6 +441,9 @@ export default function SubmitPaymentModal({
         }
       }
 
+      const defaultFirstMode = dynamicPaymentModes.length > 0 ? dynamicPaymentModes[0]?.value : "GPay";
+      const initialSplitAmt = isPaidInitial ? "0.00" : (resolvedAmount ? String(resolvedAmount) : "");
+
       setFormData((prev) => ({
         ...prev,
         eventId: initialEventId || prev.eventId,
@@ -425,16 +451,17 @@ export default function SubmitPaymentModal({
         eventCategory: matchedCategory || prev.eventCategory,
         eventName: matchedEvName || prev.eventName,
         memberName: resolvedMemName || prev.memberName,
-        amount: isPaidInitial ? "0.00" : (resolvedAmount ? String(resolvedAmount) : prev.amount),
-        paymentMode: prev.paymentMode || (dynamicPaymentModes.length > 0 ? dynamicPaymentModes[0]?.value : ""),
+        amount: initialSplitAmt || prev.amount,
+        paymentMode: prev.paymentMode || defaultFirstMode,
         paymentDate: dayjs(),
         utr: "",
         notes: "",
         screenshot: "",
+        screenshots: [],
       }));
-      if (isPaidInitial) {
-        setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "0.00" })));
-      }
+      setSplitRows([
+        { id: 1, mode: defaultFirstMode, amount: initialSplitAmt, utr: "" },
+      ]);
       setErrors({});
     }
   }, [
@@ -628,6 +655,13 @@ export default function SubmitPaymentModal({
 
             if (isPaidStatus || total === 0) {
               setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "0.00" })));
+            } else {
+              setSplitRows((rows) => {
+                if (rows.length <= 1) {
+                  return [{ ...(rows[0] || { id: 1, mode: dynamicPaymentModes[0]?.value || "GPay", utr: "" }), amount: resolvedDuesAmount }];
+                }
+                return rows;
+              });
             }
           } else if (matchedEvent) {
             const base = Number(matchedEvent.baseAmount || matchedEvent.totalExpectedAmount || 0);
@@ -646,6 +680,12 @@ export default function SubmitPaymentModal({
               ...prev,
               amount: prev.amount || String(currentEvDue),
             }));
+            setSplitRows((rows) => {
+              if (rows.length <= 1) {
+                return [{ ...(rows[0] || { id: 1, mode: dynamicPaymentModes[0]?.value || "GPay", utr: "" }), amount: String(currentEvDue) }];
+              }
+              return rows;
+            });
           }
         } catch {
           // Silent fallback
@@ -759,6 +799,19 @@ export default function SubmitPaymentModal({
 
   const handleSplitRowChange = (id, field, value) => {
     let sanitized = value;
+    if (field === "mode") {
+      const isNewCash = String(value || "").toLowerCase().includes("cash");
+      const existingRow = splitRows.find((r) => r.id === id);
+      const existingUtr = existingRow?.utr || "";
+      const trimmedUtr = isNewCash
+        ? existingUtr.slice(0, 50)
+        : existingUtr.replace(/[^a-zA-Z0-9\-_/]/g, "").slice(0, 12);
+
+      setSplitRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, mode: value, utr: trimmedUtr } : r))
+      );
+      return;
+    }
     if (field === "amount") {
       const targetAmt = Number(formData.amount) || 0;
       const otherRowsSum = Math.round(
@@ -783,7 +836,7 @@ export default function SubmitPaymentModal({
       const row = splitRows.find((r) => r.id === id);
       const isCash = String(row?.mode || "").toLowerCase().includes("cash");
       if (isCash) {
-        // Limit Cash Note to max 50 characters
+        // Strict limit Cash Note to max 50 characters
         sanitized = String(value || "").slice(0, 50);
       } else {
         // Limit UTR / Ref to max 12 characters (alphanumeric)
@@ -872,7 +925,12 @@ export default function SubmitPaymentModal({
             break;
           }
           const isRowCash = String(r.mode || "").toLowerCase().includes("cash");
-          if (!isRowCash) {
+          if (isRowCash) {
+            if (r.utr && r.utr.length > 50) {
+              errs.split = "Cash Note cannot exceed 50 characters.";
+              break;
+            }
+          } else {
             if (!r.utr || !r.utr.trim()) {
               errs.split = "UTR / Reference number is mandatory for digital payments.";
               break;
@@ -888,7 +946,11 @@ export default function SubmitPaymentModal({
       }
     } else {
       const isCash = String(formData.paymentMode || "").toLowerCase().includes("cash");
-      if (!isCash) {
+      if (isCash) {
+        if (formData.utr && formData.utr.length > 50) {
+          errs.utr = "Cash Note cannot exceed 50 characters";
+        }
+      } else {
         if (!formData.utr || !formData.utr.trim()) {
           errs.utr = "UPI / Reference Number is required for digital payments";
         } else if (formData.utr.trim().length < 6) {
@@ -902,8 +964,8 @@ export default function SubmitPaymentModal({
     const hasScreenshots =
       (formData.screenshots && formData.screenshots.length > 0) ||
       (typeof formData.screenshot === "string" && formData.screenshot.trim().length > 0);
-    if (!hasScreenshots) {
-      errs.screenshot = "At least 1 payment screenshot / receipt slip is mandatory.";
+    if (isImageMandatory && !hasScreenshots) {
+      errs.screenshot = "At least 1 payment screenshot / receipt slip is mandatory for UPI / online payments.";
     }
 
     setErrors(errs);
@@ -933,8 +995,14 @@ export default function SubmitPaymentModal({
         upiTotal = splitRows
           .filter((r) => !String(r.mode || "").toLowerCase().includes("cash"))
           .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-        finalMode = "Split";
-        finalUtr = "SPLIT";
+        
+        if (splitRows.length === 1) {
+          finalMode = splitRows[0].mode?.trim() || "GPay";
+          finalUtr = splitRows[0].utr?.trim() || (cashTotal > 0 ? "CASH" : "-");
+        } else {
+          finalMode = "Split";
+          finalUtr = "SPLIT";
+        }
         structuredSplits = splitRows.map((r) => {
           const isRowCash = String(r.mode || "").toLowerCase().includes("cash");
           const cashNoteVal = isRowCash ? (r.notes?.trim() || r.utr?.trim() || null) : null;
@@ -1532,12 +1600,30 @@ export default function SubmitPaymentModal({
                           <Box sx={{ flex: 1 }}>
                             <AppInput
                               label={isRowCash ? "Cash Note" : "UTR/Ref"}
-                              placeholder={isRowCash ? "Handover note" : "12-digit UTR ref"}
+                              placeholder={isRowCash ? "Handover note (max 50 chars)" : "12-digit UTR ref"}
                               value={row.utr}
                               onChange={(e) => handleSplitRowChange(row.id, "utr", e.target.value)}
                               size="small"
                               required={!isRowCash}
+                              maxLength={isRowCash ? 50 : 12}
                             />
+                            {isRowCash && (
+                              <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.3, px: 0.2 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
+                                  Max 50 characters
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontSize: "0.65rem",
+                                    fontWeight: 700,
+                                    color: (row.utr || "").length >= 50 ? "warning.main" : "text.secondary",
+                                  }}
+                                >
+                                  {(row.utr || "").length}/50
+                                </Typography>
+                              </Box>
+                            )}
                           </Box>
                           {!isRowCash && (
                             <Tooltip title={`Open QR Scanner for ${row.mode} (₹${row.amount || 0})`}>
@@ -1610,7 +1696,13 @@ export default function SubmitPaymentModal({
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
               <Typography variant="caption" fontWeight={700} sx={{ color: errors.screenshot ? "error.main" : "text.secondary" }}>
                 Payment Screenshots (Max 3 Images){" "}
-                <Box component="span" sx={{ color: "error.main", fontWeight: 800 }}>*</Box>
+                {isImageMandatory ? (
+                  <Box component="span" sx={{ color: "error.main", fontWeight: 800 }}>*</Box>
+                ) : (
+                  <Box component="span" sx={{ color: "text.secondary", fontWeight: 500, fontSize: "0.72rem", ml: 0.5 }}>
+                    (Optional for Cash)
+                  </Box>
+                )}
               </Typography>
               <Typography
                 variant="caption"
@@ -1740,7 +1832,9 @@ export default function SubmitPaymentModal({
                         color: errors.screenshot ? "error.main" : "text.secondary",
                       }}
                     >
-                      Select up to 3 images (Mandatory)
+                      {isImageMandatory
+                        ? "Select up to 3 images (Mandatory for UPI)"
+                        : "Select up to 3 images (Optional for Cash)"}
                     </Typography>
                   </Paper>
                 </Grid>

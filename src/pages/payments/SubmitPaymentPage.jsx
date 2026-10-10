@@ -149,7 +149,7 @@ export default function SubmitPaymentPage() {
         getPaymentTransactionsAsync().catch(() => []),
         getMembersAsync().catch(() => []),
         getEventsAsync().catch(() => []),
-        getStatusesAsync().catch(() => []),
+        getStatusesAsync(true, "Contribution").catch(() => []),
         getEventTypesAsync().catch(() => []),
         getPaymentModesAsync(true).catch(() => []),
       ]);
@@ -184,41 +184,59 @@ export default function SubmitPaymentPage() {
     }
   };
 
-  // Dynamic statuses loaded directly from Support Status Master database table
+  // Dynamic statuses loaded directly from database table
   const getModalStatusOptions = (txn) => {
-    if (!txn) return [{ label: "Pending", value: "Pending" }];
-    const hasProof = Boolean(
-      txn.transactionId ||
-      (txn.paymentMode && txn.paymentMode !== "-" && txn.paymentMode !== "None") ||
-      txn.utrNumber
+    const hasSubmittedProof = Boolean(
+      txn?.transactionId ||
+      (txn?.paymentMode && txn?.paymentMode !== "-" && txn?.paymentMode !== "--" && txn?.paymentMode !== "None") ||
+      txn?.utrNumber ||
+      txn?.utr
     );
-    const totalDue = Number(txn.totalDue || txn.amount || 0);
-    const actualRec = hasProof ? Number(txn.amount || txn.paidAmount || totalDue) : 0;
+    const actualReceived = hasSubmittedProof ? Number(txn?.amount || txn?.paidAmount || 0) : 0;
+    const isAmountReceived = actualReceived > 0;
 
-    if (actualRec <= 0 && totalDue > 0) {
-      return [{ label: "Pending", value: "Pending" }];
+    const list = Array.isArray(dbStatuses) && dbStatuses.length > 0
+      ? dbStatuses
+          .filter((s) => s.statusName && s.isActive !== false)
+          .map((s) => {
+            const isVerificationStatus = ["verified", "paid", "closed", "completed"].includes(
+              String(s.statusName).toLowerCase().trim()
+            );
+            return {
+              label: !isAmountReceived && isVerificationStatus
+                ? `${s.statusName} (Payment not received)`
+                : s.statusName,
+              value: s.statusName,
+              disabled: !isAmountReceived && isVerificationStatus,
+            };
+          })
+      : [
+          { label: "Pending", value: "Pending" },
+          { label: isAmountReceived ? "Verified" : "Verified (Payment not received)", value: "Verified", disabled: !isAmountReceived },
+          { label: "Rejected", value: "Rejected" },
+          { label: isAmountReceived ? "Paid" : "Paid (Payment not received)", value: "Paid", disabled: !isAmountReceived },
+        ];
+
+    if (txn?.status && !list.some((o) => o.value.toLowerCase() === String(txn.status).toLowerCase())) {
+      return [{ label: String(txn.status), value: String(txn.status) }, ...list];
     }
-    return [
-      { label: "Paid", value: "Paid" },
-      { label: "Pending", value: "Pending" },
-    ];
+    return list;
   };
 
   const handleStatusUpdate = async (txn, newStatus, customNotes) => {
     const target = txn || statusModalTxn;
     if (!target) return;
 
-    const isMarkingPaid = ["paid", "verified", "closed", "completed"].includes(String(newStatus).toLowerCase());
     const hasSubmittedProof = Boolean(
       target.transactionId ||
-      (target.paymentMode && target.paymentMode !== "-" && target.paymentMode !== "None") ||
-      target.utrNumber
+      (target.paymentMode && target.paymentMode !== "-" && target.paymentMode !== "--" && target.paymentMode !== "None") ||
+      target.utrNumber ||
+      target.utr
     );
-    const totalDue = Number(target.totalDue || target.amount || 0);
-    const actualReceived = hasSubmittedProof ? Number(target.amount || target.paidAmount || totalDue) : 0;
+    const actualReceived = hasSubmittedProof ? Number(target.amount || target.paidAmount || 0) : 0;
 
-    if (isMarkingPaid && actualReceived <= 0 && totalDue > 0) {
-      toast.error("Valid payment proof or amount is required to Verify/Mark as Paid. Please submit a payment first.");
+    if (actualReceived <= 0) {
+      toast.error("Payment has not been received (Received Amount: ₹0.00). You cannot verify or save this status.");
       return;
     }
 
@@ -1125,24 +1143,39 @@ export default function SubmitPaymentPage() {
         title="Authority Status Update"
         maxWidth="sm"
         actions={
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppButton variant="outlined" onClick={() => setStatusModalOpen(false)}>
-              Close
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={() =>
-                handleStatusUpdate(
-                  statusModalTxn,
-                  statusChangeValue || statusModalTxn?.status,
-                  auditRemarks
-                )
-              }
-            >
-              Save
-            </AppButton>
-          </Stack>
+          (() => {
+            const hasSubmittedProof = Boolean(
+              statusModalTxn?.transactionId ||
+              (statusModalTxn?.paymentMode && statusModalTxn?.paymentMode !== "-" && statusModalTxn?.paymentMode !== "--" && statusModalTxn?.paymentMode !== "None") ||
+              statusModalTxn?.utrNumber ||
+              statusModalTxn?.utr
+            );
+            const actualReceived = hasSubmittedProof ? Number(statusModalTxn?.amount || statusModalTxn?.paidAmount || 0) : 0;
+            const isZeroAmount = actualReceived <= 0;
+
+            return (
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <AppButton variant="outlined" onClick={() => setStatusModalOpen(false)}>
+                  Close
+                </AppButton>
+                <AppButton
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  disabled={isZeroAmount}
+                  disabledTooltip={isZeroAmount ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first." : ""}
+                  onClick={() =>
+                    handleStatusUpdate(
+                      statusModalTxn,
+                      statusChangeValue || statusModalTxn?.status,
+                      auditRemarks
+                    )
+                  }
+                >
+                  Save
+                </AppButton>
+              </Stack>
+            );
+          })()
         }
       >
         {statusModalTxn && (

@@ -1,8 +1,9 @@
 import { getApi, postApi, putApi, deleteApi } from "./apiActions";
 
-export const getStatusesAsync = async (activeOnly = false) => {
+export const getStatusesAsync = async (activeOnly = false, module = null) => {
   const params = new URLSearchParams();
   if (activeOnly) params.append("activeOnly", "true");
+  if (module) params.append("module", module);
   const queryStr = params.toString();
   const url = queryStr ? `/statuses/getAllStatusAsync?${queryStr}` : "/statuses/getAllStatusAsync";
   const result = await getApi(url);

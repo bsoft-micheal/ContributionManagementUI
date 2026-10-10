@@ -309,7 +309,7 @@ export default function SupportTicketsPage() {
         getEventsAsync().catch(() => []),
         getEventTypesAsync().catch(() => []),
         getTicketTypesAsync(true).catch(() => []),
-        getStatusesAsync(true).catch(() => []),
+        getStatusesAsync(true, "Support Ticket").catch(() => []),
         getPrioritiesAsync(true).catch(() => []),
       ]);
       if (Array.isArray(membersRes)) setMembersList(membersRes);

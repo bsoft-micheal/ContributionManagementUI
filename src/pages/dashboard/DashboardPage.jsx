@@ -1283,7 +1283,7 @@ export default function DashboardPage() {
             <Typography variant="body2">
               {isFilteredByType
                 ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
-                : "No events found for the selected period."}
+                : "No records found."}
             </Typography>
           </Box>
         )}
