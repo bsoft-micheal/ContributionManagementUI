@@ -372,7 +372,7 @@ export default function ExpensePage() {
       });
     }
 
-    const list = [{ label: form.category ? "Select Event" : "Select Event Type first", value: "" }];
+    const list = [{ label: form.category ? "Select Event Name" : "Select Event Type first", value: "" }];
     const unique = new Set();
     filtered.forEach((e) => {
       const name = e.name || e.eventName;
@@ -649,7 +649,7 @@ export default function ExpensePage() {
       return;
     }
     const newErrors = {};
-    if (!form.eventName) newErrors.eventName = "Event is required";
+    if (!form.eventName) newErrors.eventName = "Event Name is required";
     if (!form.category) newErrors.category = "Event Type is required";
     if (!form.amount || Number(form.amount) <= 0) {
       newErrors.amount = "Valid amount is required";
@@ -1143,14 +1143,14 @@ export default function ExpensePage() {
               </Box>
               <Box sx={{ minWidth: 200 }}>
                 <AppSelect
-                  label="Select Event"
+                  label="Select Event Name"
                   value={filterEvent}
                   onChange={(e) => {
                     setFilterEvent(e.target.value);
                   }}
                   options={eventOptions}
                   size="small"
-                  placeholder="Select Event"
+                  placeholder="Select Event Name"
                   fullWidth
                 />
               </Box>
@@ -1279,8 +1279,8 @@ export default function ExpensePage() {
           {/* 2. Event NEXT (loaded/filtered against selected Event Type) */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
-              label="Event"
-              placeholder={form.category ? "Select Event" : "Select Event Type first"}
+              label="Event Name"
+              placeholder={form.category ? "Select Event Name" : "Select Event Type first"}
               value={form.eventName}
               onChange={(e) => {
                 const selectedEventName = e.target.value;

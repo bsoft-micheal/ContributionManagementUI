@@ -347,7 +347,7 @@ export default function EventAddPhotoDialog({
       title={`Add Photos — ${event.eventName || "Event"}`}
       maxWidth="md"
       actions={
-        <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ width: "100%" }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
           <AppButton
             variant="outlined"
             onClick={onClose}
@@ -367,7 +367,7 @@ export default function EventAddPhotoDialog({
               "&:hover": { bgcolor: "#241d3b !important" },
             }}
           >
-            {saving ? "Uploading..." : "Save Photos"}
+            {saving ? "Uploading..." : "Save "}
           </AppButton>
         </Stack>
       }
@@ -378,8 +378,8 @@ export default function EventAddPhotoDialog({
         </Box>
       ) : (
         <Grid container spacing={2} sx={{ pt: 0.5 }}>
-          {/* Row 1: Title */}
-          <Grid size={{ xs: 12 }}>
+          {/* Row 1: Title & Event Date */}
+          <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
               label="Title"
               placeholder="e.g. Birthday celebration moments"
@@ -392,6 +392,17 @@ export default function EventAddPhotoDialog({
               }}
               error={!!errors.title}
               helperText={errors.title}
+              required
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <AppDateInput
+              label="Event Date"
+              value={form.takenDate}
+              onChange={(newVal) => {
+                setForm((c) => ({ ...c, takenDate: newVal }));
+              }}
               required
             />
           </Grid>
@@ -415,26 +426,18 @@ export default function EventAddPhotoDialog({
             />
           </Grid>
 
-          {/* Row 3: Taken Date */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppDateInput
-              label="Taken Date"
-              value={form.takenDate}
-              onChange={(newVal) => {
-                setForm((c) => ({ ...c, takenDate: newVal }));
-              }}
-              required
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <Box sx={{ pt: 2.8 }}>
+          {/* Row 3: Multi-Photo Upload Area */}
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", fontSize: "0.74rem" }}>
+                Upload Photos
+              </Typography>
               <Chip
                 label={`Photos for Event: ${existingEventPhotoCount + currentSelectedImages.length} / 5 max`}
                 size="small"
                 sx={{
                   fontWeight: 700,
-                  fontSize: "0.78rem",
+                  fontSize: "0.74rem",
                   bgcolor:
                     existingEventPhotoCount >= 5
                       ? "rgba(239, 68, 68, 0.12)"
@@ -448,10 +451,6 @@ export default function EventAddPhotoDialog({
                 }}
               />
             </Box>
-          </Grid>
-
-          {/* Row 4: Multi-Photo Upload Area */}
-          <Grid size={{ xs: 12 }}>
             <input
               type="file"
               ref={fileInputRef}
@@ -707,7 +706,7 @@ export default function EventAddPhotoDialog({
                       variant="caption"
                       sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block", mt: 0.4 }}
                     >
-                      Select up to {maxAllowedForEvent} image(s) • Max 5 photos per event • Maximum 10MB total • JPG, PNG, WebP
+                      Select up to {maxAllowedForEvent} image(s) • Max 5 photos per event • Maximum 10MB total • JPG, PNG
                     </Typography>
                     {errors.imageUrl && (
                       <Typography

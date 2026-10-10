@@ -200,7 +200,7 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
       }
       maxWidth="xs"
       actions={
-        <Stack direction="row" spacing={1.5} sx={{ width: "100%", justifyContent: "flex-end" }}>
+        <Stack direction="row" spacing={1.5} sx={{ width: "100%", justifyContent: "center" }}>
           <AppButton
             variant="outlined"
             onClick={onClose}

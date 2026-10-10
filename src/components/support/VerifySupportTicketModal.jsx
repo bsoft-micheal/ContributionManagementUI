@@ -345,7 +345,7 @@ export default function VerifySupportTicketModal({
               }}
             >
               <Grid container spacing={1.5}>
-                {/* Member Name */}
+                {/* User Name */}
                 <Grid size={{ xs: 6 }}>
                   <Typography variant="caption" color="text.secondary">
                     User Name

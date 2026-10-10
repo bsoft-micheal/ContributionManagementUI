@@ -607,7 +607,8 @@ export default function SupportTicketsPage() {
     if (!editingTicket && !canAddTicket) return;
 
     const newErrors = {};
-    if (!form.memberName) newErrors.memberName = "Member Name is required";
+    if (!form.memberName) newErrors.memberName = "User Name is required";
+    if (!form.eventType) newErrors.eventType = "Event Type is required";
     if (!form.ticketType) newErrors.ticketType = "Ticket Type is required";
     if (!form.attachment && (!editingTicket || !editingTicket.attachment)) {
       newErrors.attachment = "This field is required";
@@ -860,7 +861,7 @@ export default function SupportTicketsPage() {
       render: (row) => row.ticketNo || "--",
     },
     {
-      label: "Member Name",
+      label: "User Name",
       key: "memberName",
       render: (row) => {
         let name = row.memberName;
@@ -1205,8 +1206,8 @@ export default function SupportTicketsPage() {
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
-              label="Member Name"
-              placeholder="Select Member"
+              label="User Name"
+              placeholder="Select User"
               value={form.memberName}
               disabled={isNameLocked}
               onChange={(e) => {
@@ -1232,6 +1233,7 @@ export default function SupportTicketsPage() {
               value={form.eventType}
               onChange={(e) => {
                 const selectedType = e.target.value;
+                if (errors.eventType) setErrors((p) => ({ ...p, eventType: "" }));
                 setForm((c) => {
                   const matchingEvents = (eventsList || []).filter(
                     (ev) => (ev.eventTypeName || ev.categoryName || ev.eventType || "").trim().toLowerCase() === selectedType.trim().toLowerCase()
@@ -1251,6 +1253,9 @@ export default function SupportTicketsPage() {
                 });
               }}
               options={eventTypeOptions}
+              error={!!errors.eventType}
+              helperText={errors.eventType}
+              required
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
@@ -1543,7 +1548,7 @@ export default function SupportTicketsPage() {
             <Grid container spacing={2}>
               <Grid size={{ xs: 6 }}>
                 <Typography variant="caption" color="text.secondary">
-                  Member Name
+                  User Name
                 </Typography>
                 <Typography variant="body2" fontWeight={700}>
                   {(() => {

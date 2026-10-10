@@ -1872,8 +1872,9 @@ export default function ContributionsPage() {
             const activeEventObj = events.find(e => e.eventId === selectedEventId);
             const qrConfig = getPaymentQrConfig(activeEventObj);
 
+            const isUploaded = qrConfig.qrMode === "uploaded" && qrConfig.qrImage;
             let qrSrc = "";
-            if (qrConfig.qrMode === "uploaded" && qrConfig.qrImage) {
+            if (isUploaded) {
               qrSrc = qrConfig.qrImage;
             } else {
               qrSrc = generateQrPngDataUrl(
@@ -1893,19 +1894,21 @@ export default function ContributionsPage() {
                   p: 1.5,
                   borderRadius: "12px",
                   bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.08)" : "rgba(2, 132, 199, 0.04)"),
-                  border: "1px solid rgba(2, 132, 199, 0.2)",
+                  border: isUploaded ? "1px solid rgba(22, 163, 74, 0.3)" : "1px solid rgba(2, 132, 199, 0.2)",
                   textAlign: "center",
                 }}
               >
-                <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", display: "block", mb: 0.8 }}>
-                  {isSplitMode
+                <Typography variant="caption" fontWeight={800} sx={{ color: isUploaded ? "#16a34a" : "#0284c7", display: "block", mb: 0.8 }}>
+                  {isUploaded
+                    ? `Uploaded Custom QR (₹${targetAmount.toLocaleString("en-IN")})`
+                    : isSplitMode
                     ? `Dynamic UPI QR (Split UPI Portion: ₹${targetAmount.toLocaleString("en-IN")})`
                     : `Dynamic UPI Payment QR (₹${targetAmount.toLocaleString("en-IN")})`}
                 </Typography>
                 <Box
                   component="img"
                   src={qrSrc}
-                  alt="UPI QR Code"
+                  alt="Payment QR Code"
                   sx={{
                     width: 130,
                     height: 130,
@@ -1915,13 +1918,18 @@ export default function ContributionsPage() {
                     p: 0.6,
                     bgcolor: "#ffffff",
                     borderRadius: "10px",
-                    border: "1.5px solid #0284c7",
+                    border: isUploaded ? "1.5px solid #16a34a" : "1.5px solid #0284c7",
                     boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)",
                   }}
                 />
-                {qrConfig.upiId && (
+                {!isUploaded && qrConfig.upiId && (
                   <Typography variant="caption" fontWeight={700} sx={{ color: "#0284c7", fontSize: "0.72rem", mt: 0.5, display: "block" }}>
                     UPI ID: {qrConfig.upiId} {qrConfig.receiverName ? `(${qrConfig.receiverName})` : ""}
+                  </Typography>
+                )}
+                {isUploaded && (
+                  <Typography variant="caption" fontWeight={700} sx={{ color: "#16a34a", fontSize: "0.72rem", mt: 0.5, display: "block" }}>
+                    Payment QR uploaded manually
                   </Typography>
                 )}
                 <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.4, display: "block" }}>

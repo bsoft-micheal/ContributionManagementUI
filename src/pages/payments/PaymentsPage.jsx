@@ -639,14 +639,14 @@ export default function PaymentsPage() {
               )}
               <Box sx={{ minWidth: 180 }}>
                 <AppSelect
-                  label="Select Event"
+                  label="Select Event Name"
                   value={filterEvent}
                   onChange={(e) => {
                     setFilterEvent(e.target.value);
                   }}
                   options={eventOptions}
                   size="small"
-                  placeholder="Select Event"
+                  placeholder="Select Event Name"
                   fullWidth
                 />
               </Box>

@@ -755,13 +755,13 @@ export default function EventsPage() {
               </Box>
               <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
                 <AppSelect
-                  label="Event"
+                  label="Event Name"
                   value={filterEvent}
                   onChange={(event) => {
                     setFilterEvent(event.target.value);
                   }}
                   options={eventOptions}
-                  placeholder="Select Event"
+                  placeholder="Select Event Name"
                 />
               </Box>
               <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
