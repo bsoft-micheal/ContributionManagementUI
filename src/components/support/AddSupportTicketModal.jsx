@@ -456,11 +456,11 @@ export default function AddSupportTicketModal({
         }
       >
         <Grid container spacing={2}>
-          {/* Member Name */}
+          {/* User Name */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
-              label="Member Name"
-              placeholder="Select Member"
+              label="User Name"
+              placeholder="Select User Name"
               value={form.memberName}
               disabled={isNameLocked}
               allowClear={false}

@@ -1121,7 +1121,7 @@ export default function SubmitPaymentModal({
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
-              label="Event Category"
+              label="Event Type"
               value={formData.eventCategory}
               onChange={(e) => {
                 const newCategory = e.target.value;
