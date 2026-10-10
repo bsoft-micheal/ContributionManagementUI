@@ -49,7 +49,7 @@ export const COMMON_STRINGS = {
     MONTH_LABEL: "Month",
     YEAR_LABEL: "Year",
     EVENT_TYPE_LABEL: "Event Type",
-    EVENT_LABEL: "Event",
+    EVENT_LABEL: "Event Name",
     ALL_EVENT_TYPES: "All Event Types",
     ALL_EVENTS: "All Events",
     FILTER_BUTTON: "Filter",

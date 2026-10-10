@@ -26,7 +26,6 @@ import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FilterListIcon from "@mui/icons-material/FilterList";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import EventIcon from "@mui/icons-material/Event";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
@@ -600,7 +599,7 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
       </Box>
       <Box sx={{ width: { xs: "100%", sm: 200 } }}>
         <AppSelect
-          label={COMMON_STRINGS.DASHBOARD?.EVENT_LABEL || "Event"}
+          label={COMMON_STRINGS.DASHBOARD?.EVENT_LABEL || "Event Name"}
           value={pending.eventId || "ALL"}
           onChange={(e) => onChange("eventId", e.target.value)}
           options={eventOptions}
@@ -637,7 +636,6 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
           size="small"
           onClick={onClear}
           disabled={loading}
-          startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
           sx={{
             height: 36,
             minHeight: 36,
