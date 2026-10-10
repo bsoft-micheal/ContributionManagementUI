@@ -51,12 +51,18 @@ export default function EventExpensesDialog({ open, onClose, event, onAddExpense
         const data = await getExpensesAsync();
         if (!isMounted) return;
 
-        const targetEventName = (event.eventName || "").trim().toLowerCase();
+        const targetEventName = (event.eventName || event.name || "").trim().toLowerCase();
         const targetCategory = (event.eventTypeName || event.category || "").trim().toLowerCase();
+        const targetEventId = event.eventId || event.id;
 
         const filtered = (Array.isArray(data) ? data : []).filter((item) => {
+          if (targetEventId && item.eventId && item.eventId === targetEventId) return true;
           const itemEvent = (item.eventName || "").trim().toLowerCase();
-          return itemEvent && itemEvent === targetEventName;
+          if (!itemEvent || itemEvent !== targetEventName) return false;
+          if (targetCategory && item.category) {
+            return item.category.trim().toLowerCase() === targetCategory;
+          }
+          return true;
         });
 
         setExpenses(filtered);
@@ -119,25 +125,7 @@ export default function EventExpensesDialog({ open, onClose, event, onAddExpense
         maxWidth="md"
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ width: "100%" }}>
-            <Box sx={{ display: "flex", gap: 1 }}>
-              {onAddExpenseClick && (
-                <AppButton
-                  variant="contained"
-                  size="small"
-                  startIcon={<AddIcon />}
-                  onClick={() => {
-                    onClose();
-                    onAddExpenseClick(event);
-                  }}
-                  sx={{
-                    bgcolor: "#342b54 !important",
-                    color: "#ffffff !important",
-                    "&:hover": { bgcolor: "#241d3b !important" },
-                  }}
-                >
-                  Add Expense
-                </AppButton>
-              )}
+            <Box>
               <AppButton
                 variant="outlined"
                 size="small"
@@ -229,34 +217,16 @@ export default function EventExpensesDialog({ open, onClose, event, onAddExpense
                 borderRadius: "12px",
                 border: "1px dashed",
                 borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.15)" : "#cbd5e1"),
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc"),
               }}
             >
-              <ReceiptIcon sx={{ fontSize: "3rem", color: "text.secondary", opacity: 0.5, mb: 1 }} />
+              <ReceiptIcon sx={{ fontSize: "3rem", color: "text.secondary", opacity: 0.4, mb: 1 }} />
               <Typography variant="body1" fontWeight={700} sx={{ color: "text.primary", mb: 0.5 }}>
-                No expenses recorded for this event yet
+                No records found
               </Typography>
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                There are currently no expenses recorded for {event?.eventName}.
+                No expense records found for {event?.eventName || "this event"}.
               </Typography>
-              {onAddExpenseClick && (
-                <AppButton
-                  variant="contained"
-                  size="small"
-                  startIcon={<AddIcon />}
-                  onClick={() => {
-                    onClose();
-                    onAddExpenseClick(event);
-                  }}
-                  sx={{
-                    mt: 2,
-                    bgcolor: "#342b54 !important",
-                    color: "#ffffff !important",
-                    "&:hover": { bgcolor: "#241d3b !important" },
-                  }}
-                >
-                  Add Expense
-                </AppButton>
-              )}
             </Box>
           ) : (
             <Box sx={{ overflowX: "auto", maxHeight: expenses.length > 6 ? 260 : "none", overflowY: expenses.length > 6 ? "auto" : "visible" }}>

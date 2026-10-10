@@ -111,11 +111,16 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     event?.eventName?.toLowerCase().includes("birthday")
   );
 
+  // Strip internal <!--contrib:{...}--> metadata comment from a description string
+  const stripContribMeta = (desc) =>
+    (desc || "").replace(/<!--contrib:[\s\S]*?-->/gi, "").trim();
+
   // Helper to parse celebrants list directly from description string:
   // e.g. "Birthday celebration (4 Office, 0 WFH) for Albin (30 Sep), Michael Antony Raj C (18 Sep)... Planned Budget: ..."
   const parseCelebrantsFromDescription = (desc) => {
     if (!desc) return [];
-    const match = desc.match(/for\s+(.*?)(?:\.\s*Planned Budget|\.|$)/i);
+    const desc_clean = stripContribMeta(desc);
+    const match = desc_clean.match(/for\s+(.*?)(?:\.\s*Planned Budget|\.|$)/i);
     if (!match || !match[1]) return [];
     const celebrantsText = match[1];
     const items = celebrantsText.split(/,\s*/);
@@ -245,19 +250,20 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
 
   const tableCelebrants = getTableCelebrants();
 
-  // Overview summary text for description
+  // Overview summary text for description — always strip internal contrib metadata
   const getOverviewText = () => {
     if (!event?.description) return "";
-    const match = event.description.match(/^(Birthday celebration.*?)\s*for.*?\.\s*(Planned Budget.*)$/i);
+    const clean = stripContribMeta(event.description);
+    const match = clean.match(/^(Birthday celebration.*?)\s*for.*?\.\s*(Planned Budget.*)$/i);
     if (match) {
       return `${match[1]} • ${match[2]}`;
     }
-    return event.description;
+    return clean;
   };
 
   const overviewText = isBirthday && tableCelebrants.length > 0
     ? getOverviewText()
-    : (event?.description || "");
+    : stripContribMeta(event?.description || "");
 
   return (
     <>

@@ -482,9 +482,34 @@ export default function ContributionsPage() {
       }, 0);
       const previousUnpaid = isArrearsCleared ? 0 : rawPreviousUnpaid;
       const currentOutstanding = getContributionOutstanding(currentContribution, activeEv);
+      const isVerified = isContributionVerified(currentContribution, matchedTx);
+      const isRejected =
+        String(matchedTx?.status || "").toLowerCase() === "rejected" ||
+        String(c.paymentStatus || "").toLowerCase() === "rejected" ||
+        String(c.statusName || "").toLowerCase() === "rejected";
+
+      const isPaid =
+        isContributionPaid(currentContribution, matchedTx) ||
+        hasSubmittedPayment(currentContribution, matchedTx) ||
+        c.paymentStatus === 2 ||
+        String(c.paymentStatus || "").toLowerCase() === "paid" ||
+        String(c.statusName || "").toLowerCase() === "paid" ||
+        String(c.status || "").toLowerCase() === "paid" ||
+        isVerified;
+
+      let resolvedStatus = "Pending";
+      if (isRejected) {
+        resolvedStatus = "Rejected";
+      } else if (isVerified) {
+        resolvedStatus = "Verified";
+      } else if (isPaid) {
+        resolvedStatus = "Paid";
+      }
 
       return {
         ...currentContribution,
+        paymentStatus: resolvedStatus,
+        isVerified,
         previousUnpaid,
         previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
         totalAccumulated: currentOutstanding + previousUnpaid,
@@ -1054,12 +1079,16 @@ export default function ContributionsPage() {
           (String(c.memberId).toLowerCase() === String(target.memberId).toLowerCase() &&
             String(c.eventId).toLowerCase() === String(target.eventId).toLowerCase())
         ) {
-          const updatedStatus = isMarkingPaid ? "Paid" : newStatus;
+          const isVerified = String(newStatus).toLowerCase() === "verified";
+          const updatedStatus = isVerified ? "Verified" : (isMarkingPaid ? "Paid" : newStatus);
           const isPaid = isMarkingPaid;
           const arrears = c.previousUnpaid || 0;
           return {
             ...c,
             paymentStatus: updatedStatus,
+            statusName: updatedStatus,
+            isVerified: isVerified,
+            verifiedBy: isVerified ? verifier : c.verifiedBy,
             paymentDate: isPaid ? (c.paymentDate || new Date().toISOString()) : c.paymentDate,
             paymentMode: c.paymentMode && c.paymentMode !== "None" ? c.paymentMode : (isPaid ? "Cash" : c.paymentMode),
             totalAccumulated: isPaid ? arrears : (Number(c.amount || 0) + arrears),
@@ -1390,14 +1419,34 @@ export default function ContributionsPage() {
       render: (row) => {
         const matchedTx = findContributionTransaction(row);
         const isVerified = isContributionVerified(row, matchedTx);
+        const isPaid =
+          isContributionPaid(row, matchedTx) ||
+          hasSubmittedPayment(row, matchedTx) ||
+          isVerified ||
+          row?.paymentStatus === 2 ||
+          String(row?.paymentStatus || "").toLowerCase() === "paid" ||
+          String(row?.statusName || "").toLowerCase() === "paid";
+
+        const isRejected =
+          String(matchedTx?.status || "").toLowerCase() === "rejected" ||
+          String(row?.paymentStatus || "").toLowerCase() === "rejected" ||
+          String(row?.statusName || "").toLowerCase() === "rejected";
 
         let displayStatus = "Pending";
-        if (isVerified) {
+        if (isRejected) {
+          displayStatus = "Rejected";
+        } else if (isVerified) {
           displayStatus = "Verified";
+        } else if (isPaid) {
+          displayStatus = "Paid";
         }
 
-        const color = isVerified ? "#16a34a" : "#b45309";
-        const bg = isVerified ? "rgba(22,163,74,0.08)" : "rgba(234,179,8,0.12)";
+        const color = isRejected
+          ? "#dc2626"
+          : (isVerified ? "#16a34a" : (isPaid ? "#059669" : "#b45309"));
+        const bg = isRejected
+          ? "rgba(220,38,38,0.08)"
+          : (isVerified ? "rgba(22,163,74,0.12)" : (isPaid ? "rgba(5,150,105,0.08)" : "rgba(234,179,8,0.12)"));
 
         return (
           <Typography

@@ -898,10 +898,6 @@ export default function EventsPage() {
           loadData();
         }}
         event={expenseEvent}
-        onAddExpenseClick={(ev) => {
-          setAddExpenseEvent(ev);
-          setAddExpenseDialogOpen(true);
-        }}
       />
 
       <AppConfirmDialog
