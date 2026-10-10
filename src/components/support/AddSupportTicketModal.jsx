@@ -461,7 +461,7 @@ export default function AddSupportTicketModal({
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
               label="User Name"
-              placeholder="Select User"
+              placeholder="Select User Name"
               value={form.memberName}
               disabled={isNameLocked}
               allowClear={false}

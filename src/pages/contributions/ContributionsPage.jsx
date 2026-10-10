@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -163,6 +163,17 @@ export default function ContributionsPage() {
     arrearBreakdown: [],
   });
 
+  const reloadAllContributions = useCallback(async () => {
+    try {
+      const allData = await getContributionsAsync();
+      const list = Array.isArray(allData) ? allData : [];
+      setAllContributions(list);
+      return list;
+    } catch {
+      return [];
+    }
+  }, []);
+
   // --- Effects & Memos (all state is declared above, so no TDZ errors) ---
   useEffect(() => {
     if (!selectedEventId) {
@@ -173,15 +184,15 @@ export default function ContributionsPage() {
     let isMounted = true;
     async function loadContributions() {
       try {
+        let freshAll = allContributions;
+        if (!freshAll || freshAll.length === 0) {
+          freshAll = await reloadAllContributions();
+        }
+
         let rawData = [];
         if (selectedEventId !== "ALL") {
           rawData = await getContributionsByEventAsync(selectedEventId);
         } else {
-          let freshAll = allContributions;
-          if (!freshAll || freshAll.length === 0) {
-            freshAll = await reloadAllContributions();
-          }
-
           if (appliedEventType && appliedEventType !== "ALL") {
             const matchingEventIds = new Set(
               (events || [])
@@ -210,7 +221,7 @@ export default function ContributionsPage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedEventId, appliedEventType]);
+  }, [selectedEventId, appliedEventType, allContributions, reloadAllContributions]);
 
   useEffect(() => {
     const handleContributionUpdated = async () => {
@@ -430,22 +441,38 @@ export default function ContributionsPage() {
       };
 
       // Calculate Arrears: sum of unpaid contributions for this member in other events
-      const previousUnpaidItems = (allList || []).filter(
-        (prev) =>
-          String(prev.memberId) === String(c.memberId) &&
-          String(prev.eventId) !== String(c.eventId) &&
-          !isContributionPaid(prev) &&
-          (evList || []).some((e) => String(e.eventId || e.id) === String(prev.eventId))
-      );
+      const targetMemberId = String(c.memberId || c.userId || "").toLowerCase().trim();
+      const targetMemberName = String(c.memberName || "").toLowerCase().trim();
+      const targetEventId = String(c.eventId || (selectedEventId !== "ALL" ? selectedEventId : "")).toLowerCase().trim();
+
+      const previousUnpaidItems = (allList || []).filter((prev) => {
+        const prevMemberId = String(prev.memberId || prev.userId || "").toLowerCase().trim();
+        const prevMemberName = String(prev.memberName || "").toLowerCase().trim();
+        const isSameMember = (targetMemberId && prevMemberId && targetMemberId === prevMemberId) ||
+                             (targetMemberName && prevMemberName && targetMemberName === prevMemberName);
+        if (!isSameMember) return false;
+
+        const prevEventId = String(prev.eventId || "").toLowerCase().trim();
+        if (!prevEventId || prevEventId === targetEventId) return false;
+
+        if (isContributionPaid(prev)) return false;
+
+        return (evList || []).some((e) => String(e.eventId || e.id).toLowerCase().trim() === prevEventId);
+      });
       const matchedTx = findContributionTransaction(c, txList, c.eventId || (selectedEventId !== "ALL" ? selectedEventId : ""));
       const scope = String(c.paymentScope || c.scope || matchedTx?.notes || "").toLowerCase();
-      const clearsArrears =
+      const isAllOutstandingScope =
         scope.includes("alloutstanding") ||
         scope.includes("all outstanding") ||
         scope.includes("scope: all") ||
-        scope.includes("arrear") ||
-        (!c.paymentScope && (hasSubmittedPayment(c) || isContributionPaid(c)));
-      const isArrearsCleared = (hasSubmittedPayment(c) || isContributionPaid(c)) && clearsArrears;
+        scope.includes("scope:all") ||
+        scope.includes("arrear");
+      const isCurrentEventOnly =
+        scope.includes("currentevent") ||
+        scope.includes("current event") ||
+        scope.includes("scope: current");
+
+      const isArrearsCleared = isAllOutstandingScope && !isCurrentEventOnly && (hasSubmittedPayment(c, matchedTx) || isContributionPaid(c));
 
       const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => {
         const prevEv = (evList || []).find((e) => String(e.eventId || e.id) === String(prev.eventId));
@@ -557,17 +584,6 @@ export default function ContributionsPage() {
 
     loadEvents();
   }, []);
-
-  const reloadAllContributions = async () => {
-    try {
-      const allData = await getContributionsAsync();
-      const list = Array.isArray(allData) ? allData : [];
-      setAllContributions(list);
-      return list;
-    } catch {
-      return [];
-    }
-  };
 
   useEffect(() => {
     const handleUpdate = async () => {
@@ -1366,9 +1382,7 @@ export default function ContributionsPage() {
       key: "previousUnpaid",
       align: "right",
       render: (row) => {
-        const isPaid = isContributionPaid(row);
-        const submitted = hasSubmittedPayment(row);
-        const displayArrears = (isPaid || submitted) ? 0 : (row.previousUnpaid || 0);
+        const displayArrears = row.previousUnpaid || 0;
         const arrearsList = row.previousUnpaidItems || [];
         const hasArrears = displayArrears > 0 && arrearsList.length > 0;
         const tooltipContent = hasArrears ? (
@@ -1415,7 +1429,7 @@ export default function ContributionsPage() {
         const isPaid = isContributionPaid(row) || hasSubmittedPayment(row);
         const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId));
         const currentDue = isPaid ? 0 : getContributionOutstanding(row, activeEv);
-        const prevArrears = isPaid ? 0 : (row.previousUnpaid || 0);
+        const prevArrears = row.previousUnpaid || 0;
         const due = currentDue + prevArrears;
         return `₹${Number(due).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }

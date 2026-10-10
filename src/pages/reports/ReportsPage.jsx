@@ -366,11 +366,13 @@ export default function ReportsPage({ mode = "event" }) {
   const [filterToDate, setFilterToDate] = useState(dayjs().endOf("month"));
   const [filterEventType, setFilterEventType] = useState("ALL");
   const [filterEvent, setFilterEvent] = useState("ALL");
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState("ALL");
   const [filters, setFilters] = useState({
     fromDate: dayjs().startOf("month"),
     toDate: dayjs().endOf("month"),
     eventType: "ALL",
     event: "ALL",
+    paymentStatus: "ALL",
   });
   const [eventsList, setEventsList] = useState([]);
   const [eventTypesList, setEventTypesList] = useState([]);
@@ -554,6 +556,13 @@ export default function ReportsPage({ mode = "event" }) {
     return () => window.removeEventListener("contribution_updated", handleUpdate);
   }, []);
 
+  // Payment Status options for filtering Paid and Unpaid member contributions
+  const paymentStatusOptions = [
+    { label: "All Statuses", value: "ALL" },
+    { label: "Paid Only", value: "PAID" },
+    { label: "Unpaid / Pending Only", value: "UNPAID" },
+  ];
+
   // Dynamic Event Type options
   const eventTypeOptions = useMemo(() => {
     const set = new Set();
@@ -651,8 +660,9 @@ export default function ReportsPage({ mode = "event" }) {
     const hasDateFilter = Boolean(filters.fromDate || filters.toDate);
     const hasTypeFilter = Boolean(filters.eventType && filters.eventType !== "ALL");
     const hasEventFilter = Boolean(filters.event && filters.event !== "ALL");
+    const hasStatusFilter = Boolean(filters.paymentStatus && filters.paymentStatus !== "ALL");
 
-    if (hasDateFilter || hasTypeFilter || hasEventFilter) {
+    if (hasDateFilter || hasTypeFilter || hasEventFilter || hasStatusFilter) {
       list = list.map((m) => {
         const events = m.events || [];
         const filteredEvents = events.filter((ev) => {
@@ -660,32 +670,46 @@ export default function ReportsPage({ mode = "event" }) {
           const matchDate = isDateInRange(evDate, filters.fromDate, filters.toDate);
           const matchType = !hasTypeFilter || (ev.categoryName || ev.eventTypeName || "General").trim().toLowerCase() === filters.eventType.trim().toLowerCase();
           const matchEv = !hasEventFilter || (ev.eventName || "").trim().toLowerCase() === filters.event.trim().toLowerCase();
-          return matchDate && matchType && matchEv;
+
+          let matchStatus = true;
+          if (hasStatusFilter) {
+            const isEvPaid = (ev.paymentStatus || "").toLowerCase() === "paid" || (Number(ev.paidAmount) >= Number(ev.expectedAmount || ev.amount || 0) && Number(ev.paidAmount) > 0);
+            if (filters.paymentStatus === "PAID") {
+              matchStatus = isEvPaid || Number(ev.paidAmount) > 0;
+            } else if (filters.paymentStatus === "UNPAID") {
+              matchStatus = !isEvPaid;
+            }
+          }
+
+          return matchDate && matchType && matchEv && matchStatus;
         });
 
-        if (hasDateFilter || hasTypeFilter || hasEventFilter) {
-          const exp = filteredEvents.reduce((s, e) => s + Number(e.expectedAmount || e.amount || 0), 0);
-          const paid = filteredEvents.reduce((s, e) => s + Number(e.paidAmount || ((e.paymentStatus || "").toLowerCase() === "paid" ? (e.expectedAmount || e.amount || 0) : 0)), 0);
-          const paidCount = filteredEvents.filter((e) => (e.paymentStatus || "").toLowerCase() === "paid").length;
-          const pendingCount = filteredEvents.length - paidCount;
-
-          return {
-            ...m,
-            events: filteredEvents,
-            totalExpectedAmount: exp,
-            totalPaidAmount: paid,
-            paidEventsCount: paidCount,
-            pendingEventsCount: pendingCount,
-          };
-        }
+        const exp = filteredEvents.reduce((s, e) => s + Number(e.expectedAmount || e.amount || 0), 0);
+        const paid = filteredEvents.reduce((s, e) => s + Number(e.paidAmount || ((e.paymentStatus || "").toLowerCase() === "paid" ? (e.expectedAmount || e.amount || 0) : 0)), 0);
+        const paidCount = filteredEvents.filter((e) => (e.paymentStatus || "").toLowerCase() === "paid" || (Number(e.paidAmount) >= Number(e.expectedAmount || e.amount || 0) && Number(e.paidAmount) > 0)).length;
+        const pendingCount = filteredEvents.length - paidCount;
 
         return {
           ...m,
           events: filteredEvents,
+          totalExpectedAmount: exp,
+          totalPaidAmount: paid,
+          paidEventsCount: paidCount,
+          pendingEventsCount: pendingCount,
         };
       });
 
-      if (hasDateFilter || hasEventFilter) {
+      if (hasStatusFilter) {
+        list = list.filter((m) => {
+          if (filters.paymentStatus === "PAID") {
+            return Number(m.totalPaidAmount) > 0 || m.paidEventsCount > 0;
+          }
+          if (filters.paymentStatus === "UNPAID") {
+            return m.pendingEventsCount > 0 || (Number(m.totalExpectedAmount || 0) - Number(m.totalPaidAmount || 0)) > 0;
+          }
+          return true;
+        });
+      } else if (hasDateFilter || hasEventFilter) {
         list = list.filter((m) => (m.events && m.events.length > 0) || (m.totalExpectedAmount > 0));
       }
     }
@@ -1504,6 +1528,74 @@ export default function ReportsPage({ mode = "event" }) {
         return;
       }
 
+      if (mode === "member") {
+        const statusLabel = filters.paymentStatus === "PAID"
+          ? "Paid Only"
+          : filters.paymentStatus === "UNPAID"
+          ? "Unpaid Only"
+          : "All Statuses";
+        const fileSuffix = filters.paymentStatus === "PAID"
+          ? "-paid-only"
+          : filters.paymentStatus === "UNPAID"
+          ? "-unpaid-only"
+          : "-all";
+
+        const memberSummaryExport = (filteredMemberContributions ?? []).map((m) => {
+          const exp = Number(m.totalExpectedAmount || 0);
+          const paid = Number(m.totalPaidAmount || 0);
+          const pend = Math.max(0, exp - paid);
+          const status = pend === 0 && exp > 0 ? "Fully Paid" : (paid > 0 ? "Partially Paid" : "Unpaid");
+
+          return {
+            "Member Name": m.memberName,
+            "Department": m.department || "General",
+            "Event Type": getMemberEventType(m),
+            "Event Name": getMemberEventName(m),
+            "Expected Amount": exp,
+            "Paid Amount": paid,
+            "Pending Amount": pend,
+            "Paid Events": Number(m.paidEventsCount || 0),
+            "Pending Events": Number(m.pendingEventsCount || 0),
+            "Payment Status": status,
+          };
+        });
+
+        const detailedEventsExport = [];
+        (filteredMemberContributions ?? []).forEach((m) => {
+          (m.events || []).forEach((ev) => {
+            const evExp = Number(ev.expectedAmount || ev.amount || 0);
+            const evPaid = Number(ev.paidAmount || ((ev.paymentStatus || "").toLowerCase() === "paid" ? evExp : 0));
+            const evPend = Math.max(0, evExp - evPaid);
+            const isEvPaid = (ev.paymentStatus || "").toLowerCase() === "paid" || evPaid >= evExp;
+
+            detailedEventsExport.push({
+              "Member Name": m.memberName,
+              "Department": m.department || "General",
+              "Event Name": ev.eventName || "Event",
+              "Event Type": ev.categoryName || ev.eventTypeName || "General",
+              "Event Date": formatGridDate(ev.eventDate || ev.paymentDate || ev.createdAt),
+              "Expected Amount": evExp,
+              "Paid Amount": evPaid,
+              "Pending Amount": evPend,
+              "Status": isEvPaid ? "Paid" : "Pending",
+              "Payment Mode": ev.paymentMode || "—",
+              "Payment Date": ev.paymentDate ? formatGridDate(ev.paymentDate) : "—",
+            });
+          });
+        });
+
+        const sheets = [
+          { name: "Member Summary", data: memberSummaryExport },
+        ];
+        if (detailedEventsExport.length > 0) {
+          sheets.push({ name: "Detailed Events Breakdown", data: detailedEventsExport });
+        }
+
+        exportSheets(`member-contributions${fileSuffix}.xlsx`, sheets);
+        toast.success(`Member contributions report (${statusLabel}) exported successfully!`);
+        return;
+      }
+
       const eventCollectionsExport = (filteredEventCollections ?? []).map((e) => ({
         "Event Name": e.eventName,
         "Event Type": e.eventTypeName || "General",
@@ -1541,6 +1633,10 @@ export default function ReportsPage({ mode = "event" }) {
       text += ` • ${filters.event}`;
     } else if (filters.eventType && filters.eventType !== "ALL") {
       text += ` • ${filters.eventType}`;
+    }
+
+    if (filters.paymentStatus && filters.paymentStatus !== "ALL") {
+      text += ` • ${filters.paymentStatus === "PAID" ? "Paid Only" : "Unpaid Only"}`;
     }
     return text;
   }, [filters]);
@@ -1733,12 +1829,22 @@ export default function ReportsPage({ mode = "event" }) {
                   options={eventOptions}
                 />
               </Box>
+              {mode === "member" && (
+                <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+                  <AppSelect
+                    label="Payment Status"
+                    value={filterPaymentStatus}
+                    onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                    options={paymentStatusOptions}
+                  />
+                </Box>
+              )}
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <AppButton
                   variant="contained"
                   size="small"
                   startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
-                  onClick={() => setFilters({ fromDate: filterFromDate, toDate: filterToDate, eventType: filterEventType, event: filterEvent })}
+                  onClick={() => setFilters({ fromDate: filterFromDate, toDate: filterToDate, eventType: filterEventType, event: filterEvent, paymentStatus: filterPaymentStatus })}
                   sx={{
                     height: 34,
                     minHeight: 34,
@@ -1759,7 +1865,8 @@ export default function ReportsPage({ mode = "event" }) {
                       setFilterToDate(null);
                       setFilterEventType("ALL");
                       setFilterEvent("ALL");
-                      setFilters({ fromDate: null, toDate: null, eventType: "ALL", event: "ALL" });
+                      setFilterPaymentStatus("ALL");
+                      setFilters({ fromDate: null, toDate: null, eventType: "ALL", event: "ALL", paymentStatus: "ALL" });
                     }}
                     sx={{
                       height: 34,
