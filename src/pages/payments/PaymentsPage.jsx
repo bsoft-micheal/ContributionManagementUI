@@ -143,7 +143,7 @@ export default function PaymentsPage() {
         getPaymentTransactionsAsync().catch(() => []),
         getMembersAsync().catch(() => []),
         getEventsAsync().catch(() => []),
-        getStatusesAsync().catch(() => []),
+        getStatusesAsync(true, "Contribution").catch(() => []),
       ]);
 
       if (Array.isArray(memsRes)) setMembersList(memsRes);

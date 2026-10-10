@@ -502,9 +502,9 @@ export default function AppDataTable({
 
   const paginatedData = allowPagination
     ? processedData.slice(
-        page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage
-      )
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage
+    )
     : processedData;
 
   // Re-order columns so pinned left are first, then normal (Action first), then pinned right, then filter by visibility

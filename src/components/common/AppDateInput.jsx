@@ -624,10 +624,9 @@ export default function AppDateInput({
                     ? "0 16px 48px rgba(0, 0, 0, 0.7)"
                     : "0 12px 36px rgba(45, 25, 75, 0.18)",
                 border: (theme) =>
-                  `1px solid ${
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.08)"
-                      : "rgba(92, 75, 130, 0.12)"
+                  `1px solid ${theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.08)"
+                    : "rgba(92, 75, 130, 0.12)"
                   }`,
                 overflow: "hidden",
                 p: 0.8,

@@ -1433,8 +1433,8 @@ export default function ReportsPage({ mode = "event" }) {
   const pageTitle = mode === "payment-history"
     ? (isMember ? "My Payment History" : "Event Payment Audit")
     : (isMember
-        ? "My Contributions"
-        : ({ event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections"));
+      ? "My Contributions"
+      : ({ event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections"));
 
   const metricOptions = mode === "pending"
     ? [{ label: "By Event", key: "event" }, { label: "By Member", key: "member" }]
@@ -1448,14 +1448,14 @@ export default function ReportsPage({ mode = "event" }) {
 
   const navTabs = isMember
     ? [
-        { label: "My Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
-        { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
-      ]
+      { label: "My Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
+      { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
+    ]
     : [
-        { label: "Event Collections", path: "/reports/event-collection-audit", modeKey: "event", icon: EventIcon },
-        { label: "Member Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
-        { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
-      ];
+      { label: "Event Collections", path: "/reports/event-collection-audit", modeKey: "event", icon: EventIcon },
+      { label: "Member Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
+      { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
+    ];
 
   const hasData = useMemo(() => {
     if (mode === "payment-history") {
@@ -1476,7 +1476,7 @@ export default function ReportsPage({ mode = "event" }) {
 
   const handleExport = () => {
     if (!canExport || !hasData) {
-      toast.warning("Record not found");
+      toast.warning("No records found");
       return;
     }
     try {
@@ -1532,13 +1532,13 @@ export default function ReportsPage({ mode = "event" }) {
         const statusLabel = filters.paymentStatus === "PAID"
           ? "Paid Only"
           : filters.paymentStatus === "UNPAID"
-          ? "Unpaid Only"
-          : "All Statuses";
+            ? "Unpaid Only"
+            : "All Statuses";
         const fileSuffix = filters.paymentStatus === "PAID"
           ? "-paid-only"
           : filters.paymentStatus === "UNPAID"
-          ? "-unpaid-only"
-          : "-all";
+            ? "-unpaid-only"
+            : "-all";
 
         const memberSummaryExport = (filteredMemberContributions ?? []).map((m) => {
           const exp = Number(m.totalExpectedAmount || 0);
@@ -1722,7 +1722,7 @@ export default function ReportsPage({ mode = "event" }) {
                   />
                 </Stack>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.78rem" }}>
-                  Financial overview, velocity audit & collection analytics
+                  Detailed financial records & data collection report
                 </Typography>
               </Box>
             </Box>
@@ -1937,265 +1937,25 @@ export default function ReportsPage({ mode = "event" }) {
               </Typography>
             </Card>
           ) : (
-            <Stack spacing={3}>
-
-              {/* KPI Cards Grid */}
-              {mode !== "payment-history" && kpiCards.length > 0 && (
-                <Grid container spacing={1.25}>
-                  {kpiCards.map((card) => (
-                    <Grid key={card.label} size={{ xs: 12, sm: 6, md: 4, lg: kpiCards.length === 6 ? 2 : Math.max(3, Math.floor(12 / kpiCards.length)) }}>
-                      <MetricCard {...card} />
-                    </Grid>
-                  ))}
-                </Grid>
+            <Box sx={{ width: "100%", mt: 1 }}>
+              {(mode === "event" || !mode) && (
+                <AppDataTable title="Event Collections" columns={eventColumns} data={filteredEventCollections} loading={false} />
               )}
-
-              {/* Chart + Summary Widgets Grid */}
-              {mode !== "payment-history" && (
-                <Grid container spacing={2.5}>
-                  {/* Financial Overview Bar Chart + Pie Chart */}
-                  <Grid size={{ xs: 12 }}>
-                    {mode === "member" && isMember ? (
-                      <FinancialBarChart
-                        totalExpected={reportTotals.totalExpected}
-                        totalCollected={reportTotals.totalCollected}
-                        totalPending={reportTotals.totalPending}
-                        totalExpenses={0}
-                        totalRemaining={reportTotals.totalRemaining}
-                        events={reportBarEvents}
-                        isMember={true}
-                        isReportsPage={true}
-                        showPieChart={true}
-                      />
-                    ) : mode === "member" ? (
-                      <Card
-                        sx={{
-                          border: `1px solid ${theme.palette.divider}`,
-                          boxShadow: isDark
-                            ? "0 8px 32px rgba(0,0,0,0.35)"
-                            : "0 8px 32px rgba(0,0,0,0.06)",
-                          background: isDark
-                            ? "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)"
-                            : "linear-gradient(145deg, #f8faff 0%, #ffffff 100%)",
-                          borderRadius: "16px",
-                        }}
-                      >
-                        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                          <Grid container spacing={2.5}>
-                            {/* Left Column: Member Directory & Selector */}
-                            <Grid size={{ xs: 12, md: 4.5, lg: 4 }}>
-                              <Box
-                                sx={{
-                                  p: 2,
-                                  borderRadius: "14px",
-                                  border: `1px solid ${theme.palette.divider}`,
-                                  bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#fcfcfd",
-                                  height: "100%",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                }}
-                              >
-                                {/* Member Search & Count */}
-                                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                                  <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: "0.9375rem" }}>
-                                    Select Member
-                                  </Typography>
-                                  <Chip
-                                    size="small"
-                                    label={`${searchedMembers.length} ${searchedMembers.length === 1 ? "member" : "members"}`}
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.68rem",
-                                      fontWeight: 700,
-                                      bgcolor: isDark ? "rgba(124,58,237,0.2)" : "rgba(124,58,237,0.1)",
-                                      color: "primary.main",
-                                    }}
-                                  />
-                                </Stack>
-
-                                <TextField
-                                  size="small"
-                                  placeholder="Search member..."
-                                  value={memberSearchTerm}
-                                  onChange={(e) => setMemberSearchTerm(e.target.value)}
-                                  slotProps={{
-                                    input: {
-                                      startAdornment: (
-                                        <InputAdornment position="start">
-                                          <SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} />
-                                        </InputAdornment>
-                                      ),
-                                    },
-                                  }}
-                                  sx={{
-                                    mb: 1.5,
-                                    "& .MuiOutlinedInput-root": {
-                                      height: 36,
-                                      fontSize: "0.82rem",
-                                      borderRadius: "8px",
-                                    },
-                                  }}
-                                />
-
-                                {/* Scrollable Member List */}
-                                <Box
-                                  sx={{
-                                    maxHeight: 380,
-                                    overflowY: "auto",
-                                    pr: 0.5,
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: 1,
-                                    "&::-webkit-scrollbar": { width: 5 },
-                                    "&::-webkit-scrollbar-thumb": {
-                                      bgcolor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
-                                      borderRadius: 3,
-                                    },
-                                  }}
-                                >
-                                  {searchedMembers.length === 0 ? (
-                                    <Box sx={{ py: 4, textAlign: "center" }}>
-                                      <Typography variant="caption" color="text.secondary">
-                                        No members found matching &quot;{memberSearchTerm}&quot;
-                                      </Typography>
-                                    </Box>
-                                  ) : (
-                                    searchedMembers.map((m, idx) => {
-                                      const mId = m.memberId || m.MemberId || idx;
-                                      const isSelected = String(activeSelectedMember?.memberId || activeSelectedMember?.MemberId || 0) === String(mId);
-                                      const exp = Number(m.totalExpectedAmount || 0);
-                                      const paid = Number(m.totalPaidAmount || 0);
-                                      const pen = Math.max(0, exp - paid);
-
-                                      return (
-                                        <Box
-                                          key={mId}
-                                          onClick={() => setSelectedReportMemberId(mId)}
-                                          sx={{
-                                            p: 1.25,
-                                            px: 1.5,
-                                            borderRadius: "10px",
-                                            cursor: "pointer",
-                                            border: "1.5px solid",
-                                            borderColor: isSelected
-                                              ? "#7c3aed"
-                                              : isDark
-                                                ? "rgba(255,255,255,0.06)"
-                                                : "rgba(0,0,0,0.06)",
-                                            bgcolor: isSelected
-                                              ? isDark
-                                                ? "rgba(124,58,237,0.16)"
-                                                : "rgba(124,58,237,0.08)"
-                                              : isDark
-                                                ? "rgba(255,255,255,0.015)"
-                                                : "#ffffff",
-                                            boxShadow: isSelected
-                                              ? "0 4px 14px rgba(124,58,237,0.2)"
-                                              : "none",
-                                            transition: "all 0.2s ease",
-                                            "&:hover": {
-                                              borderColor: isSelected ? "#7c3aed" : theme.palette.primary.light,
-                                              bgcolor: isSelected
-                                                ? isDark
-                                                  ? "rgba(124,58,237,0.2)"
-                                                  : "rgba(124,58,237,0.12)"
-                                                : isDark
-                                                  ? "rgba(255,255,255,0.04)"
-                                                  : "rgba(0,0,0,0.02)",
-                                            },
-                                          }}
-                                        >
-                                          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-                                            <Box sx={{ minWidth: 0, flex: 1 }}>
-                                              <Typography
-                                                variant="body2"
-                                                fontWeight={isSelected ? 800 : 700}
-                                                noWrap
-                                                sx={{
-                                                  fontSize: "0.84rem",
-                                                  color: isSelected ? "primary.main" : "text.primary",
-                                                }}
-                                              >
-                                                {m.memberName}
-                                              </Typography>
-                                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem" }}>
-                                                {m.department || "Member"} • Paid ₹{paid.toLocaleString()}
-                                              </Typography>
-                                            </Box>
-                                            <Chip
-                                              size="small"
-                                              label={pen === 0 ? "Paid ✓" : `₹${pen.toLocaleString()} Due`}
-                                              sx={{
-                                                height: 20,
-                                                fontSize: "0.66rem",
-                                                fontWeight: 800,
-                                                bgcolor: pen === 0 ? alpha("#10b981", 0.12) : alpha("#ef4444", 0.12),
-                                                color: pen === 0 ? "#10b981" : "#ef4444",
-                                                border: `1px solid ${pen === 0 ? alpha("#10b981", 0.3) : alpha("#ef4444", 0.3)}`,
-                                              }}
-                                            />
-                                          </Stack>
-                                        </Box>
-                                      );
-                                    })
-                                  )}
-                                </Box>
-                              </Box>
-                            </Grid>
-
-                            {/* Right Column: Financial Bar Chart for the Selected Member */}
-                            <Grid size={{ xs: 12, md: 7.5, lg: 8 }}>
-                              <FinancialBarChart
-                                totalExpected={selectedMemberBarEvents[0]?.expected || reportTotals.totalExpected}
-                                totalCollected={selectedMemberBarEvents[0]?.collected || reportTotals.totalCollected}
-                                totalPending={selectedMemberBarEvents[0]?.pending || reportTotals.totalPending}
-                                totalExpenses={0}
-                                totalRemaining={selectedMemberBarEvents[0]?.remaining || reportTotals.totalRemaining}
-                                events={reportBarEvents}
-                                isMember={isMember}
-                                showPieChart={false}
-                              />
-                            </Grid>
-                          </Grid>
-                        </CardContent>
-                      </Card>
-                    ) : (
-                      <FinancialBarChart
-                        totalExpected={reportTotals.totalExpected}
-                        totalCollected={reportTotals.totalCollected}
-                        totalPending={reportTotals.totalPending}
-                        totalExpenses={reportTotals.totalExpenses}
-                        totalRemaining={reportTotals.totalRemaining}
-                        events={reportBarEvents}
-                        isMember={isMember}
-                      />
-                    )}
-                  </Grid>
-                </Grid>
+              {mode === "member" && (
+                <AppDataTable title={isMember ? "My Contribution History" : "Member Contributions"} columns={memberColumns} data={filteredMemberContributions} loading={false} />
               )}
-
-              {/* Data Tables Section */}
-              <Box sx={{ mt: 1 }}>
-                {(mode === "event" || !mode) && (
-                  <AppDataTable title="Event Collections" columns={eventColumns} data={filteredEventCollections} loading={false} />
-                )}
-                {mode === "member" && (
-                  <AppDataTable title={isMember ? "My Contribution History" : "Member Contributions"} columns={memberColumns} data={filteredMemberContributions} loading={false} />
-                )}
-                {mode === "payment-history" && (
-                  <AppDataTable
-                    title={isMember ? "My Payment Transactions" : "Event Payment Audit"}
-                    columns={paymentHistoryColumns}
-                    data={filteredPaymentHistory}
-                    loading={false}
-                  />
-                )}
-                {mode === "pending" && (
-                  <AppDataTable title="Pending Dues & Defaulters" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
-                )}
-              </Box>
-
-            </Stack>
+              {mode === "payment-history" && (
+                <AppDataTable
+                  title={isMember ? "My Payment Transactions" : "Event Payment Audit"}
+                  columns={paymentHistoryColumns}
+                  data={filteredPaymentHistory}
+                  loading={false}
+                />
+              )}
+              {mode === "pending" && (
+                <AppDataTable title="Pending Dues & Defaulters" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
+              )}
+            </Box>
           )}
         </CardContent>
       </Card>
@@ -2310,7 +2070,7 @@ export default function ReportsPage({ mode = "event" }) {
                     size="small"
                     variant="outlined"
                     disabled={modalLoading || (memberEvents || []).length === 0}
-                    disabledTooltip="Record not found"
+                    disabledTooltip="No records found"
                     startIcon={<FileDownloadIcon sx={{ fontSize: 16 }} />}
                     onClick={handleExportMemberEvents}
                     sx={{ height: 32, fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap" }}

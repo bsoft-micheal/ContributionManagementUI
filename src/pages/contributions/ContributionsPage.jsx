@@ -13,6 +13,7 @@ import {
   Tooltip,
   Chip,
   Paper,
+  Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
@@ -567,7 +568,7 @@ export default function ContributionsPage() {
 
         try {
           const [stRes, txRes, ticketsRes] = await Promise.all([
-            getStatusesAsync().catch(() => []),
+            getStatusesAsync(true, "Contribution").catch(() => []),
             getPaymentTransactionsAsync().catch(() => []),
             getSupportTicketsAsync().catch(() => []),
           ]);
@@ -600,6 +601,17 @@ export default function ContributionsPage() {
     window.addEventListener("contribution_updated", handleUpdate);
     return () => window.removeEventListener("contribution_updated", handleUpdate);
   }, []);
+
+  useEffect(() => {
+    if (!statusModalOpen) return;
+    getStatusesAsync(true, "Contribution")
+      .then((res) => {
+        if (Array.isArray(res) && res.length > 0) {
+          setDbStatuses(res);
+        }
+      })
+      .catch(() => {});
+  }, [statusModalOpen]);
 
 
 
@@ -905,20 +917,76 @@ export default function ContributionsPage() {
     toast.success("Filter cleared");
   };
 
-  const getModalStatusOptions = (row) => {
-    if (!row) return [{ label: "Pending", value: "Pending" }];
-    const matchedTx = findContributionTransaction(row);
-    const hasProof = Boolean(matchedTx || (row?.paymentMode && row.paymentMode !== "-" && row.paymentMode !== "None") || row?.utrNumber);
-    const totalDue = Number(row?.totalDue || row?.amount || matchedTx?.amount || 0);
-    const actualRec = hasProof ? Number(matchedTx?.amount || row?.paidAmount || totalDue) : 0;
+  const getActualReceivedAmount = useCallback((row, matchedTx) => {
+    if (!row) return 0;
+    const rawStatus = row.paymentStatus;
+    const isPaidOrVerified =
+      rawStatus === 2 ||
+      rawStatus === "Paid" ||
+      String(rawStatus).toLowerCase() === "paid" ||
+      String(rawStatus).toLowerCase() === "verified" ||
+      String(matchedTx?.status || "").toLowerCase() === "verified";
 
-    if (actualRec <= 0 && totalDue > 0) {
-      return [{ label: "Pending", value: "Pending" }];
+    const cashAmt = Number(matchedTx?.cashAmount || row.cashAmount || 0);
+    const upiAmt = Number(matchedTx?.upiAmount || row.upiAmount || 0);
+    const splitSum = cashAmt + upiAmt;
+
+    if (isPaidOrVerified) {
+      if (splitSum > 0) return splitSum;
+      return Number(row.totalReceivedAmount || row.paidAmount || matchedTx?.amount || row.amount || 0);
     }
-    return [
-      { label: "Paid", value: "Paid" },
-      { label: "Pending", value: "Pending" },
-    ];
+
+    const hasSubmittedProof = Boolean(
+      (matchedTx && Number(matchedTx.amount) > 0) ||
+      (row.paymentMode && row.paymentMode !== "-" && row.paymentMode !== "--" && row.paymentMode.toLowerCase() !== "none") ||
+      row.utrNumber ||
+      row.referenceNo
+    );
+
+    if (hasSubmittedProof) {
+      if (splitSum > 0) return splitSum;
+      return Number(
+        matchedTx?.amount ||
+        row.paidAmount ||
+        row.totalReceivedAmount ||
+        (Number(row.amount) > 0 && row.paymentMode && row.paymentMode !== "None" ? row.amount : 0)
+      );
+    }
+
+    return 0;
+  }, []);
+
+  const getModalStatusOptions = (row) => {
+    const matchedTx = row ? findContributionTransaction(row) : null;
+    const actualReceivedAmt = getActualReceivedAmount(row, matchedTx);
+    const isAmountReceived = actualReceivedAmt > 0;
+
+    const list = Array.isArray(dbStatuses) && dbStatuses.length > 0
+      ? dbStatuses
+          .filter((s) => s.statusName && s.isActive !== false)
+          .map((s) => {
+            const isVerificationStatus = ["verified", "paid", "closed", "completed"].includes(
+              String(s.statusName).toLowerCase().trim()
+            );
+            return {
+              label: !isAmountReceived && isVerificationStatus
+                ? `${s.statusName} (Payment not received)`
+                : s.statusName,
+              value: s.statusName,
+              disabled: !isAmountReceived && isVerificationStatus,
+            };
+          })
+      : [
+          { label: "Pending", value: "Pending" },
+          { label: isAmountReceived ? "Verified" : "Verified (Payment not received)", value: "Verified", disabled: !isAmountReceived },
+          { label: "Rejected", value: "Rejected" },
+          { label: isAmountReceived ? "Paid" : "Paid (Payment not received)", value: "Paid", disabled: !isAmountReceived },
+        ];
+
+    if (row?.paymentStatus && !list.some((o) => o.value.toLowerCase() === String(row.paymentStatus).toLowerCase())) {
+      return [{ label: String(row.paymentStatus), value: String(row.paymentStatus) }, ...list];
+    }
+    return list;
   };
   const renderStatusBadge = (status) => {
     let color = "#b45309";
@@ -971,18 +1039,10 @@ export default function ContributionsPage() {
     const isMarkingPaid = ["paid", "verified", "closed", "completed"].includes(String(newStatus).toLowerCase());
 
     const matchedTxnForValidation = findContributionTransaction(target);
-    const hasSubmittedProof = Boolean(
-      matchedTxnForValidation ||
-      (target.paymentMode && target.paymentMode !== "-" && target.paymentMode !== "None") ||
-      target.utrNumber
-    );
-    const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(target.eventId || selectedEventId));
-    const evAmt = getMemberEventAmount(target, activeEv);
-    const totalDue = Number(target.totalDue || target.amount || evAmt || matchedTxnForValidation?.amount || 0);
-    const actualReceived = hasSubmittedProof ? Number(matchedTxnForValidation?.amount || target.paidAmount || totalDue || evAmt) : (totalDue > 0 ? totalDue : 0);
+    const actualReceived = getActualReceivedAmount(target, matchedTxnForValidation);
 
     if (actualReceived <= 0) {
-      toast.error("Received amount is ₹0. You cannot update the status until payment is received.");
+      toast.error("Payment has not been received (Received Amount: ₹0.00). You cannot verify or save this status.");
       return;
     }
 
@@ -1164,8 +1224,10 @@ export default function ContributionsPage() {
                     size="small"
                     disabled={isVerifiedRow}
                     onClick={() => {
+                      const matchedTx = findContributionTransaction(row);
+                      const receivedAmt = getActualReceivedAmount(row, matchedTx);
                       setStatusModalRow(row);
-                      setStatusChangeValue(row.paymentStatus || "Paid");
+                      setStatusChangeValue(row.paymentStatus || (receivedAmt > 0 ? "Verified" : "Pending"));
                       setAuditRemarks("");
                       setStatusModalOpen(true);
                     }}
@@ -1956,27 +2018,7 @@ export default function ContributionsPage() {
         actions={
           (() => {
             const matchedTx = statusModalRow ? findContributionTransaction(statusModalRow) : null;
-            const rawStatus = statusModalRow?.paymentStatus;
-            const isPaidOrVerified =
-              rawStatus === 2 ||
-              rawStatus === "Paid" ||
-              String(rawStatus).toLowerCase() === "paid" ||
-              String(rawStatus).toLowerCase() === "verified" ||
-              String(matchedTx?.status || "").toLowerCase() === "verified";
-
-            const cashAmt = Number(matchedTx?.cashAmount || statusModalRow?.cashAmount || 0);
-            const upiAmt = Number(matchedTx?.upiAmount || statusModalRow?.upiAmount || 0);
-            const splitSum = cashAmt + upiAmt;
-
-            const hasSubmittedProof = Boolean(matchedTx || (statusModalRow?.paymentMode && statusModalRow?.paymentMode !== "-" && statusModalRow?.paymentMode !== "None") || statusModalRow?.utrNumber);
-
-            const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId || selectedEventId));
-            const evAmt = getMemberEventAmount(statusModalRow, activeEv);
-            const totalDueAmt = Number(statusModalRow?.totalDue || statusModalRow?.amount || evAmt || matchedTx?.amount || 0);
-            const actualReceivedAmt = isPaidOrVerified
-              ? (splitSum > 0 ? splitSum : Number(statusModalRow?.totalReceivedAmount || statusModalRow?.paidAmount || matchedTx?.amount || statusModalRow?.amount || evAmt || 0))
-              : (hasSubmittedProof ? Number(matchedTx?.amount || statusModalRow?.paidAmount || totalDueAmt || evAmt) : (totalDueAmt > 0 ? totalDueAmt : 0));
-
+            const actualReceivedAmt = getActualReceivedAmount(statusModalRow, matchedTx);
             const isZeroAmount = actualReceivedAmt <= 0;
 
             return (
@@ -1989,7 +2031,11 @@ export default function ContributionsPage() {
                   startIcon={<SaveIcon />}
                   loading={statusSaving}
                   disabled={isZeroAmount}
-                  disabledTooltip={isZeroAmount ? "Cannot save: amount is ₹0.00" : ""}
+                  disabledTooltip={
+                    isZeroAmount
+                      ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first."
+                      : ""
+                  }
                   onClick={() =>
                     handleStatusUpdate(
                       statusModalRow,
@@ -2022,6 +2068,7 @@ export default function ContributionsPage() {
               {/* Submitted Payment Details Summary Card */}
               {(() => {
                 const matchedTx = findContributionTransaction(statusModalRow);
+                const actualReceivedAmt = getActualReceivedAmount(statusModalRow, matchedTx);
                 const rawStatus = statusModalRow?.paymentStatus;
                 const isPaidOrVerified =
                   rawStatus === 2 ||
@@ -2036,12 +2083,13 @@ export default function ContributionsPage() {
 
                 const rawMode = statusModalRow?.paymentMode || matchedTx?.paymentMode;
                 const modeStr = (rawMode && rawMode !== "-" && rawMode !== "--") ? rawMode : "None";
-                const hasSubmittedProof = Boolean(matchedTx || (statusModalRow?.paymentMode && statusModalRow?.paymentMode !== "-" && statusModalRow?.paymentMode !== "None") || statusModalRow?.utrNumber);
-
                 const totalDueAmt = Number(statusModalRow?.totalDue || statusModalRow?.amount || matchedTx?.amount || 0);
-                const actualReceivedAmt = isPaidOrVerified
-                  ? (splitSum > 0 ? splitSum : Number(statusModalRow?.totalReceivedAmount || statusModalRow?.paidAmount || matchedTx?.amount || statusModalRow?.amount || 0))
-                  : (hasSubmittedProof ? Number(matchedTx?.amount || statusModalRow?.paidAmount || totalDueAmt) : 0);
+                const hasSubmittedProof = Boolean(
+                  (matchedTx && Number(matchedTx.amount) > 0) ||
+                  (statusModalRow?.paymentMode && statusModalRow?.paymentMode !== "-" && statusModalRow?.paymentMode !== "--" && statusModalRow?.paymentMode.toLowerCase() !== "none") ||
+                  statusModalRow?.utrNumber ||
+                  statusModalRow?.referenceNo
+                );
 
                 const utrVal = statusModalRow?.utrNumber || statusModalRow?.referenceNo || statusModalRow?.utr || matchedTx?.utr || matchedTx?.transactionRef || matchedTx?.referenceNo || "--";
                 const dateVal = statusModalRow?.paymentDate || matchedTx?.paymentDate || matchedTx?.createdOn;
@@ -2223,7 +2271,7 @@ export default function ContributionsPage() {
                           Member / Submitted By
                         </Typography>
                         <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.78rem" }}>
-                          {statusModalRow.memberName} {createdByVal && createdByVal !== statusModalRow.memberName ? `(Recorded by ${createdByVal})` : ""}
+                          {statusModalRow.memberName}
                         </Typography>
                       </Grid>
 
@@ -2347,6 +2395,7 @@ export default function ContributionsPage() {
           setSelectedVerifyTicketRow(null);
         }}
         initialData={selectedVerifyTicketRow}
+        statuses={null}
         onSuccess={() => {
           window.dispatchEvent(new CustomEvent("contribution_updated"));
         }}
