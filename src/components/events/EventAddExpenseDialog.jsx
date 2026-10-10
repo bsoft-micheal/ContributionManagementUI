@@ -218,7 +218,7 @@ export default function EventAddExpenseDialog({
       if (!file) return;
 
       if (!file.type.startsWith("image/")) {
-        toast.error("Please upload a valid image file (PNG, JPG, JPEG, WEBP).");
+        toast.error("Please upload a valid image file (PNG, JPG, JPEG).");
         return;
       }
 
@@ -265,7 +265,7 @@ export default function EventAddExpenseDialog({
 
   const handleSave = async () => {
     const newErrors = {};
-    if (!form.eventName) newErrors.eventName = "Event is required";
+    if (!form.eventName) newErrors.eventName = "Event Name is required";
     if (!form.category) newErrors.category = "Event Type is required";
     if (!form.amount || Number(form.amount) <= 0) {
       newErrors.amount = "Valid amount is required";
@@ -326,7 +326,7 @@ export default function EventAddExpenseDialog({
     <AppDialog
       open={open}
       onClose={saving ? undefined : onClose}
-      title={`Add Expense — ${event.eventName || "Event"}`}
+      title={`Add Expense — ${event.eventName || "Event Name"}`}
       maxWidth="md"
       actions={
         <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ width: "100%" }}>
@@ -581,7 +581,7 @@ export default function EventAddExpenseDialog({
                         Click to browse or upload receipt image
                       </Typography>
                       <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: "0.68rem" }}>
-                        PNG, JPG, JPEG, WEBP up to 3MB
+                        PNG, JPG, JPEG up to 3MB
                       </Typography>
                     </Box>
                   </Box>

@@ -103,7 +103,7 @@ export function normalizeEventTypeName(name) {
 /**
  * Retrieves all stored per-event-type payment QR configurations.
  * Does not hardcode values; returns dynamically saved records.
- * @returns {Record<string, { receiverName: string, upiId: string, qrMode: string, qrImage: string | null, previewAmount: string, isActive: boolean }>}
+ * @returns {Record<string, { receiverName: string, upiId: string, qrMode: string, qrImage: string | null, accountLabel?: string, remarks?: string, previewAmount: string, isActive: boolean, isConfigured?: boolean }>}
  */
 export function getAllPaymentQrConfigs() {
   try {
@@ -123,6 +123,7 @@ export function getAllPaymentQrConfigs() {
 /**
  * Saves a payment QR configuration strictly for a single event type.
  * Guarantees that saving one event type will not overwrite others.
+ * Enforces mutual exclusivity between Dynamic UPI mode and Uploaded Custom QR mode.
  * 
  * @param {string} eventType 
  * @param {Object} config 
@@ -134,16 +135,22 @@ export function savePaymentQrConfigForEventType(eventType, config) {
 
   const all = getAllPaymentQrConfigs();
   const existing = all[norm] || {};
+  const isUploaded = (config.qrMode || "").toLowerCase() === "uploaded";
 
   all[norm] = {
     ...existing,
     ...config,
-    receiverName: (config.receiverName || "").trim(),
-    upiId: (config.upiId || "").trim(),
-    qrMode: config.qrMode || "generated",
-    qrImage: config.qrImage || null,
-    previewAmount: config.previewAmount || "",
+    qrMode: isUploaded ? "uploaded" : "generated",
+    receiverName: isUploaded ? null : (config.receiverName || "").trim(),
+    upiId: isUploaded ? null : (config.upiId || "").trim(),
+    qrImage: isUploaded ? (config.qrImage || null) : null,
+    accountLabel: isUploaded && config.accountLabel ? config.accountLabel.trim() : null,
+    remarks: isUploaded && config.remarks ? config.remarks.trim() : null,
+    previewAmount: config.previewAmount ? String(config.previewAmount).trim() : "",
     isActive: config.isActive !== undefined ? config.isActive : true,
+    isConfigured: isUploaded
+      ? Boolean(config.qrImage)
+      : Boolean(config.upiId && config.upiId.trim() && config.receiverName && config.receiverName.trim()),
     isDeleted: config.isDeleted !== undefined ? config.isDeleted : false,
     IsDeleted: config.IsDeleted !== undefined ? config.IsDeleted : false,
   };
@@ -189,36 +196,60 @@ export function getPaymentQrConfig(eventTypeOrEvent) {
     if (key) matchedConfig = all[key];
   }
 
-  // If found and has a valid UPI ID
-  if (matchedConfig && matchedConfig.upiId && matchedConfig.upiId.trim()) {
-    const receiverName = matchedConfig.receiverName || "";
-    const upiId = matchedConfig.upiId.trim();
-    const qrMode = matchedConfig.qrMode || "generated";
-    const qrImage = matchedConfig.qrImage || null;
+  if (matchedConfig && !matchedConfig.isDeleted && !matchedConfig.IsDeleted) {
+    const mode = (matchedConfig.qrMode || "generated").toLowerCase();
+    const isUploaded = mode === "uploaded";
 
-    return {
-      eventType: norm,
-      receiverName,
-      upiId,
-      qrReceiverName: receiverName,
-      qrUpiId: upiId,
-      qrMode,
-      qrImage,
-      previewAmount: matchedConfig.previewAmount || "",
-      isActive: matchedConfig.isActive !== false,
-      isConfigured: true,
-      message: "",
-    };
+    if (isUploaded && matchedConfig.qrImage) {
+      return {
+        eventType: norm || "Event",
+        receiverName: "",
+        upiId: "",
+        qrReceiverName: "",
+        qrUpiId: "",
+        accountLabel: matchedConfig.accountLabel || "",
+        remarks: matchedConfig.remarks || "",
+        qrMode: "uploaded",
+        qrImage: matchedConfig.qrImage,
+        previewAmount: matchedConfig.previewAmount || "",
+        isActive: matchedConfig.isActive !== false,
+        isConfigured: true,
+        message: "",
+      };
+    }
+
+    if (!isUploaded && matchedConfig.upiId && matchedConfig.upiId.trim() && matchedConfig.receiverName && matchedConfig.receiverName.trim()) {
+      const receiverName = matchedConfig.receiverName.trim();
+      const upiId = matchedConfig.upiId.trim();
+
+      return {
+        eventType: norm || "Event",
+        receiverName,
+        upiId,
+        qrReceiverName: receiverName,
+        qrUpiId: upiId,
+        accountLabel: "",
+        remarks: "",
+        qrMode: "generated",
+        qrImage: null,
+        previewAmount: matchedConfig.previewAmount || "",
+        isActive: matchedConfig.isActive !== false,
+        isConfigured: true,
+        message: "",
+      };
+    }
   }
 
-  // If no per-event-type config exists, return clean unconfigured state (no hardcoded credentials)
+  // If no per-event-type config exists or not configured, return clean unconfigured state
   return {
     eventType: norm || "Event",
     receiverName: "",
     upiId: "",
     qrReceiverName: "",
     qrUpiId: "",
-    qrMode: "generated",
+    accountLabel: "",
+    remarks: "",
+    qrMode: matchedConfig?.qrMode === "uploaded" ? "uploaded" : "generated",
     qrImage: null,
     previewAmount: "",
     isActive: false,
@@ -228,7 +259,7 @@ export function getPaymentQrConfig(eventTypeOrEvent) {
 }
 
 /**
- * Generates a dynamic QR Code image URL tailored for a specific member's contribution amount
+ * Generates dynamic payment QR data or resolves uploaded QR tailored for a specific member's contribution amount
  * and specific event type.
  * 
  * @param {Object} params
@@ -241,9 +272,26 @@ export function getPaymentQrConfig(eventTypeOrEvent) {
 export function generateDynamicPaymentQr({ amount, note, customConfig, eventType }) {
   const config = customConfig || getPaymentQrConfig(eventType);
   const numAmount = Number(amount) || 0;
-  const isConfigured = Boolean(config.isConfigured || (config.upiId && config.upiId.trim()) || (config.qrUpiId && config.qrUpiId.trim()));
-  const effectiveUpiId = config.upiId || config.qrUpiId || "";
-  const effectiveReceiver = config.receiverName || config.qrReceiverName || "";
+  const isUploaded = (config.qrMode || "").toLowerCase() === "uploaded";
+
+  if (isUploaded) {
+    const isConfigured = Boolean(config.qrImage);
+    return {
+      upiUri: "",
+      qrImageUrl: config.qrImage || "",
+      receiverName: "",
+      upiId: "",
+      amount: numAmount,
+      mode: "uploaded",
+      isConfigured,
+      message: isConfigured ? "" : "Payment QR is not configured for this event type.",
+    };
+  }
+
+  // Dynamic UPI mode
+  const effectiveUpiId = (config.upiId || config.qrUpiId || "").trim();
+  const effectiveReceiver = (config.receiverName || config.qrReceiverName || "").trim();
+  const isConfigured = Boolean(effectiveUpiId && effectiveReceiver);
 
   if (!isConfigured || !effectiveUpiId) {
     return {
@@ -252,7 +300,7 @@ export function generateDynamicPaymentQr({ amount, note, customConfig, eventType
       receiverName: effectiveReceiver,
       upiId: effectiveUpiId,
       amount: numAmount,
-      mode: config.qrMode || "generated",
+      mode: "generated",
       isConfigured: false,
       message: "Payment QR is not configured for this event type.",
     };
@@ -265,9 +313,8 @@ export function generateDynamicPaymentQr({ amount, note, customConfig, eventType
     note: note || "Contribution Due",
   });
 
-  const isUploadedMode = config.qrMode === "uploaded" && config.qrImage;
-  let qrImageUrl = isUploadedMode ? config.qrImage : "";
-  if (!qrImageUrl && upiUri) {
+  let qrImageUrl = "";
+  if (upiUri) {
     try {
       qrImageUrl = generateQrPngDataUrl(upiUri, 300, 2);
     } catch {
@@ -281,7 +328,7 @@ export function generateDynamicPaymentQr({ amount, note, customConfig, eventType
     receiverName: effectiveReceiver,
     upiId: effectiveUpiId,
     amount: numAmount,
-    mode: isUploadedMode ? "uploaded" : "generated",
+    mode: "generated",
     isConfigured: true,
     message: "",
   };
@@ -315,12 +362,15 @@ export function buildPaymentReminderEmailHtml({
 }) {
   const effectiveCategory = categoryName || eventName || "Contribution";
   const formattedAmount = `₹${Number(amount || 0).toLocaleString("en-IN")}`;
-  const upiUri = buildUpiPaymentUri({
-    upiId,
-    receiverName,
-    amount,
-    note: `Contribution for ${effectiveCategory}`,
-  });
+  const hasUpi = Boolean(upiId && upiId.trim());
+  const upiUri = hasUpi
+    ? buildUpiPaymentUri({
+        upiId,
+        receiverName,
+        amount,
+        note: `Contribution for ${effectiveCategory}`,
+      })
+    : "";
 
   const title = customSubject || `Contribution Payment Reminder - ${effectiveCategory}`;
 
@@ -358,20 +408,25 @@ export function buildPaymentReminderEmailHtml({
       </div>
 
       <!-- QR Code Section -->
+      ${qrImageUrl ? `
       <div style="text-align: center; margin-bottom: 24px;">
         <p style="margin: 0 0 12px 0; font-size: 13px; font-weight: 700; color: #334155;">Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm):</p>
         <div style="display: inline-block; padding: 12px; background: #ffffff; border: 2px solid #0284c7; border-radius: 12px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.1);">
           <img src="${qrImageUrl}" alt="Payment QR Code" width="180" height="180" style="display: block; margin: 0 auto;" />
         </div>
-        <p style="margin: 8px 0 0 0; font-size: 11px; color: #64748b;">Amount is pre-filled automatically when scanned.</p>
+        ${hasUpi ? '<p style="margin: 8px 0 0 0; font-size: 11px; color: #64748b;">Amount is pre-filled automatically when scanned.</p>' : '<p style="margin: 8px 0 0 0; font-size: 11px; color: #64748b;">Scan with your UPI payment app to complete payment.</p>'}
       </div>
+      ` : ''}
 
-      <!-- Payment Details Breakdown -->
+      <!-- Payment Details Breakdown (only for Dynamic UPI mode with UPI ID) -->
+      ${hasUpi ? `
       <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; background: #fdfdfd; border: 1px solid #f1f5f9; border-radius: 8px;">
+        ${receiverName ? `
         <tr style="border-bottom: 1px solid #f1f5f9;">
           <td style="padding: 10px 12px; color: #64748b; font-weight: 600;">Receiver Name</td>
-          <td style="padding: 10px 12px; color: #1e293b; font-weight: 700; text-align: right;">${receiverName || "Daniel A"}</td>
+          <td style="padding: 10px 12px; color: #1e293b; font-weight: 700; text-align: right;">${receiverName}</td>
         </tr>
+        ` : ''}
         <tr>
           <td style="padding: 10px 12px; color: #64748b; font-weight: 600;">UPI ID</td>
           <td style="padding: 10px 12px; color: #0284c7; font-weight: 700; text-align: right;">${upiId}</td>
@@ -384,6 +439,7 @@ export function buildPaymentReminderEmailHtml({
           Pay ${formattedAmount} via UPI
         </a>
       </div>
+      ` : ''}
 
       <!-- One-Click Confirmation Section -->
       <div style="margin-top: 20px; padding-top: 16px; border-top: 1.5px dashed #e2e8f0; text-align: center;">
