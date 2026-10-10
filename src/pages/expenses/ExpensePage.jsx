@@ -47,6 +47,7 @@ import AppButton from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
+import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 import {
   getExpensesAsync,
   createExpenseAsync,
@@ -155,6 +156,42 @@ export default function ExpensePage() {
   const [form, setForm] = useState(initialForm);
   const [formImageError, setFormImageError] = useState(false);
   const [errors, setErrors] = useState({});
+
+  const savedFormRef = useRef(null);
+
+  const isFormDirty = React.useCallback(() => {
+    if (!dialogOpen || !savedFormRef.current) return false;
+    const s = savedFormRef.current;
+
+    if ((form.category || "").trim() !== (s.category || "").trim()) return true;
+    if ((form.eventName || "").trim() !== (s.eventName || "").trim()) return true;
+    if (String(form.amount ?? "").trim() !== String(s.amount ?? "").trim()) return true;
+    if ((form.submittedBy || "").trim() !== (s.submittedBy || "").trim()) return true;
+    if ((form.description || "").trim() !== (s.description || "").trim()) return true;
+
+    // Compare dates
+    const dateCur = form.expenseDate ? dayjs(form.expenseDate).format("YYYY-MM-DD") : "";
+    const dateSaved = s.expenseDate ? dayjs(s.expenseDate).format("YYYY-MM-DD") : "";
+    if (dateCur !== dateSaved) return true;
+
+    // Compare attachment
+    if ((form.attachment || "") !== (s.attachment || "")) return true;
+    if ((form.attachmentName || "") !== (s.attachmentName || "")) return true;
+
+    return false;
+  }, [dialogOpen, form]);
+
+  const handleCloseDialog = React.useCallback(() => {
+    setDialogOpen(false);
+    setEditingExpense(null);
+    setErrors({});
+    savedFormRef.current = null;
+  }, []);
+
+  const { handleCancelRequest, UnsavedChangesDialog } = useUnsavedChanges({
+    isDirty: isFormDirty,
+    onQuit: handleCloseDialog,
+  });
 
   // Filter state inside AppDataTable filterPanel
   const [filterEvent, setFilterEvent] = useState("ALL");
@@ -490,7 +527,7 @@ export default function ExpensePage() {
       ? `${row.id || "EXP"}_attachment.png`
       : getAttachmentDisplayName(rawFile) || `${row.id || "EXP"}_attachment.png`;
 
-    setForm({
+    const editFormData = {
       eventName: row.eventName || "",
       category: row.category || "",
       amount: row.amount || "",
@@ -500,7 +537,9 @@ export default function ExpensePage() {
       status: row.status || "Pending",
       attachment: resolvedUrl || rawFile,
       attachmentName: displayName,
-    });
+    };
+    setForm(editFormData);
+    savedFormRef.current = editFormData;
     setErrors({});
     setDialogOpen(true);
   };
@@ -661,6 +700,7 @@ export default function ExpensePage() {
       setDialogOpen(false);
       setEditingExpense(null);
       setForm(initialForm);
+      savedFormRef.current = null;
       setErrors({});
       await fetchExpensesFromDb();
     } catch (err) {
@@ -1069,11 +1109,13 @@ export default function ExpensePage() {
                       const mName = (m.name || m.memberName || "").trim().toLowerCase();
                       return mName === currentUserName.trim().toLowerCase();
                     });
-                    setEditingExpense(null);
-                    setForm({
+                    const addFormData = {
                       ...initialForm,
                       submittedBy: matched ? (matched.name || matched.memberName) : currentUserName,
-                    });
+                    };
+                    setEditingExpense(null);
+                    setForm(addFormData);
+                    savedFormRef.current = addFormData;
                     setErrors({});
                     setDialogOpen(true);
                   }}
@@ -1179,22 +1221,14 @@ export default function ExpensePage() {
       {/* Add / Edit Expense Dialog */}
       <AppDialog
         open={dialogOpen}
-        onClose={() => {
-          setDialogOpen(false);
-          setEditingExpense(null);
-          setErrors({});
-        }}
+        onClose={() => handleCancelRequest(handleCloseDialog)}
         title={editingExpense ? "Edit Expense" : "Add Expense"}
         maxWidth="md"
         actions={
           <Stack direction="row" spacing={1.5}>
             <AppButton
               variant="outlined"
-              onClick={() => {
-                setDialogOpen(false);
-                setEditingExpense(null);
-                setErrors({});
-              }}
+              onClick={() => handleCancelRequest(handleCloseDialog)}
             >
               Cancel
             </AppButton>
@@ -1966,6 +2000,7 @@ export default function ExpensePage() {
           </Box>
         )}
       </AppDialog>
+      <UnsavedChangesDialog />
     </div>
   );
 }
