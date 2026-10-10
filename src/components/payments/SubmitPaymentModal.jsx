@@ -1134,7 +1134,7 @@ export default function SubmitPaymentModal({
                 if (errors.eventCategory) setErrors((prev) => ({ ...prev, eventCategory: "" }));
               }}
               options={categoryOptions}
-              placeholder="Select Event Category"
+              placeholder="Select Event Type"
               error={!!errors.eventCategory}
               helperText={errors.eventCategory}
               required

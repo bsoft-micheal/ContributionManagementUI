@@ -1027,14 +1027,14 @@ export default function GalleryPage() {
               </Box>
               <Box sx={{ minWidth: 220 }}>
                 <AppSelect
-                  label="Select Event"
+                  label="Select Event Name"
                   value={filterEvent}
                   onChange={(e) => {
                     setFilterEvent(e.target.value);
                   }}
                   options={eventOptions}
                   size="small"
-                  placeholder="Select Event"
+                  placeholder="Select Event Name"
                   fullWidth
                 />
               </Box>
@@ -1147,7 +1147,7 @@ export default function GalleryPage() {
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
               label="Event Name"
-              placeholder="Select Event"
+              placeholder="Select Event Name"
               value={form.eventName}
               onChange={(e) => {
                 const newEventName = e.target.value;

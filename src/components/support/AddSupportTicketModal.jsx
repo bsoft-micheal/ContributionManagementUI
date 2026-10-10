@@ -362,7 +362,8 @@ export default function AddSupportTicketModal({
 
   const handleSaveTicket = async () => {
     const newErrors = {};
-    if (!form.memberName) newErrors.memberName = "Member Name is required";
+    if (!form.memberName) newErrors.memberName = "User Name is required";
+    if (!form.eventType) newErrors.eventType = "Event Type is required";
     if (!form.ticketType) newErrors.ticketType = "This field is required";
     if (!form.attachment) newErrors.attachment = "This field is required";
 
@@ -487,9 +488,10 @@ export default function AddSupportTicketModal({
               label="Event Type"
               placeholder="Select Event Type"
               value={form.eventType}
-              allowClear={true}
+              allowClear={false}
               onChange={(e) => {
                 const selectedType = e.target.value;
+                if (errors.eventType) setErrors((p) => ({ ...p, eventType: "" }));
                 setForm((c) => {
                   const matchingEvents = (eventsList || []).filter(
                     (ev) =>
@@ -514,6 +516,9 @@ export default function AddSupportTicketModal({
                 });
               }}
               options={eventTypeOptions}
+              error={!!errors.eventType}
+              helperText={errors.eventType}
+              required
             />
           </Grid>
 

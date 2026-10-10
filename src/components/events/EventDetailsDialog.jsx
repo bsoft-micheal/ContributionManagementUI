@@ -300,7 +300,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                   mb: 0.2,
                 }}
               >
-                Event Identity
+                Event Name
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
                 {event?.eventName || ""}
@@ -321,7 +321,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                   mb: 0.2,
                 }}
               >
-                Category
+                Event Type
               </Typography>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.2 }}>
                 {(() => {
@@ -504,16 +504,16 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                         }}
                       >
                         <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, width: 45, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
-                          #
+                          S.no
                         </TableCell>
                         <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
                           Birthday Member
                         </TableCell>
                         <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
-                          Date of Birth (DOB)
+                          Date of Birth 
                         </TableCell>
                         <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, width: 110, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
-                          Member Type
+                          Work Type
                         </TableCell>
                       </TableRow>
                     </TableHead>

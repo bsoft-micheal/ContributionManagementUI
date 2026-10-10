@@ -307,14 +307,14 @@ export default function PaymentQrReminderDialog({
                     ₹{amount.toLocaleString("en-IN")}
                   </Typography>
                   <Chip
-                    label="Pre-filled in QR"
+                    label={mode === "uploaded" ? "Uploaded Custom QR" : "Pre-filled in QR"}
                     size="small"
                     sx={{
                       height: 18,
                       fontSize: "0.6rem",
                       fontWeight: 800,
-                      bgcolor: "rgba(2, 132, 199, 0.12)",
-                      color: "#0284c7",
+                      bgcolor: mode === "uploaded" ? "rgba(234, 88, 12, 0.12)" : "rgba(2, 132, 199, 0.12)",
+                      color: mode === "uploaded" ? "#ea580c" : "#0284c7",
                       mt: 0.5,
                     }}
                   />
@@ -322,13 +322,13 @@ export default function PaymentQrReminderDialog({
               </Grid>
             </Box>
 
-            {/* Dynamic QR Code Card */}
+            {/* QR Code Card */}
             <Box
               sx={{
                 p: 2.5,
                 textAlign: "center",
                 borderRadius: "16px",
-                border: "2px solid #0284c7",
+                border: mode === "uploaded" ? "2px solid #16a34a" : "2px solid #0284c7",
                 bgcolor: isDark ? "rgba(2, 132, 199, 0.05)" : "rgba(2, 132, 199, 0.02)",
               }}
             >
@@ -338,7 +338,7 @@ export default function PaymentQrReminderDialog({
                   p: 1.5,
                   borderRadius: "14px",
                   bgcolor: "#ffffff",
-                  boxShadow: "0 8px 24px rgba(2, 132, 199, 0.15)",
+                  boxShadow: mode === "uploaded" ? "0 8px 24px rgba(22, 163, 74, 0.15)" : "0 8px 24px rgba(2, 132, 199, 0.15)",
                 }}
               >
                 <Box
@@ -359,33 +359,37 @@ export default function PaymentQrReminderDialog({
                 Scan with any UPI App (GPay, PhonePe, Paytm)
               </Typography>
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                Amount of <strong>₹{amount.toLocaleString("en-IN")}</strong> and Receiver <strong>{receiverName}</strong> are automatically pre-filled.
+                {mode === "uploaded"
+                  ? "Payment QR uploaded manually for this event category."
+                  : `Amount of ₹${amount.toLocaleString("en-IN")}${receiverName ? ` and Receiver ${receiverName}` : ""} are automatically pre-filled.`}
               </Typography>
 
-              {/* UPI ID & Quick Copy Bar */}
-              <Box
-                sx={{
-                  mt: 2,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 1,
-                  px: 2,
-                  py: 0.8,
-                  borderRadius: "10px",
-                  bgcolor: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
-                  border: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem", color: "#0284c7" }}>
-                  {upiId}
-                </Typography>
-                <Tooltip title="Copy UPI ID">
-                  <IconButton size="small" onClick={() => copyToClipboard(upiId, "UPI ID")}>
-                    <ContentCopyOutlinedIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Tooltip>
-              </Box>
+              {/* UPI ID & Quick Copy Bar (Only if UPI ID exists in Dynamic mode) */}
+              {upiId && (
+                <Box
+                  sx={{
+                    mt: 2,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 1,
+                    px: 2,
+                    py: 0.8,
+                    borderRadius: "10px",
+                    bgcolor: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem", color: "#0284c7" }}>
+                    {upiId}
+                  </Typography>
+                  <Tooltip title="Copy UPI ID">
+                    <IconButton size="small" onClick={() => copyToClipboard(upiId, "UPI ID")}>
+                      <ContentCopyOutlinedIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
             </Box>
 
             {sentSuccess && (
