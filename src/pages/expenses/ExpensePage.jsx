@@ -104,6 +104,7 @@ const isPdfFile = (filePath) => {
 };
 
 const initialForm = {
+  eventId: "",
   eventName: "",
   category: "",
   amount: "",
@@ -392,29 +393,39 @@ export default function ExpensePage() {
 
   // Dynamically calculate selected event budget and remaining limit
   const selectedEventBudget = useMemo(() => {
-    if (!form.eventName) return null;
-    const ev = eventsList.find(
-      (e) => (e.name || e.eventName || "").trim().toLowerCase() === form.eventName.trim().toLowerCase()
-    );
+    if (!form.eventName && !form.eventId) return null;
+    const ev = eventsList.find((e) => {
+      if (form.eventId && (e.eventId === form.eventId || e.id === form.eventId)) return true;
+      const matchName = (e.name || e.eventName || "").trim().toLowerCase() === (form.eventName || "").trim().toLowerCase();
+      if (!matchName) return false;
+      if (form.category) {
+        const cat = e.eventTypeName || e.category || "";
+        return cat.trim().toLowerCase() === form.category.trim().toLowerCase();
+      }
+      return true;
+    });
     if (!ev) return null;
 
     const expected = Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0);
     const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
     const spent = expenses
       .filter((ex) =>
-        (ex.eventName || "").trim().toLowerCase() === form.eventName.trim().toLowerCase() &&
+        (ex.eventName || "").trim().toLowerCase() === (form.eventName || "").trim().toLowerCase() &&
         (!currentExpenseId || (ex.expenseId !== currentExpenseId && ex.id !== currentExpenseId)) &&
         (ex.status || "").toLowerCase() !== "rejected"
       )
       .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
 
     const remaining = Math.max(0, expected - spent);
-    return {
-      expected,
-      spent,
-      remaining,
-    };
-  }, [form.eventName, eventsList, expenses, editingExpense]);
+    return { expected, spent, remaining };
+  }, [form.eventName, form.eventId, form.category, eventsList, expenses, editingExpense]);
+
+  // True when a budget is set AND entered amount exceeds the remaining limit
+  const isOverBudget =
+    selectedEventBudget !== null &&
+    selectedEventBudget.expected > 0 &&
+    Number(form.amount) > 0 &&
+    Number(form.amount) > selectedEventBudget.remaining;
 
   // Event options for the filter panel (cascaded by filterCategory)
   const eventOptions = useMemo(() => {
@@ -653,10 +664,12 @@ export default function ExpensePage() {
     if (!form.category) newErrors.category = "Event Type is required";
     if (!form.amount || Number(form.amount) <= 0) {
       newErrors.amount = "Valid amount is required";
-    } else if (selectedEventBudget && Number(form.amount) > selectedEventBudget.remaining) {
-      newErrors.amount = COMMON_STRINGS.EXPENSES?.AMOUNT_EXCEEDS_BUDGET
-        ? COMMON_STRINGS.EXPENSES.AMOUNT_EXCEEDS_BUDGET(selectedEventBudget.remaining)
-        : `Amount cannot exceed the remaining budget (₹${selectedEventBudget.remaining.toLocaleString()})`;
+    } else if (
+      selectedEventBudget &&
+      selectedEventBudget.expected > 0 &&
+      Number(form.amount) > selectedEventBudget.remaining
+    ) {
+      newErrors.amount = `Amount exceeds balance limit. Max allowable: ₹${selectedEventBudget.remaining.toLocaleString("en-IN")}`;
     }
     if (!form.submittedBy) newErrors.submittedBy = "Submitted by is required";
     if (!form.attachment && (!editingExpense || (!editingExpense.fileName && !editingExpense.fileUrl))) {
@@ -676,6 +689,7 @@ export default function ExpensePage() {
 
     try {
       const payload = {
+        eventId: form.eventId || undefined,
         eventName: form.eventName,
         category: form.category,
         amount: Number(form.amount),
@@ -1225,14 +1239,24 @@ export default function ExpensePage() {
         title={editingExpense ? "Edit Expense" : "Add Expense"}
         maxWidth="md"
         actions={
-          <Stack direction="row" spacing={1.5}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            {isOverBudget && (
+              <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, fontSize: "0.75rem" }}>
+                ⚠ Amount exceeds balance limit (₹{selectedEventBudget.remaining.toLocaleString("en-IN")})
+              </Typography>
+            )}
             <AppButton
               variant="outlined"
               onClick={() => handleCancelRequest(handleCloseDialog)}
             >
               Cancel
             </AppButton>
-            <AppButton variant="contained" onClick={handleSaveExpense}>
+            <AppButton
+              variant="contained"
+              onClick={handleSaveExpense}
+              disabled={isOverBudget}
+              sx={isOverBudget ? { opacity: 0.5, cursor: "not-allowed" } : {}}
+            >
               {editingExpense ? "Update" : "Save"}
             </AppButton>
           </Stack>
@@ -1299,10 +1323,41 @@ export default function ExpensePage() {
                         "";
                     }
                   }
+                  let clampedAmount = c.amount;
+                  const matchedEv = eventsList.find((ev) => {
+                    const nameMatch = (ev.name || ev.eventName || "").trim().toLowerCase() === (selectedEventName || "").trim().toLowerCase();
+                    if (!nameMatch) return false;
+                    if (autoCategory) {
+                      const cat = ev.eventTypeName || ev.category || "";
+                      return cat.trim().toLowerCase() === autoCategory.trim().toLowerCase();
+                    }
+                    return true;
+                  });
+
+                  if (c.amount && matchedEv) {
+                    const expAmt = Number(matchedEv.totalExpectedAmount ?? matchedEv.expectedAmount ?? matchedEv.baseAmount ?? 0);
+                    if (expAmt > 0) {
+                      const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
+                      const spentAmt = expenses
+                        .filter((ex) =>
+                          (ex.eventName || "").trim().toLowerCase() === (selectedEventName || "").trim().toLowerCase() &&
+                          (!currentExpenseId || (ex.expenseId !== currentExpenseId && ex.id !== currentExpenseId)) &&
+                          (ex.status || "").toLowerCase() !== "rejected"
+                        )
+                        .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+                      const remAmt = Math.max(0, expAmt - spentAmt);
+                      if (Number(c.amount) > remAmt) {
+                        clampedAmount = remAmt > 0 ? String(remAmt) : "";
+                      }
+                    }
+                  }
+
                   return {
                     ...c,
+                    eventId: matchedEv ? (matchedEv.eventId || matchedEv.id || "") : "",
                     eventName: selectedEventName,
                     category: autoCategory,
+                    amount: clampedAmount,
                   };
                 });
                 if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
@@ -1348,10 +1403,10 @@ export default function ExpensePage() {
                 </Box>
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                    {COMMON_STRINGS.EXPENSES?.REMAINING_LIMIT || "Remaining Limit"}
+                    {COMMON_STRINGS.EXPENSES?.BALANCE_LIMIT || "Balance Limit"}
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 900, color: selectedEventBudget.remaining > 0 ? "success.main" : "error.main" }}>
-                    ₹{selectedEventBudget.remaining.toLocaleString()}
+                    ₹{selectedEventBudget.remaining.toLocaleString("en-IN")}
                   </Typography>
                 </Box>
               </Box>
@@ -1364,25 +1419,46 @@ export default function ExpensePage() {
               placeholder="₹ Enter amount"
               value={form.amount}
               onChange={(e) => {
-                const val = e.target.value;
-                setForm((c) => ({ ...c, amount: val }));
-                if (selectedEventBudget && Number(val) > selectedEventBudget.remaining) {
-                  setErrors((p) => ({
-                    ...p,
-                    amount: COMMON_STRINGS.EXPENSES?.AMOUNT_EXCEEDS_BUDGET
-                      ? COMMON_STRINGS.EXPENSES.AMOUNT_EXCEEDS_BUDGET(selectedEventBudget.remaining)
-                      : `Amount cannot exceed the remaining budget (₹${selectedEventBudget.remaining.toLocaleString()})`,
-                  }));
-                } else if (errors.amount) {
+                const raw = e.target.value;
+                if (raw === "") {
+                  setForm((c) => ({ ...c, amount: "" }));
                   setErrors((p) => ({ ...p, amount: "" }));
+                  return;
                 }
+
+                const numVal = Number(raw);
+                const hasBudgetLimit = selectedEventBudget && selectedEventBudget.expected > 0;
+
+                if (hasBudgetLimit) {
+                  if (selectedEventBudget.remaining <= 0) {
+                    setForm((c) => ({ ...c, amount: "" }));
+                    setErrors((p) => ({
+                      ...p,
+                      amount: "Budget fully spent — ₹0 balance remaining for this event",
+                    }));
+                    return;
+                  }
+
+                  if (numVal > selectedEventBudget.remaining) {
+                    // Strictly clamp to maximum allowable remaining budget
+                    setForm((c) => ({ ...c, amount: String(selectedEventBudget.remaining) }));
+                    setErrors((p) => ({
+                      ...p,
+                      amount: `Exceeds balance limit — max allowable ₹${selectedEventBudget.remaining.toLocaleString("en-IN")}`,
+                    }));
+                    return;
+                  }
+                }
+
+                setForm((c) => ({ ...c, amount: raw }));
+                setErrors((p) => ({ ...p, amount: "" }));
               }}
               restrictType="numberonly"
-              error={!!errors.amount}
+              error={isOverBudget || !!errors.amount}
               helperText={
                 errors.amount ||
-                (selectedEventBudget
-                  ? `Max allowable: ₹${selectedEventBudget.remaining.toLocaleString()}`
+                (selectedEventBudget && selectedEventBudget.expected > 0
+                  ? `Max allowable: ₹${selectedEventBudget.remaining.toLocaleString("en-IN")}`
                   : undefined)
               }
               required

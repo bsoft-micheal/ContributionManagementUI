@@ -163,7 +163,7 @@ export default function EventAddExpenseDialog({
       0
     );
 
-    const targetEventName = (event.eventName || "").trim().toLowerCase();
+    const targetEventName = (event.eventName || event.name || "").trim().toLowerCase();
     const spent = existingExpenses
       .filter((ex) => {
         const exEvent = (ex.eventName || "").trim().toLowerCase();
@@ -172,12 +172,15 @@ export default function EventAddExpenseDialog({
       .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
 
     const remaining = Math.max(0, expected - spent);
-    return {
-      expected,
-      spent,
-      remaining,
-    };
+    return { expected, spent, remaining };
   }, [event, existingExpenses]);
+
+  // True when a budget is configured AND the entered amount exceeds the balance limit
+  const isOverBudget =
+    eventBudget !== null &&
+    eventBudget.expected > 0 &&
+    Number(form.amount) > 0 &&
+    Number(form.amount) > eventBudget.remaining;
 
   // Member dropdown options
   const memberOptions = useMemo(() => {
@@ -269,10 +272,12 @@ export default function EventAddExpenseDialog({
     if (!form.category) newErrors.category = "Event Type is required";
     if (!form.amount || Number(form.amount) <= 0) {
       newErrors.amount = "Valid amount is required";
-    } else if (eventBudget && eventBudget.expected > 0 && Number(form.amount) > eventBudget.remaining) {
-      newErrors.amount = COMMON_STRINGS.EXPENSES?.AMOUNT_EXCEEDS_BUDGET
-        ? COMMON_STRINGS.EXPENSES.AMOUNT_EXCEEDS_BUDGET(eventBudget.remaining)
-        : `Amount cannot exceed the remaining budget (₹${eventBudget.remaining.toLocaleString()})`;
+    } else if (
+      eventBudget &&
+      eventBudget.expected > 0 &&
+      Number(form.amount) > eventBudget.remaining
+    ) {
+      newErrors.amount = `Amount exceeds balance limit. Max allowable: ₹${eventBudget.remaining.toLocaleString("en-IN")}`;
     }
     if (!form.submittedBy) newErrors.submittedBy = "Submitted by is required";
     if (!form.attachment) {
@@ -295,6 +300,7 @@ export default function EventAddExpenseDialog({
     try {
       setSaving(true);
       const payload = {
+        eventId: event?.eventId || event?.id || undefined,
         eventName: form.eventName,
         category: form.category,
         amount: Number(form.amount),
@@ -330,6 +336,11 @@ export default function EventAddExpenseDialog({
       maxWidth="md"
       actions={
         <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ width: "100%" }}>
+          {isOverBudget && (
+            <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, fontSize: "0.75rem" }}>
+              ⚠ Exceeds balance limit (₹{eventBudget.remaining.toLocaleString("en-IN")})
+            </Typography>
+          )}
           <AppButton
             variant="outlined"
             onClick={onClose}
@@ -341,12 +352,13 @@ export default function EventAddExpenseDialog({
           <AppButton
             variant="contained"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || isOverBudget}
             sx={{
               minWidth: 110,
               bgcolor: "#342b54 !important",
               color: "#ffffff !important",
               "&:hover": { bgcolor: "#241d3b !important" },
+              ...(isOverBudget ? { opacity: 0.5, cursor: "not-allowed" } : {}),
             }}
           >
             {saving ? "Saving..." : "Save Expense"}
@@ -420,7 +432,7 @@ export default function EventAddExpenseDialog({
                 </Box>
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                    Remaining Limit
+                    Balance Limit
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 900, color: eventBudget.remaining > 0 ? "success.main" : "error.main" }}>
                     ₹{eventBudget.remaining.toLocaleString("en-IN")}
@@ -437,19 +449,42 @@ export default function EventAddExpenseDialog({
               placeholder="₹ Enter expense amount"
               value={form.amount}
               onChange={(e) => {
-                const val = e.target.value;
-                setForm((c) => ({ ...c, amount: val }));
-                if (eventBudget && eventBudget.expected > 0 && Number(val) > eventBudget.remaining) {
-                  setErrors((p) => ({
-                    ...p,
-                    amount: `Amount cannot exceed remaining budget (₹${eventBudget.remaining.toLocaleString("en-IN")})`,
-                  }));
-                } else if (errors.amount) {
+                const raw = e.target.value;
+                if (raw === "") {
+                  setForm((c) => ({ ...c, amount: "" }));
                   setErrors((p) => ({ ...p, amount: "" }));
+                  return;
                 }
+
+                const numVal = Number(raw);
+                const hasBudgetLimit = eventBudget && eventBudget.expected > 0;
+
+                if (hasBudgetLimit) {
+                  if (eventBudget.remaining <= 0) {
+                    setForm((c) => ({ ...c, amount: "" }));
+                    setErrors((p) => ({
+                      ...p,
+                      amount: "Budget fully spent — ₹0 balance remaining for this event",
+                    }));
+                    return;
+                  }
+
+                  if (numVal > eventBudget.remaining) {
+                    // Strictly clamp to maximum allowable remaining budget
+                    setForm((c) => ({ ...c, amount: String(eventBudget.remaining) }));
+                    setErrors((p) => ({
+                      ...p,
+                      amount: `Exceeds balance limit — max allowable ₹${eventBudget.remaining.toLocaleString("en-IN")}`,
+                    }));
+                    return;
+                  }
+                }
+
+                setForm((c) => ({ ...c, amount: raw }));
+                setErrors((p) => ({ ...p, amount: "" }));
               }}
               restrictType="numberonly"
-              error={!!errors.amount}
+              error={isOverBudget || !!errors.amount}
               helperText={
                 errors.amount ||
                 (eventBudget && eventBudget.expected > 0

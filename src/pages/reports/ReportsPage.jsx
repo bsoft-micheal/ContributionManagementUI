@@ -467,23 +467,87 @@ export default function ReportsPage({ mode = "event" }) {
     return list;
   }, [memberContributions, dialogFilter, dialogSearch]);
 
+  const resolveEventCategory = useCallback((ev) => {
+    if (!ev) return "General";
+    if (ev.categoryName && ev.categoryName.trim()) return ev.categoryName.trim();
+    if (ev.eventTypeName && ev.eventTypeName.trim()) return ev.eventTypeName.trim();
+    if (ev.eventType && ev.eventType.trim()) return ev.eventType.trim();
+    if (ev.category && ev.category.trim()) return ev.category.trim();
+    const match = (eventsList || []).find(
+      (el) => (el.eventId && ev.eventId && String(el.eventId) === String(ev.eventId)) ||
+              ((el.eventName || el.name || "").trim().toLowerCase() === (ev.eventName || "").trim().toLowerCase())
+    );
+    return match?.eventTypeName || match?.category || match?.categoryName || "General";
+  }, [eventsList]);
+
+  const resolveEventName = useCallback((ev) => {
+    if (!ev) return "Event";
+    if (ev.eventName && ev.eventName.trim()) return ev.eventName.trim();
+    if (ev.name && ev.name.trim()) return ev.name.trim();
+    if (ev.title && ev.title.trim()) return ev.title.trim();
+    const match = (eventsList || []).find(
+      (el) => el.eventId && ev.eventId && String(el.eventId) === String(ev.eventId)
+    );
+    return match?.eventName || match?.name || "Event";
+  }, [eventsList]);
+
+  const getMemberEventType = useCallback((r) => {
+    if (filters.eventType && filters.eventType !== "ALL") {
+      return filters.eventType;
+    }
+    if (Array.isArray(r.events) && r.events.length > 0) {
+      const types = Array.from(
+        new Set(
+          r.events
+            .map((e) => resolveEventCategory(e))
+            .filter(Boolean)
+        )
+      );
+      if (types.length > 0) return types.join(", ");
+    }
+    return r.eventTypeName || r.categoryName || r.eventType || "All Event Types";
+  }, [filters.eventType, resolveEventCategory]);
+
+  const getMemberEventName = useCallback((r) => {
+    if (filters.event && filters.event !== "ALL") {
+      return filters.event;
+    }
+    if (Array.isArray(r.events) && r.events.length > 0) {
+      let filteredEvs = r.events;
+      if (filters.eventType && filters.eventType !== "ALL") {
+        filteredEvs = filteredEvs.filter(
+          (e) => resolveEventCategory(e).trim().toLowerCase() === filters.eventType.trim().toLowerCase()
+        );
+      }
+      const names = Array.from(
+        new Set(
+          filteredEvs
+            .map((e) => resolveEventName(e))
+            .filter(Boolean)
+        )
+      );
+      if (names.length > 0) return names.join(", ");
+    }
+    return r.eventName || r.relatedEvent || r.name || "All Events";
+  }, [filters.event, filters.eventType, resolveEventCategory, resolveEventName]);
+
   const handleExportMemberEvents = () => {
     if (!selectedMember) return;
     try {
       const sheetData = memberEvents.map((e) => ({
         "Member": selectedMember.memberName,
-        "Event Name": e.eventName,
-        "Category": e.categoryName || "General",
+        "Event Type": resolveEventCategory(e),
+        "Event Name": resolveEventName(e),
         "Event Date": formatGridDate(e.eventDate || e.EventDate),
-        "Expected Amount": e.expectedAmount ?? e.amount,
-        "Paid Amount": e.paidAmount ?? 0,
-        "Pending Amount": e.pendingAmount ?? 0,
-        "Status": e.paymentStatus,
+        "Expected Amount": Number(e.expectedAmount ?? e.amount ?? 0),
+        "Paid Amount": Number(e.paidAmount ?? 0),
+        "Pending Amount": Number(e.pendingAmount ?? 0),
+        "Status": e.paymentStatus || ((Number(e.paidAmount) >= Number(e.expectedAmount)) ? "Paid" : "Pending"),
         "Payment Mode": e.paymentMode || "—",
         "Payment Date": e.paymentDate ? formatGridDate(e.paymentDate) : "—",
       }));
       exportSheets(`${selectedMember.memberName.replace(/\s+/g, "_")}_events.xlsx`, [
-        { name: "Events", data: sheetData },
+        { name: "Events Breakdown", data: sheetData },
       ]);
       toast.success("Member events exported successfully!");
     } catch {
@@ -662,59 +726,80 @@ export default function ReportsPage({ mode = "event" }) {
     const hasEventFilter = Boolean(filters.event && filters.event !== "ALL");
     const hasStatusFilter = Boolean(filters.paymentStatus && filters.paymentStatus !== "ALL");
 
-    if (hasDateFilter || hasTypeFilter || hasEventFilter || hasStatusFilter) {
-      list = list.map((m) => {
-        const events = m.events || [];
-        const filteredEvents = events.filter((ev) => {
-          const evDate = ev.eventDate || ev.paymentDate || ev.createdAt || ev.CreatedOn;
-          const matchDate = isDateInRange(evDate, filters.fromDate, filters.toDate);
-          const matchType = !hasTypeFilter || (ev.categoryName || ev.eventTypeName || "General").trim().toLowerCase() === filters.eventType.trim().toLowerCase();
-          const matchEv = !hasEventFilter || (ev.eventName || "").trim().toLowerCase() === filters.event.trim().toLowerCase();
+    list = list.map((m) => {
+      const events = m.events || [];
+      const filteredEvents = events.filter((ev) => {
+        const evDate = ev.eventDate || ev.paymentDate || ev.createdAt || ev.CreatedOn;
+        const matchDate = isDateInRange(evDate, filters.fromDate, filters.toDate);
+        const evType = resolveEventCategory(ev);
+        const matchType = !hasTypeFilter || evType.trim().toLowerCase() === filters.eventType.trim().toLowerCase();
+        const evName = resolveEventName(ev);
+        const matchEv = !hasEventFilter || evName.trim().toLowerCase() === filters.event.trim().toLowerCase();
 
-          let matchStatus = true;
-          if (hasStatusFilter) {
-            const isEvPaid = (ev.paymentStatus || "").toLowerCase() === "paid" || (Number(ev.paidAmount) >= Number(ev.expectedAmount || ev.amount || 0) && Number(ev.paidAmount) > 0);
-            if (filters.paymentStatus === "PAID") {
-              matchStatus = isEvPaid || Number(ev.paidAmount) > 0;
-            } else if (filters.paymentStatus === "UNPAID") {
-              matchStatus = !isEvPaid;
-            }
+        let matchStatus = true;
+        if (hasStatusFilter) {
+          const isEvPaid = (ev.paymentStatus || "").toLowerCase() === "paid" || (Number(ev.paidAmount) >= Number(ev.expectedAmount || ev.amount || 0) && Number(ev.paidAmount) > 0);
+          if (filters.paymentStatus === "PAID") {
+            matchStatus = isEvPaid || Number(ev.paidAmount) > 0;
+          } else if (filters.paymentStatus === "UNPAID") {
+            matchStatus = !isEvPaid;
           }
+        }
 
-          return matchDate && matchType && matchEv && matchStatus;
-        });
-
-        const exp = filteredEvents.reduce((s, e) => s + Number(e.expectedAmount || e.amount || 0), 0);
-        const paid = filteredEvents.reduce((s, e) => s + Number(e.paidAmount || ((e.paymentStatus || "").toLowerCase() === "paid" ? (e.expectedAmount || e.amount || 0) : 0)), 0);
-        const paidCount = filteredEvents.filter((e) => (e.paymentStatus || "").toLowerCase() === "paid" || (Number(e.paidAmount) >= Number(e.expectedAmount || e.amount || 0) && Number(e.paidAmount) > 0)).length;
-        const pendingCount = filteredEvents.length - paidCount;
-
-        return {
-          ...m,
-          events: filteredEvents,
-          totalExpectedAmount: exp,
-          totalPaidAmount: paid,
-          paidEventsCount: paidCount,
-          pendingEventsCount: pendingCount,
-        };
+        return matchDate && matchType && matchEv && matchStatus;
       });
 
-      if (hasStatusFilter) {
-        list = list.filter((m) => {
-          if (filters.paymentStatus === "PAID") {
-            return Number(m.totalPaidAmount) > 0 || m.paidEventsCount > 0;
-          }
-          if (filters.paymentStatus === "UNPAID") {
-            return m.pendingEventsCount > 0 || (Number(m.totalExpectedAmount || 0) - Number(m.totalPaidAmount || 0)) > 0;
-          }
-          return true;
-        });
-      } else if (hasDateFilter || hasEventFilter) {
-        list = list.filter((m) => (m.events && m.events.length > 0) || (m.totalExpectedAmount > 0));
-      }
+      const hasAnyFilter = hasDateFilter || hasTypeFilter || hasEventFilter || hasStatusFilter;
+      const targetEvents = hasAnyFilter ? filteredEvents : events;
+
+      const exp = hasAnyFilter
+        ? targetEvents.reduce((s, e) => s + Number(e.expectedAmount || e.amount || 0), 0)
+        : Number(m.totalExpectedAmount || 0);
+
+      const paid = hasAnyFilter
+        ? targetEvents.reduce((s, e) => s + Number(e.paidAmount || ((e.paymentStatus || "").toLowerCase() === "paid" ? (e.expectedAmount || e.amount || 0) : 0)), 0)
+        : Number(m.totalPaidAmount || 0);
+
+      const paidCount = hasAnyFilter
+        ? targetEvents.filter((e) => (e.paymentStatus || "").toLowerCase() === "paid" || (Number(e.paidAmount) >= Number(e.expectedAmount || e.amount || 0) && Number(e.paidAmount) > 0)).length
+        : Number(m.paidEventsCount || 0);
+
+      const pendingCount = hasAnyFilter
+        ? targetEvents.length - paidCount
+        : Number(m.pendingEventsCount || 0);
+
+      const rowObj = {
+        ...m,
+        events: targetEvents,
+        totalExpectedAmount: exp,
+        totalPaidAmount: paid,
+        totalPendingAmount: Math.max(0, exp - paid),
+        paidEventsCount: paidCount,
+        pendingEventsCount: pendingCount,
+      };
+
+      rowObj.eventType = getMemberEventType(rowObj);
+      rowObj.eventName = getMemberEventName(rowObj);
+
+      return rowObj;
+    });
+
+    if (hasStatusFilter) {
+      list = list.filter((m) => {
+        if (filters.paymentStatus === "PAID") {
+          return Number(m.totalPaidAmount) > 0 || m.paidEventsCount > 0;
+        }
+        if (filters.paymentStatus === "UNPAID") {
+          return m.pendingEventsCount > 0 || Number(m.totalPendingAmount) > 0;
+        }
+        return true;
+      });
+    } else if (hasDateFilter || hasEventFilter || hasTypeFilter) {
+      list = list.filter((m) => (m.events && m.events.length > 0) || (m.totalExpectedAmount > 0));
     }
+
     return list;
-  }, [report?.memberContributionHistory, filters, isMember, isCurrentMember, isDateInRange]);
+  }, [report?.memberContributionHistory, filters, isMember, isCurrentMember, isDateInRange, resolveEventCategory, resolveEventName, getMemberEventType, getMemberEventName]);
 
   /* Filtered Payment History (Event Type & Event against) */
   const filteredPaymentHistory = useMemo(() => {
@@ -773,50 +858,11 @@ export default function ReportsPage({ mode = "event" }) {
     },
   ];
 
-  const getMemberEventType = (r) => {
-    if (filters.eventType && filters.eventType !== "ALL") {
-      return filters.eventType;
-    }
-    if (Array.isArray(r.events) && r.events.length > 0) {
-      const types = Array.from(
-        new Set(
-          r.events
-            .map((e) => e.categoryName || e.eventTypeName || e.eventType || e.category)
-            .filter(Boolean)
-        )
-      );
-      if (types.length > 0) return types.join(", ");
-    }
-    return r.eventTypeName || r.categoryName || r.eventType || "All Event Types";
-  };
-
-  const getMemberEventName = (r) => {
-    if (filters.event && filters.event !== "ALL") {
-      return filters.event;
-    }
-    if (Array.isArray(r.events) && r.events.length > 0) {
-      let filteredEvs = r.events;
-      if (filters.eventType && filters.eventType !== "ALL") {
-        filteredEvs = filteredEvs.filter(
-          (e) => (e.categoryName || e.eventTypeName || e.eventType || "General").trim().toLowerCase() === filters.eventType.trim().toLowerCase()
-        );
-      }
-      const names = Array.from(
-        new Set(
-          filteredEvs
-            .map((e) => e.eventName || e.name || e.title)
-            .filter(Boolean)
-        )
-      );
-      if (names.length > 0) return names.join(", ");
-    }
-    return r.eventName || r.relatedEvent || r.name || "All Events";
-  };
-
   const memberColumns = [
     {
       label: "Member Name",
       key: "memberName",
+      exportValue: (r) => r.memberName,
       render: (r) => (
         <Typography
           variant="body2"
@@ -831,28 +877,49 @@ export default function ReportsPage({ mode = "event" }) {
     {
       label: "Event Type",
       key: "eventType",
+      exportValue: (r) => r.eventType || getMemberEventType(r),
       render: (r) => (
         <Typography variant="body2" fontWeight={600} color="text.secondary">
-          {getMemberEventType(r)}
+          {r.eventType || getMemberEventType(r)}
         </Typography>
       ),
     },
     {
       label: "Event Name",
       key: "eventName",
+      exportValue: (r) => r.eventName || getMemberEventName(r),
       render: (r) => (
         <Typography variant="body2" fontWeight={600}>
-          {getMemberEventName(r)}
+          {r.eventName || getMemberEventName(r)}
         </Typography>
       ),
     },
-    { label: "Expected Amount", key: "totalExpectedAmount", align: "right", render: (r) => INR(r.totalExpectedAmount) },
-    { label: "Paid Amount", key: "totalPaidAmount", align: "right", render: (r) => INR(r.totalPaidAmount) },
-    { label: "Pending Amount", key: "totalPendingAmount", align: "right", render: (r) => INR((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0)) },
+    {
+      label: "Expected Amount",
+      key: "totalExpectedAmount",
+      align: "right",
+      exportValue: (r) => Number(r.totalExpectedAmount || 0),
+      render: (r) => INR(r.totalExpectedAmount),
+    },
+    {
+      label: "Paid Amount",
+      key: "totalPaidAmount",
+      align: "right",
+      exportValue: (r) => Number(r.totalPaidAmount || 0),
+      render: (r) => INR(r.totalPaidAmount),
+    },
+    {
+      label: "Pending Amount",
+      key: "totalPendingAmount",
+      align: "right",
+      exportValue: (r) => Number(r.totalPendingAmount ?? ((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0))),
+      render: (r) => INR(r.totalPendingAmount ?? ((r.totalExpectedAmount || 0) - (r.totalPaidAmount || 0))),
+    },
     {
       label: "Paid Events",
       key: "paidEventsCount",
       align: "center",
+      exportValue: (r) => Number(r.paidEventsCount || 0),
       render: (r) => (
         <Chip
           size="small"
@@ -868,6 +935,7 @@ export default function ReportsPage({ mode = "event" }) {
       label: "Pending Events",
       key: "pendingEventsCount",
       align: "center",
+      exportValue: (r) => Number(r.pendingEventsCount || 0),
       render: (r) => (
         <Chip
           size="small"
@@ -1510,13 +1578,13 @@ export default function ReportsPage({ mode = "event" }) {
       if (isMember) {
         const myData = filteredMemberContributions[0];
         const myEventsExport = (myData?.events || []).map((e) => ({
-          "Event Name": e.eventName,
-          "Category": e.categoryName || "General",
+          "Event Type": resolveEventCategory(e),
+          "Event Name": resolveEventName(e),
           "Event Date": formatGridDate(e.eventDate),
           "Expected Amount": Number(e.expectedAmount ?? e.amount ?? 0),
           "Paid Amount": Number(e.paidAmount ?? ((e.paymentStatus || "").toLowerCase() === "paid" ? e.amount : 0)),
           "Pending Amount": Number(e.pendingAmount ?? (Math.max(0, Number(e.expectedAmount || 0) - Number(e.paidAmount || 0)))),
-          "Status": e.paymentStatus || (Number(e.paidAmount) >= Number(e.expectedAmount) ? "Paid" : "Pending"),
+          "Payment Status": e.paymentStatus || (Number(e.paidAmount) >= Number(e.expectedAmount) ? "Paid" : "Pending"),
           "Payment Mode": e.paymentMode || "—",
           "Payment Date": e.paymentDate ? formatGridDate(e.paymentDate) : "—",
         }));
@@ -1540,6 +1608,7 @@ export default function ReportsPage({ mode = "event" }) {
             ? "-unpaid-only"
             : "-all";
 
+        // 1. Member Summary Sheet
         const memberSummaryExport = (filteredMemberContributions ?? []).map((m) => {
           const exp = Number(m.totalExpectedAmount || 0);
           const paid = Number(m.totalPaidAmount || 0);
@@ -1549,8 +1618,8 @@ export default function ReportsPage({ mode = "event" }) {
           return {
             "Member Name": m.memberName,
             "Department": m.department || "General",
-            "Event Type": getMemberEventType(m),
-            "Event Name": getMemberEventName(m),
+            "Event Type": m.eventType || getMemberEventType(m),
+            "Event Name": m.eventName || getMemberEventName(m),
             "Expected Amount": exp,
             "Paid Amount": paid,
             "Pending Amount": pend,
@@ -1560,35 +1629,56 @@ export default function ReportsPage({ mode = "event" }) {
           };
         });
 
-        const detailedEventsExport = [];
+        // 2. Paid and Unpaid Detailed Breakdown Sheets
+        const paidEventsExport = [];
+        const unpaidEventsExport = [];
+
         (filteredMemberContributions ?? []).forEach((m) => {
           (m.events || []).forEach((ev) => {
             const evExp = Number(ev.expectedAmount || ev.amount || 0);
             const evPaid = Number(ev.paidAmount || ((ev.paymentStatus || "").toLowerCase() === "paid" ? evExp : 0));
             const evPend = Math.max(0, evExp - evPaid);
-            const isEvPaid = (ev.paymentStatus || "").toLowerCase() === "paid" || evPaid >= evExp;
+            const isEvPaid = (ev.paymentStatus || "").toLowerCase() === "paid" || (evPaid >= evExp && evPaid > 0);
+            const evType = resolveEventCategory(ev);
+            const evName = resolveEventName(ev);
 
-            detailedEventsExport.push({
+            const row = {
               "Member Name": m.memberName,
               "Department": m.department || "General",
-              "Event Name": ev.eventName || "Event",
-              "Event Type": ev.categoryName || ev.eventTypeName || "General",
+              "Event Type": evType,
+              "Event Name": evName,
               "Event Date": formatGridDate(ev.eventDate || ev.paymentDate || ev.createdAt),
               "Expected Amount": evExp,
               "Paid Amount": evPaid,
               "Pending Amount": evPend,
-              "Status": isEvPaid ? "Paid" : "Pending",
+              "Payment Status": isEvPaid ? "Paid" : "Pending",
               "Payment Mode": ev.paymentMode || "—",
               "Payment Date": ev.paymentDate ? formatGridDate(ev.paymentDate) : "—",
-            });
+            };
+
+            if (isEvPaid) {
+              paidEventsExport.push(row);
+            } else {
+              unpaidEventsExport.push(row);
+            }
           });
         });
 
         const sheets = [
           { name: "Member Summary", data: memberSummaryExport },
         ];
-        if (detailedEventsExport.length > 0) {
-          sheets.push({ name: "Detailed Events Breakdown", data: detailedEventsExport });
+
+        if (filters.paymentStatus === "PAID") {
+          sheets.push({ name: "Paid Events Details", data: paidEventsExport });
+        } else if (filters.paymentStatus === "UNPAID") {
+          sheets.push({ name: "Unpaid Events Details", data: unpaidEventsExport });
+        } else {
+          if (paidEventsExport.length > 0) {
+            sheets.push({ name: "Paid Events Details", data: paidEventsExport });
+          }
+          if (unpaidEventsExport.length > 0) {
+            sheets.push({ name: "Unpaid Events Details", data: unpaidEventsExport });
+          }
         }
 
         exportSheets(`member-contributions${fileSuffix}.xlsx`, sheets);

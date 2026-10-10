@@ -58,6 +58,10 @@ function printTable(title, columns, data) {
   );
 
   const getCellText = (col, row) => {
+    if (typeof col.exportValue === "function") {
+      const custom = col.exportValue(row);
+      if (custom !== undefined && custom !== null && custom !== "") return String(custom);
+    }
     let val = col.key ? row[col.key] : undefined;
     if (val === undefined && typeof col.key === "string" && col.key.length > 0) {
       val = row[col.key[0].toUpperCase() + col.key.slice(1)] ?? row[col.key[0].toLowerCase() + col.key.slice(1)];
@@ -231,6 +235,10 @@ function exportToExcel(columns, data, filename = "export.xlsx", title = "Data") 
   );
 
   const getCellText = (col, row) => {
+    if (typeof col.exportValue === "function") {
+      const custom = col.exportValue(row);
+      if (custom !== undefined && custom !== null && custom !== "") return custom;
+    }
     let val = col.key ? row[col.key] : undefined;
     if (val === undefined && typeof col.key === "string" && col.key.length > 0) {
       val = row[col.key[0].toUpperCase() + col.key.slice(1)] ?? row[col.key[0].toLowerCase() + col.key.slice(1)];
@@ -260,6 +268,10 @@ function exportToCSV(columns, data, filename = "export.csv") {
   );
 
   const getCellText = (col, row) => {
+    if (typeof col.exportValue === "function") {
+      const custom = col.exportValue(row);
+      if (custom !== undefined && custom !== null && custom !== "") return custom;
+    }
     let val = col.key ? row[col.key] : undefined;
     if (val === undefined && typeof col.key === "string" && col.key.length > 0) {
       val = row[col.key[0].toUpperCase() + col.key.slice(1)] ?? row[col.key[0].toLowerCase() + col.key.slice(1)];
