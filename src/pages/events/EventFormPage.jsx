@@ -307,9 +307,13 @@ export default function EventFormPage({
   const id = isDialog ? (propEvent?.eventId || propEvent?.id || null) : routeId;
   const isEdit = Boolean(id);
 
+  const activeRole = authState?.role || authState?.roleName;
+  const isMember = String(activeRole || "").toLowerCase() === "member";
+  const isAdminOrOrg = !isMember;
+
   // Granular Action Permissions
-  const canAddEvent = hasActionPermission("Add Event", 32, authState?.role).canExecute && canEdit;
-  const canEditEvent = hasActionPermission("Edit Event", 33, authState?.role).canExecute && canEdit;
+  const canAddEvent = (isAdminOrOrg || hasActionPermission("Add Event", 32, activeRole).canExecute) && (canEdit || isAdminOrOrg);
+  const canEditEvent = (isAdminOrOrg || hasActionPermission("Edit Event", 33, activeRole).canExecute) && (canEdit || isAdminOrOrg);
 
   useEffect(() => {
     if (isDialog) return;
@@ -537,17 +541,29 @@ export default function EventFormPage({
             0
           );
           const hasAnyPaid =
+            detailedEvent.hasPaidContributions === true ||
+            Number(detailedEvent.paidContributionsCount || 0) > 0 ||
             paidAmount > 0 ||
-            (detailedEvent.contributions || []).some(
-              (c) =>
-                Number(c.paidAmount || 0) > 0 ||
-                Number(c.amountPaid || 0) > 0 ||
-                String(c.paymentStatus || "").toLowerCase() === "paid" ||
-                String(c.status || "").toLowerCase() === "paid" ||
-                Boolean(c.paymentDate)
-            );
-          if (hasAnyPaid) {
-            setHasPayments(true);
+            (detailedEvent.contributions || []).some((c) => {
+              const pStatus = String(c.paymentStatus || "").toLowerCase();
+              const sName = String(c.statusName || c.status || "").toLowerCase();
+              const hasCash = Number(c.cashAmount || 0) > 0;
+              const hasUpi = Number(c.upiAmount || 0) > 0;
+              const hasPaidAmt = Number(c.paidAmount || c.amountPaid || 0) > 0;
+              const hasPaymentDate = Boolean(c.paymentDate);
+              const isPaidStatus = pStatus === "paid" || Number(c.paymentStatus) === 2 || ["paid", "verified", "closed", "completed", "approved"].some((st) => sName.includes(st));
+              return hasCash || hasUpi || hasPaidAmt || hasPaymentDate || isPaidStatus;
+            });
+          setHasPayments(Boolean(hasAnyPaid));
+
+          if (isEdit && hasAnyPaid) {
+            toast.warning("This event cannot be edited because one or more members have already paid their contributions.");
+            if (isDialog && onClose) {
+              onClose();
+            } else {
+              navigate("/events", { replace: true });
+            }
+            return;
           }
 
           setIsCustomEventName(Boolean(detailedEvent.eventName));
@@ -2137,7 +2153,7 @@ export default function EventFormPage({
                   >
                     <Box>
                       <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
-                        Contribution / Member
+                        Contribution Per Member
                       </Typography>
                       {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0 && (
                         <Typography sx={{ fontSize: "0.72rem", color: "#6366f1", fontWeight: 600 }}>

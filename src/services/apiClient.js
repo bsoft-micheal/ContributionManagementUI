@@ -1,4 +1,5 @@
 import axios from "axios";
+import { showAppToast } from "../components/common/AppToast";
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "https://localhost:5112/api/v1",
@@ -64,6 +65,8 @@ apiClient.interceptors.response.use(
       if (!currentPath.startsWith("/forgot-password") && currentPath !== "/login") {
         window.location.href = "/login";
       }
+    } else if (!error.response) {
+      showAppToast("Unable to reach the server. Please check your network connection.", "error");
     }
     return Promise.reject(error);
   }

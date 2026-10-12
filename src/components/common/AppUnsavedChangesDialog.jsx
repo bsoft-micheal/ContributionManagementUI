@@ -21,7 +21,7 @@ export default function AppUnsavedChangesDialog({
   onKeepEditing,
   onQuitChanges,
   title = "Unsaved Changes",
-  content = "You have unsaved changes. Do you want to keep editing or quit and discard your changes?",
+  content = "Do you want to keep editing or quit and discard your changes",
   keepEditingText = "Keep Editing",
   quitChangesText = "Quit Changes",
 }) {

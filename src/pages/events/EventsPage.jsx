@@ -161,12 +161,13 @@ export default function EventsPage() {
 
   const activeRole = authState?.role || authState?.roleName;
   const isMember = String(activeRole || "").toLowerCase() === "member";
+  const isAdminOrOrg = !isMember;
 
   // Granular Action Permissions
-  const canAddEvent = hasActionPermission("Add Event", MENU_FEATURE_IDS.EVENT_ADD, activeRole).canExecute;
-  const canEditEvent = hasActionPermission("Edit Event", MENU_FEATURE_IDS.EVENT_EDIT, activeRole).canExecute;
-  const canDeleteEvent = hasActionPermission("Delete Event", MENU_FEATURE_IDS.EVENT_DELETE, activeRole).canExecute;
-  const canViewEvent = hasActionPermission("View Event", MENU_FEATURE_IDS.EVENT_VIEW, activeRole).canView;
+  const canAddEvent = isAdminOrOrg || hasActionPermission("Add Event", MENU_FEATURE_IDS.EVENT_ADD, activeRole).canExecute;
+  const canEditEvent = isAdminOrOrg || hasActionPermission("Edit Event", MENU_FEATURE_IDS.EVENT_EDIT, activeRole).canExecute;
+  const canDeleteEvent = isAdminOrOrg || hasActionPermission("Delete Event", MENU_FEATURE_IDS.EVENT_DELETE, activeRole).canExecute;
+  const canViewEvent = true;
 
   const canAddPhotos = hasActionPermission("Add Photos", MENU_FEATURE_IDS.EVENT_ADD_PHOTOS, activeRole).canExecute;
   const canViewPhotos = hasActionPermission("view Photos", MENU_FEATURE_IDS.EVENT_VIEW_PHOTOS, activeRole).canView;
@@ -266,8 +267,17 @@ export default function EventsPage() {
         const pendingAmt = Number(e.pendingAmount !== undefined ? e.pendingAmount : (expectedAmt - paidAmt));
         const remainingAmt = paidAmt - expAmount;
 
+        const hasPaidContrib = Boolean(
+          e.hasPaidContributions ||
+          e.HasPaidContributions ||
+          Number(e.paidContributionsCount || e.PaidContributionsCount || 0) > 0 ||
+          paidAmt > 0
+        );
+
         return {
           ...e,
+          hasPaidContributions: hasPaidContrib,
+          paidContributionsCount: Number(e.paidContributionsCount || e.PaidContributionsCount || 0),
           expenseAmount: expAmount,
           remainingAmount: remainingAmt,
           pendingAmount: pendingAmt,
@@ -426,6 +436,16 @@ export default function EventsPage() {
   }, [displayedEvents]);
 
   const handleDeleteRequest = (eventItem) => {
+    const hasPaid = Boolean(
+      eventItem?.hasPaidContributions ||
+      eventItem?.HasPaidContributions ||
+      Number(eventItem?.paidContributionsCount || eventItem?.PaidContributionsCount || 0) > 0 ||
+      Number(eventItem?.totalPaidAmount || eventItem?.TotalPaidAmount || eventItem?.collectedAmount || eventItem?.CollectedAmount || eventItem?.paidAmount || 0) > 0
+    );
+    if (hasPaid) {
+      toast.error("Cannot delete event because payments have already been received.");
+      return;
+    }
     setEventToDelete(eventItem);
     setDeleteConfirmOpen(true);
   };
@@ -459,10 +479,14 @@ export default function EventsPage() {
       label: "Action",
       sx: { width: 245, minWidth: 245 },
       render: (row) => {
-        const paidAmount = Number(row.totalPaidAmount || row.collectedAmount || row.paidAmount || 0);
-        const hasPaidAmount = paidAmount > 0;
-        const isEditable = canEditEvent && !hasPaidAmount;
-        const isDeletable = canDeleteEvent && !hasPaidAmount;
+        const hasPaid = Boolean(
+          row.hasPaidContributions ||
+          row.HasPaidContributions ||
+          Number(row.paidContributionsCount || row.PaidContributionsCount || 0) > 0 ||
+          Number(row.totalPaidAmount || row.TotalPaidAmount || row.collectedAmount || row.CollectedAmount || row.paidAmount || 0) > 0
+        );
+        const isEditable = canEditEvent && !hasPaid;
+        const isDeletable = canDeleteEvent && !hasPaid;
         return (
           <Box sx={{ display: "flex", gap: 0.4, alignItems: "center" }}>
             <Tooltip title={canViewEvent ? "View Details" : "Disabled"}>
@@ -484,7 +508,7 @@ export default function EventsPage() {
               title={
                 !canEditEvent
                   ? "Disabled"
-                  : hasPaidAmount
+                  : hasPaid
                   ? "Cannot edit event after payments have been received"
                   : "Edit Event"
               }
@@ -492,9 +516,20 @@ export default function EventsPage() {
               <span style={{ display: "inline-flex", cursor: !isEditable ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
-                  sx={{ p: 0.3 }}
+                  sx={{
+                    p: 0.3,
+                    opacity: isEditable ? 1 : 0.38,
+                    cursor: !isEditable ? "not-allowed !important" : "pointer",
+                    pointerEvents: !isEditable ? "none" : "auto",
+                  }}
                   disabled={!isEditable}
-                  onClick={() => navigate(`/events/edit/${row.eventId}`)}
+                  onClick={() => {
+                    if (!isEditable) {
+                      toast.warning("Cannot edit event after payments have been received.");
+                      return;
+                    }
+                    navigate(`/events/edit/${row.eventId}`);
+                  }}
                 >
                   <EditIcon sx={{ fontSize: "1.1rem", color: isEditable ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
@@ -504,7 +539,7 @@ export default function EventsPage() {
               title={
                 !canDeleteEvent
                   ? "Disabled"
-                  : hasPaidAmount
+                  : hasPaid
                   ? "Cannot delete event after payments have been received"
                   : "Delete Event"
               }
@@ -512,9 +547,20 @@ export default function EventsPage() {
               <span style={{ display: "inline-flex", cursor: !isDeletable ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
-                  sx={{ p: 0.3 }}
+                  sx={{
+                    p: 0.3,
+                    opacity: isDeletable ? 1 : 0.38,
+                    cursor: !isDeletable ? "not-allowed !important" : "pointer",
+                    pointerEvents: !isDeletable ? "none" : "auto",
+                  }}
                   disabled={!isDeletable}
-                  onClick={() => handleDeleteRequest(row)}
+                  onClick={() => {
+                    if (!isDeletable) {
+                      toast.warning("Cannot delete event after payments have been received.");
+                      return;
+                    }
+                    handleDeleteRequest(row);
+                  }}
                 >
                   <DeleteIcon sx={{ fontSize: "1.1rem", color: isDeletable ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
