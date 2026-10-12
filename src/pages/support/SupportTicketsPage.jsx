@@ -596,6 +596,7 @@ export default function SupportTicketsPage() {
       await fetchTicketsFromDb();
     } catch (err) {
       toast.error(err, TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+      await fetchTicketsFromDb();
     } finally {
       setDeleteConfirmOpen(false);
       setTicketToDelete(null);
@@ -639,6 +640,7 @@ export default function SupportTicketsPage() {
           priority: form.priority,
           status: editingTicket.status || "Open",
           attachment: form.attachment || null,
+          modifiedOn: editingTicket.modifiedOn || null,
         });
         toast.success(TOAST_MESSAGES.SUPPORT.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
@@ -685,7 +687,15 @@ export default function SupportTicketsPage() {
       setErrors({});
       await fetchTicketsFromDb();
     } catch (err) {
-      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      if (err?.response?.status === 404 || err?.response?.status === 409) {
+        setDialogOpen(false);
+        setEditingTicket(null);
+        setForm(initialForm);
+        savedFormRef.current = null;
+        setErrors({});
+        await fetchTicketsFromDb();
+      }
     } finally {
       setIsSaving(false);
     }
@@ -718,6 +728,7 @@ export default function SupportTicketsPage() {
           message: replyText.trim(),
           replyMessage: replyText.trim(),
           status: replyStatus,
+          modifiedOn: replyTicket.modifiedOn || null,
         });
       }
       if (!hasNote && statusChanged) {
@@ -730,6 +741,7 @@ export default function SupportTicketsPage() {
           priority: replyTicket.priority,
           status: replyStatus,
           attachment: replyTicket.attachment || null,
+          modifiedOn: replyTicket.modifiedOn || null,
         });
       }
       toast.success(TOAST_MESSAGES.SUPPORT.STATUS_UPDATED || "Support ticket updated successfully!");
@@ -739,7 +751,14 @@ export default function SupportTicketsPage() {
       setReplyErrors({});
       await fetchTicketsFromDb();
     } catch (err) {
-      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      if (err?.response?.status === 404 || err?.response?.status === 409) {
+        setReplyDialogOpen(false);
+        setReplyTicket(null);
+        setReplyText("");
+        setReplyErrors({});
+        await fetchTicketsFromDb();
+      }
     }
   };
 

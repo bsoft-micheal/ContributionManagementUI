@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { Typography, Box, IconButton, Tooltip } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -26,6 +26,68 @@ import {
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+
+const NORMALIZE_MODULE_NAME = {
+  ticket: "Support Ticket",
+  tickets: "Support Ticket",
+  "support ticket": "Support Ticket",
+  "support tickets": "Support Ticket",
+  support: "Support Ticket",
+  payment: "Payments",
+  payments: "Payments",
+  expense: "Expenses",
+  expenses: "Expenses",
+  event: "Events",
+  events: "Events",
+  contribution: "Contributions",
+  contributions: "Contributions",
+  general: "General",
+};
+
+const STATUS_MODULE_CONFIG = {
+  open: ["Support Ticket"],
+  "in progress": ["Support Ticket"],
+  resolved: ["Support Ticket"],
+  pending: ["Support Ticket", "Payments", "Expenses", "Contributions"],
+  verified: ["Payments", "Contributions"],
+  closed: ["Support Ticket", "Events"],
+  paid: ["Payments", "Contributions"],
+  approved: ["Expenses"],
+  rejected: ["Expenses"],
+  active: ["Events", "General"],
+  inactive: ["Events", "General"],
+};
+
+function getModulesForStatus(row) {
+  const cleanName = String(row?.statusName || "").trim().toLowerCase();
+  const configured = STATUS_MODULE_CONFIG[cleanName] ? [...STATUS_MODULE_CONFIG[cleanName]] : [];
+
+  if (row?.module && row.module.toLowerCase() !== "general") {
+    const rawMod = row.module.trim().toLowerCase();
+    const normalizedMod = NORMALIZE_MODULE_NAME[rawMod] || row.module.trim();
+    if (!configured.includes(normalizedMod)) {
+      configured.push(normalizedMod);
+    }
+  }
+
+  if (configured.length === 0) {
+    const rawMod = (row?.module || "General").trim().toLowerCase();
+    configured.push(NORMALIZE_MODULE_NAME[rawMod] || row?.module || "General");
+  }
+
+  // Deduplicate case-insensitively
+  const seen = new Set();
+  const unique = [];
+  for (const mod of configured) {
+    const lower = mod.toLowerCase();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      unique.push(mod);
+    }
+  }
+
+  return unique;
+}
 
 const initialStatusForm = {
   statusName: "",
@@ -58,7 +120,12 @@ export default function StatusPage() {
     setLoading(true);
     try {
       const statusData = await getStatusesAsync();
-      setItems(Array.isArray(statusData) ? statusData : []);
+      const rawList = Array.isArray(statusData) ? statusData : [];
+      const enriched = rawList.map((item) => ({
+        ...item,
+        modulesText: getModulesForStatus(item).join(", "),
+      }));
+      setItems(enriched);
     } catch (error) {
       toast.error(error, "Failed to load statuses");
     } finally {
@@ -270,6 +337,27 @@ export default function StatusPage() {
       ),
     },
     {
+      label: "Applicable Module(s)",
+      key: "modulesText",
+      exportValue: (row) => getModulesForStatus(row).join(", "),
+      render: (row) => {
+        const text = getModulesForStatus(row).join(", ");
+        return (
+          <Typography
+            variant="body2"
+            sx={{
+              color: "text.primary",
+              fontWeight: 500,
+              fontSize: "0.85rem",
+              lineHeight: 1.5,
+            }}
+          >
+            {text || "--"}
+          </Typography>
+        );
+      },
+    },
+    {
       label: "Active Status",
       key: "isActive",
       render: (row) => (
@@ -291,11 +379,6 @@ export default function StatusPage() {
       ),
     },
     {
-      label: "Created By",
-      key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
-    },
-    {
       label: "Created On",
       key: "createdAt",
       render: (row) =>
@@ -313,22 +396,7 @@ export default function StatusPage() {
         columns={statusColumns}
         data={items}
         loading={loading}
-        searchPlaceholder="Search status..."
-        actions={
-          <AppButton
-            size="small"
-            variant="contained"
-            disabled={!hasWriteAccess}
-            startIcon={<AddIcon />}
-            onClick={() => {
-              setForm(initialStatusForm);
-              setErrors({});
-              setDialogOpen(true);
-            }}
-          >
-            Add
-          </AppButton>
-        }
+        searchPlaceholder="Search status or module..."
       />
 
       {/* ==================== Status Dialog ==================== */}

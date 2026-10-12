@@ -1090,7 +1090,11 @@ export default function SubmitPaymentModal({
       onClose();
       if (onSuccess) onSuccess(res);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to submit payment details");
+      toast.error(err, "Failed to submit payment details");
+      if (err?.response?.status === 404 || err?.response?.status === 409) {
+        onClose();
+        if (onSuccess) onSuccess();
+      }
     } finally {
       setSubmitting(false);
     }
