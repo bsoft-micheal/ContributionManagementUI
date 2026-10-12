@@ -164,6 +164,7 @@ export default function SettingsPage() {
   const { canEdit } = useAccessByLocation();
   const canUpdateSettings = hasActionPermission("Update Settings", 80, authState?.role).canExecute;
   const hasWriteAccess = canUpdateSettings && canEdit;
+  const isMemberRole = String(authState?.role || authState?.user?.role || "").toLowerCase().trim() === "member";
 
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem("cm_system_settings");
@@ -219,6 +220,23 @@ export default function SettingsPage() {
   const [mfaDevicesCount, setMfaDevicesCount] = useState(1);
 
   const [activeTab, setActiveTab] = useState("general");
+
+  const availableTabs = useMemo(() => {
+    if (isMemberRole) {
+      return [{ key: "general", label: "General Settings" }];
+    }
+    return [
+      { key: "general", label: "General Settings" },
+      { key: "emailTemplate", label: "Email Template Settings" },
+      { key: "paymentQr", label: "Payment QR Settings" },
+    ];
+  }, [isMemberRole]);
+
+  useEffect(() => {
+    if (isMemberRole && activeTab !== "general") {
+      setActiveTab("general");
+    }
+  }, [isMemberRole, activeTab]);
 
   const fileInputRef = useRef(null);
 
@@ -617,6 +635,7 @@ export default function SettingsPage() {
 
   // Load categories list for the Email Template selector
   useEffect(() => {
+    if (isMemberRole) return;
     const loadCategories = async () => {
       try {
         const types = await getEventTypesAsync();
@@ -635,7 +654,7 @@ export default function SettingsPage() {
       }
     };
     loadCategories();
-  }, []);
+  }, [isMemberRole]);
 
   // Load settings from backend on mount
   useEffect(() => {
@@ -1217,11 +1236,7 @@ export default function SettingsPage() {
         <Box sx={{ p: { xs: 2, md: 2.5 } }}>
           {/* Settings Navigation Tabs matching ReportsPage style */}
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2.5 }}>
-            {[
-              { key: "general", label: "General Settings" },
-              { key: "emailTemplate", label: "Email Template Settings" },
-              { key: "paymentQr", label: "Payment QR Settings" },
-            ].map((tab) => {
+            {availableTabs.map((tab) => {
               const isActive = activeTab === tab.key;
               return (
                 <Box
@@ -1274,110 +1289,117 @@ export default function SettingsPage() {
                     : "0 4px 20px rgba(74, 63, 107, 0.05)",
                 }}
               >
-                {/* General Settings Section Header */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
-                  <Box
-                    sx={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: "10px",
-                      bgcolor: "rgba(74, 63, 107, 0.1)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#4a3f6b",
-                    }}
-                  >
-                    <SettingsOutlinedIcon fontSize="small" />
-                  </Box>
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight={800}>
-                      General Settings
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
+                {/* For Admin/Manager: General Settings (Org Name) & OTP Settings */}
+                {!isMemberRole && (
+                  <>
+                    {/* General Settings Section Header */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+                      <Box
+                        sx={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: "10px",
+                          bgcolor: "rgba(74, 63, 107, 0.1)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#4a3f6b",
+                        }}
+                      >
+                        <SettingsOutlinedIcon fontSize="small" />
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight={800}>
+                          General Settings
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
 
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Stack spacing={2.2} sx={{ mt: 2 }}>
-                  {/* Organization Name */}
-                  <Box sx={{ maxWidth: { xs: "100%", sm: 460 } }}>
-                    <AppInput
-                      label="Organization Name"
-                      value={settings.orgName}
-                      maxLength={250}
-                      onChange={(e) => handleChange("orgName", e.target.value.slice(0, 250))}
-                      placeholder="e.g. Unit 1A Residents Association"
-                    />
-                  </Box>
-
-                  {/* General Toggles (Hidden as requested) */}
-
-                  <Divider sx={{ my: 1.5 }} />
-
-                  {/* 2. Forgot Password OTP Settings Section Header */}
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, pt: 0.5 }}>
-                    <Box
-                      sx={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: "10px",
-                        bgcolor: "rgba(74, 63, 107, 0.1)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#4a3f6b",
-                      }}
-                    >
-                      <LockResetOutlinedIcon fontSize="small" />
-                    </Box>
-                    <Box>
-                      <Typography variant="subtitle1" fontWeight={800}>
-                        Forgot Password OTP Settings
-                      </Typography>
-                     
-                    </Box>
-                  </Box>
-
-                  <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                      <Box sx={{ maxWidth: { xs: "100%", sm: 260 } }}>
-                        <AppInput
-                          label="Forgot Password OTP Expiry (minutes)"
-                          value={settings.otpExpiry}
-                          maxLength={8}
-                          onChange={(e) => handleChange("otpExpiry", e.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
-                          restrictType="numberonly"
-                          placeholder="e.g. 10"
-                          required
-                        />
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
-                          Validity window for the 6-digit OTP code emailed to users during password reset.
                         </Typography>
                       </Box>
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                      <Box sx={{ maxWidth: { xs: "100%", sm: 260 } }}>
+                    </Box>
+
+                    <Stack spacing={2.2} sx={{ mt: 2 }}>
+                      {/* Organization Name */}
+                      <Box sx={{ maxWidth: { xs: "100%", sm: 460 } }}>
                         <AppInput
-                          label="Max Retry Attempts"
-                          value={settings.maxRetry}
-                          maxLength={2}
-                          onChange={(e) => handleChange("maxRetry", e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
-                          restrictType="numberonly"
-                          placeholder="e.g. 3"
-                          required
+                          label="Organization Name"
+                          value={settings.orgName}
+                          maxLength={250}
+                          onChange={(e) => handleChange("orgName", e.target.value.slice(0, 250))}
+                          placeholder="e.g. Unit 1A Residents Association"
                         />
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
-                          Number of incorrect attempts allowed before the OTP is invalidated and locked.
-                        </Typography>
                       </Box>
-                    </Grid>
-                  </Grid>
 
-                  <Divider sx={{ my: 1.5 }} />
+                      {/* General Toggles (Hidden as requested) */}
 
-                  {/* 3. Two-Factor Authentication (2FA) Section Header */}
+                      <Divider sx={{ my: 1.5 }} />
+
+                      {/* 2. Forgot Password OTP Settings Section Header */}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, pt: 0.5 }}>
+                        <Box
+                          sx={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: "10px",
+                            bgcolor: "rgba(74, 63, 107, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#4a3f6b",
+                          }}
+                        >
+                          <LockResetOutlinedIcon fontSize="small" />
+                        </Box>
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight={800}>
+                            Forgot Password OTP Settings
+                          </Typography>
+                         
+                        </Box>
+                      </Box>
+
+                      <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                          <Box sx={{ maxWidth: { xs: "100%", sm: 260 } }}>
+                            <AppInput
+                              label="Forgot Password OTP Expiry (minutes)"
+                              value={settings.otpExpiry}
+                              maxLength={8}
+                              onChange={(e) => handleChange("otpExpiry", e.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
+                              restrictType="numberonly"
+                              placeholder="e.g. 10"
+                              required
+                            />
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
+                              Validity window for the 6-digit OTP code emailed to users during password reset.
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                          <Box sx={{ maxWidth: { xs: "100%", sm: 260 } }}>
+                            <AppInput
+                              label="Max Retry Attempts"
+                              value={settings.maxRetry}
+                              maxLength={2}
+                              onChange={(e) => handleChange("maxRetry", e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+                              restrictType="numberonly"
+                              placeholder="e.g. 3"
+                              required
+                            />
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
+                              Number of incorrect attempts allowed before the OTP is invalidated and locked.
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+
+                      <Divider sx={{ my: 1.5 }} />
+                    </Stack>
+                  </>
+                )}
+
+                {/* 3. Two-Factor Authentication (2FA) Section Header (Visible for Member and Admin) */}
+                <Stack spacing={2.2} sx={{ mt: isMemberRole ? 0 : 2 }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, pt: 0.5 }}>
                     <Box
                       sx={{
@@ -1397,7 +1419,7 @@ export default function SettingsPage() {
                       <Typography variant="subtitle1" fontWeight={800}>
                         Two-Factor Authentication (2FA)
                       </Typography>
-                      </Box>
+                    </Box>
                   </Box>
 
                   {/* Personal 2FA Device Configuration at UI level */}
@@ -1407,25 +1429,27 @@ export default function SettingsPage() {
                   />
                 </Stack>
 
-                {/* Save Button for General Settings */}
-                <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center" }}>
-                  <AppButton
-                    variant="contained"
-                    onClick={handleSaveGeneral}
-                    sx={{
-                      px: 3.5,
-                      fontWeight: 700,
-                    }}
-                  >
-                    Save
-                  </AppButton>
-                </Box>
+                {/* Save Button for General Settings (Admin / Non-Member only) */}
+                {!isMemberRole && (
+                  <Box sx={{ mt: 3, pt: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, display: "flex", justifyContent: "center" }}>
+                    <AppButton
+                      variant="contained"
+                      onClick={handleSaveGeneral}
+                      sx={{
+                        px: 3.5,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Save
+                    </AppButton>
+                  </Box>
+                )}
               </Card>
             </Box>
           )}
 
           {/* ── 2. Email Template Settings (Subject & Description against Category) ── */}
-          {activeTab === "emailTemplate" && (() => {
+          {!isMemberRole && activeTab === "emailTemplate" && (() => {
             const currentCategoryLabel =
               selectedCategoryId === "all"
                 ? "All Categories (General)"
@@ -1872,7 +1896,7 @@ export default function SettingsPage() {
 
 
           {/* ── 4. Payment QR Settings (Per-Event-Type) ────────────────────────── */}
-          {activeTab === "paymentQr" && (
+          {!isMemberRole && activeTab === "paymentQr" && (
             <Stack spacing={3}>
               <Grid container spacing={2.5} alignItems="flex-start">
                 {/* Left: Payment QR Form (65-70% on desktop) */}

@@ -1600,7 +1600,7 @@ export default function SubmitPaymentModal({
                           <Box sx={{ flex: 1 }}>
                             <AppInput
                               label={isRowCash ? "Cash Note" : "UTR/Ref"}
-                              placeholder={isRowCash ? "Handover note (max 50 chars)" : "12-digit UTR ref"}
+                              placeholder={isRowCash ? "Handover note " : "12-digit UTR ref"}
                               value={row.utr}
                               onChange={(e) => handleSplitRowChange(row.id, "utr", e.target.value)}
                               size="small"
@@ -1610,7 +1610,7 @@ export default function SubmitPaymentModal({
                             {isRowCash && (
                               <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.3, px: 0.2 }}>
                                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
-                                  Max 50 characters
+                                  
                                 </Typography>
                                 <Typography
                                   variant="caption"
@@ -1700,7 +1700,7 @@ export default function SubmitPaymentModal({
                   <Box component="span" sx={{ color: "error.main", fontWeight: 800 }}>*</Box>
                 ) : (
                   <Box component="span" sx={{ color: "text.secondary", fontWeight: 500, fontSize: "0.72rem", ml: 0.5 }}>
-                    (Optional for Cash)
+                    
                   </Box>
                 )}
               </Typography>

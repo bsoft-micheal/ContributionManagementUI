@@ -29,14 +29,12 @@ import { useTheme } from "@mui/material/styles";
 import {
   PictureAsPdf as PdfIcon,
   GridOn as ExcelIcon,
-  Print as PrintIcon,
   Search as SearchIcon,
   Fullscreen as FullscreenIcon,
   FullscreenExit as FullscreenExitIcon,
   FirstPage as FirstPageIcon,
   LastPage as LastPageIcon,
   ViewColumn as ColumnsIcon,
-  Download as DownloadIcon,
   ArrowUpward as SortAscIcon,
   ArrowDownward as SortDescIcon,
   Clear as ClearIcon,
@@ -770,36 +768,6 @@ export default function AppDataTable({
                     sx={exportIconBtnSx}
                   >
                     <PdfIcon sx={{ fontSize: "1.1rem" }} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title={getExportTooltip("Print Report")}>
-                <span>
-                  <IconButton
-                    size="small"
-                    disabled={!isExportAllowed}
-                    onClick={() => {
-                      if (!isExportAllowed) return;
-                      printTable(title, orderedColumns, processedData);
-                    }}
-                    sx={exportIconBtnSx}
-                  >
-                    <PrintIcon sx={{ fontSize: "1.1rem" }} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title={getExportTooltip("Download CSV")}>
-                <span>
-                  <IconButton
-                    size="small"
-                    disabled={!isExportAllowed}
-                    onClick={() => {
-                      if (!isExportAllowed) return;
-                      exportToCSV(orderedColumns, processedData, `${title || 'export'}.csv`);
-                    }}
-                    sx={exportIconBtnSx}
-                  >
-                    <DownloadIcon sx={{ fontSize: "1.1rem" }} />
                   </IconButton>
                 </span>
               </Tooltip>
