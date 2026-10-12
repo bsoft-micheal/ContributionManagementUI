@@ -42,6 +42,26 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
 
   const handleConfirmDelete = async () => {
     if (!event?.eventId) return;
+    const hasPaid = Boolean(
+      event.hasPaidContributions ||
+      Number(event.paidContributionsCount || 0) > 0 ||
+      Number(event.totalPaidAmount || event.collectedAmount || 0) > 0 ||
+      (contributions || []).some((c) => {
+        const pStatus = String(c.paymentStatus || "").toLowerCase();
+        const sName = String(c.statusName || c.status || "").toLowerCase();
+        const hasCash = Number(c.cashAmount || 0) > 0;
+        const hasUpi = Number(c.upiAmount || 0) > 0;
+        const hasPaidAmt = Number(c.paidAmount || c.amountPaid || 0) > 0;
+        const hasPaymentDate = Boolean(c.paymentDate);
+        const isPaidStatus = pStatus === "paid" || Number(c.paymentStatus) === 2 || ["paid", "verified", "closed", "completed"].includes(sName);
+        return hasCash || hasUpi || hasPaidAmt || hasPaymentDate || isPaidStatus;
+      })
+    );
+    if (hasPaid) {
+      toast.error("Cannot delete event because payments have already been received.");
+      setDeleteConfirmOpen(false);
+      return;
+    }
     setDeleting(true);
     try {
       await deleteEventAsync(event.eventId);
