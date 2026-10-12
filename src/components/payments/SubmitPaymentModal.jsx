@@ -140,14 +140,17 @@ export default function SubmitPaymentModal({
 
   const maxPayableDue = useMemo(() => {
     if (!duesSummary) return null;
-    const currentDue = duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount;
-    const arrears = duesSummary.previousArrears || 0;
-    const total = (duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears;
+    const currentDue = Math.round((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount || 0) * 100) / 100;
+    const arrears = Math.round((duesSummary.previousArrears || 0) * 100) / 100;
+    const totalDue = duesSummary.totalDue !== undefined && duesSummary.totalDue !== null && Number(duesSummary.totalDue) > 0
+      ? Math.round(Number(duesSummary.totalDue) * 100) / 100
+      : Math.round(((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears) * 100) / 100;
+    const total = totalDue > 0 ? totalDue : Math.round(((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears) * 100) / 100;
 
     if (paymentScope === "CurrentEvent") return currentDue;
     if (paymentScope === "PreviousArrears") return arrears;
-    if (paymentScope === "AllOutstanding") return total > 0 ? total : duesSummary.totalDue;
-    return duesSummary.totalDue > 0 ? duesSummary.totalDue : total;
+    if (paymentScope === "AllOutstanding") return total;
+    return total;
   }, [duesSummary, paymentScope]);
 
   const isFullySettled = useMemo(() => {
@@ -706,9 +709,11 @@ export default function SubmitPaymentModal({
   const paymentScopeOptions = useMemo(() => {
     if (!duesSummary) return [];
     const opts = [];
-    const currentDue = duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount;
-    const arrears = duesSummary.previousArrears || 0;
-    const total = (duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears;
+    const currentDue = Math.round((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount || 0) * 100) / 100;
+    const arrears = Math.round((duesSummary.previousArrears || 0) * 100) / 100;
+    const total = duesSummary.totalDue !== undefined && duesSummary.totalDue !== null && Number(duesSummary.totalDue) > 0
+      ? Math.round(Number(duesSummary.totalDue) * 100) / 100
+      : Math.round(((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears) * 100) / 100;
 
     const fmt = (num) => Number(num || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -736,16 +741,24 @@ export default function SubmitPaymentModal({
   const handlePaymentScopeChange = (scope) => {
     setPaymentScope(scope);
     if (!duesSummary) return;
-    const currentDue = duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount;
-    const arrears = duesSummary.previousArrears || 0;
-    const total = (duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears;
+    const currentDue = Math.round((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount || 0) * 100) / 100;
+    const arrears = Math.round((duesSummary.previousArrears || 0) * 100) / 100;
+    const total = duesSummary.totalDue !== undefined && duesSummary.totalDue !== null && Number(duesSummary.totalDue) > 0
+      ? Math.round(Number(duesSummary.totalDue) * 100) / 100
+      : Math.round(((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears) * 100) / 100;
 
-    let amt = total > 0 ? total : duesSummary.totalDue;
+    let amt = total;
     if (scope === "CurrentEvent") amt = currentDue;
     if (scope === "PreviousArrears") amt = arrears;
-    if (scope === "AllOutstanding") amt = total > 0 ? total : duesSummary.totalDue;
+    if (scope === "AllOutstanding") amt = total;
 
-    setFormData((prev) => ({ ...prev, amount: String(amt) }));
+    setFormData((prev) => ({ ...prev, amount: amt.toFixed(2) }));
+    setErrors((prev) => {
+      if (!prev.amount) return prev;
+      const next = { ...prev };
+      delete next.amount;
+      return next;
+    });
 
     if (isMultiSplit && splitRows.length > 0) {
       const count = splitRows.length;
@@ -870,12 +883,17 @@ export default function SubmitPaymentModal({
     if (!formData.eventCategory || !formData.eventCategory.trim()) errs.eventCategory = "Event Category is required";
     if (!formData.eventName || !formData.eventName.trim()) errs.eventName = "Event Name is required";
     
-    const targetAmt = Number(formData.amount);
-    if (!formData.amount || isNaN(targetAmt) || targetAmt <= 0) {
+    const targetAmt = Math.round((Number(formData.amount) || 0) * 100) / 100;
+    const maxDue = maxPayableDue !== null && maxPayableDue !== undefined
+      ? Math.round(Number(maxPayableDue) * 100) / 100
+      : null;
+
+    if (!formData.amount || isNaN(Number(formData.amount)) || targetAmt <= 0) {
       errs.amount = "Contribution amount must be greater than ₹0.00";
-    } else if (maxPayableDue !== null && maxPayableDue > 0 && targetAmt > maxPayableDue) {
-      const fmtMax = maxPayableDue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      errs.amount = `Contribution amount (₹${targetAmt.toLocaleString("en-IN")}) cannot exceed the maximum payable due of ₹${fmtMax}`;
+    } else if (maxDue !== null && maxDue > 0 && Math.round(targetAmt * 100) > Math.round(maxDue * 100)) {
+      const fmtMax = maxDue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmtTarget = targetAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      errs.amount = `Contribution amount (₹${fmtTarget}) cannot exceed the maximum payable due of ₹${fmtMax}`;
     } else if (targetAmt > 10000000) {
       errs.amount = "Contribution amount cannot exceed ₹1,00,00,000 (1 Crore)";
     }
@@ -1317,6 +1335,12 @@ export default function SubmitPaymentModal({
               onChange={(e) => {
                 const val = e.target.value;
                 setFormData((prev) => ({ ...prev, amount: val }));
+                setErrors((prev) => {
+                  if (!prev.amount) return prev;
+                  const next = { ...prev };
+                  delete next.amount;
+                  return next;
+                });
                 const num = Number(val) || 0;
                 if (splitRows.length === 1) {
                   setSplitRows([{ ...splitRows[0], amount: val }]);
