@@ -759,30 +759,7 @@ export default function PaymentsPage() {
             <AppButton variant="outlined" onClick={() => setViewDialogOpen(false)}>
               Close
             </AppButton>
-            {selectedTxn && selectedTxn.status !== "Closed" && (
-              <AppButton
-                variant="outlined"
-                color="error"
-                startIcon={<TicketIcon />}
-                onClick={() => {
-                  setViewDialogOpen(false);
-                  navigate("/support-tickets", {
-                    state: {
-                      raiseTicket: true,
-                      transactionId: selectedTxn.id,
-                      memberName: selectedTxn.memberName,
-                      relatedEvent: selectedTxn.eventName,
-                      amount: selectedTxn.amount,
-                      paymentMode: selectedTxn.paymentMode,
-                      utr: selectedTxn.utr,
-                    },
-                  });
-                }}
-              >
-                Raise Support Ticket
-              </AppButton>
-            )}
-          </Stack>
+          </Stack>  
         }
       >
         {selectedTxn && (

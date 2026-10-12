@@ -824,15 +824,25 @@ export default function ReportsPage({ mode = "event" }) {
     }
 
     // Event Type & Event filter
-    return list.filter((t) => {
-      const tEventName = String(t.eventName || t.EventName || "").trim().toLowerCase();
-      const evMatch = (eventsList || []).find((e) => (e.name || e.eventName || "").trim().toLowerCase() === tEventName);
-      const tEventType = String(t.eventTypeName || t.categoryName || evMatch?.eventTypeName || evMatch?.category || "General").trim().toLowerCase();
+    return list
+      .map((t) => {
+        const tEventName = String(t.eventName || t.EventName || "").trim();
+        const evMatch = (eventsList || []).find((e) => (e.name || e.eventName || "").trim().toLowerCase() === tEventName.toLowerCase());
+        const resolvedEventType = t.eventTypeName || t.categoryName || evMatch?.eventTypeName || evMatch?.category || "General";
+        return {
+          ...t,
+          eventName: tEventName || (evMatch?.name || evMatch?.eventName) || "—",
+          eventTypeName: resolvedEventType,
+        };
+      })
+      .filter((t) => {
+        const tEventName = (t.eventName || "").trim().toLowerCase();
+        const tEventType = (t.eventTypeName || "").trim().toLowerCase();
 
-      const matchType = !filters.eventType || filters.eventType === "ALL" || tEventType === filters.eventType.trim().toLowerCase();
-      const matchEv = !filters.event || filters.event === "ALL" || tEventName === filters.event.trim().toLowerCase();
-      return matchType && matchEv;
-    });
+        const matchType = !filters.eventType || filters.eventType === "ALL" || tEventType === filters.eventType.trim().toLowerCase();
+        const matchEv = !filters.event || filters.event === "ALL" || tEventName === filters.event.trim().toLowerCase();
+        return matchType && matchEv;
+      });
   }, [paymentTransactions, isMember, currentUserId, currentUserName, filters, eventsList, isDateInRange]);
 
   /* Rupee formatter */
@@ -859,21 +869,7 @@ export default function ReportsPage({ mode = "event" }) {
   ];
 
   const memberColumns = [
-    {
-      label: "Member Name",
-      key: "memberName",
-      exportValue: (r) => r.memberName,
-      render: (r) => (
-        <Typography
-          variant="body2"
-          fontWeight={700}
-          sx={{ cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }}
-          onClick={() => openBreakdownModal(r, "all")}
-        >
-          {r.memberName}
-        </Typography>
-      ),
-    },
+   
     {
       label: "Event Type",
       key: "eventType",
@@ -891,6 +887,21 @@ export default function ReportsPage({ mode = "event" }) {
       render: (r) => (
         <Typography variant="body2" fontWeight={600}>
           {r.eventName || getMemberEventName(r)}
+        </Typography>
+      ),
+    },
+     {
+      label: "Member Name",
+      key: "memberName",
+      exportValue: (r) => r.memberName,
+      render: (r) => (
+        <Typography
+          variant="body2"
+          fontWeight={700}
+          sx={{ cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }}
+          onClick={() => openBreakdownModal(r, "all")}
+        >
+          {r.memberName}
         </Typography>
       ),
     },
@@ -1127,22 +1138,24 @@ export default function ReportsPage({ mode = "event" }) {
 
   const paymentHistoryColumns = [
     {
-      label: "Event & Type",
+      label: "Event Type",
+      key: "eventTypeName",
+      exportValue: (row) => row.eventTypeName || "General",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ fontSize: "0.82rem" }}>
+          {row.eventTypeName || "General"}
+        </Typography>
+      ),
+    },
+    {
+      label: "Event Name",
       key: "eventName",
-      render: (row) => {
-        const evMatch = (eventsList || []).find((e) => (e.name || e.eventName || "").trim().toLowerCase() === (row.eventName || "").trim().toLowerCase());
-        const evType = row.eventTypeName || row.categoryName || evMatch?.eventTypeName || evMatch?.category || "General";
-        return (
-          <Box>
-            <Typography variant="body2" fontWeight={700}>
-              {row.eventName || "—"}
-            </Typography>
-            <Typography variant="caption" color="primary.main" fontWeight={600} sx={{ fontSize: "0.7rem" }}>
-              {evType}
-            </Typography>
-          </Box>
-        );
-      },
+      exportValue: (row) => row.eventName || "—",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }}>
+          {row.eventName || "—"}
+        </Typography>
+      ),
     },
     {
       label: "Member Name",
@@ -1554,8 +1567,8 @@ export default function ReportsPage({ mode = "event" }) {
           const evType = t.eventTypeName || t.categoryName || evMatch?.eventTypeName || evMatch?.category || "General";
           return {
             "Transaction ID": t.id || t.transactionId || "—",
-            "Event Name": t.eventName || "—",
             "Event Type": evType,
+            "Event Name": t.eventName || "—",
             "Member Name": t.memberName || "—",
             "Amount Paid": Number(t.amount || 0),
             "Payment Date": formatGridDate(t.paymentDate || t.createdOn),
