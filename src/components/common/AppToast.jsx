@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { Snackbar, Alert, AlertTitle, Slide, Box, Typography } from "@mui/material";
 
 const ToastContext = createContext();
@@ -39,24 +39,43 @@ export const extractErrorMessage = (err, fallback = "An unexpected error occurre
   if (
     str.includes("23503") ||
     str.toLowerCase().includes("foreign key") ||
-    str.toLowerCase().includes("reference constraint")
+    str.toLowerCase().includes("reference constraint") ||
+    str.toLowerCase().includes("in use") ||
+    str.toLowerCase().includes("cannot be deleted because it is currently in use")
   ) {
-    return "Record cannot be modified or deleted because it is referenced in other records.";
+    return "This record cannot be deleted because it is currently in use.";
   }
 
   if (
     str.includes("23505") ||
     str.toLowerCase().includes("unique constraint") ||
-    str.toLowerCase().includes("duplicate key")
+    str.toLowerCase().includes("duplicate key") ||
+    str.toLowerCase().includes("already exists")
   ) {
     return "A record with this information already exists.";
   }
 
-  if (str.includes("Microsoft.EntityFrameworkCore") || str.includes("Npgsql.") || str.includes("System.Data.")) {
-    return "Unable to save changes to the database. Please try again.";
+  if (
+    str.includes("Microsoft.EntityFrameworkCore") ||
+    str.includes("could not be translated") ||
+    str.includes("Translation of member") ||
+    str.includes("DbSet<") ||
+    str.includes("InvalidOperationException") ||
+    str.includes("Npgsql.") ||
+    str.includes("System.Data.") ||
+    str.includes("System.InvalidOperationException")
+  ) {
+    return "Unable to complete request. Please verify the record and try again.";
   }
 
   return str;
+};
+
+/**
+ * Global helper to trigger toast from anywhere (e.g. outside React components)
+ */
+export const showAppToast = (msg, type = "error") => {
+  window.dispatchEvent(new CustomEvent("app:toast", { detail: { msg, type } }));
 };
 
 /**
@@ -92,6 +111,31 @@ export const ToastProvider = ({ children }) => {
     setSeverity(type);
     setOpen(true);
   };
+
+  useEffect(() => {
+    const handleAppToast = (e) => {
+      if (e.detail?.msg) {
+        showToast(e.detail.msg, e.detail.type || "info");
+      }
+    };
+    window.addEventListener("app:toast", handleAppToast);
+
+    // Global handler: Catch any unhandled promise rejections and directly show toast message
+    const handleUnhandledRejection = (event) => {
+      if (event.reason) {
+        const errorMsg = extractErrorMessage(event.reason);
+        if (errorMsg) {
+          showToast(errorMsg, "error");
+        }
+      }
+    };
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener("app:toast", handleAppToast);
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+    };
+  }, []);
 
   const handleClose = (event, reason) => {
     if (reason === "clickaway") return;
