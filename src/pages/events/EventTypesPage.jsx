@@ -13,6 +13,7 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
 import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 import { getEventTypesAsync, createEventTypeAsync, updateEventTypeAsync, deleteEventTypeAsync } from "../../services/eventTypeService";
+import { getUsersAsync } from "../../services/userService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate, formatCreatedBy } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -27,6 +28,11 @@ const initialForm = {
   standardSharePercentage: 100,
   ruleDescription: "",
 };
+
+const isGuid = (val) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    String(val || "").trim()
+  );
 
 export default function EventTypesPage() {
   const { authState } = useAuth();
@@ -78,8 +84,40 @@ export default function EventTypesPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await getEventTypesAsync(true);
-      setTypes(data || []);
+      const [data, usersData] = await Promise.all([
+        getEventTypesAsync(true),
+        getUsersAsync().catch(() => [])
+      ]);
+
+      const userMap = {};
+      let firstAdmin = null;
+      if (Array.isArray(usersData)) {
+        usersData.forEach((u) => {
+          const id = String(u.userId || u.id || "").toLowerCase();
+          const name = u.fullName || u.name || u.username;
+          if (id && name) userMap[id] = name;
+          if (!firstAdmin && (u.roleName?.toLowerCase() === "admin" || u.role?.toLowerCase() === "admin" || u.roleNames?.some(r => r.toLowerCase() === "admin"))) {
+            firstAdmin = name;
+          }
+        });
+      }
+
+      const defaultAdminName = firstAdmin || authState?.user?.fullName || authState?.user?.username || "Admin";
+
+      const resolvedTypes = (data || []).map((t) => {
+        const raw = t.createdBy || t.CreatedBy;
+        let createdBy = raw;
+        if (!raw || isGuid(raw) || raw === "--") {
+          const mapped = raw && isGuid(raw) ? userMap[String(raw).toLowerCase()] : null;
+          createdBy = mapped || defaultAdminName;
+        }
+        return {
+          ...t,
+          createdBy,
+        };
+      });
+
+      setTypes(resolvedTypes);
     } catch (error) {
       toast.error(error, "Failed to load event types");
     } finally {
@@ -304,7 +342,10 @@ export default function EventTypesPage() {
     {
       label: COMMON_STRINGS.TABLE.CREATED_BY_COL,
       key: "createdBy",
-      render: (row) => formatCreatedBy(row.createdBy || row.CreatedBy),
+      render: (row) => {
+        const formatted = formatCreatedBy(row.createdBy || row.CreatedBy);
+        return formatted !== "--" ? formatted : (row.createdBy && !isGuid(row.createdBy) ? row.createdBy : "Admin");
+      },
     },
     {
       label: COMMON_STRINGS.TABLE.CREATED_ON_COL,

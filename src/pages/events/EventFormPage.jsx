@@ -655,6 +655,21 @@ export default function EventFormPage({
     [selectedTypes]
   );
 
+  // Event types that do NOT have configured expense items (require manual contribution amount)
+  const typesWithoutExpenseItems = useMemo(() => {
+    return nonBirthdaySelectedTypes.filter((type) => {
+      const typeMasterItems = budgetItemsList.filter((b) => {
+        if (b.isActive === false) return false;
+        if (type.eventTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === type.eventTypeId.toLowerCase()) {
+          return true;
+        }
+        const cat = (b.category || "").toLowerCase().trim();
+        return cat === (type.eventTypeName || "").toLowerCase() || cat.includes((type.eventTypeName || "").toLowerCase());
+      });
+      return typeMasterItems.length === 0;
+    });
+  }, [nonBirthdaySelectedTypes, budgetItemsList]);
+
   const handleOtherEventAmountChange = (typeId, value) => {
     const cleanVal = sanitizeDecimalAmount(value);
     setOtherEventAmounts((prev) => ({
@@ -947,14 +962,13 @@ export default function EventFormPage({
         });
       }
 
-      // 2. Add the Event Contribution Amount entered in the form
-      const rawVal = otherEventAmounts[type.eventTypeId] !== undefined
-        ? otherEventAmounts[type.eventTypeId]
-        : (nonBirthdaySelectedTypes.length === 1 && typeMasterItems.length === 0 ? form.baseAmount : "");
-      const numVal = parseFloat(String(rawVal)) || 0;
+      // 2. Add the Event Contribution Amount entered in the form ONLY IF NO CONFIGURED EXPENSE ITEMS
+      if (typeMasterItems.length === 0) {
+        const rawVal = otherEventAmounts[type.eventTypeId] !== undefined
+          ? otherEventAmounts[type.eventTypeId]
+          : (nonBirthdaySelectedTypes.length === 1 && typeMasterItems.length === 0 ? form.baseAmount : "");
+        const numVal = parseFloat(String(rawVal)) || 0;
 
-      // Include contribution amount if entered, or if there are no master items configured
-      if (numVal > 0 || typeMasterItems.length === 0) {
         const itemKey = `type_${type.eventTypeId}_contrib`;
         const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
         const amount = isManual ? (Number(customItemAmounts[itemKey]) || 0) : numVal;
@@ -1128,12 +1142,26 @@ export default function EventFormPage({
     setOfficeMembers(offTotal);
     setWfhMembers(wfhTotal);
 
+    const hasItems = budgetItemsList.some((b) => {
+      if (b.isActive === false) return false;
+      if (newTypeId && b.eventTypeId && b.eventTypeId.toLowerCase() === newTypeId.toLowerCase()) return true;
+      const cat = (b.category || "").toLowerCase().trim();
+      return cat === newTypeName.toLowerCase() || cat.includes(newTypeName.toLowerCase());
+    });
+
+    if (hasItems) {
+      setOtherEventAmounts((prev) => ({
+        ...prev,
+        [newTypeId]: "",
+      }));
+    }
+
     setForm((prev) => ({
       ...prev,
       eventTypeId: newTypeId,
       eventTypeIds: newTypeId ? [newTypeId] : [],
       eventName: updatedName,
-      baseAmount: prev.baseAmount || "",
+      baseAmount: hasItems ? "" : (prev.baseAmount || ""),
       participantIds: allActiveIds,
     }));
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
@@ -1312,33 +1340,26 @@ export default function EventFormPage({
       }
     }
 
-    if (nonBirthdaySelectedTypes.length > 0) {
-      nonBirthdaySelectedTypes.forEach((t) => {
+    if (typesWithoutExpenseItems.length > 0) {
+      typesWithoutExpenseItems.forEach((t) => {
         const val = otherEventAmounts[t.eventTypeId] !== undefined
           ? otherEventAmounts[t.eventTypeId]
           : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
         const num = parseFloat(String(val)) || 0;
-        const hasMasterItems = computedBudgetItems.some(
-          (i) =>
-            (i.category || "").toLowerCase() === (t.eventTypeName || "").toLowerCase() &&
-            !i.key.includes("_contrib") &&
-            i.amount > 0
-        );
-        if (num <= 0 && !hasMasterItems) {
-          newErrors[`baseAmount_${t.eventTypeId}`] = `Contribution amount is required for ${t.eventTypeName}`;
+
+        if (!val || String(val).trim() === "" || num <= 0) {
+          const errMsg = `${t.eventTypeName} contribution amount is required and cannot be ₹0`;
+          newErrors[`baseAmount_${t.eventTypeId}`] = errMsg;
+          if (nonBirthdaySelectedTypes.length === 1) {
+            newErrors.baseAmount = errMsg;
+          }
         }
       });
     }
 
-    if (isBirthday) {
-      const bdayBudgetAmount = computedBudgetItems
-        .filter((i) => i.category === "Birthday")
-        .reduce((sum, i) => sum + i.amount, 0);
-
-      if (plannedBudget <= 0 || bdayBudgetAmount <= 0) {
-        toast.error("Birthday event cannot be saved with ₹0. Please configure budget calculation rates or add valid expenses.");
-        return;
-      }
+    if (plannedBudget <= 0) {
+      toast.error("Event cannot be saved with ₹0. Please enter a valid contribution amount or configure budget items.");
+      return;
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -1817,8 +1838,8 @@ export default function EventFormPage({
                   />
                 </Grid>
 
-                {/* Subsection: Additional Event Contributions */}
-                {nonBirthdaySelectedTypes.length > 0 && (
+                {/* Subsection: Additional Event Contributions (Only for event types without configured expense items) */}
+                {typesWithoutExpenseItems.length > 0 && (
                   <>
                     <Grid size={{ xs: 12 }}>
                       <Typography
@@ -1838,33 +1859,24 @@ export default function EventFormPage({
                       </Typography>
                     </Grid>
 
-                    {nonBirthdaySelectedTypes.map((type) => {
+                    {typesWithoutExpenseItems.map((type) => {
                       const rawVal =
                         otherEventAmounts[type.eventTypeId] !== undefined
                           ? otherEventAmounts[type.eventTypeId]
                           : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
-                      const numVal = parseFloat(String(rawVal)) || 0;
-                      const splitPerPerson = total > 0 && numVal > 0 ? (numVal / total) : 0;
                       const fieldError =
                         errors[`baseAmount_${type.eventTypeId}`] ||
                         (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
 
-                      const hasMasterItems = computedBudgetItems.some(
-                        (i) =>
-                          (i.category || "").toLowerCase() === (type.eventTypeName || "").toLowerCase() &&
-                          !i.key.includes("_contrib") &&
-                          i.amount > 0
-                      );
-
                       return (
                         <Grid
-                          size={{ xs: 12, sm: nonBirthdaySelectedTypes.length > 1 ? 6 : 6 }}
+                          size={{ xs: 12, sm: typesWithoutExpenseItems.length > 1 ? 6 : 6 }}
                           key={type.eventTypeId}
                         >
                           <AppInput
                             label={`${type.eventTypeName} Contribution Amount`}
                             placeholder={`Enter total ${type.eventTypeName.toLowerCase()} budget (₹)`}
-                            required={!hasMasterItems}
+                            required
                             fullWidth
                             value={rawVal}
                             onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
