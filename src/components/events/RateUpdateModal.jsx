@@ -179,16 +179,16 @@ export default function RateUpdateModal({
           }}
         >
           <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-              EVENT TYPE
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
+              Event Type
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
               {item.category || item.eventTypeName || "--"}
             </Typography>
           </Box>
           <Box sx={{ textAlign: "right" }}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-              EXPENSE ITEM
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
+              Expense Item
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
               {item.expenseItem || "--"}

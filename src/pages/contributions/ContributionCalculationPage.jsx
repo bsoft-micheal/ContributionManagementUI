@@ -180,13 +180,6 @@ export default function ContributionCalculationPage() {
       render: (row) => formatGridDate(row.joiningDate),
     },
     {
-      label: "No of Years",
-      key: "tenureFormatted",
-      align: "right",
-      sx: { minWidth: 100 },
-      cellSx: { minWidth: 100 }
-    },
-    {
       label: "Rule Applied",
       sx: { minWidth: 170 },
       cellSx: { minWidth: 170 },
