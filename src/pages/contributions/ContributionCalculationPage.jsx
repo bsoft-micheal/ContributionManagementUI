@@ -89,25 +89,63 @@ export default function ContributionCalculationPage() {
     const eventParticipants = selectedEventDetails.participants || [];
 
     const hasTenureRule = Boolean(selectedEventDetails.hasTenureRule);
-    const thresholdYears = Number(selectedEventDetails.tenureThresholdYears) > 0 ? Number(selectedEventDetails.tenureThresholdYears) : 1;
-    const newEntrantPct = Number(selectedEventDetails.newEntrantSharePercentage) > 0 ? Number(selectedEventDetails.newEntrantSharePercentage) : 50;
+
+    // Parse dynamic criteria from ruleDescription if available
+    let dynamicTiers = [];
+    if (hasTenureRule && selectedEventDetails.ruleDescription) {
+      try {
+        const parsed = JSON.parse(selectedEventDetails.ruleDescription);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          dynamicTiers = parsed.map((p) => ({
+            years: Number(p.years ?? p.y ?? 1),
+            share: Number(p.share ?? p.s ?? 50)
+          })).sort((a, b) => a.years - b.years);
+        }
+      } catch {
+        // Fallback to legacy single threshold
+      }
+    }
+
+    if (hasTenureRule && dynamicTiers.length === 0) {
+      const thresholdYears = Number(selectedEventDetails.tenureThresholdYears) > 0 ? Number(selectedEventDetails.tenureThresholdYears) : 1;
+      const newEntrantPct = Number(selectedEventDetails.newEntrantSharePercentage) > 0 ? Number(selectedEventDetails.newEntrantSharePercentage) : 50;
+      dynamicTiers.push({ years: thresholdYears, share: newEntrantPct });
+    }
+
     const standardPct = Number(selectedEventDetails.standardSharePercentage) > 0 ? Number(selectedEventDetails.standardSharePercentage) : 100;
-    const newEntrantRatio = newEntrantPct / 100;
     const standardRatio = standardPct / 100;
 
-    // 1. Identify which members are participants and find their tenure/joining date
+    // 1. Identify which members are participants and find their tenure/joining date & dynamic tier
     const enrichedParticipants = eventParticipants.map(ep => {
       const memberInfo = members.find(m => m.memberId === ep.memberId);
       const joiningDate = memberInfo ? dayjs(memberInfo.joiningDate) : dayjs();
-      const tenureYears = eventDate.diff(joiningDate, 'year', true);
-      const isNewEntrant = hasTenureRule && tenureYears < thresholdYears;
+      const tenureYears = Math.max(0, eventDate.diff(joiningDate, 'year', true));
+
+      let matchedTier = null;
+      let shareRatio = standardRatio;
+      let appliedPct = standardPct;
+
+      if (hasTenureRule) {
+        for (const tier of dynamicTiers) {
+          if (tenureYears < tier.years) {
+            matchedTier = tier;
+            appliedPct = tier.share;
+            shareRatio = tier.share / 100;
+            break;
+          }
+        }
+      }
 
       return {
         memberId: ep.memberId,
         name: ep.memberName || (memberInfo ? memberInfo.name : ""),
         joiningDate: memberInfo ? memberInfo.joiningDate : null,
         tenure: tenureYears,
-        isNewEntrant,
+        hasTenureRule,
+        matchedTier,
+        shareRatio,
+        appliedPct,
+        isNewEntrant: Boolean(matchedTier),
         createdBy: memberInfo?.createdBy || memberInfo?.CreatedBy || ep.createdBy || ep.CreatedBy || "--",
         createdAt: memberInfo?.createdAt || memberInfo?.CreatedAt || memberInfo?.createdOn || memberInfo?.CreatedOn || ep.createdAt || ep.createdOn || null,
       };
@@ -118,16 +156,10 @@ export default function ContributionCalculationPage() {
     let equalShare = 0;
 
     if (hasTenureRule) {
-      // 2. Count standard vs new entrant shares
-      const newEntrantCount = enrichedParticipants.filter(p => p.isNewEntrant).length;
-      const standardCount = enrichedParticipants.length - newEntrantCount;
-
-      // 3. Split calculation: Divisor = (standardCount * standardRatio) + (newEntrantCount * newEntrantRatio)
-      const divisor = (standardCount * standardRatio) + (newEntrantCount * newEntrantRatio);
+      const divisor = enrichedParticipants.reduce((sum, p) => sum + p.shareRatio, 0);
       standardFullShare = divisor > 0 ? (totalAmount / divisor) : 0;
       setFullShareAmount(standardFullShare);
     } else {
-      // For other events without tenure rule, everyone pays an equal share amount
       const divisor = enrichedParticipants.length;
       equalShare = divisor > 0 ? (totalAmount / divisor) : 0;
       setFullShareAmount(equalShare);
@@ -138,7 +170,7 @@ export default function ContributionCalculationPage() {
       const epContribution = selectedEventDetails.contributions?.find(c => c.memberId === p.memberId);
       let calculatedAmount;
       if (hasTenureRule) {
-        calculatedAmount = p.isNewEntrant ? (standardFullShare * newEntrantRatio) : (standardFullShare * standardRatio);
+        calculatedAmount = standardFullShare * p.shareRatio;
       } else if (epContribution !== undefined && epContribution !== null && epContribution.amount !== undefined) {
         calculatedAmount = epContribution.amount;
       } else {
@@ -147,10 +179,6 @@ export default function ContributionCalculationPage() {
 
       return {
         ...p,
-        hasTenureRule,
-        thresholdYears,
-        newEntrantPct,
-        standardPct,
         tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
         calculatedAmount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimals
       };
@@ -195,11 +223,22 @@ export default function ContributionCalculationPage() {
             />
           );
         }
+        if (row.matchedTier) {
+          return (
+            <Chip
+              size="small"
+              label={`${row.appliedPct}% (< ${row.matchedTier.years} yr)`}
+              color="warning"
+              variant="outlined"
+              sx={{ fontWeight: 800, fontSize: "0.65rem" }}
+            />
+          );
+        }
         return (
           <Chip
             size="small"
-            label={row.isNewEntrant ? `${row.newEntrantPct}% (New Entrant < ${row.thresholdYears} yr)` : `${row.standardPct}% (Standard)`}
-            color={row.isNewEntrant ? "warning" : "success"}
+            label={`${row.appliedPct}% (Standard)`}
+            color="success"
             variant="outlined"
             sx={{ fontWeight: 800, fontSize: "0.65rem" }}
           />
