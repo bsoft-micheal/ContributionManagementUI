@@ -77,6 +77,7 @@ import {
   createEventAsync,
   updateEventAsync,
   getEventByIdAsync,
+  previewContributionsAsync,
 } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
@@ -344,6 +345,12 @@ export default function EventFormPage({
   const [hasPayments, setHasPayments] = useState(false);
   const [isCustomEventName, setIsCustomEventName] = useState(false);
 
+  // Individual Contribution Preview State
+  const [previewData, setPreviewData] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(null);
+  const [previewSearch, setPreviewSearch] = useState("");
+
   const isMemberActive = (m) => {
     const active =
       m.isActive === true ||
@@ -521,15 +528,19 @@ export default function EventFormPage({
             if (masterTotal > 0 && savedBaseAmount > masterTotal) {
               netContribAmount = Math.max(0, savedBaseAmount - masterTotal);
             }
+            const perPersonVal = activeMems.length > 0 && typeMasterItems.length === 0
+              ? Math.round(netContribAmount / activeMems.length)
+              : netContribAmount;
             setOtherEventAmounts({
-              [type.eventTypeId]: String(netContribAmount),
+              [type.eventTypeId]: String(perPersonVal),
             });
-            initialBaseAmount = String(netContribAmount);
+            initialBaseAmount = String(perPersonVal);
           } else if (editNonBdays.length > 1 && savedBaseAmount > 0) {
             const splitPerType = Math.round(savedBaseAmount / editNonBdays.length);
+            const perPersonSplit = activeMems.length > 0 ? Math.round(splitPerType / activeMems.length) : splitPerType;
             const initialMap = {};
             editNonBdays.forEach((t) => {
-              initialMap[t.eventTypeId] = String(splitPerType);
+              initialMap[t.eventTypeId] = String(perPersonSplit);
             });
             setOtherEventAmounts(initialMap);
           }
@@ -971,30 +982,36 @@ export default function EventFormPage({
 
         const itemKey = `type_${type.eventTypeId}_contrib`;
         const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
-        const amount = isManual ? (Number(customItemAmounts[itemKey]) || 0) : numVal;
-        const splitPerPerson = total > 0 && amount > 0 ? (amount / total) : 0;
+        const perPersonRate = isManual ? (Number(customItemAmounts[itemKey]) || 0) : numVal;
+        const totalCalculatedAmount = total * perPersonRate;
+        const amount = totalCalculatedAmount;
+        const splitPerPerson = perPersonRate;
 
         const formattedTotal = amount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         const formattedSplit = splitPerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
         const calcText = amount > 0
-          ? `₹${formattedTotal} Total ÷ ${total} Members = ₹${formattedSplit}/person`
-          : "Enter Total Event Budget";
+          ? `${total} Members × ₹${formattedSplit}/person = ₹${formattedTotal}`
+          : "Enter Per Person Amount";
 
         const calcFormula = amount > 0
-          ? `Active Members × ₹${formattedSplit}`
+          ? `${total} Active Members × ₹${formattedSplit}`
           : "₹0";
 
+        const displayName = typesWithoutExpenseItems.length === 1
+          ? "Expected Amount"
+          : `${typeName} Expected Amount`;
+
         const formulaPart = amount > 0
-          ? `${typeName} Contribution (₹${formattedTotal} ÷ ${total} Members = ₹${formattedSplit}/person)`
-          : `${typeName}: ₹0`;
+          ? `${displayName} (${total} Members × ₹${formattedSplit} = ₹${formattedTotal})`
+          : `${displayName}: ₹0`;
 
         items.push({
           id: `${type.eventTypeId}_contrib`,
           key: itemKey,
-          expenseItem: `${typeName} Contribution`,
+          expenseItem: displayName,
           category: typeName,
-          rate: amount,
+          rate: perPersonRate,
           autoAmount: numVal,
           amount,
           isManual,
@@ -1076,9 +1093,79 @@ export default function EventFormPage({
     return total > 0 ? (plannedBudget / total) : 0;
   }, [isBirthday, exempt, celebrantCount, birthdaySharePerPerson, otherEventsSharePerPerson, plannedBudget, total]);
 
+  // Preview Contribution API Call (Debounced)
+  useEffect(() => {
+    const targetTypeId = form.eventTypeId || (form.eventTypeIds && form.eventTypeIds.length > 0 ? form.eventTypeIds[0] : null);
+    const pIds = selectedParticipantIds || [];
+
+    if (!targetTypeId || pIds.length === 0 || plannedBudget <= 0) {
+      setPreviewData(null);
+      setPreviewLoading(false);
+      setPreviewError(null);
+      return;
+    }
+
+    setPreviewLoading(true);
+    setPreviewError(null);
+
+    const handler = setTimeout(async () => {
+      try {
+        const payload = {
+          eventTypeId: targetTypeId,
+          eventTypeIds: allowMultipleEvents && form.eventTypeIds?.length > 0 ? form.eventTypeIds : [targetTypeId],
+          eventDate: form.eventDate ? dayjs(form.eventDate).format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
+          baseAmount: plannedBudget,
+          participantIds: pIds,
+          contributionOverrides: [],
+        };
+
+        const res = await previewContributionsAsync(payload);
+        const resolvedData = (res && res.data) ? res.data : res;
+        if (resolvedData && (resolvedData.members || resolvedData.Members)) {
+          const rawMembers = resolvedData.members || resolvedData.Members || [];
+          const normalizedMembers = rawMembers.map((m) => ({
+            memberId: m.memberId || m.MemberId || m.userId || m.UserId,
+            memberName: m.memberName || m.MemberName || "",
+            workType: m.workType || m.WorkType || "Office",
+            completedYears: m.completedYears ?? m.CompletedYears ?? 0,
+            sharePercentage: m.sharePercentage ?? m.SharePercentage ?? 100,
+            standardAmount: m.standardAmount ?? m.StandardAmount ?? 0,
+            contributionAmount: m.contributionAmount ?? m.ContributionAmount ?? 0,
+          }));
+          setPreviewData({
+            ...resolvedData,
+            members: normalizedMembers,
+            totalMembers: resolvedData.totalMembers ?? resolvedData.TotalMembers,
+            eligibleContributors: resolvedData.eligibleContributors ?? resolvedData.EligibleContributors,
+            plannedBudget: resolvedData.plannedBudget ?? resolvedData.PlannedBudget,
+            expectedCollection: resolvedData.expectedCollection ?? resolvedData.ExpectedCollection,
+            standardContributionAmount: resolvedData.standardContributionAmount ?? resolvedData.StandardContributionAmount,
+          });
+        }
+      } catch (err) {
+        console.error("Preview contribution calculation failed:", err);
+        setPreviewError("Unable to calculate member contributions. Please try again.");
+      } finally {
+        setPreviewLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(handler);
+  }, [
+    form.eventTypeId,
+    form.eventTypeIds,
+    form.eventDate,
+    selectedParticipantIds,
+    plannedBudget,
+    allowMultipleEvents,
+  ]);
+
   const expectedCollection = useMemo(() => {
+    if (previewData && Number(previewData.expectedCollection) > 0) {
+      return previewData.expectedCollection;
+    }
     return plannedBudget;
-  }, [plannedBudget]);
+  }, [previewData, plannedBudget]);
 
   const dynamicFormulaText = computedBudgetItems
     .map((i) => i.formulaPart)
@@ -1348,7 +1435,8 @@ export default function EventFormPage({
         const num = parseFloat(String(val)) || 0;
 
         if (!val || String(val).trim() === "" || num <= 0) {
-          const errMsg = `${t.eventTypeName} contribution amount is required and cannot be ₹0`;
+          const fieldName = typesWithoutExpenseItems.length === 1 ? "Per person amount" : `${t.eventTypeName} per person amount`;
+          const errMsg = `${fieldName} is required and cannot be ₹0`;
           newErrors[`baseAmount_${t.eventTypeId}`] = errMsg;
           if (nonBirthdaySelectedTypes.length === 1) {
             newErrors.baseAmount = errMsg;
@@ -1411,13 +1499,8 @@ export default function EventFormPage({
           }
         });
       } else {
-        const baseShare = finalParticipantIds.length > 0 ? plannedBudget / finalParticipantIds.length : 0;
-        finalParticipantIds.forEach((mId) => {
-          contributionOverrides.push({
-            memberId: mId,
-            amount: parseFloat(baseShare.toFixed(2)),
-          });
-        });
+        // For non-birthday events, let backend calculate tenure and standard shares dynamically
+        // using the exact same calculation engine that powers the preview.
       }
 
       const celebrantsSummary = isBirthday
@@ -1841,23 +1924,6 @@ export default function EventFormPage({
                 {/* Subsection: Additional Event Contributions (Only for event types without configured expense items) */}
                 {typesWithoutExpenseItems.length > 0 && (
                   <>
-                    <Grid size={{ xs: 12 }}>
-                      <Typography
-                        variant="caption"
-                        fontWeight={700}
-                        sx={{
-                          display: "block",
-                          fontSize: "0.8rem",
-                          color: (theme) =>
-                            theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
-                          mt: 0.5,
-                        }}
-                      >
-                        Additional Event Contributions
-                      </Typography>
-                    </Grid>
 
                     {typesWithoutExpenseItems.map((type) => {
                       const rawVal =
@@ -1868,14 +1934,27 @@ export default function EventFormPage({
                         errors[`baseAmount_${type.eventTypeId}`] ||
                         (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
 
+                      const inputLabel =
+                        typesWithoutExpenseItems.length === 1
+                          ? "Expected Amount (Per Person)"
+                          : `${type.eventTypeName} Expected Amount (Per Person)`;
+
+                      const inputPlaceholder =
+                        typesWithoutExpenseItems.length === 1
+                          ? "Enter per person amount (e.g. 100)"
+                          : `Enter ${type.eventTypeName.toLowerCase()} per person amount (₹)`;
+
+                      const numericVal = parseFloat(String(rawVal)) || 0;
+                      const calculatedTotal = numericVal * total;
+
                       return (
                         <Grid
                           size={{ xs: 12, sm: typesWithoutExpenseItems.length > 1 ? 6 : 6 }}
                           key={type.eventTypeId}
                         >
                           <AppInput
-                            label={`${type.eventTypeName} Contribution Amount`}
-                            placeholder={`Enter total ${type.eventTypeName.toLowerCase()} budget (₹)`}
+                            label={inputLabel}
+                            placeholder={inputPlaceholder}
                             required
                             fullWidth
                             value={rawVal}
@@ -1890,7 +1969,12 @@ export default function EventFormPage({
                               </Typography>
                             }
                             error={!!fieldError}
-                            helperText={fieldError || ""}
+                            helperText={
+                              fieldError ||
+                              (numericVal > 0
+                                ? `Total: ${total} members × ₹${numericVal} = ₹${calculatedTotal.toLocaleString("en-IN")}`
+                                : `Calculated as: ${total} active members × per person amount`)
+                            }
                           />
                         </Grid>
                       );
@@ -2576,6 +2660,280 @@ export default function EventFormPage({
                   </Alert>
                 )}
               </Box>
+            </Box>
+
+            {/* Section: Individual Contribution Preview */}
+            <Box
+              sx={{
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#ffffff"),
+                border: "1px solid",
+                borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e8e5f2"),
+                borderRadius: "12px",
+                p: { xs: 2, sm: 2.2 },
+                boxShadow: "0 2px 12px rgba(74, 63, 107, 0.03)",
+                mt: 2.2,
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {/* Header */}
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.2, mb: 1.2 }}>
+                <PeopleIcon sx={{ color: "#6366f1", fontSize: "1.35rem", mt: 0.2 }} />
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="h6"
+                    fontWeight={700}
+                    sx={{
+                      fontSize: "0.98rem",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#1e1a2e"),
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    Individual Contribution Preview
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: "0.75rem",
+                      color: "#64748b",
+                      display: "block",
+                      mt: 0.2,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    Preview of contribution amount per member based on configured share rules before event submission.
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Optional Search / Filter */}
+              {selectedParticipantIds.length > 5 && (
+                <Box sx={{ mb: 1.2 }}>
+                  <OutlinedInput
+                    size="small"
+                    placeholder="Search member..."
+                    value={previewSearch}
+                    onChange={(e) => setPreviewSearch(e.target.value)}
+                    fullWidth
+                    sx={{
+                      height: 32,
+                      fontSize: "0.78rem",
+                      bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc"),
+                      borderRadius: "6px",
+                      "& input": { py: 0.5, px: 1 },
+                    }}
+                  />
+                </Box>
+              )}
+
+              {/* Preview Content State */}
+              {selectedParticipantIds.length === 0 ? (
+                <Box
+                  sx={{
+                    py: 3,
+                    textAlign: "center",
+                    bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc"),
+                    borderRadius: "8px",
+                    border: "1px dashed",
+                    borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e2e8f0"),
+                  }}
+                >
+                  <Typography sx={{ fontSize: "0.82rem", color: "#94a3b8", fontWeight: 500 }}>
+                    No participating members selected.
+                  </Typography>
+                </Box>
+              ) : plannedBudget <= 0 ? (
+                <Box
+                  sx={{
+                    py: 3,
+                    textAlign: "center",
+                    bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc"),
+                    borderRadius: "8px",
+                    border: "1px dashed",
+                    borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e2e8f0"),
+                  }}
+                >
+                  <Typography sx={{ fontSize: "0.82rem", color: "#94a3b8", fontWeight: 500 }}>
+                    Complete the event details to preview member contributions.
+                  </Typography>
+                </Box>
+              ) : previewError ? (
+                <Box
+                  sx={{
+                    py: 2.5,
+                    px: 2,
+                    textAlign: "center",
+                    bgcolor: "#fef2f2",
+                    borderRadius: "8px",
+                    border: "1px solid #fecaca",
+                  }}
+                >
+                  <Typography sx={{ fontSize: "0.82rem", color: "#ef4444", fontWeight: 500 }}>
+                    {previewError}
+                  </Typography>
+                </Box>
+              ) : previewLoading && !previewData ? (
+                <Box sx={{ py: 3, textAlign: "center" }}>
+                  <Typography sx={{ fontSize: "0.82rem", color: "#6366f1", fontWeight: 600 }}>
+                    Calculating preview...
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <TableContainer
+                    sx={{
+                      maxHeight: 340,
+                      overflowY: "auto",
+                      borderRadius: "8px",
+                      border: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#e2e8f0"),
+                      "&::-webkit-scrollbar": { width: 6 },
+                      "&::-webkit-scrollbar-thumb": {
+                        backgroundColor: (theme) => (theme.palette.mode === "dark" ? "#475569" : "#cbd5e1"),
+                        borderRadius: 3,
+                      },
+                    }}
+                  >
+                    <Table size="small" stickyHeader aria-label="individual contribution preview table">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell
+                            sx={{
+                              bgcolor: (theme) => (theme.palette.mode === "dark" ? "#1e293b" : "#f1f5f9"),
+                              fontWeight: 700,
+                              fontSize: "0.78rem",
+                              py: 0.9,
+                              px: 1.5,
+                              color: (theme) => (theme.palette.mode === "dark" ? "#f8fafc" : "#334155"),
+                              borderBottom: "1px solid",
+                              borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#cbd5e1"),
+                            }}
+                          >
+                            Member Name ⇅
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{
+                              bgcolor: (theme) => (theme.palette.mode === "dark" ? "#1e293b" : "#f1f5f9"),
+                              fontWeight: 700,
+                              fontSize: "0.78rem",
+                              py: 0.9,
+                              px: 1.5,
+                              color: (theme) => (theme.palette.mode === "dark" ? "#f8fafc" : "#334155"),
+                              borderBottom: "1px solid",
+                              borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#cbd5e1"),
+                            }}
+                          >
+                            Amount ⇅
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(() => {
+                          const list = (previewData?.members || []).filter((m) => {
+                            if (!previewSearch) return true;
+                            const q = previewSearch.toLowerCase().trim();
+                            return (
+                              (m.memberName || "").toLowerCase().includes(q) ||
+                              (m.workType || "").toLowerCase().includes(q)
+                            );
+                          });
+
+                          if (list.length === 0) {
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={2} sx={{ textAlign: "center", py: 2, color: "#94a3b8", fontSize: "0.78rem" }}>
+                                  No members match your search.
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
+
+                          return list.map((m) => {
+                            const isWfh = String(m.workType || "").toLowerCase() === "wfh";
+                            const hasReducedShare = m.sharePercentage !== undefined && Number(m.sharePercentage) < 100;
+                            return (
+                              <TableRow
+                                key={m.memberId || m.userId}
+                                hover
+                                sx={{
+                                  "&:last-child td": { borderBottom: 0 },
+                                  "&:hover": {
+                                    bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc"),
+                                  },
+                                }}
+                              >
+                                <TableCell sx={{ py: 0.75, px: 1.5, fontSize: "0.82rem" }}>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+                                    <Typography
+                                      component="span"
+                                      sx={{
+                                        fontWeight: 600,
+                                        fontSize: "0.82rem",
+                                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                                      }}
+                                    >
+                                      {m.memberName} ({isWfh ? "WFH" : "Office"})
+                                    </Typography>
+                                    {hasReducedShare && (
+                                      <Chip
+                                        label={`${m.sharePercentage}%`}
+                                        size="small"
+                                        sx={{
+                                          height: 18,
+                                          fontSize: "0.68rem",
+                                          fontWeight: 700,
+                                          bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(99, 102, 241, 0.2)" : "#ede9fe"),
+                                          color: "#6366f1",
+                                          borderRadius: "4px",
+                                          px: 0.2,
+                                        }}
+                                      />
+                                    )}
+                                  </Box>
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 0.75, px: 1.5, fontSize: "0.84rem", fontWeight: 700, color: (theme) => (theme.palette.mode === "dark" ? "#f8fafc" : "#0f172a") }}>
+                                  ₹{Number(m.contributionAmount || 0).toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          });
+                        })()}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+
+                  {/* Summary Footer */}
+                  {previewData && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        pt: 1,
+                        mt: 0.5,
+                        px: 0.5,
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span>
+                        {previewData.members ? previewData.members.length : selectedParticipantIds.length} Participants
+                      </span>
+                      <span>
+                        Total Expected: ₹{Number(previewData.expectedCollection || 0).toLocaleString("en-IN", {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </Box>
+                  )}
+                </>
+              )}
             </Box>
           </Grid>
         </Grid>

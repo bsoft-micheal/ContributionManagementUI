@@ -1456,21 +1456,37 @@ export default function SettingsPage() {
                 : categoriesList.find((c) => String(c.eventTypeId) === String(selectedCategoryId))?.eventTypeName || "Birthday";
 
             const previewDueDate = dayjs().endOf("month").format("DD/MM/YYYY");
+            const currentCatQrConfig = getPaymentQrConfig(currentCategoryLabel);
+            const previewIsUploaded = (currentCatQrConfig.qrMode || "").toLowerCase() === "uploaded";
+            const previewUpiId = currentCatQrConfig.upiId || currentQrConfig.upiId || "danielrobertanto604@okicici";
+            const previewReceiverName = currentCatQrConfig.receiverName || currentQrConfig.receiverName || settings.orgName || "Unit 1A";
+            const previewUpiUri = !previewIsUploaded && previewUpiId
+              ? buildUpiPaymentUri({
+                  upiId: previewUpiId,
+                  receiverName: previewReceiverName,
+                  amount: 500,
+                  note: `Contribution for ${currentCategoryLabel}`,
+                })
+              : "";
+            const previewQrUrl = previewIsUploaded
+              ? (currentCatQrConfig.qrImage || dynamicQrUrl || defaultPaymentQr)
+              : (previewUpiUri ? generateQrPngDataUrl(previewUpiUri, 300) : (dynamicQrUrl || defaultPaymentQr));
+
             const livePreviewData = {
               memberName: "Daniel",
               categoryName: selectedCategoryId === "all" ? "Birthday" : currentCategoryLabel,
               amount: 500,
               dueDate: previewDueDate,
               orgName: settings.orgName || "Unit 1A",
-              paymentLink: liveUpiUri,
-              qrImageUrl: dynamicQrUrl,
+              paymentLink: previewUpiUri,
+              qrImageUrl: previewQrUrl,
             };
 
             const rawSubject = templateSubject || "Contribution Notice - {categoryName}";
             const liveSubject = interpolatePlaceholders(rawSubject, livePreviewData);
 
             const defaultDesc =
-              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\nThank You,\n{orgName}";
+              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\nThank You,\n{orgName}";
             const rawDesc = templateDescription || defaultDesc;
             const liveBody = interpolatePlaceholders(rawDesc, livePreviewData)
               .replace(/<img[^>]*>/gi, "")
@@ -1613,6 +1629,41 @@ export default function SettingsPage() {
                           minRows={6}
                           required
                         />
+
+                        {/* Token Placeholder Helper Chips */}
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap", mt: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", fontWeight: 700 }}>
+                            Placeholders:
+                          </Typography>
+                          {[
+                            "{memberName}",
+                            "{categoryName}",
+                            "{amount}",
+                            "{dueDate}",
+                            "{orgName}",
+                            "{paymentLink}",
+                            "{qrCode}",
+                          ].map((token) => (
+                            <Chip
+                              key={token}
+                              label={token}
+                              size="small"
+                              onClick={() => {
+                                setTemplateDescription((prev) => (prev ? `${prev} ${token}` : token));
+                              }}
+                              sx={{
+                                fontSize: "0.68rem",
+                                fontWeight: 700,
+                                height: 22,
+                                cursor: "pointer",
+                                bgcolor: token === "{qrCode}" ? "rgba(124, 58, 237, 0.1)" : "rgba(74, 63, 107, 0.08)",
+                                color: token === "{qrCode}" ? "#7c3aed" : "#4a3f6b",
+                                border: token === "{qrCode}" ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(74, 63, 107, 0.2)",
+                                "&:hover": { bgcolor: "rgba(74, 63, 107, 0.16)" },
+                              }}
+                            />
+                          ))}
+                        </Box>
 
                         <Divider sx={{ my: 0.5 }} />
 
@@ -1852,14 +1903,96 @@ export default function SettingsPage() {
                           color: "text.primary",
                           fontSize: "0.82rem",
                           lineHeight: 1.6,
-                          mb: 2,
+                          mb: 1.5,
                         }}
                       >
                         {liveBody || `Dear Daniel,\n\nThis is a notification regarding your ${currentCategoryLabel} contribution of ₹500.\n\nDue Date: ${previewDueDate}\n\nThank You,\n${settings.orgName || "Unit 1A"}`}
                       </Typography>
 
+                      {/* Amount Due Banner */}
+                      <Box
+                        sx={{
+                          bgcolor: isDark ? "rgba(124, 58, 237, 0.08)" : "#fdf4ff",
+                          border: "1.5px solid #d946ef",
+                          borderRadius: "10px",
+                          p: 1.5,
+                          textAlign: "center",
+                          my: 1.5,
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ color: "#a21caf", fontWeight: 800, textTransform: "uppercase", fontSize: "0.68rem", display: "block" }}>
+                          Pending Amount Due
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: "#86198f" }}>
+                          ₹500
+                        </Typography>
+                      </Box>
+
+                      {/* QR Code Section Card */}
+                      <Box
+                        sx={{
+                          textAlign: "center",
+                          bgcolor: isDark ? "rgba(124, 58, 237, 0.06)" : "#faf5ff",
+                          border: "1px solid #e9d5ff",
+                          borderRadius: "12px",
+                          p: 1.8,
+                          mb: 2,
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ fontWeight: 750, color: "#4b5563", display: "block", mb: 1, textTransform: "uppercase", fontSize: "0.66rem", letterSpacing: "0.3px" }}>
+                          Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm)
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: "inline-block",
+                            p: 0.8,
+                            bgcolor: "#ffffff",
+                            borderRadius: "10px",
+                            border: "2px solid #7c3aed",
+                            boxShadow: "0 4px 12px rgba(124, 58, 237, 0.12)",
+                            mb: 1,
+                          }}
+                        >
+                          <Box
+                            component="img"
+                            src={previewQrUrl || defaultPaymentQr}
+                            alt="Payment QR Code"
+                            sx={{ width: 130, height: 130, display: "block", mx: "auto", borderRadius: "6px" }}
+                          />
+                        </Box>
+                        <Typography variant="caption" sx={{ display: "block", fontSize: "0.72rem", color: "#4b5563" }}>
+                          <strong>Payee:</strong> {previewReceiverName}
+                        </Typography>
+                        <Typography variant="caption" sx={{ display: "block", fontSize: "0.72rem", color: "#7c3aed", fontWeight: 700 }}>
+                          <strong>UPI ID:</strong> {previewUpiId}
+                        </Typography>
+                        <Typography variant="caption" sx={{ display: "block", fontSize: "0.66rem", color: "#64748b", mt: 0.5 }}>
+                          Amount is pre-filled automatically when scanned (₹500)
+                        </Typography>
+
+                        {previewUpiUri && (
+                          <Box sx={{ mt: 1.2 }}>
+                            <AppButton
+                              variant="contained"
+                              size="small"
+                              sx={{
+                                bgcolor: "#7c3aed !important",
+                                "&:hover": { bgcolor: "#6d28d9 !important" },
+                                fontSize: "0.74rem",
+                                fontWeight: 700,
+                                py: 0.6,
+                                px: 2,
+                                borderRadius: "8px",
+                              }}
+                            >
+                              Pay ₹500 via UPI
+                            </AppButton>
+                          </Box>
+                        )}
+                      </Box>
+
                       {/* Portal Redirect Button */}
-                      <Box sx={{ textAlign: "center", my: 2.5 }}>
+                      <Box sx={{ textAlign: "center", mb: 2 }}>
                         <AppButton
                           variant="contained"
                           fullWidth
