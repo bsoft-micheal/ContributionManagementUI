@@ -13,20 +13,34 @@ import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
 import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 import { getEventTypesAsync, createEventTypeAsync, updateEventTypeAsync, deleteEventTypeAsync } from "../../services/eventTypeService";
+import { getUsersAsync } from "../../services/userService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate, formatCreatedBy } from "../../utils/dateHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 
+const defaultCriteria = [
+  { years: 1, share: 50 },
+  { years: 2, share: 60 },
+  { years: 3, share: 70 },
+  { years: 4, share: 80 }
+];
+
 const initialForm = {
   eventTypeName: "",
   isActive: true,
   hasTenureRule: false,
+  criteria: defaultCriteria,
   tenureThresholdYears: 1,
   newEntrantSharePercentage: 50,
   standardSharePercentage: 100,
   ruleDescription: "",
 };
+
+const isGuid = (val) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    String(val || "").trim()
+  );
 
 export default function EventTypesPage() {
   const { authState } = useAuth();
@@ -52,10 +66,8 @@ export default function EventTypesPage() {
 
     if ((form.eventTypeName || "").trim() !== (s.eventTypeName || "").trim()) return true;
     if (Boolean(form.hasTenureRule) !== Boolean(s.hasTenureRule)) return true;
-    if (String(form.tenureThresholdYears ?? "").trim() !== String(s.tenureThresholdYears ?? "").trim()) return true;
-    if (String(form.newEntrantSharePercentage ?? "").trim() !== String(s.newEntrantSharePercentage ?? "").trim()) return true;
-    if (String(form.standardSharePercentage ?? "").trim() !== String(s.standardSharePercentage ?? "").trim()) return true;
     if (Boolean(form.isActive) !== Boolean(s.isActive)) return true;
+    if (JSON.stringify(form.criteria || []) !== JSON.stringify(s.criteria || [])) return true;
 
     return false;
   }, [dialogOpen, form]);
@@ -78,8 +90,40 @@ export default function EventTypesPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await getEventTypesAsync(true);
-      setTypes(data || []);
+      const [data, usersData] = await Promise.all([
+        getEventTypesAsync(true),
+        getUsersAsync().catch(() => [])
+      ]);
+
+      const userMap = {};
+      let firstAdmin = null;
+      if (Array.isArray(usersData)) {
+        usersData.forEach((u) => {
+          const id = String(u.userId || u.id || "").toLowerCase();
+          const name = u.fullName || u.name || u.username;
+          if (id && name) userMap[id] = name;
+          if (!firstAdmin && (u.roleName?.toLowerCase() === "admin" || u.role?.toLowerCase() === "admin" || u.roleNames?.some(r => r.toLowerCase() === "admin"))) {
+            firstAdmin = name;
+          }
+        });
+      }
+
+      const defaultAdminName = firstAdmin || authState?.user?.fullName || authState?.user?.username || "Admin";
+
+      const resolvedTypes = (data || []).map((t) => {
+        const raw = t.createdBy || t.CreatedBy;
+        let createdBy = raw;
+        if (!raw || isGuid(raw) || raw === "--") {
+          const mapped = raw && isGuid(raw) ? userMap[String(raw).toLowerCase()] : null;
+          createdBy = mapped || defaultAdminName;
+        }
+        return {
+          ...t,
+          createdBy,
+        };
+      });
+
+      setTypes(resolvedTypes);
     } catch (error) {
       toast.error(error, "Failed to load event types");
     } finally {
@@ -93,19 +137,32 @@ export default function EventTypesPage() {
       eventTypeName: { required: true, type: "letteronly", min: 2, max: 50, label: requiredLabel }
     };
 
-    if (form.hasTenureRule) {
-      schema.tenureThresholdYears = {
-        required: true,
-        label: requiredLabel,
-      };
-    }
-
     const newErrors = validateForm(form, schema);
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
+    }
+
+    if (form.hasTenureRule) {
+      if (!form.criteria || form.criteria.length === 0) {
+        toast.error("Please add at least one dynamic criteria row");
+        return;
+      }
+      for (let i = 0; i < form.criteria.length; i++) {
+        const item = form.criteria[i];
+        const y = Number(item.years);
+        const s = Number(item.share);
+        if (!y || y <= 0) {
+          toast.error(`Please enter valid Years in row ${i + 1}`);
+          return;
+        }
+        if (!s || s <= 0 || s > 100) {
+          toast.error(`Share (%) must be between 1 and 100 in row ${i + 1}`);
+          return;
+        }
+      }
     }
 
     const trimmedName = form.eventTypeName?.trim().toLowerCase();
@@ -122,14 +179,26 @@ export default function EventTypesPage() {
     }
 
     try {
+      const sortedCriteria = form.hasTenureRule
+        ? [...form.criteria]
+            .map(c => ({ years: Number(c.years), share: Number(c.share) }))
+            .sort((a, b) => a.years - b.years)
+        : [];
+
+      const firstRow = sortedCriteria[0];
+      const ruleJson = form.hasTenureRule && sortedCriteria.length > 0
+        ? JSON.stringify(sortedCriteria)
+        : "Equal Share";
+
       const payload = {
         ...form,
         hasTenureRule: Boolean(form.hasTenureRule),
-        tenureThresholdYears: Number(form.tenureThresholdYears) || 1,
-        newEntrantSharePercentage: Number(form.newEntrantSharePercentage) || 50,
-        standardSharePercentage: Number(form.standardSharePercentage) || 100,
-        ruleDescription: form.ruleDescription?.trim() || (form.hasTenureRule ? `${form.newEntrantSharePercentage || 50}% (< ${form.tenureThresholdYears || 1} yr)` : "Equal Share")
+        tenureThresholdYears: firstRow ? firstRow.years : 1,
+        newEntrantSharePercentage: firstRow ? firstRow.share : 50,
+        standardSharePercentage: 100,
+        ruleDescription: ruleJson
       };
+
       if (form.eventTypeId) {
         await updateEventTypeAsync(form.eventTypeId, payload);
         toast.success(TOAST_MESSAGES.EVENT_TYPES.SAVED_SUCCESS);
@@ -194,16 +263,56 @@ export default function EventTypesPage() {
   }
 
   const handleOpenAddDialog = () => {
-    setForm(initialForm);
-    savedFormRef.current = initialForm;
+    const addFormData = {
+      ...initialForm,
+      criteria: [
+        { years: 1, share: 50 },
+        { years: 2, share: 60 },
+        { years: 3, share: 70 },
+        { years: 4, share: 80 }
+      ]
+    };
+    setForm(addFormData);
+    savedFormRef.current = addFormData;
     setErrors({});
     setDialogOpen(true);
   };
 
   const handleOpenEditDialog = (row) => {
+    let parsedCriteria = [];
+    if (row.ruleDescription) {
+      try {
+        const parsed = JSON.parse(row.ruleDescription);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          parsedCriteria = parsed.map((p) => ({
+            years: p.years ?? p.y ?? 1,
+            share: p.share ?? p.s ?? 50
+          }));
+        }
+      } catch {
+        // Not a JSON rule description
+      }
+    }
+
+    if (parsedCriteria.length === 0) {
+      if (row.hasTenureRule) {
+        parsedCriteria = [
+          { years: row.tenureThresholdYears ?? 1, share: row.newEntrantSharePercentage ?? 50 }
+        ];
+      } else {
+        parsedCriteria = [
+          { years: 1, share: 50 },
+          { years: 2, share: 60 },
+          { years: 3, share: 70 },
+          { years: 4, share: 80 }
+        ];
+      }
+    }
+
     const editFormData = {
       ...row,
       hasTenureRule: Boolean(row.hasTenureRule),
+      criteria: parsedCriteria,
       tenureThresholdYears: row.tenureThresholdYears ?? 1,
       newEntrantSharePercentage: row.newEntrantSharePercentage ?? 50,
       standardSharePercentage: row.standardSharePercentage ?? 100,
@@ -259,15 +368,26 @@ export default function EventTypesPage() {
       key: "hasTenureRule",
       render: (row) => {
         if (row.hasTenureRule) {
+          let summary = "";
+          try {
+            const parsed = JSON.parse(row.ruleDescription);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              summary = parsed.map((c) => `< ${c.years}y: ${c.share}%`).join(", ");
+            }
+          } catch {
+            summary = row.ruleDescription || `< ${row.tenureThresholdYears ?? 1} yr: ${row.newEntrantSharePercentage ?? 50}%`;
+          }
           return (
-            <Chip
-              size="small"
-              icon={<CalculateIcon sx={{ fontSize: "0.9rem !important" }} />}
-              label={`New Entrant: ${row.newEntrantSharePercentage ?? 50}% (< ${row.tenureThresholdYears ?? 1} yr)`}
-              color="warning"
-              variant="outlined"
-              sx={{ fontWeight: 800, fontSize: "0.7rem", px: 0.5 }}
-            />
+            <Tooltip title={summary || "Dynamic Criteria"}>
+              <Chip
+                size="small"
+                icon={<CalculateIcon sx={{ fontSize: "0.9rem !important" }} />}
+                label={summary ? `Dynamic: ${summary}` : `Dynamic Share`}
+                color="warning"
+                variant="outlined"
+                sx={{ fontWeight: 800, fontSize: "0.7rem", px: 0.5, maxWidth: 280 }}
+              />
+            </Tooltip>
           );
         }
         return (
@@ -304,7 +424,10 @@ export default function EventTypesPage() {
     {
       label: COMMON_STRINGS.TABLE.CREATED_BY_COL,
       key: "createdBy",
-      render: (row) => formatCreatedBy(row.createdBy || row.CreatedBy),
+      render: (row) => {
+        const formatted = formatCreatedBy(row.createdBy || row.CreatedBy);
+        return formatted !== "--" ? formatted : (row.createdBy && !isGuid(row.createdBy) ? row.createdBy : "Admin");
+      },
     },
     {
       label: COMMON_STRINGS.TABLE.CREATED_ON_COL,
@@ -394,10 +517,25 @@ export default function EventTypesPage() {
             required
           />
 
-          {/* Dynamic Contribution Calculation Rule Flag / Checkbox Container */}
-          {/* Dynamic Contribution Calculation Rule Checkbox */}
+          {/* Enable Dynamic Calculation Checkbox */}
           <Box
-            onClick={() => setForm((f) => ({ ...f, hasTenureRule: !f.hasTenureRule }))}
+            onClick={() => {
+              setForm((f) => {
+                const nextChecked = !f.hasTenureRule;
+                return {
+                  ...f,
+                  hasTenureRule: nextChecked,
+                  criteria: (!f.criteria || f.criteria.length === 0)
+                    ? [
+                        { years: 1, share: 50 },
+                        { years: 2, share: 60 },
+                        { years: 3, share: 70 },
+                        { years: 4, share: 80 }
+                      ]
+                    : f.criteria
+                };
+              });
+            }}
             sx={{
               display: "inline-flex",
               alignItems: "center",
@@ -411,12 +549,26 @@ export default function EventTypesPage() {
           >
             <Checkbox
               checked={form.hasTenureRule}
-              onChange={(e) => setForm((f) => ({ ...f, hasTenureRule: e.target.checked }))}
+              onChange={(e) => {
+                const nextChecked = e.target.checked;
+                setForm((f) => ({
+                  ...f,
+                  hasTenureRule: nextChecked,
+                  criteria: (!f.criteria || f.criteria.length === 0)
+                    ? [
+                        { years: 1, share: 50 },
+                        { years: 2, share: 60 },
+                        { years: 3, share: 70 },
+                        { years: 4, share: 80 }
+                      ]
+                    : f.criteria
+                }));
+              }}
               onClick={(e) => e.stopPropagation()}
               size="small"
               sx={{
                 p: 0.1,
-                transform: "scale(0.8)",
+                transform: "scale(0.85)",
                 color: "#4a3f6b",
                 "&.Mui-checked": {
                   color: "#4a3f6b",
@@ -428,69 +580,174 @@ export default function EventTypesPage() {
               fontWeight={500}
               sx={{
                 color: (theme) => (theme.palette.mode === "dark" ? "#e2e8f0" : "#334155"),
-                fontSize: "0.8rem",
+                fontSize: "0.85rem",
               }}
             >
               Enable Dynamic Calculation
             </Typography>
           </Box>
 
-            {form.hasTenureRule && (
-              <Box
-                onClick={(e) => e.stopPropagation()}
-                sx={{ mt: 2.5, display: "flex", flexDirection: "column", gap: 2, pt: 2, borderTop: (theme) => `1px solid ${theme.palette.divider}` }}
+          {/* Dynamic Criteria Section */}
+          {form.hasTenureRule && (
+            <Box sx={{ mt: 1, display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{
+                  color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                  fontSize: "0.84rem",
+                }}
               >
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12 }}>
-                    <AppInput
-                      label="Criteria (Years)"
-                      placeholder="e.g. 1"
-                      fullWidth
-                      required={form.hasTenureRule}
-                      maxLength={3}
-                      value={form.tenureThresholdYears}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
-                        setForm((f) => ({ ...f, tenureThresholdYears: val }));
-                        if (errors.tenureThresholdYears) {
-                          setErrors((prev) => ({ ...prev, tenureThresholdYears: "" }));
-                        }
+                Dynamic Criteria <span style={{ color: "#ef4444" }}>*</span>
+              </Typography>
+
+              {/* Table Container */}
+              <Box
+                sx={{
+                  border: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "#e2e8f0"}`,
+                  borderRadius: "10px",
+                  overflow: "hidden",
+                }}
+              >
+                {/* Table Header */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr 64px",
+                    bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "#f8fafc"),
+                    px: 2,
+                    py: 1.2,
+                    borderBottom: (theme) => `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "#e2e8f0"}`,
+                  }}
+                >
+                  <Typography variant="caption" fontWeight={700} sx={{ color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#475569") }}>
+                    Years
+                  </Typography>
+                  <Typography variant="caption" fontWeight={700} sx={{ color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#475569") }}>
+                    Share (%)
+                  </Typography>
+                  <Typography variant="caption" fontWeight={700} align="center" sx={{ color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#475569") }}>
+                    Action
+                  </Typography>
+                </Box>
+
+                {/* Rows */}
+                <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1.5, bgcolor: (theme) => (theme.palette.mode === "dark" ? "transparent" : "#ffffff") }}>
+                  {(form.criteria || []).map((row, idx) => (
+                    <Box
+                      key={idx}
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr 64px",
+                        alignItems: "center",
+                        gap: 1.5,
                       }}
-                      error={Boolean(errors.tenureThresholdYears)}
-                      helperText={errors.tenureThresholdYears}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label="New Share (%)"
-                      placeholder="e.g. 50"
-                      fullWidth
-                      maxLength={3}
-                      value={form.newEntrantSharePercentage}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
-                        setForm((f) => ({ ...f, newEntrantSharePercentage: val }));
-                      }}
-                      helperText="Discounted share percentage"
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <AppInput
-                      label="Standard Share (%)"
-                      placeholder="e.g. 100"
-                      fullWidth
-                      maxLength={3}
-                      value={form.standardSharePercentage}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
-                        setForm((f) => ({ ...f, standardSharePercentage: val }));
-                      }}
-                      helperText="Standard share percentage"
-                    />
-                  </Grid>
-                </Grid>
+                    >
+                      <AppInput
+                        value={row.years}
+                        placeholder="e.g. 1"
+                        restrictType="numeric"
+                        maxLength={3}
+                        size="small"
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
+                          const updated = [...(form.criteria || [])];
+                          updated[idx] = { ...updated[idx], years: val };
+                          setForm((f) => ({ ...f, criteria: updated }));
+                        }}
+                      />
+                      <AppInput
+                        value={row.share}
+                        placeholder="e.g. 50"
+                        restrictType="numeric"
+                        maxLength={3}
+                        size="small"
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
+                          const updated = [...(form.criteria || [])];
+                          updated[idx] = { ...updated[idx], share: val };
+                          setForm((f) => ({ ...f, criteria: updated }));
+                        }}
+                      />
+                      <Box sx={{ display: "flex", justifyContent: "center" }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            if ((form.criteria || []).length <= 1) {
+                              toast.error("At least one criteria row is required");
+                              return;
+                            }
+                            const updated = (form.criteria || []).filter((_, i) => i !== idx);
+                            setForm((f) => ({ ...f, criteria: updated }));
+                          }}
+                          sx={{
+                            color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                            p: 0.6,
+                            "&:hover": {
+                              bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74, 63, 107, 0.08)"),
+                            },
+                          }}
+                        >
+                          <DeleteIcon sx={{ fontSize: "1.2rem" }} />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
               </Box>
-            )}
+
+              {/* Add Row Button */}
+              <Box sx={{ mt: 0.2 }}>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    const currentList = form.criteria || [];
+                    const maxYear = currentList.length > 0
+                      ? Math.max(...currentList.map((c) => Number(c.years) || 0))
+                      : 0;
+                    const lastShare = currentList.length > 0
+                      ? Number(currentList[currentList.length - 1].share) || 50
+                      : 40;
+                    const nextShare = Math.min(100, lastShare + 10);
+                    setForm((f) => ({
+                      ...f,
+                      criteria: [...(f.criteria || []), { years: maxYear + 1, share: nextShare }],
+                    }));
+                  }}
+                  sx={{
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontWeight: 700,
+                    px: 2,
+                    py: 0.5,
+                    fontSize: "0.8rem",
+                    borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#4a3f6b"),
+                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                    "&:hover": {
+                      borderColor: "#4a3f6b",
+                      bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74, 63, 107, 0.04)"),
+                    },
+                  }}
+                >
+                  Add Row
+                </AppButton>
+              </Box>
+
+              {/* Helper text caption */}
+              <Typography
+                variant="caption"
+                sx={{
+                  color: (theme) => (theme.palette.mode === "dark" ? "#94a3b8" : "#64748b"),
+                  fontSize: "0.75rem",
+                  mt: 0.2,
+                }}
+              >
+                Define contribution share by years of service.
+              </Typography>
+            </Box>
+          )}
 
           {form.eventTypeId && (
             <AppSwitch

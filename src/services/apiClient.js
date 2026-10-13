@@ -65,6 +65,14 @@ apiClient.interceptors.response.use(
       if (!currentPath.startsWith("/forgot-password") && currentPath !== "/login") {
         window.location.href = "/login";
       }
+    } else if (error.response?.status === 429) {
+      const retryAfter = error.response.headers?.["retry-after"];
+      const backendMsg = error.response.data?.message;
+      let toastMsg = backendMsg || "Too many requests. Please slow down and try again later.";
+      if (retryAfter && !toastMsg.includes("second")) {
+        toastMsg += ` (Retry after ${retryAfter}s)`;
+      }
+      showAppToast(toastMsg, "warning");
     } else if (!error.response) {
       showAppToast("Unable to reach the server. Please check your network connection.", "error");
     }
