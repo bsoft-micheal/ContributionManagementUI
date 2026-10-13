@@ -147,6 +147,28 @@ export default function ExpensePage() {
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [previewImageModal, setPreviewImageModal] = useState({ open: false, url: "", title: "" });
 
+  // Dynamically resolve logged-in user's member display name
+  const loggedInUserName = useMemo(() => {
+    const rawName = (
+      authState?.fullName ||
+      authState?.name ||
+      authState?.user?.fullName ||
+      authState?.user?.name ||
+      authState?.username ||
+      ""
+    ).trim();
+
+    const matched = membersList.find(
+      (m) =>
+        (m.name && rawName && m.name.toLowerCase() === rawName.toLowerCase()) ||
+        (m.memberName && rawName && m.memberName.toLowerCase() === rawName.toLowerCase()) ||
+        (m.email && authState?.email && m.email.toLowerCase() === authState.email.toLowerCase()) ||
+        (m.username && authState?.username && m.username.toLowerCase() === authState.username.toLowerCase())
+    );
+
+    return matched?.name || matched?.memberName || rawName || "";
+  }, [authState, membersList]);
+
   // Dedicated Status Update / Approval dialog state
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [statusExpense, setStatusExpense] = useState(null);
@@ -293,24 +315,20 @@ export default function ExpensePage() {
           setFilterCategory(location.state.category);
           setAppliedCategory(location.state.category);
         }
-        const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
-        const matched = membersList.find((m) => {
-          const mName = (m.name || m.memberName || "").trim().toLowerCase();
-          return mName === currentUserName.trim().toLowerCase();
-        });
+        const currentUserName = loggedInUserName || authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
         setEditingExpense(null);
         setFormImageError(false);
         setForm({
           ...initialForm,
           eventName: location.state.eventName || "",
           category: location.state.category || "",
-          submittedBy: matched ? (matched.name || matched.memberName) : currentUserName,
+          submittedBy: currentUserName,
         });
         setErrors({});
         setDialogOpen(true);
       }
     }
-  }, [location.state, membersList, authState]);
+  }, [location.state, membersList, authState, loggedInUserName]);
 
   // Filter panel status options (including "All Statuses")
   const statusOptions = useMemo(() => {
@@ -477,8 +495,14 @@ export default function ExpensePage() {
         });
       }
     });
+    if (loggedInUserName && !unique.has(loggedInUserName)) {
+      list.push({
+        label: `${loggedInUserName}${authState?.role ? ` (${authState.role})` : ""}`,
+        value: loggedInUserName,
+      });
+    }
     return list;
-  }, [membersList]);
+  }, [membersList, loggedInUserName, authState?.role]);
 
   // Dynamically derive category options from DB event_types table and recorded expenses
   const categoryOptions = useMemo(() => {
@@ -576,8 +600,9 @@ export default function ExpensePage() {
       await deleteExpenseAsync(expenseId);
       toast.success(TOAST_MESSAGES.EXPENSES.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchExpensesFromDb();
-    } catch {
-      toast.error(TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+    } catch (err) {
+      toast.error(err, TOAST_MESSAGES.GENERAL.DELETE_FAILED);
+      await fetchExpensesFromDb();
     } finally {
       setDeleteConfirmOpen(false);
       setExpenseToDelete(null);
@@ -704,7 +729,10 @@ export default function ExpensePage() {
 
       if (editingExpense) {
         const expenseId = editingExpense.expenseId || editingExpense.id;
-        await updateExpenseAsync(expenseId, payload);
+        await updateExpenseAsync(expenseId, {
+          ...payload,
+          modifiedOn: editingExpense.modifiedOn || null,
+        });
         toast.success(TOAST_MESSAGES.EXPENSES.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
         await createExpenseAsync(payload);
@@ -718,7 +746,15 @@ export default function ExpensePage() {
       setErrors({});
       await fetchExpensesFromDb();
     } catch (err) {
-      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      if (err?.response?.status === 404 || err?.response?.status === 409) {
+        setDialogOpen(false);
+        setEditingExpense(null);
+        setForm(initialForm);
+        savedFormRef.current = null;
+        setErrors({});
+        await fetchExpensesFromDb();
+      }
     }
   };
 
@@ -776,6 +812,7 @@ export default function ExpensePage() {
         description: updatedDescription,
         fileName: statusExpense.fileName || "",
         fileData: statusExpense.fileName?.startsWith("data:") ? statusExpense.fileName : null,
+        modifiedOn: statusExpense.modifiedOn || null,
       });
 
       // Optimistically update table data so status and reviewer change immediately
@@ -804,7 +841,13 @@ export default function ExpensePage() {
       setStatusRemarks("");
       await fetchExpensesFromDb();
     } catch (err) {
-      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      if (err?.response?.status === 404 || err?.response?.status === 409) {
+        setStatusDialogOpen(false);
+        setStatusExpense(null);
+        setStatusRemarks("");
+        await fetchExpensesFromDb();
+      }
     }
   };
 
@@ -1118,14 +1161,10 @@ export default function ExpensePage() {
                   toast.error("You do not have permission to add expenses.");
                   return;
                 }
-                const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
-                const matched = membersList.find((m) => {
-                  const mName = (m.name || m.memberName || "").trim().toLowerCase();
-                  return mName === currentUserName.trim().toLowerCase();
-                });
+                const currentUserName = loggedInUserName || authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "";
                 const addFormData = {
                   ...initialForm,
-                  submittedBy: matched ? (matched.name || matched.memberName) : currentUserName,
+                  submittedBy: currentUserName,
                 };
                 setEditingExpense(null);
                 setForm(addFormData);
@@ -1476,11 +1515,14 @@ export default function ExpensePage() {
             />
           </Grid>
 
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
               label="Submitted By"
               placeholder="Select Member"
-              value={form.submittedBy}
+              value={form.submittedBy || loggedInUserName}
+              disabled
+              allowClear={false}
+              clearable={false}
               onChange={(e) => {
                 setForm((c) => ({ ...c, submittedBy: e.target.value }));
                 if (errors.submittedBy) setErrors((p) => ({ ...p, submittedBy: "" }));

@@ -137,6 +137,27 @@ export default function EventAddExpenseDialog({
         setMembersList(combinedMembers);
         setEventTypesList(Array.isArray(eventTypesRes) ? eventTypesRes : []);
         setExistingExpenses(Array.isArray(expensesRes) ? expensesRes : []);
+
+        if (Array.isArray(combinedMembers) && combinedMembers.length > 0) {
+          const rawName = (
+            authState?.fullName ||
+            authState?.name ||
+            authState?.user?.fullName ||
+            authState?.user?.name ||
+            authState?.username ||
+            ""
+          ).trim();
+          const matched = combinedMembers.find(
+            (m) =>
+              (m.name && rawName && m.name.toLowerCase() === rawName.toLowerCase()) ||
+              (m.memberName && rawName && m.memberName.toLowerCase() === rawName.toLowerCase()) ||
+              (m.email && authState?.email && m.email.toLowerCase() === authState.email.toLowerCase()) ||
+              (m.username && authState?.username && m.username.toLowerCase() === authState.username.toLowerCase())
+          );
+          if (matched?.name || matched?.memberName) {
+            setForm((c) => ({ ...c, submittedBy: matched.name || matched.memberName }));
+          }
+        }
       } catch {
         // Fallback gracefully
       } finally {
@@ -508,11 +529,14 @@ export default function EventAddExpenseDialog({
           </Grid>
 
           {/* Row 3: Submitted By */}
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
               label="Submitted By"
               placeholder="Select Member"
               value={form.submittedBy}
+              disabled
+              allowClear={false}
+              clearable={false}
               onChange={(e) => {
                 setForm((c) => ({ ...c, submittedBy: e.target.value }));
                 if (errors.submittedBy) setErrors((p) => ({ ...p, submittedBy: "" }));

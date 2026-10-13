@@ -251,6 +251,7 @@ export default function SubmitPaymentPage() {
           status: newStatus,
           verifiedBy: verifier,
           notes: noteText,
+          modifiedOn: target.modifiedOn || null,
         });
 
         toast.success(`Payment status updated to ${newStatus} successfully!`);
@@ -272,8 +273,14 @@ export default function SubmitPaymentPage() {
         setStatusModalTxn(null);
         setAuditRemarks("");
         await loadData();
-      } catch {
-        toast.error("Failed to update payment status");
+      } catch (err) {
+        toast.error(err, "Failed to update payment status");
+        if (err?.response?.status === 404 || err?.response?.status === 409) {
+          setStatusModalOpen(false);
+          setStatusModalTxn(null);
+          setAuditRemarks("");
+          await loadData();
+        }
       }
     }
   };
@@ -631,7 +638,11 @@ export default function SubmitPaymentPage() {
       setErrors({});
       await loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to submit payment details");
+      toast.error(err, "Failed to submit payment details");
+      if (err?.response?.status === 404 || err?.response?.status === 409) {
+        setFormModalOpen(false);
+        await loadData();
+      }
     } finally {
       setSubmitting(false);
     }
