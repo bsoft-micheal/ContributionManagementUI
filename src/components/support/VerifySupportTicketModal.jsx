@@ -251,6 +251,7 @@ export default function VerifySupportTicketModal({
             message: replyText.trim(),
             replyMessage: replyText.trim(),
             status: updateStatus,
+            modifiedOn: ticketInfo?.modifiedOn || initialData?.modifiedOn || null,
           });
         }
         if (!hasNote || statusChanged) {
@@ -263,6 +264,7 @@ export default function VerifySupportTicketModal({
             priority: ticketInfo.priority || "Medium",
             status: updateStatus,
             attachment: ticketInfo.attachment || null,
+            modifiedOn: ticketInfo?.modifiedOn || initialData?.modifiedOn || null,
           });
         }
       } else {
@@ -286,12 +288,11 @@ export default function VerifySupportTicketModal({
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
-      toast.error(
-        err.response?.data?.message ||
-        err.message ||
-        TOAST_MESSAGES.GENERAL.SAVE_FAILED ||
-        "Failed to update support ticket"
-      );
+      toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED || "Failed to update support ticket");
+      if (err?.response?.status === 404 || err?.response?.status === 409) {
+        if (onSuccess) onSuccess();
+        onClose();
+      }
     } finally {
       setIsSaving(false);
     }

@@ -3,7 +3,8 @@ import { Snackbar, Alert, AlertTitle, Slide, Box, Typography } from "@mui/materi
 
 const ToastContext = createContext();
 
-export const extractErrorMessage = (err, fallback = "An unexpected error occurred.") => {
+export const extractErrorMessage = (err, fallback = "Something went wrong. Please try again.") => {
+  const status = err?.response?.status;
   let rawMsg = "";
   if (!err) rawMsg = fallback;
   else if (typeof err === "string") rawMsg = err;
@@ -25,50 +26,70 @@ export const extractErrorMessage = (err, fallback = "An unexpected error occurre
   }
   
   const str = String(rawMsg || fallback).trim();
+  const lower = str.toLowerCase();
 
-  // Sanitize internal database / EF Core exceptions
+  // 1. Record deleted conflict (404 or record not found / deleted)
   if (
-    str.includes("database operation was expected to affect") ||
-    str.includes("DbUpdateConcurrencyException") ||
-    str.includes("optimistic concurrency") ||
-    str.includes("go.microsoft.com/fwlink")
+    status === 404 ||
+    lower.includes("no longer exists") ||
+    lower.includes("recorddeleted") ||
+    lower.includes("not found") ||
+    lower.includes("isdeleted") ||
+    lower.includes("does not exist")
   ) {
-    return "The record was modified or deleted by another operation. Please refresh and try again.";
+    return "This record no longer exists. Please refresh the page.";
   }
 
+  // 2. Already processed / completed (409 or duplicate submission / completed)
+  if (
+    lower.includes("already been completed") ||
+    lower.includes("already processed") ||
+    lower.includes("already completed") ||
+    lower.includes("already verified") ||
+    lower.includes("already rejected") ||
+    lower.includes("already exists") ||
+    lower.includes("duplicate")
+  ) {
+    return "This action has already been completed.";
+  }
+
+  // 3. Record modified conflict (409 or modified by another user)
+  if (
+    status === 409 ||
+    lower.includes("updated by another user") ||
+    lower.includes("modified by another") ||
+    lower.includes("dbupdateconcurrencyexception") ||
+    lower.includes("recordmodified") ||
+    lower.includes("concurrency") ||
+    lower.includes("database operation was expected to affect") ||
+    lower.includes("optimistic concurrency")
+  ) {
+    return "This record was updated by another user. Please refresh and try again.";
+  }
+
+  // 4. Foreign key constraint
   if (
     str.includes("23503") ||
-    str.toLowerCase().includes("foreign key") ||
-    str.toLowerCase().includes("reference constraint") ||
-    str.toLowerCase().includes("in use") ||
-    str.toLowerCase().includes("cannot be deleted because it is currently in use")
+    lower.includes("foreign key") ||
+    lower.includes("reference constraint") ||
+    lower.includes("cannot be deleted because it is currently in use")
   ) {
     return "This record cannot be deleted because it is currently in use.";
   }
 
+  // 5. Internal / EF Core / Server unhandled errors
   if (
-    str.includes("23505") ||
-    str.toLowerCase().includes("unique constraint") ||
-    str.toLowerCase().includes("duplicate key") ||
-    str.toLowerCase().includes("already exists")
-  ) {
-    return "A record with this information already exists.";
-  }
-
-  if (
+    (status && status >= 500) ||
     str.includes("Microsoft.EntityFrameworkCore") ||
     str.includes("could not be translated") ||
-    str.includes("Translation of member") ||
-    str.includes("DbSet<") ||
     str.includes("InvalidOperationException") ||
-    str.includes("Npgsql.") ||
     str.includes("System.Data.") ||
-    str.includes("System.InvalidOperationException")
+    lower.includes("network error")
   ) {
-    return "Unable to complete request. Please verify the record and try again.";
+    return "Something went wrong. Please try again.";
   }
 
-  return str;
+  return str || fallback;
 };
 
 /**
