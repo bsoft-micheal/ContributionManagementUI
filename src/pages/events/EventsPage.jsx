@@ -7,6 +7,7 @@ import {
   IconButton,
   Tooltip,
   Chip,
+  Button,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
@@ -725,6 +726,76 @@ export default function EventsPage() {
         const val = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
         return `₹${Math.round(val).toLocaleString("en-IN")}`;
       }
+    },
+    {
+      label: "Support Tickets Raised",
+      key: "supportTicketRaisedCount",
+      align: "center",
+      exportValue: (row) => Number(row.supportTicketRaisedCount ?? row.SupportTicketRaisedCount ?? 0),
+      render: (row) => {
+        const count = Number(row.supportTicketRaisedCount ?? row.SupportTicketRaisedCount ?? 0);
+        if (count > 0) {
+          return (
+            <Tooltip title={`View ${count} support ticket${count > 1 ? "s" : ""} for ${row.eventName || "this event"}`}>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate("/support-tickets", {
+                    state: {
+                      eventId: row.eventId,
+                      eventName: row.eventName,
+                      relatedEvent: row.eventName,
+                    },
+                  });
+                }}
+                sx={{
+                  minWidth: 44,
+                  height: 28,
+                  px: 1.5,
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  borderRadius: "14px",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#7c3aed" : "#4a3f6b",
+                  color: "#ffffff",
+                  boxShadow: "0 2px 6px rgba(74, 63, 107, 0.3)",
+                  textTransform: "none",
+                  "&:hover": {
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d28d9" : "#3b3156",
+                    boxShadow: "0 4px 10px rgba(74, 63, 107, 0.45)",
+                  },
+                }}
+              >
+                {count}
+              </Button>
+            </Tooltip>
+          );
+        }
+        return (
+          <Button
+            variant="outlined"
+            size="small"
+            disabled
+            sx={{
+              minWidth: 44,
+              height: 28,
+              px: 1.5,
+              fontWeight: 600,
+              fontSize: "0.8rem",
+              borderRadius: "14px",
+              color: "text.secondary !important",
+              borderColor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)",
+              bgcolor: "transparent",
+              textTransform: "none",
+              cursor: "not-allowed",
+            }}
+          >
+            0
+          </Button>
+        );
+      },
     },
     {
       label: "Created By",

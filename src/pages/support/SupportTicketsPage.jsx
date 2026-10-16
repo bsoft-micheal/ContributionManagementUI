@@ -68,6 +68,7 @@ import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 const initialForm = {
   memberName: "",
   memberId: "",
+  eventId: null,
   eventType: "",
   relatedEvent: "",
   ticketType: "",
@@ -78,6 +79,7 @@ const initialForm = {
 };
 
 export default function SupportTicketsPage() {
+  const location = useLocation();
   const toast = useAppToast();
   const { authState } = useAuth();
   const { addNotification } = useNotifications();
@@ -261,12 +263,23 @@ export default function SupportTicketsPage() {
   const [replyErrors, setReplyErrors] = useState({});
 
   // Filter state inside AppDataTable filterPanel
+  const initialEventFilter = location.state?.relatedEvent || location.state?.eventName || "ALL";
   const [filterType, setFilterType] = useState("ALL");
   const [filterPriority, setFilterPriority] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [filterEvent, setFilterEvent] = useState(initialEventFilter);
   const [appliedType, setAppliedType] = useState("ALL");
   const [appliedPriority, setAppliedPriority] = useState("ALL");
   const [appliedStatus, setAppliedStatus] = useState("ALL");
+  const [appliedEvent, setAppliedEvent] = useState(initialEventFilter);
+
+  useEffect(() => {
+    if (location.state?.relatedEvent || location.state?.eventName) {
+      const ev = location.state.relatedEvent || location.state.eventName;
+      setFilterEvent(ev);
+      setAppliedEvent(ev);
+    }
+  }, [location.state?.relatedEvent, location.state?.eventName]);
 
   const fetchTicketsFromDb = async () => {
     try {
@@ -281,6 +294,7 @@ export default function SupportTicketsPage() {
           ticketNo: item.ticketNo || `TKT-2026-${String(idx + 1).padStart(3, "0")}`,
           memberName: item.memberName || "",
           memberId: item.memberId || "",
+          eventId: item.eventId || item.EventId || null,
           relatedEvent: item.relatedEvent || "",
           ticketType: item.ticketType || "General Query",
           subject: item.subject || "",
@@ -336,9 +350,9 @@ export default function SupportTicketsPage() {
   useEffect(() => {
     if (location.state?.raiseTicket) {
       setEditingTicket(null);
-      const relEvent = location.state.relatedEvent || "";
+      const relEvent = location.state.relatedEvent || location.state.eventName || "";
       const matchedEvent = (eventsList || []).find(
-        (ev) => (ev.eventName || ev.name || ev.title) === relEvent
+        (ev) => (ev.eventName || ev.name || ev.title) === relEvent || (location.state?.eventId && (ev.eventId === location.state.eventId || ev.id === location.state.eventId))
       );
       const derivedType = location.state.eventType || matchedEvent?.eventTypeName || matchedEvent?.categoryName || matchedEvent?.eventType || "";
 
@@ -350,6 +364,7 @@ export default function SupportTicketsPage() {
         ...initialForm,
         memberName,
         memberId,
+        eventId: location.state?.eventId || matchedEvent?.eventId || matchedEvent?.id || null,
         eventType: derivedType,
         relatedEvent: relEvent,
         ticketType: "Payment Issue",
@@ -499,15 +514,45 @@ export default function SupportTicketsPage() {
     ];
   }, [dbPriorities]);
 
+  // Dynamically derive event options for the event filter
+  const filterEventOptions = useMemo(() => {
+    const list = [{ label: "All Events", value: "ALL" }];
+    const seen = new Set();
+    (eventsList || []).forEach((e) => {
+      const name = e.eventName || e.name || e.title;
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push({ label: name, value: name });
+      }
+    });
+    (tickets || []).forEach((t) => {
+      const name = t.relatedEvent || t.eventName;
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push({ label: name, value: name });
+      }
+    });
+    return list;
+  }, [eventsList, tickets]);
+
   // Filtered tickets
   const filteredTickets = useMemo(() => {
     return tickets.filter((item) => {
       if (appliedType !== "ALL" && item.ticketType !== appliedType) return false;
       if (appliedPriority !== "ALL" && item.priority !== appliedPriority) return false;
       if (appliedStatus !== "ALL" && item.status !== appliedStatus) return false;
+      if (appliedEvent !== "ALL") {
+        const cleanApplied = appliedEvent.trim().toLowerCase();
+        const itemEvent = (item.relatedEvent || item.eventName || "").trim().toLowerCase();
+        const targetEventId = location.state?.eventId;
+        const matchesEventId = targetEventId && item.eventId && String(item.eventId).toLowerCase() === String(targetEventId).toLowerCase();
+        if (!matchesEventId && itemEvent !== cleanApplied && !itemEvent.includes(cleanApplied) && !cleanApplied.includes(itemEvent)) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [tickets, appliedType, appliedPriority, appliedStatus]);
+  }, [tickets, appliedType, appliedPriority, appliedStatus, appliedEvent, location.state?.eventId]);
 
   const getEventDetails = (relatedEvent) => {
     if (!relatedEvent) return { eventType: "--", eventName: "--" };
@@ -564,13 +609,14 @@ export default function SupportTicketsPage() {
   const handleEditTicket = (row) => {
     setEditingTicket(row);
     const matchedEvent = (eventsList || []).find(
-      (ev) => (ev.eventName || ev.name || ev.title) === row.relatedEvent
+      (ev) => (ev.eventName || ev.name || ev.title) === row.relatedEvent || (row.eventId && (ev.eventId === row.eventId || ev.id === row.eventId))
     );
     const derivedType = matchedEvent?.eventTypeName || matchedEvent?.categoryName || matchedEvent?.eventType || "";
 
     const editFormData = {
       memberName: row.memberName || "",
       memberId: row.memberId || "",
+      eventId: row.eventId || matchedEvent?.eventId || matchedEvent?.id || null,
       eventType: derivedType,
       relatedEvent: row.relatedEvent || "",
       ticketType: row.ticketType || "",
@@ -637,6 +683,7 @@ export default function SupportTicketsPage() {
         await updateSupportTicketAsync(ticketId, {
           memberName: form.memberName,
           memberId: resolvedMemberId || "",
+          eventId: form.eventId || editingTicket?.eventId || null,
           relatedEvent: form.relatedEvent || "",
           ticketType: form.ticketType,
           description: form.description,
@@ -654,6 +701,7 @@ export default function SupportTicketsPage() {
           ticketNo: newTicketNo,
           memberName: form.memberName,
           memberId: resolvedMemberId || "",
+          eventId: form.eventId || null,
           relatedEvent: form.relatedEvent || "",
           ticketType: form.ticketType,
           description: form.description,
@@ -1102,11 +1150,13 @@ export default function SupportTicketsPage() {
                 const defaultEvent = eventsList.length > 0 ? eventsList[0] : null;
                 const defaultEventName = defaultEvent ? (defaultEvent.eventName || defaultEvent.name || defaultEvent.title || "") : "";
                 const defaultEventType = defaultEvent ? (defaultEvent.eventTypeName || defaultEvent.categoryName || defaultEvent.eventType || "") : "";
+                const defaultEventId = defaultEvent ? (defaultEvent.eventId || defaultEvent.id || null) : null;
 
                 const addFormData = {
                   ...initialForm,
                   memberName: loggedIn.name || authState?.fullName || "",
                   memberId: loggedIn.id || "",
+                  eventId: defaultEventId,
                   relatedEvent: defaultEventName,
                   eventType: defaultEventType,
                   ticketType: "",
@@ -1166,6 +1216,19 @@ export default function SupportTicketsPage() {
                   fullWidth
                 />
               </Box>
+              <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
+                <AppSelect
+                  label="Select Event"
+                  value={filterEvent}
+                  onChange={(e) => {
+                    setFilterEvent(e.target.value);
+                  }}
+                  options={filterEventOptions}
+                  size="small"
+                  placeholder="Select Event"
+                  fullWidth
+                />
+              </Box>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <AppButton
                   variant="contained"
@@ -1175,6 +1238,7 @@ export default function SupportTicketsPage() {
                     setAppliedType(filterType);
                     setAppliedPriority(filterPriority);
                     setAppliedStatus(filterStatus);
+                    setAppliedEvent(filterEvent);
                   }}
                   sx={{
                     height: 34,
@@ -1195,9 +1259,11 @@ export default function SupportTicketsPage() {
                     setFilterType("ALL");
                     setFilterPriority("ALL");
                     setFilterStatus("ALL");
+                    setFilterEvent("ALL");
                     setAppliedType("ALL");
                     setAppliedPriority("ALL");
                     setAppliedStatus("ALL");
+                    setAppliedEvent("ALL");
                   }}
                   sx={{
                     color: "#ef4444",
@@ -1290,10 +1356,15 @@ export default function SupportTicketsPage() {
                     ? c.relatedEvent
                     : (matchingEvents.length === 1 ? (matchingEvents[0].eventName || matchingEvents[0].name || matchingEvents[0].title) : "");
 
+                  const matched = (eventsList || []).find(
+                    (ev) => (ev.eventName || ev.name || ev.title) === newRelatedEvent
+                  );
+
                   return {
                     ...c,
                     eventType: selectedType,
                     relatedEvent: newRelatedEvent,
+                    eventId: matched?.eventId || matched?.id || null,
                   };
                 });
               }}
@@ -1318,6 +1389,7 @@ export default function SupportTicketsPage() {
                 setForm((c) => ({
                   ...c,
                   relatedEvent: selectedName,
+                  eventId: matched?.eventId || matched?.id || null,
                   eventType: matchedType || c.eventType,
                 }));
               }}
