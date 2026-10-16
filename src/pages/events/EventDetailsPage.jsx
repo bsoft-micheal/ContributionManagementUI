@@ -179,14 +179,17 @@ export default function EventDetailsPage() {
       />
 
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
           <MetricCard label="Total Members" value={eventDetails.participantCount} />
         </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <MetricCard label="Expected Amount" value={`₹${Number(eventDetails.totalExpectedAmount || 0).toLocaleString("en-IN")}`} />
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <MetricCard label="Expected Amount" value={`₹${Math.round(Number(eventDetails.totalExpectedAmount || 0)).toLocaleString("en-IN")}`} />
         </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <MetricCard label="Received Amount" value={`₹${Number(eventDetails.totalPaidAmount || 0).toLocaleString("en-IN")}`} accent="#16a34a" />
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <MetricCard label="Received Amount" value={`₹${Math.round(Number(eventDetails.totalPaidAmount || 0)).toLocaleString("en-IN")}`} accent="#16a34a" />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <MetricCard label="Support Tickets Raised" value={eventDetails.supportTicketRaisedCount ?? eventDetails.SupportTicketRaisedCount ?? 0} accent="#0284c7" />
         </Grid>
       </Grid>
 
