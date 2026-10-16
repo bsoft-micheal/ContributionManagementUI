@@ -296,7 +296,7 @@ export default function ExecutiveFinancialBarChart({
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                       <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
-                        Amount in Hand
+                        Amount In Hand
                       </Typography>
                       <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
                         ₹{formatAmount(rem)}

@@ -242,9 +242,21 @@ export default function VerifySupportTicketModal({
   }, [statuses, dbStatuses, ticketInfo?.status]);
 
   const handleSave = async () => {
+    const newErrors = {};
     if (!updateStatus) {
-      setErrors({ updateStatus: "Update Status is required" });
-      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS || "Update Status is required");
+      newErrors.updateStatus = "Update Status is required";
+    }
+    if (!replyText || !replyText.trim()) {
+      newErrors.replyText = "Resolution note is required";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      if (newErrors.updateStatus && newErrors.replyText) {
+        toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS || "Please fill in all required fields");
+      } else {
+        toast.error(newErrors.replyText || newErrors.updateStatus);
+      }
       return;
     }
 
@@ -616,6 +628,7 @@ export default function VerifySupportTicketModal({
                   error={!!errors.replyText}
                   helperText={errors.replyText || ""}
                   minRows={3}
+                  required
                 />
               </Grid>
             </Grid>

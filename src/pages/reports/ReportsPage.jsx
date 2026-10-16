@@ -858,7 +858,7 @@ export default function ReportsPage({ mode = "event" }) {
     { label: "Pending Amount", key: "pendingAmount", align: "right", render: (r) => INR(r.pendingAmount) },
     { label: "Expense Amount", key: "expenseAmount", align: "right", render: (r) => INR(r.expenseAmount || 0) },
     {
-      label: "Balance Amount", key: "remainingAmount", align: "right",
+      label: "Amount In Hand", key: "remainingAmount", align: "right",
       render: (r) => {
         const exp = Number(r.expectedAmount || 0);
         const expAmt = Number(r.expenseAmount || 0);
@@ -1461,7 +1461,7 @@ export default function ReportsPage({ mode = "event" }) {
         { label: "Total Collected", value: INR(paid), accent: "#10b981", actionText: "Total Collected →" },
         { label: "Total Pending", value: INR(pend), accent: "#f43f5e", actionText: "View Unpaid →" },
         { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b", actionText: "Expenses →" },
-        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: "Net Balance →" },
+        { label: "Amount In Hand", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: "Amount In Hand →" },
         { label: "Total Events", value: ev.length, accent: "#8b5cf6", actionText: "View Events →" },
       ];
     }
@@ -1490,7 +1490,7 @@ export default function ReportsPage({ mode = "event" }) {
         { label: "Total Collected", value: INR(paid), accent: "#10b981", actionText: "Total Collected →" },
         { label: "Total Pending", value: INR(pend), accent: "#f43f5e", actionText: "View Unpaid →" },
         { label: "Total Expenses", value: INR(totalExp), accent: "#f59e0b", actionText: "Expenses →" },
-        { label: "Balance Amount", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: "Net Balance →" },
+        { label: "Amount In Hand", value: INR(remaining), accent: remaining >= 0 ? "#06b6d4" : "#f43f5e", actionText: "Amount In Hand →" },
         { label: "Total Members", value: mb.length, accent: "#8b5cf6", actionText: "All Members →" },
       ];
     }
@@ -1524,7 +1524,7 @@ export default function ReportsPage({ mode = "event" }) {
       { label: "Expected", key: "expected" },
       { label: "Pending", key: "pending" },
       { label: "Expense", key: "expense" },
-      { label: "Balance", key: "remaining" },
+      { label: "Amount In Hand", key: "remaining" },
     ];
 
   const navTabs = isMember
@@ -1707,7 +1707,7 @@ export default function ReportsPage({ mode = "event" }) {
         "Paid Amount": Number(e.paidAmount || 0),
         "Pending Amount": Number(e.pendingAmount || 0),
         "Expense Amount": Number(e.expenseAmount || 0),
-        "Balance Amount": (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0)),
+        "Amount In Hand": (Number(e.expectedAmount || 0) - Number(e.expenseAmount || 0)),
       }));
 
       exportSheets("team-contribution-reports.xlsx", [

@@ -1308,7 +1308,7 @@ export default function DashboardPage() {
                 label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Amount in Hand"}
                 value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
                 accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
-                actionText="Net Balance →"
+                actionText="Amount In Hand →"
               />
               {/* Other Roles: Card 6: Total Events */}
               <MetricCard

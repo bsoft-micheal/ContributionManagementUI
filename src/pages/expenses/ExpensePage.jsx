@@ -424,7 +424,7 @@ export default function ExpensePage() {
     });
     if (!ev) return null;
 
-    const expected = Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0);
+    const expected = Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.expectedCollection ?? ev.baseAmount ?? 0);
     const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
     const spent = expenses
       .filter((ex) =>
@@ -435,15 +435,65 @@ export default function ExpensePage() {
       .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
 
     const remaining = Math.max(0, expected - spent);
-    return { expected, spent, remaining };
+    const extraSpent = Math.max(0, spent - expected);
+    return { expected, spent, remaining, extraSpent };
   }, [form.eventName, form.eventId, form.category, eventsList, expenses, editingExpense]);
 
-  // True when a budget is set AND entered amount exceeds the remaining limit
+  // Live projection calculations based on amount entered
+  const enteredAmount = Number(form.amount) || 0;
+  const projectedTotalSpent = selectedEventBudget ? selectedEventBudget.spent + enteredAmount : 0;
+  const projectedExtraSpent = selectedEventBudget ? Math.max(0, projectedTotalSpent - selectedEventBudget.expected) : 0;
   const isOverBudget =
     selectedEventBudget !== null &&
     selectedEventBudget.expected > 0 &&
-    Number(form.amount) > 0 &&
-    Number(form.amount) > selectedEventBudget.remaining;
+    enteredAmount > 0 &&
+    projectedTotalSpent > selectedEventBudget.expected;
+
+  // Dynamic budget tracking summary for the main Expense page based on selected/filtered event or all events
+  const pageBudgetSummary = useMemo(() => {
+    const targetEventName = appliedEvent !== "ALL" ? appliedEvent : (filterEvent !== "ALL" ? filterEvent : null);
+    if (!targetEventName) {
+      const validEvents = eventsList.filter((e) => e && (e.totalExpectedAmount || e.expectedAmount || e.baseAmount));
+      const expected = validEvents.reduce(
+        (sum, e) => sum + Number(e.totalExpectedAmount ?? e.expectedAmount ?? e.baseAmount ?? 0),
+        0
+      );
+      const spent = expenses
+        .filter((ex) => (ex.status || "").toLowerCase() !== "rejected")
+        .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+      const remaining = Math.max(0, expected - spent);
+      const extraSpent = Math.max(0, spent - expected);
+      return {
+        title: "All Events",
+        expected,
+        spent,
+        remaining,
+        extraSpent,
+        isSpecificEvent: false,
+      };
+    }
+
+    const ev = eventsList.find((e) => (e.name || e.eventName || "").trim().toLowerCase() === targetEventName.trim().toLowerCase());
+    const expected = ev ? Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0) : 0;
+    const spent = expenses
+      .filter(
+        (ex) =>
+          (ex.eventName || "").trim().toLowerCase() === targetEventName.trim().toLowerCase() &&
+          (ex.status || "").toLowerCase() !== "rejected"
+      )
+      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+
+    const remaining = Math.max(0, expected - spent);
+    const extraSpent = Math.max(0, spent - expected);
+    return {
+      title: targetEventName,
+      expected,
+      spent,
+      remaining,
+      extraSpent,
+      isSpecificEvent: true,
+    };
+  }, [appliedEvent, filterEvent, eventsList, expenses]);
 
   // Event options for the filter panel (cascaded by filterCategory)
   const eventOptions = useMemo(() => {
@@ -687,14 +737,8 @@ export default function ExpensePage() {
     const newErrors = {};
     if (!form.eventName) newErrors.eventName = "Event Name is required";
     if (!form.category) newErrors.category = "Event Type is required";
-    if (!form.amount || Number(form.amount) <= 0) {
+    if (!form.amount || Number(form.amount) <= 0 || isNaN(Number(form.amount))) {
       newErrors.amount = "Valid amount is required";
-    } else if (
-      selectedEventBudget &&
-      selectedEventBudget.expected > 0 &&
-      Number(form.amount) > selectedEventBudget.remaining
-    ) {
-      newErrors.amount = `Amount exceeds balance limit. Max allowable: ₹${selectedEventBudget.remaining.toLocaleString("en-IN")}`;
     }
     if (!form.submittedBy) newErrors.submittedBy = "Submitted by is required";
     if (!form.attachment && (!editingExpense || (!editingExpense.fileName && !editingExpense.fileUrl))) {
@@ -704,11 +748,7 @@ export default function ExpensePage() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      if (newErrors.amount && selectedEventBudget && Number(form.amount) > selectedEventBudget.remaining) {
-        toast.error(newErrors.amount);
-      } else {
-        toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
-      }
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -733,10 +773,18 @@ export default function ExpensePage() {
           ...payload,
           modifiedOn: editingExpense.modifiedOn || null,
         });
-        toast.success(TOAST_MESSAGES.EXPENSES.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
+        if (isOverBudget) {
+          toast.success(`Expense updated. Note: Exceeds expected budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`);
+        } else {
+          toast.success(TOAST_MESSAGES.EXPENSES.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
+        }
       } else {
         await createExpenseAsync(payload);
-        toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
+        if (isOverBudget) {
+          toast.success(`Expense added. Note: Exceeds expected budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`);
+        } else {
+          toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
+        }
       }
 
       setDialogOpen(false);
@@ -1143,6 +1191,80 @@ export default function ExpensePage() {
 
   return (
     <div className="page-shell">
+      {/* Event Budget Tracking Summary Widget */}
+      {pageBudgetSummary && (
+        <Box
+          sx={{
+            mb: 2.5,
+            p: 2,
+            borderRadius: 2.5,
+            bgcolor: (t) => t.palette.mode === "dark" ? "rgba(30, 41, 59, 0.7)" : "#ffffff",
+            border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(226, 232, 240, 0.8)"}`,
+            boxShadow: (t) => t.palette.mode === "dark" ? "0 4px 20px rgba(0, 0, 0, 0.3)" : "0 2px 12px rgba(0, 0, 0, 0.04)",
+          }}
+        >
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.875rem", color: "text.primary" }}>
+              Budget Tracking Summary {pageBudgetSummary.isSpecificEvent ? `— ${pageBudgetSummary.title}` : `(All Events)`}
+            </Typography>
+            {pageBudgetSummary.extraSpent > 0 && (
+              <Chip
+                size="small"
+                label={`Budget Exceeded by ₹${pageBudgetSummary.extraSpent.toLocaleString("en-IN")}`}
+                sx={{
+                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
+                  color: "#ef4444",
+                  fontWeight: 800,
+                  fontSize: "0.72rem",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                }}
+              />
+            )}
+          </Box>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.1)" : "rgba(124, 58, 237, 0.04)", border: "1px solid rgba(124, 58, 237, 0.2)" }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
+                  {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: "primary.main", fontSize: "1.1rem" }}>
+                  ₹{pageBudgetSummary.expected.toLocaleString("en-IN")}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.1)" : "rgba(2, 132, 199, 0.04)", border: "1px solid rgba(2, 132, 199, 0.2)" }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
+                  {COMMON_STRINGS.EXPENSES?.TOTAL_SPENT || "Total Spent"}
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: "info.main", fontSize: "1.1rem" }}>
+                  ₹{pageBudgetSummary.spent.toLocaleString("en-IN")}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(16, 185, 129, 0.1)" : "rgba(16, 185, 129, 0.04)", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
+                  {COMMON_STRINGS.EXPENSES?.REMAINING_BUDGET || "Remaining Budget"}
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: pageBudgetSummary.remaining > 0 ? "success.main" : "text.secondary", fontSize: "1.1rem" }}>
+                  ₹{pageBudgetSummary.remaining.toLocaleString("en-IN")}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: (t) => pageBudgetSummary.extraSpent > 0 ? (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.05)") : (t.palette.mode === "dark" ? "rgba(100, 116, 139, 0.1)" : "rgba(100, 116, 139, 0.04)"), border: (t) => pageBudgetSummary.extraSpent > 0 ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(100, 116, 139, 0.2)" }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
+                  {COMMON_STRINGS.EXPENSES?.EXTRA_AMOUNT_SPENT || "Extra Amount Spent"}
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: pageBudgetSummary.extraSpent > 0 ? "error.main" : "text.secondary", fontSize: "1.1rem" }}>
+                  ₹{pageBudgetSummary.extraSpent.toLocaleString("en-IN")}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
       <AppDataTable
         title="Expense Details"
         columns={columns}
@@ -1280,8 +1402,8 @@ export default function ExpensePage() {
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             {isOverBudget && (
-              <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, fontSize: "0.75rem" }}>
-                ⚠ Amount exceeds balance limit (₹{selectedEventBudget.remaining.toLocaleString("en-IN")})
+              <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 700, fontSize: "0.75rem" }}>
+                ⚠ Expense exceeds budget by ₹{projectedExtraSpent.toLocaleString("en-IN")}
               </Typography>
             )}
             <AppButton
@@ -1293,8 +1415,6 @@ export default function ExpensePage() {
             <AppButton
               variant="contained"
               onClick={handleSaveExpense}
-              disabled={isOverBudget}
-              sx={isOverBudget ? { opacity: 0.5, cursor: "not-allowed" } : {}}
             >
               {editingExpense ? "Update" : "Save"}
             </AppButton>
@@ -1417,37 +1537,79 @@ export default function ExpensePage() {
                   borderRadius: 2,
                   bgcolor: (t) => t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.08)" : "rgba(124, 58, 237, 0.04)",
                   border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.25)" : "rgba(124, 58, 237, 0.18)"}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 1.5,
                 }}
               >
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                    {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
-                    ₹{selectedEventBudget.expected.toLocaleString()}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                    {COMMON_STRINGS.EXPENSES?.ALREADY_SPENT || "Already Spent"}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: "warning.main" }}>
-                    ₹{selectedEventBudget.spent.toLocaleString()}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                    {COMMON_STRINGS.EXPENSES?.BALANCE_LIMIT || "Balance Limit"}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 900, color: selectedEventBudget.remaining > 0 ? "success.main" : "error.main" }}>
-                    ₹{selectedEventBudget.remaining.toLocaleString("en-IN")}
-                  </Typography>
-                </Box>
+                <Grid container spacing={1.5} alignItems="center">
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                      {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
+                      ₹{selectedEventBudget.expected.toLocaleString("en-IN")}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                      {COMMON_STRINGS.EXPENSES?.TOTAL_SPENT || "Total Spent"}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: "info.main" }}>
+                      ₹{selectedEventBudget.spent.toLocaleString("en-IN")}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                      {COMMON_STRINGS.EXPENSES?.REMAINING_BUDGET || "Remaining Budget"}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: selectedEventBudget.remaining > 0 ? "success.main" : "text.secondary" }}>
+                      ₹{selectedEventBudget.remaining.toLocaleString("en-IN")}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                      {COMMON_STRINGS.EXPENSES?.EXTRA_AMOUNT_SPENT || "Extra Amount Spent"}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: selectedEventBudget.extraSpent > 0 ? "error.main" : "text.secondary" }}>
+                      ₹{selectedEventBudget.extraSpent.toLocaleString("en-IN")}
+                    </Typography>
+                  </Grid>
+                </Grid>
+
+                {/* Warning Alert if already over budget or projected to exceed budget */}
+                {isOverBudget ? (
+                  <Box
+                    sx={{
+                      mt: 1.5,
+                      p: 1,
+                      borderRadius: 1.5,
+                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(245, 158, 11, 0.12)" : "rgba(245, 158, 11, 0.08)",
+                      border: "1px solid rgba(245, 158, 11, 0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ color: (t) => t.palette.mode === "dark" ? "#fcd34d" : "#b45309", fontWeight: 700, fontSize: "0.75rem" }}>
+                      ⚠️ Warning: This expense will exceed the expected budget by ₹{projectedExtraSpent.toLocaleString("en-IN")}. Total spending will be ₹{projectedTotalSpent.toLocaleString("en-IN")}.
+                    </Typography>
+                  </Box>
+                ) : selectedEventBudget.extraSpent > 0 ? (
+                  <Box
+                    sx={{
+                      mt: 1.5,
+                      p: 1,
+                      borderRadius: 1.5,
+                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.08)",
+                      border: "1px solid rgba(239, 68, 68, 0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, fontSize: "0.75rem" }}>
+                      ⚠️ Notice: This event has already exceeded its expected budget by ₹{selectedEventBudget.extraSpent.toLocaleString("en-IN")}.
+                    </Typography>
+                  </Box>
+                ) : null}
               </Box>
             </Grid>
           )}
@@ -1464,40 +1626,17 @@ export default function ExpensePage() {
                   setErrors((p) => ({ ...p, amount: "" }));
                   return;
                 }
-
-                const numVal = Number(raw);
-                const hasBudgetLimit = selectedEventBudget && selectedEventBudget.expected > 0;
-
-                if (hasBudgetLimit) {
-                  if (selectedEventBudget.remaining <= 0) {
-                    setForm((c) => ({ ...c, amount: "" }));
-                    setErrors((p) => ({
-                      ...p,
-                      amount: "Budget fully spent — ₹0 balance remaining for this event",
-                    }));
-                    return;
-                  }
-
-                  if (numVal > selectedEventBudget.remaining) {
-                    // Strictly clamp to maximum allowable remaining budget
-                    setForm((c) => ({ ...c, amount: String(selectedEventBudget.remaining) }));
-                    setErrors((p) => ({
-                      ...p,
-                      amount: `Exceeds balance limit — max allowable ₹${selectedEventBudget.remaining.toLocaleString("en-IN")}`,
-                    }));
-                    return;
-                  }
-                }
-
                 setForm((c) => ({ ...c, amount: raw }));
-                setErrors((p) => ({ ...p, amount: "" }));
+                if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
               }}
               restrictType="numberonly"
-              error={isOverBudget || !!errors.amount}
+              error={!!errors.amount}
               helperText={
                 errors.amount ||
-                (selectedEventBudget && selectedEventBudget.expected > 0
-                  ? `Max allowable: ₹${selectedEventBudget.remaining.toLocaleString("en-IN")}`
+                (isOverBudget
+                  ? `⚠️ Warning: Exceeds budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`
+                  : selectedEventBudget && selectedEventBudget.expected > 0
+                  ? `Remaining Budget: ₹${Math.max(0, selectedEventBudget.expected - projectedTotalSpent).toLocaleString("en-IN")}`
                   : undefined)
               }
               required

@@ -193,15 +193,19 @@ export default function EventAddExpenseDialog({
       .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
 
     const remaining = Math.max(0, expected - spent);
-    return { expected, spent, remaining };
+    const extraSpent = Math.max(0, spent - expected);
+    return { expected, spent, remaining, extraSpent };
   }, [event, existingExpenses]);
 
-  // True when a budget is configured AND the entered amount exceeds the balance limit
+  // Live projection calculations based on amount entered
+  const enteredAmount = Number(form.amount) || 0;
+  const projectedTotalSpent = eventBudget ? eventBudget.spent + enteredAmount : 0;
+  const projectedExtraSpent = eventBudget ? Math.max(0, projectedTotalSpent - eventBudget.expected) : 0;
   const isOverBudget =
     eventBudget !== null &&
     eventBudget.expected > 0 &&
-    Number(form.amount) > 0 &&
-    Number(form.amount) > eventBudget.remaining;
+    enteredAmount > 0 &&
+    projectedTotalSpent > eventBudget.expected;
 
   // Member dropdown options
   const memberOptions = useMemo(() => {
@@ -291,14 +295,8 @@ export default function EventAddExpenseDialog({
     const newErrors = {};
     if (!form.eventName) newErrors.eventName = "Event Name is required";
     if (!form.category) newErrors.category = "Event Type is required";
-    if (!form.amount || Number(form.amount) <= 0) {
+    if (!form.amount || Number(form.amount) <= 0 || isNaN(Number(form.amount))) {
       newErrors.amount = "Valid amount is required";
-    } else if (
-      eventBudget &&
-      eventBudget.expected > 0 &&
-      Number(form.amount) > eventBudget.remaining
-    ) {
-      newErrors.amount = `Amount exceeds balance limit. Max allowable: ₹${eventBudget.remaining.toLocaleString("en-IN")}`;
     }
     if (!form.submittedBy) newErrors.submittedBy = "Submitted by is required";
     if (!form.attachment) {
@@ -310,11 +308,7 @@ export default function EventAddExpenseDialog({
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      if (newErrors.amount && eventBudget && eventBudget.expected > 0 && Number(form.amount) > eventBudget.remaining) {
-        toast.error(newErrors.amount);
-      } else {
-        toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
-      }
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
@@ -335,7 +329,11 @@ export default function EventAddExpenseDialog({
       };
 
       await createExpenseAsync(payload);
-      toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || "Expense added successfully!");
+      if (isOverBudget) {
+        toast.success(`Expense added. Note: Exceeds expected budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`);
+      } else {
+        toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || "Expense added successfully!");
+      }
       if (onExpenseSaved) {
         onExpenseSaved();
       }
@@ -358,8 +356,8 @@ export default function EventAddExpenseDialog({
       actions={
         <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ width: "100%" }}>
           {isOverBudget && (
-            <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, fontSize: "0.75rem" }}>
-              ⚠ Exceeds balance limit (₹{eventBudget.remaining.toLocaleString("en-IN")})
+            <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 700, fontSize: "0.75rem" }}>
+              ⚠ Expense exceeds budget by ₹{projectedExtraSpent.toLocaleString("en-IN")}
             </Typography>
           )}
           <AppButton
@@ -428,37 +426,79 @@ export default function EventAddExpenseDialog({
                   borderRadius: "10px",
                   bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.08)" : "rgba(124, 58, 237, 0.04)"),
                   border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.25)" : "rgba(124, 58, 237, 0.18)"}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 1.5,
                 }}
               >
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                    Expected Budget
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
-                    ₹{eventBudget.expected.toLocaleString("en-IN")}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                    Already Spent
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: "warning.main" }}>
-                    ₹{eventBudget.spent.toLocaleString("en-IN")}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                    Balance Limit
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 900, color: eventBudget.remaining > 0 ? "success.main" : "error.main" }}>
-                    ₹{eventBudget.remaining.toLocaleString("en-IN")}
-                  </Typography>
-                </Box>
+                <Grid container spacing={1.5} alignItems="center">
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                      Expected Budget
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
+                      ₹{eventBudget.expected.toLocaleString("en-IN")}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                      Total Spent
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: "info.main" }}>
+                      ₹{eventBudget.spent.toLocaleString("en-IN")}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                      Remaining Budget
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: eventBudget.remaining > 0 ? "success.main" : "text.secondary" }}>
+                      ₹{eventBudget.remaining.toLocaleString("en-IN")}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
+                      Extra Amount Spent
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: eventBudget.extraSpent > 0 ? "error.main" : "text.secondary" }}>
+                      ₹{eventBudget.extraSpent.toLocaleString("en-IN")}
+                    </Typography>
+                  </Grid>
+                </Grid>
+
+                {/* Warning Alert if already over budget or projected to exceed budget */}
+                {isOverBudget ? (
+                  <Box
+                    sx={{
+                      mt: 1.5,
+                      p: 1,
+                      borderRadius: 1.5,
+                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(245, 158, 11, 0.12)" : "rgba(245, 158, 11, 0.08)",
+                      border: "1px solid rgba(245, 158, 11, 0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ color: (t) => t.palette.mode === "dark" ? "#fcd34d" : "#b45309", fontWeight: 700, fontSize: "0.75rem" }}>
+                      ⚠️ Warning: This expense will exceed the expected budget by ₹{projectedExtraSpent.toLocaleString("en-IN")}. Total spending will be ₹{projectedTotalSpent.toLocaleString("en-IN")}.
+                    </Typography>
+                  </Box>
+                ) : eventBudget.extraSpent > 0 ? (
+                  <Box
+                    sx={{
+                      mt: 1.5,
+                      p: 1,
+                      borderRadius: 1.5,
+                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.08)",
+                      border: "1px solid rgba(239, 68, 68, 0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, fontSize: "0.75rem" }}>
+                      ⚠️ Notice: This event has already exceeded its expected budget by ₹{eventBudget.extraSpent.toLocaleString("en-IN")}.
+                    </Typography>
+                  </Box>
+                ) : null}
               </Box>
             </Grid>
           )}
@@ -476,40 +516,17 @@ export default function EventAddExpenseDialog({
                   setErrors((p) => ({ ...p, amount: "" }));
                   return;
                 }
-
-                const numVal = Number(raw);
-                const hasBudgetLimit = eventBudget && eventBudget.expected > 0;
-
-                if (hasBudgetLimit) {
-                  if (eventBudget.remaining <= 0) {
-                    setForm((c) => ({ ...c, amount: "" }));
-                    setErrors((p) => ({
-                      ...p,
-                      amount: "Budget fully spent — ₹0 balance remaining for this event",
-                    }));
-                    return;
-                  }
-
-                  if (numVal > eventBudget.remaining) {
-                    // Strictly clamp to maximum allowable remaining budget
-                    setForm((c) => ({ ...c, amount: String(eventBudget.remaining) }));
-                    setErrors((p) => ({
-                      ...p,
-                      amount: `Exceeds balance limit — max allowable ₹${eventBudget.remaining.toLocaleString("en-IN")}`,
-                    }));
-                    return;
-                  }
-                }
-
                 setForm((c) => ({ ...c, amount: raw }));
-                setErrors((p) => ({ ...p, amount: "" }));
+                if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
               }}
               restrictType="numberonly"
-              error={isOverBudget || !!errors.amount}
+              error={!!errors.amount}
               helperText={
                 errors.amount ||
-                (eventBudget && eventBudget.expected > 0
-                  ? `Max allowable: ₹${eventBudget.remaining.toLocaleString("en-IN")}`
+                (isOverBudget
+                  ? `⚠️ Warning: Exceeds budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`
+                  : eventBudget && eventBudget.expected > 0
+                  ? `Remaining Budget: ₹${Math.max(0, eventBudget.expected - projectedTotalSpent).toLocaleString("en-IN")}`
                   : undefined)
               }
               required
