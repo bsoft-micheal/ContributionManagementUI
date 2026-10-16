@@ -6,6 +6,7 @@ import {
   Grid,
   Stack,
   Typography,
+  Chip,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -134,7 +135,24 @@ export default function EventDetailsPage() {
   return (
     <div className="page-shell">
       <PageHeader
-        eyebrow={eventDetails.eventTypeName}
+        eyebrow={
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <span>{eventDetails.eventTypeName}</span>
+            {eventDetails.useAvailableBalance && (
+              <Chip
+                label="Funded from Amount In Hand"
+                size="small"
+                sx={{
+                  bgcolor: "rgba(22, 163, 74, 0.12)",
+                  color: "#16a34a",
+                  fontWeight: 700,
+                  fontSize: "0.72rem",
+                  height: 22,
+                }}
+              />
+            )}
+          </Box>
+        }
         title={eventDetails.eventName}
         description={`${(eventDetails.description || "").replace(/<!--contrib:.*?-->/g, "").trim()} Scheduled for ${
           eventDetails.eventDates

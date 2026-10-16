@@ -76,6 +76,7 @@ import {
   createEventAsync,
   updateEventAsync,
   getEventByIdAsync,
+  getAvailableAmountInHandAsync,
 } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
@@ -263,24 +264,50 @@ const getItemStyle = (name = "") => {
 };
 
 function extractContribAmounts(description) {
-  if (!description) return { cleanDesc: "", amounts: null };
-  const match = description.match(/<!--contrib:(.*?)-->/);
-  if (match) {
+  if (!description) return { cleanDesc: "", amounts: null, celebrants: null };
+  let cleanDesc = description;
+  let amounts = null;
+  let celebrants = null;
+
+  const matchContrib = description.match(/<!--contrib:(.*?)-->/);
+  if (matchContrib) {
     try {
-      const amounts = JSON.parse(match[1]);
-      const cleanDesc = description.replace(/<!--contrib:.*?-->/g, "").trim();
-      return { cleanDesc, amounts };
+      amounts = JSON.parse(matchContrib[1]);
+      cleanDesc = cleanDesc.replace(/<!--contrib:.*?-->/g, "").trim();
     } catch {
       // Ignore parse error
     }
   }
-  return { cleanDesc: description, amounts: null };
+
+  const matchCelebrants = description.match(/<!--celebrants:(.*?)-->/);
+  if (matchCelebrants) {
+    try {
+      celebrants = JSON.parse(matchCelebrants[1]);
+      cleanDesc = cleanDesc.replace(/<!--celebrants:.*?-->/g, "").trim();
+    } catch {
+      // Ignore parse error
+    }
+  }
+
+  return { cleanDesc, amounts, celebrants };
 }
 
-function formatDescriptionWithContrib(userDesc, amountsObj) {
-  const clean = (userDesc || "").replace(/<!--contrib:.*?-->/g, "").trim();
+function formatDescriptionWithContrib(userDesc, amountsObj, celebrantsObj) {
+  let clean = (userDesc || "")
+    .replace(/<!--contrib:.*?-->/g, "")
+    .replace(/<!--celebrants:.*?-->/g, "")
+    .trim();
+
+  const tags = [];
   if (amountsObj && Object.keys(amountsObj).length > 0) {
-    return `${clean}${clean ? " " : ""}<!--contrib:${JSON.stringify(amountsObj)}-->`;
+    tags.push(`<!--contrib:${JSON.stringify(amountsObj)}-->`);
+  }
+  if (celebrantsObj && (celebrantsObj.marriage?.length > 0 || celebrantsObj.sendOff?.length > 0)) {
+    tags.push(`<!--celebrants:${JSON.stringify(celebrantsObj)}-->`);
+  }
+
+  if (tags.length > 0) {
+    return `${clean}${clean ? " " : ""}${tags.join(" ")}`;
   }
   return clean;
 }
@@ -332,6 +359,8 @@ export default function EventFormPage({
   const [otherEventAmounts, setOtherEventAmounts] = useState({});
   const [customItemAmounts, setCustomItemAmounts] = useState({});
   const [extraExpenseItems, setExtraExpenseItems] = useState([]);
+  const [marriageCelebrantIds, setMarriageCelebrantIds] = useState([]);
+  const [sendOffMemberIds, setSendOffMemberIds] = useState([]);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -342,6 +371,11 @@ export default function EventFormPage({
   const [allowMultipleEvents, setAllowMultipleEvents] = useState(false);
   const [hasPayments, setHasPayments] = useState(false);
   const [isCustomEventName, setIsCustomEventName] = useState(false);
+  const [useAvailableBalance, setUseAvailableBalance] = useState(false);
+  const [availableAmountInHand, setAvailableAmountInHand] = useState(0);
+  const [allocatedAmount, setAllocatedAmount] = useState(0);
+  const [selectedDeductionType, setSelectedDeductionType] = useState("available");
+  const [customDeductionAmount, setCustomDeductionAmount] = useState("");
 
   const isMemberActive = (m) => {
     const active =
@@ -395,7 +429,7 @@ export default function EventFormPage({
     async function initData() {
       setLoading(true);
       try {
-        const [typesData, usersData, budgetData, settingsData] = await Promise.all([
+        const [typesData, usersData, budgetData, settingsData, amountInHandData] = await Promise.all([
           (propEventTypes && propEventTypes.length > 0)
             ? Promise.resolve(propEventTypes)
             : getEventTypesAsync(isEdit),
@@ -404,9 +438,13 @@ export default function EventFormPage({
             : getUsersAsync().catch(() => getMembersAsync()),
           getBudgetCalculationsAsync().catch(() => []),
           getSystemSettingsAsync().catch(() => null),
+          getAvailableAmountInHandAsync().catch(() => null),
         ]);
 
         if (!isMounted) return;
+
+        const handAmt = amountInHandData?.availableAmountInHand ?? amountInHandData?.data?.availableAmountInHand ?? 0;
+        setAvailableAmountInHand(Number(handAmt) || 0);
 
         const normalizedMembers = (usersData || []).map((u) => ({
           ...u,
@@ -488,7 +526,11 @@ export default function EventFormPage({
           let savedBaseAmount = Math.round(Number(detailedEvent.baseAmount || 0));
           let initialBaseAmount = savedBaseAmount > 0 ? String(savedBaseAmount) : "";
 
-          const { cleanDesc, amounts: savedContribAmounts } = extractContribAmounts(detailedEvent.description);
+          const { cleanDesc, amounts: savedContribAmounts, celebrants: savedCelebrants } = extractContribAmounts(detailedEvent.description);
+          if (savedCelebrants) {
+            if (Array.isArray(savedCelebrants.marriage)) setMarriageCelebrantIds(savedCelebrants.marriage);
+            if (Array.isArray(savedCelebrants.sendOff)) setSendOffMemberIds(savedCelebrants.sendOff);
+          }
 
           const editNonBdays = (typesData || []).filter(
             (t) => eventTypeIdsList.includes(t.eventTypeId) && !t.eventTypeName?.toLowerCase().includes("birthday")
@@ -513,26 +555,23 @@ export default function EventFormPage({
 
             const masterTotal = typeMasterItems.reduce((sum, item) => {
               const rate = Number(item.rate) || 0;
-              return sum + (activeMems.length * rate);
+              return sum + rate;
             }, 0);
 
             let netContribAmount = savedBaseAmount;
             if (masterTotal > 0 && savedBaseAmount > masterTotal) {
               netContribAmount = Math.max(0, savedBaseAmount - masterTotal);
             }
-            const perPersonVal = activeMems.length > 0 && typeMasterItems.length === 0
-              ? Math.round(netContribAmount / activeMems.length)
-              : netContribAmount;
+            const expectedVal = netContribAmount;
             setOtherEventAmounts({
-              [type.eventTypeId]: String(perPersonVal),
+              [type.eventTypeId]: String(expectedVal),
             });
-            initialBaseAmount = String(perPersonVal);
+            initialBaseAmount = String(expectedVal);
           } else if (editNonBdays.length > 1 && savedBaseAmount > 0) {
             const splitPerType = Math.round(savedBaseAmount / editNonBdays.length);
-            const perPersonSplit = activeMems.length > 0 ? Math.round(splitPerType / activeMems.length) : splitPerType;
             const initialMap = {};
             editNonBdays.forEach((t) => {
-              initialMap[t.eventTypeId] = String(perPersonSplit);
+              initialMap[t.eventTypeId] = String(splitPerType);
             });
             setOtherEventAmounts(initialMap);
           }
@@ -570,6 +609,20 @@ export default function EventFormPage({
           }
 
           setIsCustomEventName(Boolean(detailedEvent.eventName));
+          const hasBal = Boolean(detailedEvent.useAvailableBalance);
+          const savedAlloc = Number(detailedEvent.allocatedAmount) || 0;
+          setUseAvailableBalance(hasBal);
+          setAllocatedAmount(savedAlloc);
+          if (hasBal) {
+            const availAmt = Number(amountInHandData?.availableAmountInHand ?? amountInHandData?.data?.availableAmountInHand ?? 0);
+            if (savedAlloc > 0 && Math.abs(savedAlloc - availAmt) > 0.01) {
+              setSelectedDeductionType("custom");
+              setCustomDeductionAmount(String(savedAlloc));
+            } else {
+              setSelectedDeductionType("available");
+              setCustomDeductionAmount("");
+            }
+          }
           setForm({
             eventId: detailedEvent.eventId || id,
             eventName: detailedEvent.eventName || "",
@@ -602,6 +655,12 @@ export default function EventFormPage({
           setTotalMembers(activeMems.length);
           setExempt(settingsData?.birthdayMembersExempt !== undefined ? Boolean(settingsData.birthdayMembersExempt) : getDefaultBirthdayExempt());
           setIsCustomEventName(false);
+          setUseAvailableBalance(false);
+          setAllocatedAmount(0);
+          setSelectedDeductionType("available");
+          setCustomDeductionAmount("");
+          setMarriageCelebrantIds([]);
+          setSendOffMemberIds([]);
 
           setForm({
             eventName: "",
@@ -610,7 +669,7 @@ export default function EventFormPage({
             eventDate: defaultDate,
             description: "",
             baseAmount: "",
-            participantIds: activeMems.map((m) => m.memberId),
+            participantIds: [],
           });
           setOtherEventAmounts({});
           setErrors({});
@@ -658,6 +717,36 @@ export default function EventFormPage({
     [selectedTypes]
   );
 
+  const hasMarriageSelected = useMemo(
+    () =>
+      selectedTypes.some((t) => {
+        const name = (t.eventTypeName || "").toLowerCase();
+        const cat = (t.category || "").toLowerCase();
+        return name.includes("marriage") || cat.includes("marriage") || name.includes("wedding") || cat.includes("wedding");
+      }),
+    [selectedTypes]
+  );
+
+  const hasSendOffSelected = useMemo(
+    () =>
+      selectedTypes.some((t) => {
+        const name = (t.eventTypeName || "").toLowerCase();
+        const cat = (t.category || "").toLowerCase();
+        return (
+          name.includes("send-off") ||
+          name.includes("send off") ||
+          name.includes("sendoff") ||
+          name.includes("farewell") ||
+          name.includes("relieving") ||
+          cat.includes("send-off") ||
+          cat.includes("send off") ||
+          cat.includes("farewell") ||
+          cat.includes("relieving")
+        );
+      }),
+    [selectedTypes]
+  );
+
   // Event types that do NOT have configured expense items (require manual contribution amount)
   const typesWithoutExpenseItems = useMemo(() => {
     return nonBirthdaySelectedTypes.filter((type) => {
@@ -696,14 +785,88 @@ export default function EventFormPage({
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
 
   useEffect(() => {
-    if (activeMembers.length > 0) {
-      if (form.participantIds && form.participantIds.length > 0 && isEdit) {
+    if (activeMembers.length > 0 && isEdit) {
+      if (form.participantIds && form.participantIds.length > 0) {
         setSelectedParticipantIds(form.participantIds);
-      } else {
-        setSelectedParticipantIds(activeMembers.map((m) => m.memberId));
       }
     }
   }, [activeMembers, form.participantIds, isEdit]);
+
+  // Handle Marriage Celebrants change
+  const handleMarriageCelebrantsChange = (e) => {
+    const val = typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value;
+    const newIds = (val || []).filter(Boolean);
+    const removedCelebrantIds = marriageCelebrantIds.filter((id) => !newIds.includes(id));
+
+    setMarriageCelebrantIds(newIds);
+
+    // Automatically remove chosen marriage celebrants from participating members (they cannot contribute)
+    setSelectedParticipantIds((prev) => {
+      const allExempt = new Set([...newIds, ...sendOffMemberIds]);
+      let updated = prev.filter((id) => !allExempt.has(id));
+      removedCelebrantIds.forEach((id) => {
+        if (!allExempt.has(id) && !updated.includes(id)) {
+          updated.push(id);
+        }
+      });
+      return updated;
+    });
+  };
+
+  // Handle Send-off / Relieving Members change
+  const handleSendOffMembersChange = (e) => {
+    const val = typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value;
+    const newIds = (val || []).filter(Boolean);
+    const removedSendOffIds = sendOffMemberIds.filter((id) => !newIds.includes(id));
+
+    setSendOffMemberIds(newIds);
+
+    // Automatically remove chosen send-off members from participating members (they cannot contribute)
+    setSelectedParticipantIds((prev) => {
+      const allExempt = new Set([...marriageCelebrantIds, ...newIds]);
+      let updated = prev.filter((id) => !allExempt.has(id));
+      removedSendOffIds.forEach((id) => {
+        if (!allExempt.has(id) && !updated.includes(id)) {
+          updated.push(id);
+        }
+      });
+      return updated;
+    });
+  };
+
+  // Auto-clean celebrants and restore participants when their corresponding event type is deselected
+  useEffect(() => {
+    if (!hasMarriageSelected && marriageCelebrantIds.length > 0) {
+      setSelectedParticipantIds((prev) => {
+        const toAdd = marriageCelebrantIds.filter((id) => !prev.includes(id));
+        return [...prev, ...toAdd];
+      });
+      setMarriageCelebrantIds([]);
+    }
+  }, [hasMarriageSelected, marriageCelebrantIds]);
+
+  useEffect(() => {
+    if (!hasSendOffSelected && sendOffMemberIds.length > 0) {
+      setSelectedParticipantIds((prev) => {
+        const toAdd = sendOffMemberIds.filter((id) => !prev.includes(id));
+        return [...prev, ...toAdd];
+      });
+      setSendOffMemberIds([]);
+    }
+  }, [hasSendOffSelected, sendOffMemberIds]);
+
+  // All active members options for celebrant multi-selects
+  const allActiveMemberOptions = useMemo(
+    () =>
+      activeMembers.map((m) => {
+        const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+        return {
+          label: `${m.name} (${isWfh ? "WFH" : "Office"})`,
+          value: m.memberId,
+        };
+      }),
+    [activeMembers]
+  );
 
   // Participating members for the event
   const participatingMembers = useMemo(() => {
@@ -729,18 +892,24 @@ export default function EventFormPage({
     [participatingMembers]
   );
 
-  // Options for Participating Members AppMultiSelect
-  const memberOptions = useMemo(
-    () =>
-      activeMembers.map((m) => {
-        const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
-        return {
-          label: `${m.name} (${isWfh ? "WFH" : "Office"})`,
-          value: m.memberId,
-        };
-      }),
-    [activeMembers]
-  );
+  // Options for Participating Members AppMultiSelect (exempt celebrants are marked and disabled)
+  const memberOptions = useMemo(() => {
+    const exemptLookup = new Map();
+    marriageCelebrantIds.forEach((id) => exemptLookup.set(id, "Celebrating Marriage - Exempt"));
+    sendOffMemberIds.forEach((id) => exemptLookup.set(id, "Send-off - Exempt"));
+
+    return activeMembers.map((m) => {
+      const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+      const exemptReason = exemptLookup.get(m.memberId);
+      return {
+        label: exemptReason
+          ? `${m.name} (${isWfh ? "WFH" : "Office"}) - [${exemptReason}]`
+          : `${m.name} (${isWfh ? "WFH" : "Office"})`,
+        value: m.memberId,
+        disabled: Boolean(exemptReason),
+      };
+    });
+  }, [activeMembers, marriageCelebrantIds, sendOffMemberIds]);
 
   // Auto-sync active member counts and monthly celebrant counts
   useEffect(() => {
@@ -787,12 +956,15 @@ export default function EventFormPage({
 
   // Handler to add back a deselected member
   const handleAddParticipant = (memberId) => {
+    const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+    if (allExempt.has(memberId)) return;
     setSelectedParticipantIds((prev) => (prev.includes(memberId) ? prev : [...prev, memberId]));
   };
 
-  // Handler to reset/select all members
+  // Handler to reset/select all members (excluding exempt celebrants)
   const handleSelectAllParticipants = () => {
-    setSelectedParticipantIds(activeMembers.map((m) => m.memberId));
+    const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+    setSelectedParticipantIds(activeMembers.filter((m) => !allExempt.has(m.memberId)).map((m) => m.memberId));
   };
 
   // Excluded (not attending) members for non-birthday events
@@ -847,7 +1019,34 @@ export default function EventFormPage({
   const wfh = isBirthday ? Math.max(0, Number(wfhBirthdays) || 0) : nonBdayWfh;
   const bdays = isBirthday ? office + wfh : 0;
   const eligible = isBirthday ? Math.max(0, total - (exempt ? bdays : 0)) : nonBdayTotal;
-  const puffsFactor = office > 0 ? office : 0;
+
+  // Office birthday celebrants
+  const officeCelebrants = useMemo(() => {
+    return monthCelebrants.filter(
+      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+    );
+  }, [monthCelebrants]);
+
+  // Unique celebration dates among office celebrants (members born on same day celebrate simultaneously)
+  const uniqueOfficeCelebrationDates = useMemo(() => {
+    const dates = new Set();
+    officeCelebrants.forEach((m) => {
+      if (m.dateOfBirth) {
+        dates.add(dayjs(m.dateOfBirth).format("DD-MM"));
+      }
+    });
+    return Array.from(dates);
+  }, [officeCelebrants]);
+
+  // If two or three members celebrate on the same date, cake and snacks are considered as ONE for that date
+  const officeCakeAndSnacksCount = useMemo(() => {
+    if (uniqueOfficeCelebrationDates.length > 0) {
+      return uniqueOfficeCelebrationDates.length;
+    }
+    return office > 0 ? office : 0;
+  }, [uniqueOfficeCelebrationDates, office]);
+
+  const puffsFactor = officeCakeAndSnacksCount;
 
   // Compute budget calculation items dynamically based on selected Event Types from Master
   const computedBudgetItems = useMemo(() => {
@@ -879,10 +1078,15 @@ export default function EventFormPage({
         let formulaPart = "";
 
         if (name.includes("cake")) {
-          calcText = `${office} × ₹${rate.toLocaleString("en-IN")}`;
-          calcFormula = `Office Celebrants × ₹${rate.toLocaleString("en-IN")}`;
-          autoAmount = office * rate;
-          formulaPart = `Cake (Office Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+          const cakeCount = officeCakeAndSnacksCount;
+          calcText = cakeCount > 0 ? `${cakeCount} × ₹${rate.toLocaleString("en-IN")}` : "₹0";
+          calcFormula = cakeCount > 0
+            ? (office > cakeCount
+                ? `${cakeCount} Cake${cakeCount > 1 ? "s" : ""} (${office} Celebrants on same date) × ₹${rate.toLocaleString("en-IN")}`
+                : `Office Celebrations (${cakeCount}) × ₹${rate.toLocaleString("en-IN")}`)
+            : "No office celebrants";
+          autoAmount = cakeCount * rate;
+          formulaPart = `Cake (${cakeCount} × ₹${rate.toLocaleString("en-IN")})`;
         } else if (
           name.includes("gift") ||
           name.includes("present") ||
@@ -890,20 +1094,24 @@ export default function EventFormPage({
           name.includes("memento")
         ) {
           calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
-          calcFormula = `Total Celebrants × ₹${rate.toLocaleString("en-IN")}`;
+          calcFormula = `Total Celebrants (${bdays}) × ₹${rate.toLocaleString("en-IN")}`;
           autoAmount = bdays * rate;
-          formulaPart = `Gift (Total Birthday Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+          formulaPart = `Gift (${bdays} Celebrants × ₹${rate.toLocaleString("en-IN")})`;
         } else {
           if (puffsFactor > 0) {
             calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`;
-            calcFormula = `Active Members × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`;
+            calcFormula = puffsFactor > 1
+              ? `Active Members (${total}) × ₹${rate.toLocaleString("en-IN")} × ${puffsFactor} Celebrations`
+              : (office > 1 && puffsFactor === 1
+                  ? `Active Members (${total}) × ₹${rate.toLocaleString("en-IN")} (${office} Celebrants on same date)`
+                  : `Active Members (${total}) × ₹${rate.toLocaleString("en-IN")}`);
             autoAmount = total * rate * puffsFactor;
           } else {
             calcText = "WFH only → Not provided";
             calcFormula = "WFH only → Not provided";
             autoAmount = 0;
           }
-          formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString("en-IN")})`;
+          formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""})`;
         }
 
         const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
@@ -941,11 +1149,32 @@ export default function EventFormPage({
         typeMasterItems.forEach((item) => {
           const itemKey = `type_${type.eventTypeId}_${item.budgetCalculationId || item.expenseItem}`;
           const rate = Number(item.rate) || 0;
-          const autoAmount = total * rate;
+          const isGift = (item.expenseItem || "").toLowerCase().includes("gift") ||
+                         (item.expenseItem || "").toLowerCase().includes("memento") ||
+                         (item.expenseItem || "").toLowerCase().includes("present");
+          const isMarriageType = typeName.toLowerCase().includes("marriage");
+          const isSendOffType = typeName.toLowerCase().includes("send") || typeName.toLowerCase().includes("farewell");
+
+          const celebrantMultiplier = isMarriageType && marriageCelebrantIds.length > 1
+            ? marriageCelebrantIds.length
+            : (isSendOffType && sendOffMemberIds.length > 1
+                ? sendOffMemberIds.length
+                : 1);
+
+          const autoAmount = isGift ? rate * celebrantMultiplier : rate;
           const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
           const amount = isManual ? (Number(customItemAmounts[itemKey]) || 0) : autoAmount;
-          const calcFormula = `Active Members (${total}) × ₹${rate.toLocaleString("en-IN")}`;
-          const calcText = `${total} × ₹${rate.toLocaleString("en-IN")}`;
+          const formattedAmount = amount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+          const splitPerPerson = total > 0 ? (amount / total) : 0;
+          let calcFormula = total > 0
+            ? `₹${formattedAmount} ÷ ${total} Members`
+            : `₹${formattedAmount}`;
+          if (isGift && celebrantMultiplier > 1) {
+            calcFormula = `${celebrantMultiplier} Celebrants × ₹${rate.toLocaleString("en-IN")} = ₹${formattedAmount}${total > 0 ? ` (₹${splitPerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/member)` : ""}`;
+          }
+          const calcText = total > 0
+            ? `₹${formattedAmount} ÷ ${total}`
+            : `₹${formattedAmount}`;
 
           items.push({
             ...item,
@@ -958,9 +1187,12 @@ export default function EventFormPage({
             calcText,
             calcFormula,
             formulaPart: isManual
-              ? `${item.expenseItem} (Manual: ₹${amount.toLocaleString("en-IN")})`
-              : `${item.expenseItem} (${total} × ₹${rate.toLocaleString("en-IN")})`,
+              ? `${item.expenseItem} (Manual: ₹${formattedAmount})`
+              : (isGift && celebrantMultiplier > 1
+                  ? `${item.expenseItem} (${celebrantMultiplier} Celebrants × ₹${rate.toLocaleString("en-IN")})`
+                  : `${item.expenseItem} (₹${formattedAmount})`),
             isOtherEvent: true,
+            splitPerPerson,
           });
         });
       }
@@ -974,20 +1206,19 @@ export default function EventFormPage({
 
         const itemKey = `type_${type.eventTypeId}_contrib`;
         const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
-        const perPersonRate = isManual ? (Number(customItemAmounts[itemKey]) || 0) : numVal;
-        const totalCalculatedAmount = total * perPersonRate;
-        const amount = totalCalculatedAmount;
-        const splitPerPerson = perPersonRate;
+        const enteredAmount = isManual ? (Number(customItemAmounts[itemKey]) || 0) : numVal;
+        const amount = enteredAmount;
+        const splitPerPerson = total > 0 ? (amount / total) : 0;
 
         const formattedTotal = amount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         const formattedSplit = splitPerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
         const calcText = amount > 0
-          ? `${total} Members × ₹${formattedSplit}/person = ₹${formattedTotal}`
-          : "Enter Per Person Amount";
+          ? (total > 0 ? `₹${formattedTotal} ÷ ${total}` : `₹${formattedTotal}`)
+          : "Enter Expected Amount";
 
         const calcFormula = amount > 0
-          ? `${total} Active Members × ₹${formattedSplit}`
+          ? (total > 0 ? `₹${formattedTotal} ÷ ${total} Members` : `₹${formattedTotal}`)
           : "₹0";
 
         const displayName = typesWithoutExpenseItems.length === 1
@@ -995,7 +1226,7 @@ export default function EventFormPage({
           : `${typeName} Expected Amount`;
 
         const formulaPart = amount > 0
-          ? `${displayName} (${total} Members × ₹${formattedSplit} = ₹${formattedTotal})`
+          ? `${displayName} (₹${formattedTotal})`
           : `${displayName}: ₹0`;
 
         items.push({
@@ -1003,7 +1234,7 @@ export default function EventFormPage({
           key: itemKey,
           expenseItem: displayName,
           category: typeName,
-          rate: perPersonRate,
+          rate: amount,
           autoAmount: numVal,
           amount,
           isManual,
@@ -1050,6 +1281,9 @@ export default function EventFormPage({
     total,
     eligible,
     puffsFactor,
+    officeCakeAndSnacksCount,
+    marriageCelebrantIds,
+    sendOffMemberIds,
     otherEventAmounts,
     form.baseAmount,
     customItemAmounts,
@@ -1078,14 +1312,64 @@ export default function EventFormPage({
 
   const plannedBudget = computedBudgetItems.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
 
+  const effectiveDeduction = useMemo(() => {
+    if (!useAvailableBalance) return 0;
+    if (selectedDeductionType === "custom") {
+      const customVal = parseFloat(customDeductionAmount);
+      return isNaN(customVal) || customVal < 0 ? 0 : customVal;
+    }
+    return availableAmountInHand;
+  }, [useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand]);
+
+  const remainingBudgetToCollect = useMemo(() => {
+    if (!useAvailableBalance) return plannedBudget;
+    return Math.max(0, plannedBudget - effectiveDeduction);
+  }, [useAvailableBalance, plannedBudget, effectiveDeduction]);
+
   const contributionPerMember = useMemo(() => {
     if (isBirthday && exempt && celebrantCount > 0) {
-      return birthdaySharePerPerson + otherEventsSharePerPerson;
+      const scaleFactor = plannedBudget > 0 ? remainingBudgetToCollect / plannedBudget : 0;
+      const bdayPart = birthdaySharePerPerson * scaleFactor;
+      const otherPart = otherEventsSharePerPerson * scaleFactor;
+      return Math.round((bdayPart + otherPart) * 100) / 100;
     }
-    return total > 0 ? (plannedBudget / total) : 0;
-  }, [isBirthday, exempt, celebrantCount, birthdaySharePerPerson, otherEventsSharePerPerson, plannedBudget, total]);
+    return total > 0 ? Math.round((remainingBudgetToCollect / total) * 100) / 100 : 0;
+  }, [
+    isBirthday,
+    exempt,
+    celebrantCount,
+    birthdaySharePerPerson,
+    otherEventsSharePerPerson,
+    plannedBudget,
+    remainingBudgetToCollect,
+    total,
+  ]);
 
-  const expectedCollection = plannedBudget;
+  const expectedCollection = remainingBudgetToCollect;
+
+  const balanceValidationError = useMemo(() => {
+    if (!useAvailableBalance) return null;
+    if (selectedDeductionType === "custom") {
+      const customNum = parseFloat(customDeductionAmount);
+      if (isNaN(customNum) || customNum <= 0) {
+        return "Please enter a valid deduction amount greater than ₹0.";
+      }
+      if (customNum > availableAmountInHand) {
+        return `Deduction amount (₹${customNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) exceeds available Amount In Hand (₹${availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`;
+      }
+      if (customNum > plannedBudget) {
+        return `Deduction amount (₹${customNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) cannot exceed the planned budget (₹${plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`;
+      }
+    } else {
+      if (availableAmountInHand <= 0) {
+        return "No available Amount In Hand to deduct.";
+      }
+      if (availableAmountInHand > plannedBudget) {
+        return `Available balance (₹${availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) exceeds the planned budget (₹${plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}). Please select Custom Amount to deduct up to ₹${plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+      }
+    }
+    return null;
+  }, [useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, plannedBudget]);
 
   const dynamicFormulaText = computedBudgetItems
     .map((i) => i.formulaPart)
@@ -1120,8 +1404,10 @@ export default function EventFormPage({
       updatedName = sanitizeEventName(updatedName);
     }
 
-    const allActiveIds = activeMembers.map((m) => m.memberId);
-    setSelectedParticipantIds(allActiveIds);
+    const initialParticipants = isEdit ? (form.participantIds || selectedParticipantIds || []) : [];
+    if (!isEdit) {
+      setSelectedParticipantIds([]);
+    }
 
     const offTotal = activeMembers.filter(
       (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
@@ -1143,11 +1429,22 @@ export default function EventFormPage({
       ).length;
       setOfficeBirthdays(offCount);
       setWfhBirthdays(wfhCount);
+      setTotalMembers(activeMembers.length);
+      setOfficeMembers(offTotal);
+      setWfhMembers(wfhTotal);
+    } else {
+      const currParticipants = isEdit ? initialParticipants : [];
+      const pMembers = activeMembers.filter((m) => currParticipants.includes(m.memberId));
+      setTotalMembers(pMembers.length);
+      const offCount = pMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length;
+      const wfhCount = pMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length;
+      setOfficeMembers(offCount);
+      setWfhMembers(wfhCount);
     }
-
-    setTotalMembers(activeMembers.length);
-    setOfficeMembers(offTotal);
-    setWfhMembers(wfhTotal);
 
     const hasItems = budgetItemsList.some((b) => {
       if (b.isActive === false) return false;
@@ -1169,7 +1466,7 @@ export default function EventFormPage({
       eventTypeIds: newTypeId ? [newTypeId] : [],
       eventName: updatedName,
       baseAmount: hasItems ? "" : (prev.baseAmount || ""),
-      participantIds: allActiveIds,
+      participantIds: isEdit ? initialParticipants : [],
     }));
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
     if (errors.baseAmount) setErrors((p) => ({ ...p, baseAmount: "" }));
@@ -1198,8 +1495,10 @@ export default function EventFormPage({
       updatedName = sanitizeEventName(updatedName);
     }
 
-    const allActiveIds = activeMembers.map((m) => m.memberId);
-    setSelectedParticipantIds(allActiveIds);
+    const initialParticipants = isEdit ? (form.participantIds || selectedParticipantIds || []) : [];
+    if (!isEdit) {
+      setSelectedParticipantIds([]);
+    }
 
     const offTotal = activeMembers.filter(
       (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
@@ -1221,11 +1520,22 @@ export default function EventFormPage({
       ).length;
       setOfficeBirthdays(offCount);
       setWfhBirthdays(wfhCount);
+      setTotalMembers(activeMembers.length);
+      setOfficeMembers(offTotal);
+      setWfhMembers(wfhTotal);
+    } else {
+      const currParticipants = isEdit ? initialParticipants : [];
+      const pMembers = activeMembers.filter((m) => currParticipants.includes(m.memberId));
+      setTotalMembers(pMembers.length);
+      const offCount = pMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      ).length;
+      const wfhCount = pMembers.filter(
+        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      ).length;
+      setOfficeMembers(offCount);
+      setWfhMembers(wfhCount);
     }
-
-    setTotalMembers(activeMembers.length);
-    setOfficeMembers(offTotal);
-    setWfhMembers(wfhTotal);
 
     setForm((prev) => ({
       ...prev,
@@ -1233,7 +1543,7 @@ export default function EventFormPage({
       eventTypeIds: newTypeIds,
       eventName: updatedName,
       baseAmount: prev.baseAmount || "",
-      participantIds: allActiveIds,
+      participantIds: isEdit ? initialParticipants : [],
     }));
 
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
@@ -1347,6 +1657,10 @@ export default function EventFormPage({
       }
     }
 
+    if (!isBirthday && selectedParticipantIds.length === 0) {
+      newErrors.participantIds = "Please select at least one participating member";
+    }
+
     if (typesWithoutExpenseItems.length > 0) {
       typesWithoutExpenseItems.forEach((t) => {
         const val = otherEventAmounts[t.eventTypeId] !== undefined
@@ -1355,7 +1669,7 @@ export default function EventFormPage({
         const num = parseFloat(String(val)) || 0;
 
         if (!val || String(val).trim() === "" || num <= 0) {
-          const fieldName = typesWithoutExpenseItems.length === 1 ? "Per person amount" : `${t.eventTypeName} per person amount`;
+          const fieldName = typesWithoutExpenseItems.length === 1 ? "Expected amount" : `${t.eventTypeName} expected amount`;
           const errMsg = `${fieldName} is required and cannot be ₹0`;
           newErrors[`baseAmount_${t.eventTypeId}`] = errMsg;
           if (nonBirthdaySelectedTypes.length === 1) {
@@ -1368,6 +1682,21 @@ export default function EventFormPage({
     if (plannedBudget <= 0) {
       toast.error("Event cannot be saved with ₹0. Please enter a valid contribution amount or configure budget items.");
       return;
+    }
+
+    if (useAvailableBalance) {
+      if (balanceValidationError) {
+        toast.error(balanceValidationError);
+        return;
+      }
+      if (effectiveDeduction > plannedBudget) {
+        toast.error(`Deduction amount (₹${effectiveDeduction.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) cannot exceed the planned budget (₹${plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`);
+        return;
+      }
+      if (effectiveDeduction > availableAmountInHand) {
+        toast.error(`Deduction amount (₹${effectiveDeduction.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) exceeds available Amount In Hand (₹${availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`);
+        return;
+      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -1403,18 +1732,19 @@ export default function EventFormPage({
       const otherEventsSharePerPerson = finalParticipantIds.length > 0 ? otherEventsBudget / finalParticipantIds.length : 0;
 
       if (isBirthday && exempt && celebrantIds.length > 0) {
+        const scaleFactor = plannedBudget > 0 ? remainingBudgetToCollect / plannedBudget : 0;
         finalParticipantIds.forEach((mId) => {
           if (celebrantIds.includes(mId)) {
             // Celebrant is exempt from birthday portion, but pays for other events (e.g. Farewell, Dinner)
             contributionOverrides.push({
               memberId: mId,
-              amount: parseFloat(otherEventsSharePerPerson.toFixed(2)),
+              amount: parseFloat((otherEventsSharePerPerson * scaleFactor).toFixed(2)),
             });
           } else {
             // Non-celebrant pays birthday share + other events share
             contributionOverrides.push({
               memberId: mId,
-              amount: parseFloat((birthdaySharePerPerson + otherEventsSharePerPerson).toFixed(2)),
+              amount: parseFloat(((birthdaySharePerPerson + otherEventsSharePerPerson) * scaleFactor).toFixed(2)),
             });
           }
         });
@@ -1444,7 +1774,11 @@ export default function EventFormPage({
           ? [form.eventTypeId]
           : [];
 
-      const finalDescription = formatDescriptionWithContrib(form.description?.trim(), otherEventAmounts);
+      const finalDescription = formatDescriptionWithContrib(
+        form.description?.trim(),
+        otherEventAmounts,
+        { marriage: marriageCelebrantIds, sendOff: sendOffMemberIds }
+      );
 
       const payload = {
         eventName: form.eventName.trim(),
@@ -1455,6 +1789,8 @@ export default function EventFormPage({
         description: finalDescription,
         status: form.status || "Planned",
         baseAmount: plannedBudget,
+        useAvailableBalance: Boolean(useAvailableBalance),
+        allocatedAmount: useAvailableBalance ? Number(effectiveDeduction) : 0,
         participantIds:
           finalParticipantIds.length > 0 ? finalParticipantIds : form.participantIds,
         contributionOverrides: contributionOverrides,
@@ -1855,13 +2191,13 @@ export default function EventFormPage({
 
                       const inputLabel =
                         typesWithoutExpenseItems.length === 1
-                          ? "Expected Amount (Per Person)"
-                          : `${type.eventTypeName} Expected Amount (Per Person)`;
+                          ? "Expected Amount"
+                          : `${type.eventTypeName} Expected Amount`;
 
                       const inputPlaceholder =
                         typesWithoutExpenseItems.length === 1
-                          ? "Enter per person amount (e.g. 100)"
-                          : `Enter ${type.eventTypeName.toLowerCase()} per person amount (₹)`;
+                          ? "Enter total expected amount (e.g. 5000)"
+                          : `Enter ${type.eventTypeName.toLowerCase()} expected amount (₹)`;
 
                       return (
                         <Grid
@@ -1893,6 +2229,43 @@ export default function EventFormPage({
                   </>
                 )}
 
+                {/* Dynamically load celebrant fields ONLY for selected event types */}
+                {hasMarriageSelected && (
+                  <Grid size={{ xs: 12, sm: hasSendOffSelected ? 6 : 6 }}>
+                    <AppMultiSelect
+                      label="Marriage Celebrants"
+                      placeholder="Select members celebrating marriage"
+                      value={marriageCelebrantIds}
+                      onChange={handleMarriageCelebrantsChange}
+                      options={allActiveMemberOptions}
+                      maxHeight={145}
+                      helperText={
+                        marriageCelebrantIds.length > 0
+                          ? `${marriageCelebrantIds.length} celebrant${marriageCelebrantIds.length > 1 ? "s" : ""} (exempt from contributing)`
+                          : ""
+                      }
+                    />
+                  </Grid>
+                )}
+
+                {hasSendOffSelected && (
+                  <Grid size={{ xs: 12, sm: hasMarriageSelected ? 6 : 6 }}>
+                    <AppMultiSelect
+                      label="Send-off / Relieving Members"
+                      placeholder="Select members having send-off"
+                      value={sendOffMemberIds}
+                      onChange={handleSendOffMembersChange}
+                      options={allActiveMemberOptions}
+                      maxHeight={145}
+                      helperText={
+                        sendOffMemberIds.length > 0
+                          ? `${sendOffMemberIds.length} member${sendOffMemberIds.length > 1 ? "s" : ""} (exempt from contributing)`
+                          : ""
+                      }
+                    />
+                  </Grid>
+                )}
+
                 {/* Participating Members MultiSelect (for non-birthday events or multiple event mode) */}
                 {hasSelectedType && !isBirthday && (
                   <Grid size={{ xs: 12 }}>
@@ -1905,11 +2278,18 @@ export default function EventFormPage({
                           typeof e.target.value === "string"
                             ? e.target.value.split(",")
                             : e.target.value;
-                        setSelectedParticipantIds(val);
+                        const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+                        const filteredVal = (val || []).filter((id) => !allExempt.has(id));
+                        setSelectedParticipantIds(filteredVal);
+                        if (errors.participantIds) {
+                          setErrors((prev) => ({ ...prev, participantIds: "" }));
+                        }
                       }}
                       options={memberOptions}
                       maxHeight={145}
                       required
+                      error={!!errors.participantIds}
+                      helperText={errors.participantIds}
                     />
                   </Grid>
                 )}
@@ -2195,6 +2575,275 @@ export default function EventFormPage({
                     </Typography>
                   </Box>
                 </Box>
+              </Box>
+
+              {/* Use Available Amount In Hand Section */}
+              <Box
+                sx={{
+                  mt: 2,
+                  p: { xs: 1.8, sm: 2 },
+                  borderRadius: "10px",
+                  border: "1px solid",
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(99, 102, 241, 0.25)" : "#e0e7ff",
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(99, 102, 241, 0.04)" : "#f8faff",
+                }}
+              >
+                {/* Checkbox & Header */}
+                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                  <Checkbox
+                    checked={useAvailableBalance}
+                    onChange={(e) => setUseAvailableBalance(e.target.checked)}
+                    sx={{
+                      p: 0,
+                      mt: "2px",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#94a3b8" : "#4a3f6b"),
+                      "&.Mui-checked": {
+                        color: (theme) => (theme.palette.mode === "dark" ? "#818cf8" : "#342b54"),
+                      },
+                    }}
+                  />
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.88rem",
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                        cursor: "pointer",
+                        userSelect: "none",
+                      }}
+                      onClick={() => setUseAvailableBalance(!useAvailableBalance)}
+                    >
+                      Use Available Amount In Hand
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.74rem",
+                        color: "#64748b",
+                        mt: 0.25,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      Select the amount in hand to calculate the remaining amount in hand.
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {useAvailableBalance && (
+                  <Box sx={{ mt: 2 }}>
+                    {/* Dropdown for Amount In Hand */}
+                    <Box sx={{ mb: 1.5 }}>
+                      <Typography
+                        sx={{
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#475569"),
+                          mb: 0.6,
+                        }}
+                      >
+                        Amount In Hand
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={selectedDeductionType}
+                          onChange={(e) => setSelectedDeductionType(e.target.value)}
+                          sx={{
+                            borderRadius: "8px",
+                            bgcolor: (theme) =>
+                              theme.palette.mode === "dark" ? "background.paper" : "#ffffff",
+                            fontSize: "0.84rem",
+                            fontWeight: 600,
+                            color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              borderColor: (theme) =>
+                                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "#cbd5e1",
+                            },
+                          }}
+                        >
+                          <MenuItem value="available" sx={{ fontSize: "0.84rem", fontWeight: 600 }}>
+                            ₹{availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Available Amount In Hand)
+                          </MenuItem>
+                          <MenuItem value="custom" sx={{ fontSize: "0.84rem", fontWeight: 600 }}>
+                            Custom Amount...
+                          </MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Box>
+
+                    {selectedDeductionType === "custom" && (
+                      <Box sx={{ mb: 1.8 }}>
+                        <Typography
+                          sx={{
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            color: (theme) => (theme.palette.mode === "dark" ? "#94a3b8" : "#64748b"),
+                            mb: 0.5,
+                          }}
+                        >
+                          Deduction Amount (₹)
+                        </Typography>
+                        <OutlinedInput
+                          size="small"
+                          fullWidth
+                          type="number"
+                          placeholder="Enter amount to deduct"
+                          value={customDeductionAmount}
+                          onChange={(e) => setCustomDeductionAmount(sanitizeDecimalAmount(e.target.value))}
+                          startAdornment={<InputAdornment position="start">₹</InputAdornment>}
+                          endAdornment={
+                            <InputAdornment position="end">
+                              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
+                                Max: ₹{Math.min(availableAmountInHand, plannedBudget).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </Typography>
+                            </InputAdornment>
+                          }
+                          sx={{
+                            borderRadius: "8px",
+                            bgcolor: (theme) =>
+                              theme.palette.mode === "dark" ? "background.paper" : "#ffffff",
+                            fontSize: "0.85rem",
+                            fontWeight: 600,
+                          }}
+                        />
+                      </Box>
+                    )}
+
+                    {/* Calculation Strip */}
+                    <Box
+                      sx={{
+                        p: 1.5,
+                        borderRadius: "8px",
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(16, 185, 129, 0.08)" : "#f0fdf4",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(16, 185, 129, 0.3)" : "#bbf7d0",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1.2,
+                      }}
+                    >
+                      {/* Amount In Hand Kitty Impact */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        {/* Previous Amount In Hand */}
+                        <Box sx={{ textAlign: "left" }}>
+                          <Typography sx={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 500, mb: 0.2 }}>
+                            Previous Amount In Hand
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: "0.95rem",
+                              fontWeight: 800,
+                              color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#0f172a"),
+                            }}
+                          >
+                            ₹{availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </Typography>
+                        </Box>
+
+                        <Typography sx={{ fontSize: "1rem", fontWeight: 700, color: "#94a3b8", px: 0.5 }}>
+                          -
+                        </Typography>
+
+                        {/* Deducted Amount */}
+                        <Box sx={{ textAlign: "center" }}>
+                          <Typography sx={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 500, mb: 0.2 }}>
+                            Deducted for Event
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: "0.95rem",
+                              fontWeight: 800,
+                              color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#0f172a"),
+                            }}
+                          >
+                            ₹{effectiveDeduction.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </Typography>
+                        </Box>
+
+                        <Typography sx={{ fontSize: "1rem", fontWeight: 700, color: "#94a3b8", px: 0.5 }}>
+                          =
+                        </Typography>
+
+                        {/* Remaining Amount In Hand */}
+                        <Box sx={{ textAlign: "right" }}>
+                          <Typography
+                            sx={{
+                              fontSize: "0.7rem",
+                              fontWeight: 700,
+                              color: availableAmountInHand - effectiveDeduction >= 0 ? "#16a34a" : "#dc2626",
+                              mb: 0.2,
+                            }}
+                          >
+                            Remaining Amount In Hand
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: "0.95rem",
+                              fontWeight: 800,
+                              color: availableAmountInHand - effectiveDeduction >= 0 ? "#16a34a" : "#dc2626",
+                            }}
+                          >
+                            ₹{Math.max(0, availableAmountInHand - effectiveDeduction).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Event Budget Remaining Breakdown */}
+                      <Box
+                        sx={{
+                          pt: 1,
+                          borderTop: "1px dashed",
+                          borderColor: (theme) =>
+                            theme.palette.mode === "dark" ? "rgba(16, 185, 129, 0.2)" : "#bbf7d0",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 0.4,
+                        }}
+                      >
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <Typography sx={{ fontSize: "0.75rem", color: "#475569", fontWeight: 600 }}>
+                            Remaining to Collect:
+                          </Typography>
+                          <Typography sx={{ fontSize: "0.95rem", fontWeight: 800, color: "#0284c7" }}>
+                            ₹{remainingBudgetToCollect.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <Typography sx={{ fontSize: "0.72rem", color: "#64748b" }}>
+                            Split across {total} active members:
+                          </Typography>
+                          <Typography sx={{ fontSize: "0.85rem", fontWeight: 800, color: "#16a34a" }}>
+                            ₹{contributionPerMember.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / member
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    {/* Insufficient balance alert */}
+                    {balanceValidationError && (
+                      <Alert
+                        severity="error"
+                        sx={{
+                          mt: 1.5,
+                          py: 0.5,
+                          fontSize: "0.76rem",
+                          borderRadius: "6px",
+                          "& .MuiAlert-message": { lineHeight: 1.3 },
+                        }}
+                      >
+                        {balanceValidationError}
+                      </Alert>
+                    )}
+                  </Box>
+                )}
               </Box>
 
               {/* Calculation Summary Details Section */}

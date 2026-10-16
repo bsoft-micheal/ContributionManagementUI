@@ -37,3 +37,8 @@ export const sendRemindersForEventAsync = sendEventRemindersAsync;
 export const previewContributionsAsync = async (data) => {
   return await postApi("/events/previewContributionsAsync", data);
 };
+
+export const getAvailableAmountInHandAsync = async () => {
+  return await getApi("/events/getAvailableAmountInHandAsync");
+};
+

@@ -643,7 +643,30 @@ export default function EventsPage() {
     {
       label: "Event Name",
       key: "eventName",
-      render: (row) => row.eventName || "--",
+      render: (row) => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: "inherit" }}>
+            {row.eventName || "--"}
+          </Typography>
+          {row.useAvailableBalance && (
+            <Tooltip title={`Funded from Amount In Hand: ₹${Number(row.allocatedAmount || row.baseAmount || 0).toLocaleString("en-IN")}`}>
+              <Chip
+                size="small"
+                label="Amount In Hand"
+                sx={{
+                  height: 18,
+                  fontSize: "0.64rem",
+                  fontWeight: 700,
+                  bgcolor: "rgba(22, 163, 74, 0.12)",
+                  color: "#16a34a",
+                  borderRadius: "4px",
+                  "& .MuiChip-label": { px: 0.6 },
+                }}
+              />
+            </Tooltip>
+          )}
+        </Box>
+      ),
     },
     {
       label: "Event Type / Event Date",
