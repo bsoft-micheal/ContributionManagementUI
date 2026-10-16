@@ -302,6 +302,7 @@ export default function AppMultiSelect({
             <MenuItem
               key={option.value}
               value={option.value}
+              disabled={Boolean(option.disabled)}
               sx={{ fontSize: "0.85rem", py: 0.5 }}
             >
               <Checkbox

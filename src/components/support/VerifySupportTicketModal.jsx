@@ -597,7 +597,11 @@ export default function VerifySupportTicketModal({
                       overflowY: "auto",
                     }}
                   >
-                    {ticketInfo.resolutionNotes}
+                    {ticketInfo.resolutionNotes
+                      .split("\n")
+                      .map((line) => line.replace(/^\[.*?\]\s*[^:\n\r]+:\s*/, ""))
+                      .join("\n")
+                      .trim()}
                   </Box>
                 </Grid>
               )}

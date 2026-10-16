@@ -595,6 +595,45 @@ export default function SupportTicketsPage() {
     return { eventType: "--", eventName: cleanStr };
   };
 
+  const getVerifiedByName = (ticket) => {
+    if (!ticket) return "";
+    if (ticket.verifiedBy && ticket.verifiedBy !== "--") return ticket.verifiedBy;
+
+    // Extract verifier name from resolution notes if formatted like "[16 Oct 2026, 10:26 AM] Daniel A: ..."
+    if (ticket.resolutionNotes) {
+      const match = ticket.resolutionNotes.match(/\[.*?\]\s*([^:\n\r]+):/);
+      if (match && match[1]?.trim()) {
+        return match[1].trim();
+      }
+    }
+
+    if (ticket.assignedTo && ticket.assignedTo !== "--") return ticket.assignedTo;
+
+    // Check modifiedBy against membersList
+    if (ticket.modifiedBy) {
+      const matched = (membersList || []).find(
+        (m) =>
+          String(m.memberId || m.id || m.userId).toLowerCase() ===
+          String(ticket.modifiedBy).toLowerCase()
+      );
+      if (matched?.name) return matched.name;
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ticket.modifiedBy)) {
+        return ticket.modifiedBy;
+      }
+    }
+
+    return "";
+  };
+
+  const cleanResolutionNotes = (notes) => {
+    if (!notes) return "";
+    return notes
+      .split("\n")
+      .map((line) => line.replace(/^\[.*?\]\s*[^:\n\r]+:\s*/, ""))
+      .join("\n")
+      .trim();
+  };
+
   const processedTickets = useMemo(() => {
     return filteredTickets.map((item) => {
       const details = getEventDetails(item.relatedEvent);
@@ -607,6 +646,11 @@ export default function SupportTicketsPage() {
   }, [filteredTickets, eventsList, eventTypesList]);
 
   const handleEditTicket = (row) => {
+    const isVerified = ["verified", "resolved", "closed"].includes((row?.status || "").trim().toLowerCase());
+    if (isVerified) {
+      toast.warning("Cannot edit a verified ticket.");
+      return;
+    }
     setEditingTicket(row);
     const matchedEvent = (eventsList || []).find(
       (ev) => (ev.eventName || ev.name || ev.title) === row.relatedEvent || (row.eventId && (ev.eventId === row.eventId || ev.id === row.eventId))
@@ -633,6 +677,11 @@ export default function SupportTicketsPage() {
   };
 
   const handleDeleteRequest = (row) => {
+    const isVerified = ["verified", "resolved", "closed"].includes((row?.status || "").trim().toLowerCase());
+    if (isVerified) {
+      toast.warning("Cannot delete a verified ticket.");
+      return;
+    }
     setTicketToDelete(row);
     setDeleteConfirmOpen(true);
   };
@@ -816,137 +865,192 @@ export default function SupportTicketsPage() {
   const columns = [
     {
       label: "Action",
-      render: (row) => (
-        <Box sx={{ display: "flex", gap: 0.5 }}>
-          <Tooltip title={canViewTicket ? "View Details" : "Disabled"}>
-            <span style={{ display: "inline-flex", cursor: !canViewTicket ? "not-allowed" : "pointer" }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canViewTicket}
-                onClick={async () => {
-                  setSelectedTicket(row);
-                  setViewDialogOpen(true);
-                  try {
-                    const ticketId = row.ticketId || row.id;
-                    if (ticketId) {
-                      const res = await getSupportTicketByIdAsync(ticketId);
-                      const fresh = res?.data || res;
-                      if (fresh && (fresh.ticketId || fresh.id)) {
-                        setSelectedTicket((prev) => ({
-                          ...prev,
-                          ...fresh,
-                          resolutionNotes:
-                            fresh.resolutionNotes ||
-                            fresh.replyMessage ||
-                            fresh.resolution ||
-                            prev?.resolutionNotes ||
-                            "",
-                          modifiedOn: fresh.modifiedOn || prev?.modifiedOn || null,
-                          modifiedBy: fresh.modifiedBy || prev?.modifiedBy || null,
-                        }));
+      render: (row) => {
+        const isVerified = ["verified", "resolved", "closed"].includes(
+          (row.status || "").trim().toLowerCase()
+        );
+        const canVerifyAction = canVerifyTicket && !isVerified;
+        const canEditAction = canEditTicket && !isVerified;
+        const canDeleteAction = canDeleteTicket && !isVerified;
+
+        return (
+          <Box sx={{ display: "flex", gap: 0.5 }}>
+            <Tooltip title={canViewTicket ? "View Details" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canViewTicket ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canViewTicket}
+                  onClick={async () => {
+                    setSelectedTicket(row);
+                    setViewDialogOpen(true);
+                    try {
+                      const ticketId = row.ticketId || row.id;
+                      if (ticketId) {
+                        const res = await getSupportTicketByIdAsync(ticketId);
+                        const fresh = res?.data || res;
+                        if (fresh && (fresh.ticketId || fresh.id)) {
+                          setSelectedTicket((prev) => ({
+                            ...prev,
+                            ...fresh,
+                            resolutionNotes:
+                              fresh.resolutionNotes ||
+                              fresh.replyMessage ||
+                              fresh.resolution ||
+                              prev?.resolutionNotes ||
+                              "",
+                            modifiedOn: fresh.modifiedOn || prev?.modifiedOn || null,
+                            modifiedBy: fresh.modifiedBy || prev?.modifiedBy || null,
+                          }));
+                        }
                       }
+                    } catch {
+                      // row already in state
                     }
-                  } catch {
-                    // row already in state
-                  }
-                }}
-              >
-                <ViewIcon
-                  sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) =>
-                      canViewTicket
-                        ? theme.palette.mode === "dark"
-                          ? "#ffffff"
-                          : "#4a3f6b"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.45)"
-                          : "#94a3b8",
                   }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={canVerifyTicket ? "Verify Ticket" : "Disabled"}>
-            <span style={{ display: "inline-flex", cursor: !canVerifyTicket ? "not-allowed" : "pointer" }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canVerifyTicket}
-                onClick={() => {
-                  setReplyTicket(row);
-                  setReplyStatus(row.status || "In Progress");
-                  setReplyText("");
-                  setReplyDialogOpen(true);
-                }}
-              >
-                <ReplyActionIcon
+                >
+                  <ViewIcon
+                    sx={{
+                      fontSize: "1.05rem",
+                      color: (theme) =>
+                        canViewTicket
+                          ? theme.palette.mode === "dark"
+                            ? "#ffffff"
+                            : "#4a3f6b"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.45)"
+                            : "#94a3b8",
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip
+              title={
+                !canVerifyTicket
+                  ? "Disabled"
+                  : isVerified
+                  ? "Ticket is already verified"
+                  : "Verify Ticket"
+              }
+            >
+              <span style={{ display: "inline-flex", cursor: !canVerifyAction ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
                   sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) =>
-                      canVerifyTicket
-                        ? theme.palette.mode === "dark"
-                          ? "#ffffff"
-                          : "#4a3f6b"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.45)"
-                          : "#94a3b8",
+                    p: 0.3,
+                    opacity: canVerifyAction ? 1 : 0.38,
+                    cursor: !canVerifyAction ? "not-allowed !important" : "pointer",
+                    pointerEvents: !canVerifyAction ? "none" : "auto",
                   }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={canEditTicket ? "Edit" : "Disabled"}>
-            <span style={{ display: "inline-flex", cursor: !canEditTicket ? "not-allowed" : "pointer" }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canEditTicket}
-                onClick={() => handleEditTicket(row)}
-              >
-                <EditIcon
+                  disabled={!canVerifyAction}
+                  onClick={() => {
+                    if (!canVerifyAction) return;
+                    setReplyTicket(row);
+                    setReplyStatus(row.status || "In Progress");
+                    setReplyText("");
+                    setReplyDialogOpen(true);
+                  }}
+                >
+                  <ReplyActionIcon
+                    sx={{
+                      fontSize: "1.05rem",
+                      color: (theme) =>
+                        canVerifyAction
+                          ? theme.palette.mode === "dark"
+                            ? "#ffffff"
+                            : "#4a3f6b"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.45)"
+                            : "#94a3b8",
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip
+              title={
+                !canEditTicket
+                  ? "Disabled"
+                  : isVerified
+                  ? "Cannot edit a verified ticket"
+                  : "Edit"
+              }
+            >
+              <span style={{ display: "inline-flex", cursor: !canEditAction ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
                   sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) =>
-                      canEditTicket
-                        ? theme.palette.mode === "dark"
-                          ? "#ffffff"
-                          : "#4a3f6b"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.45)"
-                          : "#94a3b8",
+                    p: 0.3,
+                    opacity: canEditAction ? 1 : 0.38,
+                    cursor: !canEditAction ? "not-allowed !important" : "pointer",
+                    pointerEvents: !canEditAction ? "none" : "auto",
                   }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={canDeleteTicket ? "Delete" : "Disabled"}>
-            <span style={{ display: "inline-flex", cursor: !canDeleteTicket ? "not-allowed" : "pointer" }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canDeleteTicket}
-                onClick={() => handleDeleteRequest(row)}
-              >
-                <DeleteIcon
+                  disabled={!canEditAction}
+                  onClick={() => {
+                    if (!canEditAction) return;
+                    handleEditTicket(row);
+                  }}
+                >
+                  <EditIcon
+                    sx={{
+                      fontSize: "1.05rem",
+                      color: (theme) =>
+                        canEditAction
+                          ? theme.palette.mode === "dark"
+                            ? "#ffffff"
+                            : "#4a3f6b"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.45)"
+                            : "#94a3b8",
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip
+              title={
+                !canDeleteTicket
+                  ? "Disabled"
+                  : isVerified
+                  ? "Cannot delete a verified ticket"
+                  : "Delete"
+              }
+            >
+              <span style={{ display: "inline-flex", cursor: !canDeleteAction ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
                   sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) =>
-                      canDeleteTicket
-                        ? theme.palette.mode === "dark"
-                          ? "#ffffff"
-                          : "#4a3f6b"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.45)"
-                          : "#94a3b8",
+                    p: 0.3,
+                    opacity: canDeleteAction ? 1 : 0.38,
+                    cursor: !canDeleteAction ? "not-allowed !important" : "pointer",
+                    pointerEvents: !canDeleteAction ? "none" : "auto",
                   }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      ),
+                  disabled={!canDeleteAction}
+                  onClick={() => {
+                    if (!canDeleteAction) return;
+                    handleDeleteRequest(row);
+                  }}
+                >
+                  <DeleteIcon
+                    sx={{
+                      fontSize: "1.05rem",
+                      color: (theme) =>
+                        canDeleteAction
+                          ? theme.palette.mode === "dark"
+                            ? "#ffffff"
+                            : "#4a3f6b"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.45)"
+                            : "#94a3b8",
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        );
+      },
     },
     {
       label: "Ticket No",
@@ -1716,6 +1820,14 @@ export default function SupportTicketsPage() {
                   {formatViewDateTime(selectedTicket.createdDate)}
                 </Typography>
               </Grid>
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Verified By
+                </Typography>
+                <Typography variant="body2" fontWeight={600}>
+                  {getVerifiedByName(selectedTicket) || "--"}
+                </Typography>
+              </Grid>
               <Grid size={{ xs: 12 }}>
                 <Typography variant="caption" color="text.secondary">
                   Subject
@@ -1853,7 +1965,7 @@ export default function SupportTicketsPage() {
                     lineHeight: 1.6,
                   }}
                 >
-                  {selectedTicket.resolutionNotes ? (
+                  {cleanResolutionNotes(selectedTicket.resolutionNotes) ? (
                     <Box>
                       <Typography
                         variant="body2"
@@ -1867,31 +1979,8 @@ export default function SupportTicketsPage() {
                           lineHeight: 1.6,
                         }}
                       >
-                        {selectedTicket.resolutionNotes}
+                        {cleanResolutionNotes(selectedTicket.resolutionNotes)}
                       </Typography>
-                      {selectedTicket.modifiedOn && (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            display: "block",
-                            mt: 1.2,
-                            pt: 0.8,
-                            borderTop: (t) =>
-                              `1px dashed ${
-                                t.palette.mode === "dark"
-                                  ? "rgba(34, 197, 94, 0.2)"
-                                  : "rgba(22, 163, 74, 0.2)"
-                              }`,
-                            color: (t) =>
-                              t.palette.mode === "dark" ? "#4ade80" : "#15803d",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                          }}
-                        >
-                          Last Updated: {formatViewDateTime(selectedTicket.modifiedOn)}
-                          {selectedTicket.modifiedBy ? ` • By ${selectedTicket.modifiedBy}` : ""}
-                        </Typography>
-                      )}
                     </Box>
                   ) : (
                     <Typography
