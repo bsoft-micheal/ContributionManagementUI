@@ -69,6 +69,9 @@ export default function AppRoutes() {
         <Route path="/reports/event-collection-audit" element={<ProtectedRoute><ReportsPage mode="event" /></ProtectedRoute>} />
         <Route path="/reports/member-velocity" element={<ProtectedRoute><ReportsPage mode="member" /></ProtectedRoute>} />
         <Route path="/reports/payment-history" element={<ProtectedRoute><ReportsPage mode="payment-history" /></ProtectedRoute>} />
+        <Route path="/reports/annual-member-matrix" element={<ProtectedRoute><ReportsPage mode="annual-matrix" /></ProtectedRoute>} />
+        <Route path="/reports/annual-matrix" element={<Navigate to="/reports/annual-member-matrix" replace />} />
+        <Route path="/reports/member-matrix" element={<Navigate to="/reports/annual-member-matrix" replace />} />
         <Route path="/reports/pending-dues" element={<Navigate to="/reports/member-velocity" replace />} />
         <Route path="/reports/event-financials" element={<Navigate to="/reports/event-collection-audit" replace />} />
         <Route path="/reports/payment-modes" element={<Navigate to="/reports/event-collection-audit" replace />} />

@@ -38,6 +38,7 @@ import {
   FileDownload as FileDownloadIcon,
   RestartAlt as RestartAltIcon,
   Assessment as AssessmentIcon,
+  CalendarMonth as CalendarMonthIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { hasActionPermission } from "../../utils/rightsHelper";
@@ -45,6 +46,8 @@ import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 import { getEventsAsync } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getPaymentTransactionsAsync } from "../../services/paymentService";
+import { getUsersAsync } from "../../services/userService";
+import AnnualMemberMatrix from "../../components/reports/AnnualMemberMatrix";
 
 /* ─── Horizontal Bar Chart ─── */
 function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
@@ -377,6 +380,7 @@ export default function ReportsPage({ mode = "event" }) {
   const [eventsList, setEventsList] = useState([]);
   const [eventTypesList, setEventTypesList] = useState([]);
   const [paymentTransactions, setPaymentTransactions] = useState([]);
+  const [usersList, setUsersList] = useState([]);
   const [chartType, setChartType] = useState("pie");
   const [metric, setMetric] = useState("paid");
 
@@ -599,14 +603,17 @@ export default function ReportsPage({ mode = "event" }) {
   useEffect(() => {
     async function fetchLookups() {
       try {
-        const [eventsRes, typesRes, paymentsRes] = await Promise.all([
+        const [eventsRes, typesRes, paymentsRes, usersRes] = await Promise.all([
           getEventsAsync().catch(() => []),
           getEventTypesAsync().catch(() => []),
           getPaymentTransactionsAsync().catch(() => []),
+          getUsersAsync().catch(() => []),
         ]);
         if (Array.isArray(eventsRes)) setEventsList(eventsRes);
         if (Array.isArray(typesRes)) setEventTypesList(typesRes);
         if (Array.isArray(paymentsRes)) setPaymentTransactions(paymentsRes);
+        if (Array.isArray(usersRes?.data)) setUsersList(usersRes.data);
+        else if (Array.isArray(usersRes)) setUsersList(usersRes);
       } catch {
         // silent fallback
       }
@@ -1513,9 +1520,11 @@ export default function ReportsPage({ mode = "event" }) {
 
   const pageTitle = mode === "payment-history"
     ? (isMember ? "My Payment History" : "Event Payment Audit")
-    : (isMember
-      ? "My Contributions"
-      : ({ event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections"));
+    : mode === "annual-matrix"
+      ? (isMember ? "My Annual Contribution Matrix" : "Annual Member Contribution Matrix")
+      : (isMember
+        ? "My Contributions"
+        : ({ event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections"));
 
   const metricOptions = mode === "pending"
     ? [{ label: "By Event", key: "event" }, { label: "By Member", key: "member" }]
@@ -1531,14 +1540,19 @@ export default function ReportsPage({ mode = "event" }) {
     ? [
       { label: "My Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
       { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
+      { label: "Annual Matrix", path: "/reports/annual-member-matrix", modeKey: "annual-matrix", icon: CalendarMonthIcon },
     ]
     : [
       { label: "Event Collections", path: "/reports/event-collection-audit", modeKey: "event", icon: EventIcon },
       { label: "Member Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
       { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
+      { label: "Annual Member Matrix", path: "/reports/annual-member-matrix", modeKey: "annual-matrix", icon: CalendarMonthIcon },
     ];
 
   const hasData = useMemo(() => {
+    if (mode === "annual-matrix") {
+      return (usersList || []).length > 0 || (report?.memberContributionHistory || []).length > 0;
+    }
     if (mode === "payment-history") {
       return (filteredPaymentHistory || []).length > 0;
     }
@@ -1553,7 +1567,7 @@ export default function ReportsPage({ mode = "event" }) {
       return (report?.pendingDues || []).length > 0;
     }
     return (filteredEventCollections || []).length > 0;
-  }, [mode, filteredPaymentHistory, filteredMemberContributions, report?.pendingDues, filteredEventCollections, isMember]);
+  }, [mode, filteredPaymentHistory, filteredMemberContributions, report?.pendingDues, filteredEventCollections, usersList, report?.memberContributionHistory, isMember]);
 
   const handleExport = () => {
     if (!canExport || !hasData) {
@@ -1561,6 +1575,53 @@ export default function ReportsPage({ mode = "event" }) {
       return;
     }
     try {
+      if (mode === "annual-matrix") {
+        const curYear = dayjs().year();
+        const memberHist = report?.memberContributionHistory || [];
+        const monthShortNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        
+        const matrixExportRows = (usersList.length > 0 ? usersList : memberHist).map((u) => {
+          const mName = u.fullName || u.memberName || u.username || "Member";
+          const uId = String(u.userId || u.memberId || "").toLowerCase();
+          const hist = memberHist.find((mh) => (mh.memberId && String(mh.memberId).toLowerCase() === uId) || (mh.memberName && mh.memberName.trim().toLowerCase() === mName.trim().toLowerCase()));
+          const events = hist?.events || [];
+
+          const row = {
+            "Member Name": mName,
+            "Email": u.email || "—",
+            "Work Type": u.workType || "Office",
+          };
+
+          let totalPaid = 0;
+          let totalPending = 0;
+
+          monthShortNames.forEach((mShort, idx) => {
+            const mEvs = events.filter((ev) => {
+              const d = ev.eventDate || ev.paymentDate || ev.createdAt;
+              if (!d || !dayjs(d).isValid()) return false;
+              const dt = dayjs(d);
+              return dt.year() === curYear && dt.month() === idx;
+            });
+            const mPaid = mEvs.reduce((s, e) => s + Number(e.paidAmount ?? ((e.paymentStatus || "").toLowerCase() === "paid" ? (e.expectedAmount ?? e.amount ?? 0) : 0)), 0);
+            const mExp = mEvs.reduce((s, e) => s + Number(e.expectedAmount ?? e.amount ?? 0), 0);
+            row[mShort] = mPaid;
+            totalPaid += mPaid;
+            totalPending += Math.max(0, mExp - mPaid);
+          });
+
+          row["Total Paid"] = totalPaid;
+          row["Total Pending"] = totalPending;
+          row["Status"] = totalPending === 0 && totalPaid > 0 ? "Fully Paid" : (totalPaid > 0 ? "Partially Paid" : (totalPending > 0 ? "Pending" : "No Events"));
+          return row;
+        });
+
+        exportSheets(`annual-member-matrix-${curYear}.xlsx`, [
+          { name: `Matrix ${curYear}`, data: matrixExportRows },
+        ]);
+        toast.success("Annual member matrix exported successfully!");
+        return;
+      }
+
       if (mode === "payment-history") {
         const paymentExport = (filteredPaymentHistory ?? []).map((t) => {
           const evMatch = (eventsList || []).find((e) => (e.name || e.eventName || "").trim().toLowerCase() === (t.eventName || "").trim().toLowerCase());
@@ -1721,6 +1782,9 @@ export default function ReportsPage({ mode = "event" }) {
   };
 
   const periodLabel = useMemo(() => {
+    if (mode === "annual-matrix") {
+      return `Annual Matrix • Jan - Dec ${dayjs().year()}`;
+    }
     let text = "";
     if (filters.fromDate && filters.toDate) {
       text = `${dayjs(filters.fromDate).format("DD/MM/YYYY")} - ${dayjs(filters.toDate).format("DD/MM/YYYY")}`;
@@ -1890,107 +1954,125 @@ export default function ReportsPage({ mode = "event" }) {
             </Box>
 
             {/* Right: Inline Filter Controls */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "flex-end",
-                flexWrap: "wrap",
-                gap: 1.2,
-              }}
-            >
-              <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
-                <AppDateInput
-                  label="From Date"
-                  placeholder="From Date"
-                  value={filterFromDate}
-                  onChange={(val) => setFilterFromDate(val)}
-                  clearable
-                />
-              </Box>
-              <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
-                <AppDateInput
-                  label="To Date"
-                  placeholder="To Date"
-                  value={filterToDate}
-                  onChange={(val) => setFilterToDate(val)}
-                  clearable
-                />
-              </Box>
-              <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
-                <AppSelect
-                  label="Event Type"
-                  value={filterEventType}
-                  onChange={(e) => handleEventTypeChange(e.target.value)}
-                  options={eventTypeOptions}
-                />
-              </Box>
-              <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
-                <AppSelect
-                  label="Event"
-                  value={filterEvent}
-                  onChange={(e) => setFilterEvent(e.target.value)}
-                  options={eventOptions}
-                />
-              </Box>
-              {mode === "member" && (
-                <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
-                  <AppSelect
-                    label="Payment Status"
-                    value={filterPaymentStatus}
-                    onChange={(e) => setFilterPaymentStatus(e.target.value)}
-                    options={paymentStatusOptions}
+            {mode !== "annual-matrix" ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "flex-end",
+                  flexWrap: "wrap",
+                  gap: 1.2,
+                }}
+              >
+                <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+                  <AppDateInput
+                    label="From Date"
+                    placeholder="From Date"
+                    value={filterFromDate}
+                    onChange={(val) => setFilterFromDate(val)}
+                    clearable
                   />
                 </Box>
-              )}
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <AppButton
-                  variant="contained"
-                  size="small"
-                  startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
-                  onClick={() => setFilters({ fromDate: filterFromDate, toDate: filterToDate, eventType: filterEventType, event: filterEvent, paymentStatus: filterPaymentStatus })}
-                  sx={{
-                    height: 34,
-                    minHeight: 34,
-                    fontWeight: 700,
-                    px: 2,
-                    borderRadius: "8px",
-                  }}
-                >
-                  Filter
-                </AppButton>
-                <Tooltip title="Clear filters and reset">
+                <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+                  <AppDateInput
+                    label="To Date"
+                    placeholder="To Date"
+                    value={filterToDate}
+                    onChange={(val) => setFilterToDate(val)}
+                    clearable
+                  />
+                </Box>
+                <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+                  <AppSelect
+                    label="Event Type"
+                    value={filterEventType}
+                    onChange={(e) => handleEventTypeChange(e.target.value)}
+                    options={eventTypeOptions}
+                  />
+                </Box>
+                <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+                  <AppSelect
+                    label="Event"
+                    value={filterEvent}
+                    onChange={(e) => setFilterEvent(e.target.value)}
+                    options={eventOptions}
+                  />
+                </Box>
+                {mode === "member" && (
+                  <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+                    <AppSelect
+                      label="Payment Status"
+                      value={filterPaymentStatus}
+                      onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                      options={paymentStatusOptions}
+                    />
+                  </Box>
+                )}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <AppButton
-                    variant="outlined"
+                    variant="contained"
                     size="small"
-                    startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
-                    onClick={() => {
-                      setFilterFromDate(null);
-                      setFilterToDate(null);
-                      setFilterEventType("ALL");
-                      setFilterEvent("ALL");
-                      setFilterPaymentStatus("ALL");
-                      setFilters({ fromDate: null, toDate: null, eventType: "ALL", event: "ALL", paymentStatus: "ALL" });
-                    }}
+                    startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
+                    onClick={() => setFilters({ fromDate: filterFromDate, toDate: filterToDate, eventType: filterEventType, event: filterEvent, paymentStatus: filterPaymentStatus })}
                     sx={{
                       height: 34,
                       minHeight: 34,
                       fontWeight: 700,
-                      px: 1.8,
+                      px: 2,
                       borderRadius: "8px",
-                      color: "#ef4444",
-                      borderColor: "rgba(239, 68, 68, 0.4)",
-                      "&:hover": {
-                        borderColor: "#ef4444",
-                        color: "#ef4444",
-                        bgcolor: "rgba(239, 68, 68, 0.06)",
-                      },
                     }}
                   >
-                    Clear
+                    Filter
                   </AppButton>
-                </Tooltip>
+                  <Tooltip title="Clear filters and reset">
+                    <AppButton
+                      variant="outlined"
+                      size="small"
+                      startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
+                      onClick={() => {
+                        setFilterFromDate(null);
+                        setFilterToDate(null);
+                        setFilterEventType("ALL");
+                        setFilterEvent("ALL");
+                        setFilterPaymentStatus("ALL");
+                        setFilters({ fromDate: null, toDate: null, eventType: "ALL", event: "ALL", paymentStatus: "ALL" });
+                      }}
+                      sx={{
+                        height: 34,
+                        minHeight: 34,
+                        fontWeight: 700,
+                        px: 1.8,
+                        borderRadius: "8px",
+                        color: "#ef4444",
+                        borderColor: "rgba(239, 68, 68, 0.4)",
+                        "&:hover": {
+                          borderColor: "#ef4444",
+                          color: "#ef4444",
+                          bgcolor: "rgba(239, 68, 68, 0.06)",
+                        },
+                      }}
+                    >
+                      Clear
+                    </AppButton>
+                  </Tooltip>
+                </Box>
               </Box>
-            </Box>
+            ) : (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Chip
+                  icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />}
+                  label="Full Year Calendar (Jan — Dec)"
+                  variant="outlined"
+                  color="primary"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: "0.78rem",
+                    height: 34,
+                    borderRadius: "8px",
+                    px: 0.5,
+                  }}
+                />
+              </Box>
+            )}
           </Box>
         </Box>
 
@@ -2057,6 +2139,18 @@ export default function ReportsPage({ mode = "event" }) {
               )}
               {mode === "pending" && (
                 <AppDataTable title="Pending Dues & Defaulters" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
+              )}
+              {mode === "annual-matrix" && (
+                <AnnualMemberMatrix
+                  report={report}
+                  usersList={usersList}
+                  eventsList={eventsList}
+                  eventTypesList={eventTypesList}
+                  isMember={isMember}
+                  currentUserId={currentUserId}
+                  currentUserName={currentUserName}
+                  onOpenMemberDetails={(m) => openBreakdownModal(m, "all")}
+                />
               )}
             </Box>
           )}
