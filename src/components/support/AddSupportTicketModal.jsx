@@ -365,7 +365,7 @@ export default function AddSupportTicketModal({
     if (!form.memberName) newErrors.memberName = "User Name is required";
     if (!form.eventType) newErrors.eventType = "Event Type is required";
     if (!form.ticketType) newErrors.ticketType = "This field is required";
-    if (!form.attachment) newErrors.attachment = "This field is required";
+    if (!form.description || !form.description.trim()) newErrors.description = "This field is required";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -584,7 +584,7 @@ export default function AddSupportTicketModal({
                   fontWeight={700}
                   sx={{ color: (t) => (t.palette.mode === "dark" ? "#e2e8f0" : "#334155") }}
                 >
-                  Attachment (1 Image, Max 3MB) <span style={{ color: "#ef4444" }}>*</span>
+                  Attachment (1 Image, Max 3MB)
                 </Typography>
                 {form.attachment && (
                   <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem" }}>
@@ -750,6 +750,7 @@ export default function AddSupportTicketModal({
               error={!!errors.description}
               helperText={errors.description}
               minRows={3}
+              required
             />
           </Grid>
         </Grid>

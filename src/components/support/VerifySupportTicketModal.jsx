@@ -93,7 +93,9 @@ export default function VerifySupportTicketModal({
         relatedEvent: initialData.relatedEvent || initialData.eventName || "",
         eventName: initialData.eventName || initialData.relatedEvent || "",
         attachment: initialData.attachment || null,
-        description: initialData.description || "",
+        description: initialData.description || initialData.Description || "",
+        resolutionNotes: initialData.resolutionNotes || initialData.replyMessage || initialData.resolution || "",
+        modifiedOn: initialData.modifiedOn || null,
       });
       setUpdateStatus(initStatus);
       setReplyText("");
@@ -187,7 +189,9 @@ export default function VerifySupportTicketModal({
           relatedEvent: resolvedMatch?.relatedEvent || resolvedMatch?.eventName || rawEventName || "",
           eventName: resolvedMatch?.eventName || resolvedMatch?.relatedEvent || rawEventName || "",
           attachment: resolvedMatch?.attachment || initialData?.attachment || null,
-          description: resolvedMatch?.description || initialData?.description || "",
+          description: resolvedMatch?.description || resolvedMatch?.Description || initialData?.description || initialData?.Description || "",
+          resolutionNotes: resolvedMatch?.resolutionNotes || initialData?.resolutionNotes || initialData?.replyMessage || initialData?.resolution || "",
+          modifiedOn: resolvedMatch?.modifiedOn || initialData?.modifiedOn || null,
         };
 
         setTicketInfo(finalTicket);
@@ -207,6 +211,9 @@ export default function VerifySupportTicketModal({
             relatedEvent: initialData?.relatedEvent || initialData?.eventName || "",
             eventName: initialData?.eventName || initialData?.relatedEvent || "",
             attachment: initialData?.attachment || null,
+            description: initialData?.description || initialData?.Description || "",
+            resolutionNotes: initialData?.resolutionNotes || initialData?.replyMessage || initialData?.resolution || "",
+            modifiedOn: initialData?.modifiedOn || null,
           });
           setUpdateStatus(fallbackStatus);
         }
@@ -235,9 +242,21 @@ export default function VerifySupportTicketModal({
   }, [statuses, dbStatuses, ticketInfo?.status]);
 
   const handleSave = async () => {
+    const newErrors = {};
     if (!updateStatus) {
-      setErrors({ updateStatus: "Update Status is required" });
-      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS || "Update Status is required");
+      newErrors.updateStatus = "Update Status is required";
+    }
+    if (!replyText || !replyText.trim()) {
+      newErrors.replyText = "Resolution note is required";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      if (newErrors.updateStatus && newErrors.replyText) {
+        toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS || "Please fill in all required fields");
+      } else {
+        toast.error(newErrors.replyText || newErrors.updateStatus);
+      }
       return;
     }
 
@@ -255,8 +274,7 @@ export default function VerifySupportTicketModal({
             status: updateStatus,
             modifiedOn: ticketInfo?.modifiedOn || initialData?.modifiedOn || null,
           });
-        }
-        if (!hasNote || statusChanged) {
+        } else if (statusChanged) {
           await updateSupportTicketAsync(ticketId, {
             memberName: ticketInfo.memberName,
             memberId: ticketInfo.memberId || "",
@@ -441,6 +459,36 @@ export default function VerifySupportTicketModal({
               </Grid>
             </Box>
 
+            {/* Member Issue Description */}
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 0.8, fontWeight: 700 }}
+              >
+                Description
+              </Typography>
+              <Box
+                sx={{
+                  p: 1.5,
+                  px: 1.6,
+                  borderRadius: "10px",
+                  bgcolor: (t) =>
+                    t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                  border: (t) => `1px solid ${t.palette.divider}`,
+                  fontSize: "0.825rem",
+                  color: (t) => (t.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                  lineHeight: 1.55,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  maxHeight: 140,
+                  overflowY: "auto",
+                }}
+              >
+                {ticketInfo.description || "--"}
+              </Box>
+            </Box>
+
             {/* Attachment Preview Box */}
             {resolvedAttachment && (
               <Box>
@@ -531,6 +579,28 @@ export default function VerifySupportTicketModal({
 
             {/* Update Controls */}
             <Grid container spacing={2}>
+              {ticketInfo?.resolutionNotes && (
+                <Grid size={{ xs: 12 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: "block", mb: 0.5 }}>
+                    Previous Resolution Notes / Replies
+                  </Typography>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: "8px",
+                      bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc"),
+                      border: (t) => `1px solid ${t.palette.divider}`,
+                      whiteSpace: "pre-wrap",
+                      fontSize: "0.85rem",
+                      lineHeight: 1.6,
+                      maxHeight: "140px",
+                      overflowY: "auto",
+                    }}
+                  >
+                    {ticketInfo.resolutionNotes}
+                  </Box>
+                </Grid>
+              )}
               <Grid size={{ xs: 12, sm: 6 }}>
                 <AppSelect
                   label="Update Status"
@@ -558,6 +628,7 @@ export default function VerifySupportTicketModal({
                   error={!!errors.replyText}
                   helperText={errors.replyText || ""}
                   minRows={3}
+                  required
                 />
               </Grid>
             </Grid>

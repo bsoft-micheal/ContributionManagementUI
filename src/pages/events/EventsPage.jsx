@@ -257,16 +257,24 @@ export default function EventsPage() {
           ? name
           : userMap[rawCreatedBy] || (e.createdBy && !isGuid(e.createdBy) ? e.createdBy : "--");
 
-        const matchedExpenses = (expensesData || []).filter((exp) =>
-          String(exp.eventName || "").trim().toLowerCase() === String(e.eventName || "").trim().toLowerCase()
-        );
+        const targetEventId = String(e.eventId || e.id || "").toLowerCase();
+        const targetEventName = String(e.eventName || e.name || "").trim().toLowerCase();
+
+        const matchedExpenses = (expensesData || []).filter((exp) => {
+          if ((exp.status || "").toLowerCase() === "rejected") return false;
+          const expEventId = String(exp.eventId || "").toLowerCase();
+          const expEventName = String(exp.eventName || "").trim().toLowerCase();
+          if (expEventId && targetEventId && expEventId === targetEventId) return true;
+          return expEventName && targetEventName && expEventName === targetEventName;
+        });
         const eventExpenseTotal = matchedExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
-        const expAmount = Number(e.expenseAmount) > 0 ? Number(e.expenseAmount) : eventExpenseTotal;
-        const expectedAmt = Number(e.totalExpectedAmount) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
+        const expAmount = Math.max(Number(e.expenseAmount || 0), eventExpenseTotal);
+        const expectedAmt = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
         const paidAmt = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
         const pendingAmt = Number(e.pendingAmount !== undefined ? e.pendingAmount : (expectedAmt - paidAmt));
         const remainingAmt = paidAmt - expAmount;
+        const extraAmountSpent = Math.max(0, expAmount - expectedAmt);
 
         const hasPaidContrib = Boolean(
           e.hasPaidContributions ||
@@ -284,6 +292,7 @@ export default function EventsPage() {
           pendingAmount: pendingAmt,
           totalPaidAmount: paidAmt,
           collectedAmount: paidAmt,
+          extraAmountSpent: extraAmountSpent,
           createdByName: resolvedDisplay,
           createdBy: resolvedDisplay,
         };
@@ -719,13 +728,54 @@ export default function EventsPage() {
     },
 
     {
-      label: "Expected Collection",
+      label: "Expected Amount",
       key: "totalExpectedAmount",
       align: "right",
+      exportValue: (row) => Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0)),
       render: (row) => {
         const val = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
         return `₹${Math.round(val).toLocaleString("en-IN")}`;
       }
+    },
+    {
+      label: "Collection Amount",
+      key: "collectedAmount",
+      align: "right",
+      exportValue: (row) => Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0),
+      render: (row) => {
+        const val = Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0);
+        return `₹${Math.round(val).toLocaleString("en-IN")}`;
+      }
+    },
+    {
+      label: "Extra Amount Spent",
+      key: "extraAmountSpent",
+      align: "right",
+      exportValue: (row) => {
+        const exp = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
+        const spent = Number(row.expenseAmount || 0);
+        const extra = row.extraAmountSpent !== undefined ? Number(row.extraAmountSpent) : Math.max(0, spent - exp);
+        return extra;
+      },
+      render: (row) => {
+        const exp = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
+        const spent = Number(row.expenseAmount || 0);
+        const extra = row.extraAmountSpent !== undefined ? Number(row.extraAmountSpent) : Math.max(0, spent - exp);
+        const isOver = extra > 0;
+        return (
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: isOver ? 700 : 500,
+              color: isOver ? "#ef4444" : "text.secondary",
+              display: "inline-block",
+              fontSize: "0.85rem",
+            }}
+          >
+            {extra > 0 ? `₹${Math.round(extra).toLocaleString("en-IN")}` : "₹0"}
+          </Typography>
+        );
+      },
     },
     {
       label: "Support Tickets Raised",
@@ -937,12 +987,12 @@ export default function EventsPage() {
               }}
             >
               <MetricCard
-                label="Total Expected"
+                label="Expected Amount"
                 value={`₹${summaryTotals.totalExpected.toLocaleString("en-IN")}`}
                 accent="#6366f1"
               />
               <MetricCard
-                label="Total Collections"
+                label="Collection Amount"
                 value={`₹${summaryTotals.totalCollected.toLocaleString("en-IN")}`}
                 accent="#10b981"
               />
@@ -957,7 +1007,7 @@ export default function EventsPage() {
                 accent="#f59e0b"
               />
               <MetricCard
-                label="Balance Amount"
+                label="Amount In Hand"
                 value={`₹${summaryTotals.totalBalance.toLocaleString("en-IN")}`}
                 accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}
               />

@@ -42,7 +42,7 @@ export default function MetricCard({
     if (l.includes("collect") || l.includes("paid")) return <SavingsRoundedIcon sx={{ fontSize: 16 }} />;
     if (l.includes("pending") || l.includes("unpaid") || l.includes("due")) return <CreditCardRoundedIcon sx={{ fontSize: 16 }} />;
     if (l.includes("expense")) return <AccountBalanceWalletRoundedIcon sx={{ fontSize: 16 }} />;
-    if (l.includes("balance") || l.includes("remaining")) return <BalanceRoundedIcon sx={{ fontSize: 16 }} />;
+    if (l.includes("balance") || l.includes("remaining") || l.includes("hand")) return <BalanceRoundedIcon sx={{ fontSize: 16 }} />;
     if (l.includes("event")) return <CalendarMonthRoundedIcon sx={{ fontSize: 16 }} />;
     if (l.includes("member") || l.includes("defaulter")) return <GroupsRoundedIcon sx={{ fontSize: 16 }} />;
     return <TrendingUpRoundedIcon sx={{ fontSize: 16 }} />;

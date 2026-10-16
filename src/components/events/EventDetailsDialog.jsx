@@ -172,8 +172,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
   const getTableCelebrants = () => {
     if (!isBirthday || !event) return [];
 
-    const parsedList = parseCelebrantsFromDescription(event?.description);
-    const eventMonth = event?.eventDate ? dayjs(event.eventDate).month() : 0;
+    const eventMonth = event?.eventDate ? dayjs(event.eventDate).month() : -1;
     const map = new Map();
 
     const getDedupeKey = (id, name, dob) => {
@@ -189,6 +188,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     };
 
     // 1. Process parsed items from description (maintains exact list from description)
+    const parsedList = parseCelebrantsFromDescription(event?.description);
     parsedList.forEach((item) => {
       const cleanItemName = item.name.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
       let match = allMembers.find((m) => {
@@ -220,49 +220,50 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
           dobDayMonth: resolvedDob
             ? dayjs(resolvedDob).format("D MMMM")
             : item.dobText,
-          memberType: match?.workType || match?.memberType,
+          workType: match?.workType || match?.memberType || "Office",
         });
       }
     });
 
-    // 2. Supplement from event.participants or allMembers matching event month
-    const participantIds = (event.participants || []).map((p) => p.memberId || p.id);
-    let matchedMembers = [];
-    if (participantIds.length > 0) {
-      const pMembers = allMembers.filter((m) => participantIds.includes(m.memberId) && m.dateOfBirth);
-      const monthMatches = pMembers.filter((m) => dayjs(m.dateOfBirth).month() === eventMonth);
-      matchedMembers = monthMatches.length > 0 ? monthMatches : pMembers;
-    }
+    // 2. Identify actual birthday celebrants from active members matching the event month
+    if (eventMonth >= 0) {
+      // First check participants who have a birthday in the event month
+      const participantIds = (event.participants || []).map((p) => p.memberId || p.id);
+      const participantMonthMatches = allMembers.filter(
+        (m) => participantIds.includes(m.memberId) && m.dateOfBirth && dayjs(m.dateOfBirth).month() === eventMonth
+      );
 
-    if (matchedMembers.length === 0 && map.size === 0) {
-      matchedMembers = allMembers.filter(
+      // Check all active members who have a birthday in the event month
+      const allMonthMatches = allMembers.filter(
         (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === eventMonth
       );
-    }
 
-    matchedMembers.forEach((m) => {
-      const dedupeKey = getDedupeKey(m.memberId, m.name, m.dateOfBirth);
-      if (!map.has(dedupeKey)) {
-        map.set(dedupeKey, {
-          id: m.memberId,
-          name: m.name,
-          dateOfBirth: m.dateOfBirth,
-          dobFormatted: m.dateOfBirth ? dayjs(m.dateOfBirth).format("DD/MM/YYYY") : "--",
-          dobDayMonth: m.dateOfBirth ? dayjs(m.dateOfBirth).format("D MMMM") : "--",
-          memberType: m.workType || m.memberType || "Office",
-        });
-      } else {
-        // If already present, enrich missing birth date or ID if parsed item didn't have it
-        const existing = map.get(dedupeKey);
-        if (!existing.dateOfBirth && m.dateOfBirth) {
-          existing.id = m.memberId;
-          existing.dateOfBirth = m.dateOfBirth;
-          existing.dobFormatted = dayjs(m.dateOfBirth).format("DD/MM/YYYY");
-          existing.dobDayMonth = dayjs(m.dateOfBirth).format("D MMMM");
-          existing.memberType = m.workType || m.memberType || existing.memberType || "Office";
+      const celebrantCandidates = participantMonthMatches.length > 0 ? participantMonthMatches : allMonthMatches;
+
+      celebrantCandidates.forEach((m) => {
+        const dedupeKey = getDedupeKey(m.memberId, m.name, m.dateOfBirth);
+        if (!map.has(dedupeKey)) {
+          map.set(dedupeKey, {
+            id: m.memberId,
+            name: m.name,
+            dateOfBirth: m.dateOfBirth,
+            dobFormatted: dayjs(m.dateOfBirth).format("DD/MM/YYYY"),
+            dobDayMonth: dayjs(m.dateOfBirth).format("D MMMM"),
+            workType: m.workType || m.memberType || "Office",
+          });
+        } else {
+          // If already present, enrich missing birth date or ID if parsed item didn't have it
+          const existing = map.get(dedupeKey);
+          if (!existing.dateOfBirth && m.dateOfBirth) {
+            existing.id = m.memberId;
+            existing.dateOfBirth = m.dateOfBirth;
+            existing.dobFormatted = dayjs(m.dateOfBirth).format("DD/MM/YYYY");
+            existing.dobDayMonth = dayjs(m.dateOfBirth).format("D MMMM");
+            existing.workType = m.workType || m.memberType || existing.workType || "Office";
+          }
         }
-      }
-    });
+      });
+    }
 
     return Array.from(map.values()).sort((a, b) => {
       const dayA = a.dateOfBirth ? dayjs(a.dateOfBirth).date() : 0;

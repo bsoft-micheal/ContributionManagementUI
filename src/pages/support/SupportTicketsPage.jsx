@@ -28,6 +28,7 @@ import {
   QuestionAnswer as ReplyActionIcon,
   RestartAlt as RestartAltIcon,
   Save as SaveIcon,
+  MarkChatRead as MarkChatReadIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -50,6 +51,7 @@ import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 import VerifySupportTicketModal from "../../components/support/VerifySupportTicketModal";
 import {
   getSupportTicketsAsync,
+  getSupportTicketByIdAsync,
   createSupportTicketAsync,
   updateSupportTicketAsync,
   replySupportTicketAsync,
@@ -304,6 +306,9 @@ export default function SupportTicketsPage() {
           refNo: item.refNo || "-",
           utr: item.utr || "-",
           attachment: item.attachment || null,
+          resolutionNotes: item.resolutionNotes || item.replyMessage || item.resolution || "",
+          modifiedOn: item.modifiedOn || null,
+          modifiedBy: item.modifiedBy || null,
         }));
         setTickets(mapped);
       } else {
@@ -657,9 +662,7 @@ export default function SupportTicketsPage() {
     if (!form.memberName) newErrors.memberName = "User Name is required";
     if (!form.eventType) newErrors.eventType = "Event Type is required";
     if (!form.ticketType) newErrors.ticketType = "Ticket Type is required";
-    if (!form.attachment && (!editingTicket || !editingTicket.attachment)) {
-      newErrors.attachment = "This field is required";
-    }
+    if (!form.description || !form.description.trim()) newErrors.description = "Description is required";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -821,9 +824,32 @@ export default function SupportTicketsPage() {
                 size="small"
                 sx={{ p: 0.3 }}
                 disabled={!canViewTicket}
-                onClick={() => {
+                onClick={async () => {
                   setSelectedTicket(row);
                   setViewDialogOpen(true);
+                  try {
+                    const ticketId = row.ticketId || row.id;
+                    if (ticketId) {
+                      const res = await getSupportTicketByIdAsync(ticketId);
+                      const fresh = res?.data || res;
+                      if (fresh && (fresh.ticketId || fresh.id)) {
+                        setSelectedTicket((prev) => ({
+                          ...prev,
+                          ...fresh,
+                          resolutionNotes:
+                            fresh.resolutionNotes ||
+                            fresh.replyMessage ||
+                            fresh.resolution ||
+                            prev?.resolutionNotes ||
+                            "",
+                          modifiedOn: fresh.modifiedOn || prev?.modifiedOn || null,
+                          modifiedBy: fresh.modifiedBy || prev?.modifiedBy || null,
+                        }));
+                      }
+                    }
+                  } catch {
+                    // row already in state
+                  }
                 }}
               >
                 <ViewIcon
@@ -1399,7 +1425,7 @@ export default function SupportTicketsPage() {
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="caption" fontWeight={700} sx={{ color: (t) => t.palette.mode === "dark" ? "#e2e8f0" : "#334155" }}>
-                  Attachment (1 Image, Max 3MB) <span style={{ color: "#ef4444" }}>*</span>
+                  Attachment (1 Image, Max 3MB)
                 </Typography>
                 {form.attachment && (
                   <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem" }}>
@@ -1534,6 +1560,7 @@ export default function SupportTicketsPage() {
               error={!!errors.description}
               helperText={errors.description}
               minRows={3}
+              required
             />
           </Grid>
         </Grid>
@@ -1781,6 +1808,101 @@ export default function SupportTicketsPage() {
                   </Box>
                 </Grid>
               )}
+
+              {/* Resolution Notes / Reply Message */}
+              <Grid size={{ xs: 12 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.8,
+                    fontWeight: 700,
+                    mb: 0.8,
+                  }}
+                >
+                  <MarkChatReadIcon
+                    sx={{
+                      fontSize: 18,
+                      color: selectedTicket.resolutionNotes ? "#16a34a" : "text.secondary",
+                    }}
+                  />
+                  Resolution Notes / Reply Message
+                </Typography>
+                <Box
+                  sx={{
+                    bgcolor: (t) =>
+                      selectedTicket.resolutionNotes
+                        ? t.palette.mode === "dark"
+                          ? "rgba(34, 197, 94, 0.08)"
+                          : "#f0fdf4"
+                        : t.palette.mode === "dark"
+                          ? "rgba(255, 255, 255, 0.03)"
+                          : "#f8fafc",
+                    p: 2,
+                    borderRadius: "10px",
+                    border: (t) =>
+                      `1px solid ${
+                        selectedTicket.resolutionNotes
+                          ? t.palette.mode === "dark"
+                            ? "rgba(34, 197, 94, 0.28)"
+                            : "#bbf7d0"
+                          : t.palette.divider
+                      }`,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {selectedTicket.resolutionNotes ? (
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          color: (t) =>
+                            t.palette.mode === "dark" ? "#86efac" : "#166534",
+                          fontWeight: 500,
+                          fontSize: "0.875rem",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {selectedTicket.resolutionNotes}
+                      </Typography>
+                      {selectedTicket.modifiedOn && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            display: "block",
+                            mt: 1.2,
+                            pt: 0.8,
+                            borderTop: (t) =>
+                              `1px dashed ${
+                                t.palette.mode === "dark"
+                                  ? "rgba(34, 197, 94, 0.2)"
+                                  : "rgba(22, 163, 74, 0.2)"
+                              }`,
+                            color: (t) =>
+                              t.palette.mode === "dark" ? "#4ade80" : "#15803d",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Last Updated: {formatViewDateTime(selectedTicket.modifiedOn)}
+                          {selectedTicket.modifiedBy ? ` • By ${selectedTicket.modifiedBy}` : ""}
+                        </Typography>
+                      )}
+                    </Box>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary", fontStyle: "italic", fontSize: "0.85rem" }}
+                    >
+                      No resolution notes or reply message provided yet.
+                    </Typography>
+                  )}
+                </Box>
+              </Grid>
             </Grid>
           </Box>
         )}

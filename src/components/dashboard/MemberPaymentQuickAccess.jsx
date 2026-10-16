@@ -57,6 +57,7 @@ export default function MemberPaymentQuickAccess({
   const isDark = theme.palette.mode === "dark";
   const toast = useAppToast();
   const { authState } = useAuth();
+  const isMemberRole = isMember || String(authState?.role || "").toLowerCase() === "member";
 
   const [loading, setLoading] = useState(true);
   const [contributions, setContributions] = useState([]);
@@ -64,7 +65,8 @@ export default function MemberPaymentQuickAccess({
   const [fallbackEvents, setFallbackEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState(propEventTypes || []);
   const [membersMap, setMembersMap] = useState(new Map());
-  const [statusFilter, setStatusFilter] = useState(initialStatus); // "all" | "pending" | "paid" | "expense"
+  const effectiveInitialStatus = isMemberRole && initialStatus === "all" ? "pending" : initialStatus;
+  const [statusFilter, setStatusFilter] = useState(effectiveInitialStatus); // "all" | "pending" | "paid" | "expense"
   const [search, setSearch] = useState("");
   const [selectedEventType, setSelectedEventType] = useState(appliedFilters?.eventType || "ALL");
   const [selectedEventId, setSelectedEventId] = useState(appliedFilters?.eventId || "ALL");
@@ -110,10 +112,11 @@ export default function MemberPaymentQuickAccess({
   // Sync statusFilter if initialStatus changes
   useEffect(() => {
     if (initialStatus) {
-      setStatusFilter(initialStatus);
+      const eff = isMemberRole && initialStatus === "all" ? "pending" : initialStatus;
+      setStatusFilter(eff);
       setPage(0);
     }
-  }, [initialStatus]);
+  }, [initialStatus, isMemberRole]);
 
   // Load records based on selected month & year
   useEffect(() => {
@@ -612,71 +615,73 @@ export default function MemberPaymentQuickAccess({
 
         {/* Status Filter Pills Banner */}
         <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
-          {/* Total Expected Amount */}
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <Paper
-              onClick={() => { setStatusFilter("all"); setPage(0); }}
-              elevation={0}
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                cursor: "pointer",
-                border: "1.5px solid",
-                borderColor: statusFilter === "all" ? "primary.main" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
-                bgcolor: statusFilter === "all"
-                  ? isDark ? alpha(theme.palette.primary.main, 0.15) : alpha(theme.palette.primary.main, 0.08)
-                  : isDark ? "rgba(255,255,255,0.02)" : "#f8fafc",
-                transition: "all 0.2s ease",
-                "&:hover": { borderColor: "primary.main" },
-              }}
-            >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                fontWeight={600}
-                textTransform="none"
+          {/* Total Expected Amount - Hidden for Member role, preserved for Admin / Organizer */}
+          {!isMemberRole && (
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <Paper
+                onClick={() => { setStatusFilter("all"); setPage(0); }}
+                elevation={0}
                 sx={{
-                  fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  fontSize: "0.75rem",
-                  letterSpacing: "0.01em",
+                  p: 1.5,
+                  borderRadius: 2,
+                  cursor: "pointer",
+                  border: "1.5px solid",
+                  borderColor: statusFilter === "all" ? "primary.main" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+                  bgcolor: statusFilter === "all"
+                    ? isDark ? alpha(theme.palette.primary.main, 0.15) : alpha(theme.palette.primary.main, 0.08)
+                    : isDark ? "rgba(255,255,255,0.02)" : "#f8fafc",
+                  transition: "all 0.2s ease",
+                  "&:hover": { borderColor: "primary.main" },
                 }}
               >
-                Total Expected Amount
-              </Typography>
-              <Box sx={{ mt: 0.5 }}>
-                <Typography
-                  component="div"
-                  fontWeight={700}
-                  sx={{
-                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    fontSize: { xs: "1.05rem", sm: "1.15rem", md: "1.2rem" },
-                    letterSpacing: "-0.015em",
-                    color: isDark ? "#ffffff" : "#0f172a",
-                    lineHeight: 1.25,
-                  }}
-                >
-                  ₹{formatAmount(stats.totalAmount)}
-                </Typography>
                 <Typography
                   variant="caption"
-                  fontWeight={400}
                   color="text.secondary"
+                  fontWeight={600}
+                  textTransform="none"
                   sx={{
                     fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    display: "block",
-                    mt: 0.25,
-                    fontSize: "0.7rem",
-                    lineHeight: 1.4,
+                    fontSize: "0.75rem",
+                    letterSpacing: "0.01em",
                   }}
                 >
-                  {stats.totalCount} Members
+                  Expected Amount
                 </Typography>
-              </Box>
-            </Paper>
-          </Grid>
+                <Box sx={{ mt: 0.5 }}>
+                  <Typography
+                    component="div"
+                    fontWeight={700}
+                    sx={{
+                      fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      fontSize: { xs: "1.05rem", sm: "1.15rem", md: "1.2rem" },
+                      letterSpacing: "-0.015em",
+                      color: isDark ? "#ffffff" : "#0f172a",
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    ₹{formatAmount(stats.totalAmount)}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    fontWeight={400}
+                    color="text.secondary"
+                    sx={{
+                      fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      display: "block",
+                      mt: 0.25,
+                      fontSize: "0.7rem",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {stats.totalCount} Members
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
+          )}
 
           {/* Pending / Unpaid */}
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid size={{ xs: 12, sm: isMemberRole ? 6 : 4 }}>
             <Paper
               onClick={() => { setStatusFilter("pending"); setPage(0); }}
               elevation={0}
@@ -742,7 +747,7 @@ export default function MemberPaymentQuickAccess({
           </Grid>
 
           {/* Paid */}
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid size={{ xs: 12, sm: isMemberRole ? 6 : 4 }}>
             <Paper
               onClick={() => { setStatusFilter("paid"); setPage(0); }}
               elevation={0}
