@@ -1011,15 +1011,15 @@ export default function DashboardPage() {
         title = appliedFilters.eventType;
       }
     } else {
-      title = "Total Expected";
+      title = isMember ? "Paid Amount" : "Expected Amount";
     }
     return {
       title,
-      amount: totalExpected,
+      amount: isMember ? totalCollected : totalExpected,
       expenses: totalExpenses,
-      remaining: totalRemaining,
+      remaining: isMember ? undefined : totalRemaining,
     };
-  }, [donutView, isFilteredByType, isFilteredByEvent, appliedFilters.eventType, appliedFilters.eventId, allEvents, totalExpected, totalExpenses, totalRemaining]);
+  }, [donutView, isFilteredByType, isFilteredByEvent, appliedFilters.eventType, appliedFilters.eventId, allEvents, totalExpected, totalCollected, totalExpenses, totalRemaining, isMember]);
 
   // Multi-ring chart ring definitions
   const amountRing = {
@@ -1055,43 +1055,58 @@ export default function DashboardPage() {
       render: (row) => row.eventName || "--",
     },
     { label: "Event Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
-    {
-      label: "Expected Amount", key: "expectedAmount", align: "right",
-      render: (row) => `₹${Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))).toLocaleString()}`,
-    },
-    {
-      label: isMember ? "Paid Amount" : "Collected Amount", key: "collectedAmount", align: "right",
-      render: (row) => `₹${Number(row.collectedAmount || 0).toLocaleString()}`,
-    },
-    {
-      label: "Pending Amount", key: "pendingAmount", align: "right",
-      render: (row) => `₹${Number(row.pendingAmount || 0).toLocaleString()}`,
-    },
-    {
-      label: "Expense Amount", key: "expenseAmount", align: "right",
-      render: (row) => `₹${Number(row.expenseAmount || 0).toLocaleString()}`,
-    },
-    {
-      label: "Balance Amount", key: "remainingAmount", align: "right",
-      render: (row) => {
-        const expected = Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0)));
-        const expense = Number(row.expenseAmount || 0);
-        const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (expected - expense);
-        return `₹${rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`;
+    ...(isMember ? [
+      {
+        label: "Paid Amount", key: "collectedAmount", align: "right",
+        render: (row) => `₹${Number(row.collectedAmount || 0).toLocaleString()}`,
       },
-    },
-    {
-      label: "Paid / Total", key: "totalContributionsCount", align: "center",
-      render: (row) => {
-        const paid = (row.totalContributionsCount ?? 0) - (row.pendingContributionsCount ?? 0);
-        const total = row.totalContributionsCount ?? 0;
-        return (
-          <Chip label={`${paid} / ${total}`} size="small"
-            color={row.pendingContributionsCount === 0 ? "success" : "warning"}
-            variant="outlined" sx={{ fontWeight: 700, minWidth: 64 }} />
-        );
+      {
+        label: "Unpaid Amount", key: "pendingAmount", align: "right",
+        render: (row) => `₹${Number(row.pendingAmount || 0).toLocaleString()}`,
       },
-    },
+      {
+        label: "Expense Amount", key: "expenseAmount", align: "right",
+        render: (row) => `₹${Number(row.expenseAmount || 0).toLocaleString()}`,
+      },
+    ] : [
+      {
+        label: "Expected Amount", key: "expectedAmount", align: "right",
+        render: (row) => `₹${Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))).toLocaleString()}`,
+      },
+      {
+        label: "Collection Amount", key: "collectedAmount", align: "right",
+        render: (row) => `₹${Number(row.collectedAmount || 0).toLocaleString()}`,
+      },
+      {
+        label: "Pending Amount", key: "pendingAmount", align: "right",
+        render: (row) => `₹${Number(row.pendingAmount || 0).toLocaleString()}`,
+      },
+      {
+        label: "Expense Amount", key: "expenseAmount", align: "right",
+        render: (row) => `₹${Number(row.expenseAmount || 0).toLocaleString()}`,
+      },
+      {
+        label: "Amount in Hand", key: "remainingAmount", align: "right",
+        render: (row) => {
+          const expected = Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0)));
+          const expense = Number(row.expenseAmount || 0);
+          const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (expected - expense);
+          return `₹${rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`;
+        },
+      },
+      {
+        label: "Paid / Total", key: "totalContributionsCount", align: "center",
+        render: (row) => {
+          const paid = (row.totalContributionsCount ?? 0) - (row.pendingContributionsCount ?? 0);
+          const total = row.totalContributionsCount ?? 0;
+          return (
+            <Chip label={`${paid} / ${total}`} size="small"
+              color={row.pendingContributionsCount === 0 ? "success" : "warning"}
+              variant="outlined" sx={{ fontWeight: 700, minWidth: 64 }} />
+          );
+        },
+      },
+    ]),
     {
       label: "Created By",
       key: "createdBy",
@@ -1206,60 +1221,105 @@ export default function DashboardPage() {
       {/* ── Content ─────────────────────────────────────────────────────── */}
       <Stack spacing={3}>
 
-        {/* ① Top Summary Metric Cards (6 Cards Grid: Expected, Collections, Pending, Expenses, Remaining, Events) */}
+        {/* ① Top Summary Metric Cards */}
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: {
               xs: "1fr",
               sm: "repeat(2, minmax(0, 1fr))",
-              md: "repeat(3, minmax(0, 1fr))",
-              lg: "repeat(6, minmax(0, 1fr))",
+              md: isMember ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+              lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
             },
             gap: { xs: 1, sm: 1.25 },
           }}
         >
-          <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Total Expected"}
-            value={`₹${totalExpected.toLocaleString()}`}
-            accent="#6366f1"
-            onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
-            actionText="All Members →"
-          />
-          <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Total Collections"}
-            value={`₹${totalCollected.toLocaleString()}`}
-            accent="#10b981"
-            onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-            actionText={isMember ? "My Payments →" : "View Paid →"}
-          />
-          <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Total Pending"}
-            value={`₹${totalPending.toLocaleString()}`}
-            accent="#f43f5e"
-            onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-            actionText="View Unpaid →"
-          />
-          <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
-            value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
-            accent="#f59e0b"
-            onClick={() => navigate("/expense")}
-            actionText="Expenses →"
-          />
-          <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Balance Amount"}
-            value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
-            accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
-            actionText="Net Balance →"
-          />
-          <MetricCard
-            label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
-            value={events.length}
-            accent="#8b5cf6"
-            onClick={() => navigate("/events")}
-            actionText="View Events →"
-          />
+          {isMember ? (
+            <>
+              {/* Member Card 1: Paid Amount */}
+              <MetricCard
+                label="Paid Amount"
+                value={`₹${totalCollected.toLocaleString()}`}
+                accent="#10b981"
+                onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+                actionText="My Payments →"
+              />
+              {/* Member Card 2: Unpaid Amount */}
+              <MetricCard
+                label="Unpaid Amount"
+                value={`₹${totalPending.toLocaleString()}`}
+                accent="#f43f5e"
+                onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
+                actionText="View Unpaid →"
+              />
+              {/* Member Card 3: Total Expenses */}
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
+                value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
+                accent="#f59e0b"
+                onClick={() => navigate("/expense")}
+                actionText="Expenses →"
+              />
+              {/* Member Card 4: Total Events */}
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
+                value={events.length}
+                accent="#8b5cf6"
+                onClick={() => navigate("/events")}
+                actionText="View Events →"
+              />
+            </>
+          ) : (
+            <>
+              {/* Other Roles: Card 1: Expected Amount */}
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Expected Amount"}
+                value={`₹${totalExpected.toLocaleString()}`}
+                accent="#6366f1"
+                onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
+                actionText="All Members →"
+              />
+              {/* Other Roles: Card 2: Collection Amount */}
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Collection Amount"}
+                value={`₹${totalCollected.toLocaleString()}`}
+                accent="#10b981"
+                onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+                actionText="View Paid →"
+              />
+              {/* Other Roles: Card 3: Pending Amount */}
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Pending Amount"}
+                value={`₹${totalPending.toLocaleString()}`}
+                accent="#f43f5e"
+                onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
+                actionText="View Unpaid →"
+              />
+              {/* Other Roles: Card 4: Total Expenses */}
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
+                value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
+                accent="#f59e0b"
+                onClick={() => navigate("/expense")}
+                actionText="Expenses →"
+              />
+              {/* Other Roles: Card 5: Amount in Hand */}
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Amount in Hand"}
+                value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
+                accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
+                actionText="Net Balance →"
+              />
+              {/* Other Roles: Card 6: Total Events */}
+              <MetricCard
+                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
+                value={events.length}
+                accent="#8b5cf6"
+                onClick={() => navigate("/events")}
+                actionText="View Events →"
+              />
+            </>
+          )}
         </Box>
 
         {/* ② Financial Overview Column / Bar Chart */}

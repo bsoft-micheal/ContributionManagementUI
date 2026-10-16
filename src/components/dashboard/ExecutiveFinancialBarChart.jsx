@@ -212,7 +212,7 @@ export default function ExecutiveFinancialBarChart({
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                       <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.74rem", color: "#6366f1" }}>
-                        Total Expected
+                        Expected Amount
                       </Typography>
                       <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#6366f1" }}>
                         ₹{formatAmount(exp)}
@@ -227,7 +227,7 @@ export default function ExecutiveFinancialBarChart({
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                       <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#10b981" }}>
-                        {isMember ? "My Collections" : "Total Collections"}
+                        {isMember ? "My Collections" : "Collection Amount"}
                       </Typography>
                       <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#10b981" }}>
                         ₹{formatAmount(col)}
@@ -250,7 +250,7 @@ export default function ExecutiveFinancialBarChart({
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                       <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#f43f5e" }}>
-                        Total Pending
+                        Pending Amount
                       </Typography>
                       <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: "#f43f5e" }}>
                         ₹{formatAmount(pen)}
@@ -296,7 +296,7 @@ export default function ExecutiveFinancialBarChart({
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                       <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
-                        Balance Amount
+                        Amount in Hand
                       </Typography>
                       <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78125rem", color: isSurplus ? "#06b6d4" : "#f43f5e" }}>
                         ₹{formatAmount(rem)}

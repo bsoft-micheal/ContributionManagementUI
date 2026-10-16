@@ -87,10 +87,54 @@ export default function FinancialBarChart({
     const expn = Math.max(0, Number(totalExpenses || 0));
     const bal = Number(totalRemaining || 0);
 
+    if (isMember) {
+      return [
+        {
+          id: "paid",
+          label: "Paid Amount",
+          value: col,
+          formattedValue: `₹${col.toLocaleString("en-IN")}`,
+          color: "#10b981", // Emerald Green
+          bgGradient: isDark
+            ? "linear-gradient(180deg, #34d399 0%, #10b981 100%)"
+            : "linear-gradient(180deg, #34d399 0%, #10b981 100%)",
+          icon: <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />,
+          helper: "Total contributions paid",
+          statusText: "Paid",
+        },
+        {
+          id: "unpaid",
+          label: "Unpaid Amount",
+          value: pen,
+          formattedValue: `₹${pen.toLocaleString("en-IN")}`,
+          color: "#f43f5e", // Rose Red
+          bgGradient: isDark
+            ? "linear-gradient(180deg, #fb7185 0%, #f43f5e 100%)"
+            : "linear-gradient(180deg, #fb7185 0%, #f43f5e 100%)",
+          icon: <WarningAmberIcon sx={{ fontSize: 16 }} />,
+          helper: "Unpaid / outstanding contributions",
+          statusText: "Unpaid",
+        },
+        {
+          id: "expenses",
+          label: "Total Expenses",
+          value: expn,
+          formattedValue: `₹${expn.toLocaleString("en-IN")}`,
+          color: "#f59e0b", // Amber / Warm Orange
+          bgGradient: isDark
+            ? "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)"
+            : "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)",
+          icon: <ReceiptLongIcon sx={{ fontSize: 16 }} />,
+          helper: "Actual expenses incurred for events",
+          statusText: "Spent",
+        },
+      ];
+    }
+
     const items = [
       {
         id: "expected",
-        label: isReportsMember ? "My Expected" : "Total Expected",
+        label: isReportsMember ? "My Expected" : "Expected Amount",
         value: exp,
         formattedValue: `₹${exp.toLocaleString("en-IN")}`,
         color: "#6366f1", // Indigo / Purple
@@ -103,7 +147,7 @@ export default function FinancialBarChart({
       },
       {
         id: "collected",
-        label: isReportsMember ? "My Paid" : (isMember ? "Total Paid" : "Total Collections"),
+        label: isReportsMember ? "My Paid" : "Collection Amount",
         value: col,
         formattedValue: `₹${col.toLocaleString("en-IN")}`,
         color: "#10b981", // Emerald Green
@@ -111,12 +155,12 @@ export default function FinancialBarChart({
           ? "linear-gradient(180deg, #34d399 0%, #10b981 100%)"
           : "linear-gradient(180deg, #34d399 0%, #10b981 100%)",
         icon: <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />,
-        helper: isMember ? "Total contributions paid" : "Total funds collected into treasury",
-        statusText: isMember ? "Paid" : "Collections",
+        helper: "Total funds collected into treasury",
+        statusText: "Collection",
       },
       {
         id: "pending",
-        label: isReportsMember ? "My Pending" : "Total Pending",
+        label: isReportsMember ? "My Pending" : "Pending Amount",
         value: pen,
         formattedValue: `₹${pen.toLocaleString("en-IN")}`,
         color: "#f43f5e", // Rose Red
@@ -146,7 +190,7 @@ export default function FinancialBarChart({
         },
         {
           id: "balance",
-          label: "Balance Amount",
+          label: "Amount in Hand",
           value: bal,
           formattedValue: `₹${bal.toLocaleString("en-IN")}`,
           color: bal >= 0 ? "#06b6d4" : "#f43f5e", // Mild Cyan / Rose
@@ -165,7 +209,7 @@ export default function FinancialBarChart({
     }
 
     return items;
-  }, [totalExpected, totalCollected, totalPending, totalExpenses, totalRemaining, isMember, isDark]);
+  }, [totalExpected, totalCollected, totalPending, totalExpenses, totalRemaining, isMember, isReportsMember, isDark]);
 
   // ─── 2. Scale & Y-Axis Ticks for Bar Chart ──────────────────────────────────
   const { maxVal, yTicks } = useMemo(() => {
@@ -228,7 +272,13 @@ export default function FinancialBarChart({
       const expn = Math.max(0, Number(totalExpenses || 0));
       const bal = Math.max(0, Number(totalRemaining || 0));
 
-      if (isReportsMember) {
+      if (isMember) {
+        rawItems = [
+          { id: "p-col", label: "Paid Amount", value: col, formattedValue: `₹${col.toLocaleString("en-IN")}`, color: "#10b981" },
+          { id: "p-pen", label: "Unpaid Amount", value: pen, formattedValue: `₹${pen.toLocaleString("en-IN")}`, color: "#f43f5e" },
+          { id: "p-exp", label: "Total Expenses", value: expn, formattedValue: `₹${expn.toLocaleString("en-IN")}`, color: "#f59e0b" },
+        ];
+      } else if (isReportsMember) {
         rawItems = [
           { id: "p-expct", label: "My Expected", value: exp, formattedValue: `₹${exp.toLocaleString("en-IN")}`, color: "#6366f1" },
           { id: "p-col", label: "My Paid", value: col, formattedValue: `₹${col.toLocaleString("en-IN")}`, color: "#10b981" },
@@ -240,7 +290,7 @@ export default function FinancialBarChart({
           { id: "p-col", label: "Collections", value: col, formattedValue: `₹${col.toLocaleString("en-IN")}`, color: "#10b981" },
           { id: "p-pen", label: "Pending", value: pen, formattedValue: `₹${pen.toLocaleString("en-IN")}`, color: "#f43f5e" },
           { id: "p-exp", label: "Expenses", value: expn, formattedValue: `₹${expn.toLocaleString("en-IN")}`, color: "#f59e0b" },
-          { id: "p-bal", label: "Balance", value: bal, formattedValue: `₹${bal.toLocaleString("en-IN")}`, color: "#06b6d4" },
+          { id: "p-bal", label: "Amount in Hand", value: bal, formattedValue: `₹${bal.toLocaleString("en-IN")}`, color: "#06b6d4" },
         ];
       }
     }
@@ -271,7 +321,7 @@ export default function FinancialBarChart({
     });
 
     return { slices, totalVal };
-  }, [pieMode, events, totalCollected, totalPending, totalExpenses, totalRemaining]);
+  }, [pieMode, events, totalCollected, totalPending, totalExpenses, totalRemaining, isMember, isReportsMember]);
 
   const activeBarDetail = hoveredBar
     ? metricItems.find((m) => m.id === hoveredBar) || metricItems[0]

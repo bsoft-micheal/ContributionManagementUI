@@ -271,16 +271,14 @@ export default function SubmitPaymentModal({
   }, [supportsQr, isMultiSplit, splitRows, formData.amount, formData.eventName, formData.memberName, qrConfig, resolvedCategory]);
 
   const arrearTooltipContent = useMemo(() => {
-    const list = duesSummary?.arrearBreakdown || initialArrearBreakdown || [];
+    const list = duesSummary?.arrearBreakdown || [];
     const totalArrears =
       duesSummary?.previousArrears !== undefined && duesSummary?.previousArrears !== null
         ? Number(duesSummary.previousArrears)
         : list.reduce((acc, item) => acc + (Number(item.amount) || 0), 0);
 
-    if (!list || list.length === 0) {
-      return totalArrears > 0
-        ? `Arrears accumulated: ₹${totalArrears.toLocaleString()}`
-        : "No previous arrears";
+    if (totalArrears <= 0 || !list || list.length === 0) {
+      return "No previous arrears";
     }
     return (
       <Box sx={{ p: 0.8, minWidth: 200 }}>
@@ -305,7 +303,7 @@ export default function SubmitPaymentModal({
         </Box>
       </Box>
     );
-  }, [duesSummary?.arrearBreakdown, duesSummary?.previousArrears, initialArrearBreakdown]);
+  }, [duesSummary?.arrearBreakdown, duesSummary?.previousArrears]);
 
   const handleCopyUpi = async (upi) => {
     if (!upi) return;
@@ -576,12 +574,19 @@ export default function SubmitPaymentModal({
           );
 
           if (res) {
-            const isPaidStatus =
-              String(res.status || initialStatus || "").toLowerCase() === "paid" ||
-              String(res.status || initialStatus || "").toLowerCase() === "verified" ||
-              String(res.status || initialStatus || "").toLowerCase() === "completed" ||
+            const isInitialPaid =
+              String(initialStatus || "").toLowerCase() === "paid" ||
+              String(initialStatus || "").toLowerCase() === "verified" ||
+              (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0);
+
+            const isBackendPaid =
+              String(res.status || "").toLowerCase() === "paid" ||
+              String(res.status || "").toLowerCase() === "verified" ||
+              String(res.status || "").toLowerCase() === "completed" ||
               (res.totalDue === 0 && (res.currentEventDue ?? 0) === 0);
-            const isSubmittedProps = initialIsSubmitted || (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0) || isPaidStatus;
+
+            const isPaidStatus = isInitialPaid || isBackendPaid;
+            const isSubmittedProps = initialIsSubmitted || isPaidStatus;
 
             const fallbackEvAmt = () => {
               if (matchedEvent) {
@@ -598,21 +603,16 @@ export default function SubmitPaymentModal({
               ? 0
               : (isSubmittedProps
                 ? (initialCurrentDue ?? (resolvedFallback > 0 ? resolvedFallback : 0))
-                : Number(res.currentEventDue || res.amount || matchedEvent?.amount || matchedEvent?.contributionAmount || resolvedFallback || 0));
+                : Number(res.currentEventDue ?? res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? resolvedFallback ?? 0));
 
-            const prevArrears = isPaidStatus
-              ? 0
-              : (isSubmittedProps
-                ? (initialPreviousArrears ?? 0)
-                : Number(res.previousArrears ?? res.arrears ?? 0));
+            // Caller (e.g. ContributionsPage grid) has verified whether arrears are cleared
+            const callerClearedArrears = initialPreviousArrears === 0 || (Array.isArray(initialArrearBreakdown) && initialArrearBreakdown.length === 0 && initialPreviousArrears !== undefined);
 
-            const baseAmt = Number(
-              res.amount || matchedEvent?.amount || matchedEvent?.contributionAmount || (currentEvDue > 0 ? currentEvDue : resolvedFallback)
-            );
-
-            let breakdown = (res.arrearBreakdown && res.arrearBreakdown.length > 0)
-              ? res.arrearBreakdown
-              : (initialArrearBreakdown || []);
+            let breakdown = callerClearedArrears
+              ? []
+              : (Array.isArray(initialArrearBreakdown) && initialArrearBreakdown.length > 0
+                ? initialArrearBreakdown
+                : (res.arrearBreakdown || []));
 
             // Dynamically filter out deleted events from arrear breakdown
             breakdown = breakdown.filter(item => {
@@ -624,24 +624,30 @@ export default function SubmitPaymentModal({
                );
             });
 
-            const filteredPrevArrears = isPaidStatus 
-              ? 0 
-              : breakdown.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            const filteredPrevArrears = callerClearedArrears || (isPaidStatus && initialPreviousArrears === 0)
+              ? 0
+              : (isPaidStatus
+                ? (initialPreviousArrears !== undefined ? Number(initialPreviousArrears) : breakdown.reduce((sum, item) => sum + (Number(item.amount) || 0), 0))
+                : (initialPreviousArrears !== undefined ? Number(initialPreviousArrears) : breakdown.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)));
 
-            // Re-evaluate total based on filtered arrears
-            const total = isPaidStatus ? 0 : Number((currentEvDue + filteredPrevArrears).toFixed(2));
+            const safePrevArrears = filteredPrevArrears > 0 ? filteredPrevArrears : 0;
+            const total = isPaidStatus && safePrevArrears === 0 ? 0 : Number((currentEvDue + safePrevArrears).toFixed(2));
+
+            const baseAmt = Number(
+              res.amount || matchedEvent?.amount || matchedEvent?.contributionAmount || (currentEvDue > 0 ? currentEvDue : resolvedFallback)
+            );
 
             setDuesSummary({
               currentEventDue: currentEvDue,
-              previousArrears: filteredPrevArrears,
+              previousArrears: safePrevArrears,
               totalDue: total,
               status: isPaidStatus ? "Paid" : (isSubmittedProps ? (initialStatus || "Pending") : (res.status || (currentEvDue === 0 && baseAmt > 0 ? "Paid" : "Pending"))),
               baseAmount: baseAmt,
-              arrearBreakdown: filteredPrevArrears === 0 ? [] : breakdown,
+              arrearBreakdown: safePrevArrears === 0 ? [] : breakdown,
             });
-            if (!paymentScope) setPaymentScope(prevArrears > 0 ? "AllOutstanding" : "CurrentEvent");
+            if (!paymentScope) setPaymentScope(safePrevArrears > 0 ? "AllOutstanding" : "CurrentEvent");
 
-            const resolvedDuesAmount = (isPaidStatus || total === 0)
+            const resolvedDuesAmount = (isPaidStatus && safePrevArrears === 0) || total === 0
               ? "0.00"
               : (total > 0
                 ? String(total)
@@ -656,7 +662,7 @@ export default function SubmitPaymentModal({
               amount: resolvedDuesAmount,
             }));
 
-            if (isPaidStatus || total === 0) {
+            if ((isPaidStatus && safePrevArrears === 0) || total === 0) {
               setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "0.00" })));
             } else {
               setSplitRows((rows) => {
@@ -709,11 +715,12 @@ export default function SubmitPaymentModal({
   const paymentScopeOptions = useMemo(() => {
     if (!duesSummary) return [];
     const opts = [];
-    const currentDue = Math.round((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount || 0) * 100) / 100;
+    const isPaid = String(duesSummary.status || "").toLowerCase() === "paid";
+    const currentDue = isPaid ? 0 : Math.round((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount || 0) * 100) / 100;
     const arrears = Math.round((duesSummary.previousArrears || 0) * 100) / 100;
-    const total = duesSummary.totalDue !== undefined && duesSummary.totalDue !== null && Number(duesSummary.totalDue) > 0
+    const total = isPaid && arrears === 0 ? 0 : (duesSummary.totalDue !== undefined && duesSummary.totalDue !== null && Number(duesSummary.totalDue) > 0
       ? Math.round(Number(duesSummary.totalDue) * 100) / 100
-      : Math.round(((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears) * 100) / 100;
+      : Math.round(((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears) * 100) / 100);
 
     const fmt = (num) => Number(num || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -723,12 +730,11 @@ export default function SubmitPaymentModal({
         value: "AllOutstanding",
       });
     }
-    if (currentDue > 0) {
-      opts.push({
-        label: `Current Event Only (₹${fmt(currentDue)})${duesSummary.status === "Paid" ? " [Paid]" : ""}`,
-        value: "CurrentEvent",
-      });
-    }
+    const currentEventAmt = duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : (duesSummary.baseAmount || 0);
+    opts.push({
+      label: `Current Event Only (₹${fmt(currentEventAmt)})${isPaid ? " [Paid]" : ""}`,
+      value: "CurrentEvent",
+    });
     if (arrears > 0) {
       opts.push({
         label: `Previous Arrears Only (₹${fmt(arrears)})`,
@@ -741,11 +747,12 @@ export default function SubmitPaymentModal({
   const handlePaymentScopeChange = (scope) => {
     setPaymentScope(scope);
     if (!duesSummary) return;
-    const currentDue = Math.round((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount || 0) * 100) / 100;
+    const isPaid = String(duesSummary.status || "").toLowerCase() === "paid";
+    const currentDue = isPaid ? 0 : Math.round((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) * 100) / 100;
     const arrears = Math.round((duesSummary.previousArrears || 0) * 100) / 100;
-    const total = duesSummary.totalDue !== undefined && duesSummary.totalDue !== null && Number(duesSummary.totalDue) > 0
+    const total = isPaid && arrears === 0 ? 0 : (duesSummary.totalDue !== undefined && duesSummary.totalDue !== null && Number(duesSummary.totalDue) > 0
       ? Math.round(Number(duesSummary.totalDue) * 100) / 100
-      : Math.round(((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears) * 100) / 100;
+      : Math.round((currentDue + arrears) * 100) / 100);
 
     let amt = total;
     if (scope === "CurrentEvent") amt = currentDue;

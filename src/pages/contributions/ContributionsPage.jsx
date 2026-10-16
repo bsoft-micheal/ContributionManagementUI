@@ -137,6 +137,8 @@ export default function ContributionsPage() {
   const [eventTypes, setEventTypes] = useState([]);
   const [filterEventType, setFilterEventType] = useState("ALL");
   const [appliedEventType, setAppliedEventType] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [appliedStatus, setAppliedStatus] = useState("ALL");
   const [rawContributions, setRawContributions] = useState([]);
 
   // --- All remaining useState declarations (must be before any useEffect/useMemo that references them) ---
@@ -506,10 +508,24 @@ export default function ContributionsPage() {
         resolvedStatus = "Paid";
       }
 
+      // Compute paid amount for this contribution
+      let paidAmount = 0;
+      const cash = Number(c.cashAmount) || 0;
+      const upi = Number(c.upiAmount) || 0;
+      const txAmt = Number(matchedTx?.amount) || 0;
+      if (cash > 0 || upi > 0) {
+        paidAmount = cash + upi;
+      } else if (txAmt > 0) {
+        paidAmount = txAmt;
+      } else if (isPaid) {
+        paidAmount = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
+      }
+
       return {
         ...currentContribution,
         paymentStatus: resolvedStatus,
         isVerified,
+        paidAmount,
         previousUnpaid,
         previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
         totalAccumulated: currentOutstanding + previousUnpaid,
@@ -534,8 +550,20 @@ export default function ContributionsPage() {
 
   // contributions is derived from rawContributions via enrichContributions (defined above)
   const contributions = useMemo(() => {
-    return enrichContributions(rawContributions, allContributions, events, transactions);
-  }, [rawContributions, allContributions, events, transactions]);
+    const enriched = enrichContributions(rawContributions, allContributions, events, transactions);
+    if (!appliedStatus || appliedStatus === "ALL") return enriched;
+    const filterLower = appliedStatus.toLowerCase();
+    return enriched.filter((c) => {
+      const statusLower = String(c.paymentStatus || "").toLowerCase();
+      if (filterLower === "paid") {
+        return statusLower === "paid" || statusLower === "verified";
+      }
+      if (filterLower === "pending") {
+        return statusLower === "pending";
+      }
+      return statusLower === filterLower;
+    });
+  }, [rawContributions, allContributions, events, transactions, appliedStatus]);
 
   const handleOpenSubmitPaymentModal = (row) => {
     const evId = row?.eventId || selectedEventId || "";
@@ -932,6 +960,7 @@ export default function ContributionsPage() {
   const handleApplyFilter = () => {
     setAppliedEventType(filterEventType);
     setSelectedEventId(filterEventId);
+    setAppliedStatus(filterStatus);
   };
 
   const handleClearFilter = () => {
@@ -939,6 +968,8 @@ export default function ContributionsPage() {
     setAppliedEventType("ALL");
     setFilterEventId("ALL");
     setSelectedEventId("ALL");
+    setFilterStatus("ALL");
+    setAppliedStatus("ALL");
     toast.success("Filter cleared");
   };
 
@@ -1367,6 +1398,7 @@ export default function ContributionsPage() {
                       ticketId: matchedTicket?.ticketId || matchedTicket?.id,
                       ticketNo: matchedTicket?.ticketNo,
                       attachment: matchedTicket?.attachment,
+                      description: matchedTicket?.description || matchedTicket?.Description || "",
                       status: matchedTicket?.status || "Open",
                       ticketType: matchedTicket?.ticketType || "Payment Issue",
                       priority: matchedTicket?.priority || "Medium",
@@ -1468,25 +1500,112 @@ export default function ContributionsPage() {
       }
     },
     {
+      label: "Paid",
+      key: "paidAmount",
+      align: "right",
+      render: (row) => {
+        const matchedTx = findContributionTransaction(row);
+        const isVerified = isContributionVerified(row, matchedTx);
+        const isPaid =
+          isContributionPaid(row, matchedTx) ||
+          hasSubmittedPayment(row, matchedTx) ||
+          isVerified ||
+          row?.paymentStatus === 2 ||
+          String(row?.paymentStatus || "").toLowerCase() === "paid" ||
+          String(row?.statusName || "").toLowerCase() === "paid";
+
+        const activeEv = (events || []).find(
+          (e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId)
+        );
+        const eventAmount = getMemberEventAmount(row, activeEv);
+
+        let paidAmount = 0;
+        const cash = Number(row.cashAmount) || 0;
+        const upi = Number(row.upiAmount) || 0;
+        const txAmt = Number(matchedTx?.amount) || 0;
+
+        if (cash > 0 || upi > 0) {
+          paidAmount = cash + upi;
+        } else if (txAmt > 0) {
+          paidAmount = txAmt;
+        } else if (isPaid) {
+          paidAmount = eventAmount > 0 ? eventAmount : Number(row.amount || 0);
+        } else if (row.paidAmount !== undefined && row.paidAmount !== null && Number(row.paidAmount) > 0) {
+          paidAmount = Number(row.paidAmount);
+        }
+
+        const paidEventName =
+          row.eventName ||
+          activeEv?.eventName ||
+          activeEv?.title ||
+          matchedTx?.eventName ||
+          "Current Event";
+
+        const tooltipContent = paidAmount > 0 ? (
+          <Box sx={{ p: 0.5, minWidth: 150 }}>
+            <Typography variant="caption" fontWeight={800} sx={{ display: "block", color: "#86efac", mb: 0.3 }}>
+              Paid Against Event:
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#fff", fontSize: "0.78rem", fontWeight: 700 }}>
+              {paidEventName}
+            </Typography>
+            {(row.paymentDate || matchedTx?.paymentDate) && (
+              <Typography variant="caption" sx={{ display: "block", color: "#cbd5e1", mt: 0.4, fontSize: "0.72rem" }}>
+                Payment Date: {formatGridDate(row.paymentDate || matchedTx?.paymentDate)}
+              </Typography>
+            )}
+            {(row.paymentMode || matchedTx?.paymentMode) && (
+              <Typography variant="caption" sx={{ display: "block", color: "#cbd5e1", fontSize: "0.72rem" }}>
+                Payment Mode: {row.paymentMode || matchedTx?.paymentMode}
+              </Typography>
+            )}
+            {matchedTx?.utr && (
+              <Typography variant="caption" sx={{ display: "block", color: "#93c5fd", fontSize: "0.7rem", mt: 0.2 }}>
+                Ref / UTR: {matchedTx.utr}
+              </Typography>
+            )}
+          </Box>
+        ) : (
+          `Pending payment for ${paidEventName}`
+        );
+
+        return (
+          <Tooltip title={tooltipContent} arrow enterDelay={150}>
+            <Typography
+              variant="body2"
+              fontWeight={paidAmount > 0 ? 800 : 500}
+              color={paidAmount > 0 ? "success.main" : "text.secondary"}
+              sx={{
+                cursor: "help",
+                textDecoration: paidAmount > 0 ? "underline dotted" : "none",
+                display: "inline-block",
+              }}
+            >
+              ₹{Number(paidAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Typography>
+          </Tooltip>
+        );
+      },
+    },
+    {
       label: "Amount",
       key: "amount",
       align: "right",
       render: (row) => {
-        const isPaid = isContributionPaid(row) || hasSubmittedPayment(row);
         const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId));
         const eventAmount = getMemberEventAmount(row, activeEv);
-        const displayAmount = isPaid ? 0 : eventAmount;
+        const displayAmount = eventAmount > 0 ? eventAmount : Number(row.amount || 0);
 
         return (
           <Typography
             variant="body2"
             fontWeight={700}
-            color={isPaid ? "success.main" : "inherit"}
+            color="inherit"
           >
             ₹{Number(displayAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </Typography>
         );
-      }
+      },
     },
     {
       label: "Arrears",
@@ -1645,6 +1764,22 @@ export default function ContributionsPage() {
                     setFilterEventId(event.target.value);
                   }}
                   options={eventOptions}
+                  fullWidth
+                />
+              </Box>
+              <Box sx={{ minWidth: 180, maxWidth: 240 }}>
+                <AppSelect
+                  label="Status"
+                  placeholder="Select status"
+                  value={filterStatus}
+                  onChange={(event) => {
+                    setFilterStatus(event.target.value);
+                  }}
+                  options={[
+                    { label: "All Statuses", value: "ALL" },
+                    { label: "Paid", value: "Paid" },
+                    { label: "Pending", value: "Pending" },
+                  ]}
                   fullWidth
                 />
               </Box>
