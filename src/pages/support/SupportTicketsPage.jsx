@@ -199,9 +199,9 @@ export default function SupportTicketsPage() {
         return;
       }
 
-      const MAX_SIZE = 3 * 1024 * 1024; // 3MB limit
+      const MAX_SIZE = 6 * 1024 * 1024; // 6MB limit
       if (file.size > MAX_SIZE) {
-        toast.error("Image size exceeds maximum limit of 3 MB");
+        toast.error("Image size exceeds maximum limit of 6 MB");
         return;
       }
 
@@ -708,10 +708,10 @@ export default function SupportTicketsPage() {
     if (!editingTicket && !canAddTicket) return;
 
     const newErrors = {};
-    if (!form.memberName) newErrors.memberName = "User Name is required";
-    if (!form.eventType) newErrors.eventType = "Event Type is required";
-    if (!form.ticketType) newErrors.ticketType = "Ticket Type is required";
-    if (!form.description || !form.description.trim()) newErrors.description = "Description is required";
+    if (!form.memberName) newErrors.memberName = "This field is required";
+    if (!form.eventType) newErrors.eventType = "This field is required";
+    if (!form.ticketType) newErrors.ticketType = "This field is required";
+    if (!form.description || !form.description.trim()) newErrors.description = "This field is required";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -809,15 +809,15 @@ export default function SupportTicketsPage() {
 
     const newErrors = {};
     if (!replyStatus) {
-      newErrors.replyStatus = "Update Status is required";
+      newErrors.replyStatus = "This field is required";
     }
     if (!hasNote && !statusChanged) {
-      newErrors.replyText = "Resolution notes or new status update is required";
+      newErrors.replyText = "This field is required";
     }
 
     if (Object.keys(newErrors).length > 0) {
       setReplyErrors(newErrors);
-      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS || "This field is required");
+      toast.error("This field is required");
       return;
     }
     setReplyErrors({});
@@ -1529,7 +1529,7 @@ export default function SupportTicketsPage() {
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="caption" fontWeight={700} sx={{ color: (t) => t.palette.mode === "dark" ? "#e2e8f0" : "#334155" }}>
-                  Attachment (1 Image, Max 3MB)
+                  Attachment (1 Image, Max 6MB)
                 </Typography>
                 {form.attachment && (
                   <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem" }}>
@@ -1576,7 +1576,7 @@ export default function SupportTicketsPage() {
                 >
                   <CloudUploadIcon sx={{ fontSize: 20, color: errors.attachment ? "#ef4444" : ((t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b") }} />
                   <Typography variant="caption" fontWeight={600} sx={{ color: errors.attachment ? "#ef4444" : "text.secondary" }}>
-                    Click to attach image (Max 3MB)
+                    Click to attach image (Max 6MB)
                   </Typography>
                 </Box>
               ) : (

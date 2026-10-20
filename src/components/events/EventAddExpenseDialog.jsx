@@ -250,9 +250,9 @@ export default function EventAddExpenseDialog({
         return;
       }
 
-      const MAX_SIZE = 3 * 1024 * 1024; // 3MB limit
+      const MAX_SIZE = 6 * 1024 * 1024; // 6MB limit
       if (file.size > MAX_SIZE) {
-        toast.error("Image size exceeds maximum limit of 3 MB");
+        toast.error("Image size exceeds maximum limit of 6 MB");
         return;
       }
 
@@ -293,17 +293,17 @@ export default function EventAddExpenseDialog({
 
   const handleSave = async () => {
     const newErrors = {};
-    if (!form.eventName) newErrors.eventName = "Event Name is required";
-    if (!form.category) newErrors.category = "Event Type is required";
-    if (!form.amount || Number(form.amount) <= 0 || isNaN(Number(form.amount))) {
-      newErrors.amount = "Valid amount is required";
+    if (!form.eventName) newErrors.eventName = "This field is required";
+    if (!form.category) newErrors.category = "This field is required";
+    if (!form.amount || !String(form.amount).trim() || Number(form.amount) <= 0 || isNaN(Number(form.amount))) {
+      newErrors.amount = "This field is required";
     }
-    if (!form.submittedBy) newErrors.submittedBy = "Submitted by is required";
+    if (!form.submittedBy) newErrors.submittedBy = "This field is required";
     if (!form.attachment) {
-      newErrors.attachment = "Attachment (1 Image) is required";
+      newErrors.attachment = "This field is required";
     }
     if (!form.description || !form.description.trim()) {
-      newErrors.description = "Description is required";
+      newErrors.description = "This field is required";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -570,7 +570,7 @@ export default function EventAddExpenseDialog({
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="caption" fontWeight={700} sx={{ color: (t) => (t.palette.mode === "dark" ? "#e2e8f0" : "#334155") }}>
-                  Attachment (1 Image, Max 3MB) <span style={{ color: "#ef4444" }}>*</span>
+                  Attachment (1 Image, Max 6MB) <span style={{ color: "#ef4444" }}>*</span>
                 </Typography>
                 {form.attachment && (
                   <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem" }}>
@@ -657,7 +657,7 @@ export default function EventAddExpenseDialog({
                         Click to browse or upload receipt image
                       </Typography>
                       <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: "0.68rem" }}>
-                        PNG, JPG, JPEG up to 3MB
+                        PNG, JPG, JPEG up to 6MB
                       </Typography>
                     </Box>
                   </Box>

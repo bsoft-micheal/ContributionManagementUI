@@ -308,14 +308,27 @@ export default function EventsPage() {
     loadData();
   }, [filters.year, filters.month]);
 
-  const currentYear = dayjs().year();
-  const yearOptions = [
-    { label: "All", value: 0 },
-    ...Array.from({ length: 11 }, (_, i) => {
-      const y = currentYear - 5 + i;
-      return { label: String(y), value: y };
-    }),
-  ];
+  const yearOptions = useMemo(() => {
+    const curYear = dayjs().year();
+    const yearsSet = new Set();
+    for (let i = curYear - 5; i <= curYear + 5; i++) {
+      yearsSet.add(i);
+    }
+    (events || []).forEach((e) => {
+      const d = e.eventDate || e.createdOn || e.date;
+      if (d) {
+        const y = dayjs(d).year();
+        if (y && !isNaN(y)) {
+          yearsSet.add(y);
+        }
+      }
+    });
+    const sortedYears = Array.from(yearsSet).sort((a, b) => a - b);
+    return [
+      { label: "All", value: 0 },
+      ...sortedYears.map((y) => ({ label: String(y), value: y })),
+    ];
+  }, [events]);
 
   const monthOptions = [
     { label: "All", value: 0 },
@@ -362,12 +375,13 @@ export default function EventsPage() {
   }, [events, filterEventType]);
 
   const handleEventTypeChange = (newType) => {
-    setFilterEventType(newType);
-    if (newType !== "ALL" && filterEvent !== "ALL") {
+    const normalizedType = newType || "ALL";
+    setFilterEventType(normalizedType);
+    if (normalizedType !== "ALL" && filterEvent !== "ALL") {
       const isStillValid = (events || []).some((e) => {
         const name = e.eventName || e.name;
         const cat = (e.eventTypeName || e.category || "").toLowerCase();
-        return name?.toLowerCase() === filterEvent.toLowerCase() && cat === newType.toLowerCase();
+        return name?.toLowerCase() === filterEvent.toLowerCase() && cat === normalizedType.toLowerCase();
       });
       if (!isStillValid) {
         setFilterEvent("ALL");
@@ -387,15 +401,13 @@ export default function EventsPage() {
   };
 
   const handleClearFilter = () => {
-    const defaultMonth = dayjs().month() + 1;
-    const defaultYear = dayjs().year();
-    setFilterYear(defaultYear);
-    setFilterMonth(defaultMonth);
+    setFilterYear(0);
+    setFilterMonth(0);
     setFilterEventType("ALL");
     setFilterEvent("ALL");
     const resetFilters = {
-      year: defaultYear,
-      month: defaultMonth,
+      year: 0,
+      month: 0,
       eventType: "ALL",
       event: "ALL",
     };
@@ -915,8 +927,10 @@ export default function EventsPage() {
                   label="Year"
                   value={filterYear}
                   onChange={(event) => {
-                    setFilterYear(Number(event.target.value));
+                    const val = event.target.value;
+                    setFilterYear(val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
                   }}
+                  onClear={() => setFilterYear(0)}
                   options={yearOptions}
                   placeholder="Select Year"
                 />
@@ -926,8 +940,10 @@ export default function EventsPage() {
                   label="Month"
                   value={filterMonth}
                   onChange={(event) => {
-                    setFilterMonth(Number(event.target.value));
+                    const val = event.target.value;
+                    setFilterMonth(val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
                   }}
+                  onClear={() => setFilterMonth(0)}
                   options={monthOptions}
                   placeholder="Select Month"
                 />
@@ -937,8 +953,9 @@ export default function EventsPage() {
                   label="Event Type"
                   value={filterEventType}
                   onChange={(event) => {
-                    handleEventTypeChange(event.target.value);
+                    handleEventTypeChange(event.target.value || "ALL");
                   }}
+                  onClear={() => handleEventTypeChange("ALL")}
                   options={eventTypeOptions}
                   placeholder="Select Event Type"
                 />
@@ -948,8 +965,9 @@ export default function EventsPage() {
                   label="Event Name"
                   value={filterEvent}
                   onChange={(event) => {
-                    setFilterEvent(event.target.value);
+                    setFilterEvent(event.target.value || "ALL");
                   }}
+                  onClear={() => setFilterEvent("ALL")}
                   options={eventOptions}
                   placeholder="Select Event Name"
                 />

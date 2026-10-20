@@ -638,7 +638,7 @@ export default function EventFormPage({
           });
         } else {
           // Creating a new event
-          const defaultDate = propEvent?.eventDate ? dayjs(propEvent.eventDate) : null;
+          const defaultDate = propEvent?.eventDate ? dayjs(propEvent.eventDate) : dayjs();
           const targetMonth = defaultDate && defaultDate.isValid() ? defaultDate.month() : -1;
           const celebrantsInMonth = targetMonth >= 0
             ? activeMems.filter(
@@ -664,10 +664,20 @@ export default function EventFormPage({
           setMarriageCelebrantIds([]);
           setSendOffMemberIds([]);
 
+          const isDefaultBday = Boolean(bdayType && defaultTypeId === bdayType.eventTypeId);
+          const defaultTypeName = (typesData || []).find((t) => t.eventTypeId === defaultTypeId)?.eventTypeName || "";
+          const monthStr = defaultDate && defaultDate.isValid() ? defaultDate.format("MMMM") : "";
+          let initialEventName = "";
+          if (isDefaultBday) {
+            initialEventName = monthStr ? `${monthStr} Birthday Celebration` : "Birthday Celebration";
+          } else if (defaultTypeName) {
+            initialEventName = monthStr ? `${monthStr} ${defaultTypeName} Celebration` : `${defaultTypeName} Celebration`;
+          }
+
           setForm({
-            eventName: "",
-            eventTypeId: "",
-            eventTypeIds: [],
+            eventName: sanitizeEventName(initialEventName),
+            eventTypeId: defaultTypeId,
+            eventTypeIds: defaultTypeId ? [defaultTypeId] : [],
             eventDate: defaultDate,
             description: "",
             baseAmount: "",

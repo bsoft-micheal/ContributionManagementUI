@@ -244,19 +244,15 @@ export default function VerifySupportTicketModal({
   const handleSave = async () => {
     const newErrors = {};
     if (!updateStatus) {
-      newErrors.updateStatus = "Update Status is required";
+      newErrors.updateStatus = "This field is required";
     }
     if (!replyText || !replyText.trim()) {
-      newErrors.replyText = "Resolution note is required";
+      newErrors.replyText = "This field is required";
     }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      if (newErrors.updateStatus && newErrors.replyText) {
-        toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS || "Please fill in all required fields");
-      } else {
-        toast.error(newErrors.replyText || newErrors.updateStatus);
-      }
+      toast.error("This field is required");
       return;
     }
 

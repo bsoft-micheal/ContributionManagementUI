@@ -45,10 +45,11 @@ export default function AppSelect({
   }, [options]);
 
   const isDefaultOrAllValue = useMemo(() => {
-    if (!value) return true;
+    if (!value && value !== 0) return true;
     const strVal = String(value).trim().toLowerCase();
     if (
       strVal === "" ||
+      strVal === "0" ||
       strVal === "all" ||
       strVal.startsWith("all_") ||
       strVal === "all events" ||
@@ -57,8 +58,11 @@ export default function AppSelect({
       return true;
     }
     const foundOpt = uniqueOptions.find((o) => String(o.value).toLowerCase() === strVal);
-    if (foundOpt && String(foundOpt.label || "").trim().toLowerCase().startsWith("all ")) {
-      return true;
+    if (foundOpt) {
+      const optLabel = String(foundOpt.label || "").trim().toLowerCase();
+      if (optLabel === "all" || optLabel.startsWith("all ") || optLabel.startsWith("all_")) {
+        return true;
+      }
     }
     return false;
   }, [value, uniqueOptions]);
@@ -76,9 +80,16 @@ export default function AppSelect({
     value === null ||
     uniqueOptions.some((o) => String(o.value) === String(value));
 
+  const displayLabel = label ? String(label).replace(/\s*\*+$/, "").trim() : "";
+
   const handleClear = (e) => {
-    e.stopPropagation();
-    if (onChange) {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (onClear) {
+      onClear();
+    } else if (onChange) {
       onChange({ target: { name: props.name || "", value: "" } });
     }
   };
@@ -98,7 +109,7 @@ export default function AppSelect({
             fontSize: "0.78125rem",
           }}
         >
-          {label}
+          {displayLabel}
           {required && (
             <Box component="span" sx={{ color: (theme) => theme.palette.mode === "dark" ? "#f87171" : "#ef4444", ml: 0.5, fontSize: "1rem", lineHeight: 0 }}>
               *
@@ -241,27 +252,19 @@ export default function AppSelect({
                 right: 26,
                 top: "50%",
                 transform: "translateY(-50%)",
-                zIndex: 2,
+                zIndex: 3,
+                pointerEvents: "auto",
               }}
             >
               <IconButton
                 size="small"
                 aria-label="clear selection"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  if (onClear) {
-                    onClear();
-                  } else if (onChange) {
-                    onChange({ target: { value: "" } });
-                  }
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
+                onClick={handleClear}
+                onMouseDown={handleClear}
                 sx={{
                   p: 0.25,
+                  cursor: "pointer",
+                  pointerEvents: "auto",
                   color: (theme) =>
                     theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.6)" : "#64748b",
                   "&:hover": {

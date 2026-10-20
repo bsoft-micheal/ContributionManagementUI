@@ -101,6 +101,7 @@ export default function SubmitPaymentPage() {
   const [statusModalTxn, setStatusModalTxn] = useState(null);
   const [statusChangeValue, setStatusChangeValue] = useState("");
   const [auditRemarks, setAuditRemarks] = useState("");
+  const [statusError, setStatusError] = useState("");
 
   const isAuthorityRole = [
     "admin",
@@ -561,10 +562,10 @@ export default function SubmitPaymentPage() {
 
   const validateForm = () => {
     const errs = {};
-    if (!formData.memberName.trim()) errs.memberName = "Member Name is required";
-    if (!formData.eventCategory.trim()) errs.eventCategory = "Event Category is required";
-    if (!formData.eventName.trim()) errs.eventName = "Event Name is required";
-    if (!formData.amount || Number(formData.amount) <= 0) errs.amount = "Valid amount is required";
+    if (!formData.memberName.trim()) errs.memberName = "This field is required";
+    if (!formData.eventCategory.trim()) errs.eventCategory = "This field is required";
+    if (!formData.eventName.trim()) errs.eventName = "This field is required";
+    if (!formData.amount || !String(formData.amount).trim() || Number(formData.amount) <= 0) errs.amount = "This field is required";
 
     const isCash = String(formData.paymentMode || "").toLowerCase().includes("cash");
     if (!isCash) {
@@ -655,8 +656,8 @@ export default function SubmitPaymentPage() {
       toast.error("Please upload an image file (PNG, JPG, JPEG)");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size must be less than 5 MB");
+    if (file.size > 6 * 1024 * 1024) {
+      toast.error("Image size exceeds maximum limit of 6 MB");
       return;
     }
     const reader = new FileReader();
@@ -1150,6 +1151,7 @@ export default function SubmitPaymentPage() {
           setStatusModalOpen(false);
           setStatusModalTxn(null);
           setAuditRemarks("");
+          setStatusError("");
         }}
         title="Authority Status Update"
         maxWidth="sm"
@@ -1174,13 +1176,18 @@ export default function SubmitPaymentPage() {
                   startIcon={<SaveIcon />}
                   disabled={isZeroAmount}
                   disabledTooltip={isZeroAmount ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first." : ""}
-                  onClick={() =>
+                  onClick={() => {
+                    if (!statusChangeValue || !String(statusChangeValue).trim()) {
+                      setStatusError("This field is required");
+                      toast.error("This field is required");
+                      return;
+                    }
                     handleStatusUpdate(
                       statusModalTxn,
-                      statusChangeValue || statusModalTxn?.status,
+                      statusChangeValue,
                       auditRemarks
-                    )
-                  }
+                    );
+                  }}
                 >
                   Save
                 </AppButton>
@@ -1206,10 +1213,16 @@ export default function SubmitPaymentPage() {
               <Grid container spacing={2} alignItems="center">
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <AppSelect
-                    label="Select Status *"
-                    value={statusChangeValue || statusModalTxn?.status || "Pending"}
-                    onChange={(e) => setStatusChangeValue(e.target.value)}
+                    label="Select Status"
+                    placeholder="Select Status"
+                    value={statusChangeValue}
+                    onChange={(e) => {
+                      setStatusChangeValue(e.target.value);
+                      if (statusError) setStatusError("");
+                    }}
                     options={getModalStatusOptions(statusModalTxn)}
+                    error={Boolean(statusError)}
+                    helperText={statusError || ""}
                     required
                   />
                 </Grid>
@@ -1218,7 +1231,13 @@ export default function SubmitPaymentPage() {
                     Status Preview
                   </Typography>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {renderStatusBadge(statusChangeValue || statusModalTxn?.status)}
+                    {statusChangeValue ? (
+                      renderStatusBadge(statusChangeValue)
+                    ) : (
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
+                        None selected
+                      </Typography>
+                    )}
                   </Box>
                 </Grid>
               </Grid>
