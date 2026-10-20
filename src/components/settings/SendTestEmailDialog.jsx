@@ -26,6 +26,7 @@ import {
   getPaymentQrConfig,
   generateDynamicPaymentQr,
 } from "../../utils/upiQrHelper";
+import { validateEmail } from "../../utils/validation";
 
 export default function SendTestEmailDialog({
   open,
@@ -89,8 +90,14 @@ export default function SendTestEmailDialog({
   const previewDescription = interpolatePlaceholders(template.description, previewData);
 
   const handleSend = async () => {
-    if (!recipientEmail || !recipientEmail.trim() || !recipientEmail.includes("@")) {
+    if (!recipientEmail || !recipientEmail.trim()) {
       toast.error("Please enter a valid recipient email address.");
+      return;
+    }
+
+    const emailErr = validateEmail(recipientEmail);
+    if (emailErr) {
+      toast.error(emailErr);
       return;
     }
 

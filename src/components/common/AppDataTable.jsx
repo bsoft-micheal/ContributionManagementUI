@@ -429,15 +429,24 @@ export default function AppDataTable({
   const processedData = useMemo(() => {
     let result = [...data];
 
-    // 1. Deep search across rendered column outputs + nested row values
+    // Deduplicate data by unique identifier if present
+    const seenIds = new Set();
+    result = result.filter((row, idx) => {
+      const id = row?.userId ?? row?.id ?? row?.key ?? row?._id ?? row?.memberId ?? row?.photoId ?? row?.eventId ?? row?.expenseId ?? row?.roleId ?? idx;
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      return true;
+    });
+
+    // 1. Accurate search across table columns and their rendered text
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter((row) => {
-        // Check formatted column output first (matches text shown in UI)
+        // Search across defined table columns
         const matchInColumns = (columns || []).some((col) => {
           if (!col) return false;
 
-          // Skip Action column icon tooltips/buttons
+          // Skip Action column
           const labelLower = String(col.label || "").toLowerCase();
           if (labelLower === "action") return false;
 
@@ -448,23 +457,25 @@ export default function AppDataTable({
           if (col.render) {
             try {
               const rendered = col.render(row);
-              const text = extractTextFromReactNode(rendered).toLowerCase();
-              if (text && text.includes(q)) return true;
+              const text = extractTextFromReactNode(rendered).trim().toLowerCase();
+              if (text && text !== "--" && text.includes(q)) return true;
             } catch (e) {
               // ignore render errors during search
             }
           }
+
           if (col.key && row[col.key] != null) {
-            const val = String(row[col.key]).toLowerCase();
-            if (val.includes(q)) return true;
+            const rawVal = row[col.key];
+            if (typeof rawVal === "string" || typeof rawVal === "number") {
+              const strVal = String(rawVal).trim().toLowerCase();
+              if (strVal && strVal.includes(q)) return true;
+            }
           }
+
           return false;
         });
 
-        if (matchInColumns) return true;
-
-        // Fallback: search raw & nested object values
-        return recursiveSearch(row, q);
+        return matchInColumns;
       });
     }
 

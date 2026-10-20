@@ -298,14 +298,13 @@ export default function EventAddPhotoDialog({
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
 
     try {
       setSaving(true);
       const payload = {
-        title: form.title.trim(),
+        title: form.title.trim().slice(0, 250),
         eventName: form.eventName,
         category: form.category,
         imageUrl:
@@ -330,7 +329,11 @@ export default function EventAddPhotoDialog({
       }
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED);
+      const errMsg = err.response?.data?.message || err.message || TOAST_MESSAGES.GENERAL.SAVE_FAILED;
+      setErrors((prev) => ({
+        ...prev,
+        form: errMsg,
+      }));
     } finally {
       setSaving(false);
     }
@@ -359,7 +362,13 @@ export default function EventAddPhotoDialog({
           <AppButton
             variant="contained"
             onClick={handleSave}
-            disabled={saving || maxAllowedForEvent <= 0}
+            disabled={
+              saving ||
+              maxAllowedForEvent <= 0 ||
+              !form.title?.trim() ||
+              form.title.trim().length > 250 ||
+              (form.description && form.description.length > 500)
+            }
             sx={{
               minWidth: 110,
               bgcolor: "#342b54 !important",
@@ -378,6 +387,13 @@ export default function EventAddPhotoDialog({
         </Box>
       ) : (
         <Grid container spacing={2} sx={{ pt: 0.5 }}>
+          {errors.form && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="error" sx={{ borderRadius: "8px", fontWeight: 600 }}>
+                {errors.form}
+              </Alert>
+            </Grid>
+          )}
           {/* Row 1: Title & Event Date */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
@@ -386,12 +402,19 @@ export default function EventAddPhotoDialog({
               value={form.title}
               maxLength={250}
               onChange={(e) => {
-                const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, "").slice(0, 250);
+                const raw = e.target.value;
+                const sanitized = raw.replace(/[^A-Za-z\s]/g, "").slice(0, 250);
                 setForm((c) => ({ ...c, title: sanitized }));
-                if (errors.title) setErrors((p) => ({ ...p, title: "" }));
+                if (/[^A-Za-z\s]/.test(raw)) {
+                  setErrors((p) => ({ ...p, title: "Only letters and spaces are allowed" }));
+                } else if (raw.length > 250) {
+                  setErrors((p) => ({ ...p, title: "Title must be at most 250 characters" }));
+                } else {
+                  setErrors((p) => (p.title || p.form ? { ...p, title: "", form: "" } : p));
+                }
               }}
               error={!!errors.title}
-              helperText={errors.title}
+              helperText={errors.title || `${(form.title || "").length}/250 characters`}
               required
             />
           </Grid>
@@ -729,8 +752,11 @@ export default function EventAddPhotoDialog({
               placeholder="Optional photo caption or memory details..."
               value={form.description}
               onChange={(e) => {
-                setForm((c) => ({ ...c, description: e.target.value }));
+                if (e.target.value.length <= 500) {
+                  setForm((c) => ({ ...c, description: e.target.value }));
+                }
               }}
+              maxLength={500}
               minRows={2}
               maxRows={3}
             />

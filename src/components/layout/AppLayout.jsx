@@ -47,7 +47,7 @@ import AppDateInput from "../common/AppDateInput";
 import AppButton from "../common/AppButton";
 import AppImageUpload from "../common/AppImageUpload";
 import { useAppToast } from "../common/AppToast";
-import { validateForm } from "../../utils/validation";
+import { validateForm, validateEmail } from "../../utils/validation";
 import { getImageUrl } from "../../services/apiClient";
 import { getProfileAsync, changePasswordAsync } from "../../services/userService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
@@ -1120,10 +1120,16 @@ export default function AppLayout() {
                 type="email"
                 value={profileForm.email}
                 onChange={(e) => {
-                  setProfileForm((prev) => ({ ...prev, email: e.target.value }));
-                  if (profileErrors.email) setProfileErrors((prev) => ({ ...prev, email: "" }));
+                  const val = e.target.value;
+                  setProfileForm((prev) => ({ ...prev, email: val }));
+                  if (profileErrors.email) {
+                    setProfileErrors((prev) => ({
+                      ...prev,
+                      email: !val.trim() ? "This field is required" : validateEmail(val),
+                    }));
+                  }
                 }}
-                maxLength={250}
+                maxLength={254}
                 error={!!profileErrors.email}
                 helperText={profileErrors.email}
                 required

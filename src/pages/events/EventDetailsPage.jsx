@@ -154,7 +154,7 @@ export default function EventDetailsPage() {
           </Box>
         }
         title={eventDetails.eventName}
-        description={`${(eventDetails.description || "").replace(/<!--contrib:.*?-->/g, "").trim()} Scheduled for ${
+        description={`${(eventDetails.description || "").replace(/<!--[\s\S]*?-->/g, "").trim()} Scheduled for ${
           eventDetails.eventDates
             ? String(eventDetails.eventDates)
                 .split(",")
