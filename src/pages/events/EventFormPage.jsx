@@ -132,7 +132,7 @@ const initialForm = {
   eventName: "",
   eventTypeId: "",
   eventTypeIds: [],
-  eventDate: dayjs(),
+  eventDate: null,
   description: "",
   status: "Planned",
   baseAmount: "",
@@ -638,11 +638,13 @@ export default function EventFormPage({
           });
         } else {
           // Creating a new event
-          const defaultDate = propEvent?.eventDate ? dayjs(propEvent.eventDate) : dayjs();
-          const targetMonth = defaultDate.month();
-          const celebrantsInMonth = activeMems.filter(
-            (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
-          );
+          const defaultDate = propEvent?.eventDate ? dayjs(propEvent.eventDate) : null;
+          const targetMonth = defaultDate && defaultDate.isValid() ? defaultDate.month() : -1;
+          const celebrantsInMonth = targetMonth >= 0
+            ? activeMems.filter(
+                (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+              )
+            : [];
           const offCount = celebrantsInMonth.filter(
             (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
           ).length;
@@ -1397,10 +1399,18 @@ export default function EventFormPage({
 
     let updatedName = form.eventName;
     if (!isEdit && !isCustomEventName) {
-      const monthStr = dayjs(form.eventDate).format("MMMM");
-      updatedName = isNewBday
-        ? `${monthStr} Birthday Celebration`
-        : `${monthStr} ${newTypeName} Celebration`;
+      const monthStr = form.eventDate && dayjs(form.eventDate).isValid()
+        ? dayjs(form.eventDate).format("MMMM")
+        : "";
+      if (monthStr) {
+        updatedName = isNewBday
+          ? `${monthStr} Birthday Celebration`
+          : `${monthStr} ${newTypeName} Celebration`;
+      } else {
+        updatedName = isNewBday
+          ? `Birthday Celebration`
+          : (newTypeName ? `${newTypeName} Celebration` : "");
+      }
       updatedName = sanitizeEventName(updatedName);
     }
 
@@ -1417,10 +1427,14 @@ export default function EventFormPage({
     ).length;
 
     if (isNewBday) {
-      const targetMonth = dayjs(form.eventDate).month();
-      const celebrantsInMonth = activeMembers.filter(
-        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
-      );
+      const targetMonth = form.eventDate && dayjs(form.eventDate).isValid()
+        ? dayjs(form.eventDate).month()
+        : -1;
+      const celebrantsInMonth = targetMonth >= 0
+        ? activeMembers.filter(
+            (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+          )
+        : [];
       const offCount = celebrantsInMonth.filter(
         (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
       ).length;
@@ -1481,16 +1495,18 @@ export default function EventFormPage({
 
     let updatedName = form.eventName;
     if (!isEdit && !isCustomEventName) {
-      const monthStr = dayjs(form.eventDate).format("MMMM");
+      const monthStr = form.eventDate && dayjs(form.eventDate).isValid()
+        ? dayjs(form.eventDate).format("MMMM")
+        : "";
       if (selectedTypesList.length === 0) {
-        updatedName = `${monthStr} Celebration`;
+        updatedName = monthStr ? `${monthStr} Celebration` : "Celebration";
       } else if (selectedTypesList.length === 1) {
         updatedName = hasBday
-          ? `${monthStr} Birthday Celebration`
-          : `${monthStr} ${selectedTypesList[0].eventTypeName} Celebration`;
+          ? (monthStr ? `${monthStr} Birthday Celebration` : "Birthday Celebration")
+          : (monthStr ? `${monthStr} ${selectedTypesList[0].eventTypeName} Celebration` : `${selectedTypesList[0].eventTypeName} Celebration`);
       } else {
         const names = selectedTypesList.map((t) => t.eventTypeName);
-        updatedName = `${monthStr} ${names.join(" and ")} Celebration`;
+        updatedName = monthStr ? `${monthStr} ${names.join(" and ")} Celebration` : `${names.join(" and ")} Celebration`;
       }
       updatedName = sanitizeEventName(updatedName);
     }
@@ -1508,10 +1524,14 @@ export default function EventFormPage({
     ).length;
 
     if (hasBday) {
-      const targetMonth = dayjs(form.eventDate).month();
-      const celebrantsInMonth = activeMembers.filter(
-        (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
-      );
+      const targetMonth = form.eventDate && dayjs(form.eventDate).isValid()
+        ? dayjs(form.eventDate).month()
+        : -1;
+      const celebrantsInMonth = targetMonth >= 0
+        ? activeMembers.filter(
+            (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
+          )
+        : [];
       const offCount = celebrantsInMonth.filter(
         (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
       ).length;
@@ -1586,13 +1606,13 @@ export default function EventFormPage({
 
   // Handle date change
   const handleDateChange = (newDate) => {
-    if (!newDate) return;
-    const oldMonth = dayjs(form.eventDate).month();
-    const newMonth = dayjs(newDate).month();
+    const validDate = newDate && dayjs(newDate).isValid() ? newDate : null;
+    const oldMonth = form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).month() : -1;
+    const newMonth = validDate ? dayjs(validDate).month() : -1;
 
     let newEventName = form.eventName;
-    if (!isEdit && !isCustomEventName) {
-      const monthStr = dayjs(newDate).format("MMMM");
+    if (!isEdit && !isCustomEventName && validDate) {
+      const monthStr = dayjs(validDate).format("MMMM");
       if (selectedTypes.length <= 1) {
         newEventName = isBirthday
           ? `${monthStr} Birthday Celebration`
@@ -1603,7 +1623,7 @@ export default function EventFormPage({
       newEventName = sanitizeEventName(newEventName);
     }
 
-    if (oldMonth !== newMonth) {
+    if (validDate && oldMonth !== newMonth) {
       const celebrantsInNewMonth = activeMembers.filter(
         (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === newMonth
       );
@@ -1619,49 +1639,53 @@ export default function EventFormPage({
 
     setForm((c) => ({
       ...c,
-      eventDate: newDate,
+      eventDate: validDate,
       eventName: newEventName,
     }));
-    if (errors.eventDate) setErrors((p) => ({ ...p, eventDate: "" }));
+    setErrors((p) => ({ ...p, eventDate: validDate ? "" : "This field is required" }));
   };
 
   const handleSubmit = async () => {
-    const filed = "This field is required";
-    const schema = {
-      eventName: {
-        required: true,
-        type: "letteronly",
-        min: 3,
-        max: 250,
-        label: "Event Name",
-      },
-      eventDate: { required: true, label: filed },
-    };
+    const requiredMsg = "This field is required";
+    const newErrors = {};
 
-    const newErrors = validateForm(form, schema);
-
-    if (!isEdit && form.eventDate && dayjs(form.eventDate).isBefore(dayjs().startOf("day"))) {
-      newErrors.eventDate = "Cannot create an event for a past date";
-    }
-
+    // 1. Mandatory Event Type Validation
     if (allowMultipleEvents) {
-      if (!form.eventTypeIds || form.eventTypeIds.length < 2) {
+      if (!form.eventTypeIds || form.eventTypeIds.length === 0) {
+        newErrors.eventTypeId = requiredMsg;
+      } else if (form.eventTypeIds.length < 2) {
         newErrors.eventTypeId = "Please select at least 2 Event types";
-        toast.error("Please select at least 2 Event types");
-        setErrors(newErrors);
-        return;
       }
     } else {
       if (!form.eventTypeId) {
-        newErrors.eventTypeId = filed;
+        newErrors.eventTypeId = requiredMsg;
       }
     }
 
-    if (!isBirthday && selectedParticipantIds.length === 0) {
+    // 2. Mandatory Event Name Validation
+    const rawName = String(form.eventName ?? "").trim();
+    if (!rawName) {
+      newErrors.eventName = requiredMsg;
+    } else if (rawName.length < 3) {
+      newErrors.eventName = "Event Name must be at least 3 characters";
+    } else if (rawName.length > 250) {
+      newErrors.eventName = "Event Name cannot exceed 250 characters";
+    }
+
+    // 3. Mandatory Event Date Validation
+    if (!form.eventDate || !dayjs(form.eventDate).isValid()) {
+      newErrors.eventDate = requiredMsg;
+    } else if (!isEdit && dayjs(form.eventDate).isBefore(dayjs().startOf("day"))) {
+      newErrors.eventDate = "Cannot create an event for a past date";
+    }
+
+    // 4. Participant validation for non-birthday events if an event type is chosen
+    if (!isBirthday && (form.eventTypeId || form.eventTypeIds?.length > 0) && selectedParticipantIds.length === 0) {
       newErrors.participantIds = "Please select at least one participating member";
     }
 
-    if (typesWithoutExpenseItems.length > 0) {
+    // 5. Types without expense items amount validation
+    if (typesWithoutExpenseItems.length > 0 && (form.eventTypeId || form.eventTypeIds?.length > 0)) {
       typesWithoutExpenseItems.forEach((t) => {
         const val = otherEventAmounts[t.eventTypeId] !== undefined
           ? otherEventAmounts[t.eventTypeId]
@@ -1679,6 +1703,14 @@ export default function EventFormPage({
       });
     }
 
+    // CRITICAL: Block submission and display inline errors on ALL mandatory fields first!
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
+      return;
+    }
+
+    // Check budget calculation only after mandatory required fields are valid
     if (plannedBudget <= 0) {
       toast.error("Event cannot be saved with ₹0. Please enter a valid contribution amount or configure budget items.");
       return;
@@ -1697,12 +1729,6 @@ export default function EventFormPage({
         toast.error(`Deduction amount (₹${effectiveDeduction.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) exceeds available Amount In Hand (₹${availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`);
         return;
       }
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
-      return;
     }
 
     if (isEdit && hasPayments) {
@@ -2048,6 +2074,11 @@ export default function EventFormPage({
                       placeholder="Select EventType"
                       value={form.eventTypeId}
                       onChange={(e) => handleTypeChange(e.target.value)}
+                      onBlur={() => {
+                        if (!form.eventTypeId) {
+                          setErrors((p) => ({ ...p, eventTypeId: "This field is required" }));
+                        }
+                      }}
                       clearable
                       options={typeOptions}
                       error={!!errors.eventTypeId}
@@ -2079,6 +2110,12 @@ export default function EventFormPage({
                       }
                       setErrors((p) => ({ ...p, eventName: nameErr }));
                     }}
+                    onBlur={() => {
+                      const cleanVal = String(form.eventName ?? "").trim();
+                      if (!cleanVal) {
+                        setErrors((p) => ({ ...p, eventName: "This field is required" }));
+                      }
+                    }}
                     inputProps={{ maxLength: 250 }}
                     error={!!errors.eventName}
                     helperText={errors.eventName}
@@ -2093,7 +2130,7 @@ export default function EventFormPage({
                       required
                       value={
                         celebrantDatesCsv ||
-                        (form.eventDate
+                        (form.eventDate && dayjs(form.eventDate).isValid()
                           ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
                           : "Auto calculated")
                       }
@@ -2136,6 +2173,7 @@ export default function EventFormPage({
                     <AppDateInput
                       label="Event Date"
                       required
+                      clearable
                       value={form.eventDate}
                       minDate={!isEdit ? dayjs().startOf("day") : undefined}
                       onChange={handleDateChange}
@@ -2324,7 +2362,7 @@ export default function EventFormPage({
                       mb: 0.6,
                     }}
                   >
-                    Identified Celebrants in {dayjs(form.eventDate).format("MMMM")} ({monthCelebrants.length}):
+                    Identified Celebrants in {form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("MMMM") : ""} ({monthCelebrants.length}):
                   </Typography>
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px 8px" }}>
                     {monthCelebrants.map((m) => {

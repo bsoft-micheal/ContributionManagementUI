@@ -33,6 +33,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   validateForm,
+  validateEmail,
   validateIndianMobile,
   validatePassword,
   validateConfirmPassword,
@@ -433,8 +434,8 @@ export default function UserFormPage() {
         return "";
       }
       case "email": {
-        if (!strVal) return "This field is required";
-        const emailErr = validateEmail(strVal);
+        if (!value || !String(value).trim()) return "This field is required";
+        const emailErr = validateEmail(value);
         return emailErr || "";
       }
       case "phone": {
@@ -476,6 +477,7 @@ export default function UserFormPage() {
       }
       case "username": {
         if (!currentForm.createMemberProfile) return "";
+        if (!strVal) return "This field is required";
         return validateUsername(value, { isRequired: true });
       }
       case "newPassword": {
@@ -485,9 +487,8 @@ export default function UserFormPage() {
           (hasExistingLogin && isChangingPassword);
         if (!shouldReqPassword) return "";
 
-        const customReqMsg = hasExistingLogin ? "New password is required." : "Password is required.";
         if (!value || !String(value).trim()) {
-          return customReqMsg;
+          return "This field is required";
         }
 
         return validatePassword(value, {
@@ -502,6 +503,10 @@ export default function UserFormPage() {
           (!hasExistingLogin && Boolean(currentForm.createMemberProfile)) ||
           (hasExistingLogin && isChangingPassword);
         if (!shouldReqPassword) return "";
+
+        if (!value || !String(value).trim()) {
+          return "This field is required";
+        }
 
         return validateConfirmPassword(value, currentForm.newPassword, {
           isRequired: true,
@@ -730,9 +735,13 @@ export default function UserFormPage() {
     const e = validateForm(form, schema);
 
     if (form.createMemberProfile) {
-      const userErr = validateUsername(form.username, { isRequired: true });
-      if (userErr) {
-        e.username = userErr;
+      if (!form.username || !String(form.username).trim()) {
+        e.username = "This field is required";
+      } else {
+        const userErr = validateUsername(form.username, { isRequired: true });
+        if (userErr) {
+          e.username = userErr;
+        }
       }
     }
 
@@ -741,9 +750,8 @@ export default function UserFormPage() {
       (hasExistingLogin && isChangingPassword);
 
     if (form.createMemberProfile && shouldReqPassword) {
-      const customReqMsg = hasExistingLogin ? "New password is required." : "Password is required.";
       if (!form.newPassword || !String(form.newPassword).trim()) {
-        e.newPassword = customReqMsg;
+        e.newPassword = "This field is required";
       } else {
         const pwErr = validatePassword(form.newPassword, {
           username: form.username,
@@ -755,11 +763,15 @@ export default function UserFormPage() {
         }
       }
 
-      const cpwErr = validateConfirmPassword(form.confirmPassword, form.newPassword, {
-        isRequired: true,
-      });
-      if (cpwErr) {
-        e.confirmPassword = cpwErr;
+      if (!form.confirmPassword || !String(form.confirmPassword).trim()) {
+        e.confirmPassword = "This field is required";
+      } else {
+        const cpwErr = validateConfirmPassword(form.confirmPassword, form.newPassword, {
+          isRequired: true,
+        });
+        if (cpwErr) {
+          e.confirmPassword = cpwErr;
+        }
       }
     }
 
@@ -1001,7 +1013,7 @@ export default function UserFormPage() {
                   placeholder="Enter email address"
                   value={form.email}
                   onChange={(e) => fieldChange("email", e.target.value)}
-                  maxLength={250}
+                  maxLength={254}
                   error={!!errors.email}
                   helperText={errors.email}
                   required
@@ -1291,7 +1303,7 @@ export default function UserFormPage() {
                     maxLength={30}
                     autoComplete="off"
                     error={!!errors.username}
-                    helperText={errors.username || "4–30 characters. Start with a letter. Use letters, numbers, dot or underscore only."}
+                    helperText={errors.username || ""}
                     required
                   />
                 </Grid>

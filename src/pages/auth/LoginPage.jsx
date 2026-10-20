@@ -11,6 +11,7 @@ import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
 import { getRightsForPath, getFirstAccessiblePath } from "../../utils/rightsHelper";
+import { validateEmail } from "../../utils/validation";
 
 export default function LoginPage() {
   const theme = useTheme();
@@ -78,8 +79,13 @@ export default function LoginPage() {
     const newErrors = {};
     if (!form.email?.trim()) {
       newErrors.email = COMMON_STRINGS.VALIDATION.USERNAME_OR_EMAIL_REQUIRED || COMMON_STRINGS.VALIDATION.REQUIRED;
-    } else if (form.email.trim().length > 250) {
-      newErrors.email = "Username or Email must not exceed 250 characters";
+    } else if (form.email.length > 254) {
+      newErrors.email = "Username or Email cannot exceed 254 characters";
+    } else if (form.email.includes("@")) {
+      const emailErr = validateEmail(form.email);
+      if (emailErr) {
+        newErrors.email = emailErr;
+      }
     }
 
     if (!form.password) {
@@ -368,14 +374,21 @@ export default function LoginPage() {
                         fullWidth
                         value={form.email}
                         onChange={(e) => {
-                          setForm((c) => ({ ...c, email: e.target.value }));
-                          if (errors.email) setErrors((prev) => ({ ...prev, email: "" }));
+                          const val = e.target.value;
+                          setForm((c) => ({ ...c, email: val }));
+                          if (errors.email) {
+                            if (val.includes("@")) {
+                              setErrors((prev) => ({ ...prev, email: validateEmail(val) }));
+                            } else {
+                              setErrors((prev) => ({ ...prev, email: "" }));
+                            }
+                          }
                         }}
                         error={!!errors.email}
                         helperText={errors.email}
                         placeholder={COMMON_STRINGS.AUTH.USERNAME_OR_EMAIL_PLACEHOLDER}
                         size="small"
-                        inputProps={{ maxLength: 250 }}
+                        inputProps={{ maxLength: 254 }}
                         sx={{
                           "& .MuiOutlinedInput-root": {
                             borderRadius: "6px",

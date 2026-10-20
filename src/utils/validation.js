@@ -100,7 +100,7 @@ export function validateField(value, config = {}) {
 
   // 2. Email format check
   if (email || config.type === "email") {
-    const emailErr = validateEmail(strVal);
+    const emailErr = validateEmail(value);
     if (emailErr) {
       return emailErr;
     }
@@ -191,105 +191,47 @@ export function validateIndianMobile(value) {
 }
 
 /**
- * Comprehensive email validation ensuring standard email formatting,
- * no forbidden characters/patterns, valid domain structure, and max 250 characters.
- * @param {string} value The email address to validate.
- * @returns {string} Error message if invalid, or empty string if valid.
+ * Comprehensive email validation ensuring strict RFC 5321/5322 compliance:
+ * - Allowed local characters: letters A-Z, a-z, digits 0-9, dot (.), underscore (_), percent (%), plus (+), hyphen (-)
+ * - Allowed domain characters: letters A-Z, a-z, digits 0-9, hyphen (-), dot (.)
+ * - No whitespace before, inside, or after
+ * - Exactly one '@' symbol
+ * - No leading/trailing dots in local part, no consecutive dots
+ * - Domain must have a valid extension (minimum 2 letters)
+ * - Domain labels cannot start or end with hyphens, no underscores
+ * - Maximum length 254 characters
+ * @param {string} value The raw email input to validate.
+ * @returns {string} Validation error message, or empty string if valid.
+ */
+export const emailRegex = /^[a-zA-Z0-9_+-]+(?:\.[a-zA-Z0-9_+-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/;
+
+/**
+ * Validates an email address against length and format constraints.
+ * Requirements:
+ * - Local part allows alphanumeric, underscore, plus, hyphen, and dots (not leading, trailing, or consecutive).
+ * - Domain part allows alphanumeric and hyphen labels separated by dots with at least one domain extension.
+ * - Maximum length: 254 characters.
+ * - No whitespace, multiple '@', or invalid characters.
+ * @param {string} value The raw email input to validate.
+ * @returns {string} Error message "Please enter a valid email address." or empty string if valid.
  */
 export function validateEmail(value) {
-  if (!value || !String(value).trim()) {
+  if (value === undefined || value === null) {
     return "";
   }
-  const strVal = String(value).trim();
 
-  // 1. Length constraint: maximum 250 characters
-  if (strVal.length > 250) {
-    return "Email cannot exceed 250 characters";
-  }
-
-  // 2. Spaces not allowed
-  if (/\s/.test(strVal)) {
-    return "Email cannot contain spaces";
+  const rawStr = String(value).trim();
+  if (!rawStr) {
+    return "";
   }
 
-  // 3. Disallowed special characters: ", (, ), ,, :, ;, <, >, [, ], $, #, %, *
-  const disallowedSpecialChars = /["(),:;<>[\\\]$#%*]/;
-  if (disallowedSpecialChars.test(strVal)) {
-    return "Email contains invalid special characters";
+  // Reject spaces or length exceeding 254 characters
+  if (String(value).length > 254 || /\s/.test(String(value))) {
+    return "Please enter a valid email address.";
   }
 
-  // 4. @ symbol checks
-  const atParts = strVal.split("@");
-  if (atParts.length === 1) {
-    return "Email must contain an '@' symbol";
-  }
-  if (atParts.length > 2) {
-    return "Email cannot contain multiple '@' symbols";
-  }
-
-  const [localPart, domainPart] = atParts;
-
-  // 5. Local part (before @) checks
-  if (!localPart) {
-    return "Email is missing local part before '@'";
-  }
-  if (localPart.startsWith(".")) {
-    return "Email cannot start with a dot";
-  }
-  if (localPart.endsWith(".")) {
-    return "Email cannot end with a dot before '@'";
-  }
-  if (localPart.includes("..")) {
-    return "Email cannot contain consecutive dots";
-  }
-  // Local part character allowance: letters, numbers, and standard safe punctuation . _ - +
-  if (!/^[a-zA-Z0-9._+-]+$/.test(localPart)) {
-    return "Email contains invalid characters";
-  }
-
-  // 6. Domain part (after @) checks
-  if (!domainPart) {
-    return "Email is missing domain after '@'";
-  }
-  if (domainPart.startsWith(".") || domainPart.endsWith(".")) {
-    return "Email domain cannot start or end with a dot";
-  }
-  if (domainPart.includes("..")) {
-    return "Email domain cannot contain consecutive dots";
-  }
-
-  // Domain labels check
-  const domainLabels = domainPart.split(".");
-  if (domainLabels.length < 2) {
-    return "Email domain must include a top-level domain (e.g., .com)";
-  }
-
-  // Check top-level domain (TLD) - last part after dot must be letters only and >= 2 chars
-  const tld = domainLabels[domainLabels.length - 1];
-  if (!/^[a-zA-Z]{2,}$/.test(tld)) {
-    return "Email has an invalid top-level domain (e.g., .com, .org)";
-  }
-
-  // Check domain labels: letters, numbers, hyphens only. No underscores (exam_ple.com is invalid), no special chars
-  for (const label of domainLabels) {
-    if (!label) {
-      return "Email domain format is invalid";
-    }
-    if (label.startsWith("-") || label.endsWith("-")) {
-      return "Domain labels cannot start or end with a hyphen";
-    }
-    if (label.includes("_")) {
-      return "Email domain cannot contain underscore ('_')";
-    }
-    if (!/^[a-zA-Z0-9-]+$/.test(label)) {
-      return "Email domain contains invalid characters";
-    }
-  }
-
-  // 7. Strict overall standard email regex check
-  const strictEmailRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9._+-]*[a-zA-Z0-9])?@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
-  if (!strictEmailRegex.test(strVal)) {
-    return "Please enter a valid email address";
+  if (!emailRegex.test(rawStr)) {
+    return "Please enter a valid email address.";
   }
 
   return "";
@@ -345,7 +287,7 @@ export function validateUsername(value, options = {}) {
   const { isRequired = true } = options;
 
   if (value === undefined || value === null || String(value).trim() === "") {
-    return isRequired ? "Username is required." : "";
+    return isRequired ? (options.requiredMessage || "This field is required") : "";
   }
 
   const strVal = String(value).trim();
@@ -407,12 +349,12 @@ export function validatePassword(rawPassword, options = {}) {
   } = options;
 
   if (rawPassword === undefined || rawPassword === null || rawPassword === "") {
-    return isRequired ? "Password is required." : "";
+    return isRequired ? (options.requiredMessage || "This field is required") : "";
   }
 
   const trimmed = String(rawPassword).trim();
   if (!trimmed) {
-    return isRequired ? "Password is required." : "";
+    return isRequired ? (options.requiredMessage || "This field is required") : "";
   }
 
   // 1. Internal spaces
@@ -484,18 +426,22 @@ export function validateConfirmPassword(rawConfirmPassword, rawPassword, options
   const { isRequired = true } = options;
 
   if (rawConfirmPassword === undefined || rawConfirmPassword === null || rawConfirmPassword === "") {
-    return isRequired || (rawPassword && String(rawPassword).trim()) ? "Confirm password is required." : "";
+    return isRequired || (rawPassword && String(rawPassword).trim())
+      ? (options.requiredMessage || "This field is required")
+      : "";
   }
 
   const trimmedConfirm = String(rawConfirmPassword).trim();
   const trimmedPassword = String(rawPassword ?? "").trim();
 
   if (!trimmedConfirm) {
-    return isRequired || trimmedPassword ? "Confirm password is required." : "";
+    return isRequired || trimmedPassword
+      ? (options.requiredMessage || "This field is required")
+      : "";
   }
 
   if (trimmedConfirm !== trimmedPassword) {
-    return "Password and confirm password do not match.";
+    return "Password does not match.";
   }
 
   return "";

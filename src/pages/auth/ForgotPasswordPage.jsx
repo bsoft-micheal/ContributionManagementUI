@@ -21,7 +21,7 @@ import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import { requestForgotPasswordOtpAsync } from "../../services/userService";
 import loginBg from "../../assets/login_bg.png";
 import rightLoginBg from "../../assets/right_login_bg.png";
-import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import { validateEmail } from "../../utils/validation";
 
 export default function ForgotPasswordPage() {
   const theme = useTheme();
@@ -33,18 +33,10 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
 
   const validateEmailFormat = (val) => {
-    const trimmed = val ? val.trim() : "";
-    if (!trimmed) {
+    if (!val || !val.trim()) {
       return "Email address is required.";
     }
-    if (trimmed.length > 254) {
-      return "Email address cannot exceed 254 characters.";
-    }
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(trimmed)) {
-      return "Please enter a valid email address.";
-    }
-    return "";
+    return validateEmail(val);
   };
 
   const handleRequestOtp = async (e) => {
@@ -217,8 +209,11 @@ export default function ForgotPasswordPage() {
                   label="Email Address"
                   value={email}
                   onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (emailError) setEmailError("");
+                    const val = e.target.value;
+                    setEmail(val);
+                    if (emailError) {
+                      setEmailError(!val.trim() ? "Email address is required." : validateEmail(val));
+                    }
                   }}
                   error={!!emailError}
                   helperText={emailError}

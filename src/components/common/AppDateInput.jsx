@@ -418,6 +418,7 @@ export default function AppDateInput({
 }) {
   const theme = useTheme();
   const dayjsVal = toDayjs(value);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
 
   const handleChange = (newValue) => {
     if (onChange) {
@@ -460,6 +461,9 @@ export default function AppDateInput({
         format={format}
         disabled={disabled}
         readOnly={readOnly}
+        open={pickerOpen}
+        onOpen={() => setPickerOpen(true)}
+        onClose={() => setPickerOpen(false)}
         minDate={minDate ? toDayjs(minDate) : undefined}
         maxDate={maxDate ? toDayjs(maxDate) : undefined}
         disableFuture={disableFuture}
@@ -482,6 +486,12 @@ export default function AppDateInput({
           },
           openPickerButton: {
             size: "small",
+            onClick: (e) => {
+              e.stopPropagation();
+              if (!disabled && !readOnly) {
+                setPickerOpen((prev) => !prev);
+              }
+            },
             sx: {
               width: 24,
               height: 24,
@@ -522,6 +532,14 @@ export default function AppDateInput({
             helperText: helperText,
             placeholder: format,
             variant: "outlined",
+            onClick: (e) => {
+              if (!disabled && !readOnly) {
+                setPickerOpen(true);
+              }
+              if (customSlotProps.textField?.onClick) {
+                customSlotProps.textField.onClick(e);
+              }
+            },
             InputProps: {
               startAdornment: startAdornment ? (
                 <Box
@@ -550,6 +568,7 @@ export default function AppDateInput({
                 color: (theme) =>
                   theme.palette.mode === "dark" ? "#ffffff" : "inherit",
                 "& input, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
+                  cursor: disabled ? "default" : "pointer",
                   py: size === "small" ? 0.5 : 0.8,
                   pl: size === "small" ? 1 : 1.2,
                   pr: 0.2,
@@ -601,12 +620,16 @@ export default function AppDateInput({
                         : "#6f5bd3",
                   borderWidth: "2px",
                 },
-                "& .MuiFormHelperText-root": {
-                  fontSize: "0.75rem",
-                  fontWeight: 400,
-                  mt: 0.5,
-                  color: (theme) => error ? (theme.palette.mode === "dark" ? "#f87171 !important" : "#ef4444 !important") : (theme.palette.mode === "dark" ? "#cbd5e1 !important" : "#334155 !important"),
-                },
+              },
+              "& .MuiFormHelperText-root": {
+                fontSize: "0.75rem",
+                fontWeight: 500,
+                mt: 0.5,
+                ml: 0.5,
+                color: (theme) =>
+                  error
+                    ? (theme.palette.mode === "dark" ? "#f87171 !important" : "#ef4444 !important")
+                    : (theme.palette.mode === "dark" ? "#cbd5e1 !important" : "#334155 !important"),
               },
               ...customSlotProps.textField?.sx,
             },

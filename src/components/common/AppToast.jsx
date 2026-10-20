@@ -37,7 +37,7 @@ export const extractErrorMessage = (err, fallback = "Something went wrong. Pleas
     lower.includes("isdeleted") ||
     lower.includes("does not exist")
   ) {
-    return "This record no longer exists. Please refresh the page.";
+    return "Username not found.";
   }
 
   // 2. Already processed / completed (409 or duplicate submission / completed)

@@ -52,6 +52,7 @@ import UserDetailsDialog from "../../components/members/UserDetailsDialog";
 import SwitchRoleDialog from "../../components/members/SwitchRoleDialog";
 import {
   validateForm,
+  validateEmail,
   validateIndianMobile,
   validatePassword,
   validateConfirmPassword,
@@ -411,6 +412,12 @@ export default function UsersPage() {
       }
     }
 
+    if (field === "email") {
+      if (errors.email) {
+        setErrors((prev) => ({ ...prev, email: !value ? "This field is required" : validateEmail(value) }));
+      }
+    }
+
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -648,12 +655,40 @@ export default function UsersPage() {
 
   function handleToggleStatusRequest(row) {
     if (!canChangeUserStatus) return;
+
+    // Disallow deactivating currently logged in user
+    const isSelf = Boolean(
+      (authState?.userId && String(row.userId).toLowerCase() === String(authState.userId).toLowerCase()) ||
+      (authState?.email && row.email && String(row.email).toLowerCase() === String(authState.email).toLowerCase()) ||
+      (authState?.username && row.username && String(row.username).toLowerCase() === String(authState.username).toLowerCase())
+    );
+
+    if (row.isActive && isSelf) {
+      toast.error("You cannot deactivate your own account.");
+      return;
+    }
+
     setUserToToggle(row);
     setStatusConfirmOpen(true);
   }
 
   async function handleConfirmStatusToggle() {
     if (!userToToggle) return;
+
+    // Disallow deactivating currently logged in user
+    const isSelf = Boolean(
+      (authState?.userId && String(userToToggle.userId).toLowerCase() === String(authState.userId).toLowerCase()) ||
+      (authState?.email && userToToggle.email && String(userToToggle.email).toLowerCase() === String(authState.email).toLowerCase()) ||
+      (authState?.username && userToToggle.username && String(userToToggle.username).toLowerCase() === String(authState.username).toLowerCase())
+    );
+
+    if (userToToggle.isActive && isSelf) {
+      toast.error("You cannot deactivate your own account.");
+      setStatusConfirmOpen(false);
+      setUserToToggle(null);
+      return;
+    }
+
     try {
       const payload = {
         fullName: userToToggle.fullName || userToToggle.FullName || userToToggle.username,
@@ -713,8 +748,9 @@ export default function UsersPage() {
 
     // 2. Email Format & Email Uniqueness
     if (!email) return { error: `Row ${rowNum}: Email is required` };
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return { error: `Row ${rowNum}: Invalid email format '${email}' (e.g. name@domain.com)` };
+    const emailErr = validateEmail(email);
+    if (emailErr) {
+      return { error: `Row ${rowNum}: ${emailErr} ('${email}')` };
     }
     const emailLower = email.toLowerCase();
     const existingEmail = users.find((u) => u.email && u.email.trim().toLowerCase() === emailLower);
@@ -956,22 +992,39 @@ export default function UsersPage() {
                 </Tooltip>
               );
             })()}
-            <Tooltip title={canChangeUserStatus ? (row.isActive ? "Deactivate User" : "Activate User") : "Disabled"}>
-              <span style={{ display: "inline-flex", cursor: !canChangeUserStatus ? "not-allowed" : "pointer" }}>
-                <IconButton
-                  size="small"
-                  sx={{ p: 0.3 }}
-                  disabled={!canChangeUserStatus}
-                  onClick={() => handleToggleStatusRequest(row)}
-                >
-                  {row.isActive ? (
-                    <ToggleOnIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#10b981" : "#94a3b8" }} />
-                  ) : (
-                    <ToggleOffIcon sx={{ fontSize: "1.25rem", color: canChangeUserStatus ? "#ef4444" : "#94a3b8" }} />
-                  )}
-                </IconButton>
-              </span>
-            </Tooltip>
+            {(() => {
+              const isSelf = Boolean(
+                (authState?.userId && String(row.userId).toLowerCase() === String(authState.userId).toLowerCase()) ||
+                (authState?.email && row.email && String(row.email).toLowerCase() === String(authState.email).toLowerCase()) ||
+                (authState?.username && row.username && String(row.username).toLowerCase() === String(authState.username).toLowerCase())
+              );
+              const isDeactivatingSelf = row.isActive && isSelf;
+              const canToggle = canChangeUserStatus && !isDeactivatingSelf;
+              const tooltipTitle = isDeactivatingSelf
+                ? "You cannot deactivate your own account"
+                : canChangeUserStatus
+                ? (row.isActive ? "Deactivate User" : "Activate User")
+                : "Disabled";
+
+              return (
+                <Tooltip title={tooltipTitle}>
+                  <span style={{ display: "inline-flex", cursor: !canToggle ? "not-allowed" : "pointer" }}>
+                    <IconButton
+                      size="small"
+                      sx={{ p: 0.3 }}
+                      disabled={!canToggle}
+                      onClick={() => handleToggleStatusRequest(row)}
+                    >
+                      {row.isActive ? (
+                        <ToggleOnIcon sx={{ fontSize: "1.25rem", color: canToggle ? "#10b981" : "#94a3b8" }} />
+                      ) : (
+                        <ToggleOffIcon sx={{ fontSize: "1.25rem", color: canToggle ? "#ef4444" : "#94a3b8" }} />
+                      )}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              );
+            })()}
           </Box>
         );
       },

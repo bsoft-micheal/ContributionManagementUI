@@ -22,7 +22,7 @@ import AppConfirmDialog from "../common/AppConfirmDialog";
 import { useAppToast } from "../common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { hasActionPermission } from "../../utils/rightsHelper";
-import { deleteEventAsync } from "../../services/eventService";
+import { deleteEventAsync, getEventByIdAsync } from "../../services/eventService";
 import { getContributionsByEventAsync } from "../../services/contributionService";
 import { getMembersAsync } from "../../services/memberService";
 import { COMMON_STRINGS, TOAST_MESSAGES } from "../../constants";
@@ -36,6 +36,21 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
   const [internalMembers, setInternalMembers] = useState([]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [detailedEvent, setDetailedEvent] = useState(null);
+
+  useEffect(() => {
+    if (open && event?.eventId) {
+      getEventByIdAsync(event.eventId)
+        .then((res) => {
+          if (res) setDetailedEvent(res);
+        })
+        .catch(() => {});
+    } else {
+      setDetailedEvent(null);
+    }
+  }, [open, event?.eventId]);
+
+  const activeEvent = detailedEvent || event;
 
   const canDeleteEvent = Boolean(
     hasActionPermission("Delete Event", 33, authState?.role).canExecute ||
@@ -134,9 +149,27 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     event?.eventName?.toLowerCase().includes("birthday")
   );
 
-  // Strip internal <!--contrib:{...}--> metadata comment from a description string
+  // Strip internal metadata comments (<!--contrib:...-->, <!--celebrants:...-->, etc.) from a description string
   const stripContribMeta = (desc) =>
-    (desc || "").replace(/<!--contrib:[\s\S]*?-->/gi, "").trim();
+    (desc || "").replace(/<!--[\s\S]*?-->/gi, "").trim();
+
+  // Extract celebrants metadata saved as <!--celebrants:{"marriage":[...],"sendOff":[...]}-->
+  const extractCelebrantsMeta = (desc) => {
+    if (!desc) return null;
+    const match = desc.match(/<!--celebrants:(.*?)-->/);
+    if (match && match[1]) {
+      try {
+        return JSON.parse(match[1]);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const celebrantsMeta =
+    extractCelebrantsMeta(activeEvent?.description) ||
+    extractCelebrantsMeta(event?.description);
 
   // Helper to parse celebrants list directly from description string:
   // e.g. "Birthday celebration (4 Office, 0 WFH) for Albin (30 Sep), Michael Antony Raj C (18 Sep)... Planned Budget: ..."
@@ -272,12 +305,156 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     });
   };
 
-  const tableCelebrants = getTableCelebrants();
+  const getTableMembers = () => {
+    if (isBirthday) {
+      return getTableCelebrants();
+    }
+
+    const currentEvent = detailedEvent || event;
+    if (!currentEvent) return [];
+
+    const eventDateFormatted = currentEvent?.eventDate
+      ? dayjs(currentEvent.eventDate).format("DD/MM/YYYY")
+      : "--";
+
+    // 1. Check for specific featured members (Send-off / Relieving or Marriage)
+    const sendOffIds = Array.isArray(celebrantsMeta?.sendOff) ? celebrantsMeta.sendOff : [];
+    const marriageIds = Array.isArray(celebrantsMeta?.marriage) ? celebrantsMeta.marriage : [];
+
+    const featuredMembers = [];
+
+    if (sendOffIds.length > 0) {
+      sendOffIds.forEach((sId) => {
+        const matched = allMembers.find((m) => m.memberId === sId);
+        if (matched) {
+          featuredMembers.push({
+            id: sId,
+            name: matched.name,
+            dateValue: eventDateFormatted,
+            workType: matched.workType || matched.memberType || "Office",
+            roleType: "Send-off",
+          });
+        }
+      });
+    }
+
+    if (marriageIds.length > 0) {
+      marriageIds.forEach((mId) => {
+        const matched = allMembers.find((m) => m.memberId === mId);
+        if (matched) {
+          featuredMembers.push({
+            id: mId,
+            name: matched.name,
+            dateValue: eventDateFormatted,
+            workType: matched.workType || matched.memberType || "Office",
+            roleType: "Marriage",
+          });
+        }
+      });
+    }
+
+    // If specific featured members (Send-off / Marriage) are defined, display only those particular members!
+    if (featuredMembers.length > 0) {
+      return featuredMembers.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    }
+
+    // 2. Fallback to participating members if no specific send-off or marriage members are designated
+    const map = new Map();
+
+    const participants = currentEvent.participants || [];
+    participants.forEach((p) => {
+      const pId = p.memberId || p.id;
+      const matched = allMembers.find((m) => m.memberId === pId);
+      const name = p.name || p.memberName || matched?.name || "";
+      if (!name) return;
+      const workType = matched?.workType || matched?.memberType || p.workType || p.memberType || "Office";
+      const key = pId ? `id:${pId}` : name.toLowerCase().trim();
+      if (!map.has(key)) {
+        map.set(key, {
+          id: pId || key,
+          name,
+          dateValue: eventDateFormatted,
+          workType,
+        });
+      }
+    });
+
+    const participantIds = currentEvent.participantIds || [];
+    participantIds.forEach((pId) => {
+      const matched = allMembers.find((m) => m.memberId === pId);
+      if (!matched) return;
+      const key = `id:${pId}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: pId,
+          name: matched.name,
+          dateValue: eventDateFormatted,
+          workType: matched.workType || matched.memberType || "Office",
+        });
+      }
+    });
+
+    (contributions || []).forEach((c) => {
+      const cId = c.memberId;
+      const matched = allMembers.find((m) => m.memberId === cId);
+      const name = c.memberName || matched?.name || "";
+      if (!name) return;
+      const workType = matched?.workType || matched?.memberType || c.workType || c.memberType || "Office";
+      const key = cId ? `id:${cId}` : name.toLowerCase().trim();
+      if (!map.has(key)) {
+        map.set(key, {
+          id: cId || key,
+          name,
+          dateValue: eventDateFormatted,
+          workType,
+        });
+      }
+    });
+
+    if (map.size === 0 && allMembers.length > 0) {
+      allMembers.forEach((m) => {
+        const key = `id:${m.memberId}`;
+        map.set(key, {
+          id: m.memberId,
+          name: m.name,
+          dateValue: eventDateFormatted,
+          workType: m.workType || m.memberType || "Office",
+        });
+      });
+    }
+
+    return Array.from(map.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  };
+
+  const tableMembers = getTableMembers();
+
+  // Determine the nature of members listed in the table
+  const hasSendOffInTable = tableMembers.some((m) => m.roleType === "Send-off");
+  const hasMarriageInTable = tableMembers.some((m) => m.roleType === "Marriage");
+
+  const tableMembersLabel = isBirthday
+    ? `${tableMembers.length} Birthday Celebrant${tableMembers.length !== 1 ? "s" : ""}`
+    : hasSendOffInTable && hasMarriageInTable
+    ? `${tableMembers.length} Send-off & Marriage Celebrant${tableMembers.length !== 1 ? "s" : ""}`
+    : hasSendOffInTable
+    ? `${tableMembers.length} Send-off Member${tableMembers.length !== 1 ? "s" : ""}`
+    : hasMarriageInTable
+    ? `${tableMembers.length} Marriage Celebrant${tableMembers.length !== 1 ? "s" : ""}`
+    : `${tableMembers.length} Participating Member${tableMembers.length !== 1 ? "s" : ""}`;
+
+  const tableMemberColumnTitle = isBirthday
+    ? "Birthday Member"
+    : hasSendOffInTable && !hasMarriageInTable
+    ? "Send-off Member"
+    : hasMarriageInTable && !hasSendOffInTable
+    ? "Marriage Celebrant"
+    : "Member Name";
 
   // Overview summary text for description — always strip internal contrib metadata
   const getOverviewText = () => {
-    if (!event?.description) return "";
-    const clean = stripContribMeta(event.description);
+    const desc = activeEvent?.description || event?.description || "";
+    if (!desc) return "";
+    const clean = stripContribMeta(desc);
     const match = clean.match(/^(Birthday celebration.*?)\s*for.*?\.\s*(Planned Budget.*)$/i);
     if (match) {
       return `${match[1]} • ${match[2]}`;
@@ -285,9 +462,9 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     return clean;
   };
 
-  const overviewText = isBirthday && tableCelebrants.length > 0
+  const overviewText = isBirthday && tableMembers.length > 0
     ? getOverviewText()
-    : stripContribMeta(event?.description || "");
+    : stripContribMeta(activeEvent?.description || event?.description || "");
 
   return (
     <>
@@ -569,16 +746,22 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                 >
                   Description
                 </Typography>
-                {isBirthday && tableCelebrants.length > 0 && (
+                {tableMembers.length > 0 && (
                   <Chip
                     size="small"
-                    label={`${tableCelebrants.length} Birthday Celebrant${tableCelebrants.length !== 1 ? "s" : ""}`}
+                    label={tableMembersLabel}
                     sx={{
                       height: 22,
                       fontSize: "0.68rem",
                       fontWeight: 700,
-                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(192, 38, 211, 0.2)" : "rgba(192, 38, 211, 0.1)",
-                      color: (theme) => theme.palette.mode === "dark" ? "#f0abfc" : "#86198f",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? (isBirthday ? "rgba(192, 38, 211, 0.2)" : (hasSendOffInTable || hasMarriageInTable) ? "rgba(124, 58, 237, 0.2)" : "rgba(14, 165, 233, 0.2)")
+                          : (isBirthday ? "rgba(192, 38, 211, 0.1)" : (hasSendOffInTable || hasMarriageInTable) ? "rgba(124, 58, 237, 0.1)" : "rgba(14, 165, 233, 0.1)"),
+                      color: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? (isBirthday ? "#f0abfc" : (hasSendOffInTable || hasMarriageInTable) ? "#c4b5fd" : "#38bdf8")
+                          : (isBirthday ? "#86198f" : (hasSendOffInTable || hasMarriageInTable) ? "#6d28d9" : "#0284c7"),
                       borderRadius: "6px",
                     }}
                   />
@@ -592,7 +775,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                     color: "text.primary",
                     fontSize: "0.8rem",
                     lineHeight: 1.5,
-                    mb: isBirthday && tableCelebrants.length > 0 ? 1.5 : 0,
+                    mb: tableMembers.length > 0 ? 1.5 : 0,
                     fontWeight: 500,
                   }}
                 >
@@ -600,16 +783,16 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                 </Typography>
               )}
 
-              {/* Table of Birthday Members and their DOB */}
-              {isBirthday && tableCelebrants.length > 0 && (
+              {/* Table of Members */}
+              {tableMembers.length > 0 && (
                 <Box
                   sx={{
                     borderRadius: "8px",
                     overflow: "hidden",
                     border: (theme) => `1px solid ${theme.palette.divider}`,
                     bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
-                    maxHeight: tableCelebrants.length > 6 ? 260 : "none",
-                    overflowY: tableCelebrants.length > 6 ? "auto" : "visible",
+                    maxHeight: tableMembers.length > 6 ? 260 : "none",
+                    overflowY: tableMembers.length > 6 ? "auto" : "visible",
                   }}
                 >
                   <Table size="small" stickyHeader>
@@ -623,10 +806,10 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                           S.no
                         </TableCell>
                         <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
-                          Birthday Member
+                          {tableMemberColumnTitle}
                         </TableCell>
                         <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
-                          Date of Birth 
+                          {isBirthday ? "Date of Birth" : "Event Date"}
                         </TableCell>
                         <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, width: 110, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
                           Work Type
@@ -634,7 +817,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {tableCelebrants.map((celebrant, index) => (
+                      {tableMembers.map((celebrant, index) => (
                         <TableRow
                           key={celebrant.id || index}
                           sx={{
@@ -655,7 +838,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                             </Box>
                           </TableCell>
                           <TableCell sx={{ fontSize: "0.78rem", py: 0.8, fontWeight: 600, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.primary" }}>
-                            {celebrant.dobFormatted}
+                            {isBirthday ? celebrant.dobFormatted : celebrant.dateValue}
                           </TableCell>
                           <TableCell sx={{ fontSize: "0.75rem", py: 0.8 }}>
                             <Chip
