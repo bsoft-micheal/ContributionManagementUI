@@ -72,7 +72,7 @@ const initialForm = {
   eventType: "",
   relatedEvent: "",
   ticketType: "",
-  priority: "Medium",
+  priority: "",
   description: "",
   attachment: "",
   attachmentName: "",
@@ -89,7 +89,7 @@ export default function SupportTicketsPage() {
   const userRole = String(authState?.role || authState?.user?.roleName || "").trim().toLowerCase();
   const isAdminOrOrg = userRole === "admin" || userRole === "organizer";
   const isMemberRole = userRole === "member";
-  const isNameLocked = isMemberRole || Boolean(location.state?.raiseTicket) || Boolean(location.state?.memberName);
+  const isNameLocked = true;
 
   // Action-level feature IDs from navigation_menus (parent_id=12):
   // 49=Add support, 50=View details, 51=Verify, 52=Edit, 53=Delete
@@ -143,6 +143,7 @@ export default function SupportTicketsPage() {
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+  const [removeAttachmentConfirmOpen, setRemoveAttachmentConfirmOpen] = useState(false);
 
   const savedFormRef = useRef(null);
 
@@ -230,6 +231,10 @@ export default function SupportTicketsPage() {
 
   const handleRemoveAttachment = (e) => {
     if (e) e.stopPropagation();
+    setRemoveAttachmentConfirmOpen(true);
+  };
+
+  const handleConfirmRemoveAttachment = () => {
     setForm((c) => ({
       ...c,
       attachment: "",
@@ -238,6 +243,7 @@ export default function SupportTicketsPage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    setRemoveAttachmentConfirmOpen(false);
   };
 
   const handleDownloadImage = (dataUrl, fileName = "ticket_attachment.png") => {
@@ -664,7 +670,7 @@ export default function SupportTicketsPage() {
       eventType: derivedType,
       relatedEvent: row.relatedEvent || "",
       ticketType: row.ticketType || "",
-      priority: row.priority || "Medium",
+      priority: row.priority || "",
       status: row.status || "Open",
       description: row.description || "",
       attachment: row.attachment || "",
@@ -708,9 +714,10 @@ export default function SupportTicketsPage() {
     if (!editingTicket && !canAddTicket) return;
 
     const newErrors = {};
-    if (!form.memberName) newErrors.memberName = "User Name is required";
+    if (!form.memberName) newErrors.memberName = "Name is required";
     if (!form.eventType) newErrors.eventType = "Event Type is required";
     if (!form.ticketType) newErrors.ticketType = "Ticket Type is required";
+    if (!form.priority || !String(form.priority).trim()) newErrors.priority = "This field is required";
     if (!form.description || !form.description.trim()) newErrors.description = "Description is required";
 
     if (Object.keys(newErrors).length > 0) {
@@ -1421,10 +1428,12 @@ export default function SupportTicketsPage() {
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
-              label="User Name"
-              placeholder="Select User"
+              label="Name"
+              placeholder="Select Name"
               value={form.memberName}
-              disabled={isNameLocked}
+              disabled={true}
+              allowClear={false}
+              clearable={false}
               onChange={(e) => {
                 const selectedName = e.target.value;
                 const matched = membersList.find((m) => (m.name || m.memberName) === selectedName);
@@ -1520,8 +1529,13 @@ export default function SupportTicketsPage() {
               label="Priority"
               placeholder="Select Priority"
               value={form.priority}
-              onChange={(e) => setForm((c) => ({ ...c, priority: e.target.value }))}
+              onChange={(e) => {
+                setForm((c) => ({ ...c, priority: e.target.value }));
+                if (errors.priority) setErrors((p) => ({ ...p, priority: "" }));
+              }}
               options={priorityOptions.filter((o) => o.value !== "ALL")}
+              error={Boolean(errors.priority)}
+              helperText={errors.priority}
               required
             />
           </Grid>
@@ -1611,9 +1625,22 @@ export default function SupportTicketsPage() {
                       }}
                     />
                     <Box sx={{ overflow: "hidden" }}>
-                      <Typography variant="caption" fontWeight={700} sx={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>
-                        {form.attachmentName || "Attached Image"}
-                      </Typography>
+                      <Tooltip title={form.attachmentName || "Attached Image"} arrow placement="top">
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          sx={{
+                            display: "block",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: 120,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {form.attachmentName || "Attached Image"}
+                        </Typography>
+                      </Tooltip>
                       <Typography variant="caption" sx={{ color: "#0284c7", fontSize: "0.66rem", display: "block" }}>
                         Click to preview
                       </Typography>
@@ -1680,6 +1707,18 @@ export default function SupportTicketsPage() {
         onConfirm={handleConfirmDelete}
         title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
         content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
+      />
+
+      {/* Confirm Remove Attachment Dialog */}
+      <AppConfirmDialog
+        open={removeAttachmentConfirmOpen}
+        onClose={() => setRemoveAttachmentConfirmOpen(false)}
+        onConfirm={handleConfirmRemoveAttachment}
+        title="Remove Attachment"
+        content="Are you sure you want to remove this attached image?"
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmColor="error"
       />
 
       {/* View Details & Reply Dialog */}
@@ -1770,7 +1809,7 @@ export default function SupportTicketsPage() {
             <Grid container spacing={2}>
               <Grid size={{ xs: 6 }}>
                 <Typography variant="caption" color="text.secondary">
-                  User Name
+                  Name
                 </Typography>
                 <Typography variant="body2" fontWeight={700}>
                   {(() => {
@@ -1832,7 +1871,15 @@ export default function SupportTicketsPage() {
                 <Typography variant="caption" color="text.secondary">
                   Subject
                 </Typography>
-                <Typography variant="body2" fontWeight={700}>
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word",
+                  }}
+                >
                   {selectedTicket.subject}
                 </Typography>
               </Grid>
@@ -1849,6 +1896,9 @@ export default function SupportTicketsPage() {
                     borderRadius: "8px",
                     border: (t) => `1px solid ${t.palette.divider}`,
                     lineHeight: 1.6,
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word",
                   }}
                 >
                   {selectedTicket.description}

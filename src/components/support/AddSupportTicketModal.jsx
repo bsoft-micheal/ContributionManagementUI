@@ -20,6 +20,7 @@ import {
 import dayjs from "dayjs";
 
 import AppDialog from "../common/AppDialog";
+import AppConfirmDialog from "../common/AppConfirmDialog";
 import AppButton from "../common/AppButton";
 import AppSelect from "../common/AppSelect";
 import AppTextArea from "../common/AppTextArea";
@@ -50,7 +51,7 @@ const initialForm = {
   eventType: "",
   relatedEvent: "",
   ticketType: "",
-  priority: "Medium",
+  priority: "",
   description: "",
   attachment: "",
   attachmentName: "",
@@ -81,10 +82,11 @@ export default function AddSupportTicketModal({
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewImageSrc, setPreviewImageSrc] = useState("");
   const [previewImageTitle, setPreviewImageTitle] = useState("");
+  const [removeAttachmentConfirmOpen, setRemoveAttachmentConfirmOpen] = useState(false);
 
   const userRole = String(authState?.role || authState?.user?.roleName || "").trim().toLowerCase();
   const isMemberRole = userRole === "member";
-  const isNameLocked = isMemberRole || Boolean(initialData?.memberName);
+  const isNameLocked = true;
 
   // Load lookup lists when modal is open
   useEffect(() => {
@@ -163,7 +165,7 @@ export default function AddSupportTicketModal({
       eventType: rawEventType,
       relatedEvent: rawEventName,
       ticketType: initialData?.ticketType || "",
-      priority: initialData?.priority || "Medium",
+      priority: initialData?.priority || "",
       description: initialData?.description || "",
       attachment: "",
       attachmentName: "",
@@ -328,6 +330,10 @@ export default function AddSupportTicketModal({
 
   const handleRemoveAttachment = (e) => {
     if (e) e.stopPropagation();
+    setRemoveAttachmentConfirmOpen(true);
+  };
+
+  const handleConfirmRemoveAttachment = () => {
     setForm((c) => ({
       ...c,
       attachment: "",
@@ -336,6 +342,7 @@ export default function AddSupportTicketModal({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    setRemoveAttachmentConfirmOpen(false);
   };
 
   const handleDownloadImage = (dataUrl, fileName = "ticket_attachment.png") => {
@@ -362,9 +369,10 @@ export default function AddSupportTicketModal({
 
   const handleSaveTicket = async () => {
     const newErrors = {};
-    if (!form.memberName) newErrors.memberName = "User Name is required";
+    if (!form.memberName) newErrors.memberName = "Name is required";
     if (!form.eventType) newErrors.eventType = "Event Type is required";
     if (!form.ticketType) newErrors.ticketType = "This field is required";
+    if (!form.priority || !String(form.priority).trim()) newErrors.priority = "This field is required";
     if (!form.description || !form.description.trim()) newErrors.description = "This field is required";
 
     if (Object.keys(newErrors).length > 0) {
@@ -391,7 +399,7 @@ export default function AddSupportTicketModal({
         relatedEvent: form.relatedEvent || "",
         ticketType: form.ticketType,
         description: form.description || "",
-        priority: form.priority || "Medium",
+        priority: form.priority,
         status: "Open",
         attachment: form.attachment || null,
       });
@@ -457,14 +465,15 @@ export default function AddSupportTicketModal({
         }
       >
         <Grid container spacing={2}>
-          {/* User Name */}
+          {/* Name */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
-              label="User Name"
-              placeholder="Select User Name"
+              label="Name"
+              placeholder="Select Name"
               value={form.memberName}
-              disabled={isNameLocked}
+              disabled={true}
               allowClear={false}
+              clearable={false}
               onChange={(e) => {
                 const selectedName = e.target.value;
                 const matched = membersList.find((m) => (m.name || m.memberName) === selectedName);
@@ -569,8 +578,13 @@ export default function AddSupportTicketModal({
               label="Priority"
               placeholder="Select Priority"
               value={form.priority}
-              onChange={(e) => setForm((c) => ({ ...c, priority: e.target.value }))}
+              onChange={(e) => {
+                setForm((c) => ({ ...c, priority: e.target.value }));
+                if (errors.priority) setErrors((p) => ({ ...p, priority: "" }));
+              }}
               options={priorityOptions.filter((o) => o.value !== "ALL")}
+              error={Boolean(errors.priority)}
+              helperText={errors.priority}
               required
             />
           </Grid>
@@ -677,19 +691,22 @@ export default function AddSupportTicketModal({
                       }}
                     />
                     <Box sx={{ overflow: "hidden" }}>
-                      <Typography
-                        variant="caption"
-                        fontWeight={700}
-                        sx={{
-                          display: "block",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          maxWidth: 120,
-                        }}
-                      >
-                        {form.attachmentName || "Attached Image"}
-                      </Typography>
+                      <Tooltip title={form.attachmentName || "Attached Image"} arrow placement="top">
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          sx={{
+                            display: "block",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: 120,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {form.attachmentName || "Attached Image"}
+                        </Typography>
+                      </Tooltip>
                       <Typography variant="caption" sx={{ color: "#0284c7", fontSize: "0.66rem", display: "block" }}>
                         Click to preview
                       </Typography>
@@ -820,6 +837,18 @@ export default function AddSupportTicketModal({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Confirm Remove Attachment Dialog */}
+      <AppConfirmDialog
+        open={removeAttachmentConfirmOpen}
+        onClose={() => setRemoveAttachmentConfirmOpen(false)}
+        onConfirm={handleConfirmRemoveAttachment}
+        title="Remove Attachment"
+        content="Are you sure you want to remove this attached image?"
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmColor="error"
+      />
     </>
   );
 }

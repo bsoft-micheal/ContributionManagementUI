@@ -51,14 +51,14 @@ export default function UserDetailsDialog({ open, onClose, user }) {
       }
     >
       <Grid container spacing={2.5}>
-        {/* Full Name */}
+        {/* Name */}
         <Grid size={{ xs: 12, sm: 6 }}>
           <Box>
             <Typography
               variant="caption"
               sx={{ fontWeight: 800, color: "text.secondary", fontSize: "0.7rem", display: "block" }}
             >
-              Full Name
+              Name
             </Typography>
             <Typography
               variant="body2"

@@ -96,7 +96,7 @@ export const TOAST_MESSAGES = {
     CREATED_SUCCESS: "Support ticket created successfully",
     UPDATED_SUCCESS: "Support ticket updated successfully",
     DELETED_SUCCESS: "Record deleted successfully.",
-    STATUS_UPDATED: "Ticket status updated successfully",
+    STATUS_UPDATED: "Support Ticket Verified Successfully",
     RESOLVED_SUCCESS: "Ticket marked as resolved successfully"
   },
   SETTINGS: {

@@ -218,6 +218,9 @@ export default function SettingsPage() {
   const [triggeringHangfire, setTriggeringHangfire] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(() => dayjs().format("DD MMM YYYY"));
   const [mfaDevicesCount, setMfaDevicesCount] = useState(1);
+  const mfaRef = useRef(null);
+  const [generalErrors, setGeneralErrors] = useState({});
+  const [templateErrors, setTemplateErrors] = useState({});
 
   const [activeTab, setActiveTab] = useState("general");
 
@@ -336,7 +339,7 @@ export default function SettingsPage() {
   const upiError = isUploadedMode
     ? ""
     : !currentQrConfig.upiId
-      ? "UPI ID is required."
+      ? (COMMON_STRINGS?.VALIDATION?.REQUIRED_FIELD || "This field is required")
       : !upiValidation.isValid
         ? (upiValidation.error || "Enter a valid UPI ID.")
         : "";
@@ -344,7 +347,7 @@ export default function SettingsPage() {
   const receiverError = isUploadedMode
     ? ""
     : !currentQrConfig.receiverName?.trim()
-      ? "Receiver name is required."
+      ? (COMMON_STRINGS?.VALIDATION?.REQUIRED_FIELD || "This field is required")
       : "";
 
   const liveUpiUri = !isUploadedMode && isCurrentConfigured
@@ -862,23 +865,45 @@ export default function SettingsPage() {
 
   // 1. Save General Settings (Org info + OTP / 2FA)
   const handleSaveGeneral = async () => {
+    const newErrors = {};
+    const requiredMsg = COMMON_STRINGS?.VALIDATION?.REQUIRED_FIELD || "This field is required";
+
     if (!settings.orgName || !settings.orgName.trim()) {
-      toast.error("Organization Name is required.");
+      newErrors.orgName = requiredMsg;
+    } else if (settings.orgName.length > 250) {
+      newErrors.orgName = "Organization Name cannot exceed 250 characters.";
+    }
+
+    if (!settings.otpExpiry || !String(settings.otpExpiry).trim()) {
+      newErrors.otpExpiry = requiredMsg;
+    } else if (Number(settings.otpExpiry) <= 0) {
+      newErrors.otpExpiry = "Please enter a valid OTP Expiry in minutes.";
+    }
+
+    if (!settings.maxRetry || !String(settings.maxRetry).trim()) {
+      newErrors.maxRetry = requiredMsg;
+    } else if (Number(settings.maxRetry) <= 0) {
+      newErrors.maxRetry = "Please enter a valid Max Retry Attempt.";
+    }
+
+    let mfaValid = true;
+    if (mfaRef.current?.isSettingUp) {
+      mfaValid = mfaRef.current.validate();
+    }
+
+    if (Object.keys(newErrors).length > 0 || !mfaValid) {
+      setGeneralErrors(newErrors);
       return;
     }
-    if (settings.orgName.length > 250) {
-      toast.error("Organization Name cannot exceed 250 characters.");
-      return;
-    }
-    if (!settings.otpExpiry || Number(settings.otpExpiry) <= 0) {
-      toast.error("Please enter a valid OTP Expiry in minutes.");
-      return;
-    }
-    if (!settings.maxRetry || Number(settings.maxRetry) <= 0) {
-      toast.error("Please enter a valid Max Retry Attempt.");
-      return;
-    }
+
+    setGeneralErrors({});
+
     try {
+      if (mfaRef.current?.isSettingUp) {
+        const verified = await mfaRef.current.verifyAndSave();
+        if (!verified) return;
+      }
+
       await persistSettings(settings);
       toast.success("General & Security settings saved successfully!");
     } catch {
@@ -901,28 +926,37 @@ export default function SettingsPage() {
 
   // Save Email Template Settings
   const handleSaveEmailTemplate = async () => {
+    const newErrors = {};
+    const requiredMsg = COMMON_STRINGS?.VALIDATION?.REQUIRED_FIELD || "This field is required";
+
     if (!templateSubject || !templateSubject.trim()) {
-      toast.error("Email Subject is required.");
-      return;
+      newErrors.templateSubject = requiredMsg;
     }
     if (!templateDescription || !templateDescription.trim()) {
-      toast.error("Email Description is required.");
-      return;
+      newErrors.templateDescription = requiredMsg;
     }
 
     const intervalVal = Number(settings.reminderIntervalValue || settings.reminderIntervalDays);
     const unit = settings.reminderIntervalUnit || "Days";
 
-    if (!intervalVal || isNaN(intervalVal) || intervalVal <= 0) {
-      toast.error("Please enter a valid Reminder Interval number greater than 0.");
-      return;
+    if (!settings.reminderIntervalValue && !settings.reminderIntervalDays) {
+      newErrors.reminderInterval = requiredMsg;
+    } else if (!intervalVal || isNaN(intervalVal) || intervalVal <= 0) {
+      newErrors.reminderInterval = "Please enter a valid Reminder Interval number greater than 0.";
     }
 
     const maxRemindersNum = Number(settings.maxReminders);
-    if (!settings.maxReminders || isNaN(maxRemindersNum) || maxRemindersNum < 1 || maxRemindersNum > 50) {
-      toast.error("Please enter a valid Maximum Reminders limit between 1 and 50.");
+    if (!settings.maxReminders) {
+      newErrors.maxReminders = requiredMsg;
+    } else if (isNaN(maxRemindersNum) || maxRemindersNum < 1 || maxRemindersNum > 50) {
+      newErrors.maxReminders = "Please enter a valid Maximum Reminders limit between 1 and 50.";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setTemplateErrors(newErrors);
       return;
     }
+    setTemplateErrors({});
 
     try {
       const updatedCategoryTemplates = { ...(settings.categoryTemplates || DEFAULT_CATEGORY_TEMPLATES) };
@@ -1325,8 +1359,17 @@ export default function SettingsPage() {
                           label="Organization Name"
                           value={settings.orgName}
                           maxLength={250}
-                          onChange={(e) => handleChange("orgName", e.target.value.slice(0, 250))}
+                          onChange={(e) => {
+                            const val = e.target.value.slice(0, 250);
+                            handleChange("orgName", val);
+                            if (val.trim()) {
+                              setGeneralErrors((prev) => ({ ...prev, orgName: "" }));
+                            }
+                          }}
                           placeholder="e.g. Unit 1A Residents Association"
+                          required
+                          error={Boolean(generalErrors.orgName)}
+                          helperText={generalErrors.orgName}
                         />
                       </Box>
 
@@ -1364,11 +1407,19 @@ export default function SettingsPage() {
                             <AppInput
                               label="Forgot Password OTP Expiry (minutes)"
                               value={settings.otpExpiry}
-                              maxLength={8}
-                              onChange={(e) => handleChange("otpExpiry", e.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
+                              maxLength={2}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
+                                handleChange("otpExpiry", val);
+                                if (val.trim()) {
+                                  setGeneralErrors((prev) => ({ ...prev, otpExpiry: "" }));
+                                }
+                              }}
                               restrictType="numberonly"
                               placeholder="e.g. 10"
                               required
+                              error={Boolean(generalErrors.otpExpiry)}
+                              helperText={generalErrors.otpExpiry}
                             />
                             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
                               Validity window for the 6-digit OTP code emailed to users during password reset.
@@ -1381,10 +1432,18 @@ export default function SettingsPage() {
                               label="Max Retry Attempts"
                               value={settings.maxRetry}
                               maxLength={2}
-                              onChange={(e) => handleChange("maxRetry", e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
+                                handleChange("maxRetry", val);
+                                if (val.trim()) {
+                                  setGeneralErrors((prev) => ({ ...prev, maxRetry: "" }));
+                                }
+                              }}
                               restrictType="numberonly"
                               placeholder="e.g. 3"
                               required
+                              error={Boolean(generalErrors.maxRetry)}
+                              helperText={generalErrors.maxRetry}
                             />
                             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.5, display: "block" }}>
                               Number of incorrect attempts allowed before the OTP is invalidated and locked.
@@ -1424,6 +1483,7 @@ export default function SettingsPage() {
 
                   {/* Personal 2FA Device Configuration at UI level */}
                   <MfaSettings
+                    ref={mfaRef}
                     embedded
                     title=""
                   />
@@ -1615,19 +1675,33 @@ export default function SettingsPage() {
                         <AppInput
                           label={`Email Subject (${templateType === "initial" ? "Initial Email" : "Reminder Email"})`}
                           value={templateSubject}
-                          onChange={(e) => setTemplateSubject(e.target.value)}
+                          onChange={(e) => {
+                            setTemplateSubject(e.target.value);
+                            if (e.target.value.trim()) {
+                              setTemplateErrors((prev) => ({ ...prev, templateSubject: "" }));
+                            }
+                          }}
                           placeholder="e.g. Contribution Payment Reminder - {categoryName}"
                           required
+                          error={Boolean(templateErrors.templateSubject)}
+                          helperText={templateErrors.templateSubject}
                         />
 
                         {/* 4. Email Description */}
                         <AppTextArea
                           label={`Email Description (${templateType === "initial" ? "Initial Email" : "Reminder Email"})`}
                           value={templateDescription}
-                          onChange={(e) => setTemplateDescription(e.target.value)}
+                          onChange={(e) => {
+                            setTemplateDescription(e.target.value);
+                            if (e.target.value.trim()) {
+                              setTemplateErrors((prev) => ({ ...prev, templateDescription: "" }));
+                            }
+                          }}
                           placeholder="Enter email message / description for the category..."
                           minRows={6}
                           required
+                          error={Boolean(templateErrors.templateDescription)}
+                          helperText={templateErrors.templateDescription}
                         />
 
                         {/* Token Placeholder Helper Chips */}
@@ -1726,9 +1800,15 @@ export default function SettingsPage() {
                                   const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
                                   handleChange("reminderIntervalValue", val);
                                   handleChange("reminderIntervalDays", val);
+                                  if (val.trim()) {
+                                    setTemplateErrors((prev) => ({ ...prev, reminderInterval: "" }));
+                                  }
                                 }}
                                 restrictType="numberonly"
                                 placeholder="e.g. 10"
+                                required
+                                error={Boolean(templateErrors.reminderInterval)}
+                                helperText={templateErrors.reminderInterval}
                               />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
@@ -1751,9 +1831,15 @@ export default function SettingsPage() {
                                 onChange={(e) => {
                                   const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
                                   handleChange("maxReminders", val);
+                                  if (val.trim()) {
+                                    setTemplateErrors((prev) => ({ ...prev, maxReminders: "" }));
+                                  }
                                 }}
                                 restrictType="numberonly"
                                 placeholder="e.g. 3"
+                                required
+                                error={Boolean(templateErrors.maxReminders)}
+                                helperText={templateErrors.maxReminders}
                               />
                             </Grid>
                           </Grid>

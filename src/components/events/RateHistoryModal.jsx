@@ -76,10 +76,17 @@ export default function RateHistoryModal({
   const latestHistory = historyList[0];
   const lastUpdatedOn = latestHistory?.changedOn
     ? formatGridDate(latestHistory.changedOn)
-    : item.createdAt || item.createdOn
-    ? formatGridDate(item.createdAt || item.createdOn)
+    : item.modifiedOn || item.ModifiedOn || item.createdAt || item.createdOn
+    ? formatGridDate(item.modifiedOn || item.ModifiedOn || item.createdAt || item.createdOn)
     : "--";
-  const lastUpdatedBy = latestHistory?.changedBy || item.createdBy || "--";
+  const lastUpdatedBy =
+    latestHistory?.modifiedBy ||
+    latestHistory?.changedBy ||
+    item.modifiedBy ||
+    item.ModifiedBy ||
+    item.createdBy ||
+    item.CreatedBy ||
+    "--";
 
   return (
     <AppDialog
@@ -319,7 +326,7 @@ export default function RateHistoryModal({
 
                       <TableCell>
                         <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.8rem" }}>
-                          {row.changedBy || "--"}
+                          {row.modifiedBy || row.changedBy || item.modifiedBy || item.ModifiedBy || item.createdBy || item.CreatedBy || "--"}
                         </Typography>
                       </TableCell>
 
