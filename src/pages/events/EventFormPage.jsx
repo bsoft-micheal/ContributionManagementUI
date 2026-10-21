@@ -1086,9 +1086,7 @@ export default function EventFormPage({
         return cat === "birthday" || cat.includes("birthday");
       });
 
-      const effectiveBdayItems = bdayMasterItems.length > 0
-        ? bdayMasterItems
-        : [{ budgetCalculationId: "default_cake", expenseItem: "Cake", rate: 300, category: "Birthday" }];
+      const effectiveBdayItems = bdayMasterItems;
 
       effectiveBdayItems.forEach((item) => {
         const itemKey = `bday_${item.budgetCalculationId || item.expenseItem}`;
@@ -3071,7 +3069,9 @@ export default function EventFormPage({
                                 borderBottom: "none",
                               }}
                             >
-                              Select an event type to view calculation details
+                              {hasSelectedType
+                                ? "No budget calculation items configured for this event type"
+                                : "Select an event type to view calculation details"}
                             </TableCell>
                           </TableRow>
                         ) : (
