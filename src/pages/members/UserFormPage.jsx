@@ -46,7 +46,6 @@ import {
 } from "../../services/userService";
 import { getRolesAsync } from "../../services/roleService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
-import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 
 const GENDER_OPTIONS = [
   { label: "Male", value: "Male" },
@@ -151,51 +150,9 @@ export default function UserFormPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const savedFormRef = React.useRef(null);
-
-  const isFormDirty = React.useCallback(() => {
-    if (!savedFormRef.current) return false;
-    const s = savedFormRef.current;
-
-    // Compare basic fields
-    if ((form.fullName || "").trim() !== (s.fullName || "").trim()) return true;
-    if ((form.email || "").trim() !== (s.email || "").trim()) return true;
-    if ((form.phone || "").trim() !== (s.phone || "").trim()) return true;
-    if ((form.gender || "") !== (s.gender || "")) return true;
-    if ((form.workType || "") !== (s.workType || "")) return true;
-
-    // Compare dates
-    const dobCurrent = form.dateOfBirth ? dayjs(form.dateOfBirth).format("YYYY-MM-DD") : "";
-    const dobSaved = s.dateOfBirth ? dayjs(s.dateOfBirth).format("YYYY-MM-DD") : "";
-    if (dobCurrent !== dobSaved) return true;
-
-    const joinCurrent = form.joiningDate ? dayjs(form.joiningDate).format("YYYY-MM-DD") : "";
-    const joinSaved = s.joiningDate ? dayjs(s.joiningDate).format("YYYY-MM-DD") : "";
-    if (joinCurrent !== joinSaved) return true;
-
-    // Compare credentials / flags
-    if (Boolean(form.createMemberProfile) !== Boolean(s.createMemberProfile)) return true;
-    if (Boolean(form.enableMultipleRoles) !== Boolean(s.enableMultipleRoles)) return true;
-    if ((form.username || "").trim() !== (s.username || "").trim()) return true;
-    if ((form.primaryRole || "") !== (s.primaryRole || "")) return true;
-    if ((form.roleName || "") !== (s.roleName || "")) return true;
-
-    // Compare secondary roles array
-    const sec1 = Array.isArray(form.secondaryRoles) ? [...form.secondaryRoles].sort().join(",") : "";
-    const sec2 = Array.isArray(s.secondaryRoles) ? [...s.secondaryRoles].sort().join(",") : "";
-    if (sec1 !== sec2) return true;
-
-    // Compare passwords if entered
-    if (form.newPassword && form.newPassword.length > 0) return true;
-    if (form.confirmPassword && form.confirmPassword.length > 0) return true;
-
-    return false;
-  }, [form]);
-
-  const { handleCancelRequest, UnsavedChangesDialog } = useUnsavedChanges({
-    isDirty: isFormDirty,
-    onQuit: () => navigate("/users"),
-  });
+  const handleCancel = React.useCallback(() => {
+    navigate("/users");
+  }, [navigate]);
 
   const userRolesList = React.useMemo(() => {
     return (roles || []).map((r) => ({
@@ -235,9 +192,9 @@ export default function UserFormPage() {
     setLoading(true);
     try {
       const [rData, wData, uData] = await Promise.all([
-        getRolesAsync(),
-        getWorkTypesAsync(true),
-        getUsersAsync(),
+        getRolesAsync().catch(() => []),
+        getWorkTypesAsync(true).catch(() => []),
+        getUsersAsync().catch(() => []),
       ]);
       const loadedRoles = rData || [];
       const loadedWorkTypes = wData || [];
@@ -268,10 +225,9 @@ export default function UserFormPage() {
               : "Office",
         };
         setForm(defaultFormData);
-        savedFormRef.current = defaultFormData;
       }
     } catch (error) {
-      toast.error("Failed to load user form data.");
+      console.error("Error loading user form data:", error);
     } finally {
       setLoading(false);
     }
@@ -419,7 +375,6 @@ export default function UserFormPage() {
     };
 
     setForm(editFormData);
-    savedFormRef.current = editFormData;
   }
 
   function validateSingleField(field, value, currentForm) {
@@ -462,6 +417,10 @@ export default function UserFormPage() {
         if (!value) return "This field is required";
         const joinDay = dayjs(value);
         if (!joinDay.isValid()) return "Invalid joining date";
+        const maxJoinDate = dayjs().add(3, "month").endOf("day");
+        if (joinDay.isAfter(maxJoinDate)) {
+          return "Joining Date cannot be more than 3 months in the future";
+        }
         if (currentForm.dateOfBirth) {
           const dobDay = dayjs(currentForm.dateOfBirth);
           if (dobDay.isValid()) {
@@ -801,15 +760,21 @@ export default function UserFormPage() {
       }
     }
 
-    if (form.joiningDate && form.dateOfBirth) {
-      const dobDay = dayjs(form.dateOfBirth);
+    if (form.joiningDate) {
       const joinDay = dayjs(form.joiningDate);
       if (!joinDay.isValid()) {
         e.joiningDate = "Invalid joining date";
-      } else if (joinDay.isBefore(dobDay) || joinDay.isSame(dobDay)) {
-        e.joiningDate = "Joining Date must be after Date of Birth";
-      } else if (joinDay.diff(dobDay, "year") < 18) {
-        e.joiningDate = "Joining Date must be at least 18 years after Date of Birth";
+      } else if (joinDay.isAfter(dayjs().add(3, "month").endOf("day"))) {
+        e.joiningDate = "Joining Date cannot be more than 3 months in the future";
+      } else if (form.dateOfBirth) {
+        const dobDay = dayjs(form.dateOfBirth);
+        if (dobDay.isValid()) {
+          if (joinDay.isBefore(dobDay) || joinDay.isSame(dobDay)) {
+            e.joiningDate = "Joining Date must be after Date of Birth";
+          } else if (joinDay.diff(dobDay, "year") < 18) {
+            e.joiningDate = "Joining Date must be at least 18 years after Date of Birth";
+          }
+        }
       }
     }
 
@@ -961,7 +926,7 @@ export default function UserFormPage() {
             <Tooltip title="Back to Users">
               <IconButton
                 size="small"
-                onClick={() => handleCancelRequest(() => navigate("/users"))}
+                onClick={handleCancel}
                 sx={{
                   color: "#ffffff",
                   p: 0.5,
@@ -995,8 +960,8 @@ export default function UserFormPage() {
               {/* Row 1 */}
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <AppInput
-                  label="Full Name"
-                  placeholder="Enter full name"
+                  label="Name"
+                  placeholder="Enter name"
                   value={form.fullName}
                   onChange={(e) => fieldChange("fullName", e.target.value)}
                   restrictType="letteronly"
@@ -1065,6 +1030,7 @@ export default function UserFormPage() {
                   label="Joining Date"
                   value={form.joiningDate}
                   onChange={(newVal) => fieldChange("joiningDate", newVal)}
+                  maxDate={dayjs().add(3, "month")}
                   error={!!errors.joiningDate}
                   helperText={errors.joiningDate}
                   required
@@ -1523,7 +1489,7 @@ export default function UserFormPage() {
           >
             <AppButton
               variant="outlined"
-              onClick={() => handleCancelRequest(() => navigate("/users"))}
+              onClick={handleCancel}
               disabled={saving}
               sx={{
                 px: 3,
@@ -1563,7 +1529,6 @@ export default function UserFormPage() {
           </Stack>
         </Box>
       </Paper>
-      <UnsavedChangesDialog />
     </div>
   );
 }

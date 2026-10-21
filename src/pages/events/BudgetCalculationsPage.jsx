@@ -37,7 +37,7 @@ import { COMMON_STRINGS, TOAST_MESSAGES } from "../../constants";
 
 const formatRateAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
-  const cleanVal = String(value).replace(/[^0-9]/g, "");
+  const cleanVal = String(value).replace(/[^0-9]/g, "").slice(0, 5);
   if (!cleanVal) return "";
   return Number(cleanVal).toLocaleString("en-US");
 };
@@ -173,8 +173,8 @@ export default function BudgetCalculationsPage() {
           if (isNaN(num) || num <= 0) {
             return "Rate must be greater than 0";
           }
-          if (num > 1000000) {
-            return "Rate cannot exceed 1,000,000";
+          if (String(num).length > 5 || num > 99999) {
+            return "Rate cannot exceed 5 characters";
           }
           return "";
         },
@@ -637,7 +637,7 @@ export default function BudgetCalculationsPage() {
             fullWidth
             value={formatRateAmount(form.rate)}
             onChange={(e) => {
-              const rawVal = e.target.value.replace(/[^0-9]/g, "");
+              const rawVal = e.target.value.replace(/[^0-9]/g, "").slice(0, 5);
               setForm((f) => ({
                 ...f,
                 rate: rawVal === "" ? "" : Number(rawVal),
@@ -646,7 +646,7 @@ export default function BudgetCalculationsPage() {
                 setErrors((prev) => ({ ...prev, rate: "" }));
               }
             }}
-            maxLength={15}
+            maxLength={6}
             error={!!errors.rate}
             helperText={errors.rate}
             required

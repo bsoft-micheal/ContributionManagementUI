@@ -257,11 +257,11 @@ export default function UsersPage() {
       },
       "Joining Date": (r, getColLetter) => ({
         type: "custom",
-        formulae: [`${getColLetter("Joining Date")}${r}>${getColLetter("Date of Birth")}${r}`],
+        formulae: [`AND(${getColLetter("Joining Date")}${r}>${getColLetter("Date of Birth")}${r}, ${getColLetter("Joining Date")}${r}<=EDATE(TODAY(),3))`],
         promptTitle: "Joining Date",
-        prompt: "Format: DD/MM/YYYY. Joining date must be after Date of Birth.",
+        prompt: "Format: DD/MM/YYYY. Joining date must be after Date of Birth and up to 3 months in the future.",
         errorTitle: "Invalid Joining Date",
-        error: "Joining Date must be after Date of Birth.",
+        error: "Joining Date must be after Date of Birth and cannot exceed 3 months from today.",
       }),
       "Work Type": {
         type: "list",
@@ -490,16 +490,22 @@ export default function UsersPage() {
       }
     }
 
-    // Joining Date must be after DOB
-    if (form.joiningDate && form.dateOfBirth) {
-      const dobDay = dayjs(form.dateOfBirth);
+    // Joining Date validation
+    if (form.joiningDate) {
       const joinDay = dayjs(form.joiningDate);
       if (!joinDay.isValid()) {
         e.joiningDate = "Invalid joining date";
-      } else if (joinDay.isBefore(dobDay) || joinDay.isSame(dobDay)) {
-        e.joiningDate = "Joining Date must be after Date of Birth";
-      } else if (joinDay.diff(dobDay, "year") < 18) {
-        e.joiningDate = "Joining Date must be at least 18 years after Date of Birth";
+      } else if (joinDay.isAfter(dayjs().add(3, "month").endOf("day"))) {
+        e.joiningDate = "Joining Date cannot be more than 3 months in the future";
+      } else if (form.dateOfBirth) {
+        const dobDay = dayjs(form.dateOfBirth);
+        if (dobDay.isValid()) {
+          if (joinDay.isBefore(dobDay) || joinDay.isSame(dobDay)) {
+            e.joiningDate = "Joining Date must be after Date of Birth";
+          } else if (joinDay.diff(dobDay, "year") < 18) {
+            e.joiningDate = "Joining Date must be at least 18 years after Date of Birth";
+          }
+        }
       }
     }
 
@@ -855,10 +861,13 @@ export default function UsersPage() {
       return { error: `Row ${rowNum}: User must be at least 18 years old (Age: ${ageInYears} yrs, DOB: ${dob.format("DD/MM/YYYY")})` };
     }
 
-    // 8. Joining Date must be after DOB
+    // 8. Joining Date must be after DOB and up to 3 months in the future
     const joiningDate = parseExcelDate(joiningStr);
     if (!joiningDate || !joiningDate.isValid()) {
       return { error: `Row ${rowNum}: Joining Date must be a valid date (DD/MM/YYYY)` };
+    }
+    if (joiningDate.isAfter(dayjs().add(3, "month").endOf("day"))) {
+      return { error: `Row ${rowNum}: Joining Date (${joiningDate.format("DD/MM/YYYY")}) cannot be more than 3 months in the future` };
     }
     if (joiningDate.isBefore(dob) || joiningDate.isSame(dob)) {
       return { error: `Row ${rowNum}: Joining Date (${joiningDate.format("DD/MM/YYYY")}) must be after Date of Birth (${dob.format("DD/MM/YYYY")})` };
@@ -1031,7 +1040,7 @@ export default function UsersPage() {
     },
 
     {
-      label: "Full Name",
+      label: "Name",
       key: "fullName",
       render: (row) => row.fullName || row.FullName || row.memberUsername || "--",
     },
