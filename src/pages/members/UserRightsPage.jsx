@@ -122,11 +122,10 @@ export default function UserRightsPage() {
   const hasNoPermissions = Boolean(!loading && selectedRoleName && unassignedRoles.has(selectedRoleName));
 
   const moduleOptions = useMemo(() => {
-    const roleRights = rights[selectedRoleName] || [];
+    const roleRights = rights[selectedRoleName] || rights[filterRoleName] || [];
     const rawModules = roleRights.map((r) => r.module).filter(Boolean);
-    const uniqueModules = Array.from(new Set(rawModules));
-    const modulesToUse = uniqueModules.length > 0 ? uniqueModules : CANONICAL_MODULE_ORDER;
-    const sortedModules = [...modulesToUse].sort((a, b) => {
+    const combinedSet = new Set([...CANONICAL_MODULE_ORDER, ...rawModules]);
+    const sortedModules = Array.from(combinedSet).sort((a, b) => {
       const idxA = CANONICAL_MODULE_ORDER.indexOf(a);
       const idxB = CANONICAL_MODULE_ORDER.indexOf(b);
       const effA = idxA >= 0 ? idxA : 999;
@@ -134,7 +133,7 @@ export default function UserRightsPage() {
       return effA - effB;
     });
     return [{ label: "All Modules", value: "All" }, ...sortedModules.map((m) => ({ label: m, value: m }))];
-  }, [rights, selectedRoleName]);
+  }, [rights, selectedRoleName, filterRoleName]);
 
   // ── Initial load: fetch roles ─────────────────────────────────────────────
   useEffect(() => {
@@ -314,7 +313,11 @@ export default function UserRightsPage() {
         return (a.featureID || 0) - (b.featureID || 0);
       });
 
-      const finalRows = sorted.map((r, i) => ({ ...r, _uid: i + 1 }));
+      const finalRows = sorted.map((r, i) => ({
+        ...r,
+        id: r.roleRightId || r.featureID || (i + 1),
+        _uid: i + 1,
+      }));
 
       setRights(prev => ({ ...prev, [roleName]: finalRows }));
       try {
@@ -426,6 +429,7 @@ export default function UserRightsPage() {
         const featId = Number(r.featureID || r.FeatureID || r.featureId || r.FeatureId || 0);
         return {
           ...r,
+          id: r.roleRightId || r.featureID || (i + 1),
           _uid: i + 1,
           roleId: selectedRoleObj?.roleId || r.roleId || undefined,
           role: selectedRoleName,
@@ -547,16 +551,24 @@ export default function UserRightsPage() {
 
   // ── Apply filter ───────────────────────────────────────────────────────────
   const handleApplyFilter = () => {
+    if (!filterRoleName) {
+      toast.error("Please select a role to filter.");
+      return;
+    }
     setSelectedRoleName(filterRoleName);
-    setSelectedModule(filterModule);
+    setSelectedModule(filterModule || "All");
+    fetchRightsForRole(filterRoleName);
   };
 
   const handleClearFilter = () => {
-    const defaultRole = roles.length > 0 ? roles[0].roleName : "";
+    const defaultRole = roles.length > 0 ? roles[0].roleName : "Admin";
     setFilterRoleName(defaultRole);
     setFilterModule("All");
     setSelectedRoleName(defaultRole);
     setSelectedModule("All");
+    if (defaultRole) {
+      fetchRightsForRole(defaultRole);
+    }
   };
 
   const handleRefresh = () => {
@@ -565,12 +577,14 @@ export default function UserRightsPage() {
 
   // ── Filtered rows ─────────────────────────────────────────────────────────
   const filteredRows = useMemo(() => {
-    const rows = rights[selectedRoleName] || [];
-    return rows.filter(row => {
-      if (selectedModule !== "All" && row.module.toLowerCase() !== selectedModule.toLowerCase()) return false;
-      return true;
-    });
-  }, [rights, selectedRoleName, selectedModule]);
+    const activeRole = selectedRoleName || filterRoleName || (roles[0]?.roleName ?? "");
+    const rows = rights[activeRole] || [];
+    const mod = (selectedModule || "").trim().toLowerCase();
+    if (!mod || mod === "all" || mod === "all modules") {
+      return rows;
+    }
+    return rows.filter((row) => (row.module || "").trim().toLowerCase() === mod);
+  }, [rights, selectedRoleName, filterRoleName, roles, selectedModule]);
 
   // ── Columns: S.no, Module, Sub Module, Action, Rights Accessibility, Current Access, Created On ──
   const columns = [
@@ -730,43 +744,61 @@ export default function UserRightsPage() {
         data={filteredRows}
         loading={loading}
         allowPagination={false}
+        searchPlaceholder="Search module, sub-module, action..."
         emptyMessage={hasNoPermissions ? "No permissions assigned. Contact your administrator for access." : "No records found."}
         filterPanel={
-          <Grid container spacing={3} alignItems="center">
-            <Grid size={{ xs: 12, md: 3.5 }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <AppSelect
                 label="Role"
                 placeholder="Select Role"
                 value={filterRoleName}
-                onChange={(e) => {
-                  setFilterRoleName(e.target.value);
-                  setSelectedRoleName(e.target.value);
-                }}
+                onChange={(e) => setFilterRoleName(e.target.value)}
+                onClear={() => setFilterRoleName(roles[0]?.roleName || "Admin")}
                 options={roles.map(r => ({ label: r.roleName, value: r.roleName }))}
                 required
                 fullWidth
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 3.5 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3.2 }}>
               <AppSelect
                 label="Module"
                 placeholder="Select Module"
                 value={filterModule}
                 onChange={(e) => setFilterModule(e.target.value)}
+                onClear={() => setFilterModule("All")}
                 options={moduleOptions}
                 required
                 fullWidth
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 5 }} sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center", mt: { xs: 0, md: 2.2 } }}>
+            <Grid size={{ xs: 12, md: 5.8 }} sx={{ display: "flex", gap: 1.2, flexWrap: "wrap", alignItems: "center", mt: { xs: 0, md: 2.2 } }}>
               <AppButton
                 variant="contained"
                 size="small"
-                startIcon={<FilterListIcon />}
+                startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
                 onClick={handleApplyFilter}
-                sx={{ height: 34, fontWeight: 700, fontSize: "0.75rem", px: 2 }}
+                sx={{ height: 34, minHeight: 34, fontWeight: 700, fontSize: "0.78rem", px: 2, borderRadius: "8px" }}
               >
                 Filter
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                size="small"
+                onClick={handleClearFilter}
+                sx={{
+                  height: 34,
+                  minHeight: 34,
+                  fontWeight: 700,
+                  fontSize: "0.78rem",
+                  px: 1.8,
+                  borderRadius: "8px",
+                  color: "#ef4444",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
+                  "&:hover": { borderColor: "#ef4444", bgcolor: "rgba(239, 68, 68, 0.05)" },
+                }}
+              >
+                Clear Filter
               </AppButton>
               <AppButton
                 variant="contained"
@@ -777,6 +809,7 @@ export default function UserRightsPage() {
                 disabled={saving || loading}
                 sx={{
                   height: 34,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.78rem",
                   px: 2.2,
@@ -794,27 +827,21 @@ export default function UserRightsPage() {
               <AppButton
                 variant="outlined"
                 size="small"
-                startIcon={<RefreshIcon />}
+                startIcon={<RefreshIcon sx={{ fontSize: 17 }} />}
                 onClick={handleRefresh}
                 sx={{
-                  height: 34, fontWeight: 700, fontSize: "0.75rem", px: 2,
-                  color: "#6366f1", borderColor: "rgba(99,102,241,0.4)",
-                  "&:hover": { borderColor: "#6366f1", bgcolor: "rgba(99,102,241,0.05)" },
+                  height: 34,
+                  minHeight: 34,
+                  fontWeight: 700,
+                  fontSize: "0.78rem",
+                  px: 2,
+                  borderRadius: "8px",
+                  color: "#6366f1",
+                  borderColor: "rgba(99, 102, 241, 0.4)",
+                  "&:hover": { borderColor: "#6366f1", bgcolor: "rgba(99, 102, 241, 0.05)" },
                 }}
               >
                 Refresh
-              </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
-                onClick={handleClearFilter}
-                sx={{
-                  height: 34, fontWeight: 700, fontSize: "0.75rem", px: 2,
-                  color: "#ef4444", borderColor: "rgba(239,68,68,0.4)",
-                  "&:hover": { borderColor: "#ef4444", bgcolor: "rgba(239,68,68,0.05)" },
-                }}
-              >
-                Clear
               </AppButton>
             </Grid>
           </Grid>

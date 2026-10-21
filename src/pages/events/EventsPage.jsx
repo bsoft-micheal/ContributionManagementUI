@@ -161,19 +161,18 @@ export default function EventsPage() {
   const hasWriteAccess = canEdit;
 
   const activeRole = authState?.role || authState?.roleName;
-  const isMember = String(activeRole || "").toLowerCase() === "member";
-  const isAdminOrOrg = !isMember;
 
-  // Granular Action Permissions
-  const canAddEvent = isAdminOrOrg || hasActionPermission("Add Event", MENU_FEATURE_IDS.EVENT_ADD, activeRole).canExecute;
-  const canEditEvent = isAdminOrOrg || hasActionPermission("Edit Event", MENU_FEATURE_IDS.EVENT_EDIT, activeRole).canExecute;
-  const canDeleteEvent = isAdminOrOrg || hasActionPermission("Delete Event", MENU_FEATURE_IDS.EVENT_DELETE, activeRole).canExecute;
-  const canViewEvent = true;
+  // Granular Action Permissions evaluated via MENU_FEATURE_IDS and role rights
+  const canViewEvent = hasActionPermission("View Event", MENU_FEATURE_IDS.EVENT_VIEW, activeRole).canView;
+  const canAddEvent = hasActionPermission("Add Event", MENU_FEATURE_IDS.EVENT_ADD, activeRole).canExecute;
+  const canEditEvent = hasActionPermission("Edit Event", MENU_FEATURE_IDS.EVENT_EDIT, activeRole).canExecute;
+  const canDeleteEvent = hasActionPermission("Delete Event", MENU_FEATURE_IDS.EVENT_DELETE, activeRole).canExecute;
+  const canExportEvent = hasActionPermission("Export Event", MENU_FEATURE_IDS.EVENT_EXPORT, activeRole).canExecute;
 
   const canAddPhotos = hasActionPermission("Add Photos", MENU_FEATURE_IDS.EVENT_ADD_PHOTOS, activeRole).canExecute;
-  const canViewPhotos = hasActionPermission("view Photos", MENU_FEATURE_IDS.EVENT_VIEW_PHOTOS, activeRole).canView;
+  const canViewPhotos = hasActionPermission("View Photos", MENU_FEATURE_IDS.EVENT_VIEW_PHOTOS, activeRole).canView;
   const canAddExpense = hasActionPermission("Add Expense", MENU_FEATURE_IDS.EVENT_ADD_EXPENSE, activeRole).canExecute;
-  const canViewExpense = hasActionPermission("view Expense", MENU_FEATURE_IDS.EVENT_VIEW_EXPENSE, activeRole).canView;
+  const canViewExpense = hasActionPermission("View Expense", MENU_FEATURE_IDS.EVENT_VIEW_EXPENSE, activeRole).canView;
 
   const navigate = useNavigate();
   const toast = useAppToast();
@@ -900,6 +899,7 @@ export default function EventsPage() {
         title="Events Details"
         columns={columns}
         data={displayedEvents}
+        allowExport={canExportEvent}
         actions={
           <AppButton
             size="small"

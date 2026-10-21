@@ -325,16 +325,7 @@ export default function ExpensePage() {
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
 
-      let finalStatuses = Array.isArray(statusesRes) && statusesRes.length > 0 ? statusesRes : [];
-      if (finalStatuses.length === 0) {
-        // Fallback: fetch active statuses and filter locally for module === "Expense"
-        const allStatuses = await getStatusesAsync(true).catch(() => []);
-        if (Array.isArray(allStatuses)) {
-          finalStatuses = allStatuses.filter(
-            (s) => s.module && s.module.trim().toLowerCase() === "expense"
-          );
-        }
-      }
+      const finalStatuses = Array.isArray(statusesRes) ? statusesRes : [];
       setStatusesList(finalStatuses);
     } catch {
       toast.error("Failed to load lookup data.");
@@ -381,31 +372,28 @@ export default function ExpensePage() {
     }
   }, [location.state, membersList, authState, loggedInUserName]);
 
-  // Filter panel status options (including "All Statuses")
+  // Filter panel status options (including "All Statuses") dynamically from DB
   const statusOptions = useMemo(() => {
     const list = (statusesList || []).map((s) => s.statusName);
-    const base = list.length > 0 ? list : ["Pending", "Verify"];
-    const set = new Set(["ALL", ...base]);
+    const set = new Set(["ALL", ...list]);
     return Array.from(set).map((s) => ({
       label: s === "ALL" ? "All Statuses" : s,
       value: s,
     }));
   }, [statusesList]);
 
-  // Form status options for Add/Edit dialog
+  // Form status options for Add/Edit dialog dynamically from DB
   const dynamicStatusOptions = useMemo(() => {
     const list = (statusesList || []).map((s) => s.statusName);
-    const base = list.length > 0 ? list : ["Pending", "Verify"];
-    const set = new Set(base);
+    const set = new Set(list);
     if (form.status) set.add(form.status);
     return Array.from(set).map((s) => ({ label: s, value: s }));
   }, [statusesList, form.status]);
 
-  // Dedicated status options for the Verify / Status dialog
+  // Dedicated status options for the Verify / Status dialog dynamically from DB
   const verificationStatusOptions = useMemo(() => {
     const list = (statusesList || []).map((s) => s.statusName);
-    const base = list.length > 0 ? list : ["Verify", "Pending"];
-    const set = new Set(base);
+    const set = new Set(list);
     if (newStatus) set.add(newStatus);
     const items = Array.from(set).filter(Boolean).map((s) => ({ label: s, value: s }));
     return [

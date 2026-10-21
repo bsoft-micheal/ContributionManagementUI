@@ -91,7 +91,7 @@ import {
   buildUpiPaymentUri,
   getQrCodeApiUrl,
 } from "../../utils/upiQrHelper";
-import { TOAST_MESSAGES } from "../../constants";
+import { TOAST_MESSAGES, MENU_FEATURE_IDS } from "../../constants";
 
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { useAuth } from "../../contexts/AuthContext";
@@ -334,12 +334,10 @@ export default function EventFormPage({
   const isEdit = Boolean(id);
 
   const activeRole = authState?.role || authState?.roleName;
-  const isMember = String(activeRole || "").toLowerCase() === "member";
-  const isAdminOrOrg = !isMember;
 
-  // Granular Action Permissions
-  const canAddEvent = (isAdminOrOrg || hasActionPermission("Add Event", 32, activeRole).canExecute) && (canEdit || isAdminOrOrg);
-  const canEditEvent = (isAdminOrOrg || hasActionPermission("Edit Event", 33, activeRole).canExecute) && (canEdit || isAdminOrOrg);
+  // Granular Action Permissions evaluated via MENU_FEATURE_IDS and role rights
+  const canAddEvent = hasActionPermission("Add Event", MENU_FEATURE_IDS.EVENT_ADD, activeRole).canExecute;
+  const canEditEvent = hasActionPermission("Edit Event", MENU_FEATURE_IDS.EVENT_EDIT, activeRole).canExecute;
 
   useEffect(() => {
     if (isDialog) return;
@@ -1656,6 +1654,11 @@ export default function EventFormPage({
   };
 
   const handleSubmit = async () => {
+    if (isEdit ? !canEditEvent : !canAddEvent) {
+      toast.error(isEdit ? "Access Denied: You do not have permission to edit events." : "Access Denied: You do not have permission to add events.");
+      return;
+    }
+
     const requiredMsg = "This field is required";
     const newErrors = {};
 
@@ -3305,7 +3308,7 @@ export default function EventFormPage({
           >
             {readOnly ? (isDialog ? "Close" : "Back to Events") : "Cancel"}
           </AppButton>
-          {canEdit && (
+          {(isEdit ? canEditEvent : canAddEvent) && canEdit && (
             <Tooltip title={isEdit && hasPayments ? "Cannot edit event after payments have been received" : ""}>
               <span>
                 <AppButton
