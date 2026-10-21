@@ -326,8 +326,32 @@ export default function ExpensePage() {
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
 
-      const finalStatuses = Array.isArray(statusesRes) ? statusesRes : [];
-      setStatusesList(finalStatuses);
+      let finalStatuses = Array.isArray(statusesRes) ? statusesRes : [];
+      if (finalStatuses.length === 0) {
+        const allStatuses = await getStatusesAsync(true).catch(() => []);
+        if (Array.isArray(allStatuses) && allStatuses.length > 0) {
+          finalStatuses = allStatuses;
+        }
+      }
+      // Strictly only "Pending" and "Verified" for expenses
+      finalStatuses = finalStatuses.filter((s) => {
+        const name = (s.statusName || "").trim().toLowerCase();
+        return name === "pending" || name === "verified";
+      });
+      const existingMap = new Map();
+      finalStatuses.forEach((s) => existingMap.set((s.statusName || "").trim().toLowerCase(), s));
+      const cleanList = [];
+      if (existingMap.has("pending")) {
+        cleanList.push(existingMap.get("pending"));
+      } else {
+        cleanList.push({ statusId: "pending", statusName: "Pending", isActive: true });
+      }
+      if (existingMap.has("verified")) {
+        cleanList.push(existingMap.get("verified"));
+      } else {
+        cleanList.push({ statusId: "verified", statusName: "Verified", isActive: true });
+      }
+      setStatusesList(cleanList);
     } catch {
       toast.error("Failed to load lookup data.");
     }
@@ -373,35 +397,31 @@ export default function ExpensePage() {
     }
   }, [location.state, membersList, authState, loggedInUserName]);
 
-  // Filter panel status options (including "All Statuses") dynamically from DB
+  // Filter panel status options (Only "All Statuses", "Pending", "Verified")
   const statusOptions = useMemo(() => {
-    const list = (statusesList || []).map((s) => s.statusName);
-    const set = new Set(["ALL", ...list]);
-    return Array.from(set).map((s) => ({
-      label: s === "ALL" ? "All Statuses" : s,
-      value: s,
-    }));
-  }, [statusesList]);
+    return [
+      { label: "All Statuses", value: "ALL" },
+      { label: "Pending", value: "Pending" },
+      { label: "Verified", value: "Verified" },
+    ];
+  }, []);
 
-  // Form status options for Add/Edit dialog dynamically from DB
+  // Form status options for Add/Edit dialog (Only Pending and Verified)
   const dynamicStatusOptions = useMemo(() => {
-    const list = (statusesList || []).map((s) => s.statusName);
-    const set = new Set(list);
-    if (form.status) set.add(form.status);
-    return Array.from(set).map((s) => ({ label: s, value: s }));
-  }, [statusesList, form.status]);
+    return [
+      { label: "Pending", value: "Pending" },
+      { label: "Verified", value: "Verified" },
+    ];
+  }, []);
 
-  // Dedicated status options for the Verify / Status dialog dynamically from DB
+  // Dedicated status options for the Verify / Status dialog (Only Pending and Verified)
   const verificationStatusOptions = useMemo(() => {
-    const list = (statusesList || []).map((s) => s.statusName);
-    const set = new Set(list);
-    if (newStatus) set.add(newStatus);
-    const items = Array.from(set).filter(Boolean).map((s) => ({ label: s, value: s }));
     return [
       { label: "Select Status", value: "" },
-      ...items,
+      { label: "Verified", value: "Verified" },
+      { label: "Pending", value: "Pending" },
     ];
-  }, [statusesList, newStatus]);
+  }, []);
 
   // Event Type options for the Add/Edit form
   const formEventTypeOptions = useMemo(() => {

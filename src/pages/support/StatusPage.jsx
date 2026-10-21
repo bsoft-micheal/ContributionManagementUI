@@ -17,6 +17,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import AppSwitch from "../../components/common/AppSwitch";
+import AppMultiSelect from "../../components/common/AppMultiSelect";
 import {
   getStatusesAsync,
   createStatusAsync,
@@ -44,16 +45,24 @@ const NORMALIZE_MODULE_NAME = {
   general: "General",
 };
 
+const AVAILABLE_MODULES = [
+  { label: "Expenses", value: "Expenses" },
+  { label: "Contributions", value: "Contributions" },
+  { label: "Payments", value: "Payments" },
+  { label: "Support Ticket", value: "Support Ticket" },
+  { label: "Events", value: "Events" },
+];
+
 const STATUS_MODULE_CONFIG = {
   open: ["Support Ticket"],
   "in progress": ["Support Ticket"],
   resolved: ["Support Ticket"],
   pending: ["Support Ticket", "Payments", "Expenses", "Contributions"],
-  verified: ["Payments", "Contributions"],
+  verified: ["Payments", "Contributions", "Expenses"],
   closed: ["Support Ticket", "Events"],
   paid: ["Payments", "Contributions"],
-  approved: ["Expenses"],
-  rejected: ["Expenses"],
+  approved: ["General"],
+  rejected: ["General"],
   active: ["Events", "General"],
   inactive: ["Events", "General"],
 };
@@ -63,10 +72,13 @@ function getModulesForStatus(row) {
   const configured = STATUS_MODULE_CONFIG[cleanName] ? [...STATUS_MODULE_CONFIG[cleanName]] : [];
 
   if (row?.module && row.module.toLowerCase() !== "general") {
-    const rawMod = row.module.trim().toLowerCase();
-    const normalizedMod = NORMALIZE_MODULE_NAME[rawMod] || row.module.trim();
-    if (!configured.includes(normalizedMod)) {
-      configured.push(normalizedMod);
+    const rawParts = row.module.split(",").map((p) => p.trim()).filter(Boolean);
+    for (const part of rawParts) {
+      const lower = part.toLowerCase();
+      const normalized = NORMALIZE_MODULE_NAME[lower] || part;
+      if (!configured.some((c) => c.toLowerCase() === normalized.toLowerCase())) {
+        configured.push(normalized);
+      }
     }
   }
 
@@ -91,6 +103,7 @@ function getModulesForStatus(row) {
 
 const initialStatusForm = {
   statusName: "",
+  modules: [],
   isActive: true,
 };
 
@@ -161,8 +174,14 @@ export default function StatusPage() {
     }
 
     try {
+      const moduleStr =
+        Array.isArray(form.modules) && form.modules.length > 0
+          ? form.modules.join(", ")
+          : "General";
+
       const payload = {
         statusName: form.statusName.trim(),
+        module: moduleStr,
         isActive: form.isActive !== undefined ? form.isActive : true,
       };
 
@@ -244,6 +263,7 @@ export default function StatusPage() {
                   setForm({
                     statusId: row.statusId,
                     statusName: row.statusName || "",
+                    modules: getModulesForStatus(row),
                     isActive: row.isActive ?? true,
                   });
                   setErrors({});
@@ -439,6 +459,20 @@ export default function StatusPage() {
             error={!!errors.statusName}
             helperText={errors.statusName}
             required
+          />
+
+          <AppMultiSelect
+            label="Applicable Module(s)"
+            placeholder="Select applicable modules"
+            value={form.modules || []}
+            onChange={(e) => {
+              const val =
+                typeof e.target.value === "string"
+                  ? e.target.value.split(",")
+                  : e.target.value;
+              setForm((f) => ({ ...f, modules: val }));
+            }}
+            options={AVAILABLE_MODULES}
           />
 
           {form.statusId && (

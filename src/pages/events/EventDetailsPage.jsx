@@ -202,7 +202,14 @@ export default function EventDetailsPage() {
           <MetricCard label="Total Members" value={eventDetails.participantCount} />
         </Grid>
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <MetricCard label="Expected Amount" value={formatWholeCurrency(eventDetails.totalExpectedAmount || 0)} />
+          <MetricCard
+            label="Expected Amount"
+            value={formatWholeCurrency(
+              eventDetails.useAvailableBalance && Number(eventDetails.allocatedAmount) > 0
+                ? Math.max(0, (Number(eventDetails.baseAmount) || Number(eventDetails.totalExpectedAmount) || 0) - Number(eventDetails.allocatedAmount))
+                : (eventDetails.totalExpectedAmount || 0)
+            )}
+          />
         </Grid>
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
           <MetricCard label="Received Amount" value={formatWholeCurrency(eventDetails.totalPaidAmount || 0)} accent="#16a34a" />

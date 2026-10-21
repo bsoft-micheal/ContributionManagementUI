@@ -138,7 +138,18 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     return null;
   }
 
-  const totalExpected = roundToWhole(event?.totalExpectedAmount || 0);
+  const allocatedAmt = (activeEvent?.useAvailableBalance || event?.useAvailableBalance)
+    ? Number(activeEvent?.allocatedAmount ?? event?.allocatedAmount ?? 0)
+    : 0;
+  const rawBudget = Math.max(
+    Number(activeEvent?.baseAmount ?? event?.baseAmount ?? 0),
+    Number(activeEvent?.totalExpectedAmount ?? event?.totalExpectedAmount ?? 0) + allocatedAmt
+  );
+  const totalExpected = roundToWhole(
+    allocatedAmt > 0
+      ? Math.max(0, (Number(activeEvent?.baseAmount ?? event?.baseAmount ?? 0) || rawBudget) - allocatedAmt)
+      : (Number(activeEvent?.totalExpectedAmount ?? event?.totalExpectedAmount) || rawBudget)
+  );
   const totalPaid = (contributions || [])
     .filter((c) => c.paymentStatus === "Paid")
     .reduce((sum, c) => sum + roundToWhole(c.amount || 0), 0);
@@ -882,6 +893,11 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                   <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "primary.main" }}>
                     {formatWholeCurrency(totalExpected)}
                   </Typography>
+                  {allocatedAmt > 0 && (
+                    <Typography variant="caption" sx={{ color: "#16a34a", fontSize: "0.72rem", display: "block" }}>
+                      (Budget: {formatWholeCurrency(rawBudget)} - {formatWholeCurrency(allocatedAmt)} from Hand)
+                    </Typography>
+                  )}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>

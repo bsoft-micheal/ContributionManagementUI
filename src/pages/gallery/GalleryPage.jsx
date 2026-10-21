@@ -93,6 +93,19 @@ export function dataURLtoBlob(dataurl) {
   }
 }
 
+// Helper to calculate exact byte size of an image data URL or string
+export function getImageByteSize(url) {
+  if (!url || typeof url !== "string") return 0;
+  if (url.startsWith("data:")) {
+    const commaIdx = url.indexOf(",");
+    if (commaIdx === -1) return 0;
+    const base64Str = url.substring(commaIdx + 1);
+    const padding = base64Str.endsWith("==") ? 2 : base64Str.endsWith("=") ? 1 : 0;
+    return Math.max(0, Math.round((base64Str.length * 3) / 4) - padding);
+  }
+  return 0;
+}
+
 const initialForm = {
   title: "",
   eventName: "",
@@ -126,6 +139,9 @@ export default function GalleryPage() {
   const [editingPhoto, setEditingPhoto] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [photoToDelete, setPhotoToDelete] = useState(null);
+  const [removeImageConfirmOpen, setRemoveImageConfirmOpen] = useState(false);
+  const [removeImageIndexToConfirm, setRemoveImageIndexToConfirm] = useState(null);
+  const [clearAllImagesConfirmOpen, setClearAllImagesConfirmOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [activeViewImageIndex, setActiveViewImageIndex] = useState(0);
@@ -133,6 +149,46 @@ export default function GalleryPage() {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [remoteImageSizes, setRemoteImageSizes] = useState({});
+
+  useEffect(() => {
+    (form.imageUrls || []).forEach((url) => {
+      if (url && !url.startsWith("data:") && remoteImageSizes[url] === undefined) {
+        fetch(url, { method: "HEAD" })
+          .then((res) => {
+            const cl = res.headers.get("content-length");
+            if (cl) {
+              setRemoteImageSizes((prev) => ({ ...prev, [url]: parseInt(cl, 10) }));
+            }
+          })
+          .catch(() => {
+            setRemoteImageSizes((prev) => ({ ...prev, [url]: 350 * 1024 }));
+          });
+      }
+    });
+  }, [form.imageUrls]);
+
+  const MAX_BATCH_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+  const usedBytes = useMemo(() => {
+    let total = 0;
+    (form.imageUrls || []).forEach((url) => {
+      if (!url) return;
+      if (url.startsWith("data:")) {
+        total += getImageByteSize(url);
+      } else if (remoteImageSizes[url]) {
+        total += remoteImageSizes[url];
+      } else {
+        total += 350 * 1024;
+      }
+    });
+    return total;
+  }, [form.imageUrls, remoteImageSizes]);
+
+  const usedMB = usedBytes / (1024 * 1024);
+  const remainingMB = Math.max(0, (MAX_BATCH_SIZE_BYTES - usedBytes) / (1024 * 1024));
+  const usedMBFormatted = usedMB.toFixed(2);
+  const remainingMBFormatted = remainingMB.toFixed(2);
 
   const savedFormRef = useRef(null);
 
@@ -617,24 +673,25 @@ export default function GalleryPage() {
       filesToProcess = fileList.slice(0, availableSlots);
     }
 
-    // Validate image format and total size (Max 10MB)
-    const MAX_BATCH_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-    let totalSize = 0;
-
+    // Validate image format and total size against remaining capacity
+    let incomingSize = 0;
     for (const file of filesToProcess) {
       if (!file.type.startsWith("image/")) {
         toast.error(`"${file.name}" is not a supported image file.`);
         return;
       }
       if (file.size > MAX_BATCH_SIZE_BYTES) {
-        toast.error(`"${file.name}" exceeds the 10MB size limit (${(file.size / (1024 * 1024)).toFixed(1)}MB).`);
+        toast.error(`"${file.name}" exceeds the 10MB size limit (${(file.size / (1024 * 1024)).toFixed(2)}MB).`);
         return;
       }
-      totalSize += file.size;
+      incomingSize += file.size;
     }
 
-    if (totalSize > MAX_BATCH_SIZE_BYTES) {
-      toast.error(`Selected images total ${(totalSize / (1024 * 1024)).toFixed(1)}MB, which exceeds the 10MB limit.`);
+    const remainingBytes = Math.max(0, MAX_BATCH_SIZE_BYTES - usedBytes);
+    if (incomingSize > remainingBytes) {
+      toast.error(
+        `Selected images total ${(incomingSize / (1024 * 1024)).toFixed(2)}MB, which exceeds remaining limit of ${remainingMBFormatted}MB (10MB total).`
+      );
       return;
     }
 
@@ -698,27 +755,41 @@ export default function GalleryPage() {
     };
   };
 
-  const handleRemoveImageIndex = (indexToRemove, e) => {
-    e.stopPropagation();
-    setForm((prev) => {
-      const updated = (prev.imageUrls || []).filter((_, idx) => idx !== indexToRemove);
-      return {
-        ...prev,
-        imageUrls: updated,
-        imageUrl: updated[0] || "",
-      };
-    });
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const handleRequestRemoveImage = (indexToRemove, e) => {
+    if (e) e.stopPropagation();
+    setRemoveImageIndexToConfirm(indexToRemove);
+    setRemoveImageConfirmOpen(true);
   };
 
-  const handleClearAllImages = (e) => {
-    e.stopPropagation();
+  const handleConfirmRemoveImage = () => {
+    if (removeImageIndexToConfirm !== null) {
+      setForm((prev) => {
+        const updated = (prev.imageUrls || []).filter((_, idx) => idx !== removeImageIndexToConfirm);
+        return {
+          ...prev,
+          imageUrls: updated,
+          imageUrl: updated[0] || "",
+        };
+      });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+    setRemoveImageConfirmOpen(false);
+    setRemoveImageIndexToConfirm(null);
+  };
+
+  const handleRequestClearAllImages = (e) => {
+    if (e) e.stopPropagation();
+    setClearAllImagesConfirmOpen(true);
+  };
+
+  const handleConfirmClearAllImages = () => {
     setForm((prev) => ({
       ...prev,
       imageUrls: [],
       imageUrl: "",
     }));
     if (fileInputRef.current) fileInputRef.current.value = "";
+    setClearAllImagesConfirmOpen(false);
   };
 
   const handleDeleteRequest = (row) => {
@@ -923,38 +994,78 @@ export default function GalleryPage() {
     {
       label: "Title",
       key: "title",
-      render: (row) => (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="body2" fontWeight={700} sx={{ color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") }}>
-            {row.title}
-          </Typography>
-          {row.images && row.images.length > 1 && (
-            <Chip
-              label={`${row.images.length} photos`}
-              size="small"
-              sx={{
-                height: 18,
-                fontSize: "0.65rem",
-                fontWeight: 700,
-                bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74,63,107,0.08)",
-                color: (t) => t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-              }}
-            />
-          )}
-        </Box>
-      ),
+      render: (row) => {
+        const titleStr = row.title || "";
+        const isLong = titleStr.length > 30;
+        const displayTitle = isLong ? `${titleStr.slice(0, 30)}...` : titleStr;
+
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, maxWidth: 320 }}>
+            {isLong ? (
+              <Tooltip title={titleStr} arrow placement="top">
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{
+                    color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                    cursor: "pointer",
+                  }}
+                >
+                  {displayTitle}
+                </Typography>
+              </Tooltip>
+            ) : (
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{
+                  color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                }}
+              >
+                {displayTitle}
+              </Typography>
+            )}
+            {row.images && row.images.length > 1 && (
+              <Chip
+                label={`${row.images.length} photos`}
+                size="small"
+                sx={{
+                  height: 18,
+                  fontSize: "0.65rem",
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74,63,107,0.08)"),
+                  color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                }}
+              />
+            )}
+          </Box>
+        );
+      },
     },
     {
       label: "Event Name",
       key: "eventName",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={600}>
-          {row.eventName}
-        </Typography>
-      ),
+      render: (row) => {
+        const nameStr = row.eventName || "--";
+        const isLong = nameStr.length > 30;
+        const displayName = isLong ? `${nameStr.slice(0, 30)}...` : nameStr;
+
+        return isLong ? (
+          <Tooltip title={nameStr} arrow placement="top">
+            <Typography variant="body2" fontWeight={600} sx={{ cursor: "pointer" }}>
+              {displayName}
+            </Typography>
+          </Tooltip>
+        ) : (
+          <Typography variant="body2" fontWeight={600}>
+            {displayName}
+          </Typography>
+        );
+      },
     },
     {
-      label: "Category",
+      label: "Event Type",
       key: "category",
       render: (row) => (
         <Typography
@@ -1257,23 +1368,36 @@ export default function GalleryPage() {
           )}
 
           <Grid size={{ xs: 12 }}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5, flexWrap: "wrap", gap: 1 }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: errors.imageUrl ? "error.main" : "text.secondary" }}>
                 Upload Images {form.eventName ? `(Max ${maxPhotosForForm} for this entry, Total 5 per event)` : "(Max 5 images per event, up to 10MB)"} <Box component="span" sx={{ color: "error.main" }}>*</Box>
               </Typography>
-              {form.imageUrls && form.imageUrls.length > 0 && (
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                 <Chip
-                  label={`${form.imageUrls.length} of ${maxPhotosForForm} uploaded ${form.eventName ? `(Event Total: ${existingEventPhotoCount + form.imageUrls.length}/5)` : ""}`}
+                  label={`${remainingMBFormatted} MB remaining of 10 MB`}
                   size="small"
                   sx={{
                     height: 20,
                     fontSize: "0.65rem",
                     fontWeight: 800,
-                    bgcolor: (existingEventPhotoCount + form.imageUrls.length) >= 5 ? "rgba(22, 163, 74, 0.12)" : "rgba(74, 63, 107, 0.12)",
-                    color: (existingEventPhotoCount + form.imageUrls.length) >= 5 ? "#16a34a" : "#4a3f6b",
+                    bgcolor: remainingMB < 1 ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 185, 129, 0.12)",
+                    color: remainingMB < 1 ? "#ef4444" : "#10b981",
                   }}
                 />
-              )}
+                {form.imageUrls && form.imageUrls.length > 0 && (
+                  <Chip
+                    label={`${form.imageUrls.length} of ${maxPhotosForForm} uploaded ${form.eventName ? `(Event Total: ${existingEventPhotoCount + form.imageUrls.length}/5)` : ""}`}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: "0.65rem",
+                      fontWeight: 800,
+                      bgcolor: (existingEventPhotoCount + form.imageUrls.length) >= 5 ? "rgba(22, 163, 74, 0.12)" : "rgba(74, 63, 107, 0.12)",
+                      color: (existingEventPhotoCount + form.imageUrls.length) >= 5 ? "#16a34a" : "#4a3f6b",
+                    }}
+                  />
+                )}
+              </Stack>
             </Box>
             <input
               type="file"
@@ -1348,7 +1472,7 @@ export default function GalleryPage() {
                       }}
                     >
                       <Typography variant="caption" sx={{ fontWeight: 800, color: "text.primary" }}>
-                        Preview Uploaded Images ({form.imageUrls.length}/{maxPhotosForForm})
+                        Preview Uploaded Images ({form.imageUrls.length}/{maxPhotosForForm}) • {usedMBFormatted} MB used ({remainingMBFormatted} MB remaining)
                       </Typography>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         {form.imageUrls.length < maxPhotosForForm && (
@@ -1369,7 +1493,7 @@ export default function GalleryPage() {
                           size="small"
                           variant="text"
                           color="error"
-                          onClick={handleClearAllImages}
+                          onClick={handleRequestClearAllImages}
                           sx={{ fontSize: "0.72rem", height: 26, minWidth: "auto", p: 0.5 }}
                         >
                           Clear All
@@ -1420,7 +1544,11 @@ export default function GalleryPage() {
 
                           {/* Number Index Badge */}
                           <Chip
-                            label={`#${idx + 1}`}
+                            label={(() => {
+                              const bytes = getImageByteSize(url) || remoteImageSizes[url] || 0;
+                              const mb = (bytes / (1024 * 1024)).toFixed(2);
+                              return bytes > 0 ? `#${idx + 1} • ${mb} MB` : `#${idx + 1}`;
+                            })()}
                             size="small"
                             sx={{
                               position: "absolute",
@@ -1429,7 +1557,7 @@ export default function GalleryPage() {
                               height: 18,
                               fontSize: "0.62rem",
                               fontWeight: 800,
-                              bgcolor: "rgba(0,0,0,0.7)",
+                              bgcolor: "rgba(0,0,0,0.75)",
                               color: "#ffffff",
                             }}
                           />
@@ -1438,7 +1566,7 @@ export default function GalleryPage() {
                           <Tooltip title="Remove photo">
                             <IconButton
                               size="small"
-                              onClick={(e) => handleRemoveImageIndex(idx, e)}
+                              onClick={(e) => handleRequestRemoveImage(idx, e)}
                               sx={{
                                 position: "absolute",
                                 top: 5,
@@ -1500,7 +1628,7 @@ export default function GalleryPage() {
                       variant="caption"
                       sx={{ color: "#10b981", fontWeight: 700, mt: 1.2, display: "block" }}
                     >
-                      ✓ {form.imageUrls.length} photo(s) selected for this entry (Event Total: {existingEventPhotoCount + form.imageUrls.length}/5)
+                      ✓ {form.imageUrls.length} photo(s) selected ({usedMBFormatted} MB used • {remainingMBFormatted} MB remaining of 10 MB) (Event Total: {existingEventPhotoCount + form.imageUrls.length}/5)
                     </Typography>
                   </Box>
                 ) : (
@@ -1510,7 +1638,7 @@ export default function GalleryPage() {
                       Click to browse or drop images from device
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block", mt: 0.4 }}>
-                      Select up to {maxPhotosForForm} image(s) • Max 5 photos per event • Maximum 10MB total • JPG, PNG, WebP
+                      Select up to {maxPhotosForForm} image(s) • Max 5 photos per event • {remainingMBFormatted} MB remaining of 10 MB limit • JPG, PNG, WebP
                     </Typography>
                     {errors.imageUrl && (
                       <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, mt: 0.6, display: "block" }}>
@@ -1535,6 +1663,31 @@ export default function GalleryPage() {
         onConfirm={handleConfirmDelete}
         title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
         content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
+      />
+
+      {/* Confirm Remove Uploaded Image Dialog */}
+      <AppConfirmDialog
+        open={removeImageConfirmOpen}
+        onClose={() => {
+          setRemoveImageConfirmOpen(false);
+          setRemoveImageIndexToConfirm(null);
+        }}
+        onConfirm={handleConfirmRemoveImage}
+        title="Remove Photo"
+        content="Are you sure you want to remove this photo?"
+        confirmText="Remove"
+        confirmColor="error"
+      />
+
+      {/* Confirm Clear All Uploaded Images Dialog */}
+      <AppConfirmDialog
+        open={clearAllImagesConfirmOpen}
+        onClose={() => setClearAllImagesConfirmOpen(false)}
+        onConfirm={handleConfirmClearAllImages}
+        title="Clear All Photos"
+        content="Are you sure you want to remove all photos from this entry?"
+        confirmText="Clear All"
+        confirmColor="error"
       />
 
       {/* View Photo Details Dialog */}
@@ -1872,31 +2025,42 @@ export default function GalleryPage() {
                 }}
               >
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid size={{ xs: 12, sm: 6 }} sx={{ minWidth: 0 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
                       Title
                     </Typography>
                     <Typography
                       variant="subtitle1"
                       fontWeight={700}
-                      sx={{ color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") }}
+                      sx={{
+                        color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                        wordBreak: "break-word",
+                        overflowWrap: "anywhere",
+                      }}
                     >
                       {selectedPhoto.title}
                     </Typography>
                   </Grid>
 
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid size={{ xs: 12, sm: 6 }} sx={{ minWidth: 0 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
                       Event Name
                     </Typography>
-                    <Typography variant="body1" fontWeight={600}>
+                    <Typography
+                      variant="body1"
+                      fontWeight={600}
+                      sx={{
+                        wordBreak: "break-word",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
                       {selectedPhoto.eventName || "--"}
                     </Typography>
                   </Grid>
 
                   <Grid size={{ xs: 6, sm: 4 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
-                      Category
+                      Event Type
                     </Typography>
                     <Chip
                       label={selectedPhoto.category || "General"}
@@ -1945,24 +2109,44 @@ export default function GalleryPage() {
                   </Grid>
 
                   {selectedPhoto.description && (
-                    <Grid size={{ xs: 12 }}>
+                    <Grid size={{ xs: 12 }} sx={{ minWidth: 0 }}>
                       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.3 }}>
                         Description
                       </Typography>
-                      <Typography
-                        variant="body2"
+                      <Box
                         sx={{
                           bgcolor: (t) =>
                             t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#ffffff",
                           p: 1.5,
                           borderRadius: "8px",
                           border: (t) => `1px solid ${t.palette.divider}`,
-                          whiteSpace: "pre-line",
-                          lineHeight: 1.6,
+                          maxHeight: 180,
+                          overflowY: "auto",
+                          overflowX: "hidden",
+                          wordBreak: "break-word",
+                          overflowWrap: "anywhere",
+                          "&::-webkit-scrollbar": { width: 6 },
+                          "&::-webkit-scrollbar-thumb": {
+                            bgcolor: (t) =>
+                              t.palette.mode === "dark"
+                                ? "rgba(255,255,255,0.2)"
+                                : "rgba(0,0,0,0.2)",
+                            borderRadius: 3,
+                          },
                         }}
                       >
-                        {selectedPhoto.description}
-                      </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            overflowWrap: "anywhere",
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          {selectedPhoto.description}
+                        </Typography>
+                      </Box>
                     </Grid>
                   )}
                 </Grid>
