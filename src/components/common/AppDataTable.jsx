@@ -432,7 +432,7 @@ export default function AppDataTable({
     // Deduplicate data by unique identifier if present
     const seenIds = new Set();
     result = result.filter((row, idx) => {
-      const id = row?.userId ?? row?.id ?? row?.key ?? row?._id ?? row?.memberId ?? row?.photoId ?? row?.eventId ?? row?.expenseId ?? row?.roleId ?? idx;
+      const id = row?.roleRightId ?? row?.featureID ?? row?.featureId ?? row?._uid ?? row?.userId ?? row?.id ?? row?.key ?? row?._id ?? row?.memberId ?? row?.photoId ?? row?.eventId ?? row?.expenseId ?? (row?.roleName && !row?.roleRightId ? row?.roleId : undefined) ?? idx;
       if (seenIds.has(id)) return false;
       seenIds.add(id);
       return true;

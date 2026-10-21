@@ -314,7 +314,6 @@ export default function ContributionCalculationPage() {
                     const firstEventId = events[0].eventId;
                     setFilterEventId(firstEventId);
                     setSelectedEventId(firstEventId);
-                    toast.success("Filter cleared");
                   }
                 }}
                 sx={{

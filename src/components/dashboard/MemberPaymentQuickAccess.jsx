@@ -825,7 +825,12 @@ export default function MemberPaymentQuickAccess({
               size="small"
               value={selectedEventType}
               onChange={(e) => {
-                setSelectedEventType(e.target.value);
+                setSelectedEventType(e.target.value || "ALL");
+                setSelectedEventId("ALL");
+                setPage(0);
+              }}
+              onClear={() => {
+                setSelectedEventType("ALL");
                 setSelectedEventId("ALL");
                 setPage(0);
               }}
@@ -838,7 +843,11 @@ export default function MemberPaymentQuickAccess({
               size="small"
               value={selectedEventId}
               onChange={(e) => {
-                setSelectedEventId(e.target.value);
+                setSelectedEventId(e.target.value || "ALL");
+                setPage(0);
+              }}
+              onClear={() => {
+                setSelectedEventId("ALL");
                 setPage(0);
               }}
               options={eventOptions}

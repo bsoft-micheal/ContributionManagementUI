@@ -299,9 +299,9 @@ export default function AddSupportTicketModal({
         return;
       }
 
-      const MAX_SIZE = 3 * 1024 * 1024; // 3MB limit
+      const MAX_SIZE = 6 * 1024 * 1024; // 6MB limit
       if (file.size > MAX_SIZE) {
-        toast.error("Image size exceeds maximum limit of 3 MB");
+        toast.error("Image size exceeds maximum limit of 6 MB");
         return;
       }
 
@@ -369,8 +369,8 @@ export default function AddSupportTicketModal({
 
   const handleSaveTicket = async () => {
     const newErrors = {};
-    if (!form.memberName) newErrors.memberName = "Name is required";
-    if (!form.eventType) newErrors.eventType = "Event Type is required";
+    if (!form.memberName) newErrors.memberName = "This field is required";
+    if (!form.eventType) newErrors.eventType = "This field is required";
     if (!form.ticketType) newErrors.ticketType = "This field is required";
     if (!form.priority || !String(form.priority).trim()) newErrors.priority = "This field is required";
     if (!form.description || !form.description.trim()) newErrors.description = "This field is required";
@@ -396,6 +396,7 @@ export default function AddSupportTicketModal({
         ticketNo: newTicketNo,
         memberName: form.memberName,
         memberId: resolvedMemberId || "",
+        eventId: form.eventId || initialData?.eventId || null,
         relatedEvent: form.relatedEvent || "",
         ticketType: form.ticketType,
         description: form.description || "",
@@ -405,6 +406,7 @@ export default function AddSupportTicketModal({
       });
 
       const actualTicketNo = created?.ticketNo || newTicketNo;
+      window.dispatchEvent(new CustomEvent("support_ticket_updated", { detail: created }));
 
       // Trigger notification for Authority/Admin safely
       try {
@@ -598,7 +600,7 @@ export default function AddSupportTicketModal({
                   fontWeight={700}
                   sx={{ color: (t) => (t.palette.mode === "dark" ? "#e2e8f0" : "#334155") }}
                 >
-                  Attachment (1 Image, Max 3MB)
+                  Attachment (1 Image, Max 6MB)
                 </Typography>
                 {form.attachment && (
                   <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem" }}>
@@ -656,7 +658,7 @@ export default function AddSupportTicketModal({
                     fontWeight={600}
                     sx={{ color: errors.attachment ? "#ef4444" : "text.secondary" }}
                   >
-                    Click to attach image (Max 3MB)
+                    Click to attach image (Max 6MB)
                   </Typography>
                 </Box>
               ) : (

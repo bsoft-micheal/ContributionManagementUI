@@ -118,9 +118,10 @@ export default function ContributionsPage() {
   // Authority Status Update state
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [statusModalRow, setStatusModalRow] = useState(null);
-  const [statusChangeValue, setStatusChangeValue] = useState("Paid");
+  const [statusChangeValue, setStatusChangeValue] = useState("");
   const [auditRemarks, setAuditRemarks] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState("");
   const [dbStatuses, setDbStatuses] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [verifiedKeys, setVerifiedKeys] = useState(() => new Set());
@@ -325,6 +326,63 @@ export default function ContributionsPage() {
       }
       return isMatchingEventName(targetEventName, tEventName);
     });
+  };
+
+  const findRaisedSupportTicket = (c) => {
+    if (!c || !Array.isArray(supportTickets) || supportTickets.length === 0) return null;
+
+    const rowMemberId = String(c.memberId || c.userId || "").trim().toLowerCase();
+    const rowMemberName = String(c.memberName || "").trim().toLowerCase();
+    if (!rowMemberId && !rowMemberName) return null;
+
+    const rowEventId = String(c.eventId || (selectedEventId !== "ALL" ? selectedEventId : "") || "").trim().toLowerCase();
+    const activeEvent = (events || []).find((e) => String(e.eventId || e.id).toLowerCase() === rowEventId);
+    const rowEventName = (c.eventName || activeEvent?.eventName || activeEvent?.title || activeEvent?.name || "")
+      .replace(/\s*\(\d{2}\/\d{2}\/\d{4}\)/g, "")
+      .trim()
+      .toLowerCase();
+
+    // Filter tickets that belong strictly to this member
+    const memberTickets = [...supportTickets].reverse().filter((t) => {
+      const tMemberId = String(t.memberId || t.userId || "").trim().toLowerCase();
+      const tMemberName = String(t.memberName || "").trim().toLowerCase();
+
+      return (rowMemberId && tMemberId && rowMemberId === tMemberId) ||
+        (rowMemberName && tMemberName && rowMemberName === tMemberName);
+    });
+
+    if (memberTickets.length === 0) return null;
+
+    // 1. Exact Match: member + eventId
+    if (rowEventId) {
+      const matchedByEventId = memberTickets.find((t) => {
+        const tEventId = String(t.eventId || "").trim().toLowerCase();
+        return Boolean(tEventId && tEventId === rowEventId);
+      });
+      if (matchedByEventId) return matchedByEventId;
+    }
+
+    // 2. Match: member + eventName
+    if (rowEventName) {
+      const matchedByEventName = memberTickets.find((t) => {
+        const tEv = String(t.relatedEvent || t.eventName || "")
+          .replace(/\s*\(\d{2}\/\d{2}\/\d{4}\)/g, "")
+          .trim()
+          .toLowerCase();
+        return Boolean(tEv && (tEv === rowEventName || tEv.includes(rowEventName) || rowEventName.includes(tEv)));
+      });
+      if (matchedByEventName) return matchedByEventName;
+    }
+
+    // 3. Match: member ticket with no specific event attached (general ticket raised by member)
+    const generalTicket = memberTickets.find((t) => {
+      const tEv = String(t.relatedEvent || t.eventName || "").trim();
+      const tEvId = String(t.eventId || "").trim();
+      return !tEv && !tEvId;
+    });
+    if (generalTicket) return generalTicket;
+
+    return null;
   };
 
   const hasContributionPayment = (c, tx = null) => {
@@ -566,6 +624,21 @@ export default function ContributionsPage() {
   }, [rawContributions, allContributions, events, transactions, appliedStatus]);
 
   const handleOpenSubmitPaymentModal = (row) => {
+    if (!row) return;
+    const matchedTx = findContributionTransaction(row);
+    const isVerifiedRow = isContributionVerified(row, matchedTx);
+    const hasSubmitted = hasSubmittedPayment(row, matchedTx);
+    const hasDirectPaid = isContributionPaid(row, matchedTx);
+    const statusStr = String(row?.paymentStatus || row?.status || row?.statusName || "").trim().toLowerCase();
+    const isPaidStatus = statusStr === "paid" || statusStr === "verified" || statusStr === "completed" || statusStr === "closed" || row?.paymentStatus === 2;
+    const isSettledByAmount = Number(row?.paidAmount || 0) > 0 && (row?.totalAccumulated === undefined || Number(row?.totalAccumulated) <= 0);
+    const isPaidMember = Boolean(isVerifiedRow || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount);
+
+    if (isPaidMember) {
+      toast.info("This contribution has already been fully paid and settled.");
+      return;
+    }
+
     const evId = row?.eventId || selectedEventId || "";
     const activeEv = (events || []).find((e) => String(e.eventId || e.id) === String(evId));
     const isPaidRow = row ? (isContributionPaid(row) || String(row?.paymentStatus || row?.status || "").toLowerCase() === "paid") : false;
@@ -652,7 +725,11 @@ export default function ContributionsPage() {
       reloadAllContributions();
     };
     window.addEventListener("contribution_updated", handleUpdate);
-    return () => window.removeEventListener("contribution_updated", handleUpdate);
+    window.addEventListener("support_ticket_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("contribution_updated", handleUpdate);
+      window.removeEventListener("support_ticket_updated", handleUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -970,7 +1047,6 @@ export default function ContributionsPage() {
     setSelectedEventId("ALL");
     setFilterStatus("ALL");
     setAppliedStatus("ALL");
-    toast.success("Filter cleared");
   };
 
   const getActualReceivedAmount = useCallback((row, matchedTx) => {
@@ -1083,6 +1159,12 @@ export default function ContributionsPage() {
   const handleStatusUpdate = async (row, newStatus, customNotes) => {
     const target = row || statusModalRow;
     if (!target) return;
+
+    if (!newStatus || !String(newStatus).trim()) {
+      setStatusError("This field is required");
+      toast.error("This field is required");
+      return;
+    }
 
     const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "Admin";
     const noteText = customNotes !== undefined
@@ -1250,30 +1332,55 @@ export default function ContributionsPage() {
     {
       label: "Action",
       render: (row) => {
-        const isPaidRow = isContributionPaid(row) || String(row?.paymentStatus || row?.status || "").toLowerCase() === "paid";
         const matchedTx = findContributionTransaction(row);
         const isVerifiedRow = isContributionVerified(row, matchedTx);
+        const hasSubmitted = hasSubmittedPayment(row, matchedTx);
+        const hasDirectPaid = isContributionPaid(row, matchedTx);
+        const statusStr = String(row?.paymentStatus || row?.status || row?.statusName || "").trim().toLowerCase();
+        const isPaidStatus = statusStr === "paid" || statusStr === "verified" || statusStr === "completed" || statusStr === "closed" || row?.paymentStatus === 2;
+        const isSettledByAmount = Number(row?.paidAmount || 0) > 0 && (row?.totalAccumulated === undefined || Number(row?.totalAccumulated) <= 0);
+        const isPaidMember = Boolean(isVerifiedRow || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount);
+
+        const tooltipTitle = isPaidMember
+          ? (isVerifiedRow
+              ? "Payment Verified & Settled"
+              : (hasSubmitted && statusStr === "pending")
+              ? "Payment Proof Submitted (Pending Verification)"
+              : "Payment Fully Cleared (Settled)")
+          : "Submit Payment Details";
 
         return (
           <Box sx={{ display: "flex", gap: 0.6, alignItems: "center" }}>
             {canAddContribution && (
-              <Tooltip title={isPaidRow ? "Payment Fully Cleared (Settled)" : "Submit Payment Details"}>
-                <IconButton
-                  size="small"
-                  onClick={() => handleOpenSubmitPaymentModal(row)}
-                  sx={{
-                    p: 0.4,
-                    color: isPaidRow ? "#16a34a" : "#4a3f6b",
-                    bgcolor: isPaidRow ? "rgba(22, 163, 74, 0.12)" : "rgba(74, 63, 107, 0.08)",
-                    borderRadius: "6px",
-                    "&:hover": {
-                      bgcolor: isPaidRow ? "rgba(22, 163, 74, 0.22)" : "rgba(74, 63, 107, 0.18)",
-                      color: isPaidRow ? "#15803d" : "#3b325c",
-                    },
-                  }}
-                >
-                  <PaymentIcon sx={{ fontSize: "1.15rem" }} />
-                </IconButton>
+              <Tooltip title={tooltipTitle}>
+                <span style={{ display: "inline-flex", cursor: isPaidMember ? "not-allowed" : "pointer" }}>
+                  <IconButton
+                    size="small"
+                    disabled={isPaidMember}
+                    onClick={() => handleOpenSubmitPaymentModal(row)}
+                    sx={{
+                      p: 0.4,
+                      color: isPaidMember ? "#9ca3af" : (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                      bgcolor: isPaidMember
+                        ? "rgba(156, 163, 175, 0.08)"
+                        : (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(74, 63, 107, 0.08)"),
+                      borderRadius: "6px",
+                      "&.Mui-disabled": {
+                        color: "#9ca3af",
+                        bgcolor: "rgba(156, 163, 175, 0.08)",
+                        opacity: 0.65,
+                      },
+                      "&:hover": {
+                        bgcolor: isPaidMember
+                          ? "rgba(156, 163, 175, 0.08)"
+                          : (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(74, 63, 107, 0.18)"),
+                        color: isPaidMember ? "#9ca3af" : (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#3b325c"),
+                      },
+                    }}
+                  >
+                    <PaymentIcon sx={{ fontSize: "1.15rem" }} />
+                  </IconButton>
+                </span>
               </Tooltip>
             )}
 
@@ -1284,11 +1391,10 @@ export default function ContributionsPage() {
                     size="small"
                     disabled={isVerifiedRow}
                     onClick={() => {
-                      const matchedTx = findContributionTransaction(row);
-                      const receivedAmt = getActualReceivedAmount(row, matchedTx);
                       setStatusModalRow(row);
-                      setStatusChangeValue(row.paymentStatus || (receivedAmt > 0 ? "Verified" : "Pending"));
+                      setStatusChangeValue("");
                       setAuditRemarks("");
+                      setStatusError("");
                       setStatusModalOpen(true);
                     }}
                     sx={{
@@ -1344,86 +1450,51 @@ export default function ContributionsPage() {
               </Tooltip>
             )}
 
-            {/* Verify Support Ticket Icon */}
-            {canVerifySupportTicket && (
-              <Tooltip title="Verify Support Ticket">
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    const activeEvent = events.find((e) => String(e.eventId) === String(row.eventId || (selectedEventId !== "ALL" ? selectedEventId : "")));
-                    const evName = (row.eventName || activeEvent?.eventName || activeEvent?.title || "").replace(/\s*\(\d{2}\/\d{2}\/\d{4}\)/g, "").trim().toLowerCase();
-                    const mName = (row.memberName || "").trim().toLowerCase();
-                    const mId = String(row.memberId || "").trim().toLowerCase();
+            {/* Verify Support Ticket Icon - Only visible when member has actually raised a support ticket */}
+            {(() => {
+              const raisedTicket = findRaisedSupportTicket(row);
+              if (!canVerifySupportTicket || !raisedTicket) return null;
 
-                    // Match exact ticket from loaded supportTickets
-                    let matchedTicket = null;
-                    if (Array.isArray(supportTickets) && supportTickets.length > 0) {
-                      // 1. Member + Event match
-                      matchedTicket = [...supportTickets].reverse().find((t) => {
-                        const tMember = (t.memberName || "").trim().toLowerCase();
-                        const tMemberId = String(t.memberId || "").trim().toLowerCase();
-                        const tEv = (t.relatedEvent || t.eventName || "").trim().toLowerCase();
-                        const isMem = tMember === mName || (mId && tMemberId === mId);
-                        const isEv = evName && (tEv === evName || tEv.includes(evName) || evName.includes(tEv));
-                        return isMem && isEv;
+              return (
+                <Tooltip title={`Verify Support Ticket (${raisedTicket.ticketNo || "Raised"})`}>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      const activeEvent = events.find((e) => String(e.eventId) === String(row.eventId || (selectedEventId !== "ALL" ? selectedEventId : "")));
+                      setSelectedVerifyTicketRow({
+                        ...raisedTicket,
+                        memberName: raisedTicket.memberName || row.memberName,
+                        memberId: raisedTicket.memberId || row.memberId,
+                        ticketId: raisedTicket.ticketId || raisedTicket.id,
+                        ticketNo: raisedTicket.ticketNo,
+                        attachment: raisedTicket.attachment,
+                        description: raisedTicket.description || raisedTicket.Description || "",
+                        status: raisedTicket.status || "Open",
+                        ticketType: raisedTicket.ticketType || "Payment Issue",
+                        priority: raisedTicket.priority || "Medium",
+                        relatedEvent: raisedTicket.relatedEvent || raisedTicket.eventName || row.eventName || activeEvent?.eventName || activeEvent?.title || "",
+                        eventName: raisedTicket.eventName || raisedTicket.relatedEvent || row.eventName || activeEvent?.eventName || "",
+                        contributionId: row.contributionId,
+                        paymentStatus: row.paymentStatus,
                       });
-
-                      // 2. Member match
-                      if (!matchedTicket && mName) {
-                        matchedTicket = [...supportTickets].reverse().find((t) => {
-                          const tMember = (t.memberName || "").trim().toLowerCase();
-                          const tMemberId = String(t.memberId || "").trim().toLowerCase();
-                          return tMember === mName || (mId && tMemberId === mId);
-                        });
-                      }
-
-                      // 3. Event match
-                      if (!matchedTicket && evName) {
-                        matchedTicket = [...supportTickets].reverse().find((t) => {
-                          const tEv = (t.relatedEvent || t.eventName || "").trim().toLowerCase();
-                          return tEv === evName || tEv.includes(evName) || evName.includes(tEv);
-                        });
-                      }
-
-                      // 4. Latest ticket fallback
-                      if (!matchedTicket) {
-                        matchedTicket = supportTickets[supportTickets.length - 1];
-                      }
-                    }
-
-                    setSelectedVerifyTicketRow({
-                      ...matchedTicket,
-                      memberName: matchedTicket?.memberName || row.memberName,
-                      memberId: matchedTicket?.memberId || row.memberId,
-                      ticketId: matchedTicket?.ticketId || matchedTicket?.id,
-                      ticketNo: matchedTicket?.ticketNo,
-                      attachment: matchedTicket?.attachment,
-                      description: matchedTicket?.description || matchedTicket?.Description || "",
-                      status: matchedTicket?.status || "Open",
-                      ticketType: matchedTicket?.ticketType || "Payment Issue",
-                      priority: matchedTicket?.priority || "Medium",
-                      relatedEvent: matchedTicket?.relatedEvent || matchedTicket?.eventName || row.eventName || activeEvent?.eventName || activeEvent?.title || "",
-                      eventName: matchedTicket?.eventName || matchedTicket?.relatedEvent || row.eventName || activeEvent?.eventName || "",
-                      contributionId: row.contributionId,
-                      paymentStatus: row.paymentStatus,
-                    });
-                    setVerifyTicketModalOpen(true);
-                  }}
-                  sx={{
-                    p: 0.4,
-                    color: "#0284c7",
-                    bgcolor: "rgba(2, 132, 199, 0.1)",
-                    borderRadius: "6px",
-                    "&:hover": {
-                      bgcolor: "rgba(2, 132, 199, 0.22)",
-                      color: "#0369a1",
-                    },
-                  }}
-                >
-                  <SupportAgentIcon sx={{ fontSize: "1.15rem" }} />
-                </IconButton>
-              </Tooltip>
-            )}
+                      setVerifyTicketModalOpen(true);
+                    }}
+                    sx={{
+                      p: 0.4,
+                      color: "#0284c7",
+                      bgcolor: "rgba(2, 132, 199, 0.1)",
+                      borderRadius: "6px",
+                      "&:hover": {
+                        bgcolor: "rgba(2, 132, 199, 0.22)",
+                        color: "#0369a1",
+                      },
+                    }}
+                  >
+                    <SupportAgentIcon sx={{ fontSize: "1.15rem" }} />
+                  </IconButton>
+                </Tooltip>
+              );
+            })()}
           </Box>
         );
       },
@@ -1749,8 +1820,9 @@ export default function ContributionsPage() {
                   placeholder="Select event type"
                   value={filterEventType}
                   onChange={(event) => {
-                    handleEventTypeChange(event.target.value);
+                    handleEventTypeChange(event.target.value || "ALL");
                   }}
+                  onClear={() => handleEventTypeChange("ALL")}
                   options={eventTypeOptions}
                   fullWidth
                 />
@@ -1761,8 +1833,9 @@ export default function ContributionsPage() {
                   placeholder="Select an event"
                   value={filterEventId}
                   onChange={(event) => {
-                    setFilterEventId(event.target.value);
+                    setFilterEventId(event.target.value || "ALL");
                   }}
+                  onClear={() => setFilterEventId("ALL")}
                   options={eventOptions}
                   fullWidth
                 />
@@ -1773,8 +1846,9 @@ export default function ContributionsPage() {
                   placeholder="Select status"
                   value={filterStatus}
                   onChange={(event) => {
-                    setFilterStatus(event.target.value);
+                    setFilterStatus(event.target.value || "ALL");
                   }}
+                  onClear={() => setFilterStatus("ALL")}
                   options={[
                     { label: "All Statuses", value: "ALL" },
                     { label: "Paid", value: "Paid" },
@@ -2195,7 +2269,9 @@ export default function ContributionsPage() {
         onClose={() => {
           setStatusModalOpen(false);
           setStatusModalRow(null);
+          setStatusChangeValue("");
           setAuditRemarks("");
+          setStatusError("");
         }}
         title="Authority Status Update"
         maxWidth="md"
@@ -2220,13 +2296,18 @@ export default function ContributionsPage() {
                       ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first."
                       : ""
                   }
-                  onClick={() =>
+                  onClick={() => {
+                    if (!statusChangeValue || !String(statusChangeValue).trim()) {
+                      setStatusError("This field is required");
+                      toast.error("This field is required");
+                      return;
+                    }
                     handleStatusUpdate(
                       statusModalRow,
-                      statusChangeValue || statusModalRow?.paymentStatus,
+                      statusChangeValue,
                       auditRemarks
-                    )
-                  }
+                    );
+                  }}
                 >
                   Save
                 </AppButton>
@@ -2513,10 +2594,16 @@ export default function ContributionsPage() {
               <Grid container spacing={2} alignItems="center">
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <AppSelect
-                    label="Select Status *"
-                    value={statusChangeValue || statusModalRow?.paymentStatus || "Paid"}
-                    onChange={(e) => setStatusChangeValue(e.target.value)}
+                    label="Select Status"
+                    placeholder="Select Status"
+                    value={statusChangeValue}
+                    onChange={(e) => {
+                      setStatusChangeValue(e.target.value);
+                      if (statusError) setStatusError("");
+                    }}
                     options={getModalStatusOptions(statusModalRow)}
+                    error={Boolean(statusError)}
+                    helperText={statusError || ""}
                     required
                   />
                 </Grid>
@@ -2525,7 +2612,13 @@ export default function ContributionsPage() {
                     Status Preview
                   </Typography>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {renderStatusBadge(statusChangeValue || statusModalRow?.paymentStatus)}
+                    {statusChangeValue ? (
+                      renderStatusBadge(statusChangeValue)
+                    ) : (
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
+                        None selected
+                      </Typography>
+                    )}
                   </Box>
                 </Grid>
               </Grid>
@@ -2569,6 +2662,13 @@ export default function ContributionsPage() {
           setSelectedTicketRow(null);
         }}
         initialData={selectedTicketRow}
+        onSuccess={async () => {
+          try {
+            const ticketsRes = await getSupportTicketsAsync();
+            if (Array.isArray(ticketsRes)) setSupportTickets(ticketsRes);
+          } catch {}
+          window.dispatchEvent(new CustomEvent("contribution_updated"));
+        }}
       />
 
       {/* ── Verify Support Ticket Dialog ── */}

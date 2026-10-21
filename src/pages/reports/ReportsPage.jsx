@@ -1985,7 +1985,8 @@ export default function ReportsPage({ mode = "event" }) {
                   <AppSelect
                     label="Event Type"
                     value={filterEventType}
-                    onChange={(e) => handleEventTypeChange(e.target.value)}
+                    onChange={(e) => handleEventTypeChange(e.target.value || "ALL")}
+                    onClear={() => handleEventTypeChange("ALL")}
                     options={eventTypeOptions}
                   />
                 </Box>
@@ -1993,7 +1994,8 @@ export default function ReportsPage({ mode = "event" }) {
                   <AppSelect
                     label="Event"
                     value={filterEvent}
-                    onChange={(e) => setFilterEvent(e.target.value)}
+                    onChange={(e) => setFilterEvent(e.target.value || "ALL")}
+                    onClear={() => setFilterEvent("ALL")}
                     options={eventOptions}
                   />
                 </Box>
@@ -2002,7 +2004,8 @@ export default function ReportsPage({ mode = "event" }) {
                     <AppSelect
                       label="Payment Status"
                       value={filterPaymentStatus}
-                      onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                      onChange={(e) => setFilterPaymentStatus(e.target.value || "ALL")}
+                      onClear={() => setFilterPaymentStatus("ALL")}
                       options={paymentStatusOptions}
                     />
                   </Box>

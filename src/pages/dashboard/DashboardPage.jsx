@@ -557,7 +557,7 @@ const YEAR_OPTIONS = [
   }),
 ];
 
-function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eventOptions, loading }) {
+function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OPTIONS, eventTypeOptions, eventOptions, loading }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -574,8 +574,12 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.YEAR_LABEL || "Year"}
           value={pending.year}
-          onChange={(e) => onChange("year", Number(e.target.value))}
-          options={YEAR_OPTIONS}
+          onChange={(e) => {
+            const val = e.target.value;
+            onChange("year", val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
+          }}
+          onClear={() => onChange("year", 0)}
+          options={yearOptions}
           size="small"
         />
       </Box>
@@ -583,7 +587,11 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.MONTH_LABEL || "Month"}
           value={pending.month}
-          onChange={(e) => onChange("month", Number(e.target.value))}
+          onChange={(e) => {
+            const val = e.target.value;
+            onChange("month", val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
+          }}
+          onClear={() => onChange("month", 0)}
           options={MONTH_OPTIONS}
           size="small"
         />
@@ -592,7 +600,8 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.EVENT_TYPE_LABEL || "Event Type"}
           value={pending.eventType || "ALL"}
-          onChange={(e) => onChange("eventType", e.target.value)}
+          onChange={(e) => onChange("eventType", e.target.value || "ALL")}
+          onClear={() => onChange("eventType", "ALL")}
           options={eventTypeOptions}
           size="small"
         />
@@ -601,7 +610,8 @@ function FilterBar({ pending, onChange, onFilter, onClear, eventTypeOptions, eve
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.EVENT_LABEL || "Event Name"}
           value={pending.eventId || "ALL"}
-          onChange={(e) => onChange("eventId", e.target.value)}
+          onChange={(e) => onChange("eventId", e.target.value || "ALL")}
+          onClear={() => onChange("eventId", "ALL")}
           options={eventOptions}
           size="small"
         />
@@ -830,6 +840,29 @@ export default function DashboardPage() {
     return options;
   }, [eventTypes, summary?.upcomingEvents]);
 
+  // Dynamic Year Options calculated from current year window + any event years in the database
+  const dynamicYearOptions = useMemo(() => {
+    const currentYear = dayjs().year();
+    const yearsSet = new Set();
+    for (let i = currentYear - 5; i <= currentYear + 5; i++) {
+      yearsSet.add(i);
+    }
+    (summary?.upcomingEvents || []).forEach((e) => {
+      const d = e.eventDate || e.createdOn || e.date;
+      if (d) {
+        const y = dayjs(d).year();
+        if (y && !isNaN(y)) {
+          yearsSet.add(y);
+        }
+      }
+    });
+    const sortedYears = Array.from(yearsSet).sort((a, b) => a - b);
+    return [
+      { label: "All", value: 0 },
+      ...sortedYears.map((y) => ({ label: String(y), value: y })),
+    ];
+  }, [summary?.upcomingEvents]);
+
   // Build Event options cascading from pendingFilters.eventType
   const eventOptions = useMemo(() => {
     const options = [
@@ -845,12 +878,17 @@ export default function DashboardPage() {
           (e) => (e.eventTypeName || "").toLowerCase() === selectedType.toLowerCase()
         );
 
+    const seen = new Set();
     matchingEvents.forEach((e) => {
       if (e.eventName) {
-        options.push({
-          label: e.eventName,
-          value: e.eventId ? String(e.eventId) : e.eventName,
-        });
+        const val = e.eventId ? String(e.eventId) : e.eventName;
+        if (!seen.has(val)) {
+          seen.add(val);
+          options.push({
+            label: e.eventName,
+            value: val,
+          });
+        }
       }
     });
 
@@ -858,14 +896,21 @@ export default function DashboardPage() {
   }, [summary?.upcomingEvents, pendingFilters.eventType]);
 
   function handleFilterChange(key, value) {
+    let normalizedVal = value;
+    if (key === "year" || key === "month") {
+      normalizedVal = value === "" || value === null || isNaN(Number(value)) ? 0 : Number(value);
+    } else if (key === "eventType" || key === "eventId") {
+      normalizedVal = !value ? "ALL" : value;
+    }
+
     if (key === "eventType") {
       setPendingFilters((prev) => ({
         ...prev,
-        eventType: value,
+        eventType: normalizedVal,
         eventId: "ALL", // Automatically reset selected event when event type changes
       }));
     } else {
-      setPendingFilters((prev) => ({ ...prev, [key]: value }));
+      setPendingFilters((prev) => ({ ...prev, [key]: normalizedVal }));
     }
   }
 
@@ -876,14 +921,14 @@ export default function DashboardPage() {
 
   function handleClear() {
     const defaultValues = {
-      month: dayjs().month() + 1,
-      year: dayjs().year(),
+      month: 0,
+      year: 0,
       eventType: "ALL",
       eventId: "ALL",
     };
     setPendingFilters(defaultValues);
     setAppliedFilters(defaultValues);
-    loadDashboard(defaultValues.month, defaultValues.year);
+    loadDashboard(0, 0);
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -1212,6 +1257,7 @@ export default function DashboardPage() {
           onChange={handleFilterChange}
           onFilter={handleFilter}
           onClear={handleClear}
+          yearOptions={dynamicYearOptions}
           eventTypeOptions={eventTypeOptions}
           eventOptions={eventOptions}
           loading={loading}

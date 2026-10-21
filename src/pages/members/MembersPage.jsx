@@ -265,10 +265,10 @@ export default function MembersPage() {
                     label="Filter by Role"
                     placeholder="Select Role"
                     value={filterRoleId}
-                    onChange={(e) => setFilterRoleId(e.target.value)}
+                    onChange={(e) => setFilterRoleId(e.target.value || "")}
+                    onClear={() => setFilterRoleId("")}
                     options={[{ label: "All Roles", value: "" }, ...roleOptions]}
                     size="small"
-                    required
                     fullWidth
                   />
                 </Box>
@@ -295,7 +295,6 @@ export default function MembersPage() {
                   onClick={() => {
                     setFilterRoleId("");
                     setAppliedRoleId("");
-                    toast.success("Filter cleared");
                   }}
                   sx={{
                     color: "#ef4444",

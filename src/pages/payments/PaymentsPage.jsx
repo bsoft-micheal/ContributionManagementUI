@@ -628,8 +628,9 @@ export default function PaymentsPage() {
                     label="Select Member"
                     value={filterMember}
                     onChange={(e) => {
-                      setFilterMember(e.target.value);
+                      setFilterMember(e.target.value || "ALL");
                     }}
+                    onClear={() => setFilterMember("ALL")}
                     options={memberOptions}
                     size="small"
                     placeholder="Select Member"
@@ -642,8 +643,9 @@ export default function PaymentsPage() {
                   label="Select Event Name"
                   value={filterEvent}
                   onChange={(e) => {
-                    setFilterEvent(e.target.value);
+                    setFilterEvent(e.target.value || "ALL");
                   }}
+                  onClear={() => setFilterEvent("ALL")}
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event Name"
@@ -655,8 +657,9 @@ export default function PaymentsPage() {
                   label="Payment Mode"
                   value={filterMode}
                   onChange={(e) => {
-                    setFilterMode(e.target.value);
+                    setFilterMode(e.target.value || "ALL");
                   }}
+                  onClear={() => setFilterMode("ALL")}
                   options={modeOptions}
                   size="small"
                   placeholder="Payment Mode"
@@ -668,12 +671,12 @@ export default function PaymentsPage() {
                   label="Select Status"
                   value={filterStatus}
                   onChange={(e) => {
-                    setFilterStatus(e.target.value);
+                    setFilterStatus(e.target.value || "ALL");
                   }}
+                  onClear={() => setFilterStatus("ALL")}
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
-                  required
                   fullWidth
                 />
               </Box>
