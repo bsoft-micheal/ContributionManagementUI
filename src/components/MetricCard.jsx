@@ -21,6 +21,7 @@ export default function MetricCard({
   clickable = false,
   actionText,
   icon,
+  badge,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -132,24 +133,36 @@ export default function MetricCard({
         </Box>
 
         {/* Middle Value */}
-        <Typography
-          component="div"
+        <Box
           sx={{
-            color: valueColor || (isDark ? "#ffffff" : "#0f172a"),
-            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            fontWeight: 800,
-            fontSize: { xs: "1.32rem", sm: "1.44rem" },
-            letterSpacing: "-0.02em",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 0.5,
             my: { xs: 0.5, sm: 0.65 },
-            lineHeight: 1.15,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            minWidth: 0,
           }}
-          title={typeof value === "string" ? value : undefined}
         >
-          {value}
-        </Typography>
+          <Typography
+            component="div"
+            sx={{
+              color: valueColor || (isDark ? "#ffffff" : "#0f172a"),
+              fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontWeight: 800,
+              fontSize: { xs: "1.32rem", sm: "1.44rem" },
+              letterSpacing: "-0.02em",
+              lineHeight: 1.15,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={typeof value === "string" ? value : undefined}
+          >
+            {value}
+          </Typography>
+          {badge}
+        </Box>
 
         {/* Bottom Action Link */}
         {Boolean(actionText) ? (
