@@ -5,6 +5,7 @@
  */
 
 import { generateQrPngDataUrl, generateQrSvgDataUrl } from "./qrCodeGenerator";
+import { roundToWhole, formatWholeCurrency } from "./roundingHelper";
 
 export { generateQrPngDataUrl, generateQrSvgDataUrl };
 
@@ -52,7 +53,7 @@ export function buildUpiPaymentUri({ upiId, receiverName, amount, note }) {
   params.set("cu", "INR");
 
   if (amount !== undefined && amount !== null && amount !== "" && Number(amount) > 0) {
-    params.set("am", Number(amount).toFixed(2));
+    params.set("am", String(roundToWhole(Number(amount))));
   }
 
   if (note && note.trim()) {
@@ -361,7 +362,7 @@ export function buildPaymentReminderEmailHtml({
   orgName = "Unit 1A Residents Association",
 }) {
   const effectiveCategory = categoryName || eventName || "Contribution";
-  const formattedAmount = `₹${Number(amount || 0).toLocaleString("en-IN")}`;
+  const formattedAmount = formatWholeCurrency(amount);
   const hasUpi = Boolean(upiId && upiId.trim());
   const upiUri = hasUpi
     ? buildUpiPaymentUri({

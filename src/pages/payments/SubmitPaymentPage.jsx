@@ -30,6 +30,7 @@ import {
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
+import { roundToWhole, formatWholeCurrency } from "../../utils/roundingHelper";
 
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -259,7 +260,7 @@ export default function SubmitPaymentPage() {
         addNotification({
           type: "PAYMENT_STATUS_UPDATED",
           title: "Payment Status Updated",
-          message: `Payment ${target.id} of ₹${Number(target.amount).toLocaleString("en-IN")} status updated to ${newStatus}.`,
+          message: `Payment ${target.id} of ${formatWholeCurrency(target.amount)} status updated to ${newStatus}.`,
           link: "/payment-submission",
         });
 
@@ -365,7 +366,7 @@ export default function SubmitPaymentPage() {
     let amt = duesSummary.totalDue;
     if (scope === "CurrentEvent") amt = duesSummary.currentEventDue;
     if (scope === "PreviousArrears") amt = duesSummary.previousArrears;
-    setFormData((prev) => ({ ...prev, amount: String(amt) }));
+    setFormData((prev) => ({ ...prev, amount: String(roundToWhole(amt || 0)) }));
   };
 
   // Sync Member/Event context dynamically from backend API when form opens or selection changes
@@ -385,10 +386,10 @@ export default function SubmitPaymentPage() {
           );
 
           if (res) {
-            const currentEvDue = Number(res.currentEventDue ?? res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? 0);
-            const prevArrears = Number(res.previousArrears ?? res.arrears ?? 0);
-            const total = Number((res.totalDue ?? (currentEvDue + prevArrears)).toFixed(2));
-            const baseAmt = Number(res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? currentEvDue);
+            const currentEvDue = roundToWhole(Number(res.currentEventDue ?? res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? 0));
+            const prevArrears = roundToWhole(Number(res.previousArrears ?? res.arrears ?? 0));
+            const total = roundToWhole(Number(res.totalDue ?? (currentEvDue + prevArrears)));
+            const baseAmt = roundToWhole(Number(res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? currentEvDue));
 
             const isPaidStatus =
               String(res.status || "").toLowerCase() === "paid" ||
@@ -409,10 +410,10 @@ export default function SubmitPaymentPage() {
               ...prev,
               eventName: res.eventName || prev.eventName,
               memberName: res.memberName || prev.memberName || authState?.fullName || "",
-              amount: isPaidStatus || total === 0 ? "0.00" : (total > 0 ? String(total) : currentEvDue > 0 ? String(currentEvDue) : prev.amount),
+              amount: isPaidStatus || total === 0 ? "0" : (total > 0 ? String(total) : currentEvDue > 0 ? String(currentEvDue) : prev.amount),
             }));
           } else if (matchedEvent) {
-            const currentEvDue = Number(matchedEvent.amount || matchedEvent.contributionAmount || 0);
+            const currentEvDue = roundToWhole(Number(matchedEvent.amount || matchedEvent.contributionAmount || 0));
             setDuesSummary({
               currentEventDue: currentEvDue,
               previousArrears: 0,
@@ -887,7 +888,7 @@ export default function SubmitPaymentPage() {
       key: "amount",
       render: (row) => (
         <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }}>
-          ₹{Number(row.amount).toLocaleString("en-IN")}
+          {formatWholeCurrency(row.amount)}
         </Typography>
       ),
     },
@@ -1070,7 +1071,7 @@ export default function SubmitPaymentPage() {
                     Amount Paid
                   </Typography>
                   <Typography variant="body2" fontWeight={800} color="primary.main">
-                    ₹{Number(selectedTxn.amount).toLocaleString("en-IN")}
+                    {formatWholeCurrency(selectedTxn.amount)}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 6 }}>

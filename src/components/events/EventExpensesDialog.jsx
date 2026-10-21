@@ -27,6 +27,7 @@ import dayjs from "dayjs";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import { formatGridDate } from "../../utils/dateHelper";
+import { roundToWhole, formatWholeCurrency } from "../../utils/roundingHelper";
 import { getExpensesAsync } from "../../services/expenseService";
 import { getImageUrl } from "../../services/apiClient";
 import { useAppToast } from "../common/AppToast";
@@ -82,7 +83,7 @@ export default function EventExpensesDialog({ open, onClose, event, onAddExpense
   }, [open, event]);
 
   const totalExpenseAmount = useMemo(() => {
-    return expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    return roundToWhole(expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
   }, [expenses]);
 
   const getStatusColor = (status) => {
@@ -187,7 +188,7 @@ export default function EventExpensesDialog({ open, onClose, event, onAddExpense
                 Total Expenses
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 900, color: "#7c3aed" }}>
-                ₹{totalExpenseAmount.toLocaleString("en-IN")}
+                {formatWholeCurrency(totalExpenseAmount)}
               </Typography>
             </Box>
 
@@ -197,7 +198,7 @@ export default function EventExpensesDialog({ open, onClose, event, onAddExpense
                   Event Valuation
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 800, color: "#10b981" }}>
-                  ₹{Number(event.valuation).toLocaleString("en-IN")}
+                  {formatWholeCurrency(event.valuation)}
                 </Typography>
               </Box>
             ) : null}
@@ -262,7 +263,7 @@ export default function EventExpensesDialog({ open, onClose, event, onAddExpense
                           {row.category || event?.eventTypeName || "--"}
                         </TableCell>
                         <TableCell sx={{ fontSize: "0.78rem", fontWeight: 800 }}>
-                          ₹{Number(row.amount || 0).toLocaleString("en-IN")}
+                          {formatWholeCurrency(row.amount || 0)}
                         </TableCell>
                         <TableCell sx={{ fontSize: "0.78rem" }}>
                           {row.expenseDate ? formatGridDate(row.expenseDate) : "--"}

@@ -33,6 +33,7 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 import { useLocation } from "react-router-dom";
 import { formatGridDate, formatViewDate } from "../../utils/dateHelper";
+import { roundToWhole, formatWholeCurrency } from "../../utils/roundingHelper";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -467,15 +468,15 @@ export default function ExpensePage() {
     });
     if (!ev) return null;
 
-    const expected = Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.expectedCollection ?? ev.baseAmount ?? 0);
+    const expected = roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.expectedCollection ?? ev.baseAmount ?? 0));
     const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
-    const spent = expenses
+    const spent = roundToWhole(expenses
       .filter((ex) =>
         (ex.eventName || "").trim().toLowerCase() === (form.eventName || "").trim().toLowerCase() &&
         (!currentExpenseId || (ex.expenseId !== currentExpenseId && ex.id !== currentExpenseId)) &&
         (ex.status || "").toLowerCase() !== "rejected"
       )
-      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
 
     const remaining = Math.max(0, expected - spent);
     const extraSpent = Math.max(0, spent - expected);
@@ -503,17 +504,17 @@ export default function ExpensePage() {
           return cat && cat.trim().toLowerCase() === appliedCategory.trim().toLowerCase();
         });
       }
-      const expected = validEvents.reduce(
+      const expected = roundToWhole(validEvents.reduce(
         (sum, e) => sum + Number(e.totalExpectedAmount ?? e.expectedAmount ?? e.baseAmount ?? 0),
         0
-      );
-      const spent = expenses
+      ));
+      const spent = roundToWhole(expenses
         .filter((ex) => {
           if ((ex.status || "").toLowerCase() === "rejected") return false;
           if (appliedCategory !== "ALL" && (ex.category || "").trim().toLowerCase() !== appliedCategory.trim().toLowerCase()) return false;
           return true;
         })
-        .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+        .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
       const remaining = Math.max(0, expected - spent);
       const extraSpent = Math.max(0, spent - expected);
       return {
@@ -527,14 +528,14 @@ export default function ExpensePage() {
     }
 
     const ev = eventsList.find((e) => (e.name || e.eventName || "").trim().toLowerCase() === targetEventName.trim().toLowerCase());
-    const expected = ev ? Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0) : 0;
-    const spent = expenses
+    const expected = ev ? roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0)) : 0;
+    const spent = roundToWhole(expenses
       .filter(
         (ex) =>
           (ex.eventName || "").trim().toLowerCase() === targetEventName.trim().toLowerCase() &&
           (ex.status || "").toLowerCase() !== "rejected"
       )
-      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
 
     const remaining = Math.max(0, expected - spent);
     const extraSpent = Math.max(0, spent - expected);
@@ -841,14 +842,14 @@ export default function ExpensePage() {
           modifiedOn: editingExpense.modifiedOn || null,
         });
         if (isOverBudget) {
-          toast.success(`Expense updated. Note: Exceeds expected budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`);
+          toast.success(`Expense updated. Note: Exceeds expected budget by ${formatWholeCurrency(projectedExtraSpent)}`);
         } else {
           toast.success(TOAST_MESSAGES.EXPENSES.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
         }
       } else {
         await createExpenseAsync(payload);
         if (isOverBudget) {
-          toast.success(`Expense added. Note: Exceeds expected budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`);
+          toast.success(`Expense added. Note: Exceeds expected budget by ${formatWholeCurrency(projectedExtraSpent)}`);
         } else {
           toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
         }
@@ -1109,7 +1110,7 @@ export default function ExpensePage() {
       key: "amount",
       render: (row) => (
         <Typography variant="body2" fontWeight={700}>
-          ₹{Number(row.amount).toLocaleString("en-IN")}
+          {formatWholeCurrency(row.amount)}
         </Typography>
       ),
     },
@@ -1289,7 +1290,7 @@ export default function ExpensePage() {
             {pageBudgetSummary.extraSpent > 0 && (
               <Chip
                 size="small"
-                label={`Budget Exceeded by ₹${pageBudgetSummary.extraSpent.toLocaleString("en-IN")}`}
+                label={`Budget Exceeded by ${formatWholeCurrency(pageBudgetSummary.extraSpent)}`}
                 sx={{
                   bgcolor: (t) => t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
                   color: "#ef4444",
@@ -1307,7 +1308,7 @@ export default function ExpensePage() {
                   {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 800, color: "primary.main", fontSize: "1.1rem" }}>
-                  ₹{pageBudgetSummary.expected.toLocaleString("en-IN")}
+                  {formatWholeCurrency(pageBudgetSummary.expected)}
                 </Typography>
               </Box>
             </Grid>
@@ -1317,7 +1318,7 @@ export default function ExpensePage() {
                   {COMMON_STRINGS.EXPENSES?.TOTAL_SPENT || "Total Spent"}
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 800, color: "info.main", fontSize: "1.1rem" }}>
-                  ₹{pageBudgetSummary.spent.toLocaleString("en-IN")}
+                  {formatWholeCurrency(pageBudgetSummary.spent)}
                 </Typography>
               </Box>
             </Grid>
@@ -1327,7 +1328,7 @@ export default function ExpensePage() {
                   {COMMON_STRINGS.EXPENSES?.REMAINING_BUDGET || "Remaining Budget"}
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 800, color: pageBudgetSummary.remaining > 0 ? "success.main" : "text.secondary", fontSize: "1.1rem" }}>
-                  ₹{pageBudgetSummary.remaining.toLocaleString("en-IN")}
+                  {formatWholeCurrency(pageBudgetSummary.remaining)}
                 </Typography>
               </Box>
             </Grid>
@@ -1337,7 +1338,7 @@ export default function ExpensePage() {
                   {COMMON_STRINGS.EXPENSES?.EXTRA_AMOUNT_SPENT || "Extra Amount Spent"}
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 800, color: pageBudgetSummary.extraSpent > 0 ? "error.main" : "text.secondary", fontSize: "1.1rem" }}>
-                  ₹{pageBudgetSummary.extraSpent.toLocaleString("en-IN")}
+                  {formatWholeCurrency(pageBudgetSummary.extraSpent)}
                 </Typography>
               </Box>
             </Grid>
@@ -1488,7 +1489,7 @@ export default function ExpensePage() {
           <Stack direction="row" spacing={1.5} alignItems="center">
             {isOverBudget && (
               <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, fontSize: "0.75rem" }}>
-                Note: Expense exceeds budget by ₹{projectedExtraSpent.toLocaleString("en-IN")}
+                Note: Expense exceeds budget by {formatWholeCurrency(projectedExtraSpent)}
               </Typography>
             )}
             <AppButton
@@ -1611,7 +1612,7 @@ export default function ExpensePage() {
                       {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
-                      ₹{selectedEventBudget.expected.toLocaleString("en-IN")}
+                      {formatWholeCurrency(selectedEventBudget.expected)}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
@@ -1619,7 +1620,7 @@ export default function ExpensePage() {
                       {COMMON_STRINGS.EXPENSES?.TOTAL_SPENT || "Total Spent"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: "info.main" }}>
-                      ₹{selectedEventBudget.spent.toLocaleString("en-IN")}
+                      {formatWholeCurrency(selectedEventBudget.spent)}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
@@ -1627,7 +1628,7 @@ export default function ExpensePage() {
                       {COMMON_STRINGS.EXPENSES?.REMAINING_BUDGET || "Remaining Budget"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: selectedEventBudget.remaining > 0 ? "success.main" : "text.secondary" }}>
-                      ₹{selectedEventBudget.remaining.toLocaleString("en-IN")}
+                      {formatWholeCurrency(selectedEventBudget.remaining)}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
@@ -1635,7 +1636,7 @@ export default function ExpensePage() {
                       {COMMON_STRINGS.EXPENSES?.EXTRA_AMOUNT_SPENT || "Extra Amount Spent"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: selectedEventBudget.extraSpent > 0 ? "error.main" : "text.secondary" }}>
-                      ₹{selectedEventBudget.extraSpent.toLocaleString("en-IN")}
+                      {formatWholeCurrency(selectedEventBudget.extraSpent)}
                     </Typography>
                   </Grid>
                 </Grid>
@@ -1655,7 +1656,7 @@ export default function ExpensePage() {
                     }}
                   >
                     <Typography variant="caption" sx={{ color: (t) => t.palette.mode === "dark" ? "#a5b4fc" : "#4338ca", fontWeight: 700, fontSize: "0.75rem" }}>
-                      Note: This expense exceeds the expected budget by ₹{projectedExtraSpent.toLocaleString("en-IN")}. Total spending will be ₹{projectedTotalSpent.toLocaleString("en-IN")}.
+                      Note: This expense exceeds the expected budget by {formatWholeCurrency(projectedExtraSpent)}. Total spending will be {formatWholeCurrency(projectedTotalSpent)}.
                     </Typography>
                   </Box>
                 ) : selectedEventBudget.extraSpent > 0 ? (
@@ -1672,7 +1673,7 @@ export default function ExpensePage() {
                     }}
                   >
                     <Typography variant="caption" sx={{ color: (t) => t.palette.mode === "dark" ? "#a5b4fc" : "#4338ca", fontWeight: 700, fontSize: "0.75rem" }}>
-                      Note: This event has exceeded its expected budget by ₹{selectedEventBudget.extraSpent.toLocaleString("en-IN")}.
+                      Note: This event has exceeded its expected budget by {formatWholeCurrency(selectedEventBudget.extraSpent)}.
                     </Typography>
                   </Box>
                 ) : null}
@@ -1703,9 +1704,9 @@ export default function ExpensePage() {
               helperText={
                 errors.amount ||
                 (isOverBudget
-                  ? `Note: Exceeds budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`
+                  ? `Note: Exceeds budget by ${formatWholeCurrency(projectedExtraSpent)}`
                   : selectedEventBudget && selectedEventBudget.expected > 0
-                  ? `Remaining Budget: ₹${Math.max(0, selectedEventBudget.expected - projectedTotalSpent).toLocaleString("en-IN")}`
+                  ? `Remaining Budget: ${formatWholeCurrency(Math.max(0, selectedEventBudget.expected - projectedTotalSpent))}`
                   : undefined)
               }
               required
@@ -2026,7 +2027,7 @@ export default function ExpensePage() {
                     fontWeight={800}
                     sx={{ color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#1e293b"), fontSize: "1.05rem" }}
                   >
-                    ₹{Number(selectedExpense.amount).toLocaleString("en-IN")}
+                    {formatWholeCurrency(selectedExpense.amount)}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 6 }}>
@@ -2241,7 +2242,7 @@ export default function ExpensePage() {
                     Amount
                   </Typography>
                   <Typography variant="body2" fontWeight={700} sx={{ color: "#16a34a" }}>
-                    ₹{Number(statusExpense.amount || 0).toLocaleString("en-IN")}
+                    {formatWholeCurrency(statusExpense.amount || 0)}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 6 }}>

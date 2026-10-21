@@ -32,6 +32,7 @@ import {
   interpolatePlaceholders,
   logEmailReminder,
 } from "../../services/emailReminderScheduler";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 export default function PaymentQrReminderDialog({
   open,
@@ -304,7 +305,7 @@ export default function PaymentQrReminderDialog({
                     OUTSTANDING DUE
                   </Typography>
                   <Typography variant="h5" fontWeight={900} sx={{ color: "#0284c7" }}>
-                    ₹{amount.toLocaleString("en-IN")}
+                    {formatWholeCurrency(amount)}
                   </Typography>
                   <Chip
                     label={mode === "uploaded" ? "Uploaded Custom QR" : "Pre-filled in QR"}
@@ -344,7 +345,7 @@ export default function PaymentQrReminderDialog({
                 <Box
                   component="img"
                   src={qrImageUrl}
-                  alt={`UPI QR for ₹${amount}`}
+                  alt={`UPI QR for ${formatWholeCurrency(amount)}`}
                   sx={{
                     width: 190,
                     height: 190,
@@ -361,7 +362,7 @@ export default function PaymentQrReminderDialog({
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
                 {mode === "uploaded"
                   ? "Payment QR uploaded manually for this event category."
-                  : `Amount of ₹${amount.toLocaleString("en-IN")}${receiverName ? ` and Receiver ${receiverName}` : ""} are automatically pre-filled.`}
+                  : `Amount of ${formatWholeCurrency(amount)}${receiverName ? ` and Receiver ${receiverName}` : ""} are automatically pre-filled.`}
               </Typography>
 
               {/* UPI ID & Quick Copy Bar (Only if UPI ID exists in Dynamic mode) */}
@@ -454,7 +455,7 @@ export default function PaymentQrReminderDialog({
                 OUTSTANDING AMOUNT
               </Typography>
               <Typography variant="h4" fontWeight={900} sx={{ color: "#0284c7" }}>
-                ₹{amount.toLocaleString("en-IN")}
+                {formatWholeCurrency(amount)}
               </Typography>
             </Box>
 

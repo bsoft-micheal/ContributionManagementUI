@@ -38,6 +38,7 @@ import AppButton from "../../components/common/AppButton";
 import { COMMON_STRINGS } from "../../constants";
 import { getDashboardSummaryAsync } from "../../services/dashboardService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
+import { formatWholeCurrency, formatWholeNumber } from "../../utils/roundingHelper";
 import { getMembersAsync } from "../../services/memberService";
 import { useAppToast } from "../../components/common/AppToast";
 import AppDataTable from "../../components/common/AppDataTable";
@@ -74,8 +75,7 @@ const DONUT_COLORS = [
 
 // ─── Format Helpers ───────────────────────────────────────────────────────────
 function fmtAmt(v) {
-  const n = Number(v) || 0;
-  return `₹${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatWholeCurrency(v);
 }
 
 // ─── SVG Arc Path Generator ───────────────────────────────────────────────────
@@ -281,7 +281,7 @@ function InteractiveDonutChart({
             letterSpacing: "-0.02em",
           }}
         >
-          ₹{Number(display?.value ?? display?.amount ?? 0).toLocaleString()}
+          {formatWholeCurrency(display?.value ?? display?.amount ?? 0)}
         </Typography>
 
         {/* Current Remaining Amount */}
@@ -304,7 +304,7 @@ function InteractiveDonutChart({
                 lineHeight: 1,
               }}
             >
-              Bal: ₹{Math.abs(display.remaining).toLocaleString()}
+              Bal: {formatWholeCurrency(display.remaining)}
             </Typography>
           </Box>
         )}
@@ -1103,32 +1103,32 @@ export default function DashboardPage() {
     ...(isMember ? [
       {
         label: "Paid Amount", key: "collectedAmount", align: "right",
-        render: (row) => `₹${Number(row.collectedAmount || 0).toLocaleString()}`,
+        render: (row) => formatWholeCurrency(row.collectedAmount || 0),
       },
       {
         label: "Unpaid Amount", key: "pendingAmount", align: "right",
-        render: (row) => `₹${Number(row.pendingAmount || 0).toLocaleString()}`,
+        render: (row) => formatWholeCurrency(row.pendingAmount || 0),
       },
       {
         label: "Expense Amount", key: "expenseAmount", align: "right",
-        render: (row) => `₹${Number(row.expenseAmount || 0).toLocaleString()}`,
+        render: (row) => formatWholeCurrency(row.expenseAmount || 0),
       },
     ] : [
       {
         label: "Expected Amount", key: "expectedAmount", align: "right",
-        render: (row) => `₹${Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))).toLocaleString()}`,
+        render: (row) => formatWholeCurrency(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0))),
       },
       {
         label: "Collection Amount", key: "collectedAmount", align: "right",
-        render: (row) => `₹${Number(row.collectedAmount || 0).toLocaleString()}`,
+        render: (row) => formatWholeCurrency(row.collectedAmount || 0),
       },
       {
         label: "Pending Amount", key: "pendingAmount", align: "right",
-        render: (row) => `₹${Number(row.pendingAmount || 0).toLocaleString()}`,
+        render: (row) => formatWholeCurrency(row.pendingAmount || 0),
       },
       {
         label: "Expense Amount", key: "expenseAmount", align: "right",
-        render: (row) => `₹${Number(row.expenseAmount || 0).toLocaleString()}`,
+        render: (row) => formatWholeCurrency(row.expenseAmount || 0),
       },
       {
         label: "Amount in Hand", key: "remainingAmount", align: "right",
@@ -1136,7 +1136,7 @@ export default function DashboardPage() {
           const expected = Number(row.expectedAmount ?? (Number(row.collectedAmount || 0) + Number(row.pendingAmount || 0)));
           const expense = Number(row.expenseAmount || 0);
           const rem = row.remainingAmount !== undefined ? Number(row.remainingAmount) : (expected - expense);
-          return `₹${rem.toLocaleString(undefined, { minimumFractionDigits: (rem % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`;
+          return formatWholeCurrency(rem);
         },
       },
       {
@@ -1285,7 +1285,7 @@ export default function DashboardPage() {
               {/* Member Card 1: Paid Amount */}
               <MetricCard
                 label="Paid Amount"
-                value={`₹${totalCollected.toLocaleString()}`}
+                value={formatWholeCurrency(totalCollected)}
                 accent="#10b981"
                 onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
                 actionText="My Payments →"
@@ -1293,7 +1293,7 @@ export default function DashboardPage() {
               {/* Member Card 2: Unpaid Amount */}
               <MetricCard
                 label="Unpaid Amount"
-                value={`₹${totalPending.toLocaleString()}`}
+                value={formatWholeCurrency(totalPending)}
                 accent="#f43f5e"
                 onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
                 actionText="View Unpaid →"
@@ -1301,7 +1301,7 @@ export default function DashboardPage() {
               {/* Member Card 3: Total Expenses */}
               <MetricCard
                 label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
-                value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
+                value={formatWholeCurrency(totalExpenses)}
                 accent="#f59e0b"
                 onClick={() => navigate("/expense")}
                 actionText="Expenses →"
@@ -1320,7 +1320,7 @@ export default function DashboardPage() {
               {/* Other Roles: Card 1: Expected Amount */}
               <MetricCard
                 label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Expected Amount"}
-                value={`₹${totalExpected.toLocaleString()}`}
+                value={formatWholeCurrency(totalExpected)}
                 accent="#6366f1"
                 onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
                 actionText="All Members →"
@@ -1328,7 +1328,7 @@ export default function DashboardPage() {
               {/* Other Roles: Card 2: Collection Amount */}
               <MetricCard
                 label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Collection Amount"}
-                value={`₹${totalCollected.toLocaleString()}`}
+                value={formatWholeCurrency(totalCollected)}
                 accent="#10b981"
                 onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
                 actionText="View Paid →"
@@ -1336,7 +1336,7 @@ export default function DashboardPage() {
               {/* Other Roles: Card 3: Pending Amount */}
               <MetricCard
                 label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Pending Amount"}
-                value={`₹${totalPending.toLocaleString()}`}
+                value={formatWholeCurrency(totalPending)}
                 accent="#f43f5e"
                 onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
                 actionText="View Unpaid →"
@@ -1344,7 +1344,7 @@ export default function DashboardPage() {
               {/* Other Roles: Card 4: Total Expenses */}
               <MetricCard
                 label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
-                value={`₹${Number(totalExpenses || 0).toLocaleString(undefined, { maximumFractionDigits: (totalExpenses % 1 === 0 ? 0 : 2) })}`}
+                value={formatWholeCurrency(totalExpenses)}
                 accent="#f59e0b"
                 onClick={() => navigate("/expense")}
                 actionText="Expenses →"
@@ -1352,7 +1352,7 @@ export default function DashboardPage() {
               {/* Other Roles: Card 5: Amount in Hand */}
               <MetricCard
                 label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Amount in Hand"}
-                value={`₹${Number(totalRemaining || 0).toLocaleString(undefined, { minimumFractionDigits: (totalRemaining % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 })}`}
+                value={formatWholeCurrency(totalRemaining)}
                 accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
                 actionText="Amount In Hand →"
               />

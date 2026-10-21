@@ -42,6 +42,7 @@ import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getDashboardSummaryAsync } from "../../services/dashboardService";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppToast } from "../common/AppToast";
+import { formatWholeNumber, roundToWhole } from "../../utils/roundingHelper";
 
 export default function MemberPaymentQuickAccess({
   events = [],
@@ -89,11 +90,8 @@ export default function MemberPaymentQuickAccess({
     setSelectedEventId(appliedFilters?.eventId || "ALL");
   }, [appliedFilters?.eventType, appliedFilters?.eventId]);
 
-  // Format amount cleanly without forced .00 trailing decimals
-  const formatAmount = (val) =>
-    Number(val || 0).toLocaleString(undefined, {
-      maximumFractionDigits: Number(val || 0) % 1 === 0 ? 0 : 2,
-    });
+  // Format amount cleanly as whole number with Indian comma grouping
+  const formatAmount = (val) => formatWholeNumber(val);
 
   // Readable period label (e.g. "October 2026")
   const periodLabel = useMemo(() => {

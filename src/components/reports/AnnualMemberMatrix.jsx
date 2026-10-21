@@ -39,6 +39,7 @@ import AppSelect from "../common/AppSelect";
 import AppButton from "../common/AppButton";
 import { exportSheets } from "../../utils/exportToExcel";
 import { formatGridDate } from "../../utils/dateHelper";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -51,7 +52,7 @@ const MONTH_SHORT = [
 ];
 
 /* ─── Rupee formatter ─── */
-const INR = (n) => "\u20B9" + Number(n || 0).toLocaleString();
+const INR = (n) => formatWholeCurrency(n);
 
 /* ═══════════════════════ MAIN COMPONENT ═══════════════════════ */
 export default function AnnualMemberMatrix({

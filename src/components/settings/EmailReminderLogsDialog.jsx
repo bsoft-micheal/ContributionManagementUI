@@ -26,6 +26,7 @@ import {
   getEmailReminderLogs,
   clearEmailReminderLogs,
 } from "../../services/emailReminderScheduler";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 export default function EmailReminderLogsDialog({ open, onClose }) {
   const theme = useTheme();
@@ -189,7 +190,7 @@ export default function EmailReminderLogsDialog({ open, onClose }) {
                       />
                     </TableCell>
                     <TableCell sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#0284c7" }}>
-                      {row.amount ? `₹${Number(row.amount).toLocaleString("en-IN")}` : "—"}
+                      {row.amount ? formatWholeCurrency(row.amount) : "—"}
                     </TableCell>
                     <TableCell sx={{ fontSize: "0.74rem", maxWidth: 220 }}>
                       <Tooltip title={row.subject || ""}>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Box, Typography, Stack, useTheme, Chip } from "@mui/material";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 const COLOR_PALETTE = [
   "#7c3aed", // Vibrant Violet
@@ -248,7 +249,7 @@ export default function AppPieChart({
                   mt: 0.25,
                 }}
               >
-                ₹{activeSlice.value.toLocaleString()}
+                {formatWholeCurrency(activeSlice.value)}
               </Typography>
               {showPercentage && (
                 <Chip
@@ -290,7 +291,7 @@ export default function AppPieChart({
                   letterSpacing: "-0.02em",
                 }}
               >
-                ₹{totalValue.toLocaleString()}
+                {formatWholeCurrency(totalValue)}
               </Typography>
               <Typography
                 variant="caption"
@@ -389,7 +390,7 @@ export default function AppPieChart({
                   whiteSpace: "nowrap",
                 }}
               >
-                ₹{slice.value.toLocaleString()}
+                {formatWholeCurrency(slice.value)}
               </Typography>
 
               {/* Percentage Badge */}

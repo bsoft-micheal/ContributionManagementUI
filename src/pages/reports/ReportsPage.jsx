@@ -10,6 +10,7 @@ import {
 import { useTheme, alpha } from "@mui/material/styles";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
+import { formatWholeCurrency, roundToWhole } from "../../utils/roundingHelper";
 import apiClient from "../../services/apiClient";
 import { exportSheets } from "../../utils/exportToExcel";
 import AppDataTable from "../../components/common/AppDataTable";
@@ -92,7 +93,7 @@ function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
               />
             </Box>
             <Typography variant="body2" fontWeight={600} sx={{ textAlign: "right", fontSize: "0.875rem", fontVariantNumeric: "tabular-nums" }}>
-              {"\u20B9"}{value.toLocaleString()}
+              {formatWholeCurrency(value)}
             </Typography>
           </Box>
         );
@@ -853,7 +854,7 @@ export default function ReportsPage({ mode = "event" }) {
   }, [paymentTransactions, isMember, currentUserId, currentUserName, filters, eventsList, isDateInRange]);
 
   /* Rupee formatter */
-  const INR = (n) => "\u20B9" + Number(n || 0).toLocaleString();
+  const INR = (n) => formatWholeCurrency(n);
 
   /* ── Column Definitions ── */
   const eventColumns = [

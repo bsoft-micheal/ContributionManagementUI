@@ -4,6 +4,11 @@ import { useTheme } from "@mui/material/styles";
 import { FilterList as FilterListIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
+import {
+  roundToWhole,
+  formatWholeCurrency,
+  distributeRoundedTotal,
+} from "../../utils/roundingHelper";
 import { getMembersAsync } from "../../services/memberService";
 import { getRolesAsync } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
@@ -151,38 +156,39 @@ export default function ContributionCalculationPage() {
       };
     });
 
-    const totalAmount = selectedEventDetails.baseAmount || 0;
+    const totalAmount = roundToWhole(selectedEventDetails.baseAmount || 0);
     let standardFullShare = 0;
     let equalShare = 0;
 
     if (hasTenureRule) {
       const divisor = enrichedParticipants.reduce((sum, p) => sum + p.shareRatio, 0);
       standardFullShare = divisor > 0 ? (totalAmount / divisor) : 0;
-      setFullShareAmount(standardFullShare);
+      setFullShareAmount(roundToWhole(standardFullShare));
     } else {
       const divisor = enrichedParticipants.length;
       equalShare = divisor > 0 ? (totalAmount / divisor) : 0;
-      setFullShareAmount(equalShare);
+      setFullShareAmount(roundToWhole(equalShare));
     }
 
-    // 4. Calculate for each participant
-    const calculated = enrichedParticipants.map(p => {
+    // 4. Calculate raw shares and distribute whole-number shares with exact sum guarantee
+    const rawShares = enrichedParticipants.map(p => {
       const epContribution = selectedEventDetails.contributions?.find(c => c.memberId === p.memberId);
-      let calculatedAmount;
       if (hasTenureRule) {
-        calculatedAmount = standardFullShare * p.shareRatio;
+        return standardFullShare * p.shareRatio;
       } else if (epContribution !== undefined && epContribution !== null && epContribution.amount !== undefined) {
-        calculatedAmount = epContribution.amount;
+        return Number(epContribution.amount) || 0;
       } else {
-        calculatedAmount = equalShare;
+        return equalShare;
       }
-
-      return {
-        ...p,
-        tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
-        calculatedAmount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimals
-      };
     });
+
+    const roundedShares = distributeRoundedTotal(totalAmount, rawShares);
+
+    const calculated = enrichedParticipants.map((p, idx) => ({
+      ...p,
+      tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
+      calculatedAmount: roundedShares[idx],
+    }));
 
     setCalculationData(calculated);
   };
@@ -251,8 +257,7 @@ export default function ContributionCalculationPage() {
       align: "right",
       sx: { minWidth: 130 },
       cellSx: { minWidth: 130 },
-      render: (row) =>
-        `₹${(row.calculatedAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (row) => formatWholeCurrency(row.calculatedAmount || 0),
     },
     {
       label: "Created By",
@@ -344,7 +349,7 @@ export default function ContributionCalculationPage() {
                     <Stack spacing={0.5}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Event Cost:</Typography>
-                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>₹{(selectedEventDetails?.baseAmount || 0).toLocaleString()}</Typography>
+                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{formatWholeCurrency(selectedEventDetails?.baseAmount || 0)}</Typography>
                       </Box>
                       <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Participants:</Typography>
@@ -373,7 +378,7 @@ export default function ContributionCalculationPage() {
                       <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Standard ({currentStandardPct}%)</Typography>
                         <Typography variant="body2" fontWeight={900} color="primary.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
-                          ₹{(fullShareAmount * (currentStandardPct / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatWholeCurrency(fullShareAmount * (currentStandardPct / 100))}
                         </Typography>
                       </Grid>
 
@@ -381,7 +386,7 @@ export default function ContributionCalculationPage() {
                       <Grid size={{ xs: 6, sm: 2 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>New Entrant ({currentNewEntrantPct}%)</Typography>
                         <Typography variant="body2" fontWeight={900} color="warning.main" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
-                          ₹{(fullShareAmount * (currentNewEntrantPct / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatWholeCurrency(fullShareAmount * (currentNewEntrantPct / 100))}
                         </Typography>
                       </Grid>
                     </>
@@ -405,7 +410,7 @@ export default function ContributionCalculationPage() {
                       <Grid size={{ xs: 12, sm: 4 }} sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 2, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 600 }}>Equal Share per Member</Typography>
                         <Typography variant="body2" fontWeight={900} color="primary.main" sx={{ fontSize: "0.95rem", mt: 0.2 }}>
-                          ₹{fullShareAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatWholeCurrency(fullShareAmount)}
                         </Typography>
                       </Grid>
                     </>

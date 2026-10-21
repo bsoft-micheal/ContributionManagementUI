@@ -14,6 +14,7 @@ import { formatViewDate, formatGridDate } from "../../utils/dateHelper";
 import { ArrowBack as ArrowBackIcon, NotificationsActive as NotificationsActiveIcon, Send as SendIcon } from "@mui/icons-material";
 import { Tooltip, IconButton } from "@mui/material";
 import MetricCard from "../../components/MetricCard";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 import apiClient from "../../services/apiClient";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppButton from "../../components/common/AppButton";
@@ -101,7 +102,7 @@ export default function EventDetailsPage() {
       ),
     },
     { label: "Member Name", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
-    { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>₹{Number(row.amount || 0).toLocaleString("en-IN")}</Typography> },
+    { label: "Amount", key: "amount", align: "right", render: (row) => <Typography variant="body2" fontWeight={700}>{formatWholeCurrency(row.amount || 0)}</Typography> },
     {
       label: "Status",
       key: "paymentStatus",
@@ -201,10 +202,10 @@ export default function EventDetailsPage() {
           <MetricCard label="Total Members" value={eventDetails.participantCount} />
         </Grid>
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <MetricCard label="Expected Amount" value={`₹${Math.round(Number(eventDetails.totalExpectedAmount || 0)).toLocaleString("en-IN")}`} />
+          <MetricCard label="Expected Amount" value={formatWholeCurrency(eventDetails.totalExpectedAmount || 0)} />
         </Grid>
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <MetricCard label="Received Amount" value={`₹${Math.round(Number(eventDetails.totalPaidAmount || 0)).toLocaleString("en-IN")}`} accent="#16a34a" />
+          <MetricCard label="Received Amount" value={formatWholeCurrency(eventDetails.totalPaidAmount || 0)} accent="#16a34a" />
         </Grid>
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
           <MetricCard label="Support Tickets Raised" value={eventDetails.supportTicketRaisedCount ?? eventDetails.SupportTicketRaisedCount ?? 0} accent="#0284c7" />
