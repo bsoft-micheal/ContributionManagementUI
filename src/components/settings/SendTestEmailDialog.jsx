@@ -79,6 +79,7 @@ export default function SendTestEmailDialog({
   const previewData = {
     memberName: "Alex Morgan",
     categoryName,
+    eventDescription: "Sample event description entered during event creation",
     amount: testAmount,
     dueDate: "15th of this month",
     orgName: "Unit 1A Residents Association",
@@ -257,34 +258,151 @@ export default function SendTestEmailDialog({
               {previewDescription}
             </Typography>
 
-            {/* QR Scanner & Amount Box in Preview */}
+            {/* Event Details Card (Matches Email Template & Visual Specifications) */}
             <Box
               sx={{
-                p: 2,
+                bgcolor: isDark ? "rgba(74, 63, 107, 0.08)" : "#faf9fd",
+                border: "1px solid rgba(74, 63, 107, 0.12)",
                 borderRadius: "10px",
-                bgcolor: isDark ? "rgba(255,255,255,0.04)" : "#ffffff",
-                border: `1px solid ${theme.palette.divider}`,
-                textAlign: "center",
-                maxWidth: 320,
-                margin: "0 auto",
+                p: 2,
+                my: 2,
               }}
             >
-              <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", textTransform: "uppercase" }}>
-                Pending Contribution: ₹{testAmount}
-              </Typography>
-              <Box sx={{ my: 1 }}>
-                <img
-                  src={qrImageUrl}
-                  alt="Test QR"
-                  width={140}
-                  height={140}
-                  style={{ display: "block", margin: "0 auto", borderRadius: "8px" }}
-                />
+              {/* Event Name */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Event Name:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#ffffff" : "#1e1a2e" }}>
+                  {categoryName.toLowerCase().includes("birthday") ? "Birthday Celebration" : `${categoryName} Celebration`}
+                </Typography>
               </Box>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem" }}>
-                UPI ID: <strong>{upiId}</strong> ({receiverName})
-              </Typography>
+
+              {/* Birthday Celebrants & Dates */}
+              {categoryName.toLowerCase().includes("birthday") && (
+                <Box sx={{ pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", display: "block", mb: 0.8 }}>
+                    Birthday Celebrants &amp; Dates:
+                  </Typography>
+                  <Box
+                    sx={{
+                      bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#fbfaff",
+                      border: "1.5px solid #ece8f8",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {[
+                      { name: "Leo Albert L", date: "October 05, 2026" },
+                      { name: "Kaviarasan K", date: "October 08, 2026" },
+                      { name: "Christy Chandran R", date: "October 09, 2026" },
+                      { name: "testerr", date: "October 18, 2026" },
+                    ].map((c, i, arr) => (
+                      <Box
+                        key={c.name}
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          px: 1.5,
+                          py: 0.8,
+                          borderBottom: i < arr.length - 1 ? "1px dashed rgba(74, 63, 107, 0.12)" : "none",
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ color: "#4a3f6b", fontWeight: 700, fontSize: "0.75rem", display: "flex", alignItems: "center", gap: 0.5 }}>
+                          🎂 {c.name}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#c026d3", fontWeight: 700, fontSize: "0.75rem" }}>
+                          {c.date}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Event Date */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Event Date:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? "#ffffff" : "#1e1a2e" }}>
+                  {categoryName.toLowerCase().includes("birthday") ? "5 Oct, 10 Oct (2), 19 Oct" : previewData.dueDate}
+                </Typography>
+              </Box>
+
+              {/* Total Amount */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Total Amount:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#ffffff" : "#1e1a2e" }}>
+                  {categoryName.toLowerCase().includes("birthday") ? "Rs.6250.00 (4 celebrants combined)" : "Rs.5000.00"}
+                </Typography>
+              </Box>
+
+              {/* Description */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Description:
+                </Typography>
+                <Typography variant="caption" sx={{ color: isDark ? "#cbd5e1" : "#1e1a2e" }}>
+                  {previewData.eventDescription || ""}
+                </Typography>
+              </Box>
+
+              {/* Contribution Amount */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Contribution Amount:
+                </Typography>
+                <Box
+                  sx={{
+                    bgcolor: "#f0ecf9",
+                    color: "#2d2550",
+                    fontWeight: 800,
+                    fontSize: "0.88rem",
+                    px: 1.2,
+                    py: 0.4,
+                    borderRadius: "6px",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {categoryName.toLowerCase().includes("birthday") ? "₹135.87" : `₹${testAmount}`}
+                </Box>
+              </Box>
             </Box>
+
+            {/* QR Scanner in Preview (if not in description) */}
+            {!previewDescription?.includes("{qrCode}") && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: "10px",
+                  bgcolor: isDark ? "rgba(255,255,255,0.04)" : "#ffffff",
+                  border: `1px solid ${theme.palette.divider}`,
+                  textAlign: "center",
+                  maxWidth: 320,
+                  margin: "0 auto",
+                }}
+              >
+                <Typography variant="caption" fontWeight={800} sx={{ color: "#0284c7", textTransform: "uppercase" }}>
+                  Scan to Pay via Any UPI App
+                </Typography>
+                <Box sx={{ my: 1 }}>
+                  <img
+                    src={qrImageUrl}
+                    alt="Test QR"
+                    width={130}
+                    height={130}
+                    style={{ display: "block", margin: "0 auto", borderRadius: "8px" }}
+                  />
+                </Box>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem" }}>
+                  UPI ID: <strong>{upiId}</strong> ({receiverName})
+                </Typography>
+              </Box>
+            )}
           </Box>
         </Box>
       </Stack>

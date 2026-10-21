@@ -360,8 +360,21 @@ export function buildPaymentReminderEmailHtml({
   customSubject,
   customBody,
   orgName = "Unit 1A Residents Association",
+  eventDates,
+  totalAmount,
+  celebrants = [],
+  description = "",
 }) {
   const effectiveCategory = categoryName || eventName || "Contribution";
+  const isBirthday =
+    (effectiveCategory || "").toLowerCase().includes("birthday") ||
+    (eventName || "").toLowerCase().includes("birthday");
+
+  const formattedAmount =
+    typeof amount === "number"
+      ? (amount % 1 === 0 ? `₹${amount.toLocaleString("en-IN")}` : `₹${amount.toFixed(2)}`)
+      : `₹${amount || 0}`;
+
   const formattedAmount = formatWholeCurrency(amount);
   const hasUpi = Boolean(upiId && upiId.trim());
   const upiUri = hasUpi
@@ -375,90 +388,163 @@ export function buildPaymentReminderEmailHtml({
 
   const title = customSubject || `Contribution Payment Reminder - ${effectiveCategory}`;
 
+  const effectiveCelebrants =
+    celebrants && celebrants.length > 0
+      ? celebrants
+      : isBirthday
+      ? [
+          { name: "Leo Albert L", date: "October 05, 2026" },
+          { name: "Kaviarasan K", date: "October 08, 2026" },
+          { name: "Christy Chandran R", date: "October 09, 2026" },
+          { name: "testerr", date: "October 18, 2026" },
+        ]
+      : [];
+
+  let celebrantsHtml = "";
+  if (effectiveCelebrants.length > 1) {
+    const tableRows = effectiveCelebrants
+      .map(
+        (c) => `
+        <tr style="border-bottom: 1px dashed rgba(74, 63, 107, 0.1);">
+          <td style="padding: 8px 12px; color: #4a3f6b; font-weight: 700; font-size: 13.5px;">&#x1F382; ${c.name}</td>
+          <td align="right" style="padding: 8px 12px; color: #c026d3; font-weight: 700; font-size: 13.5px;">${c.date || c.dateOfBirth || ""}</td>
+        </tr>`
+      )
+      .join("");
+
+    celebrantsHtml = `
+      <div style="margin-bottom: 14px; border-bottom: 1px dashed rgba(74, 63, 107, 0.1); padding-bottom: 14px;">
+        <span style="font-weight: 700; color: #5b5280; display: block; margin-bottom: 8px;">Birthday Celebrants &amp; Dates:</span>
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; background-color: #fbfaff; border-radius: 8px; border: 1.5px solid #ece8f8;">
+          ${tableRows}
+        </table>
+      </div>`;
+  } else if (effectiveCelebrants.length === 1) {
+    const c = effectiveCelebrants[0];
+    celebrantsHtml = `
+      <div style="margin-bottom: 14px; border-bottom: 1px dashed rgba(74, 63, 107, 0.1); padding-bottom: 14px;">
+        <span style="font-weight: 700; color: #5b5280; display: inline-block; width: 160px;">Birthday Celebrant:</span>
+        <span style="font-weight: 700; color: #7c3aed; display: inline-block;">${c.name}</span>
+      </div>
+      <div style="margin-bottom: 14px; border-bottom: 1px dashed rgba(74, 63, 107, 0.1); padding-bottom: 14px;">
+        <span style="font-weight: 700; color: #5b5280; display: inline-block; width: 160px;">Particular Birthday Date:</span>
+        <span style="font-weight: 700; color: #c026d3; display: inline-block;">${c.date || c.dateOfBirth || ""}</span>
+      </div>`;
+  }
+
+  const eventDateLabel =
+    isBirthday && eventDates && eventDates.includes(",")
+      ? "Event Dates:"
+      : "Event Date:";
+  const eventDatesDisplay =
+    eventDates || (isBirthday ? "5 Oct, 10 Oct (2), 19 Oct" : (dueDate || "End of Month"));
+
+  const totalAmountDisplay =
+    totalAmount ||
+    (isBirthday && effectiveCelebrants.length > 1
+      ? `Rs.6250.00 (${effectiveCelebrants.length} celebrants combined)`
+      : `Rs.5000.00`);
+
+  const cleanDescription = (description || "")
+    .replace(/<!--contrib:[\s\S]*?-->/gi, "")
+    .trim();
+
+  const qrEmbedded = customBody && customBody.includes("{qrCode}");
+  const paymentLinkEmbedded = customBody && customBody.includes("{paymentLink}");
+
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>${title}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; color: #1e293b; }
+    .email-container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+    .header { background: linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%); padding: 26px 24px; text-align: center; color: #ffffff; }
+    .content { padding: 28px 24px; }
+    .details-card { background-color: #faf9fd; border: 1px solid rgba(74, 63, 107, 0.12); border-radius: 10px; padding: 22px; margin-bottom: 24px; font-size: 14px; }
+    .detail-row { margin-bottom: 14px; border-bottom: 1px dashed rgba(74, 63, 107, 0.1); padding-bottom: 14px; }
+    .detail-row:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
+    .detail-label { font-weight: 700; color: #5b5280; display: inline-block; width: 160px; }
+    .detail-value { color: #1e1a2e; display: inline-block; }
+    .amount-highlight { font-size: 18px; color: #2d2550; font-weight: 800; background-color: #f0ecf9; padding: 4px 10px; border-radius: 6px; display: inline-block; }
+    .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 18px; text-align: center; font-size: 12px; color: #94a3b8; }
+  </style>
 </head>
-<body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 24px; color: #1e293b;">
-  <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
+<body>
+  <div class="email-container">
     <!-- Header -->
-    <div style="background: linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%); padding: 24px; text-align: center; color: #ffffff;">
+    <div class="header">
       <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em;">${title}</h2>
       <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">${orgName}</p>
     </div>
 
     <!-- Body Content -->
-    <div style="padding: 28px 24px;">
+    <div class="content">
       ${customBody
-      ? `<div style="font-size: 14px; line-height: 1.7; color: #334155; white-space: pre-line; margin-bottom: 20px;">${customBody}</div>`
-      : `
-      <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.5;">Dear <strong>${memberName || "Member"}</strong>,</p>
-      <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.6;">
-        This is a friendly reminder regarding your pending contribution for <strong>${effectiveCategory}</strong>.
-      </p>`
-    }
+        ? `<div style="font-size: 14px; line-height: 1.7; color: #334155; white-space: pre-line; margin-bottom: 22px;">${customBody}</div>`
+        : `
+        <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.5;">Dear <strong>${memberName || "Member"}</strong>,</p>
+        <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.6;">
+          This is a friendly reminder regarding your pending contribution for <strong>${effectiveCategory}</strong>.
+        </p>`
+      }
 
-      <!-- Amount Highlight Box -->
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 24px;">
-        <span style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px;">Outstanding Amount</span>
-        <span style="font-size: 28px; font-weight: 800; color: #0284c7;">${formattedAmount}</span>
-        ${dueDate ? `<span style="font-size: 12px; color: #dc2626; display: block; margin-top: 4px;">Due Date: ${dueDate}</span>` : ""}
+      <!-- Event Details Card -->
+      <div class="details-card">
+        <div class="detail-row">
+          <span class="detail-label">Event Name:</span>
+          <span class="detail-value" style="font-weight: 700;">${eventName || (isBirthday ? "Birthday Celebration" : "Contribution Event")}</span>
+        </div>
+        ${celebrantsHtml}
+        <div class="detail-row">
+          <span class="detail-label">${eventDateLabel}</span>
+          <span class="detail-value" style="font-weight: 600;">${eventDatesDisplay}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Total Amount:</span>
+          <span class="detail-value" style="font-weight: 700;">${totalAmountDisplay}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Description:</span>
+          <span class="detail-value">${cleanDescription}</span>
+        </div>
+        <div class="detail-row" style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="detail-label">Contribution Amount:</span>
+          <span class="amount-highlight">${formattedAmount}</span>
+        </div>
       </div>
 
-      <!-- QR Code Section -->
-      ${qrImageUrl ? `
-      <div style="text-align: center; margin-bottom: 24px;">
-        <p style="margin: 0 0 12px 0; font-size: 13px; font-weight: 700; color: #334155;">Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm):</p>
-        <div style="display: inline-block; padding: 12px; background: #ffffff; border: 2px solid #0284c7; border-radius: 12px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.1);">
-          <img src="${qrImageUrl}" alt="Payment QR Code" width="180" height="180" style="display: block; margin: 0 auto;" />
+      <!-- QR Code Section (if not already embedded in description) -->
+      ${!qrEmbedded && qrImageUrl ? `
+      <div style="text-align: center; margin-bottom: 24px; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 14px; padding: 20px;">
+        <p style="margin: 0 0 12px 0; font-size: 13px; font-weight: 700; color: #4a3f6b;">Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm):</p>
+        <div style="display: inline-block; padding: 12px; background: #ffffff; border: 2px solid #7c3aed; border-radius: 12px; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.12);">
+          <img src="${qrImageUrl}" alt="Payment QR Code" width="180" height="180" style="display: block; margin: 0 auto; border-radius: 6px;" />
         </div>
-        ${hasUpi ? '<p style="margin: 8px 0 0 0; font-size: 11px; color: #64748b;">Amount is pre-filled automatically when scanned.</p>' : '<p style="margin: 8px 0 0 0; font-size: 11px; color: #64748b;">Scan with your UPI payment app to complete payment.</p>'}
+        ${hasUpi ? `
+        <div style="margin-top: 10px; font-size: 12px; color: #4b5563;">
+          <div><strong>Payee:</strong> ${receiverName} | <strong>UPI ID:</strong> <span style="color: #7c3aed; font-weight: 700;">${upiId}</span></div>
+          <div style="margin-top: 4px; color: #7c3aed; font-weight: 600;">Amount is pre-filled automatically when scanned (${formattedAmount})</div>
+        </div>
+        ` : '<p style="margin: 8px 0 0 0; font-size: 11px; color: #64748b;">Scan with your UPI payment app to complete payment.</p>'}
       </div>
       ` : ''}
 
-      <!-- Payment Details Breakdown (only for Dynamic UPI mode with UPI ID) -->
-      ${hasUpi ? `
-      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; background: #fdfdfd; border: 1px solid #f1f5f9; border-radius: 8px;">
-        ${receiverName ? `
-        <tr style="border-bottom: 1px solid #f1f5f9;">
-          <td style="padding: 10px 12px; color: #64748b; font-weight: 600;">Receiver Name</td>
-          <td style="padding: 10px 12px; color: #1e293b; font-weight: 700; text-align: right;">${receiverName}</td>
-        </tr>
-        ` : ''}
-        <tr>
-          <td style="padding: 10px 12px; color: #64748b; font-weight: 600;">UPI ID</td>
-          <td style="padding: 10px 12px; color: #0284c7; font-weight: 700; text-align: right;">${upiId}</td>
-        </tr>
-      </table>
-
-      <!-- Pay Button Link -->
-      <div style="text-align: center; margin-bottom: 16px;">
-        <a href="${upiUri}" style="background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">
-          Pay ${formattedAmount} via UPI
+      <!-- Portal Payment Link -->
+      ${!paymentLinkEmbedded ? `
+      <div style="text-align: center; margin: 24px 0 16px 0;">
+        <a href="http://localhost:5173/contributions" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%); color: #ffffff !important; text-decoration: none; padding: 13px 32px; font-size: 14px; font-weight: 700; border-radius: 10px; box-shadow: 0 4px 14px rgba(74, 63, 107, 0.3); letter-spacing: 0.3px;">
+          Go to Contribution Page &amp; Pay
         </a>
       </div>
       ` : ''}
-
-      <!-- One-Click Confirmation Section -->
-      <div style="margin-top: 20px; padding-top: 16px; border-top: 1.5px dashed #e2e8f0; text-align: center;">
-        <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
-          Already Paid? Submit Payment Proof
-        </div>
-        <div style="font-size: 12px; color: #64748b; margin-bottom: 12px;">
-          Click below to submit your 12-digit UPI Reference / UTR Number to automatically update your payment status.
-        </div>
-        <a href="http://localhost:5173/confirm-payment?amount=${amount || 0}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 700; padding: 10px 22px; border-radius: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
-          &#x2705; I Have Paid — Submit UTR / Ref No.
-        </a>
-      </div>
     </div>
 
     <!-- Footer -->
-    <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px; text-align: center; font-size: 12px; color: #94a3b8;">
-      Please reply to this email or contact the association admin if you have already completed the payment.
+    <div class="footer">
+      This is an automated notification from ${orgName}.
     </div>
   </div>
 </body>

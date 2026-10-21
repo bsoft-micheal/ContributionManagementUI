@@ -295,7 +295,7 @@ export default function ContributionCalculationPage() {
             <Grid size={{ xs: 12, lg: 4 }} sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, flexWrap: "wrap", pt: 0.5 }}>
               <Box sx={{ minWidth: 220, flexGrow: 1 }}>
                 <AppSelect
-                  label="Planned Event"
+                  label="Event Name"
                   placeholder="Select an event"
                   value={filterEventId}
                   onChange={(e) => {

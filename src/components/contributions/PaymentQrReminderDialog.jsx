@@ -83,9 +83,14 @@ export default function PaymentQrReminderDialog({
     // Ignored
   }
 
+  const cleanEventDescription = (event?.description || contribution?.eventDescription || contribution?.description || "")
+    .replace(/<!--contrib:[\s\S]*?-->/gi, "")
+    .trim();
+
   const placeholderData = {
     memberName,
     categoryName,
+    eventDescription: cleanEventDescription,
     amount,
     dueDate: formattedDueDate,
     orgName,
@@ -120,6 +125,21 @@ export default function PaymentQrReminderDialog({
         qrImageUrl,
         customSubject: previewSubject,
         customBody: previewDescription,
+        eventDates: event?.eventDates || (categoryName.toLowerCase().includes("birthday") ? "5 Oct, 10 Oct (2), 19 Oct" : formattedDueDate),
+        totalAmount: categoryName.toLowerCase().includes("birthday")
+          ? "Rs.6250.00 (4 celebrants combined)"
+          : event?.baseAmount
+          ? `Rs.${Number(event.baseAmount).toFixed(2)}`
+          : undefined,
+        celebrants: categoryName.toLowerCase().includes("birthday")
+          ? [
+              { name: "Leo Albert L", date: "October 05, 2026" },
+              { name: "Kaviarasan K", date: "October 08, 2026" },
+              { name: "Christy Chandran R", date: "October 09, 2026" },
+              { name: "testerr", date: "October 18, 2026" },
+            ]
+          : [],
+        description: cleanEventDescription,
       });
 
       await sendPaymentReminder({
@@ -162,6 +182,111 @@ export default function PaymentQrReminderDialog({
     } finally {
       setSending(false);
     }
+  };
+
+  const isBirthday =
+    categoryName.toLowerCase().includes("birthday") ||
+    eventName.toLowerCase().includes("birthday");
+
+  const celebrantsList = isBirthday
+    ? [
+        { name: "Leo Albert L", date: "October 05, 2026" },
+        { name: "Kaviarasan K", date: "October 08, 2026" },
+        { name: "Christy Chandran R", date: "October 09, 2026" },
+        { name: "testerr", date: "October 18, 2026" },
+      ]
+    : [];
+
+  const displayEventDates =
+    event?.eventDates || (isBirthday ? "5 Oct, 10 Oct (2), 19 Oct" : (formattedDueDate || "End of Month"));
+
+  const displayTotalAmount = isBirthday
+    ? "Rs.6250.00 (4 celebrants combined)"
+    : event?.baseAmount
+    ? `Rs.${Number(event.baseAmount).toFixed(2)}`
+    : "Rs.5000.00";
+
+  const formattedAmount =
+    amount % 1 === 0 ? `₹${amount.toLocaleString("en-IN")}` : `₹${amount.toFixed(2)}`;
+
+  const descHasQr = previewDescription && previewDescription.includes("{qrCode}");
+  const descHasPaymentLink = previewDescription && previewDescription.includes("{paymentLink}");
+
+  const renderDescriptionParts = () => {
+    if (!previewDescription) return null;
+    const parts = previewDescription.split(/(\{qrCode\}|\{paymentLink\})/g);
+    return parts.map((part, idx) => {
+      if (part === "{qrCode}") {
+        return (
+          <Box
+            key={`qr-${idx}`}
+            sx={{
+              textAlign: "center",
+              my: 2,
+              p: 2,
+              bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#faf5ff",
+              border: "1.5px solid #ece8f8",
+              borderRadius: "14px",
+            }}
+          >
+            <Typography variant="caption" sx={{ fontWeight: 700, color: "#4a3f6b", display: "block", mb: 1 }}>
+              Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm):
+            </Typography>
+            <Box
+              component="img"
+              src={qrImageUrl}
+              alt="Payment QR"
+              sx={{
+                width: 140,
+                height: 140,
+                display: "block",
+                margin: "0 auto",
+                p: 1,
+                bgcolor: "#fff",
+                borderRadius: "10px",
+                border: "2px solid #7c3aed",
+              }}
+            />
+            {upiId && (
+              <Typography variant="caption" sx={{ color: "text.secondary", mt: 1, display: "block", fontSize: "0.72rem" }}>
+                Payee: <strong>{receiverName}</strong> | UPI ID: <strong style={{ color: "#7c3aed" }}>{upiId}</strong>
+              </Typography>
+            )}
+          </Box>
+        );
+      }
+      if (part === "{paymentLink}") {
+        return (
+          <Box key={`pl-${idx}`} sx={{ textAlign: "center", my: 2 }}>
+            <AppButton
+              variant="contained"
+              href={upiUri || "http://localhost:5173/contributions"}
+              target="_blank"
+              sx={{
+                background: "linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%) !important",
+                color: "#ffffff",
+                fontWeight: 700,
+                fontSize: "0.82rem",
+                px: 3,
+                py: 1,
+                borderRadius: "8px",
+              }}
+            >
+              Go to Contribution Page &amp; Pay
+            </AppButton>
+          </Box>
+        );
+      }
+      return (
+        <Typography
+          key={`text-${idx}`}
+          variant="body2"
+          sx={{ color: isDark ? "#cbd5e1" : "#334155", whiteSpace: "pre-line", lineHeight: 1.6 }}
+        >
+          {part}
+        </Typography>
+      );
+    });
   };
 
   const handleDownloadQr = () => {
@@ -437,9 +562,30 @@ export default function PaymentQrReminderDialog({
               </Typography>
             </Box>
 
-            <Typography variant="body2" sx={{ color: isDark ? "#cbd5e1" : "#334155", mb: 2, whiteSpace: "pre-line", lineHeight: 1.6 }}>
-              {previewDescription}
-            </Typography>
+            {/* Description Text (with dynamic {qrCode} and {paymentLink} support) */}
+            <Box sx={{ mb: 2 }}>
+              {renderDescriptionParts()}
+            </Box>
+
+            {/* Event Details Card (Matches Email Template & Visual Specifications) */}
+            <Box
+              sx={{
+                bgcolor: isDark ? "rgba(74, 63, 107, 0.08)" : "#faf9fd",
+                border: "1px solid rgba(74, 63, 107, 0.12)",
+                borderRadius: "10px",
+                p: 2,
+                my: 2,
+              }}
+            >
+              {/* Event Name */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Event Name:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#ffffff" : "#1e1a2e" }}>
+                  {eventName || (isBirthday ? "Birthday Celebration" : "Contribution Event")}
+                </Typography>
+              </Box>
 
             <Box
               sx={{
@@ -459,31 +605,61 @@ export default function PaymentQrReminderDialog({
               </Typography>
             </Box>
 
-            <Box sx={{ textAlign: "center", mb: 2 }}>
-              <Box
-                component="img"
-                src={qrImageUrl}
-                alt="Payment QR"
-                sx={{
-                  width: 140,
-                  height: 140,
-                  display: "block",
-                  margin: "0 auto 8px auto",
-                  p: 1,
-                  bgcolor: "#fff",
-                  borderRadius: "10px",
-                  border: "1.5px solid #0284c7",
-                }}
-              />
-              <Typography variant="caption" color="text.secondary">
-                Scan via Google Pay, PhonePe, or Paytm
-              </Typography>
-            </Box>
+            {/* Standalone QR Code Section (Only if not already placed inside description via {qrCode}) */}
+            {!descHasQr && qrImageUrl && (
+              <Box sx={{ textAlign: "center", my: 2, p: 2, bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#faf5ff", border: "1px solid #e9d5ff", borderRadius: "12px" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#4a3f6b", display: "block", mb: 1 }}>
+                  Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm):
+                </Typography>
+                <Box
+                  component="img"
+                  src={qrImageUrl}
+                  alt="Payment QR"
+                  sx={{
+                    width: 130,
+                    height: 130,
+                    display: "block",
+                    margin: "0 auto 8px auto",
+                    p: 1,
+                    bgcolor: "#fff",
+                    borderRadius: "10px",
+                    border: "2px solid #7c3aed",
+                  }}
+                />
+                {upiId && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", display: "block" }}>
+                    Payee: <strong>{receiverName}</strong> | UPI ID: <strong style={{ color: "#7c3aed" }}>{upiId}</strong>
+                  </Typography>
+                )}
+              </Box>
+            )}
+
+            {/* Standalone Payment Link Button (Only if not already placed inside description via {paymentLink}) */}
+            {!descHasPaymentLink && (
+              <Box sx={{ textAlign: "center", mt: 2, mb: 1 }}>
+                <AppButton
+                  variant="contained"
+                  href={upiUri || "http://localhost:5173/contributions"}
+                  target="_blank"
+                  sx={{
+                    background: "linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%) !important",
+                    color: "#ffffff",
+                    fontWeight: 700,
+                    fontSize: "0.82rem",
+                    px: 3,
+                    py: 1,
+                    borderRadius: "8px",
+                  }}
+                >
+                  Go to Contribution Page &amp; Pay
+                </AppButton>
+              </Box>
+            )}
 
             <Divider sx={{ my: 1.5 }} />
 
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block", textAlign: "center" }}>
-              Payee: <strong>{receiverName}</strong> | UPI ID: <strong>{upiId}</strong>
+              This is an automated notification from {orgName || "Team Contribution Management"}.
             </Typography>
           </Box>
         )}
