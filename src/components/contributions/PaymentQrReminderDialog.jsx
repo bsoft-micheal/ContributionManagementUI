@@ -587,22 +587,94 @@ export default function PaymentQrReminderDialog({
                 </Typography>
               </Box>
 
-            <Box
-              sx={{
-                p: 2,
-                borderRadius: "10px",
-                bgcolor: isDark ? "rgba(2, 132, 199, 0.08)" : "#f8fafc",
-                border: "1px solid #e2e8f0",
-                textAlign: "center",
-                mb: 2,
-              }}
-            >
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                OUTSTANDING AMOUNT
-              </Typography>
-              <Typography variant="h4" fontWeight={900} sx={{ color: "#0284c7" }}>
-                {formatWholeCurrency(amount)}
-              </Typography>
+              {/* Birthday Celebrants & Dates */}
+              {isBirthday && celebrantsList.length > 0 && (
+                <Box sx={{ pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", display: "block", mb: 0.8 }}>
+                    Birthday Celebrants &amp; Dates:
+                  </Typography>
+                  <Box
+                    sx={{
+                      bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#fbfaff",
+                      border: "1.5px solid #ece8f8",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {celebrantsList.map((c, i, arr) => (
+                      <Box
+                        key={c.name}
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          px: 1.5,
+                          py: 0.8,
+                          borderBottom: i < arr.length - 1 ? "1px dashed rgba(74, 63, 107, 0.12)" : "none",
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ color: "#4a3f6b", fontWeight: 700, fontSize: "0.75rem", display: "flex", alignItems: "center", gap: 0.5 }}>
+                          🎂 {c.name}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#c026d3", fontWeight: 700, fontSize: "0.75rem" }}>
+                          {c.date}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Event Date */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Event Date:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? "#ffffff" : "#1e1a2e" }}>
+                  {displayEventDates}
+                </Typography>
+              </Box>
+
+              {/* Total Amount */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Total Amount:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#ffffff" : "#1e1a2e" }}>
+                  {displayTotalAmount}
+                </Typography>
+              </Box>
+
+              {/* Description */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Description:
+                </Typography>
+                <Typography variant="caption" sx={{ color: isDark ? "#cbd5e1" : "#1e1a2e" }}>
+                  {cleanEventDescription || ""}
+                </Typography>
+              </Box>
+
+              {/* Contribution Amount */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                  Contribution Amount:
+                </Typography>
+                <Box
+                  sx={{
+                    bgcolor: "#f0ecf9",
+                    color: "#2d2550",
+                    fontWeight: 800,
+                    fontSize: "0.88rem",
+                    px: 1.2,
+                    py: 0.4,
+                    borderRadius: "6px",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {formattedAmount}
+                </Box>
+              </Box>
             </Box>
 
             {/* Standalone QR Code Section (Only if not already placed inside description via {qrCode}) */}

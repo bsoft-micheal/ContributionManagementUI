@@ -370,11 +370,6 @@ export function buildPaymentReminderEmailHtml({
     (effectiveCategory || "").toLowerCase().includes("birthday") ||
     (eventName || "").toLowerCase().includes("birthday");
 
-  const formattedAmount =
-    typeof amount === "number"
-      ? (amount % 1 === 0 ? `₹${amount.toLocaleString("en-IN")}` : `₹${amount.toFixed(2)}`)
-      : `₹${amount || 0}`;
-
   const formattedAmount = formatWholeCurrency(amount);
   const hasUpi = Boolean(upiId && upiId.trim());
   const upiUri = hasUpi
