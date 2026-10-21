@@ -106,8 +106,58 @@ const MfaSettings = forwardRef(function MfaSettings(
     }
   };
 
+  const handleOtpKeyDown = (e) => {
+    const isControlKey =
+      e.key === "Backspace" ||
+      e.key === "Delete" ||
+      e.key === "Tab" ||
+      e.key === "Escape" ||
+      e.key === "Enter" ||
+      e.key === "ArrowLeft" ||
+      e.key === "ArrowRight" ||
+      e.key === "ArrowUp" ||
+      e.key === "ArrowDown" ||
+      e.key === "Home" ||
+      e.key === "End" ||
+      e.ctrlKey ||
+      e.metaKey;
+
+    if (!isControlKey && !/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      return;
+    }
+
+    if (!isControlKey) {
+      const input = e.target;
+      const hasSelection =
+        input.selectionStart !== null &&
+        input.selectionEnd !== null &&
+        input.selectionStart !== input.selectionEnd;
+      if ((verifyForm.otp || "").length >= 6 && !hasSelection) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pasteText = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+    const digits = pasteText.replace(/\D/g, "");
+    const input = e.target;
+    const current = verifyForm.otp || "";
+    const start = input.selectionStart ?? current.length;
+    const end = input.selectionEnd ?? current.length;
+    const nextVal = (current.slice(0, start) + digits + current.slice(end)).slice(0, 6);
+    setVerifyForm((prev) => ({ ...prev, otp: nextVal }));
+    if (errors.otp) {
+      if (/^\d{6}$/.test(nextVal)) {
+        setErrors((prev) => ({ ...prev, otp: "" }));
+      }
+    }
+  };
+
   const handleOtpChange = (e) => {
-    const val = e.target.value;
+    const val = (e.target.value || "").replace(/\D/g, "").slice(0, 6);
     setVerifyForm((prev) => ({ ...prev, otp: val }));
     if (errors.otp) {
       if (/^\d{6}$/.test(val)) {
@@ -318,8 +368,17 @@ const MfaSettings = forwardRef(function MfaSettings(
                 label="6-Digit Code"
                 value={verifyForm.otp}
                 onChange={handleOtpChange}
-                placeholder="123456"
+                onKeyDown={handleOtpKeyDown}
+                onPaste={handleOtpPaste}
+                placeholder="e.g. 123456"
                 required
+                restrictType="numberonly"
+                maxLength={6}
+                inputProps={{
+                  inputMode: "numeric",
+                  pattern: "[0-9]*",
+                  maxLength: 6,
+                }}
                 error={Boolean(errors.otp)}
                 helperText={errors.otp}
               />

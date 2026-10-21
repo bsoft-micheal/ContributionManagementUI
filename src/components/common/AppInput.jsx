@@ -59,9 +59,80 @@ export default function AppInput({
     if (maxLength !== undefined && maxLength !== null) {
       val = val.slice(0, Number(maxLength));
     }
-    e.target.value = val;
+    if (e.target.value !== val) {
+      e.target.value = val;
+    }
     if (onChange) {
       onChange(e);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (restrictType === "numberonly") {
+      const isControlKey =
+        e.key === "Backspace" ||
+        e.key === "Delete" ||
+        e.key === "Tab" ||
+        e.key === "Escape" ||
+        e.key === "Enter" ||
+        e.key === "ArrowLeft" ||
+        e.key === "ArrowRight" ||
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown" ||
+        e.key === "Home" ||
+        e.key === "End" ||
+        e.ctrlKey ||
+        e.metaKey;
+
+      if (!isControlKey && !/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        return;
+      }
+
+      if (maxLength && !isControlKey) {
+        const input = e.target;
+        const hasSelection =
+          input.selectionStart !== null &&
+          input.selectionEnd !== null &&
+          input.selectionStart !== input.selectionEnd;
+        if ((input.value || "").length >= Number(maxLength) && !hasSelection) {
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+
+    if (props.onKeyDown) {
+      props.onKeyDown(e);
+    }
+  };
+
+  const handlePaste = (e) => {
+    if (restrictType === "numberonly") {
+      e.preventDefault();
+      const pasteText = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+      const digits = pasteText.replace(/\D/g, "");
+      const input = e.target;
+      const current = input.value || "";
+      const start = input.selectionStart ?? current.length;
+      const end = input.selectionEnd ?? current.length;
+      let nextVal = current.slice(0, start) + digits + current.slice(end);
+      if (maxLength !== undefined && maxLength !== null) {
+        nextVal = nextVal.slice(0, Number(maxLength));
+      }
+      input.value = nextVal;
+      if (onChange) {
+        onChange({
+          ...e,
+          target: input,
+          currentTarget: input,
+        });
+      }
+      return;
+    }
+
+    if (props.onPaste) {
+      props.onPaste(e);
     }
   };
 
@@ -96,8 +167,11 @@ export default function AppInput({
         </Typography>
       )}
       <TextField
+        {...props}
         value={value}
         onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         type={effectiveType}
         fullWidth={fullWidth}
         placeholder={effectivePlaceholder}
@@ -196,7 +270,6 @@ export default function AppInput({
           ) : defaultPasswordAdornment,
           ...InputProps,
         }}
-        {...props}
       />
     </Box>
   );

@@ -22,34 +22,34 @@ export const DEFAULT_CATEGORY_TEMPLATES = {
   all: {
     initialSubject: "Contribution Notice - {categoryName}",
     initialDescription:
-      "Dear {memberName},\n\nThis is a notification regarding your contribution for {categoryName} of {amount}, due by {dueDate}.\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a notification regarding your contribution for {categoryName} of {amount}, due by {dueDate}.\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
     reminderSubject: "Payment Reminder: Pending Contribution for {categoryName}",
     reminderDescription:
-      "Dear {memberName},\n\nThis is a friendly reminder that your contribution of {amount} for {categoryName} is still pending.\nDue Date: {dueDate}\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a friendly reminder that your contribution of {amount} for {categoryName} is still pending.\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
   },
   birthday: {
     initialSubject: "Birthday Celebration Contribution - {categoryName}",
     initialDescription:
-      "Dear {memberName},\n\nWe have upcoming birthdays this month in our team! Your planned contribution for {categoryName} is {amount}, due by {dueDate}.\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nWarm regards,\n{orgName}",
+      "Dear {memberName},\n\nWe have upcoming birthdays this month in our team! Your planned contribution for {categoryName} is {amount}, due by {dueDate}.\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nWarm regards,\n{orgName}",
     reminderSubject: "Gentle Reminder: Birthday Contribution Pending ({categoryName})",
     reminderDescription:
-      "Dear {memberName},\n\nJust a quick follow-up regarding your pending birthday contribution of {amount} for {categoryName}.\nDue Date: {dueDate}\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you for celebrating our colleagues with us!\n{orgName}",
+      "Dear {memberName},\n\nJust a quick follow-up regarding your pending birthday contribution of {amount} for {categoryName}.\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you for celebrating our colleagues with us!\n{orgName}",
   },
   "team dinner": {
     initialSubject: "Team Dinner Contribution - {categoryName}",
     initialDescription:
-      "Dear {memberName},\n\nWe are looking forward to our upcoming Team Dinner! Your contribution amount is {amount}, due on or before {dueDate}.\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nBest regards,\n{orgName}",
+      "Dear {memberName},\n\nWe are looking forward to our upcoming Team Dinner! Your contribution amount is {amount}, due on or before {dueDate}.\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nBest regards,\n{orgName}",
     reminderSubject: "Reminder: Team Dinner Contribution ({categoryName})",
     reminderDescription:
-      "Dear {memberName},\n\nThis is a reminder that your Team Dinner contribution of {amount} is currently pending.\nDue Date: {dueDate}\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a reminder that your Team Dinner contribution of {amount} is currently pending.\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
   },
   farewell: {
     initialSubject: "Farewell Gathering Contribution - {categoryName}",
     initialDescription:
-      "Dear {memberName},\n\nWe are organizing a farewell gathering for our colleagues. Your contribution for {categoryName} is {amount}, due by {dueDate}.\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nWarm regards,\n{orgName}",
+      "Dear {memberName},\n\nWe are organizing a farewell gathering for our colleagues. Your contribution for {categoryName} is {amount}, due by {dueDate}.\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nWarm regards,\n{orgName}",
     reminderSubject: "Reminder: Farewell Contribution Pending ({categoryName})",
     reminderDescription:
-      "Dear {memberName},\n\nThis is a quick reminder regarding your pending farewell contribution of {amount}.\nDue Date: {dueDate}\n\nPlease log in to the portal to view details and complete your contribution payment.\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a quick reminder regarding your pending farewell contribution of {amount}.\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
   },
 };
 
@@ -118,6 +118,7 @@ export function interpolatePlaceholders(text, data = {}) {
   const {
     memberName = "Member",
     categoryName = "Event Category",
+    eventDescription = "",
     amount = 0,
     dueDate = "",
     orgName = "Unit 1A Residents Association",
@@ -136,6 +137,7 @@ export function interpolatePlaceholders(text, data = {}) {
     .replace(/\{memberName\}/g, memberName)
     .replace(/\{categoryName\}/g, categoryName)
     .replace(/\{eventName\}/g, categoryName) // Backward compatibility
+    .replace(/\{eventDescription\}/g, eventDescription)
     .replace(/\{amount\}/g, formattedAmount)
     .replace(/\{dueDate\}/g, effectiveDueDate)
     .replace(/\{orgName\}/g, orgName)
@@ -236,6 +238,7 @@ export async function sendTestEmail({
   const placeholderData = {
     memberName: "Alex Morgan",
     categoryName: categoryName || "Birthday",
+    eventDescription: "Sample event description entered during event creation",
     amount: testAmount,
     dueDate: dayjs().add(15, "day").format("DD/MM/YYYY"),
     orgName,
@@ -247,34 +250,113 @@ export async function sendTestEmail({
   const bodyText = interpolatePlaceholders(template.description, placeholderData);
 
   const formattedAmount = `₹${testAmount.toLocaleString("en-IN")}`;
+  const isBirthday = (categoryName || "").toLowerCase().includes("birthday");
+  const celebrants = isBirthday
+    ? [
+        { name: "Leo Albert L", date: "October 05, 2026" },
+        { name: "Kaviarasan K", date: "October 08, 2026" },
+        { name: "Christy Chandran R", date: "October 09, 2026" },
+        { name: "testerr", date: "October 18, 2026" },
+      ]
+    : [];
+
+  const celebrantsTableRows = celebrants
+    .map(
+      (c) => `
+      <tr style="border-bottom: 1px dashed rgba(74, 63, 107, 0.1);">
+        <td style="padding: 8px 12px; color: #4a3f6b; font-weight: 700; font-size: 13.5px;">&#x1F382; ${c.name}</td>
+        <td align="right" style="padding: 8px 12px; color: #c026d3; font-weight: 700; font-size: 13.5px;">${c.date}</td>
+      </tr>`
+    )
+    .join("");
+
+  const celebrantsHtml = celebrants.length > 0
+    ? `
+      <div style="margin-bottom: 14px; border-bottom: 1px dashed rgba(74, 63, 107, 0.1); padding-bottom: 14px;">
+        <span style="font-weight: 700; color: #5b5280; display: block; margin-bottom: 8px;">Birthday Celebrants &amp; Dates:</span>
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; background-color: #fbfaff; border-radius: 8px; border: 1.5px solid #ece8f8;">
+          ${celebrantsTableRows}
+        </table>
+      </div>`
+    : "";
+
+  const eventDatesDisplay = isBirthday ? "5 Oct, 10 Oct (2), 19 Oct" : (placeholderData.dueDate || "End of Month");
+  const totalAmountDisplay = isBirthday ? "Rs.6250.00 (4 celebrants combined)" : "Rs.5000.00";
+  const displayAmount = isBirthday ? "₹135.87" : formattedAmount;
+
+  const qrEmbedded = bodyText && bodyText.includes("{qrCode}");
+  const paymentLinkEmbedded = bodyText && bodyText.includes("{paymentLink}");
+
   const htmlContent = `
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>${subject}</title></head>
-<body style="font-family:'Segoe UI',Arial,sans-serif;background-color:#f4f6f9;margin:0;padding:24px;color:#1e293b;">
-  <div style="max-width:540px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">
-    <div style="background:linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%);padding:22px;text-align:center;color:#ffffff;">
+<head>
+  <meta charset="utf-8">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; color: #1e293b; }
+    .email-container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+    .header { background: linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%); padding: 24px; text-align: center; color: #ffffff; }
+    .content { padding: 26px 22px; }
+    .details-card { background-color: #faf9fd; border: 1px solid rgba(74, 63, 107, 0.12); border-radius: 10px; padding: 20px; margin-bottom: 22px; font-size: 14px; }
+    .detail-row { margin-bottom: 14px; border-bottom: 1px dashed rgba(74, 63, 107, 0.1); padding-bottom: 14px; }
+    .detail-row:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
+    .detail-label { font-weight: 700; color: #5b5280; display: inline-block; width: 160px; }
+    .detail-value { color: #1e1a2e; display: inline-block; }
+    .amount-highlight { font-size: 18px; color: #2d2550; font-weight: 800; background-color: #f0ecf9; padding: 4px 10px; border-radius: 6px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
       <span style="display:inline-block;padding:3px 10px;background:rgba(255,255,255,0.2);border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">TEST EMAIL PREVIEW</span>
       <h2 style="margin:0;font-size:19px;font-weight:700;">${subject}</h2>
       <p style="margin:4px 0 0 0;font-size:12px;opacity:0.9;">Category: <strong>${categoryName || "Category"}</strong> | ${orgName}</p>
     </div>
-    <div style="padding:26px 22px;">
+    <div class="content">
       <div style="font-size:14px;line-height:1.7;color:#334155;white-space:pre-line;margin-bottom:20px;">
         ${bodyText}
       </div>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px;">
-        <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:4px;">Contribution Due</span>
-        <span style="font-size:26px;font-weight:800;color:#0284c7;">${formattedAmount}</span>
+
+      <div class="details-card">
+        <div class="detail-row">
+          <span class="detail-label">Event Name:</span>
+          <span class="detail-value" style="font-weight: 700;">${isBirthday ? "Birthday Celebration" : `${categoryName} Celebration`}</span>
+        </div>
+        ${celebrantsHtml}
+        <div class="detail-row">
+          <span class="detail-label">${isBirthday ? "Event Date:" : "Event Date:"}</span>
+          <span class="detail-value" style="font-weight: 600;">${eventDatesDisplay}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Total Amount:</span>
+          <span class="detail-value" style="font-weight: 700;">${totalAmountDisplay}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Description:</span>
+          <span class="detail-value">${placeholderData.eventDescription || ""}</span>
+        </div>
+        <div class="detail-row" style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="detail-label">Contribution Amount:</span>
+          <span class="amount-highlight">${displayAmount}</span>
+        </div>
       </div>
-      <div style="text-align:center;margin-bottom:20px;">
-        <div style="display:inline-block;padding:10px;background:#ffffff;border:2px solid #0284c7;border-radius:12px;box-shadow:0 4px 12px rgba(2,132,199,0.1);">
-          <img src="${qrImageUrl}" alt="Payment QR Code" width="180" height="180" style="display:block;margin:0 auto;" />
+
+      ${!qrEmbedded ? `
+      <div style="text-align:center;margin-bottom:20px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:14px;padding:18px;">
+        <p style="margin:0 0 10px 0;font-size:13px;font-weight:700;color:#4a3f6b;">Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm):</p>
+        <div style="display:inline-block;padding:10px;background:#ffffff;border:2px solid #7c3aed;border-radius:12px;box-shadow:0 4px 12px rgba(124,58,237,0.12);">
+          <img src="${qrImageUrl}" alt="Payment QR Code" width="170" height="170" style="display:block;margin:0 auto;border-radius:6px;" />
         </div>
         <p style="margin:6px 0 0 0;font-size:11px;color:#64748b;">UPI ID: <strong>${upiId}</strong> (${receiverName})</p>
       </div>
-      <div style="text-align:center;">
-        <a href="${upiUri}" style="background-color:#0284c7;color:#ffffff;text-decoration:none;padding:11px 24px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Pay ${formattedAmount} via UPI</a>
+      ` : ''}
+
+      ${!paymentLinkEmbedded ? `
+      <div style="text-align:center;margin: 20px 0 10px 0;">
+        <a href="${upiUri}" style="background:linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%);color:#ffffff !important;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Go to Contribution Page &amp; Pay</a>
       </div>
+      ` : ''}
     </div>
     <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px;text-align:center;font-size:11px;color:#94a3b8;">
       This is a test notification generated from System Settings (${templateType === "initial" ? "Initial Template" : "Reminder Template"}).
@@ -487,9 +569,14 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
     const templateType = targetStage === "Initial" ? "initial" : "reminder";
     const template = resolveCategoryTemplate(categoryId, categoryName, templateType);
 
+    const cleanEventDescription = (evt?.description || "")
+      .replace(/<!--contrib:[\s\S]*?-->/gi, "")
+      .trim();
+
     const placeholderData = {
       memberName,
       categoryName,
+      eventDescription: cleanEventDescription,
       amount,
       dueDate: evt?.eventDate || dayjs().endOf("month").format("DD/MM/YYYY"),
       orgName: settings.orgName,

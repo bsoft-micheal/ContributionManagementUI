@@ -61,6 +61,7 @@ import AppSwitch from "../../components/common/AppSwitch";
 import AppButton from "../../components/common/AppButton";
 import AppTextArea from "../../components/common/AppTextArea";
 import AppDataTable from "../../components/common/AppDataTable";
+import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import MfaSettings from "../../components/common/MfaSettings";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
@@ -75,6 +76,7 @@ import {
   triggerHangfireRemindersAsync,
 } from "../../services/settingsService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getUsersAsync } from "../../services/userService";
 import SendTestEmailDialog from "../../components/settings/SendTestEmailDialog";
 import EmailReminderLogsDialog from "../../components/settings/EmailReminderLogsDialog";
 import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
@@ -199,6 +201,7 @@ export default function SettingsPage() {
   });
 
   const [categoriesList, setCategoriesList] = useState([]);
+  const [usersList, setUsersList] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(() => {
     const saved = localStorage.getItem("cm_system_settings");
     if (saved) {
@@ -262,6 +265,7 @@ export default function SettingsPage() {
     return {};
   });
   const [selectedQrEventType, setSelectedQrEventType] = useState("");
+  const [deleteQrEventType, setDeleteQrEventType] = useState(null);
 
   // Dynamically derive event type options strictly from active categoriesList
   const qrEventTypeOptions = useMemo(() => {
@@ -275,11 +279,11 @@ export default function SettingsPage() {
     return list.map((t) => ({ label: t, value: t }));
   }, [categoriesList]);
 
-  // Ensure selectedQrEventType is initialized to the first available event type
+  // If an event type was selected but it was removed from options, reset to empty
   useEffect(() => {
-    if (qrEventTypeOptions.length > 0) {
-      if (!selectedQrEventType || !qrEventTypeOptions.some((o) => o.value === selectedQrEventType)) {
-        setSelectedQrEventType(qrEventTypeOptions[0].value);
+    if (selectedQrEventType && qrEventTypeOptions.length > 0) {
+      if (!qrEventTypeOptions.some((o) => o.value === selectedQrEventType)) {
+        setSelectedQrEventType("");
       }
     }
   }, [qrEventTypeOptions, selectedQrEventType]);
@@ -336,19 +340,23 @@ export default function SettingsPage() {
     ? validateUpiId(currentQrConfig.upiId)
     : { isValid: false, error: "" };
 
-  const upiError = isUploadedMode
+  const upiError = !selectedQrEventType || isUploadedMode
     ? ""
-    : !currentQrConfig.upiId
+    : !currentQrConfig.upiId?.trim()
       ? (COMMON_STRINGS?.VALIDATION?.REQUIRED_FIELD || "This field is required")
-      : !upiValidation.isValid
-        ? (upiValidation.error || "Enter a valid UPI ID.")
-        : "";
+      : currentQrConfig.upiId.length > 50
+        ? "UPI ID cannot exceed 50 characters."
+        : !upiValidation.isValid
+          ? (upiValidation.error || "Enter a valid UPI ID.")
+          : "";
 
-  const receiverError = isUploadedMode
+  const receiverError = !selectedQrEventType || isUploadedMode
     ? ""
     : !currentQrConfig.receiverName?.trim()
       ? (COMMON_STRINGS?.VALIDATION?.REQUIRED_FIELD || "This field is required")
-      : "";
+      : currentQrConfig.receiverName.length > 150
+        ? "Receiver name cannot exceed 150 characters."
+        : "";
 
   const liveUpiUri = !isUploadedMode && isCurrentConfigured
     ? buildUpiPaymentUri({
@@ -373,6 +381,44 @@ export default function SettingsPage() {
     }
   };
 
+  const userMap = useMemo(() => {
+    const map = {};
+    if (Array.isArray(usersList)) {
+      usersList.forEach((u) => {
+        const id = String(u.userId || u.id || "").toLowerCase();
+        const name = u.fullName || u.name || u.username;
+        if (id && name) map[id] = name;
+        if (u.username && name) map[String(u.username).toLowerCase()] = name;
+      });
+    }
+    return map;
+  }, [usersList]);
+
+  const currentUserName = useMemo(() => {
+    return authState?.fullName || authState?.username || authState?.name || authState?.user?.fullName || authState?.user?.username || "Daniel";
+  }, [authState]);
+
+  const resolveUserName = (rawCreatedBy) => {
+    if (!rawCreatedBy || rawCreatedBy === "--") {
+      return currentUserName;
+    }
+    const str = String(rawCreatedBy).trim();
+    if (isGuid(str)) {
+      return userMap[str.toLowerCase()] || currentUserName;
+    }
+    if (str.toLowerCase() === "admin") {
+      const adminUser = usersList.find((u) => {
+        const role = String(u.roleName || u.role || "").toLowerCase();
+        return role === "admin";
+      });
+      return adminUser?.fullName || adminUser?.name || adminUser?.username || currentUserName;
+    }
+    if (userMap[str.toLowerCase()]) {
+      return userMap[str.toLowerCase()];
+    }
+    return str;
+  };
+
   // Directory of all Event Types and their configured UPI IDs for the AppDataTable Grid
   const qrTableData = useMemo(() => {
     const rows = [];
@@ -391,6 +437,9 @@ export default function SettingsPage() {
           const hasDynamic = Boolean(!isDeleted && rowMode === "generated" && config?.upiId && config?.upiId.trim() && config?.receiverName && config?.receiverName.trim());
           const isConfigured = hasUploaded || hasDynamic;
 
+          const rawCreatedBy = config?.createdBy || c?.createdBy || c?.CreatedBy;
+          const resolvedCreatedBy = resolveUserName(rawCreatedBy);
+
           rows.push({
             id: c.eventTypeId || typeName,
             eventTypeId: c.eventTypeId,
@@ -405,8 +454,8 @@ export default function SettingsPage() {
             isConfigured,
             isDeleted: isDeleted,
             isActive: isDeleted ? false : (config ? config.isActive !== false : false),
-            createdBy: (!isGuid(config?.createdBy) && config?.createdBy) || "--",
-            createdOn: config?.createdOn || config?.createdAt || null,
+            createdBy: resolvedCreatedBy,
+            createdOn: config?.createdOn || config?.createdAt || c?.createdOn || c?.CreatedOn || null,
           });
         }
       });
@@ -458,7 +507,7 @@ export default function SettingsPage() {
                 <Tooltip title={`Delete Payment QR for ${row.eventTypeName}`}>
                   <IconButton
                     size="small"
-                    onClick={() => handleDeletePaymentQr(row.eventTypeName)}
+                    onClick={() => setDeleteQrEventType(row.eventTypeName)}
                     sx={{
                       p: 0.4,
                       color: "#dc2626",
@@ -595,10 +644,10 @@ export default function SettingsPage() {
         key: "createdBy",
         render: (row) => {
           const raw = row.createdBy || row.CreatedBy;
-          const isUuid = Boolean(raw && isGuid(raw));
+          const name = resolveUserName(raw);
           return (
             <Typography variant="body2" color="text.secondary">
-              {isUuid || !raw ? "--" : raw}
+              {name || "--"}
             </Typography>
           );
         },
@@ -657,6 +706,14 @@ export default function SettingsPage() {
       }
     };
     loadCategories();
+
+    // Load users list to resolve createdBy user names
+    getUsersAsync()
+      .then((res) => {
+        const list = res?.data || res || [];
+        if (Array.isArray(list)) setUsersList(list);
+      })
+      .catch(() => {});
   }, [isMemberRole]);
 
   // Load settings from backend on mount
@@ -1082,29 +1139,23 @@ export default function SettingsPage() {
 
     if (isUploaded) {
       if (!configToSave.qrImage) {
-        toast.error("Please upload a QR code image.");
         return;
       }
     } else {
       if (!configToSave.receiverName || !configToSave.receiverName.trim()) {
-        toast.error("Receiver name is required.");
         return;
       }
       if (configToSave.receiverName.length > 150) {
-        toast.error("Receiver name cannot exceed 150 characters.");
         return;
       }
       if (!configToSave.upiId || !configToSave.upiId.trim()) {
-        toast.error("UPI ID is required.");
         return;
       }
       const upiCheck = validateUpiId(configToSave.upiId);
       if (!upiCheck.isValid) {
-        toast.error(upiCheck.error || "Enter a valid UPI ID.");
         return;
       }
       if (configToSave.upiId && configToSave.upiId.length > 50) {
-        toast.error("UPI ID cannot exceed 50 characters.");
         return;
       }
     }
@@ -1124,7 +1175,7 @@ export default function SettingsPage() {
             isDeleted: false,
             IsDeleted: false,
             createdOn: new Date().toISOString(),
-            createdBy: authState?.user?.fullName || authState?.user?.username || "Admin",
+            createdBy: currentUserName,
           }
         : {
             receiverName: configToSave.receiverName.trim(),
@@ -1139,7 +1190,7 @@ export default function SettingsPage() {
             isDeleted: false,
             IsDeleted: false,
             createdOn: new Date().toISOString(),
-            createdBy: authState?.user?.fullName || authState?.user?.username || "Admin",
+            createdBy: currentUserName,
           };
 
       // 1. Save in local per-event-type storage & update state (isolated per event type)
@@ -1161,6 +1212,13 @@ export default function SettingsPage() {
     }
   };
 
+  const handleConfirmDeleteQr = async () => {
+    if (!deleteQrEventType) return;
+    const target = deleteQrEventType;
+    setDeleteQrEventType(null);
+    await handleDeletePaymentQr(target);
+  };
+
   const handleDeletePaymentQr = async (eventTypeName) => {
     if (!eventTypeName) return;
     try {
@@ -1177,7 +1235,7 @@ export default function SettingsPage() {
         isDeleted: true,
         IsDeleted: true,
         deletedOn: new Date().toISOString(),
-        deletedBy: authState?.user?.fullName || authState?.user?.username || "Admin",
+        deletedBy: currentUserName,
       };
 
       const updatedAll = savePaymentQrConfigForEventType(eventTypeName, deletedConfig);
@@ -1535,6 +1593,7 @@ export default function SettingsPage() {
             const livePreviewData = {
               memberName: "Daniel",
               categoryName: selectedCategoryId === "all" ? "Birthday" : currentCategoryLabel,
+              eventDescription: "Sample event description entered during event creation",
               amount: 500,
               dueDate: previewDueDate,
               orgName: settings.orgName || "Unit 1A",
@@ -1546,12 +1605,8 @@ export default function SettingsPage() {
             const liveSubject = interpolatePlaceholders(rawSubject, livePreviewData);
 
             const defaultDesc =
-              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\nThank You,\n{orgName}";
+              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank You,\n{orgName}";
             const rawDesc = templateDescription || defaultDesc;
-            const liveBody = interpolatePlaceholders(rawDesc, livePreviewData)
-              .replace(/<img[^>]*>/gi, "")
-              .replace(/https?:\/\/\S+/gi, "")
-              .trim();
 
             return (
               <Grid container spacing={2.5} alignItems="flex-start">
@@ -1687,6 +1742,41 @@ export default function SettingsPage() {
                           helperText={templateErrors.templateSubject}
                         />
 
+                        {/* Subject Placeholder Helper Chips */}
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap", mt: -0.5, mb: 1 }}>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", fontWeight: 700 }}>
+                            Subject Placeholders:
+                          </Typography>
+                          {[
+                            "{categoryName}",
+                            "{memberName}",
+                            "{amount}",
+                            "{dueDate}",
+                            "{orgName}",
+                            "{eventDescription}",
+                          ].map((token) => (
+                            <Chip
+                              key={token}
+                              label={token}
+                              size="small"
+                              onClick={() => {
+                                setTemplateSubject((prev) => (prev ? `${prev} ${token}` : token));
+                                setTemplateErrors((prev) => ({ ...prev, templateSubject: "" }));
+                              }}
+                              sx={{
+                                fontSize: "0.68rem",
+                                fontWeight: 700,
+                                height: 22,
+                                cursor: "pointer",
+                                bgcolor: "rgba(2, 132, 199, 0.08)",
+                                color: "#0284c7",
+                                border: "1px solid rgba(2, 132, 199, 0.2)",
+                                "&:hover": { bgcolor: "rgba(2, 132, 199, 0.16)" },
+                              }}
+                            />
+                          ))}
+                        </Box>
+
                         {/* 4. Email Description */}
                         <AppTextArea
                           label={`Email Description (${templateType === "initial" ? "Initial Email" : "Reminder Email"})`}
@@ -1712,6 +1802,7 @@ export default function SettingsPage() {
                           {[
                             "{memberName}",
                             "{categoryName}",
+                            "{eventDescription}",
                             "{amount}",
                             "{dueDate}",
                             "{orgName}",
@@ -1723,20 +1814,62 @@ export default function SettingsPage() {
                               label={token}
                               size="small"
                               onClick={() => {
-                                setTemplateDescription((prev) => (prev ? `${prev} ${token}` : token));
+                                setTemplateDescription((prev) => {
+                                  if (!prev) return token;
+                                  if (token === "{qrCode}" || token === "{paymentLink}") {
+                                    const thankIdx = prev.search(/thank\s*you/i);
+                                    if (thankIdx !== -1) {
+                                      return `${prev.slice(0, thankIdx).trimEnd()}\n\n${token}\n\n${prev.slice(thankIdx).trimStart()}`;
+                                    }
+                                  }
+                                  return `${prev.trimEnd()}\n\n${token}`;
+                                });
                               }}
                               sx={{
                                 fontSize: "0.68rem",
                                 fontWeight: 700,
                                 height: 22,
                                 cursor: "pointer",
-                                bgcolor: token === "{qrCode}" ? "rgba(124, 58, 237, 0.1)" : "rgba(74, 63, 107, 0.08)",
-                                color: token === "{qrCode}" ? "#7c3aed" : "#4a3f6b",
-                                border: token === "{qrCode}" ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(74, 63, 107, 0.2)",
+                                bgcolor: token === "{qrCode}" || token === "{paymentLink}" ? "rgba(124, 58, 237, 0.1)" : "rgba(74, 63, 107, 0.08)",
+                                color: token === "{qrCode}" || token === "{paymentLink}" ? "#7c3aed" : "#4a3f6b",
+                                border: token === "{qrCode}" || token === "{paymentLink}" ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(74, 63, 107, 0.2)",
                                 "&:hover": { bgcolor: "rgba(74, 63, 107, 0.16)" },
                               }}
                             />
                           ))}
+                          <Chip
+                            label="+ Insert QR & Payment Link"
+                            size="small"
+                            onClick={() => {
+                              setTemplateDescription((prev) => {
+                                const current = prev || "";
+                                let updated = current;
+                                const needsQr = !updated.includes("{qrCode}");
+                                const needsPay = !updated.includes("{paymentLink}");
+                                if (!needsQr && !needsPay) return current;
+
+                                const insertBlock = [needsQr ? "{qrCode}" : null, needsPay ? "{paymentLink}" : null]
+                                  .filter(Boolean)
+                                  .join("\n\n");
+
+                                const thankIdx = updated.search(/thank\s*you/i);
+                                if (thankIdx !== -1) {
+                                  return `${updated.slice(0, thankIdx).trimEnd()}\n\n${insertBlock}\n\n${updated.slice(thankIdx).trimStart()}`;
+                                }
+                                return `${updated.trimEnd()}\n\n${insertBlock}`;
+                              });
+                            }}
+                            sx={{
+                              fontSize: "0.68rem",
+                              fontWeight: 750,
+                              height: 22,
+                              cursor: "pointer",
+                              bgcolor: "rgba(124, 58, 237, 0.12)",
+                              color: "#7c3aed",
+                              border: "1px dashed #7c3aed",
+                              "&:hover": { bgcolor: "rgba(124, 58, 237, 0.22)" },
+                            }}
+                          />
                         </Box>
 
                         <Divider sx={{ my: 0.5 }} />
@@ -1981,130 +2114,276 @@ export default function SettingsPage() {
                         </Typography>
                       </Box>
 
-                      {/* Email Body text */}
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          whiteSpace: "pre-line",
-                          color: "text.primary",
-                          fontSize: "0.82rem",
-                          lineHeight: 1.6,
-                          mb: 1.5,
-                        }}
-                      >
-                        {liveBody || `Dear Daniel,\n\nThis is a notification regarding your ${currentCategoryLabel} contribution of ₹500.\n\nDue Date: ${previewDueDate}\n\nThank You,\n${settings.orgName || "Unit 1A"}`}
-                      </Typography>
+                      {/* Dynamic Email Body & Embedded Components */}
+                      {(() => {
+                        const effectiveDesc = templateDescription || defaultDesc;
+                        if (!effectiveDesc) return null;
 
-                      {/* Amount Due Banner */}
-                      <Box
-                        sx={{
-                          bgcolor: isDark ? "rgba(124, 58, 237, 0.08)" : "#fdf4ff",
-                          border: "1.5px solid #d946ef",
-                          borderRadius: "10px",
-                          p: 1.5,
-                          textAlign: "center",
-                          my: 1.5,
-                        }}
-                      >
-                        <Typography variant="caption" sx={{ color: "#a21caf", fontWeight: 800, textTransform: "uppercase", fontSize: "0.68rem", display: "block" }}>
-                          Pending Amount Due
-                        </Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 800, color: "#86198f" }}>
-                          ₹500
-                        </Typography>
-                      </Box>
+                        // Replace standard text placeholders
+                        let processed = effectiveDesc
+                          .replace(/\{memberName\}/g, livePreviewData.memberName || "Daniel")
+                          .replace(/\{categoryName\}/g, livePreviewData.categoryName || "Birthday")
+                          .replace(/\{eventName\}/g, livePreviewData.categoryName || "Birthday")
+                          .replace(/\{eventDescription\}/g, livePreviewData.eventDescription || "")
+                          .replace(/\{amount\}/g, typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || "₹500"))
+                          .replace(/\{dueDate\}/g, livePreviewData.dueDate || previewDueDate || "End of Month")
+                          .replace(/\{orgName\}/g, livePreviewData.orgName || settings.orgName || "Unit 1A Residents Association");
 
-                      {/* QR Code Section Card */}
-                      <Box
-                        sx={{
-                          textAlign: "center",
-                          bgcolor: isDark ? "rgba(124, 58, 237, 0.06)" : "#faf5ff",
-                          border: "1px solid #e9d5ff",
-                          borderRadius: "12px",
-                          p: 1.8,
-                          mb: 2,
-                        }}
-                      >
-                        <Typography variant="caption" sx={{ fontWeight: 750, color: "#4b5563", display: "block", mb: 1, textTransform: "uppercase", fontSize: "0.66rem", letterSpacing: "0.3px" }}>
-                          Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm)
-                        </Typography>
-                        <Box
-                          sx={{
-                            display: "inline-block",
-                            p: 0.8,
-                            bgcolor: "#ffffff",
-                            borderRadius: "10px",
-                            border: "2px solid #7c3aed",
-                            boxShadow: "0 4px 12px rgba(124, 58, 237, 0.12)",
-                            mb: 1,
-                          }}
-                        >
-                          <Box
-                            component="img"
-                            src={previewQrUrl || defaultPaymentQr}
-                            alt="Payment QR Code"
-                            sx={{ width: 130, height: 130, display: "block", mx: "auto", borderRadius: "6px" }}
-                          />
-                        </Box>
-                        <Typography variant="caption" sx={{ display: "block", fontSize: "0.72rem", color: "#4b5563" }}>
-                          <strong>Payee:</strong> {previewReceiverName}
-                        </Typography>
-                        <Typography variant="caption" sx={{ display: "block", fontSize: "0.72rem", color: "#7c3aed", fontWeight: 700 }}>
-                          <strong>UPI ID:</strong> {previewUpiId}
-                        </Typography>
-                        <Typography variant="caption" sx={{ display: "block", fontSize: "0.66rem", color: "#64748b", mt: 0.5 }}>
-                          Amount is pre-filled automatically when scanned (₹500)
-                        </Typography>
+                        // Tokenize on {qrCode} and {paymentLink}
+                        const parts = processed.split(/(\{qrCode\}|\{paymentLink\})/gi);
 
-                        {previewUpiUri && (
-                          <Box sx={{ mt: 1.2 }}>
-                            <AppButton
-                              variant="contained"
-                              size="small"
-                              sx={{
-                                bgcolor: "#7c3aed !important",
-                                "&:hover": { bgcolor: "#6d28d9 !important" },
-                                fontSize: "0.74rem",
-                                fontWeight: 700,
-                                py: 0.6,
-                                px: 2,
-                                borderRadius: "8px",
-                              }}
-                            >
-                              Pay ₹500 via UPI
-                            </AppButton>
+                        return (
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                            {parts.map((part, index) => {
+                              const trimmed = part.trim();
+                              if (trimmed.toLowerCase() === "{qrcode}") {
+                                return (
+                                  <Box
+                                    key={`qr-${index}`}
+                                    sx={{
+                                      textAlign: "center",
+                                      bgcolor: isDark ? "rgba(124, 58, 237, 0.06)" : "#faf5ff",
+                                      border: "1px solid #e9d5ff",
+                                      borderRadius: "12px",
+                                      p: 1.8,
+                                      my: 1.5,
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        fontWeight: 750,
+                                        color: "#4b5563",
+                                        display: "block",
+                                        mb: 1,
+                                        textTransform: "uppercase",
+                                        fontSize: "0.66rem",
+                                        letterSpacing: "0.3px",
+                                      }}
+                                    >
+                                      Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm)
+                                    </Typography>
+                                    <Box
+                                      sx={{
+                                        display: "inline-block",
+                                        p: 0.8,
+                                        bgcolor: "#ffffff",
+                                        borderRadius: "10px",
+                                        border: "2px solid #7c3aed",
+                                        boxShadow: "0 4px 12px rgba(124, 58, 237, 0.12)",
+                                        mb: 1,
+                                      }}
+                                    >
+                                      <Box
+                                        component="img"
+                                        src={previewQrUrl || defaultPaymentQr}
+                                        alt="Payment QR Code"
+                                        sx={{ width: 130, height: 130, display: "block", mx: "auto", borderRadius: "6px" }}
+                                      />
+                                    </Box>
+                                    <Typography variant="caption" sx={{ display: "block", fontSize: "0.72rem", color: "#4b5563" }}>
+                                      <strong>Payee:</strong> {previewReceiverName}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ display: "block", fontSize: "0.72rem", color: "#7c3aed", fontWeight: 700 }}>
+                                      <strong>UPI ID:</strong> {previewUpiId}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ display: "block", fontSize: "0.66rem", color: "#64748b", mt: 0.5 }}>
+                                      Amount is pre-filled automatically when scanned (₹500)
+                                    </Typography>
+
+                                    {previewUpiUri && (
+                                      <Box sx={{ mt: 1.2 }}>
+                                        <AppButton
+                                          variant="contained"
+                                          size="small"
+                                          sx={{
+                                            bgcolor: "#7c3aed !important",
+                                            "&:hover": { bgcolor: "#6d28d9 !important" },
+                                            fontSize: "0.74rem",
+                                            fontWeight: 700,
+                                            py: 0.6,
+                                            px: 2,
+                                            borderRadius: "8px",
+                                          }}
+                                        >
+                                          Pay ₹500 via UPI
+                                        </AppButton>
+                                      </Box>
+                                    )}
+                                  </Box>
+                                );
+                              }
+
+                              if (trimmed.toLowerCase() === "{paymentlink}") {
+                                return (
+                                  <Box key={`paylink-${index}`} sx={{ textAlign: "center", my: 1.5 }}>
+                                    <AppButton
+                                      variant="contained"
+                                      fullWidth
+                                      sx={{
+                                        bgcolor: "#4a3f6b !important",
+                                        "&:hover": { bgcolor: "#2d2550 !important" },
+                                        py: 1.2,
+                                        fontWeight: 700,
+                                        fontSize: "0.82rem",
+                                        textTransform: "none",
+                                        borderRadius: "10px",
+                                        boxShadow: "0 4px 12px rgba(74, 63, 107, 0.25)",
+                                      }}
+                                    >
+                                      Go to Contribution Page &amp; Pay
+                                    </AppButton>
+                                  </Box>
+                                );
+                              }
+
+                              if (!part) return null;
+
+                              return (
+                                <React.Fragment key={`frag-${index}`}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      whiteSpace: "pre-line",
+                                      color: "text.primary",
+                                      fontSize: "0.82rem",
+                                      lineHeight: 1.6,
+                                      mb: 1.5,
+                                    }}
+                                  >
+                                    {part}
+                                  </Typography>
+
+                                  {/* Event Details Card (as shown in user design) */}
+                                  {index === 0 && (
+                                    <Box
+                                      sx={{
+                                        bgcolor: isDark ? "rgba(74, 63, 107, 0.08)" : "#faf9fd",
+                                        border: "1px solid rgba(74, 63, 107, 0.12)",
+                                        borderRadius: "10px",
+                                        p: 2,
+                                        my: 1.5,
+                                      }}
+                                    >
+                                      {/* Event Name */}
+                                      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                          Event Name:
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#1e1a2e" }}>
+                                          {selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")
+                                            ? "Birthday Celebration"
+                                            : `${currentCategoryLabel} Celebration`}
+                                        </Typography>
+                                      </Box>
+
+                                      {/* Birthday Celebrants & Dates */}
+                                      {(selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")) && (
+                                        <Box sx={{ pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                          <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", display: "block", mb: 0.8 }}>
+                                            Birthday Celebrants &amp; Dates:
+                                          </Typography>
+                                          <Box
+                                            sx={{
+                                              bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#fbfaff",
+                                              border: "1.5px solid #ece8f8",
+                                              borderRadius: "8px",
+                                              overflow: "hidden",
+                                            }}
+                                          >
+                                            {[
+                                              { name: "Leo Albert L", date: "October 05, 2026" },
+                                              { name: "Kaviarasan K", date: "October 08, 2026" },
+                                              { name: "Christy Chandran R", date: "October 09, 2026" },
+                                              { name: "testerr", date: "October 18, 2026" },
+                                            ].map((c, i, arr) => (
+                                              <Box
+                                                key={c.name}
+                                                sx={{
+                                                  display: "flex",
+                                                  justifyContent: "space-between",
+                                                  alignItems: "center",
+                                                  px: 1.5,
+                                                  py: 0.8,
+                                                  borderBottom: i < arr.length - 1 ? "1px dashed rgba(74, 63, 107, 0.12)" : "none",
+                                                }}
+                                              >
+                                                <Typography variant="caption" sx={{ color: "#4a3f6b", fontWeight: 700, fontSize: "0.75rem", display: "flex", alignItems: "center", gap: 0.5 }}>
+                                                  🎂 {c.name}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: "#c026d3", fontWeight: 700, fontSize: "0.75rem" }}>
+                                                  {c.date}
+                                                </Typography>
+                                              </Box>
+                                            ))}
+                                          </Box>
+                                        </Box>
+                                      )}
+
+                                      {/* Event Date */}
+                                      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                          Event Date:
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ fontWeight: 600, color: "#1e1a2e" }}>
+                                          {selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")
+                                            ? "5 Oct, 10 Oct (2), 19 Oct"
+                                            : previewDueDate || "End of Month"}
+                                        </Typography>
+                                      </Box>
+
+                                      {/* Total Amount */}
+                                      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                          Total Amount:
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#1e1a2e" }}>
+                                          {selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")
+                                            ? "Rs.6250.00 (4 celebrants combined)"
+                                            : "Rs.5000.00"}
+                                        </Typography>
+                                      </Box>
+
+                                      {/* Description */}
+                                      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                          Description:
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: "#1e1a2e" }}>
+                                          {livePreviewData.eventDescription || ""}
+                                        </Typography>
+                                      </Box>
+
+                                      {/* Contribution Amount */}
+                                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                          Contribution Amount:
+                                        </Typography>
+                                        <Box
+                                          sx={{
+                                            bgcolor: "#f0ecf9",
+                                            color: "#2d2550",
+                                            fontWeight: 800,
+                                            fontSize: "0.88rem",
+                                            px: 1.2,
+                                            py: 0.4,
+                                            borderRadius: "6px",
+                                            letterSpacing: "0.02em",
+                                          }}
+                                        >
+                                          {selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")
+                                            ? "₹135.87"
+                                            : typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || "₹500")}
+                                        </Box>
+                                      </Box>
+                                    </Box>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
                           </Box>
-                        )}
-                      </Box>
-
-                      {/* Portal Redirect Button */}
-                      <Box sx={{ textAlign: "center", mb: 2 }}>
-                        <AppButton
-                          variant="contained"
-                          fullWidth
-                          sx={{
-                            bgcolor: "#4a3f6b !important",
-                            "&:hover": { bgcolor: "#2d2550 !important" },
-                            py: 1.2,
-                            fontWeight: 700,
-                            fontSize: "0.82rem",
-                            textTransform: "none",
-                            borderRadius: "10px",
-                            boxShadow: "0 4px 12px rgba(74, 63, 107, 0.25)",
-                          }}
-                        >
-                          Go to Contribution Page &amp; Pay
-                        </AppButton>
-                      </Box>
-
-
-                      {/* Email Footer */}
-                      <Box sx={{ mt: 2, pt: 1, borderTop: (t) => `1px dashed ${t.palette.divider}` }}>
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
-                          Thank You,<br />
-                          <strong>{settings.orgName || "Unit 1A"}</strong>
-                        </Typography>
-                      </Box>
+                        );
+                      })()}
                     </Box>
                   </Card>
                 </Grid>
@@ -2158,18 +2437,32 @@ export default function SettingsPage() {
                         {/* Status Badge */}
                         <Chip
                           label={
-                            isCurrentConfigured
+                            !selectedQrEventType
+                              ? "Select Event Type"
+                              : isCurrentConfigured
                               ? `${selectedQrEventType}: Configured`
-                              : `${selectedQrEventType || "Event"}: Not Configured`
+                              : `${selectedQrEventType}: Not Configured`
                           }
                           size="small"
                           sx={{
                             fontWeight: 700,
                             fontSize: "0.72rem",
                             height: 24,
-                            bgcolor: isCurrentConfigured ? "rgba(22, 163, 74, 0.12)" : "rgba(239, 68, 68, 0.12)",
-                            color: isCurrentConfigured ? "#16a34a" : "#dc2626",
-                            border: isCurrentConfigured ? "1px solid rgba(22, 163, 74, 0.25)" : "1px solid rgba(239, 68, 68, 0.25)",
+                            bgcolor: !selectedQrEventType
+                              ? "rgba(100, 116, 139, 0.12)"
+                              : isCurrentConfigured
+                              ? "rgba(22, 163, 74, 0.12)"
+                              : "rgba(239, 68, 68, 0.12)",
+                            color: !selectedQrEventType
+                              ? "#64748b"
+                              : isCurrentConfigured
+                              ? "#16a34a"
+                              : "#dc2626",
+                            border: !selectedQrEventType
+                              ? "1px solid rgba(100, 116, 139, 0.25)"
+                              : isCurrentConfigured
+                              ? "1px solid rgba(22, 163, 74, 0.25)"
+                              : "1px solid rgba(239, 68, 68, 0.25)",
                           }}
                         />
                       </Box>
@@ -2509,7 +2802,7 @@ export default function SettingsPage() {
                         </Box>
                       </Box>
                       <Chip
-                        label={selectedQrEventType}
+                        label={selectedQrEventType || "Select Event"}
                         size="small"
                         color="primary"
                         variant="outlined"
@@ -2524,7 +2817,7 @@ export default function SettingsPage() {
                       {!isUploadedMode && (
                         <Box sx={{ width: "100%" }}>
                           <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em", display: "block" }}>
-                            RECEIVER NAME ({selectedQrEventType.toUpperCase()})
+                            RECEIVER NAME{selectedQrEventType ? ` (${selectedQrEventType.toUpperCase()})` : ""}
                           </Typography>
                           <Typography variant="subtitle1" fontWeight={800} sx={{ mt: 0.2, color: "text.primary" }}>
                             {currentQrConfig.receiverName || (
@@ -2540,10 +2833,10 @@ export default function SettingsPage() {
                       {isUploadedMode && (
                         <Box sx={{ width: "100%" }}>
                           <Typography variant="caption" fontWeight={750} sx={{ color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem", letterSpacing: "0.05em", display: "block" }}>
-                            UPLOADED CUSTOM QR ({selectedQrEventType.toUpperCase()})
+                            UPLOADED CUSTOM QR{selectedQrEventType ? ` (${selectedQrEventType.toUpperCase()})` : ""}
                           </Typography>
                           <Typography variant="subtitle1" fontWeight={800} sx={{ mt: 0.2, color: "text.primary" }}>
-                            {currentQrConfig.accountLabel || selectedQrEventType}
+                            {currentQrConfig.accountLabel || selectedQrEventType || "--"}
                           </Typography>
                         </Box>
                       )}
@@ -2716,6 +3009,18 @@ export default function SettingsPage() {
       <EmailReminderLogsDialog
         open={logsDialogOpen}
         onClose={() => setLogsDialogOpen(false)}
+      />
+
+      {/* Delete Payment QR Confirmation Dialog */}
+      <AppConfirmDialog
+        open={Boolean(deleteQrEventType)}
+        onClose={() => setDeleteQrEventType(null)}
+        onConfirm={handleConfirmDeleteQr}
+        title="Confirm"
+        content={`Are you sure you want to delete `}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmColor="error"
       />
     </div>
   );
