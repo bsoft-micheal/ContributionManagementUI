@@ -36,6 +36,11 @@ import AppTextArea from "../../components/common/AppTextArea";
 
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
+import {
+  roundToWhole,
+  formatWholeCurrency,
+  formatWholeNumber,
+} from "../../utils/roundingHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
@@ -262,7 +267,7 @@ export default function ContributionsPage() {
     const base = Number(activeEv.baseAmount || activeEv.totalExpectedAmount || 0);
     const count = Number(activeEv.participantCount || (activeEv.participants && activeEv.participants.length) || 0);
     if (count > 0 && base > 0) {
-      return Number((base / count).toFixed(2));
+      return roundToWhole(base / count);
     }
     return base > 0 ? base : 0;
   };
@@ -1652,7 +1657,7 @@ export default function ContributionsPage() {
                 display: "inline-block",
               }}
             >
-              ₹{Number(paidAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatWholeCurrency(paidAmount)}
             </Typography>
           </Tooltip>
         );
@@ -1673,7 +1678,7 @@ export default function ContributionsPage() {
             fontWeight={700}
             color="inherit"
           >
-            ₹{Number(displayAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatWholeCurrency(displayAmount)}
           </Typography>
         );
       },
@@ -1694,15 +1699,15 @@ export default function ContributionsPage() {
             {arrearsList.map((item, idx) => (
               <Box key={idx} sx={{ display: "flex", justifyContent: "space-between", gap: 1.5, fontSize: "0.72rem", py: 0.2 }}>
                 <span style={{ color: "#e2e8f0" }}>• {item.eventName || "Event"}</span>
-                <span style={{ fontWeight: 800, color: "#fff" }}>₹{Number(item.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span style={{ fontWeight: 800, color: "#fff" }}>{formatWholeCurrency(item.amount || 0)}</span>
               </Box>
             ))}
             <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.2)", mt: 0.5, pt: 0.3, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "0.75rem", color: "#fca5a5" }}>
               <span>Total Arrears:</span>
-              <span>₹{Number(displayArrears).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>{formatWholeCurrency(displayArrears)}</span>
             </Box>
           </Box>
-        ) : (displayArrears > 0 ? `Total Arrears: ₹${Number(displayArrears).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "No previous arrears");
+        ) : (displayArrears > 0 ? `Total Arrears: ${formatWholeCurrency(displayArrears)}` : "No previous arrears");
 
         return (
           <Tooltip title={tooltipContent} arrow enterDelay={150}>
@@ -1716,7 +1721,7 @@ export default function ContributionsPage() {
                 display: "inline-block",
               }}
             >
-              ₹{Number(displayArrears).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatWholeCurrency(displayArrears)}
             </Typography>
           </Tooltip>
         );
@@ -1732,7 +1737,7 @@ export default function ContributionsPage() {
         const currentDue = isPaid ? 0 : getContributionOutstanding(row, activeEv);
         const prevArrears = row.previousUnpaid || 0;
         const due = currentDue + prevArrears;
-        return `₹${Number(due).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return formatWholeCurrency(due);
       }
     },
     {
@@ -1760,8 +1765,8 @@ export default function ContributionsPage() {
         if (isSplit) {
           const cashAmount = row.cashAmount || matchedTx?.cashAmount;
           const upiAmount = row.upiAmount || matchedTx?.upiAmount;
-          const cashInfo = cashAmount ? `₹${Number(cashAmount).toLocaleString()} Cash` : "";
-          const upiInfo = upiAmount ? `₹${Number(upiAmount).toLocaleString()} UPI` : "";
+          const cashInfo = cashAmount ? `${formatWholeCurrency(cashAmount)} Cash` : "";
+          const upiInfo = upiAmount ? `${formatWholeCurrency(upiAmount)} UPI` : "";
           const splitLabel = cashInfo && upiInfo ? `Split (${cashInfo} + ${upiInfo})` : "Split";
           const tooltipText = cashInfo && upiInfo ? `Split Payment: ${cashInfo} and ${upiInfo}` : "Split Payment (Partial Cash + Partial UPI)";
 
@@ -1947,19 +1952,19 @@ export default function ContributionsPage() {
                 <Grid size={{ xs: 4 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem", display: "block" }}>Current Event</Typography>
                   <Typography variant="body2" fontWeight={800} color={payment.currentEventDue > 0 ? "error.main" : "success.main"}>
-                    ₹{(payment.currentEventDue || 0).toLocaleString()}
+                    {formatWholeCurrency(payment.currentEventDue || 0)}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 4 }} sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem", display: "block" }}>Previous Arrears</Typography>
                   <Typography variant="body2" fontWeight={800} color={payment.previousArrears > 0 ? "error.main" : "text.secondary"}>
-                    ₹{(payment.previousArrears || 0).toLocaleString()}
+                    {formatWholeCurrency(payment.previousArrears || 0)}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 4 }} sx={{ borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem", display: "block" }}>Total Due</Typography>
                   <Typography variant="body2" fontWeight={900} color="primary.main">
-                    ₹{(payment.totalDue || 0).toLocaleString()}
+                    {formatWholeCurrency(payment.totalDue || 0)}
                   </Typography>
                 </Grid>
               </Grid>
@@ -1974,9 +1979,9 @@ export default function ContributionsPage() {
               value={payment.paymentScope || "CurrentEvent"}
               onChange={(e) => handlePaymentScopeChange(e.target.value)}
               options={[
-                ...(payment.currentEventDue > 0 ? [{ label: `Current Event Only (₹${payment.currentEventDue.toLocaleString()})`, value: "CurrentEvent" }] : []),
-                ...(payment.previousArrears > 0 ? [{ label: `Previous Arrears Only (₹${payment.previousArrears.toLocaleString()})`, value: "PreviousArrears" }] : []),
-                ...((payment.currentEventDue > 0 && payment.previousArrears > 0) ? [{ label: `All Outstanding (₹${payment.totalDue.toLocaleString()})`, value: "AllOutstanding" }] : []),
+                ...(payment.currentEventDue > 0 ? [{ label: `Current Event Only (${formatWholeCurrency(payment.currentEventDue)})`, value: "CurrentEvent" }] : []),
+                ...(payment.previousArrears > 0 ? [{ label: `Previous Arrears Only (${formatWholeCurrency(payment.previousArrears)})`, value: "PreviousArrears" }] : []),
+                ...((payment.currentEventDue > 0 && payment.previousArrears > 0) ? [{ label: `All Outstanding (${formatWholeCurrency(payment.totalDue)})`, value: "AllOutstanding" }] : []),
               ]}
               required
             />
@@ -2079,7 +2084,7 @@ export default function ContributionsPage() {
                       }}
                     >
                       <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 800, fontSize: "0.75rem" }}>
-                        ✓ Balanced: ₹{c.toLocaleString()} (Cash) + ₹{u.toLocaleString()} (UPI) = ₹{tot.toLocaleString()}
+                        ✓ Balanced: {formatWholeCurrency(c)} (Cash) + {formatWholeCurrency(u)} (UPI) = {formatWholeCurrency(tot)}
                       </Typography>
                     </Box>
                   );
@@ -2097,10 +2102,10 @@ export default function ContributionsPage() {
                       }}
                     >
                       <Typography variant="caption" sx={{ color: "#dc2626", fontWeight: 800, fontSize: "0.72rem", display: "block" }}>
-                        ⚠️ Split total is ₹{sum.toLocaleString()} (Diff: {diff > 0 ? `₹${diff.toLocaleString()} remaining` : `₹${Math.abs(diff).toLocaleString()} over`}).
+                        ⚠️ Split total is {formatWholeCurrency(sum)} (Diff: {diff > 0 ? `${formatWholeCurrency(diff)} remaining` : `${formatWholeCurrency(Math.abs(diff))} over`}).
                       </Typography>
                       <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem" }}>
-                        The sum of Cash + UPI must equal the Total Amount (₹{tot.toLocaleString()}).
+                        The sum of Cash + UPI must equal the Total Amount ({formatWholeCurrency(tot)}).
                       </Typography>
                     </Box>
                   );
@@ -2158,10 +2163,10 @@ export default function ContributionsPage() {
               >
                 <Typography variant="caption" fontWeight={800} sx={{ color: isUploaded ? "#16a34a" : "#0284c7", display: "block", mb: 0.8 }}>
                   {isUploaded
-                    ? `Uploaded Custom QR (₹${targetAmount.toLocaleString("en-IN")})`
+                    ? `Uploaded Custom QR (${formatWholeCurrency(targetAmount)})`
                     : isSplitMode
-                    ? `Dynamic UPI QR (Split UPI Portion: ₹${targetAmount.toLocaleString("en-IN")})`
-                    : `Dynamic UPI Payment QR (₹${targetAmount.toLocaleString("en-IN")})`}
+                    ? `Dynamic UPI QR (Split UPI Portion: ${formatWholeCurrency(targetAmount)})`
+                    : `Dynamic UPI Payment QR (${formatWholeCurrency(targetAmount)})`}
                 </Typography>
                 <Box
                   component="img"
@@ -2192,8 +2197,8 @@ export default function ContributionsPage() {
                 )}
                 <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", mt: 0.4, display: "block" }}>
                   {isSplitMode
-                    ? `Scan with any UPI app to pay ₹${targetAmount.toLocaleString("en-IN")} online. Collect ₹${Number(payment.cashAmount || 0).toLocaleString("en-IN")} in cash.`
-                    : `Scan with any UPI app to pay ₹${targetAmount.toLocaleString("en-IN")} directly.`}
+                    ? `Scan with any UPI app to pay ${formatWholeCurrency(targetAmount)} online. Collect ${formatWholeCurrency(Number(payment.cashAmount || 0))} in cash.`
+                    : `Scan with any UPI app to pay ${formatWholeCurrency(targetAmount)} directly.`}
                 </Typography>
               </Box>
             );
@@ -2370,9 +2375,9 @@ export default function ContributionsPage() {
 
                 const eventBreakdownItems = [];
                 if (currentEvAmt > 0) {
-                  eventBreakdownItems.push(`${primaryEvName}: ₹${currentEvAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                  eventBreakdownItems.push(`${primaryEvName}: ${formatWholeCurrency(currentEvAmt)}`);
                 } else {
-                  eventBreakdownItems.push(`${primaryEvName}: ₹${actualReceivedAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                  eventBreakdownItems.push(`${primaryEvName}: ${formatWholeCurrency(actualReceivedAmt)}`);
                 }
 
                 const prevArrears = Number(statusModalRow?.previousArrears || matchedTx?.previousArrears || (actualReceivedAmt > currentEvAmt && currentEvAmt > 0 ? actualReceivedAmt - currentEvAmt : 0));
@@ -2383,11 +2388,11 @@ export default function ContributionsPage() {
                     const name = item.eventName || item.title || item.eventCategory || "Previous Event";
                     const amt = Number(item.dueAmount || item.amount || item.due || 0);
                     if (amt > 0) {
-                      eventBreakdownItems.push(`${name}: ₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                      eventBreakdownItems.push(`${name}: ${formatWholeCurrency(amt)}`);
                     }
                   });
                 } else if (prevArrears > 0 && actualReceivedAmt > currentEvAmt) {
-                  eventBreakdownItems.push(`Previous Arrears: ₹${prevArrears.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                  eventBreakdownItems.push(`Previous Arrears: ${formatWholeCurrency(prevArrears)}`);
                 }
 
                 return (
@@ -2442,12 +2447,12 @@ export default function ContributionsPage() {
                                   Event Payment Breakdown:
                                 </Typography>
                                 {eventBreakdownItems.map((itemStr, idx) => (
-                                  <Typography key={idx} variant="caption" sx={{ display: "block", fontSize: "0.72rem", py: 0.1 }}>
+                                   <Typography key={idx} variant="caption" sx={{ display: "block", fontSize: "0.72rem", py: 0.1 }}>
                                     • {itemStr}
                                   </Typography>
                                 ))}
                                 <Typography variant="caption" fontWeight={800} sx={{ display: "block", mt: 0.5, pt: 0.5, borderTop: "1px solid rgba(255,255,255,0.2)" }}>
-                                  {isPaidOrVerified ? "Total Received" : "Received"}: ₹{actualReceivedAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {isPaidOrVerified ? "Total Received" : "Received"}: {formatWholeCurrency(actualReceivedAmt)}
                                 </Typography>
                               </Box>
                             )
@@ -2467,13 +2472,13 @@ export default function ContributionsPage() {
                               textUnderlineOffset: "3px",
                             }}
                           >
-                            ₹{actualReceivedAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {formatWholeCurrency(actualReceivedAmt)}
                             <InfoIcon sx={{ fontSize: 13, opacity: 0.7 }} />
                           </Typography>
                         </Tooltip>
                         {!isPaidOrVerified && !hasSubmittedProof && totalDueAmt > 0 && (
                           <Typography variant="caption" color="warning.main" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 700, mt: 0.2 }}>
-                            (Due: ₹{totalDueAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                            (Due: {formatWholeCurrency(totalDueAmt)})
                           </Typography>
                         )}
                         {!isPaidOrVerified && hasSubmittedProof && (
@@ -2508,7 +2513,7 @@ export default function ContributionsPage() {
                         />
                         {(cashAmt > 0 || upiAmt > 0) && (
                           <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", mt: 0.4 }}>
-                            Cash: ₹{Number(cashAmt || 0).toLocaleString()} | UPI: ₹{Number(upiAmt || 0).toLocaleString()}
+                            Cash: {formatWholeCurrency(cashAmt || 0)} | UPI: {formatWholeCurrency(upiAmt || 0)}
                           </Typography>
                         )}
                       </Grid>

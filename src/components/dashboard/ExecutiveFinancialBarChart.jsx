@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import BarChartRoundedIcon from "@mui/icons-material/BarChartRounded";
 import dayjs from "dayjs";
+import { formatWholeNumber } from "../../utils/roundingHelper";
 
 /**
  * ExecutiveFinancialBarChart
@@ -23,10 +24,7 @@ export default function ExecutiveFinancialBarChart({
   const isDark = theme.palette.mode === "dark";
   const [hoveredEventId, setHoveredEventId] = useState(null);
 
-  const formatAmount = (val) =>
-    Number(val || 0).toLocaleString(undefined, {
-      maximumFractionDigits: Number(val || 0) % 1 === 0 ? 0 : 2,
-    });
+  const formatAmount = (val) => formatWholeNumber(val);
 
   return (
     <Box>

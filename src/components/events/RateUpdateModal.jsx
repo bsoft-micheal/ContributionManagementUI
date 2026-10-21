@@ -17,6 +17,7 @@ import AppTextArea from "../common/AppTextArea";
 import AppDateInput from "../common/AppDateInput";
 import { useAppToast } from "../common/AppToast";
 import { updateBudgetCalculationRateAsync } from "../../services/budgetCalculationService";
+import { formatWholeCurrency, formatWholeNumber } from "../../utils/roundingHelper";
 
 const formatRateAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -24,7 +25,7 @@ const formatRateAmount = (value) => {
   if (!cleanVal) return "";
   const num = Number(cleanVal);
   if (isNaN(num)) return "";
-  return num.toLocaleString("en-US");
+  return formatWholeNumber(num);
 };
 
 export default function RateUpdateModal({
@@ -235,7 +236,7 @@ export default function RateUpdateModal({
                 }}
               >
                 <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.text.secondary }}>
-                  ₹ {currentRateNum.toLocaleString("en-IN")}
+                  {formatWholeCurrency(currentRateNum)}
                 </Typography>
               </Box>
             </Box>
@@ -296,7 +297,7 @@ export default function RateUpdateModal({
                 fontSize: "0.78rem",
               }}
             >
-              {isIncrease ? "Increase" : "Decrease"} of ₹{Math.abs(diffAmount).toLocaleString("en-IN")}
+              {isIncrease ? "Increase" : "Decrease"} of {formatWholeCurrency(Math.abs(diffAmount))}
               {diffPercentage !== null ? ` (${isIncrease ? "+" : ""}${diffPercentage}%)` : ""}
             </Typography>
           </Box>

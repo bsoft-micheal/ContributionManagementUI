@@ -22,6 +22,7 @@ import AppSelect from "../common/AppSelect";
 import AppDateInput from "../common/AppDateInput";
 import AppTextArea from "../common/AppTextArea";
 import AppButton from "../common/AppButton";
+import { roundToWhole, formatWholeCurrency } from "../../utils/roundingHelper";
 import { useAppToast } from "../common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { createExpenseAsync, getExpensesAsync } from "../../services/expenseService";
@@ -175,22 +176,22 @@ export default function EventAddExpenseDialog({
   // Compute budget details for the selected event
   const eventBudget = useMemo(() => {
     if (!event) return null;
-    const expected = Number(
+    const expected = roundToWhole(Number(
       event.totalExpectedAmount ??
       event.expectedAmount ??
       event.expectedCollection ??
       event.baseAmount ??
       event.valuation ??
       0
-    );
+    ));
 
     const targetEventName = (event.eventName || event.name || "").trim().toLowerCase();
-    const spent = existingExpenses
+    const spent = roundToWhole(existingExpenses
       .filter((ex) => {
         const exEvent = (ex.eventName || "").trim().toLowerCase();
         return exEvent === targetEventName && (ex.status || "").toLowerCase() !== "rejected";
       })
-      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
 
     const remaining = Math.max(0, expected - spent);
     const extraSpent = Math.max(0, spent - expected);
@@ -330,7 +331,7 @@ export default function EventAddExpenseDialog({
 
       await createExpenseAsync(payload);
       if (isOverBudget) {
-        toast.success(`Expense added. Note: Exceeds expected budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`);
+        toast.success(`Expense added. Note: Exceeds expected budget by ${formatWholeCurrency(projectedExtraSpent)}`);
       } else {
         toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || "Expense added successfully!");
       }
@@ -357,7 +358,7 @@ export default function EventAddExpenseDialog({
         <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ width: "100%" }}>
           {isOverBudget && (
             <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 700, fontSize: "0.75rem" }}>
-              ⚠ Expense exceeds budget by ₹{projectedExtraSpent.toLocaleString("en-IN")}
+              ⚠ Expense exceeds budget by {formatWholeCurrency(projectedExtraSpent)}
             </Typography>
           )}
           <AppButton
@@ -434,7 +435,7 @@ export default function EventAddExpenseDialog({
                       Expected Budget
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
-                      ₹{eventBudget.expected.toLocaleString("en-IN")}
+                      {formatWholeCurrency(eventBudget.expected)}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
@@ -442,7 +443,7 @@ export default function EventAddExpenseDialog({
                       Total Spent
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: "info.main" }}>
-                      ₹{eventBudget.spent.toLocaleString("en-IN")}
+                      {formatWholeCurrency(eventBudget.spent)}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
@@ -450,7 +451,7 @@ export default function EventAddExpenseDialog({
                       Remaining Budget
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: eventBudget.remaining > 0 ? "success.main" : "text.secondary" }}>
-                      ₹{eventBudget.remaining.toLocaleString("en-IN")}
+                      {formatWholeCurrency(eventBudget.remaining)}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
@@ -458,7 +459,7 @@ export default function EventAddExpenseDialog({
                       Extra Amount Spent
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: eventBudget.extraSpent > 0 ? "error.main" : "text.secondary" }}>
-                      ₹{eventBudget.extraSpent.toLocaleString("en-IN")}
+                      {formatWholeCurrency(eventBudget.extraSpent)}
                     </Typography>
                   </Grid>
                 </Grid>
@@ -478,7 +479,7 @@ export default function EventAddExpenseDialog({
                     }}
                   >
                     <Typography variant="caption" sx={{ color: (t) => t.palette.mode === "dark" ? "#fcd34d" : "#b45309", fontWeight: 700, fontSize: "0.75rem" }}>
-                      ⚠️ Warning: This expense will exceed the expected budget by ₹{projectedExtraSpent.toLocaleString("en-IN")}. Total spending will be ₹{projectedTotalSpent.toLocaleString("en-IN")}.
+                      ⚠️ Warning: This expense will exceed the expected budget by {formatWholeCurrency(projectedExtraSpent)}. Total spending will be {formatWholeCurrency(projectedTotalSpent)}.
                     </Typography>
                   </Box>
                 ) : eventBudget.extraSpent > 0 ? (
@@ -495,7 +496,7 @@ export default function EventAddExpenseDialog({
                     }}
                   >
                     <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, fontSize: "0.75rem" }}>
-                      ⚠️ Notice: This event has already exceeded its expected budget by ₹{eventBudget.extraSpent.toLocaleString("en-IN")}.
+                      ⚠️ Notice: This event has already exceeded its expected budget by {formatWholeCurrency(eventBudget.extraSpent)}.
                     </Typography>
                   </Box>
                 ) : null}
@@ -524,9 +525,9 @@ export default function EventAddExpenseDialog({
               helperText={
                 errors.amount ||
                 (isOverBudget
-                  ? `⚠️ Warning: Exceeds budget by ₹${projectedExtraSpent.toLocaleString("en-IN")}`
+                  ? `⚠️ Warning: Exceeds budget by ${formatWholeCurrency(projectedExtraSpent)}`
                   : eventBudget && eventBudget.expected > 0
-                  ? `Remaining Budget: ₹${Math.max(0, eventBudget.expected - projectedTotalSpent).toLocaleString("en-IN")}`
+                  ? `Remaining Budget: ${formatWholeCurrency(Math.max(0, eventBudget.expected - projectedTotalSpent))}`
                   : undefined)
               }
               required

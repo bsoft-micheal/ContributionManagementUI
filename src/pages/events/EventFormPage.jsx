@@ -73,6 +73,12 @@ import AppButton from "../../components/common/AppButton";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import {
+  roundToWhole,
+  formatWholeCurrency,
+  formatWholeNumber,
+  distributeRoundedTotal,
+} from "../../utils/roundingHelper";
+import {
   createEventAsync,
   updateEventAsync,
   getEventByIdAsync,
@@ -1089,39 +1095,39 @@ export default function EventFormPage({
 
         if (name.includes("cake")) {
           const cakeCount = officeCakeAndSnacksCount;
-          calcText = cakeCount > 0 ? `${cakeCount} × ₹${rate.toLocaleString("en-IN")}` : "₹0";
+          calcText = cakeCount > 0 ? `${cakeCount} × ₹${formatWholeNumber(rate)}` : "₹0";
           calcFormula = cakeCount > 0
             ? (office > cakeCount
-                ? `${cakeCount} Cake${cakeCount > 1 ? "s" : ""} (${office} Celebrants on same date) × ₹${rate.toLocaleString("en-IN")}`
-                : `Office Celebrations (${cakeCount}) × ₹${rate.toLocaleString("en-IN")}`)
+                ? `${cakeCount} Cake${cakeCount > 1 ? "s" : ""} (${office} Celebrants on same date) × ₹${formatWholeNumber(rate)}`
+                : `Office Celebrations (${cakeCount}) × ₹${formatWholeNumber(rate)}`)
             : "No office celebrants";
           autoAmount = cakeCount * rate;
-          formulaPart = `Cake (${cakeCount} × ₹${rate.toLocaleString("en-IN")})`;
+          formulaPart = `Cake (${cakeCount} × ₹${formatWholeNumber(rate)})`;
         } else if (
           name.includes("gift") ||
           name.includes("present") ||
           name.includes("voucher") ||
           name.includes("memento")
         ) {
-          calcText = `${bdays} × ₹${rate.toLocaleString("en-IN")}`;
-          calcFormula = `Total Celebrants (${bdays}) × ₹${rate.toLocaleString("en-IN")}`;
+          calcText = `${bdays} × ₹${formatWholeNumber(rate)}`;
+          calcFormula = `Total Celebrants (${bdays}) × ₹${formatWholeNumber(rate)}`;
           autoAmount = bdays * rate;
-          formulaPart = `Gift (${bdays} Celebrants × ₹${rate.toLocaleString("en-IN")})`;
+          formulaPart = `Gift (${bdays} Celebrants × ₹${formatWholeNumber(rate)})`;
         } else {
           if (puffsFactor > 0) {
-            calcText = `${total} × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`;
+            calcText = `${total} × ₹${formatWholeNumber(rate)}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""}`;
             calcFormula = puffsFactor > 1
-              ? `Active Members (${total}) × ₹${rate.toLocaleString("en-IN")} × ${puffsFactor} Celebrations`
+              ? `Active Members (${total}) × ₹${formatWholeNumber(rate)} × ${puffsFactor} Celebrations`
               : (office > 1 && puffsFactor === 1
-                  ? `Active Members (${total}) × ₹${rate.toLocaleString("en-IN")} (${office} Celebrants on same date)`
-                  : `Active Members (${total}) × ₹${rate.toLocaleString("en-IN")}`);
+                  ? `Active Members (${total}) × ₹${formatWholeNumber(rate)} (${office} Celebrants on same date)`
+                  : `Active Members (${total}) × ₹${formatWholeNumber(rate)}`);
             autoAmount = total * rate * puffsFactor;
           } else {
             calcText = "WFH only → Not provided";
             calcFormula = "WFH only → Not provided";
             autoAmount = 0;
           }
-          formulaPart = `${item.expenseItem} (Total Active Members × ₹${rate.toLocaleString("en-IN")}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""})`;
+          formulaPart = `${item.expenseItem} (Total Active Members × ₹${formatWholeNumber(rate)}${puffsFactor > 1 ? ` × ${puffsFactor}` : ""})`;
         }
 
         const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
@@ -1137,7 +1143,7 @@ export default function EventFormPage({
           isManual,
           calcText,
           calcFormula,
-          formulaPart: isManual ? `${item.expenseItem} (Manual: ₹${amount.toLocaleString("en-IN")})` : formulaPart,
+          formulaPart: isManual ? `${item.expenseItem} (Manual: ₹${formatWholeNumber(amount)})` : formulaPart,
         });
       });
     }
@@ -1174,13 +1180,13 @@ export default function EventFormPage({
           const autoAmount = isGift ? rate * celebrantMultiplier : rate;
           const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
           const amount = isManual ? (Number(customItemAmounts[itemKey]) || 0) : autoAmount;
-          const formattedAmount = amount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-          const splitPerPerson = total > 0 ? (amount / total) : 0;
+          const formattedAmount = formatWholeNumber(amount);
+          const splitPerPerson = total > 0 ? roundToWhole(amount / total) : 0;
           let calcFormula = total > 0
             ? `₹${formattedAmount} ÷ ${total} Members`
             : `₹${formattedAmount}`;
           if (isGift && celebrantMultiplier > 1) {
-            calcFormula = `${celebrantMultiplier} Celebrants × ₹${rate.toLocaleString("en-IN")} = ₹${formattedAmount}${total > 0 ? ` (₹${splitPerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/member)` : ""}`;
+            calcFormula = `${celebrantMultiplier} Celebrants × ₹${formatWholeNumber(rate)} = ₹${formattedAmount}${total > 0 ? ` (₹${formatWholeNumber(splitPerPerson)}/member)` : ""}`;
           }
           const calcText = total > 0
             ? `₹${formattedAmount} ÷ ${total}`
@@ -1199,7 +1205,7 @@ export default function EventFormPage({
             formulaPart: isManual
               ? `${item.expenseItem} (Manual: ₹${formattedAmount})`
               : (isGift && celebrantMultiplier > 1
-                  ? `${item.expenseItem} (${celebrantMultiplier} Celebrants × ₹${rate.toLocaleString("en-IN")})`
+                  ? `${item.expenseItem} (${celebrantMultiplier} Celebrants × ₹${formatWholeNumber(rate)})`
                   : `${item.expenseItem} (₹${formattedAmount})`),
             isOtherEvent: true,
             splitPerPerson,
@@ -1218,10 +1224,10 @@ export default function EventFormPage({
         const isManual = customItemAmounts[itemKey] !== undefined && customItemAmounts[itemKey] !== "";
         const enteredAmount = isManual ? (Number(customItemAmounts[itemKey]) || 0) : numVal;
         const amount = enteredAmount;
-        const splitPerPerson = total > 0 ? (amount / total) : 0;
+        const splitPerPerson = total > 0 ? roundToWhole(amount / total) : 0;
 
-        const formattedTotal = amount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-        const formattedSplit = splitPerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        const formattedTotal = formatWholeNumber(amount);
+        const formattedSplit = formatWholeNumber(splitPerPerson);
 
         const calcText = amount > 0
           ? (total > 0 ? `₹${formattedTotal} ÷ ${total}` : `₹${formattedTotal}`)
@@ -1274,9 +1280,9 @@ export default function EventFormPage({
         amount,
         isManual: true,
         isCustom: true,
-        calcText: `Custom Expense: ₹${amount.toLocaleString("en-IN")}`,
+        calcText: `Custom Expense: ₹${formatWholeNumber(amount)}`,
         calcFormula: "Custom Expense",
-        formulaPart: `${extra.name} (₹${amount.toLocaleString("en-IN")})`,
+        formulaPart: `${extra.name} (₹${formatWholeNumber(amount)})`,
         isOtherEvent: true,
       });
     });
@@ -1320,15 +1326,15 @@ export default function EventFormPage({
   const birthdaySharePerPerson = birthdayEligibleCount > 0 ? (bdayBudget / birthdayEligibleCount) : 0;
   const otherEventsSharePerPerson = total > 0 ? (otherEventsBudget / total) : 0;
 
-  const plannedBudget = computedBudgetItems.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+  const plannedBudget = roundToWhole(computedBudgetItems.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0));
 
   const effectiveDeduction = useMemo(() => {
     if (!useAvailableBalance) return 0;
     if (selectedDeductionType === "custom") {
       const customVal = parseFloat(customDeductionAmount);
-      return isNaN(customVal) || customVal < 0 ? 0 : customVal;
+      return isNaN(customVal) || customVal < 0 ? 0 : roundToWhole(customVal);
     }
-    return availableAmountInHand;
+    return roundToWhole(availableAmountInHand);
   }, [useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand]);
 
   const remainingBudgetToCollect = useMemo(() => {
@@ -1341,9 +1347,9 @@ export default function EventFormPage({
       const scaleFactor = plannedBudget > 0 ? remainingBudgetToCollect / plannedBudget : 0;
       const bdayPart = birthdaySharePerPerson * scaleFactor;
       const otherPart = otherEventsSharePerPerson * scaleFactor;
-      return Math.round((bdayPart + otherPart) * 100) / 100;
+      return roundToWhole(bdayPart + otherPart);
     }
-    return total > 0 ? Math.round((remainingBudgetToCollect / total) * 100) / 100 : 0;
+    return total > 0 ? roundToWhole(remainingBudgetToCollect / total) : 0;
   }, [
     isBirthday,
     exempt,
@@ -1365,17 +1371,17 @@ export default function EventFormPage({
         return "Please enter a valid deduction amount greater than ₹0.";
       }
       if (customNum > availableAmountInHand) {
-        return `Deduction amount (₹${customNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) exceeds available Amount In Hand (₹${availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`;
+        return `Deduction amount (${formatWholeCurrency(customNum)}) exceeds available Amount In Hand (${formatWholeCurrency(availableAmountInHand)}).`;
       }
       if (customNum > plannedBudget) {
-        return `Deduction amount (₹${customNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) cannot exceed the planned budget (₹${plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`;
+        return `Deduction amount (${formatWholeCurrency(customNum)}) cannot exceed the planned budget (${formatWholeCurrency(plannedBudget)}).`;
       }
     } else {
       if (availableAmountInHand <= 0) {
         return "No available Amount In Hand to deduct.";
       }
       if (availableAmountInHand > plannedBudget) {
-        return `Available balance (₹${availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) exceeds the planned budget (₹${plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}). Please select Custom Amount to deduct up to ₹${plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+        return `Available balance (${formatWholeCurrency(availableAmountInHand)}) exceeds the planned budget (${formatWholeCurrency(plannedBudget)}). Please select Custom Amount to deduct up to ${formatWholeCurrency(plannedBudget)}.`;
       }
     }
     return null;
@@ -1735,11 +1741,11 @@ export default function EventFormPage({
         return;
       }
       if (effectiveDeduction > plannedBudget) {
-        toast.error(`Deduction amount (₹${effectiveDeduction.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) cannot exceed the planned budget (₹${plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`);
+        toast.error(`Deduction amount (${formatWholeCurrency(effectiveDeduction)}) cannot exceed the planned budget (${formatWholeCurrency(plannedBudget)}).`);
         return;
       }
       if (effectiveDeduction > availableAmountInHand) {
-        toast.error(`Deduction amount (₹${effectiveDeduction.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) exceeds available Amount In Hand (₹${availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`);
+        toast.error(`Deduction amount (${formatWholeCurrency(effectiveDeduction)}) exceeds available Amount In Hand (${formatWholeCurrency(availableAmountInHand)}).`);
         return;
       }
     }
@@ -1772,20 +1778,17 @@ export default function EventFormPage({
 
       if (isBirthday && exempt && celebrantIds.length > 0) {
         const scaleFactor = plannedBudget > 0 ? remainingBudgetToCollect / plannedBudget : 0;
-        finalParticipantIds.forEach((mId) => {
-          if (celebrantIds.includes(mId)) {
-            // Celebrant is exempt from birthday portion, but pays for other events (e.g. Farewell, Dinner)
-            contributionOverrides.push({
-              memberId: mId,
-              amount: parseFloat((otherEventsSharePerPerson * scaleFactor).toFixed(2)),
-            });
-          } else {
-            // Non-celebrant pays birthday share + other events share
-            contributionOverrides.push({
-              memberId: mId,
-              amount: parseFloat(((birthdaySharePerPerson + otherEventsSharePerPerson) * scaleFactor).toFixed(2)),
-            });
-          }
+        const rawShares = finalParticipantIds.map((mId) =>
+          celebrantIds.includes(mId)
+            ? otherEventsSharePerPerson * scaleFactor
+            : (birthdaySharePerPerson + otherEventsSharePerPerson) * scaleFactor
+        );
+        const roundedShares = distributeRoundedTotal(remainingBudgetToCollect, rawShares);
+        finalParticipantIds.forEach((mId, idx) => {
+          contributionOverrides.push({
+            memberId: mId,
+            amount: roundedShares[idx],
+          });
         });
       } else {
         // For non-birthday events, let backend calculate tenure and standard shares dynamically
@@ -1800,12 +1803,8 @@ export default function EventFormPage({
 
       const defaultDesc = isBirthday
         ? `Birthday celebration (${office} Office, ${wfh} WFH)${celebrantsSummary ? ` for ${celebrantsSummary}` : ""
-        }${nonBirthdaySelectedTypes.length > 0 ? ` + ${nonBirthdaySelectedTypes.map(t => t.eventTypeName).join(" & ")}` : ""}. Planned Budget: ₹${plannedBudget.toLocaleString(
-          "en-IN"
-        )}, Contribution/member: ₹${contributionPerMember}`
-        : `${selectedTypeNames.join(" & ") || "Event"} celebration for ${total} members. Planned Budget: ₹${plannedBudget.toLocaleString(
-          "en-IN"
-        )}, Contribution/member: ₹${contributionPerMember}`;
+        }${nonBirthdaySelectedTypes.length > 0 ? ` + ${nonBirthdaySelectedTypes.map(t => t.eventTypeName).join(" & ")}` : ""}. Planned Budget: ₹${formatWholeNumber(plannedBudget)}, Contribution/member: ₹${formatWholeNumber(contributionPerMember)}`
+        : `${selectedTypeNames.join(" & ") || "Event"} celebration for ${total} members. Planned Budget: ₹${formatWholeNumber(plannedBudget)}, Contribution/member: ₹${formatWholeNumber(contributionPerMember)}`;
 
       const finalTypeIds = allowMultipleEvents && form.eventTypeIds?.length > 0
         ? form.eventTypeIds
@@ -2571,7 +2570,7 @@ export default function EventFormPage({
                         color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
                       }}
                     >
-                      ₹{plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      ₹{formatWholeNumber(plannedBudget)}
                     </Typography>
                   </Box>
 
@@ -2593,12 +2592,12 @@ export default function EventFormPage({
                       </Typography>
                       {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0 && (
                         <Typography sx={{ fontSize: "0.72rem", color: "#6366f1", fontWeight: 600 }}>
-                          Celebrants: ₹{otherEventsSharePerPerson.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          Celebrants: ₹{formatWholeNumber(otherEventsSharePerPerson)}
                         </Typography>
                       )}
                     </Box>
                     <Typography sx={{ fontSize: "0.98rem", fontWeight: 800, color: "#0284c7" }}>
-                      ₹{contributionPerMember.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      ₹{formatWholeNumber(contributionPerMember)}
                     </Typography>
                   </Box>
 
@@ -2622,7 +2621,7 @@ export default function EventFormPage({
                         color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
                       }}
                     >
-                      ₹{expectedCollection.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      ₹{formatWholeNumber(expectedCollection)}
                     </Typography>
                   </Box>
                 </Box>
@@ -2713,7 +2712,7 @@ export default function EventFormPage({
                           }}
                         >
                           <MenuItem value="available" sx={{ fontSize: "0.84rem", fontWeight: 600 }}>
-                            ₹{availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Available Amount In Hand)
+                            ₹{formatWholeNumber(availableAmountInHand)} (Available Amount In Hand)
                           </MenuItem>
                           <MenuItem value="custom" sx={{ fontSize: "0.84rem", fontWeight: 600 }}>
                             Custom Amount...
@@ -2745,7 +2744,7 @@ export default function EventFormPage({
                           endAdornment={
                             <InputAdornment position="end">
                               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
-                                Max: ₹{Math.min(availableAmountInHand, plannedBudget).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                Max: ₹{formatWholeNumber(Math.min(availableAmountInHand, plannedBudget))}
                               </Typography>
                             </InputAdornment>
                           }
@@ -2795,7 +2794,7 @@ export default function EventFormPage({
                               color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#0f172a"),
                             }}
                           >
-                            ₹{availableAmountInHand.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ₹{formatWholeNumber(availableAmountInHand)}
                           </Typography>
                         </Box>
 
@@ -2815,7 +2814,7 @@ export default function EventFormPage({
                               color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#0f172a"),
                             }}
                           >
-                            ₹{effectiveDeduction.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ₹{formatWholeNumber(effectiveDeduction)}
                           </Typography>
                         </Box>
 
@@ -2842,7 +2841,7 @@ export default function EventFormPage({
                               color: availableAmountInHand - effectiveDeduction >= 0 ? "#16a34a" : "#dc2626",
                             }}
                           >
-                            ₹{Math.max(0, availableAmountInHand - effectiveDeduction).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ₹{formatWholeNumber(Math.max(0, availableAmountInHand - effectiveDeduction))}
                           </Typography>
                         </Box>
                       </Box>
@@ -2864,7 +2863,7 @@ export default function EventFormPage({
                             Remaining to Collect:
                           </Typography>
                           <Typography sx={{ fontSize: "0.95rem", fontWeight: 800, color: "#0284c7" }}>
-                            ₹{remainingBudgetToCollect.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ₹{formatWholeNumber(remainingBudgetToCollect)}
                           </Typography>
                         </Box>
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2872,7 +2871,7 @@ export default function EventFormPage({
                             Split across {total} active members:
                           </Typography>
                           <Typography sx={{ fontSize: "0.85rem", fontWeight: 800, color: "#16a34a" }}>
-                            ₹{contributionPerMember.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / member
+                            ₹{formatWholeNumber(contributionPerMember)} / member
                           </Typography>
                         </Box>
                       </Box>
@@ -3248,7 +3247,7 @@ export default function EventFormPage({
                       color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
                     }}
                   >
-                    ₹{plannedBudget.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    ₹{formatWholeNumber(plannedBudget)}
                   </Typography>
                 </Box>
 

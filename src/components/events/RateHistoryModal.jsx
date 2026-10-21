@@ -32,6 +32,7 @@ import AppButton from "../common/AppButton";
 import { useAppToast } from "../common/AppToast";
 import { getBudgetCalculationHistoryAsync } from "../../services/budgetCalculationService";
 import { formatGridDate } from "../../utils/dateHelper";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 export default function RateHistoryModal({
   open,
@@ -177,7 +178,7 @@ export default function RateHistoryModal({
                   lineHeight: 1.1,
                 }}
               >
-                ₹{(item.rate ?? 0).toLocaleString("en-IN")}
+                {formatWholeCurrency(item.rate ?? 0)}
               </Typography>
             </Box>
 
@@ -279,7 +280,7 @@ export default function RateHistoryModal({
                             color: theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                           }}
                         >
-                          ₹{(row.newRate ?? 0).toLocaleString("en-IN")}
+                          {formatWholeCurrency(row.newRate ?? 0)}
                         </Typography>
                       </TableCell>
 
@@ -299,7 +300,7 @@ export default function RateHistoryModal({
                         ) : isIncrease ? (
                           <Chip
                             icon={<TrendingUpRoundedIcon sx={{ "&&": { color: "#16a34a", fontSize: "0.95rem" } }} />}
-                            label={`+₹${(row.changeAmount ?? 0).toLocaleString("en-IN")} (${row.changePercentage > 0 ? "+" : ""}${row.changePercentage}%)`}
+                            label={`+${formatWholeCurrency(row.changeAmount ?? 0)} (${row.changePercentage > 0 ? "+" : ""}${row.changePercentage}%)`}
                             size="small"
                             sx={{
                               fontSize: "0.7rem",
@@ -312,7 +313,7 @@ export default function RateHistoryModal({
                         ) : isDecrease ? (
                           <Chip
                             icon={<TrendingDownRoundedIcon sx={{ "&&": { color: "#dc2626", fontSize: "0.95rem" } }} />}
-                            label={`-₹${Math.abs(row.changeAmount ?? 0).toLocaleString("en-IN")} (${row.changePercentage}%)`}
+                            label={`-${formatWholeCurrency(Math.abs(row.changeAmount ?? 0))} (${row.changePercentage}%)`}
                             size="small"
                             sx={{
                               fontSize: "0.7rem",

@@ -26,6 +26,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
+import { formatWholeCurrency, roundToWhole } from "../../utils/roundingHelper";
 import { useAppToast } from "../../components/common/AppToast";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
@@ -431,19 +432,19 @@ export default function EventsPage() {
   const summaryTotals = useMemo(() => {
     const totalExpected = (displayedEvents || []).reduce((sum, e) => {
       const exp = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
-      return sum + Math.round(exp);
+      return sum + roundToWhole(exp);
     }, 0);
     const totalCollected = (displayedEvents || []).reduce((sum, e) => {
-      return sum + Math.round(Number(e.collectedAmount ?? e.totalPaidAmount ?? 0));
+      return sum + roundToWhole(Number(e.collectedAmount ?? e.totalPaidAmount ?? 0));
     }, 0);
     const totalPending = (displayedEvents || []).reduce((sum, e) => {
       const exp = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
       const col = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
       const pen = Number(e.pendingAmount !== undefined ? e.pendingAmount : (exp - col));
-      return sum + Math.round(pen);
+      return sum + roundToWhole(pen);
     }, 0);
     const totalExpenses = (displayedEvents || []).reduce((sum, e) => {
-      return sum + Math.round(Number(e.expenseAmount || 0));
+      return sum + roundToWhole(Number(e.expenseAmount || 0));
     }, 0);
     const totalBalance = totalCollected - totalExpenses;
 
@@ -660,7 +661,7 @@ export default function EventsPage() {
             {row.eventName || "--"}
           </Typography>
           {row.useAvailableBalance && (
-            <Tooltip title={`Funded from Amount In Hand: ₹${Number(row.allocatedAmount || row.baseAmount || 0).toLocaleString("en-IN")}`}>
+            <Tooltip title={`Funded from Amount In Hand: ${formatWholeCurrency(row.allocatedAmount || row.baseAmount || 0)}`}>
               <Chip
                 size="small"
                 label="Amount In Hand"
@@ -765,20 +766,20 @@ export default function EventsPage() {
       label: "Expected Amount",
       key: "totalExpectedAmount",
       align: "right",
-      exportValue: (row) => Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0)),
+      exportValue: (row) => roundToWhole(Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0))),
       render: (row) => {
         const val = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
-        return `₹${Math.round(val).toLocaleString("en-IN")}`;
+        return formatWholeCurrency(val);
       }
     },
     {
       label: "Collection Amount",
       key: "collectedAmount",
       align: "right",
-      exportValue: (row) => Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0),
+      exportValue: (row) => roundToWhole(Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0)),
       render: (row) => {
         const val = Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0);
-        return `₹${Math.round(val).toLocaleString("en-IN")}`;
+        return formatWholeCurrency(val);
       }
     },
     {
@@ -789,7 +790,7 @@ export default function EventsPage() {
         const exp = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
         const spent = Number(row.expenseAmount || 0);
         const extra = row.extraAmountSpent !== undefined ? Number(row.extraAmountSpent) : Math.max(0, spent - exp);
-        return extra;
+        return roundToWhole(extra);
       },
       render: (row) => {
         const exp = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
@@ -806,7 +807,7 @@ export default function EventsPage() {
               fontSize: "0.85rem",
             }}
           >
-            {extra > 0 ? `₹${Math.round(extra).toLocaleString("en-IN")}` : "₹0"}
+            {extra > 0 ? formatWholeCurrency(extra) : "₹0"}
           </Typography>
         );
       },
@@ -1029,27 +1030,27 @@ export default function EventsPage() {
             >
               <MetricCard
                 label="Expected Amount"
-                value={`₹${summaryTotals.totalExpected.toLocaleString("en-IN")}`}
+                value={formatWholeCurrency(summaryTotals.totalExpected)}
                 accent="#6366f1"
               />
               <MetricCard
                 label="Collection Amount"
-                value={`₹${summaryTotals.totalCollected.toLocaleString("en-IN")}`}
+                value={formatWholeCurrency(summaryTotals.totalCollected)}
                 accent="#10b981"
               />
               <MetricCard
                 label="Total Pending"
-                value={`₹${summaryTotals.totalPending.toLocaleString("en-IN")}`}
+                value={formatWholeCurrency(summaryTotals.totalPending)}
                 accent="#f43f5e"
               />
               <MetricCard
                 label="Total Expenses"
-                value={`₹${summaryTotals.totalExpenses.toLocaleString("en-IN")}`}
+                value={formatWholeCurrency(summaryTotals.totalExpenses)}
                 accent="#f59e0b"
               />
               <MetricCard
                 label="Amount In Hand"
-                value={`₹${summaryTotals.totalBalance.toLocaleString("en-IN")}`}
+                value={formatWholeCurrency(summaryTotals.totalBalance)}
                 accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}
               />
             </Box>

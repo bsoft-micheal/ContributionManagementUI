@@ -272,6 +272,9 @@ export default function EventAddPhotoDialog({
 
     if (!form.category) newErrors.category = "This field is required";
     if (!form.eventName) newErrors.eventName = "This field is required";
+    if (form.description && form.description.length > 500) {
+      newErrors.description = "Description cannot exceed 500 characters";
+    }
 
     if (maxAllowedForEvent === 0) {
       toast.error(
@@ -362,13 +365,7 @@ export default function EventAddPhotoDialog({
           <AppButton
             variant="contained"
             onClick={handleSave}
-            disabled={
-              saving ||
-              maxAllowedForEvent <= 0 ||
-              !form.title?.trim() ||
-              form.title.trim().length > 250 ||
-              (form.description && form.description.length > 500)
-            }
+            disabled={saving || maxAllowedForEvent <= 0}
             sx={{
               minWidth: 110,
               bgcolor: "#342b54 !important",
@@ -401,6 +398,7 @@ export default function EventAddPhotoDialog({
               placeholder="e.g. Birthday celebration moments"
               value={form.title}
               maxLength={250}
+              showCount
               onChange={(e) => {
                 const raw = e.target.value;
                 const sanitized = raw.replace(/[^A-Za-z\s]/g, "").slice(0, 250);
@@ -414,7 +412,7 @@ export default function EventAddPhotoDialog({
                 }
               }}
               error={!!errors.title}
-              helperText={errors.title || `${(form.title || "").length}/250 characters`}
+              helperText={errors.title}
               required
             />
           </Grid>

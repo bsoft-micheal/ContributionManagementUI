@@ -5,6 +5,7 @@ import {
   buildUpiPaymentUri,
   getQrCodeApiUrl,
 } from "../utils/upiQrHelper";
+import { formatWholeCurrency } from "../utils/roundingHelper";
 import { sendPaymentReminder } from "./contributionService";
 import { getContributionsAsync } from "./contributionService";
 import { getEventsAsync } from "./eventService";
@@ -125,7 +126,7 @@ export function interpolatePlaceholders(text, data = {}) {
     qrImageUrl = "",
   } = data;
 
-  const formattedAmount = typeof amount === "number" ? `₹${amount.toLocaleString("en-IN")}` : `₹${amount}`;
+  const formattedAmount = formatWholeCurrency(amount);
   const effectiveDueDate = dueDate ? (dayjs(dueDate).isValid() ? dayjs(dueDate).format("DD/MM/YYYY") : dueDate) : "End of Month";
 
   const qrHtmlTag = qrImageUrl
@@ -246,7 +247,7 @@ export async function sendTestEmail({
   const subject = interpolatePlaceholders(template.subject, placeholderData);
   const bodyText = interpolatePlaceholders(template.description, placeholderData);
 
-  const formattedAmount = `₹${testAmount.toLocaleString("en-IN")}`;
+  const formattedAmount = formatWholeCurrency(testAmount);
   const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -516,7 +517,7 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
       </div>
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px;">
         <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:4px;">Pending Amount</span>
-        <span style="font-size:26px;font-weight:800;color:#0284c7;">₹${amount.toLocaleString("en-IN")}</span>
+        <span style="font-size:26px;font-weight:800;color:#0284c7;">${formatWholeCurrency(amount)}</span>
       </div>
       <div style="text-align:center;margin-bottom:20px;">
         <div style="display:inline-block;padding:10px;background:#ffffff;border:2px solid #0284c7;border-radius:12px;box-shadow:0 4px 12px rgba(2,132,199,0.1);">
@@ -525,7 +526,7 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
         <p style="margin:6px 0 0 0;font-size:11px;color:#64748b;">UPI ID: <strong>${upiId}</strong> (${receiverName})</p>
       </div>
       <div style="text-align:center;">
-        <a href="${upiUri}" style="background-color:#0284c7;color:#ffffff;text-decoration:none;padding:11px 24px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Pay ₹${amount.toLocaleString("en-IN")} via UPI</a>
+        <a href="${upiUri}" style="background-color:#0284c7;color:#ffffff;text-decoration:none;padding:11px 24px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Pay ${formatWholeCurrency(amount)} via UPI</a>
       </div>
     </div>
     <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px;text-align:center;font-size:11px;color:#94a3b8;">

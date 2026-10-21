@@ -3,6 +3,7 @@ import { Box, Grid, Typography, Chip, Tooltip, IconButton, Avatar } from "@mui/m
 import { ExitToApp as ExitIcon, CheckCircle as CheckCircleIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
+import { roundToWhole, formatWholeCurrency } from "../../utils/roundingHelper";
 import { getMembersAsync, updateMemberAsync } from "../../services/memberService";
 import { getContributionsAsync } from "../../services/contributionService";
 import { getEventsAsync } from "../../services/eventService";
@@ -54,9 +55,9 @@ export default function ExitProcessPage() {
       }).map(member => {
         // Calculate pending dues
         const memberContributions = contributions.filter(c => c.memberId === member.memberId);
-        const pendingAmount = memberContributions
+        const pendingAmount = roundToWhole(memberContributions
           .filter(c => c.paymentStatus !== "Paid")
-          .reduce((sum, c) => sum + (c.amount || 0), 0);
+          .reduce((sum, c) => sum + (c.amount || 0), 0));
         
         return {
           ...member,
@@ -118,7 +119,7 @@ export default function ExitProcessPage() {
       align: "right",
       render: (row) => (
         <Typography variant="body2" fontWeight={900} color={row.pendingAmount > 0 ? "error.main" : "success.main"}>
-          ₹{Number(row.pendingAmount || 0).toLocaleString("en-IN")}
+          {formatWholeCurrency(row.pendingAmount || 0)}
         </Typography>
       )
     },

@@ -33,13 +33,14 @@ import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getExpensesAsync } from "../../services/expenseService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
+import { formatWholeCurrency, formatWholeNumber } from "../../utils/roundingHelper";
 import { COMMON_STRINGS, TOAST_MESSAGES } from "../../constants";
 
 const formatRateAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
   const cleanVal = String(value).replace(/[^0-9]/g, "").slice(0, 5);
   if (!cleanVal) return "";
-  return Number(cleanVal).toLocaleString("en-US");
+  return formatWholeNumber(cleanVal);
 };
 
 const initialForm = {
@@ -442,7 +443,7 @@ export default function BudgetCalculationsPage() {
       align: "right",
       render: (row) => (
         <Typography variant="body2" fontWeight={700}>
-          ₹{(row.rate ?? 0).toLocaleString("en-IN")}
+          {formatWholeCurrency(row.rate ?? 0)}
         </Typography>
       ),
     },
