@@ -19,7 +19,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import RuleRoundedIcon from "@mui/icons-material/RuleRounded";
 
-import { MENU_FEATURE_IDS } from "../constants";
+import { COMMON_STRINGS, MENU_FEATURE_IDS } from "../constants";
 
 export const navigationItems = [
   {
@@ -52,7 +52,7 @@ export const navigationItems = [
     children: [
       { featureId: MENU_FEATURE_IDS.CONTRIBUTION, label: "Contribution", path: "/contributions", icon: <SavingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: MENU_FEATURE_IDS.PAYMENT_HISTORY, label: "Payment History", path: "/payments", icon: <ReceiptLongRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: MENU_FEATURE_IDS.CALCULATION, label: "Calculation", path: "/contribution-calculation", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.CALCULATION, label: COMMON_STRINGS.CONTRIBUTION_CALCULATION.MENU_LABEL, path: "/contribution-calculation", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: MENU_FEATURE_IDS.EXPENSE, label: "Expense", path: "/expense", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: "1rem" }} /> },
     ]
   },
