@@ -184,6 +184,8 @@ export default function ContributionCalculationPage() {
 
     const roundedShares = distributeRoundedTotal(totalAmount, rawShares);
 
+    const calculated = enrichedParticipants.map((p, idx) => {
+      const epContribution = selectedEventDetails.contributions?.find(c => c.memberId === p.memberId);
       const rowCreatedAt =
         epContribution?.createdAt ||
         epContribution?.createdOn ||
@@ -196,20 +198,14 @@ export default function ContributionCalculationPage() {
         selectedEventDetails?.CreatedOn ||
         selectedEventDetails?.eventDate ||
         null;
-
       return {
         ...p,
         createdAt: rowCreatedAt,
         createdOn: rowCreatedAt,
         tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
-        calculatedAmount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimals
+        calculatedAmount: roundedShares[idx],
       };
     });
-    const calculated = enrichedParticipants.map((p, idx) => ({
-      ...p,
-      tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
-      calculatedAmount: roundedShares[idx],
-    }));
 
     setCalculationData(calculated);
   };
