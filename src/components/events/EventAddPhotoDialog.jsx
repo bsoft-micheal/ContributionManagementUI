@@ -21,10 +21,11 @@ import AppSelect from "../common/AppSelect";
 import AppDateInput from "../common/AppDateInput";
 import AppTextArea from "../common/AppTextArea";
 import AppButton from "../common/AppButton";
+import AppConfirmDialog from "../common/AppConfirmDialog";
 import { useAppToast } from "../common/AppToast";
 import { getGalleryPhotosAsync, createGalleryPhotoAsync } from "../../services/galleryService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
-import { extractImages } from "../../pages/gallery/GalleryPage";
+import { extractImages, getImageByteSize } from "../../pages/gallery/GalleryPage";
 import { TOAST_MESSAGES } from "../../constants";
 
 const initialForm = {
@@ -52,6 +53,10 @@ export default function EventAddPhotoDialog({
   const [loadingData, setLoadingData] = useState(false);
   const [existingEventPhotoCount, setExistingEventPhotoCount] = useState(0);
   const [eventTypesList, setEventTypesList] = useState([]);
+  const [removeImageConfirmOpen, setRemoveImageConfirmOpen] = useState(false);
+  const [removeImageIndexToConfirm, setRemoveImageIndexToConfirm] = useState(null);
+  const [clearAllImagesConfirmOpen, setClearAllImagesConfirmOpen] = useState(false);
+  const [remoteImageSizes, setRemoteImageSizes] = useState({});
 
   useEffect(() => {
     if (!open || !event) {
@@ -156,7 +161,7 @@ export default function EventAddPhotoDialog({
     }
 
     const MAX_BATCH_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-    let totalSize = 0;
+    let incomingSize = 0;
 
     for (const file of filesToProcess) {
       if (!file.type.startsWith("image/")) {
@@ -164,14 +169,17 @@ export default function EventAddPhotoDialog({
         return;
       }
       if (file.size > MAX_BATCH_SIZE_BYTES) {
-        toast.error(`"${file.name}" exceeds the 10MB size limit.`);
+        toast.error(`"${file.name}" exceeds the 10MB size limit (${(file.size / (1024 * 1024)).toFixed(2)}MB).`);
         return;
       }
-      totalSize += file.size;
+      incomingSize += file.size;
     }
 
-    if (totalSize > MAX_BATCH_SIZE_BYTES) {
-      toast.error(`Selected images total exceeds 10MB limit.`);
+    const remainingBytes = Math.max(0, MAX_BATCH_SIZE_BYTES - usedBytes);
+    if (incomingSize > remainingBytes) {
+      toast.error(
+        `Selected images total ${(incomingSize / (1024 * 1024)).toFixed(2)}MB, which exceeds remaining limit of ${remainingMBFormatted}MB (10MB total).`
+      );
       return;
     }
 
@@ -235,27 +243,41 @@ export default function EventAddPhotoDialog({
     };
   };
 
-  const handleRemoveImageIndex = (indexToRemove, e) => {
+  const handleRequestRemoveImage = (indexToRemove, e) => {
     if (e) e.stopPropagation();
-    setForm((prev) => {
-      const updated = (prev.imageUrls || []).filter((_, idx) => idx !== indexToRemove);
-      return {
-        ...prev,
-        imageUrls: updated,
-        imageUrl: updated[0] || "",
-      };
-    });
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    setRemoveImageIndexToConfirm(indexToRemove);
+    setRemoveImageConfirmOpen(true);
   };
 
-  const handleClearAllImages = (e) => {
+  const handleConfirmRemoveImage = () => {
+    if (removeImageIndexToConfirm !== null) {
+      setForm((prev) => {
+        const updated = (prev.imageUrls || []).filter((_, idx) => idx !== removeImageIndexToConfirm);
+        return {
+          ...prev,
+          imageUrls: updated,
+          imageUrl: updated[0] || "",
+        };
+      });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+    setRemoveImageConfirmOpen(false);
+    setRemoveImageIndexToConfirm(null);
+  };
+
+  const handleRequestClearAllImages = (e) => {
     if (e) e.stopPropagation();
+    setClearAllImagesConfirmOpen(true);
+  };
+
+  const handleConfirmClearAllImages = () => {
     setForm((prev) => ({
       ...prev,
       imageUrls: [],
       imageUrl: "",
     }));
     if (fileInputRef.current) fileInputRef.current.value = "";
+    setClearAllImagesConfirmOpen(false);
   };
 
   const handleSave = async () => {
@@ -346,8 +368,48 @@ export default function EventAddPhotoDialog({
 
   const currentSelectedImages = form.imageUrls || (form.imageUrl ? [form.imageUrl] : []);
 
+  useEffect(() => {
+    (currentSelectedImages || []).forEach((url) => {
+      if (url && !url.startsWith("data:") && remoteImageSizes[url] === undefined) {
+        fetch(url, { method: "HEAD" })
+          .then((res) => {
+            const cl = res.headers.get("content-length");
+            if (cl) {
+              setRemoteImageSizes((prev) => ({ ...prev, [url]: parseInt(cl, 10) }));
+            }
+          })
+          .catch(() => {
+            setRemoteImageSizes((prev) => ({ ...prev, [url]: 350 * 1024 }));
+          });
+      }
+    });
+  }, [currentSelectedImages]);
+
+  const MAX_BATCH_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+  const usedBytes = React.useMemo(() => {
+    let total = 0;
+    (currentSelectedImages || []).forEach((url) => {
+      if (!url) return;
+      if (url.startsWith("data:")) {
+        total += getImageByteSize(url);
+      } else if (remoteImageSizes[url]) {
+        total += remoteImageSizes[url];
+      } else {
+        total += 350 * 1024;
+      }
+    });
+    return total;
+  }, [currentSelectedImages, remoteImageSizes]);
+
+  const usedMB = usedBytes / (1024 * 1024);
+  const remainingMB = Math.max(0, (MAX_BATCH_SIZE_BYTES - usedBytes) / (1024 * 1024));
+  const usedMBFormatted = usedMB.toFixed(2);
+  const remainingMBFormatted = remainingMB.toFixed(2);
+
   return (
-    <AppDialog
+    <>
+      <AppDialog
       open={open}
       onClose={saving ? undefined : onClose}
       title={`Add Photos — ${event.eventName || "Event"}`}
@@ -453,24 +515,38 @@ export default function EventAddPhotoDialog({
               <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", fontSize: "0.74rem" }}>
                 Upload Photos
               </Typography>
-              <Chip
-                label={`Photos for Event: ${existingEventPhotoCount + currentSelectedImages.length} / 5 max`}
-                size="small"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: "0.74rem",
-                  bgcolor:
-                    existingEventPhotoCount >= 5
-                      ? "rgba(239, 68, 68, 0.12)"
-                      : "rgba(124, 58, 237, 0.12)",
-                  color: existingEventPhotoCount >= 5 ? "#ef4444" : "#7c3aed",
-                  border: "1px solid",
-                  borderColor:
-                    existingEventPhotoCount >= 5
-                      ? "rgba(239, 68, 68, 0.25)"
-                      : "rgba(124, 58, 237, 0.25)",
-                }}
-              />
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                <Chip
+                  label={`${remainingMBFormatted} MB remaining of 10 MB`}
+                  size="small"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: "0.74rem",
+                    bgcolor: remainingMB < 1 ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 185, 129, 0.12)",
+                    color: remainingMB < 1 ? "#ef4444" : "#10b981",
+                    border: "1px solid",
+                    borderColor: remainingMB < 1 ? "rgba(239, 68, 68, 0.25)" : "rgba(16, 185, 129, 0.25)",
+                  }}
+                />
+                <Chip
+                  label={`Photos for Event: ${existingEventPhotoCount + currentSelectedImages.length} / 5 max`}
+                  size="small"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: "0.74rem",
+                    bgcolor:
+                      existingEventPhotoCount >= 5
+                        ? "rgba(239, 68, 68, 0.12)"
+                        : "rgba(124, 58, 237, 0.12)",
+                    color: existingEventPhotoCount >= 5 ? "#ef4444" : "#7c3aed",
+                    border: "1px solid",
+                    borderColor:
+                      existingEventPhotoCount >= 5
+                        ? "rgba(239, 68, 68, 0.25)"
+                        : "rgba(124, 58, 237, 0.25)",
+                  }}
+                />
+              </Stack>
             </Box>
             <input
               type="file"
@@ -540,7 +616,7 @@ export default function EventAddPhotoDialog({
                       }}
                     >
                       <Typography variant="caption" sx={{ fontWeight: 800, color: "text.primary" }}>
-                        Selected Photos ({currentSelectedImages.length}/{maxAllowedForEvent})
+                        Selected Photos ({currentSelectedImages.length}/{maxAllowedForEvent}) • {usedMBFormatted} MB used ({remainingMBFormatted} MB remaining)
                       </Typography>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         {currentSelectedImages.length < maxAllowedForEvent && (
@@ -561,7 +637,7 @@ export default function EventAddPhotoDialog({
                           size="small"
                           variant="text"
                           color="error"
-                          onClick={handleClearAllImages}
+                          onClick={handleRequestClearAllImages}
                           sx={{ fontSize: "0.72rem", height: 26, minWidth: "auto", p: 0.5 }}
                         >
                           Clear All
@@ -611,7 +687,11 @@ export default function EventAddPhotoDialog({
                           />
 
                           <Chip
-                            label={`#${idx + 1}`}
+                            label={(() => {
+                              const bytes = getImageByteSize(url) || remoteImageSizes[url] || 0;
+                              const mb = (bytes / (1024 * 1024)).toFixed(2);
+                              return bytes > 0 ? `#${idx + 1} • ${mb} MB` : `#${idx + 1}`;
+                            })()}
                             size="small"
                             sx={{
                               position: "absolute",
@@ -620,7 +700,7 @@ export default function EventAddPhotoDialog({
                               height: 18,
                               fontSize: "0.62rem",
                               fontWeight: 800,
-                              bgcolor: "rgba(0,0,0,0.7)",
+                              bgcolor: "rgba(0,0,0,0.75)",
                               color: "#ffffff",
                             }}
                           />
@@ -628,7 +708,7 @@ export default function EventAddPhotoDialog({
                           <Tooltip title="Remove photo">
                             <IconButton
                               size="small"
-                              onClick={(e) => handleRemoveImageIndex(idx, e)}
+                              onClick={(e) => handleRequestRemoveImage(idx, e)}
                               sx={{
                                 position: "absolute",
                                 top: 5,
@@ -762,5 +842,31 @@ export default function EventAddPhotoDialog({
         </Grid>
       )}
     </AppDialog>
+
+    {/* Confirm Remove Uploaded Image Dialog */}
+    <AppConfirmDialog
+      open={removeImageConfirmOpen}
+      onClose={() => {
+        setRemoveImageConfirmOpen(false);
+        setRemoveImageIndexToConfirm(null);
+      }}
+      onConfirm={handleConfirmRemoveImage}
+      title="Remove Photo"
+      content="Are you sure you want to remove this photo?"
+      confirmText="Remove"
+      confirmColor="error"
+    />
+
+    {/* Confirm Clear All Uploaded Images Dialog */}
+    <AppConfirmDialog
+      open={clearAllImagesConfirmOpen}
+      onClose={() => setClearAllImagesConfirmOpen(false)}
+      onConfirm={handleConfirmClearAllImages}
+      title="Clear All Photos"
+      content="Are you sure you want to remove all photos from this entry?"
+      confirmText="Clear All"
+      confirmColor="error"
+    />
+  </>
   );
 }

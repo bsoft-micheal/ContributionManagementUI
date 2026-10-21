@@ -270,11 +270,16 @@ export default function EventsPage() {
         const eventExpenseTotal = matchedExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
         const expAmount = Math.max(Number(e.expenseAmount || 0), eventExpenseTotal);
-        const expectedAmt = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
+        const allocatedAmt = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
+        const rawBudget = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
+        // If event was funded from Amount in Hand, member collection expected is reduced by allocatedAmt
+        const expectedAmt = allocatedAmt > 0 && Number(e.totalExpectedAmount || 0) <= (rawBudget - allocatedAmt)
+          ? Number(e.totalExpectedAmount)
+          : (allocatedAmt > 0 ? Math.max(0, rawBudget - allocatedAmt) : (Number(e.totalExpectedAmount) || rawBudget));
         const paidAmt = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
-        const pendingAmt = Number(e.pendingAmount !== undefined ? e.pendingAmount : (expectedAmt - paidAmt));
+        const pendingAmt = Number(e.pendingAmount !== undefined ? e.pendingAmount : Math.max(0, expectedAmt - paidAmt));
         const remainingAmt = paidAmt - expAmount;
-        const extraAmountSpent = Math.max(0, expAmount - expectedAmt);
+        const extraAmountSpent = Math.max(0, expAmount - rawBudget);
 
         const hasPaidContrib = Boolean(
           e.hasPaidContributions ||
@@ -285,6 +290,11 @@ export default function EventsPage() {
 
         return {
           ...e,
+          baseAmount: Number(e.baseAmount || 0) || rawBudget,
+          useAvailableBalance: Boolean(e.useAvailableBalance),
+          allocatedAmount: allocatedAmt,
+          totalExpectedAmount: expectedAmt,
+          expectedAmount: expectedAmt,
           hasPaidContributions: hasPaidContrib,
           paidContributionsCount: Number(e.paidContributionsCount || e.PaidContributionsCount || 0),
           expenseAmount: expAmount,
@@ -430,29 +440,43 @@ export default function EventsPage() {
   }, [events, filters]);
 
   const summaryTotals = useMemo(() => {
-    const totalExpected = (displayedEvents || []).reduce((sum, e) => {
-      const exp = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
-      return sum + roundToWhole(exp);
-    }, 0);
     const totalCollected = (displayedEvents || []).reduce((sum, e) => {
       return sum + roundToWhole(Number(e.collectedAmount ?? e.totalPaidAmount ?? 0));
     }, 0);
+
+    const totalAllocated = (displayedEvents || []).reduce((sum, e) => {
+      const allocated = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
+      return sum + roundToWhole(allocated);
+    }, 0);
+
+    const totalExpected = (displayedEvents || []).reduce((sum, e) => {
+      const allocated = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
+      const raw = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
+      const exp = allocated > 0 ? Math.max(0, (Number(e.baseAmount || 0) || raw) - allocated) : (Number(e.totalExpectedAmount) || Number(e.baseAmount) || 0);
+      return sum + roundToWhole(exp);
+    }, 0);
+
     const totalPending = (displayedEvents || []).reduce((sum, e) => {
-      const exp = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
+      const allocated = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
+      const raw = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
+      const exp = allocated > 0 ? Math.max(0, (Number(e.baseAmount || 0) || raw) - allocated) : (Number(e.totalExpectedAmount) || Number(e.baseAmount) || 0);
       const col = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
-      const pen = Number(e.pendingAmount !== undefined ? e.pendingAmount : (exp - col));
+      const pen = Number(e.pendingAmount !== undefined ? e.pendingAmount : Math.max(0, exp - col));
       return sum + roundToWhole(pen);
     }, 0);
+
     const totalExpenses = (displayedEvents || []).reduce((sum, e) => {
       return sum + roundToWhole(Number(e.expenseAmount || 0));
     }, 0);
-    const totalBalance = totalCollected - totalExpenses;
+
+    const totalBalance = totalCollected - totalExpenses - totalAllocated;
 
     return {
       totalExpected,
       totalCollected,
       totalPending,
       totalExpenses,
+      totalAllocated,
       totalBalance,
     };
   }, [displayedEvents]);
@@ -766,10 +790,27 @@ export default function EventsPage() {
       label: "Expected Amount",
       key: "totalExpectedAmount",
       align: "right",
-      exportValue: (row) => roundToWhole(Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0))),
+      exportValue: (row) => {
+        const allocated = row.useAvailableBalance ? Number(row.allocatedAmount || 0) : 0;
+        const raw = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
+        return roundToWhole(allocated > 0 ? Math.max(0, raw - allocated) : raw);
+      },
       render: (row) => {
-        const val = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
-        return formatWholeCurrency(val);
+        const allocated = row.useAvailableBalance ? Number(row.allocatedAmount || 0) : 0;
+        const raw = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
+        const val = allocated > 0 ? Math.max(0, raw - allocated) : raw;
+        return (
+          <Box sx={{ textAlign: "right" }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {formatWholeCurrency(val)}
+            </Typography>
+            {allocated > 0 && (
+              <Typography variant="caption" sx={{ color: "#16a34a", fontSize: "0.7rem", display: "block" }}>
+                (Budget: {formatWholeCurrency(raw)} - {formatWholeCurrency(allocated)} from Hand)
+              </Typography>
+            )}
+          </Box>
+        );
       }
     },
     {

@@ -503,7 +503,7 @@ export default function EventPhotoDetailsDialog({
             }}
           >
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }} sx={{ minWidth: 0 }}>
                 <Typography
                   variant="caption"
                   color="text.secondary"
@@ -517,13 +517,15 @@ export default function EventPhotoDetailsDialog({
                   sx={{
                     color: (t) =>
                       t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                    wordBreak: "break-word",
+                    overflowWrap: "anywhere",
                   }}
                 >
                   {displayTitle}
                 </Typography>
               </Grid>
 
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }} sx={{ minWidth: 0 }}>
                 <Typography
                   variant="caption"
                   color="text.secondary"
@@ -531,7 +533,14 @@ export default function EventPhotoDetailsDialog({
                 >
                   Event Name
                 </Typography>
-                <Typography variant="body1" fontWeight={600}>
+                <Typography
+                  variant="body1"
+                  fontWeight={600}
+                  sx={{
+                    wordBreak: "break-word",
+                    overflowWrap: "anywhere",
+                  }}
+                >
                   {displayEventName}
                 </Typography>
               </Grid>
@@ -542,7 +551,7 @@ export default function EventPhotoDetailsDialog({
                   color="text.secondary"
                   sx={{ display: "block", mb: 0.3 }}
                 >
-                  Category
+                  Event Type
                 </Typography>
                 <Chip
                   label={displayCategory}
@@ -600,6 +609,54 @@ export default function EventPhotoDetailsDialog({
                   }}
                 />
               </Grid>
+
+              {primaryDetails?.description && (
+                <Grid size={{ xs: 12 }} sx={{ minWidth: 0 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mb: 0.3 }}
+                  >
+                    Description
+                  </Typography>
+                  <Box
+                    sx={{
+                      bgcolor: (t) =>
+                        t.palette.mode === "dark"
+                          ? "rgba(255,255,255,0.02)"
+                          : "#ffffff",
+                      p: 1.5,
+                      borderRadius: "8px",
+                      border: (t) => `1px solid ${t.palette.divider}`,
+                      maxHeight: 180,
+                      overflowY: "auto",
+                      overflowX: "hidden",
+                      wordBreak: "break-word",
+                      overflowWrap: "anywhere",
+                      "&::-webkit-scrollbar": { width: 6 },
+                      "&::-webkit-scrollbar-thumb": {
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.2)"
+                            : "rgba(0,0,0,0.2)",
+                        borderRadius: 3,
+                      },
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        overflowWrap: "anywhere",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {primaryDetails.description}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
             </Grid>
           </Box>
         </Box>

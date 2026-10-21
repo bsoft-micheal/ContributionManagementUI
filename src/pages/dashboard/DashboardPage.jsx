@@ -956,6 +956,10 @@ export default function DashboardPage() {
 
   const totalCollected = events.reduce((sum, e) => sum + (Number(e.collectedAmount) || 0), 0);
   const totalPending = events.reduce((sum, e) => sum + (Number(e.pendingAmount) || 0), 0);
+  const totalAllocated = events.reduce(
+    (sum, e) => sum + (e.useAvailableBalance ? (Number(e.allocatedAmount) || 0) : 0),
+    0
+  );
   const totalExpected = events.reduce((sum, e) => {
     const exp = Number(e.expectedAmount);
     return sum + (!isNaN(exp) && exp > 0 ? exp : (Number(e.collectedAmount || 0) + Number(e.pendingAmount || 0)));
@@ -969,11 +973,11 @@ export default function DashboardPage() {
     return eventExpensesSum > 0 ? eventExpensesSum : Number(summary?.totalExpenses ?? 0);
   }, [events, isFilteredByEvent, isFilteredByType, summary?.totalExpenses]);
 
-  // Current Remaining / Balance Amount:
-  // Formula: Total Collection − Total Expense (for both Admin and Member's assigned events)
+  // Current Remaining / Balance Amount (Amount in Hand):
+  // Formula: Total Collection − Total Expense − Total Allocated from Hand
   const totalRemaining = useMemo(() => {
-    return totalCollected - totalExpenses;
-  }, [totalCollected, totalExpenses]);
+    return totalCollected - totalExpenses - totalAllocated;
+  }, [totalCollected, totalExpenses, totalAllocated]);
 
   const pendingCount = events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0);
   const totalContributionsCount = events.reduce((sum, e) => sum + (Number(e.totalContributionsCount) || 0), 0);
@@ -993,7 +997,8 @@ export default function DashboardPage() {
       const exp = Number(e.expectedAmount) || (Number(e.collectedAmount || 0) + Number(e.pendingAmount || 0));
       const col = Number(e.collectedAmount) || 0;
       const expense = Number(e.expenseAmount) || 0;
-      const remaining = e.remainingAmount !== undefined ? Number(e.remainingAmount) : (col - expense);
+      const allocated = e.useAvailableBalance ? (Number(e.allocatedAmount) || 0) : 0;
+      const remaining = e.remainingAmount !== undefined ? Number(e.remainingAmount) : (col - expense - allocated);
       const pctNum =
         totalExpected > 0
           ? (exp / totalExpected) * 100

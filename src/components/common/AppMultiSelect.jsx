@@ -18,7 +18,13 @@ export default function AppMultiSelect({
 }) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
-  const allSelected = options.length > 0 && value.length === options.length;
+
+  const selectableOptions = options.filter((o) => !o.disabled);
+  const allSelected =
+    selectableOptions.length > 0 &&
+    selectableOptions.every((o) => (value || []).includes(o.value));
+  const someSelected =
+    selectableOptions.some((o) => (value || []).includes(o.value)) && !allSelected;
 
   const handleSelectChange = (event) => {
     const {
@@ -27,14 +33,18 @@ export default function AppMultiSelect({
 
     if (selectedValues.includes("select-all")) {
       if (allSelected) {
-        // Deselect all
-        onChange({ target: { value: [] } });
+        // Deselect all selectable options (keep any disabled selected values intact)
+        const disabledSelected = (value || []).filter((v) =>
+          options.some((o) => o.value === v && o.disabled)
+        );
+        onChange({ target: { value: disabledSelected } });
       } else {
-        // Select all
-        onChange({ target: { value: options.map((o) => o.value) } });
+        // Select all selectable options
+        const selectableVals = selectableOptions.map((o) => o.value);
+        const merged = Array.from(new Set([...(value || []), ...selectableVals]));
+        onChange({ target: { value: merged } });
       }
-      // Auto close when selecting/deselecting all
-      setOpen(false);
+      // Keep menu open so user can continue toggling selections without reopening
     } else {
       onChange(event);
     }
@@ -86,6 +96,10 @@ export default function AppMultiSelect({
           open: open,
           onOpen: () => setOpen(true),
           onClose: () => setOpen(false),
+          MenuProps: {
+            autoFocus: false,
+            disableAutoFocusItem: true,
+          },
           renderValue: (selected) => {
             if (!selected || selected.length === 0) {
               return (
@@ -281,9 +295,10 @@ export default function AppMultiSelect({
           >
             <Checkbox
               checked={allSelected}
-              indeterminate={value.length > 0 && value.length < options.length}
+              indeterminate={someSelected}
               size="small"
               sx={{
+                pointerEvents: "none",
                 color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.4)" : "rgba(74, 63, 107, 0.4)",
                 "&.Mui-checked, &.MuiCheckbox-indeterminate": {
                   color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
@@ -297,7 +312,7 @@ export default function AppMultiSelect({
           </MenuItem>
         )}
         {options.map((option) => {
-          const isChecked = value.includes(option.value);
+          const isChecked = (value || []).includes(option.value);
           return (
             <MenuItem
               key={option.value}
@@ -309,6 +324,7 @@ export default function AppMultiSelect({
                 checked={isChecked}
                 size="small"
                 sx={{
+                  pointerEvents: "none",
                   color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.4)" : "rgba(74, 63, 107, 0.4)",
                   "&.Mui-checked": {
                     color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
