@@ -131,7 +131,7 @@ const sanitizeDecimalAmount = (value) => {
 
 const sanitizeEventName = (value) => {
   if (!value) return "";
-  return String(value).replace(/[^a-zA-Z\s]/g, "").slice(0, 250);
+  return String(value).replace(/[^a-zA-Z\s]/g, "").trimStart().slice(0, 250);
 };
 
 const initialForm = {
@@ -815,6 +815,9 @@ export default function EventFormPage({
     const removedCelebrantIds = marriageCelebrantIds.filter((id) => !newIds.includes(id));
 
     setMarriageCelebrantIds(newIds);
+    if (errors.marriageCelebrantIds) {
+      setErrors((prev) => ({ ...prev, marriageCelebrantIds: "" }));
+    }
 
     // Automatically remove chosen marriage celebrants from participating members (they cannot contribute)
     setSelectedParticipantIds((prev) => {
@@ -836,6 +839,9 @@ export default function EventFormPage({
     const removedSendOffIds = sendOffMemberIds.filter((id) => !newIds.includes(id));
 
     setSendOffMemberIds(newIds);
+    if (errors.sendOffMemberIds) {
+      setErrors((prev) => ({ ...prev, sendOffMemberIds: "" }));
+    }
 
     // Automatically remove chosen send-off members from participating members (they cannot contribute)
     setSelectedParticipantIds((prev) => {
@@ -1619,8 +1625,21 @@ export default function EventFormPage({
   };
 
   // Handle date change
-  const handleDateChange = (newDate) => {
+  const handleDateChange = (newDate, customErr) => {
     const validDate = newDate && dayjs(newDate).isValid() ? newDate : null;
+    const today = dayjs().startOf("day");
+
+    // Strictly restrict previous date when typing manually or picking in Add mode
+    if (!isEdit && ((validDate && dayjs(validDate).isBefore(today)) || customErr)) {
+      setErrors((p) => ({ ...p, eventDate: "Cannot create an event for a past date" }));
+      toast.error("Cannot create an event for a past date. Please select today or a future date.");
+      setForm((c) => ({
+        ...c,
+        eventDate: today,
+      }));
+      return;
+    }
+
     const oldMonth = form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).month() : -1;
     const newMonth = validDate ? dayjs(validDate).month() : -1;
 
@@ -1696,6 +1715,14 @@ export default function EventFormPage({
       newErrors.eventDate = requiredMsg;
     } else if (!isEdit && dayjs(form.eventDate).isBefore(dayjs().startOf("day"))) {
       newErrors.eventDate = "Cannot create an event for a past date";
+    }
+
+    // 3a. Mandatory Celebrant Validation for Marriage and Send-off
+    if (hasMarriageSelected && marriageCelebrantIds.length === 0) {
+      newErrors.marriageCelebrantIds = "Please select at least one marriage celebrant";
+    }
+    if (hasSendOffSelected && sendOffMemberIds.length === 0) {
+      newErrors.sendOffMemberIds = "Please select at least one send-off / relieving member";
     }
 
     // 4. Participant validation for non-birthday events if an event type is chosen
@@ -2187,6 +2214,7 @@ export default function EventFormPage({
                       required
                       clearable
                       value={form.eventDate}
+                      disablePast={!isEdit}
                       minDate={!isEdit ? dayjs().startOf("day") : undefined}
                       onChange={handleDateChange}
                       error={!!errors.eventDate}
@@ -2289,10 +2317,13 @@ export default function EventFormPage({
                       onChange={handleMarriageCelebrantsChange}
                       options={allActiveMemberOptions}
                       maxHeight={145}
+                      required
+                      error={!!errors.marriageCelebrantIds}
                       helperText={
-                        marriageCelebrantIds.length > 0
+                        errors.marriageCelebrantIds ||
+                        (marriageCelebrantIds.length > 0
                           ? `${marriageCelebrantIds.length} celebrant${marriageCelebrantIds.length > 1 ? "s" : ""} (exempt from contributing)`
-                          : ""
+                          : "")
                       }
                     />
                   </Grid>
@@ -2307,10 +2338,13 @@ export default function EventFormPage({
                       onChange={handleSendOffMembersChange}
                       options={allActiveMemberOptions}
                       maxHeight={145}
+                      required
+                      error={!!errors.sendOffMemberIds}
                       helperText={
-                        sendOffMemberIds.length > 0
+                        errors.sendOffMemberIds ||
+                        (sendOffMemberIds.length > 0
                           ? `${sendOffMemberIds.length} member${sendOffMemberIds.length > 1 ? "s" : ""} (exempt from contributing)`
-                          : ""
+                          : "")
                       }
                     />
                   </Grid>
