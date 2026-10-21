@@ -19,6 +19,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import SavingsIcon from "@mui/icons-material/Savings";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 // Curated solid colors for Pie Chart (modeled directly on Google Charts reference image)
 const PIE_COLORS = [
@@ -93,7 +94,7 @@ export default function FinancialBarChart({
           id: "paid",
           label: "Paid Amount",
           value: col,
-          formattedValue: `₹${col.toLocaleString("en-IN")}`,
+          formattedValue: formatWholeCurrency(col),
           color: "#10b981", // Emerald Green
           bgGradient: isDark
             ? "linear-gradient(180deg, #34d399 0%, #10b981 100%)"
@@ -106,7 +107,7 @@ export default function FinancialBarChart({
           id: "unpaid",
           label: "Unpaid Amount",
           value: pen,
-          formattedValue: `₹${pen.toLocaleString("en-IN")}`,
+          formattedValue: formatWholeCurrency(pen),
           color: "#f43f5e", // Rose Red
           bgGradient: isDark
             ? "linear-gradient(180deg, #fb7185 0%, #f43f5e 100%)"
@@ -119,7 +120,7 @@ export default function FinancialBarChart({
           id: "expenses",
           label: "Total Expenses",
           value: expn,
-          formattedValue: `₹${expn.toLocaleString("en-IN")}`,
+          formattedValue: formatWholeCurrency(expn),
           color: "#f59e0b", // Amber / Warm Orange
           bgGradient: isDark
             ? "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)"
@@ -136,7 +137,7 @@ export default function FinancialBarChart({
         id: "expected",
         label: isReportsMember ? "My Expected" : "Expected Amount",
         value: exp,
-        formattedValue: `₹${exp.toLocaleString("en-IN")}`,
+        formattedValue: formatWholeCurrency(exp),
         color: "#6366f1", // Indigo / Purple
         bgGradient: isDark
           ? "linear-gradient(180deg, #818cf8 0%, #6366f1 100%)"
@@ -149,7 +150,7 @@ export default function FinancialBarChart({
         id: "collected",
         label: isReportsMember ? "My Paid" : "Collection Amount",
         value: col,
-        formattedValue: `₹${col.toLocaleString("en-IN")}`,
+        formattedValue: formatWholeCurrency(col),
         color: "#10b981", // Emerald Green
         bgGradient: isDark
           ? "linear-gradient(180deg, #34d399 0%, #10b981 100%)"
@@ -162,7 +163,7 @@ export default function FinancialBarChart({
         id: "pending",
         label: isReportsMember ? "My Pending" : "Pending Amount",
         value: pen,
-        formattedValue: `₹${pen.toLocaleString("en-IN")}`,
+        formattedValue: formatWholeCurrency(pen),
         color: "#f43f5e", // Rose Red
         bgGradient: isDark
           ? "linear-gradient(180deg, #fb7185 0%, #f43f5e 100%)"
@@ -179,7 +180,7 @@ export default function FinancialBarChart({
           id: "expenses",
           label: "Total Expenses",
           value: expn,
-          formattedValue: `₹${expn.toLocaleString("en-IN")}`,
+          formattedValue: formatWholeCurrency(expn),
           color: "#f59e0b", // Amber / Warm Orange
           bgGradient: isDark
             ? "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)"
@@ -192,7 +193,7 @@ export default function FinancialBarChart({
           id: "balance",
           label: "Amount in Hand",
           value: bal,
-          formattedValue: `₹${bal.toLocaleString("en-IN")}`,
+          formattedValue: formatWholeCurrency(bal),
           color: bal >= 0 ? "#06b6d4" : "#f43f5e", // Mild Cyan / Rose
           bgGradient: bal >= 0
             ? isDark
@@ -244,7 +245,7 @@ export default function FinancialBarChart({
     if (val >= 10000000) return `₹${(val / 10000000).toFixed(1)}Cr`;
     if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
     if (val >= 1000) return `₹${(val / 1000).toFixed(0)}K`;
-    return `₹${val.toLocaleString("en-IN")}`;
+    return formatWholeCurrency(val);
   };
 
   const chartHeight = 220; // Height of bar plot area in px
@@ -260,7 +261,7 @@ export default function FinancialBarChart({
           id: e.eventId || e.id || `ev-${idx}`,
           label: e.eventName || e.label || `Event ${idx + 1}`,
           value: Math.max(0, val),
-          formattedValue: `₹${val.toLocaleString("en-IN")}`,
+          formattedValue: formatWholeCurrency(val),
           color: PIE_COLORS[idx % PIE_COLORS.length],
         };
       });
@@ -274,23 +275,23 @@ export default function FinancialBarChart({
 
       if (isMember) {
         rawItems = [
-          { id: "p-col", label: "Paid Amount", value: col, formattedValue: `₹${col.toLocaleString("en-IN")}`, color: "#10b981" },
-          { id: "p-pen", label: "Unpaid Amount", value: pen, formattedValue: `₹${pen.toLocaleString("en-IN")}`, color: "#f43f5e" },
-          { id: "p-exp", label: "Total Expenses", value: expn, formattedValue: `₹${expn.toLocaleString("en-IN")}`, color: "#f59e0b" },
+          { id: "p-col", label: "Paid Amount", value: col, formattedValue: formatWholeCurrency(col), color: "#10b981" },
+          { id: "p-pen", label: "Unpaid Amount", value: pen, formattedValue: formatWholeCurrency(pen), color: "#f43f5e" },
+          { id: "p-exp", label: "Total Expenses", value: expn, formattedValue: formatWholeCurrency(expn), color: "#f59e0b" },
         ];
       } else if (isReportsMember) {
         rawItems = [
-          { id: "p-expct", label: "My Expected", value: exp, formattedValue: `₹${exp.toLocaleString("en-IN")}`, color: "#6366f1" },
-          { id: "p-col", label: "My Paid", value: col, formattedValue: `₹${col.toLocaleString("en-IN")}`, color: "#10b981" },
-          { id: "p-pen", label: "My Pending", value: pen, formattedValue: `₹${pen.toLocaleString("en-IN")}`, color: "#f43f5e" },
+          { id: "p-expct", label: "My Expected", value: exp, formattedValue: formatWholeCurrency(exp), color: "#6366f1" },
+          { id: "p-col", label: "My Paid", value: col, formattedValue: formatWholeCurrency(col), color: "#10b981" },
+          { id: "p-pen", label: "My Pending", value: pen, formattedValue: formatWholeCurrency(pen), color: "#f43f5e" },
         ];
       } else {
         rawItems = [
-          { id: "p-expct", label: "Expected", value: exp, formattedValue: `₹${exp.toLocaleString("en-IN")}`, color: "#6366f1" },
-          { id: "p-col", label: "Collections", value: col, formattedValue: `₹${col.toLocaleString("en-IN")}`, color: "#10b981" },
-          { id: "p-pen", label: "Pending", value: pen, formattedValue: `₹${pen.toLocaleString("en-IN")}`, color: "#f43f5e" },
-          { id: "p-exp", label: "Expenses", value: expn, formattedValue: `₹${expn.toLocaleString("en-IN")}`, color: "#f59e0b" },
-          { id: "p-bal", label: "Amount in Hand", value: bal, formattedValue: `₹${bal.toLocaleString("en-IN")}`, color: "#06b6d4" },
+          { id: "p-expct", label: "Expected", value: exp, formattedValue: formatWholeCurrency(exp), color: "#6366f1" },
+          { id: "p-col", label: "Collections", value: col, formattedValue: formatWholeCurrency(col), color: "#10b981" },
+          { id: "p-pen", label: "Pending", value: pen, formattedValue: formatWholeCurrency(pen), color: "#f43f5e" },
+          { id: "p-exp", label: "Expenses", value: expn, formattedValue: formatWholeCurrency(expn), color: "#f59e0b" },
+          { id: "p-bal", label: "Amount in Hand", value: bal, formattedValue: formatWholeCurrency(bal), color: "#06b6d4" },
         ];
       }
     }

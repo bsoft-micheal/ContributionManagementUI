@@ -3,6 +3,7 @@ import {
   Box,
   Typography,
   Grid,
+  Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
@@ -16,6 +17,7 @@ import AppTextArea from "../common/AppTextArea";
 import AppDateInput from "../common/AppDateInput";
 import { useAppToast } from "../common/AppToast";
 import { updateBudgetCalculationRateAsync } from "../../services/budgetCalculationService";
+import { formatWholeCurrency, formatWholeNumber } from "../../utils/roundingHelper";
 
 const formatRateAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -23,7 +25,7 @@ const formatRateAmount = (value) => {
   if (!cleanVal) return "";
   const num = Number(cleanVal);
   if (isNaN(num)) return "";
-  return num.toLocaleString("en-US");
+  return formatWholeNumber(num);
 };
 
 export default function RateUpdateModal({
@@ -137,7 +139,7 @@ export default function RateUpdateModal({
     <AppDialog
       open={open}
       onClose={onClose}
-      title={`Update Rate - ${item.expenseItem || "Expense Item"}`}
+      title="Update Rate"
       maxWidth="sm"
       actions={
         <Box sx={{ display: "flex", justifyContent: "center", gap: 1.5, width: "100%" }}>
@@ -181,13 +183,27 @@ export default function RateUpdateModal({
               {item.category || item.eventTypeName || "--"}
             </Typography>
           </Box>
-          <Box sx={{ textAlign: "right" }}>
+          <Box sx={{ textAlign: "right", minWidth: 0, maxWidth: "60%" }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
               Expense Item
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
-              {item.expenseItem || "--"}
-            </Typography>
+            <Tooltip title={item.expenseItem && item.expenseItem.length > 25 ? item.expenseItem : ""} arrow>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: theme.palette.text.primary,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  cursor: item.expenseItem && item.expenseItem.length > 25 ? "pointer" : "default",
+                }}
+              >
+                {item.expenseItem && item.expenseItem.length > 25
+                  ? `${item.expenseItem.slice(0, 25)}...`
+                  : item.expenseItem || "--"}
+              </Typography>
+            </Tooltip>
           </Box>
         </Box>
 
@@ -220,7 +236,7 @@ export default function RateUpdateModal({
                 }}
               >
                 <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.text.secondary }}>
-                  ₹ {currentRateNum.toLocaleString("en-IN")}
+                  {formatWholeCurrency(currentRateNum)}
                 </Typography>
               </Box>
             </Box>
@@ -281,7 +297,7 @@ export default function RateUpdateModal({
                 fontSize: "0.78rem",
               }}
             >
-              {isIncrease ? "Increase" : "Decrease"} of ₹{Math.abs(diffAmount).toLocaleString("en-IN")}
+              {isIncrease ? "Increase" : "Decrease"} of {formatWholeCurrency(Math.abs(diffAmount))}
               {diffPercentage !== null ? ` (${isIncrease ? "+" : ""}${diffPercentage}%)` : ""}
             </Typography>
           </Box>

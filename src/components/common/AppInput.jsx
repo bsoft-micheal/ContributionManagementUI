@@ -18,6 +18,8 @@ export default function AppInput({
   required = false,
   restrictType,
   maxLength,
+  showCount = false,
+  countFormat,
   startAdornment,
   endAdornment,
   InputProps = {},
@@ -50,6 +52,27 @@ export default function AppInput({
       </IconButton>
     </InputAdornment>
   ) : undefined;
+
+  const currentLength = typeof value === "string" ? value.length : (value !== null && value !== undefined ? String(value).length : 0);
+  const characterCountAdornment = showCount ? (
+    <Typography
+      variant="caption"
+      sx={{
+        fontSize: "0.72rem",
+        fontWeight: 500,
+        color: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.45)" : "#94a3b8"),
+        userSelect: "none",
+        whiteSpace: "nowrap",
+        ml: 0.5,
+      }}
+    >
+      {typeof countFormat === "function"
+        ? countFormat(currentLength, maxLength)
+        : (maxLength ? `${currentLength}/${maxLength} characters` : currentLength)}
+    </Typography>
+  ) : undefined;
+
+  const effectiveEndAdornment = endAdornment || (showCount ? characterCountAdornment : undefined);
 
   const handleInputChange = (e) => {
     let val = e.target.value;
@@ -263,9 +286,9 @@ export default function AppInput({
               {startAdornment}
             </InputAdornment>
           ) : undefined,
-          endAdornment: endAdornment ? (
-            <InputAdornment position="end" sx={{ ml: 0.5 }}>
-              {endAdornment}
+          endAdornment: effectiveEndAdornment ? (
+            <InputAdornment position="end" sx={{ ml: 0.5, pointerEvents: "none" }}>
+              {effectiveEndAdornment}
             </InputAdornment>
           ) : defaultPasswordAdornment,
           ...InputProps,

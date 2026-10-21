@@ -22,6 +22,7 @@ import {
 import dayjs from "dayjs";
 import { formatGridDate, formatViewDateTime } from "../../utils/dateHelper";
 import SubmitPaymentModal from "../../components/payments/SubmitPaymentModal";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
@@ -536,7 +537,7 @@ export default function PaymentsPage() {
     {
       label: "Amount",
       key: "amount",
-      render: (row) => `₹${Number(row.amount).toLocaleString("en-IN")}`,
+      render: (row) => formatWholeCurrency(row.amount),
     },
     {
       label: "Payment Date",
@@ -838,7 +839,7 @@ export default function PaymentsPage() {
                   fontWeight={800}
                   color={(t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")}
                 >
-                  ₹{Number(selectedTxn.amount).toLocaleString("en-IN")}
+                  {formatWholeCurrency(selectedTxn.amount)}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 6 }}>

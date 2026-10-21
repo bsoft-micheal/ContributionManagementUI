@@ -132,6 +132,7 @@ export default function GalleryPage() {
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const savedFormRef = useRef(null);
 
@@ -772,6 +773,9 @@ export default function GalleryPage() {
 
     if (!form.category) newErrors.category = filed;
     if (!form.eventName) newErrors.eventName = filed;
+    if (form.description && form.description.length > 500) {
+      newErrors.description = "Description cannot exceed 500 characters";
+    }
 
     const existingCount = getExistingPhotoCountForEvent(form.eventName, editingPhoto);
     const maxAllowed = Math.max(0, 5 - existingCount);
@@ -798,6 +802,7 @@ export default function GalleryPage() {
       return;
     }
 
+    setSaving(true);
     try {
       const payload = {
         title: form.title.trim().slice(0, 250),
@@ -846,6 +851,8 @@ export default function GalleryPage() {
         ...prev,
         form: errMsg,
       }));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1111,13 +1118,9 @@ export default function GalleryPage() {
             <AppButton
               variant="contained"
               onClick={handleSavePhoto}
-              disabled={
-                !form.title?.trim() ||
-                form.title.trim().length > 250 ||
-                (form.description && form.description.length > 500)
-              }
+              disabled={saving}
             >
-              {editingPhoto ? "Update" : "Save"}
+              {saving ? "Saving..." : (editingPhoto ? "Update" : "Save")}
             </AppButton>
           </Stack>
         }
@@ -1136,6 +1139,7 @@ export default function GalleryPage() {
               placeholder="Enter the Title"
               value={form.title}
               maxLength={250}
+              showCount
               onChange={(e) => {
                 const raw = e.target.value;
                 const sanitized = raw.replace(/[^A-Za-z\s]/g, "").slice(0, 250);
@@ -1149,7 +1153,7 @@ export default function GalleryPage() {
                 }
               }}
               error={!!errors.title}
-              helperText={errors.title || `${(form.title || "").length}/250 characters`}
+              helperText={errors.title}
               required
             />
           </Grid>

@@ -15,6 +15,7 @@ import {
   Select,
   MenuItem,
   Avatar,
+  Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
@@ -31,6 +32,7 @@ import AppButton from "../common/AppButton";
 import { useAppToast } from "../common/AppToast";
 import { getBudgetCalculationHistoryAsync } from "../../services/budgetCalculationService";
 import { formatGridDate } from "../../utils/dateHelper";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 export default function RateHistoryModal({
   open,
@@ -92,7 +94,7 @@ export default function RateHistoryModal({
     <AppDialog
       open={open}
       onClose={onClose}
-      title={`Rate History - ${item.expenseItem || "Expense Item"}`}
+      title="Rate History"
       maxWidth="md"
       actions={
         <Box sx={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
@@ -117,24 +119,40 @@ export default function RateHistoryModal({
             border: `1px solid ${theme.palette.divider}`,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
             <Avatar
               sx={{
                 bgcolor: theme.palette.mode === "dark" ? "#2d2448" : "#ede8f9",
                 color: theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                 width: 48,
                 height: 48,
+                flexShrink: 0,
               }}
             >
               <ReceiptLongRoundedIcon />
             </Avatar>
-            <Box>
+            <Box sx={{ minWidth: 0, maxWidth: { xs: 200, sm: 260 } }}>
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                 Expense Item
               </Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: theme.palette.text.primary, lineHeight: 1.2 }}>
-                {item.expenseItem}
-              </Typography>
+              <Tooltip title={item.expenseItem && item.expenseItem.length > 25 ? item.expenseItem : ""} arrow>
+                <Typography
+                  variant="subtitle1"
+                  sx={{
+                    fontWeight: 800,
+                    color: theme.palette.text.primary,
+                    lineHeight: 1.2,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    cursor: item.expenseItem && item.expenseItem.length > 25 ? "pointer" : "default",
+                  }}
+                >
+                  {item.expenseItem && item.expenseItem.length > 25
+                    ? `${item.expenseItem.slice(0, 25)}...`
+                    : item.expenseItem || "--"}
+                </Typography>
+              </Tooltip>
             </Box>
           </Box>
 
@@ -160,7 +178,7 @@ export default function RateHistoryModal({
                   lineHeight: 1.1,
                 }}
               >
-                ₹{(item.rate ?? 0).toLocaleString("en-IN")}
+                {formatWholeCurrency(item.rate ?? 0)}
               </Typography>
             </Box>
 
@@ -262,7 +280,7 @@ export default function RateHistoryModal({
                             color: theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                           }}
                         >
-                          ₹{(row.newRate ?? 0).toLocaleString("en-IN")}
+                          {formatWholeCurrency(row.newRate ?? 0)}
                         </Typography>
                       </TableCell>
 
@@ -282,7 +300,7 @@ export default function RateHistoryModal({
                         ) : isIncrease ? (
                           <Chip
                             icon={<TrendingUpRoundedIcon sx={{ "&&": { color: "#16a34a", fontSize: "0.95rem" } }} />}
-                            label={`+₹${(row.changeAmount ?? 0).toLocaleString("en-IN")} (${row.changePercentage > 0 ? "+" : ""}${row.changePercentage}%)`}
+                            label={`+${formatWholeCurrency(row.changeAmount ?? 0)} (${row.changePercentage > 0 ? "+" : ""}${row.changePercentage}%)`}
                             size="small"
                             sx={{
                               fontSize: "0.7rem",
@@ -295,7 +313,7 @@ export default function RateHistoryModal({
                         ) : isDecrease ? (
                           <Chip
                             icon={<TrendingDownRoundedIcon sx={{ "&&": { color: "#dc2626", fontSize: "0.95rem" } }} />}
-                            label={`-₹${Math.abs(row.changeAmount ?? 0).toLocaleString("en-IN")} (${row.changePercentage}%)`}
+                            label={`-${formatWholeCurrency(Math.abs(row.changeAmount ?? 0))} (${row.changePercentage}%)`}
                             size="small"
                             sx={{
                               fontSize: "0.7rem",

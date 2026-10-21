@@ -32,6 +32,12 @@ import {
   getPaymentQrConfig,
   generateDynamicPaymentQr,
 } from "../../utils/upiQrHelper";
+import {
+  roundToWhole,
+  formatWholeCurrency,
+  formatWholeNumber,
+  distributeEqualSplit,
+} from "../../utils/roundingHelper";
 
 import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
@@ -301,13 +307,13 @@ export default function SubmitPaymentModal({
           {list.map((item, idx) => (
             <Box key={idx} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, fontSize: "0.74rem" }}>
               <span style={{ color: "#f1f5f9" }}>• {item.eventName || item.title || "Event"}</span>
-              <span style={{ fontWeight: 800, color: "#fff" }}>₹{Number(item.amount || 0).toLocaleString()}</span>
+              <span style={{ fontWeight: 800, color: "#fff" }}>{formatWholeCurrency(item.amount || 0)}</span>
             </Box>
           ))}
         </Stack>
         <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.2)", mt: 0.8, pt: 0.5, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "0.78rem", color: "#fca5a5" }}>
           <span>Total Arrears:</span>
-          <span>₹{totalArrears.toLocaleString()}</span>
+          <span>{formatWholeCurrency(totalArrears)}</span>
         </Box>
       </Box>
     );
@@ -650,7 +656,7 @@ export default function SubmitPaymentModal({
                 : (initialPreviousArrears !== undefined ? Number(initialPreviousArrears) : breakdown.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)));
 
             const safePrevArrears = filteredPrevArrears > 0 ? filteredPrevArrears : 0;
-            const total = isPaidStatus && safePrevArrears === 0 ? 0 : Number((currentEvDue + safePrevArrears).toFixed(2));
+            const total = isPaidStatus && safePrevArrears === 0 ? 0 : roundToWhole(currentEvDue + safePrevArrears);
 
             const baseAmt = Number(
               res.amount || matchedEvent?.amount || matchedEvent?.contributionAmount || (currentEvDue > 0 ? currentEvDue : resolvedFallback)
@@ -741,13 +747,13 @@ export default function SubmitPaymentModal({
     if (!duesSummary) return [];
     const opts = [];
     const isPaid = String(duesSummary.status || "").toLowerCase() === "paid";
-    const currentDue = isPaid ? 0 : Math.round((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount || 0) * 100) / 100;
-    const arrears = Math.round((duesSummary.previousArrears || 0) * 100) / 100;
+    const currentDue = isPaid ? 0 : roundToWhole(duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount || 0);
+    const arrears = roundToWhole(duesSummary.previousArrears || 0);
     const total = isPaid && arrears === 0 ? 0 : (duesSummary.totalDue !== undefined && duesSummary.totalDue !== null && Number(duesSummary.totalDue) > 0
-      ? Math.round(Number(duesSummary.totalDue) * 100) / 100
-      : Math.round(((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears) * 100) / 100);
+      ? roundToWhole(duesSummary.totalDue)
+      : roundToWhole((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) + arrears));
 
-    const fmt = (num) => Number(num || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmt = (num) => formatWholeNumber(num);
 
     if (total > 0) {
       opts.push({
@@ -773,18 +779,18 @@ export default function SubmitPaymentModal({
     setPaymentScope(scope);
     if (!duesSummary) return;
     const isPaid = String(duesSummary.status || "").toLowerCase() === "paid";
-    const currentDue = isPaid ? 0 : Math.round((duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0) * 100) / 100;
-    const arrears = Math.round((duesSummary.previousArrears || 0) * 100) / 100;
+    const currentDue = isPaid ? 0 : roundToWhole(duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0);
+    const arrears = roundToWhole(duesSummary.previousArrears || 0);
     const total = isPaid && arrears === 0 ? 0 : (duesSummary.totalDue !== undefined && duesSummary.totalDue !== null && Number(duesSummary.totalDue) > 0
-      ? Math.round(Number(duesSummary.totalDue) * 100) / 100
-      : Math.round((currentDue + arrears) * 100) / 100);
+      ? roundToWhole(duesSummary.totalDue)
+      : roundToWhole(currentDue + arrears));
 
     let amt = total;
     if (scope === "CurrentEvent") amt = currentDue;
     if (scope === "PreviousArrears") amt = arrears;
     if (scope === "AllOutstanding") amt = total;
 
-    setFormData((prev) => ({ ...prev, amount: amt.toFixed(2) }));
+    setFormData((prev) => ({ ...prev, amount: roundToWhole(amt).toString() }));
     setErrors((prev) => {
       if (!prev.amount) return prev;
       const next = { ...prev };
@@ -794,21 +800,20 @@ export default function SubmitPaymentModal({
 
     if (isMultiSplit && splitRows.length > 0) {
       const count = splitRows.length;
-      const baseShare = Math.floor((amt / count) * 100) / 100;
-      const remainder = Math.round((amt - baseShare * count) * 100) / 100;
+      const shares = distributeEqualSplit(roundToWhole(amt), count);
       setSplitRows((rows) =>
         rows.map((r, i) => ({
           ...r,
-          amount: i === 0 ? String((baseShare + remainder).toFixed(2)) : String(baseShare.toFixed(2)),
+          amount: String(shares[i] || 0),
         }))
       );
     }
   };
 
   const handleAddSplitRow = () => {
-    const curSum = splitRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-    const targetAmt = Number(formData.amount) || 0;
-    const remaining = Math.max(0, Math.round((targetAmt - curSum) * 100) / 100);
+    const curSum = roundToWhole(splitRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0));
+    const targetAmt = roundToWhole(formData.amount || 0);
+    const remaining = Math.max(0, targetAmt - curSum);
 
     if (targetAmt <= 0) {
       toast.warning("Please choose a payment scope and enter/select an amount first.");
@@ -867,14 +872,14 @@ export default function SubmitPaymentModal({
       return;
     }
     if (field === "amount") {
-      const targetAmt = Number(formData.amount) || 0;
-      const otherRowsSum = Math.round(
+      const targetAmt = roundToWhole(formData.amount || 0);
+      const otherRowsSum = roundToWhole(
         splitRows
           .filter((r) => r.id !== id)
-          .reduce((sum, r) => sum + (Number(r.amount) || 0), 0) * 100
-      ) / 100;
+          .reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+      );
 
-      const maxAllowedForThisRow = Math.max(0, Math.round((targetAmt - otherRowsSum) * 100) / 100);
+      const maxAllowedForThisRow = Math.max(0, targetAmt - otherRowsSum);
       const numVal = Number(sanitized);
 
       if (targetAmt > 0 && !isNaN(numVal) && numVal > maxAllowedForThisRow) {
@@ -904,16 +909,15 @@ export default function SubmitPaymentModal({
   };
 
   const handleQuickSplitEvenly = () => {
-    const targetAmt = Number(formData.amount) || 0;
+    const targetAmt = roundToWhole(formData.amount || 0);
     if (targetAmt <= 0 || splitRows.length === 0) return;
     const count = splitRows.length;
-    const baseShare = Math.floor((targetAmt / count) * 100) / 100;
-    const remainder = Math.round((targetAmt - baseShare * count) * 100) / 100;
+    const shares = distributeEqualSplit(targetAmt, count);
 
     setSplitRows((prev) =>
       prev.map((row, idx) => ({
         ...row,
-        amount: idx === 0 ? String((baseShare + remainder).toFixed(2)) : String(baseShare.toFixed(2)),
+        amount: String(shares[idx] || 0),
       }))
     );
   };
@@ -927,19 +931,17 @@ export default function SubmitPaymentModal({
       errs.paymentScope = "This field is required";
     }
     
-    const targetAmt = Math.round((Number(formData.amount) || 0) * 100) / 100;
+    const targetAmt = roundToWhole(formData.amount || 0);
     const maxDue = maxPayableDue !== null && maxPayableDue !== undefined
-      ? Math.round(Number(maxPayableDue) * 100) / 100
+      ? roundToWhole(maxPayableDue)
       : null;
 
     if (!formData.amount || !String(formData.amount).trim()) {
       errs.amount = "This field is required";
     } else if (isNaN(Number(formData.amount)) || targetAmt <= 0) {
-      errs.amount = "Contribution amount must be greater than ₹0.00";
-    } else if (maxDue !== null && maxDue > 0 && Math.round(targetAmt * 100) > Math.round(maxDue * 100)) {
-      const fmtMax = maxDue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const fmtTarget = targetAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      errs.amount = `Contribution amount (₹${fmtTarget}) cannot exceed the maximum payable due of ₹${fmtMax}`;
+      errs.amount = "Contribution amount must be greater than ₹0";
+    } else if (maxDue !== null && maxDue > 0 && targetAmt > maxDue) {
+      errs.amount = `Contribution amount (${formatWholeCurrency(targetAmt)}) cannot exceed the maximum payable due of ${formatWholeCurrency(maxDue)}`;
     } else if (targetAmt > 10000000) {
       errs.amount = "Contribution amount cannot exceed ₹1,00,00,000 (1 Crore)";
     }
@@ -952,16 +954,12 @@ export default function SubmitPaymentModal({
       if (splitRows.length === 0) {
         errs.split = "At least one payment row is required for payment breakdown";
       } else {
-        const sum = Math.round(splitRows.reduce((acc, r) => acc + (Number(r.amount) || 0), 0) * 100) / 100;
-        if (Math.abs(sum - (targetAmt || 0)) > 0.01) {
-          const diff = Math.round(((targetAmt || 0) - sum) * 100) / 100;
-          const fmtSum = sum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-          const fmtTarget = (targetAmt || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-          const fmtDiff = Math.abs(diff).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
+        const sum = roundToWhole(splitRows.reduce((acc, r) => acc + (Number(r.amount) || 0), 0));
+        if (sum !== targetAmt) {
+          const diff = targetAmt - sum;
           errs.split = diff > 0
-            ? `Allocated breakdown total (₹${fmtSum}) is less than Total Amount (₹${fmtTarget}). Remaining: ₹${fmtDiff}`
-            : `Allocated breakdown total (₹${fmtSum}) exceeds Total Amount (₹${fmtTarget}). Excess: ₹${fmtDiff}`;
+            ? `Allocated breakdown total (${formatWholeCurrency(sum)}) is less than Total Amount (${formatWholeCurrency(targetAmt)}). Remaining: ${formatWholeCurrency(diff)}`
+            : `Allocated breakdown total (${formatWholeCurrency(sum)}) exceeds Total Amount (${formatWholeCurrency(targetAmt)}). Excess: ${formatWholeCurrency(Math.abs(diff))}`;
         }
 
         // Check for duplicate payment modes
@@ -977,11 +975,11 @@ export default function SubmitPaymentModal({
           const r = splitRows[i];
           const rowAmt = Number(r.amount);
           if (!r.amount || isNaN(rowAmt) || rowAmt <= 0) {
-            errs.split = "Amount must be greater than ₹0.00";
+            errs.split = "Amount must be greater than ₹0";
             break;
           }
           if (targetAmt > 0 && rowAmt > targetAmt) {
-            errs.split = `Amount (₹${rowAmt.toLocaleString("en-IN")}) cannot exceed Total Amount (₹${targetAmt.toLocaleString("en-IN")})`;
+            errs.split = `Amount (${formatWholeCurrency(rowAmt)}) cannot exceed Total Amount (${formatWholeCurrency(targetAmt)})`;
             break;
           }
           if (rowAmt > 10000000) {
@@ -1392,7 +1390,7 @@ export default function SubmitPaymentModal({
               type={duesSummary ? "text" : "number"}
               value={
                 duesSummary && !isNaN(Number(formData.amount)) && Number(formData.amount) > 0
-                  ? Number(formData.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  ? formatWholeNumber(formData.amount)
                   : formData.amount
               }
               onChange={(e) => {
@@ -1408,18 +1406,17 @@ export default function SubmitPaymentModal({
                 if (splitRows.length === 1) {
                   setSplitRows([{ ...splitRows[0], amount: val }]);
                 } else if (splitRows.length > 1 && num > 0) {
-                  const baseShare = Math.floor((num / splitRows.length) * 100) / 100;
-                  const remainder = Math.round((num - baseShare * splitRows.length) * 100) / 100;
+                  const shares = distributeEqualSplit(roundToWhole(num), splitRows.length);
                   setSplitRows((rows) =>
                     rows.map((r, i) => ({
                       ...r,
-                      amount: i === 0 ? String((baseShare + remainder).toFixed(2)) : String(baseShare.toFixed(2)),
+                      amount: String(shares[i] || 0),
                     }))
                   );
                 }
               }}
               disabled={!!duesSummary}
-              placeholder="0.00"
+              placeholder="0"
               error={!!errors.amount}
               helperText={
                 errors.amount ||
@@ -1428,7 +1425,7 @@ export default function SubmitPaymentModal({
                   : !paymentScope && duesSummary && (duesSummary.previousArrears > 0 || duesSummary.totalDue > 0)
                   ? "Please select a payment target scope above"
                   : Number(formData.amount || 0) > 0
-                  ? `Fixed from target scope: ₹${Number(formData.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  ? `Fixed from target scope: ${formatWholeCurrency(formData.amount || 0)}`
                   : "")
               }
               required
@@ -1501,7 +1498,7 @@ export default function SubmitPaymentModal({
                   fontWeight={800}
                   color={duesSummary.currentEventDue > 0 ? "error.main" : "success.main"}
                 >
-                  ₹{(duesSummary.currentEventDue ?? 0).toLocaleString()}
+                  {formatWholeCurrency(duesSummary.currentEventDue ?? 0)}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 4 }} sx={{ borderLeft: (t) => `1px solid ${t.palette.divider}` }}>
@@ -1520,7 +1517,7 @@ export default function SubmitPaymentModal({
                       color={duesSummary.previousArrears > 0 ? "error.main" : "text.secondary"}
                       sx={{ textDecoration: duesSummary.previousArrears > 0 ? "underline dotted" : "none" }}
                     >
-                      ₹{(duesSummary.previousArrears || 0).toLocaleString()}
+                      {formatWholeCurrency(duesSummary.previousArrears || 0)}
                     </Typography>
                   </Box>
                 </Tooltip>
@@ -1530,7 +1527,7 @@ export default function SubmitPaymentModal({
                   Total Due
                 </Typography>
                 <Typography variant="body1" fontWeight={900} color={duesSummary.totalDue > 0 ? "error.main" : "success.main"}>
-                  ₹{(duesSummary.totalDue ?? 0).toLocaleString()}
+                  {formatWholeCurrency(duesSummary.totalDue ?? 0)}
                 </Typography>
               </Grid>
             </Grid>
@@ -1598,10 +1595,10 @@ export default function SubmitPaymentModal({
                     isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0)
                       ? "✓ Dues Cleared: ₹0"
                       : splitDifference === 0
-                      ? `✓ Allocated: ₹${allocatedSplitSum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ₹${targetAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      ? `✓ Allocated: ${formatWholeCurrency(allocatedSplitSum)} / ${formatWholeCurrency(targetAmount)}`
                       : splitDifference > 0
-                      ? `Remaining: ₹${splitDifference.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      : `Exceeds: ₹${Math.abs(splitDifference).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      ? `Remaining: ${formatWholeCurrency(splitDifference)}`
+                      : `Exceeds: ${formatWholeCurrency(Math.abs(splitDifference))}`
                   }
                   sx={{
                     fontWeight: 800,
@@ -2008,7 +2005,7 @@ export default function SubmitPaymentModal({
           )}
 
           <Typography variant="h5" fontWeight={900} sx={{ color: "primary.main", mb: 0.5 }}>
-            ₹{Number(activeQrModal?.amount || formData.amount || 0).toLocaleString("en-IN")}
+            {formatWholeCurrency(activeQrModal?.amount || formData.amount || 0)}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
             {formData.eventName || "Contribution"} • {formData.memberName || "Member"}

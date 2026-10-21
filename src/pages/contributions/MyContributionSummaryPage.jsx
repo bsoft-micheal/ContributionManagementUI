@@ -10,6 +10,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import { formatGridDate } from "../../utils/dateHelper";
+import { formatWholeCurrency, roundToWhole } from "../../utils/roundingHelper";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
 import CategoryRoundedIcon from "@mui/icons-material/CategoryRounded";
@@ -128,7 +129,7 @@ export default function MyContributionSummaryPage() {
       align: "right",
       render: (row) => (
         <Typography variant="body2" fontWeight={800} color="success.main">
-          ₹{row.totalPaid.toLocaleString()}
+          {formatWholeCurrency(row.totalPaid)}
         </Typography>
       ),
     },
@@ -175,7 +176,7 @@ export default function MyContributionSummaryPage() {
       align: "right",
       render: (row) => (
         <Typography variant="body2" fontWeight={700}>
-          ₹{row.amount.toLocaleString()}
+          {formatWholeCurrency(row.amount)}
         </Typography>
       ),
     },
@@ -242,8 +243,8 @@ export default function MyContributionSummaryPage() {
   };
 
   const memberName = summary?.memberName || authState?.fullName || "Member";
-  const totalPaid = summary?.totalPaidAmount ?? 0;
-  const totalPending = summary?.totalPendingAmount ?? 0;
+  const totalPaid = roundToWhole(summary?.totalPaidAmount ?? 0);
+  const totalPending = roundToWhole(summary?.totalPendingAmount ?? 0);
   const categoryCount = summary?.categoryBreakdown?.length ?? 0;
 
   return (
@@ -329,7 +330,7 @@ export default function MyContributionSummaryPage() {
                 <StatCard
                   icon={<AccountBalanceWalletRoundedIcon />}
                   label="Total Paid (All Time)"
-                  value={`₹${totalPaid.toLocaleString()}`}
+                  value={formatWholeCurrency(totalPaid)}
                   color="#16a34a"
                 />
               </Grid>
@@ -337,7 +338,7 @@ export default function MyContributionSummaryPage() {
                 <StatCard
                   icon={<PendingActionsRoundedIcon />}
                   label="Total Pending"
-                  value={`₹${totalPending.toLocaleString()}`}
+                  value={formatWholeCurrency(totalPending)}
                   color="#dc2626"
                 />
               </Grid>

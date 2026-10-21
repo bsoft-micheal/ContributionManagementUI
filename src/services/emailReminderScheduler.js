@@ -5,6 +5,7 @@ import {
   buildUpiPaymentUri,
   getQrCodeApiUrl,
 } from "../utils/upiQrHelper";
+import { formatWholeCurrency } from "../utils/roundingHelper";
 import { sendPaymentReminder } from "./contributionService";
 import { getContributionsAsync } from "./contributionService";
 import { getEventsAsync } from "./eventService";
@@ -126,7 +127,7 @@ export function interpolatePlaceholders(text, data = {}) {
     qrImageUrl = "",
   } = data;
 
-  const formattedAmount = typeof amount === "number" ? `₹${amount.toLocaleString("en-IN")}` : `₹${amount}`;
+  const formattedAmount = formatWholeCurrency(amount);
   const effectiveDueDate = dueDate ? (dayjs(dueDate).isValid() ? dayjs(dueDate).format("DD/MM/YYYY") : dueDate) : "End of Month";
 
   const qrHtmlTag = qrImageUrl
@@ -249,44 +250,7 @@ export async function sendTestEmail({
   const subject = interpolatePlaceholders(template.subject, placeholderData);
   const bodyText = interpolatePlaceholders(template.description, placeholderData);
 
-  const formattedAmount = `₹${testAmount.toLocaleString("en-IN")}`;
-  const isBirthday = (categoryName || "").toLowerCase().includes("birthday");
-  const celebrants = isBirthday
-    ? [
-        { name: "Leo Albert L", date: "October 05, 2026" },
-        { name: "Kaviarasan K", date: "October 08, 2026" },
-        { name: "Christy Chandran R", date: "October 09, 2026" },
-        { name: "testerr", date: "October 18, 2026" },
-      ]
-    : [];
-
-  const celebrantsTableRows = celebrants
-    .map(
-      (c) => `
-      <tr style="border-bottom: 1px dashed rgba(74, 63, 107, 0.1);">
-        <td style="padding: 8px 12px; color: #4a3f6b; font-weight: 700; font-size: 13.5px;">&#x1F382; ${c.name}</td>
-        <td align="right" style="padding: 8px 12px; color: #c026d3; font-weight: 700; font-size: 13.5px;">${c.date}</td>
-      </tr>`
-    )
-    .join("");
-
-  const celebrantsHtml = celebrants.length > 0
-    ? `
-      <div style="margin-bottom: 14px; border-bottom: 1px dashed rgba(74, 63, 107, 0.1); padding-bottom: 14px;">
-        <span style="font-weight: 700; color: #5b5280; display: block; margin-bottom: 8px;">Birthday Celebrants &amp; Dates:</span>
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; background-color: #fbfaff; border-radius: 8px; border: 1.5px solid #ece8f8;">
-          ${celebrantsTableRows}
-        </table>
-      </div>`
-    : "";
-
-  const eventDatesDisplay = isBirthday ? "5 Oct, 10 Oct (2), 19 Oct" : (placeholderData.dueDate || "End of Month");
-  const totalAmountDisplay = isBirthday ? "Rs.6250.00 (4 celebrants combined)" : "Rs.5000.00";
-  const displayAmount = isBirthday ? "₹135.87" : formattedAmount;
-
-  const qrEmbedded = bodyText && bodyText.includes("{qrCode}");
-  const paymentLinkEmbedded = bodyText && bodyText.includes("{paymentLink}");
-
+  const formattedAmount = formatWholeCurrency(testAmount);
   const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -603,7 +567,7 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
       </div>
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px;">
         <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:4px;">Pending Amount</span>
-        <span style="font-size:26px;font-weight:800;color:#0284c7;">₹${amount.toLocaleString("en-IN")}</span>
+        <span style="font-size:26px;font-weight:800;color:#0284c7;">${formatWholeCurrency(amount)}</span>
       </div>
       <div style="text-align:center;margin-bottom:20px;">
         <div style="display:inline-block;padding:10px;background:#ffffff;border:2px solid #0284c7;border-radius:12px;box-shadow:0 4px 12px rgba(2,132,199,0.1);">
@@ -612,7 +576,7 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
         <p style="margin:6px 0 0 0;font-size:11px;color:#64748b;">UPI ID: <strong>${upiId}</strong> (${receiverName})</p>
       </div>
       <div style="text-align:center;">
-        <a href="${upiUri}" style="background-color:#0284c7;color:#ffffff;text-decoration:none;padding:11px 24px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Pay ₹${amount.toLocaleString("en-IN")} via UPI</a>
+        <a href="${upiUri}" style="background-color:#0284c7;color:#ffffff;text-decoration:none;padding:11px 24px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Pay ${formatWholeCurrency(amount)} via UPI</a>
       </div>
     </div>
     <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px;text-align:center;font-size:11px;color:#94a3b8;">

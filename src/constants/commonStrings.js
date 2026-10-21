@@ -1,4 +1,5 @@
 // Centralized Common UI Strings and Text Constants
+import { formatWholeCurrency } from "../utils/roundingHelper";
 
 export const COMMON_STRINGS = {
   ACTIONS: {
@@ -71,7 +72,7 @@ export const COMMON_STRINGS = {
     BALANCE_LIMIT: "Balance Limit",
     REMAINING_LIMIT: "Remaining Budget",
     NO_BUDGET_ALLOCATED: "No expected budget allocated for this event",
-    AMOUNT_EXCEEDS_BUDGET: (extra) => `Expense exceeds budget by ₹${Number(extra).toLocaleString("en-IN")}`,
+    AMOUNT_EXCEEDS_BUDGET: (extra) => `Expense exceeds budget by ${formatWholeCurrency(extra)}`,
   },
   VALIDATION: {
     REQUIRED: "This field is required",
@@ -102,6 +103,10 @@ export const COMMON_STRINGS = {
     EMPTY_VALUE: "--",
     SELECT_ALL: "All",
     SELECT_OPTION: "Select an option"
+  },
+  CONTRIBUTION_CALCULATION: {
+    TITLE: "Contribution Share Rules",
+    MENU_LABEL: "Contribution Share Rules"
   }
 };
 

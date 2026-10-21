@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { Delete as DeleteIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatViewDate } from "../../utils/dateHelper";
+import { formatWholeCurrency, roundToWhole } from "../../utils/roundingHelper";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import AppConfirmDialog from "../common/AppConfirmDialog";
@@ -137,11 +138,11 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     return null;
   }
 
-  const totalExpected = event?.totalExpectedAmount || 0;
+  const totalExpected = roundToWhole(event?.totalExpectedAmount || 0);
   const totalPaid = (contributions || [])
     .filter((c) => c.paymentStatus === "Paid")
-    .reduce((sum, c) => sum + (c.amount || 0), 0);
-  const totalUnpaid = totalExpected - totalPaid;
+    .reduce((sum, c) => sum + roundToWhole(c.amount || 0), 0);
+  const totalUnpaid = Math.max(0, totalExpected - totalPaid);
   const unpaidList = (contributions || []).filter((c) => c.paymentStatus !== "Paid");
 
   const isBirthday = Boolean(
@@ -879,7 +880,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                     Total Expected
                   </Typography>
                   <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "primary.main" }}>
-                    ₹{totalExpected.toLocaleString("en-IN")}
+                    {formatWholeCurrency(totalExpected)}
                   </Typography>
                 </Box>
               </Grid>
@@ -896,7 +897,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                     Total Paid
                   </Typography>
                   <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "success.main" }}>
-                    ₹{totalPaid.toLocaleString("en-IN")}
+                    {formatWholeCurrency(totalPaid)}
                   </Typography>
                 </Box>
               </Grid>
@@ -913,7 +914,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                     Unpaid Amount
                   </Typography>
                   <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "#dc2626" }}>
-                    ₹{totalUnpaid.toLocaleString("en-IN")}
+                    {formatWholeCurrency(totalUnpaid)}
                   </Typography>
                 </Box>
               </Grid>

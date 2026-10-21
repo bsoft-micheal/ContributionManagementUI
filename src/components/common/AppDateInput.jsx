@@ -422,6 +422,13 @@ export default function AppDateInput({
 
   const handleChange = (newValue) => {
     if (onChange) {
+      if (newValue && newValue.isValid()) {
+        const min = minDate ? toDayjs(minDate) : (disablePast ? dayjs().startOf("day") : null);
+        if (min && newValue.isBefore(min, "day")) {
+          onChange(null, "Cannot select a past date");
+          return;
+        }
+      }
       onChange(newValue && newValue.isValid() ? newValue : null);
     }
   };
@@ -468,6 +475,11 @@ export default function AppDateInput({
         maxDate={maxDate ? toDayjs(maxDate) : undefined}
         disableFuture={disableFuture}
         disablePast={disablePast}
+        onError={(newError) => {
+          if (newError === "minDate" || newError === "disablePast") {
+            if (onChange) onChange(null, "Cannot select a past date");
+          }
+        }}
         closeOnSelect={false}
         showDaysOutsideCurrentMonth
         dayOfWeekFormatter={(date) =>
