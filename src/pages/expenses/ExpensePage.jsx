@@ -49,6 +49,7 @@ import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import useUnsavedChanges from "../../hooks/useUnsavedChanges";
+import ExpenseFormDialog from "../../components/expenses/ExpenseFormDialog";
 import {
   getExpensesAsync,
   createExpenseAsync,
@@ -679,7 +680,7 @@ export default function ExpensePage() {
       return;
     }
     const s = (row.status || "").toLowerCase();
-    if (s.includes("verify") || s.includes("approved") || s.includes("paid")) {
+    if (s.includes("verif") || s.includes("approv") || s.includes("paid")) {
       toast.warning("Verified expense cannot be edited.");
       return;
     }
@@ -715,7 +716,7 @@ export default function ExpensePage() {
       return;
     }
     const s = (row.status || "").toLowerCase();
-    if (s.includes("verify") || s.includes("approved") || s.includes("paid")) {
+    if (s.includes("verif") || s.includes("approv") || s.includes("paid")) {
       toast.warning("Verified expense cannot be deleted.");
       return;
     }
@@ -900,7 +901,7 @@ export default function ExpensePage() {
       return;
     }
     const s = (row.status || "").toLowerCase();
-    if (s.includes("verify") || s.includes("approved") || s.includes("paid")) {
+    if (s.includes("verif") || s.includes("approv") || s.includes("paid")) {
       toast.info("This expense has already been verified.");
       return;
     }
@@ -975,7 +976,7 @@ export default function ExpensePage() {
       );
 
       if (!isPendingState) {
-        toast.success(`Expense ${newStatus.toLowerCase().includes("verify") ? "verified" : "updated"} successfully!`);
+        toast.success(`Expense ${newStatus.toLowerCase().includes("verif") ? "verified" : "updated"} successfully!`);
       } else {
         toast.success(`Expense status updated to ${newStatus}!`);
       }
@@ -999,7 +1000,7 @@ export default function ExpensePage() {
       label: "Action",
       render: (row) => {
         const statusLower = (row.status || "").toLowerCase();
-        const isVerified = statusLower.includes("verify") || statusLower.includes("approved") || statusLower.includes("paid");
+        const isVerified = statusLower.includes("verif") || statusLower.includes("approv") || statusLower.includes("paid");
 
         return (
           <Box sx={{ display: "flex", gap: 0.5 }}>
@@ -1007,7 +1008,7 @@ export default function ExpensePage() {
               <span style={{ display: "inline-flex", cursor: !canViewExpense ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
-                  sx={{ p: 0.3 }}
+                  sx={{ p: 0.3, opacity: !canViewExpense ? 0.38 : 1 }}
                   disabled={!canViewExpense}
                   onClick={() => {
                     if (!canViewExpense) return;
@@ -1031,7 +1032,7 @@ export default function ExpensePage() {
               <span style={{ display: "inline-flex", cursor: (!canVerifyExpense || isVerified) ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
-                  sx={{ p: 0.3 }}
+                  sx={{ p: 0.3, opacity: (!canVerifyExpense || isVerified) ? 0.38 : 1 }}
                   disabled={!canVerifyExpense || isVerified}
                   onClick={() => handleOpenStatusDialog(row)}
                 >
@@ -1055,7 +1056,7 @@ export default function ExpensePage() {
               <span style={{ display: "inline-flex", cursor: (!canEditExpense || isVerified) ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
-                  sx={{ p: 0.3 }}
+                  sx={{ p: 0.3, opacity: (!canEditExpense || isVerified) ? 0.38 : 1 }}
                   disabled={!canEditExpense || isVerified}
                   onClick={() => handleEditExpense(row)}
                 >
@@ -1079,7 +1080,7 @@ export default function ExpensePage() {
               <span style={{ display: "inline-flex", cursor: (!canDeleteExpense || isVerified) ? "not-allowed" : "pointer" }}>
                 <IconButton
                   size="small"
-                  sx={{ p: 0.3 }}
+                  sx={{ p: 0.3, opacity: (!canDeleteExpense || isVerified) ? 0.38 : 1 }}
                   disabled={!canDeleteExpense || isVerified}
                   onClick={() => handleDeleteRequest(row)}
                 >
@@ -1144,7 +1145,7 @@ export default function ExpensePage() {
       key: "status",
       render: (row) => {
         const s = (row.status || "").toLowerCase();
-        const isApprovedOrVerified = s.includes("verify") || s.includes("approved") || s.includes("paid");
+        const isApprovedOrVerified = s.includes("verif") || s.includes("approv") || s.includes("paid");
         const isPending = s.includes("pending");
         return (
           <Typography
@@ -1499,454 +1500,16 @@ export default function ExpensePage() {
         }
       />
 
-      {/* Add / Edit Expense Dialog */}
-      <AppDialog
+      {/* Add / Edit Expense Dialog (Shared Component) */}
+      <ExpenseFormDialog
         open={dialogOpen}
-        onClose={() => handleCancelRequest(handleCloseDialog)}
-        title={editingExpense ? "Edit Expense" : "Add Expense"}
-        maxWidth="md"
-        actions={
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            {isOverBudget && (
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, fontSize: "0.75rem" }}>
-                Note: Expense exceeds budget by {formatWholeCurrency(projectedExtraSpent)}
-              </Typography>
-            )}
-            <AppButton
-              variant="outlined"
-              onClick={() => handleCancelRequest(handleCloseDialog)}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              onClick={handleSaveExpense}
-            >
-              {editingExpense ? "Update" : "Save"}
-            </AppButton>
-          </Stack>
-        }
-      >
-        <Grid container spacing={2}>
-          {/* 1. Event Type FIRST */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppSelect
-              label="Event Type"
-              placeholder="Select Event Type"
-              value={form.category}
-              onChange={(e) => {
-                const selectedType = e.target.value;
-                setForm((c) => {
-                  const matchingEvents = eventsList.filter((ev) => {
-                    const eventCat =
-                      ev.eventTypeName ||
-                      ev.category ||
-                      eventTypesList.find((t) => t.eventTypeId === ev.eventTypeId)?.eventTypeName;
-                    return (
-                      eventCat &&
-                      eventCat.trim().toLowerCase() === selectedType.trim().toLowerCase()
-                    );
-                  });
-                  const stillMatches = matchingEvents.some(
-                    (ev) => (ev.name || ev.eventName) === c.eventName
-                  );
-                  return {
-                    ...c,
-                    category: selectedType,
-                    eventName: stillMatches ? c.eventName : "",
-                  };
-                });
-                if (errors.category) setErrors((p) => ({ ...p, category: "" }));
-              }}
-              options={formEventTypeOptions}
-              error={!!errors.category}
-              helperText={errors.category}
-              required
-            />
-          </Grid>
-
-          {/* 2. Event NEXT (loaded/filtered against selected Event Type) */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppSelect
-              label="Event Name"
-              placeholder={form.category ? "Select Event Name" : "Select Event Type first"}
-              value={form.eventName}
-              onChange={(e) => {
-                const selectedEventName = e.target.value;
-                setForm((c) => {
-                  let autoCategory = c.category;
-                  if (!autoCategory) {
-                    const matchedEv = eventsList.find(
-                      (ev) => (ev.name || ev.eventName) === selectedEventName
-                    );
-                    if (matchedEv) {
-                      autoCategory =
-                        matchedEv.eventTypeName ||
-                        matchedEv.category ||
-                        eventTypesList.find((t) => t.eventTypeId === matchedEv.eventTypeId)
-                          ?.eventTypeName ||
-                        "";
-                    }
-                  }
-                  const matchedEv = eventsList.find((ev) => {
-                    const nameMatch = (ev.name || ev.eventName || "").trim().toLowerCase() === (selectedEventName || "").trim().toLowerCase();
-                    if (!nameMatch) return false;
-                    if (autoCategory) {
-                      const cat = ev.eventTypeName || ev.category || "";
-                      return cat.trim().toLowerCase() === autoCategory.trim().toLowerCase();
-                    }
-                    return true;
-                  });
-
-                  return {
-                    ...c,
-                    eventId: matchedEv ? (matchedEv.eventId || matchedEv.id || "") : "",
-                    eventName: selectedEventName,
-                    category: autoCategory,
-                    amount: c.amount,
-                  };
-                });
-                if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
-              }}
-              options={formEventOptions}
-              error={!!errors.eventName}
-              helperText={errors.eventName}
-              required
-            />
-          </Grid>
-
-          {/* Budget Info Card for Selected Event */}
-          {selectedEventBudget && (
-            <Grid size={{ xs: 12 }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.08)" : "rgba(124, 58, 237, 0.04)",
-                  border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.25)" : "rgba(124, 58, 237, 0.18)"}`,
-                }}
-              >
-                <Grid container spacing={1.5} alignItems="center">
-                  <Grid size={{ xs: 6, sm: 3 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                      {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
-                      {formatWholeCurrency(selectedEventBudget.expected)}
-                    </Typography>
-                  </Grid>
-                  <Grid size={{ xs: 6, sm: 3 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                      {COMMON_STRINGS.EXPENSES?.TOTAL_SPENT || "Total Spent"}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800, color: "info.main" }}>
-                      {formatWholeCurrency(selectedEventBudget.spent)}
-                    </Typography>
-                  </Grid>
-                  <Grid size={{ xs: 6, sm: 3 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                      {COMMON_STRINGS.EXPENSES?.REMAINING_BUDGET || "Remaining Budget"}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800, color: selectedEventBudget.remaining > 0 ? "success.main" : "text.secondary" }}>
-                      {formatWholeCurrency(selectedEventBudget.remaining)}
-                    </Typography>
-                  </Grid>
-                  <Grid size={{ xs: 6, sm: 3 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}>
-                      {COMMON_STRINGS.EXPENSES?.EXTRA_AMOUNT_SPENT || "Extra Amount Spent"}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800, color: selectedEventBudget.extraSpent > 0 ? "error.main" : "text.secondary" }}>
-                      {formatWholeCurrency(selectedEventBudget.extraSpent)}
-                    </Typography>
-                  </Grid>
-                </Grid>
-
-                {/* Notice if already over budget or projected to exceed budget */}
-                {isOverBudget ? (
-                  <Box
-                    sx={{
-                      mt: 1.5,
-                      p: 1,
-                      borderRadius: 1.5,
-                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(99, 102, 241, 0.12)" : "rgba(99, 102, 241, 0.08)",
-                      border: "1px solid rgba(99, 102, 241, 0.3)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ color: (t) => t.palette.mode === "dark" ? "#a5b4fc" : "#4338ca", fontWeight: 700, fontSize: "0.75rem" }}>
-                      Note: This expense exceeds the expected budget by {formatWholeCurrency(projectedExtraSpent)}. Total spending will be {formatWholeCurrency(projectedTotalSpent)}.
-                    </Typography>
-                  </Box>
-                ) : selectedEventBudget.extraSpent > 0 ? (
-                  <Box
-                    sx={{
-                      mt: 1.5,
-                      p: 1,
-                      borderRadius: 1.5,
-                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(99, 102, 241, 0.12)" : "rgba(99, 102, 241, 0.08)",
-                      border: "1px solid rgba(99, 102, 241, 0.3)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ color: (t) => t.palette.mode === "dark" ? "#a5b4fc" : "#4338ca", fontWeight: 700, fontSize: "0.75rem" }}>
-                      Note: This event has exceeded its expected budget by {formatWholeCurrency(selectedEventBudget.extraSpent)}.
-                    </Typography>
-                  </Box>
-                ) : null}
-              </Box>
-            </Grid>
-          )}
-
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppInput
-              label="Amount"
-              placeholder="₹ Enter amount"
-              value={form.amount}
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (raw === "") {
-                  setForm((c) => ({ ...c, amount: "" }));
-                  setErrors((p) => ({ ...p, amount: "" }));
-                  return;
-                }
-                if (raw.length > 6) return;
-                setForm((c) => ({ ...c, amount: raw }));
-                if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
-              }}
-              maxLength={6}
-              inputProps={{ maxLength: 6 }}
-              restrictType="numberonly"
-              error={!!errors.amount}
-              helperText={
-                errors.amount ||
-                (isOverBudget
-                  ? `Note: Exceeds budget by ${formatWholeCurrency(projectedExtraSpent)}`
-                  : selectedEventBudget && selectedEventBudget.expected > 0
-                  ? `Remaining Budget: ${formatWholeCurrency(Math.max(0, selectedEventBudget.expected - projectedTotalSpent))}`
-                  : undefined)
-              }
-              required
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppDateInput
-              label="Expense Date"
-              value={form.expenseDate}
-              onChange={(newVal) => {
-                setForm((c) => ({ ...c, expenseDate: newVal }));
-                if (errors.expenseDate) setErrors((p) => ({ ...p, expenseDate: "" }));
-              }}
-              disableFuture
-              maxDate={dayjs()}
-              error={!!errors.expenseDate}
-              helperText={errors.expenseDate}
-              required
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppSelect
-              label="Submitted By"
-              placeholder="Select Member"
-              value={form.submittedBy || loggedInUserName}
-              disabled
-              allowClear={false}
-              clearable={false}
-              onChange={(e) => {
-                setForm((c) => ({ ...c, submittedBy: e.target.value }));
-                if (errors.submittedBy) setErrors((p) => ({ ...p, submittedBy: "" }));
-              }}
-              options={memberOptions}
-              error={!!errors.submittedBy}
-              helperText={errors.submittedBy}
-              required
-            />
-          </Grid>
-
-          {/* Attachment Bar - Identical to Support Tickets */}
-          <Grid size={{ xs: 12 }}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Typography variant="caption" fontWeight={700} sx={{ color: (t) => t.palette.mode === "dark" ? "#e2e8f0" : "#334155" }}>
-                  Attachment (1 Image, Max 6MB)
-                </Typography>
-                {form.attachment && (
-                  <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem" }}>
-                    ✓ Image Attached
-                  </Typography>
-                )}
-              </Box>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImageChange}
-                accept="image/png,image/jpeg,image/jpg,image/webp"
-                style={{ display: "none" }}
-              />
-
-              {!form.attachment ? (
-                <Box
-                  onClick={() => fileInputRef.current?.click()}
-                  sx={{
-                    border: errors.attachment ? "1.5px dashed #ef4444" : "1.5px dashed",
-                    borderColor: errors.attachment
-                      ? "#ef4444"
-                      : ((t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)"),
-                    borderRadius: "10px",
-                    p: 1.1,
-                    minHeight: 46,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 1,
-                    cursor: "pointer",
-                    bgcolor: errors.attachment
-                      ? "rgba(239, 68, 68, 0.05)"
-                      : ((t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)"),
-                    transition: "all 0.2s ease",
-                    "&:hover": {
-                      borderColor: errors.attachment
-                        ? "#dc2626"
-                        : ((t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
-                      bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.07)",
-                    },
-                  }}
-                >
-                  <CloudUploadIcon sx={{ fontSize: 20, color: errors.attachment ? "#ef4444" : ((t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b") }} />
-                  <Typography variant="caption" fontWeight={600} sx={{ color: errors.attachment ? "#ef4444" : "text.secondary" }}>
-                    Click to attach image (Max 6MB)
-                  </Typography>
-                </Box>
-              ) : (
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    p: 0.6,
-                    px: 1,
-                    border: (t) => `1px solid ${t.palette.divider}`,
-                    borderRadius: "10px",
-                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc",
-                    minHeight: 46,
-                  }}
-                >
-                  <Box
-                    sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer", overflow: "hidden" }}
-                    onClick={() => openImagePreview(form.attachment, form.attachmentName || `${editingExpense?.id || "EXP"}_attachment.png`)}
-                  >
-                    <Box
-                      component="img"
-                      src={form.attachment}
-                      alt="Preview"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                        const fb = e.currentTarget.nextSibling;
-                        if (fb) fb.style.display = "flex";
-                      }}
-                      sx={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: "6px",
-                        objectFit: "cover",
-                        border: "1px solid rgba(0,0,0,0.1)",
-                        flexShrink: 0,
-                      }}
-                    />
-                    <Box
-                      sx={{
-                        display: "none",
-                        width: 34,
-                        height: 34,
-                        borderRadius: "6px",
-                        bgcolor: "rgba(74,63,107,0.1)",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <ImageIcon sx={{ fontSize: 20, color: "#4a3f6b" }} />
-                    </Box>
-                    <Box sx={{ overflow: "hidden" }}>
-                      <Tooltip title={form.attachmentName || "Attached Image"} arrow placement="top">
-                        <Typography
-                          variant="caption"
-                          fontWeight={700}
-                          sx={{
-                            display: "block",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            maxWidth: 140,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {form.attachmentName || "Attached Image"}
-                        </Typography>
-                      </Tooltip>
-                      <Typography variant="caption" sx={{ color: "#0284c7", fontSize: "0.66rem", display: "block" }}>
-                        Click to preview
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Stack direction="row" spacing={0.3}>
-                    <Tooltip title="Preview">
-                      <IconButton size="small" onClick={() => openImagePreview(form.attachment, form.attachmentName || `${editingExpense?.id || "EXP"}_attachment.png`)}>
-                        <ViewIcon sx={{ fontSize: 17, color: (t) => t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b" }} />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Download">
-                      <IconButton size="small" onClick={() => handleDownloadImage(form.attachment, form.attachmentName || `${editingExpense?.id || "EXP"}_attachment.png`)}>
-                        <DownloadIcon sx={{ fontSize: 17, color: "#0284c7" }} />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Change">
-                      <IconButton size="small" onClick={() => fileInputRef.current?.click()}>
-                        <CloudUploadIcon sx={{ fontSize: 17, color: "#d97706" }} />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Remove">
-                      <IconButton size="small" onClick={handleRemoveAttachment}>
-                        <DeleteIcon sx={{ fontSize: 17, color: "#ef4444" }} />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
-                </Box>
-              )}
-              {errors.attachment && (
-                <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 600, mt: 0.3, px: 0.5 }}>
-                  {errors.attachment}
-                </Typography>
-              )}
-            </Box>
-          </Grid>
-
-          {/* Description */}
-          <Grid size={{ xs: 12 }}>
-            <AppTextArea
-              label="Description"
-              placeholder="Enter expense description..."
-              value={form.description}
-              onChange={(e) => {
-                setForm((c) => ({ ...c, description: e.target.value }));
-                if (errors.description) setErrors((p) => ({ ...p, description: "" }));
-              }}
-              error={!!errors.description}
-              helperText={errors.description}
-              minRows={3}
-              maxLength={500}
-              showCount
-              required
-            />
-          </Grid>
-        </Grid>
-      </AppDialog>
+        onClose={handleCloseDialog}
+        onSaved={fetchExpensesFromDb}
+        editingExpense={editingExpense}
+        events={eventsList}
+        eventTypes={eventTypesList}
+        members={membersList}
+      />
 
       {/* Confirm Delete Dialog */}
       <AppConfirmDialog
@@ -2014,19 +1577,19 @@ export default function ExpensePage() {
                     fontSize: "0.75rem",
                     bgcolor: (() => {
                       const s = (selectedExpense.status || "").toLowerCase();
-                      if (s.includes("verify") || s.includes("approved") || s.includes("paid")) return "rgba(22, 163, 74, 0.12)";
+                      if (s.includes("verif") || s.includes("approv") || s.includes("paid")) return "rgba(22, 163, 74, 0.12)";
                       if (s.includes("pending")) return "rgba(234, 179, 8, 0.12)";
                       return "rgba(220, 38, 38, 0.12)";
                     })(),
                     color: (() => {
                       const s = (selectedExpense.status || "").toLowerCase();
-                      if (s.includes("verify") || s.includes("approved") || s.includes("paid")) return "#16a34a";
+                      if (s.includes("verif") || s.includes("approv") || s.includes("paid")) return "#16a34a";
                       if (s.includes("pending")) return "#d97706";
                       return "#dc2626";
                     })(),
                     border: (() => {
                       const s = (selectedExpense.status || "").toLowerCase();
-                      if (s.includes("verify") || s.includes("approved") || s.includes("paid")) return "1px solid rgba(22, 163, 74, 0.25)";
+                      if (s.includes("verif") || s.includes("approv") || s.includes("paid")) return "1px solid rgba(22, 163, 74, 0.25)";
                       if (s.includes("pending")) return "1px solid rgba(234, 179, 8, 0.25)";
                       return "1px solid rgba(220, 38, 38, 0.25)";
                     })(),
@@ -2213,7 +1776,7 @@ export default function ExpensePage() {
               variant="contained"
               onClick={handleUpdateExpenseStatus}
             >
-              {newStatus.toLowerCase().includes("verify")
+              {newStatus.toLowerCase().includes("verif")
                 ? "Verify Expense"
                 : newStatus.toLowerCase().includes("approv")
                   ? "Approve Expense"
@@ -2256,13 +1819,13 @@ export default function ExpensePage() {
                         fontSize: "0.72rem",
                         bgcolor: (() => {
                           const s = (statusExpense.status || "").toLowerCase();
-                          if (s.includes("verify") || s.includes("approved") || s.includes("paid")) return "rgba(22, 163, 74, 0.12)";
+                          if (s.includes("verif") || s.includes("approv") || s.includes("paid")) return "rgba(22, 163, 74, 0.12)";
                           if (s.includes("pending")) return "rgba(234, 179, 8, 0.15)";
                           return "rgba(220, 38, 38, 0.12)";
                         })(),
                         color: (() => {
                           const s = (statusExpense.status || "").toLowerCase();
-                          if (s.includes("verify") || s.includes("approved") || s.includes("paid")) return "#16a34a";
+                          if (s.includes("verif") || s.includes("approv") || s.includes("paid")) return "#16a34a";
                           if (s.includes("pending")) return "#d97706";
                           return "#dc2626";
                         })(),

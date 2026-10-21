@@ -552,22 +552,27 @@ export default function AppDateInput({
                 customSlotProps.textField.onClick(e);
               }
             },
-            InputProps: {
-              startAdornment: startAdornment ? (
-                <Box
-                  component="span"
-                  sx={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    mr: 0.5,
-                    ml: 0.2,
-                    pointerEvents: "none",
-                  }}
-                >
-                  {startAdornment}
-                </Box>
-              ) : undefined,
-              ...customSlotProps.textField?.InputProps,
+            slotProps: {
+              input: {
+                startAdornment: startAdornment ? (
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      mr: 0.5,
+                      ml: 0.2,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {startAdornment}
+                  </Box>
+                ) : undefined,
+                ...(customSlotProps.textField?.slotProps?.input || customSlotProps.textField?.InputProps || InputProps),
+              },
+              htmlInput: customSlotProps.textField?.slotProps?.htmlInput || customSlotProps.textField?.inputProps || inputProps,
+              inputLabel: customSlotProps.textField?.slotProps?.inputLabel || customSlotProps.textField?.InputLabelProps || InputLabelProps,
+              formHelperText: customSlotProps.textField?.slotProps?.formHelperText || customSlotProps.textField?.FormHelperTextProps || FormHelperTextProps,
             },
             sx: {
               "& .MuiOutlinedInput-root": {

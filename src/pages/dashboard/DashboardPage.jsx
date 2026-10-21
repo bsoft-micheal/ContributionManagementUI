@@ -974,10 +974,218 @@ export default function DashboardPage() {
   }, [events, isFilteredByEvent, isFilteredByType, summary?.totalExpenses]);
 
   // Current Remaining / Balance Amount (Amount in Hand):
-  // Formula: Total Collection − Total Expense − Total Allocated from Hand
+  // - Single Event View: Event cash balance = Total Collection - Total Expense
+  // - All Events View: Kitty Balance = Total Collection - Total Expense - Total Allocated from Kitty
   const totalRemaining = useMemo(() => {
+    if (isFilteredByEvent) {
+      return totalCollected - totalExpenses;
+    }
     return totalCollected - totalExpenses - totalAllocated;
-  }, [totalCollected, totalExpenses, totalAllocated]);
+  }, [isFilteredByEvent, totalCollected, totalExpenses, totalAllocated]);
+
+  // ── All Events that were funded from Amount In Hand (Kitty Beneficiaries) ──
+  const allFundedEvents = useMemo(() => {
+    const map = new Map();
+    (allEvents || []).forEach((e) => {
+      const isFunded = Boolean(e.useAvailableBalance ?? e.UseAvailableBalance);
+      const amt = Number(e.allocatedAmount ?? e.AllocatedAmount ?? 0);
+      if (isFunded && amt > 0) {
+        const key = String(e.eventId || e.id || e.eventName);
+        if (!map.has(key)) map.set(key, e);
+      }
+    });
+    return Array.from(map.values());
+  }, [allEvents]);
+
+  const totalKittyAllocated = useMemo(() => {
+    return allFundedEvents.reduce(
+      (sum, e) => sum + Number(e.allocatedAmount ?? e.AllocatedAmount ?? 0),
+      0
+    );
+  }, [allFundedEvents]);
+
+  // ── Source events that generated the surplus / Amount In Hand kitty ──
+  const contributingEvents = useMemo(() => {
+    return (allEvents || [])
+      .filter((e) => {
+        const isFunded = Boolean(e.useAvailableBalance ?? e.UseAvailableBalance);
+        const col = Number(e.collectedAmount || 0);
+        const exp = Number(e.expenseAmount || 0);
+        const surplus = col - exp;
+        return !isFunded && surplus > 0;
+      })
+      .map((e) => ({
+        id: e.eventId || e.id || e.eventName,
+        name: e.eventName,
+        amount: Number(e.collectedAmount || 0) - Number(e.expenseAmount || 0),
+      }));
+  }, [allEvents]);
+
+  // Badge for Amount In Hand Card:
+  // ONLY show on the specific event that actually used Amount In Hand,
+  // or on All Events view if Amount In Hand was used.
+  // Hover reveals WHICH events contributed the funds!
+  const usedInHandBadge = useMemo(() => {
+    // 1. Single Event view: Only show if THIS event used Amount In Hand
+    if (isFilteredByEvent) {
+      const currentEvt = events[0];
+      const isCurrentFunded = Boolean(currentEvt?.useAvailableBalance ?? currentEvt?.UseAvailableBalance);
+      const currentAllocated = Number(currentEvt?.allocatedAmount ?? currentEvt?.AllocatedAmount ?? 0);
+
+      if (!isCurrentFunded || currentAllocated <= 0) {
+        return null;
+      }
+
+      return (
+        <Tooltip
+          arrow
+          placement="top"
+          enterTouchDelay={0}
+          componentsProps={{
+            tooltip: {
+              sx: {
+                bgcolor: isDark ? "#1e293b" : "#0f172a",
+                color: "#ffffff",
+                p: 1.2,
+                borderRadius: "8px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                maxWidth: 320,
+              },
+            },
+            arrow: { sx: { color: isDark ? "#1e293b" : "#0f172a" } },
+          }}
+          title={
+            <Box sx={{ p: 0.3 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "#67e8f9", display: "block", mb: 0.4, fontSize: "0.76rem" }}>
+                Funded from Earlier Events:
+              </Typography>
+              {contributingEvents.length > 0 ? (
+                contributingEvents.map((src, idx) => (
+                  <Box key={src.id || idx} sx={{ display: "flex", justifyContent: "space-between", gap: 1.5, py: 0.2 }}>
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", fontSize: "0.72rem" }}>
+                      • {src.name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: "#a5f3fc", fontSize: "0.72rem" }}>
+                      {formatWholeCurrency(src.amount)}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", fontSize: "0.72rem" }}>
+                  Reserve Amount In Hand
+                </Typography>
+              )}
+              <Divider sx={{ borderColor: "rgba(255,255,255,0.15)", my: 0.4 }} />
+              <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: "#ffffff", fontSize: "0.72rem" }}>
+                  Total Used for {currentEvt.eventName}:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: "#67e8f9", fontSize: "0.72rem" }}>
+                  {formatWholeCurrency(currentAllocated)}
+                </Typography>
+              </Box>
+            </Box>
+          }
+        >
+          <Chip
+            label={`Used: ${formatWholeCurrency(currentAllocated)}`}
+            size="small"
+            sx={{
+              height: 20,
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              bgcolor: isDark ? "rgba(6, 182, 212, 0.2)" : "rgba(6, 182, 212, 0.12)",
+              color: isDark ? "#67e8f9" : "#0891b2",
+              border: "1px solid",
+              borderColor: isDark ? "rgba(6, 182, 212, 0.35)" : "rgba(6, 182, 212, 0.3)",
+              cursor: "pointer",
+            }}
+          />
+        </Tooltip>
+      );
+    }
+
+    // 2. All Events view: show total used if any event used Amount In Hand
+    if (allFundedEvents.length === 0 || totalKittyAllocated <= 0) {
+      return null;
+    }
+
+    return (
+      <Tooltip
+        arrow
+        placement="top"
+        enterTouchDelay={0}
+        componentsProps={{
+          tooltip: {
+            sx: {
+              bgcolor: isDark ? "#1e293b" : "#0f172a",
+              color: "#ffffff",
+              p: 1.2,
+              borderRadius: "8px",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              maxWidth: 320,
+            },
+          },
+          arrow: { sx: { color: isDark ? "#1e293b" : "#0f172a" } },
+        }}
+        title={
+          <Box sx={{ p: 0.3 }}>
+            <Typography variant="caption" sx={{ fontWeight: 800, color: "#67e8f9", display: "block", mb: 0.3, fontSize: "0.76rem" }}>
+              Amount In Hand Used:
+            </Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: "#ffffff", display: "block", fontSize: "0.72rem", mb: 0.2 }}>
+              Used for:
+            </Typography>
+            {allFundedEvents.map((e, idx) => (
+              <Box key={e.eventId || idx} sx={{ display: "flex", justifyContent: "space-between", gap: 1.5, py: 0.15 }}>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", fontSize: "0.72rem" }}>
+                  • {e.eventName}
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#67e8f9", fontSize: "0.72rem" }}>
+                  {formatWholeCurrency(Number(e.allocatedAmount || 0))}
+                </Typography>
+              </Box>
+            ))}
+            {contributingEvents.length > 0 && (
+              <>
+                <Divider sx={{ borderColor: "rgba(255,255,255,0.15)", my: 0.4 }} />
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#ffffff", display: "block", fontSize: "0.72rem", mb: 0.2 }}>
+                  Taken from:
+                </Typography>
+                {contributingEvents.map((src, idx) => (
+                  <Box key={src.id || idx} sx={{ display: "flex", justifyContent: "space-between", gap: 1.5, py: 0.15 }}>
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", fontSize: "0.72rem" }}>
+                      • {src.name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: "#a5f3fc", fontSize: "0.72rem" }}>
+                      {formatWholeCurrency(src.amount)}
+                    </Typography>
+                  </Box>
+                ))}
+              </>
+            )}
+          </Box>
+        }
+      >
+        <Chip
+          label={`Used: ${formatWholeCurrency(totalKittyAllocated)}`}
+          size="small"
+          sx={{
+            height: 20,
+            fontSize: "0.68rem",
+            fontWeight: 700,
+            bgcolor: isDark ? "rgba(6, 182, 212, 0.2)" : "rgba(6, 182, 212, 0.12)",
+            color: isDark ? "#67e8f9" : "#0891b2",
+            border: "1px solid",
+            borderColor: isDark ? "rgba(6, 182, 212, 0.35)" : "rgba(6, 182, 212, 0.3)",
+            cursor: "pointer",
+          }}
+        />
+      </Tooltip>
+    );
+  }, [isFilteredByEvent, events, allFundedEvents, totalKittyAllocated, contributingEvents, isDark]);
 
   const pendingCount = events.reduce((sum, e) => sum + (Number(e.pendingContributionsCount) || 0), 0);
   const totalContributionsCount = events.reduce((sum, e) => sum + (Number(e.totalContributionsCount) || 0), 0);
@@ -1245,165 +1453,166 @@ export default function DashboardPage() {
         <>
           {/* ── Top Filter Bar ────────────────────────────────────────────────── */}
           <Card
-        sx={{
-          p: { xs: 2, sm: 2.25 },
-          px: { xs: 2, sm: 3 },
-          borderRadius: 3,
-          overflow: "visible",
-          bgcolor: isDark ? "background.paper" : "#ffffff",
-          border: `1px solid ${theme.palette.divider}`,
-          boxShadow: isDark
-            ? "0 4px 20px rgba(0,0,0,0.25)"
-            : "0 2px 12px rgba(0,0,0,0.03)",
-        }}
-      >
-        <FilterBar
-          pending={pendingFilters}
-          onChange={handleFilterChange}
-          onFilter={handleFilter}
-          onClear={handleClear}
-          yearOptions={dynamicYearOptions}
-          eventTypeOptions={eventTypeOptions}
-          eventOptions={eventOptions}
-          loading={loading}
-        />
-      </Card>
+            sx={{
+              p: { xs: 2, sm: 2.25 },
+              px: { xs: 2, sm: 3 },
+              borderRadius: 3,
+              overflow: "visible",
+              bgcolor: isDark ? "background.paper" : "#ffffff",
+              border: `1px solid ${theme.palette.divider}`,
+              boxShadow: isDark
+                ? "0 4px 20px rgba(0,0,0,0.25)"
+                : "0 2px 12px rgba(0,0,0,0.03)",
+            }}
+          >
+            <FilterBar
+              pending={pendingFilters}
+              onChange={handleFilterChange}
+              onFilter={handleFilter}
+              onClear={handleClear}
+              yearOptions={dynamicYearOptions}
+              eventTypeOptions={eventTypeOptions}
+              eventOptions={eventOptions}
+              loading={loading}
+            />
+          </Card>
 
-      {/* ── Content ─────────────────────────────────────────────────────── */}
-      <Stack spacing={3}>
+          {/* ── Content ─────────────────────────────────────────────────────── */}
+          <Stack spacing={3}>
 
-        {/* ① Top Summary Metric Cards */}
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "repeat(2, minmax(0, 1fr))",
-              md: isMember ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
-              lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
-            },
-            gap: { xs: 1, sm: 1.25 },
-          }}
-        >
-          {isMember ? (
-            <>
-              {/* Member Card 1: Paid Amount */}
-              <MetricCard
-                label="Paid Amount"
-                value={formatWholeCurrency(totalCollected)}
-                accent="#10b981"
-                onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-                actionText="My Payments →"
-              />
-              {/* Member Card 2: Unpaid Amount */}
-              <MetricCard
-                label="Unpaid Amount"
-                value={formatWholeCurrency(totalPending)}
-                accent="#f43f5e"
-                onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-                actionText="View Unpaid →"
-              />
-              {/* Member Card 3: Total Expenses */}
-              <MetricCard
-                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
-                value={formatWholeCurrency(totalExpenses)}
-                accent="#f59e0b"
-                onClick={() => navigate("/expense")}
-                actionText="Expenses →"
-              />
-              {/* Member Card 4: Total Events */}
-              <MetricCard
-                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
-                value={events.length}
-                accent="#8b5cf6"
-                onClick={() => navigate("/events")}
-                actionText="View Events →"
-              />
-            </>
-          ) : (
-            <>
-              {/* Other Roles: Card 1: Expected Amount */}
-              <MetricCard
-                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Expected Amount"}
-                value={formatWholeCurrency(totalExpected)}
-                accent="#6366f1"
-                onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
-                actionText="All Members →"
-              />
-              {/* Other Roles: Card 2: Collection Amount */}
-              <MetricCard
-                label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Collection Amount"}
-                value={formatWholeCurrency(totalCollected)}
-                accent="#10b981"
-                onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-                actionText="View Paid →"
-              />
-              {/* Other Roles: Card 3: Pending Amount */}
-              <MetricCard
-                label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Pending Amount"}
-                value={formatWholeCurrency(totalPending)}
-                accent="#f43f5e"
-                onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-                actionText="View Unpaid →"
-              />
-              {/* Other Roles: Card 4: Total Expenses */}
-              <MetricCard
-                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
-                value={formatWholeCurrency(totalExpenses)}
-                accent="#f59e0b"
-                onClick={() => navigate("/expense")}
-                actionText="Expenses →"
-              />
-              {/* Other Roles: Card 5: Amount in Hand */}
-              <MetricCard
-                label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Amount in Hand"}
-                value={formatWholeCurrency(totalRemaining)}
-                accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
-                actionText="Amount In Hand →"
-              />
-              {/* Other Roles: Card 6: Total Events */}
-              <MetricCard
-                label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
-                value={events.length}
-                accent="#8b5cf6"
-                onClick={() => navigate("/events")}
-                actionText="View Events →"
-              />
-            </>
-          )}
-        </Box>
+            {/* ① Top Summary Metric Cards */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  md: isMember ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+                  lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
+                },
+                gap: { xs: 1, sm: 1.25 },
+              }}
+            >
+              {isMember ? (
+                <>
+                  {/* Member Card 1: Paid Amount */}
+                  <MetricCard
+                    label="Paid Amount"
+                    value={formatWholeCurrency(totalCollected)}
+                    accent="#10b981"
+                    onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+                    actionText="My Payments →"
+                  />
+                  {/* Member Card 2: Unpaid Amount */}
+                  <MetricCard
+                    label="Unpaid Amount"
+                    value={formatWholeCurrency(totalPending)}
+                    accent="#f43f5e"
+                    onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
+                    actionText="View Unpaid →"
+                  />
+                  {/* Member Card 3: Total Expenses */}
+                  <MetricCard
+                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
+                    value={formatWholeCurrency(totalExpenses)}
+                    accent="#f59e0b"
+                    onClick={() => navigate("/expense")}
+                    actionText="Expenses →"
+                  />
+                  {/* Member Card 4: Total Events */}
+                  <MetricCard
+                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
+                    value={events.length}
+                    accent="#8b5cf6"
+                    onClick={() => navigate("/events")}
+                    actionText="View Events →"
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Other Roles: Card 1: Expected Amount */}
+                  <MetricCard
+                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Expected Amount"}
+                    value={formatWholeCurrency(totalExpected)}
+                    accent="#6366f1"
+                    onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
+                    actionText="All Members →"
+                  />
+                  {/* Other Roles: Card 2: Collection Amount */}
+                  <MetricCard
+                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Collection Amount"}
+                    value={formatWholeCurrency(totalCollected)}
+                    accent="#10b981"
+                    onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
+                    actionText="View Paid →"
+                  />
+                  {/* Other Roles: Card 3: Pending Amount */}
+                  <MetricCard
+                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Pending Amount"}
+                    value={formatWholeCurrency(totalPending)}
+                    accent="#f43f5e"
+                    onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
+                    actionText="View Unpaid →"
+                  />
+                  {/* Other Roles: Card 4: Total Expenses */}
+                  <MetricCard
+                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
+                    value={formatWholeCurrency(totalExpenses)}
+                    accent="#f59e0b"
+                    onClick={() => navigate("/expense")}
+                    actionText="Expenses →"
+                  />
+                  {/* Other Roles: Card 5: Amount in Hand */}
+                  <MetricCard
+                    label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Amount in Hand"}
+                    value={formatWholeCurrency(totalRemaining)}
+                    accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
+                    badge={usedInHandBadge}
+                    actionText="Amount In Hand →"
+                  />
+                  {/* Other Roles: Card 6: Total Events */}
+                  <MetricCard
+                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
+                    value={events.length}
+                    accent="#8b5cf6"
+                    onClick={() => navigate("/events")}
+                    actionText="View Events →"
+                  />
+                </>
+              )}
+            </Box>
 
-        {/* ② Financial Overview Column / Bar Chart */}
-        {events.length > 0 ? (
-          <FinancialBarChart
-            totalExpected={totalExpected}
-            totalCollected={totalCollected}
-            totalPending={totalPending}
-            totalExpenses={totalExpenses}
-            totalRemaining={totalRemaining}
-            events={events}
-            isMember={isMember}
-          />
-        ) : (
-          <Box sx={{
-            py: 10, display: "grid", placeItems: "center", color: "text.secondary",
-            border: `1px dashed ${theme.palette.divider}`, borderRadius: 2,
-          }}>
-            <Typography variant="body2">
-              {isFilteredByType
-                ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
-                : "No records found."}
-            </Typography>
-          </Box>
-        )}
-        <CollapsibleSection
-          title="Events for Selected Period"
-          count={events.length}
-          defaultOpen
-        >
-          <AppDataTable columns={columns} data={events} loading={false} />
-        </CollapsibleSection>
-      </Stack>
+            {/* ② Financial Overview Column / Bar Chart */}
+            {events.length > 0 ? (
+              <FinancialBarChart
+                totalExpected={totalExpected}
+                totalCollected={totalCollected}
+                totalPending={totalPending}
+                totalExpenses={totalExpenses}
+                totalRemaining={totalRemaining}
+                events={events}
+                isMember={isMember}
+              />
+            ) : (
+              <Box sx={{
+                py: 10, display: "grid", placeItems: "center", color: "text.secondary",
+                border: `1px dashed ${theme.palette.divider}`, borderRadius: 2,
+              }}>
+                <Typography variant="body2">
+                  {isFilteredByType
+                    ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
+                    : "No records found."}
+                </Typography>
+              </Box>
+            )}
+            <CollapsibleSection
+              title="Events for Selected Period"
+              count={events.length}
+              defaultOpen
+            >
+              <AppDataTable columns={columns} data={events} loading={false} />
+            </CollapsibleSection>
+          </Stack>
         </>
       )}
 

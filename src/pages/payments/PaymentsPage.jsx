@@ -41,6 +41,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
 import { TOAST_MESSAGES, COMMON_STRINGS, MENU_FEATURE_IDS } from "../../constants";
 import { getImageUrl } from "../../services/apiClient";
+import { groupSplitTransactions } from "../../utils/paymentGroupHelper";
 
 export default function PaymentsPage() {
   const navigate = useNavigate();
@@ -177,7 +178,8 @@ export default function PaymentsPage() {
           createdOn: t.createdOn || t.CreatedOn || t.createdAt || t.CreatedAt || null,
           createdAt: t.createdAt || t.CreatedAt || t.createdOn || t.CreatedOn || null,
         }));
-        setTransactions(mapped);
+        const grouped = groupSplitTransactions(mapped);
+        setTransactions(grouped);
       }
     } catch {
       toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
@@ -238,7 +240,12 @@ export default function PaymentsPage() {
         return false;
       }
       if (appliedEvent !== "ALL" && t.eventName !== appliedEvent) return false;
-      if (appliedMode !== "ALL" && t.paymentMode !== appliedMode) return false;
+      if (appliedMode !== "ALL") {
+        const matchMode =
+          t.paymentMode === appliedMode ||
+          (Array.isArray(t.paymentModes) && t.paymentModes.includes(appliedMode));
+        if (!matchMode) return false;
+      }
       if (appliedStatus !== "ALL" && t.status !== appliedStatus) return false;
       if (appliedDate && !dayjs(t.paymentDate).isSame(appliedDate, "day")) return false;
       return true;
@@ -503,7 +510,7 @@ export default function PaymentsPage() {
           >
             {row.id}
           </Typography>
-          {row.parentTxnNumber && (
+          {(row.isSplitGroup || row.parentTxnNumber) && (
             <Chip
               label="Split"
               size="small"
@@ -795,7 +802,70 @@ export default function PaymentsPage() {
               <Box>{renderStatusBadge(selectedTxn.status)}</Box>
             </Box>
 
-            {selectedTxn.parentTxnNumber && (
+            {selectedTxn.isSplitGroup && selectedTxn.splits?.length > 0 ? (
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: "10px",
+                  bgcolor: (t) =>
+                    t.palette.mode === "dark" ? "rgba(99, 102, 241, 0.08)" : "rgba(99, 102, 241, 0.04)",
+                  border: "1px solid rgba(99, 102, 241, 0.25)",
+                }}
+              >
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#6366f1" }}>
+                    Split Payment Breakdown ({selectedTxn.splits.length} parts)
+                  </Typography>
+                  <Chip
+                    label={`Total: ${formatWholeCurrency(selectedTxn.amount)}`}
+                    size="small"
+                    sx={{
+                      fontWeight: 800,
+                      bgcolor: "rgba(99, 102, 241, 0.15)",
+                      color: "#6366f1",
+                    }}
+                  />
+                </Stack>
+
+                <Stack spacing={1}>
+                  {selectedTxn.splits.map((split, sIdx) => (
+                    <Box
+                      key={split.id || sIdx}
+                      sx={{
+                        p: 1.25,
+                        borderRadius: "8px",
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#ffffff",
+                        border: (t) => `1px solid ${t.palette.divider}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 1,
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.8rem", color: "text.primary" }}>
+                          {split.id || split.txnNumber}
+                        </Typography>
+                        {renderPaymentModeBadge(split.paymentMode)}
+                      </Box>
+
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        {split.utr && split.utr !== "-" && split.utr !== "--" && (
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
+                            Ref: <strong>{split.utr}</strong>
+                          </Typography>
+                        )}
+                        <Typography variant="body2" fontWeight={800} sx={{ color: "success.main" }}>
+                          {formatWholeCurrency(split.amount)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            ) : selectedTxn.parentTxnNumber && (
               <Box
                 sx={{
                   p: 1.5,

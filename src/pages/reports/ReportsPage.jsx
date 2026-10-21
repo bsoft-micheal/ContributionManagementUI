@@ -49,6 +49,7 @@ import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getPaymentTransactionsAsync } from "../../services/paymentService";
 import { getUsersAsync } from "../../services/userService";
 import AnnualMemberMatrix from "../../components/reports/AnnualMemberMatrix";
+import { groupSplitTransactions } from "../../utils/paymentGroupHelper";
 
 /* ─── Horizontal Bar Chart ─── */
 function SimpleBarChart({ items, valueKey = "value", labelKey = "label" }) {
@@ -612,7 +613,7 @@ export default function ReportsPage({ mode = "event" }) {
         ]);
         if (Array.isArray(eventsRes)) setEventsList(eventsRes);
         if (Array.isArray(typesRes)) setEventTypesList(typesRes);
-        if (Array.isArray(paymentsRes)) setPaymentTransactions(paymentsRes);
+        if (Array.isArray(paymentsRes)) setPaymentTransactions(groupSplitTransactions(paymentsRes));
         if (Array.isArray(usersRes?.data)) setUsersList(usersRes.data);
         else if (Array.isArray(usersRes)) setUsersList(usersRes);
       } catch {

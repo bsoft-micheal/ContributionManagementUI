@@ -793,6 +793,15 @@ export default function GalleryPage() {
   };
 
   const handleDeleteRequest = (row) => {
+    if (!canDeletePhoto) {
+      toast.error("You do not have permission to delete photos.");
+      return;
+    }
+    const hasPhotos = (Array.isArray(row.images) && row.images.length > 0) || Boolean(row.imageUrl && String(row.imageUrl).trim());
+    if (hasPhotos) {
+      toast.warning("Cannot delete gallery entry once photos are added.");
+      return;
+    }
     setPhotoToDelete(row);
     setDeleteConfirmOpen(true);
   };
@@ -930,66 +939,83 @@ export default function GalleryPage() {
   const columns = [
     {
       label: "Action",
-      render: (row) => (
-        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-          <Tooltip title={canViewGallery ? "View Details" : "Disabled"}>
-            <span style={{ display: "inline-flex", cursor: !canViewGallery ? "not-allowed" : "pointer" }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canViewGallery}
-                onClick={() => {
-                  if (!canViewGallery) return;
-                  setSelectedPhoto(row);
-                  setActiveViewImageIndex(0);
-                  setViewDialogOpen(true);
-                }}
-              >
-                <ViewIcon
-                  sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) => canViewGallery ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
+      render: (row) => {
+        const hasPhotos = (Array.isArray(row.images) && row.images.length > 0) || Boolean(row.imageUrl && String(row.imageUrl).trim());
+        const isDeletable = canDeletePhoto && !hasPhotos;
+
+        return (
+          <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+            <Tooltip title={canViewGallery ? "View Details" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canViewGallery ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canViewGallery}
+                  onClick={() => {
+                    if (!canViewGallery) return;
+                    setSelectedPhoto(row);
+                    setActiveViewImageIndex(0);
+                    setViewDialogOpen(true);
                   }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={canEditPhoto ? "Edit" : "Disabled"}>
-            <span style={{ display: "inline-flex", cursor: !canEditPhoto ? "not-allowed" : "pointer" }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canEditPhoto}
-                onClick={() => handleEditPhoto(row)}
-              >
-                <EditIcon
+                >
+                  <ViewIcon
+                    sx={{
+                      fontSize: "1.05rem",
+                      color: (theme) => canViewGallery ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={canEditPhoto ? "Edit" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canEditPhoto ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canEditPhoto}
+                  onClick={() => handleEditPhoto(row)}
+                >
+                  <EditIcon
+                    sx={{
+                      fontSize: "1.05rem",
+                      color: (theme) => canEditPhoto ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip
+              title={
+                !canDeletePhoto
+                  ? "Disabled"
+                  : hasPhotos
+                  ? "Cannot delete gallery entry once photos are added"
+                  : "Delete"
+              }
+            >
+              <span style={{ display: "inline-flex", cursor: !isDeletable ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
                   sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) => canEditPhoto ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
+                    p: 0.3,
+                    opacity: !isDeletable ? 0.38 : 1,
+                    pointerEvents: !isDeletable ? "none" : "auto",
                   }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={canDeletePhoto ? "Delete" : "Disabled"}>
-            <span style={{ display: "inline-flex", cursor: !canDeletePhoto ? "not-allowed" : "pointer" }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canDeletePhoto}
-                onClick={() => handleDeleteRequest(row)}
-              >
-                <DeleteIcon
-                  sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) => canDeletePhoto ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
-                  }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      ),
+                  disabled={!isDeletable}
+                  onClick={() => handleDeleteRequest(row)}
+                >
+                  <DeleteIcon
+                    sx={{
+                      fontSize: "1.05rem",
+                      color: (theme) => isDeletable ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        );
+      },
     },
     {
       label: "Title",
