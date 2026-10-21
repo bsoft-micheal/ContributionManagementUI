@@ -1098,32 +1098,61 @@ export default function ContributionsPage() {
     const actualReceivedAmt = getActualReceivedAmount(row, matchedTx);
     const isAmountReceived = actualReceivedAmt > 0;
 
-    const list = Array.isArray(dbStatuses) && dbStatuses.length > 0
-      ? dbStatuses
-          .filter((s) => s.statusName && s.isActive !== false)
-          .map((s) => {
-            const isVerificationStatus = ["verified", "paid", "closed", "completed"].includes(
-              String(s.statusName).toLowerCase().trim()
-            );
-            return {
-              label: !isAmountReceived && isVerificationStatus
-                ? `${s.statusName} (Payment not received)`
-                : s.statusName,
-              value: s.statusName,
-              disabled: !isAmountReceived && isVerificationStatus,
-            };
-          })
-      : [
-          { label: "Pending", value: "Pending" },
-          { label: isAmountReceived ? "Verified" : "Verified (Payment not received)", value: "Verified", disabled: !isAmountReceived },
-          { label: "Rejected", value: "Rejected" },
-          { label: isAmountReceived ? "Paid" : "Paid (Payment not received)", value: "Paid", disabled: !isAmountReceived },
-        ];
+    // Allowed statuses for Authority Status Update modal: Pending, Rejected, Verified (Paid is strictly excluded)
+    const allowed = ["pending", "verified", "rejected"];
 
-    if (row?.paymentStatus && !list.some((o) => o.value.toLowerCase() === String(row.paymentStatus).toLowerCase())) {
-      return [{ label: String(row.paymentStatus), value: String(row.paymentStatus) }, ...list];
+    let options = [];
+
+    if (Array.isArray(dbStatuses) && dbStatuses.length > 0) {
+      options = dbStatuses
+        .filter((s) => {
+          const name = String(s.statusName || "").toLowerCase().trim();
+          return s.statusName && s.isActive !== false && allowed.includes(name) && name !== "paid";
+        })
+        .map((s) => {
+          const name = s.statusName.trim();
+          const isVerificationStatus = name.toLowerCase() === "verified";
+          return {
+            label: !isAmountReceived && isVerificationStatus
+              ? `${name} (Payment not received)`
+              : name,
+            value: name,
+            disabled: !isAmountReceived && isVerificationStatus,
+          };
+        });
     }
-    return list;
+
+    // Ensure all 3 required statuses (Pending, Verified, Rejected) exist in options
+    const existingValues = new Set(options.map((o) => o.value.toLowerCase()));
+
+    if (!existingValues.has("pending")) {
+      options.push({ label: "Pending", value: "Pending", disabled: false });
+    }
+    if (!existingValues.has("verified")) {
+      options.push({
+        label: isAmountReceived ? "Verified" : "Verified (Payment not received)",
+        value: "Verified",
+        disabled: !isAmountReceived,
+      });
+    }
+    if (!existingValues.has("rejected")) {
+      options.push({ label: "Rejected", value: "Rejected", disabled: false });
+    }
+
+    // Sort to keep consistent order: Pending, Verified, Rejected
+    const order = ["pending", "verified", "rejected"];
+    options.sort((a, b) => order.indexOf(a.value.toLowerCase()) - order.indexOf(b.value.toLowerCase()));
+
+    // Never display "Paid" even if row's current paymentStatus is "Paid"
+    if (
+      row?.paymentStatus &&
+      String(row.paymentStatus).toLowerCase().trim() !== "paid" &&
+      !options.some((o) => o.value.toLowerCase() === String(row.paymentStatus).toLowerCase().trim())
+    ) {
+      return [{ label: String(row.paymentStatus), value: String(row.paymentStatus) }, ...options];
+    }
+
+    return options;
   };
   const renderStatusBadge = (status) => {
     let color = "#b45309";
