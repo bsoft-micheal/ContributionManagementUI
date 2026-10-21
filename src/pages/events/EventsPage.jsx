@@ -1107,48 +1107,56 @@ export default function EventsPage() {
         members={members}
       />
 
-      <EventPhotoDetailsDialog
-        open={photoDetailsDialogOpen}
-        onClose={() => {
-          setPhotoDetailsDialogOpen(false);
-          setPhotoEvent(null);
-        }}
-        event={photoEvent}
-        onAddPhotosClick={(ev) => {
-          setAddPhotoEvent(ev);
-          setAddPhotoDialogOpen(true);
-        }}
-      />
+      {photoDetailsDialogOpen && photoEvent && (
+        <EventPhotoDetailsDialog
+          open={photoDetailsDialogOpen}
+          onClose={() => {
+            setPhotoDetailsDialogOpen(false);
+            setPhotoEvent(null);
+          }}
+          event={photoEvent}
+          onAddPhotosClick={(ev) => {
+            setAddPhotoEvent(ev);
+            setAddPhotoDialogOpen(true);
+          }}
+        />
+      )}
 
-      <EventAddPhotoDialog
-        open={addPhotoDialogOpen}
-        onClose={() => {
-          setAddPhotoDialogOpen(false);
-          setAddPhotoEvent(null);
-        }}
-        event={addPhotoEvent}
-        onPhotosSaved={() => loadData()}
-      />
+      {addPhotoDialogOpen && addPhotoEvent && (
+        <EventAddPhotoDialog
+          open={addPhotoDialogOpen}
+          onClose={() => {
+            setAddPhotoDialogOpen(false);
+            setAddPhotoEvent(null);
+          }}
+          event={addPhotoEvent}
+          onPhotosSaved={() => loadData()}
+        />
+      )}
 
-      <EventAddExpenseDialog
-        open={addExpenseDialogOpen}
-        onClose={() => {
-          setAddExpenseDialogOpen(false);
-          setAddExpenseEvent(null);
-        }}
-        event={addExpenseEvent}
-        onExpenseSaved={() => loadData()}
-      />
+      {addExpenseDialogOpen && addExpenseEvent && (
+        <EventAddExpenseDialog
+          open={addExpenseDialogOpen}
+          onClose={() => {
+            setAddExpenseDialogOpen(false);
+            setAddExpenseEvent(null);
+          }}
+          event={addExpenseEvent}
+          onExpenseSaved={() => loadData()}
+        />
+      )}
 
-      <EventExpensesDialog
-        open={expenseDetailsDialogOpen}
-        onClose={() => {
-          setExpenseDetailsDialogOpen(false);
-          setExpenseEvent(null);
-          loadData();
-        }}
-        event={expenseEvent}
-      />
+      {expenseDetailsDialogOpen && expenseEvent && (
+        <EventExpensesDialog
+          open={expenseDetailsDialogOpen}
+          onClose={() => {
+            setExpenseDetailsDialogOpen(false);
+            setExpenseEvent(null);
+            loadData();
+          }}
+          event={expenseEvent}
+        />
+      )}
 
       <AppConfirmDialog
         open={deleteConfirmOpen}

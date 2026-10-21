@@ -364,8 +364,6 @@ export default function EventAddPhotoDialog({
     }
   };
 
-  if (!event) return null;
-
   const currentSelectedImages = form.imageUrls || (form.imageUrl ? [form.imageUrl] : []);
 
   useEffect(() => {
@@ -407,12 +405,14 @@ export default function EventAddPhotoDialog({
   const usedMBFormatted = usedMB.toFixed(2);
   const remainingMBFormatted = remainingMB.toFixed(2);
 
+  if (!event) return null;
+
   return (
     <>
       <AppDialog
       open={open}
       onClose={saving ? undefined : onClose}
-      title={`Add Photos — ${event.eventName || "Event"}`}
+      title={`Add Photos — ${event?.eventName || "Event"}`}
       maxWidth="md"
       actions={
         <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
@@ -512,8 +512,27 @@ export default function EventAddPhotoDialog({
           {/* Row 3: Multi-Photo Upload Area */}
           <Grid size={{ xs: 12 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", fontSize: "0.74rem" }}>
-                Upload Photos
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 700,
+                  color: errors.imageUrl ? "error.main" : "text.secondary",
+                  fontSize: "0.74rem",
+                }}
+              >
+                Upload Photos{" "}
+                <Box
+                  component="span"
+                  sx={{
+                    color: (theme) => (theme.palette.mode === "dark" ? "#f87171" : "#ef4444"),
+                    ml: 0.5,
+                    fontSize: "0.95rem",
+                    lineHeight: 0,
+                    verticalAlign: "middle",
+                  }}
+                >
+                  *
+                </Box>
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                 <Chip
@@ -571,7 +590,7 @@ export default function EventAddPhotoDialog({
                 }}
               >
                 <Typography variant="body2" sx={{ color: "error.main", fontWeight: 700 }}>
-                  Event "{event.eventName}" has reached the maximum photo limit (5 / 5 photos).
+                  Event "{event?.eventName || "Event"}" has reached the maximum photo limit (5 / 5 photos).
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   To add new photos, delete existing photos from the Gallery first.

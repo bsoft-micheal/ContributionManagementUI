@@ -155,11 +155,11 @@ export default function EventPhotoDetailsDialog({
   const currentImages = allImages;
   const activeImg = currentImages[activeImageIndex] || currentImages[0];
   const displayTitle =
-    primaryDetails?.title || `${event.eventName || "Event"} Photos`;
-  const displayEventName = event.eventName || primaryDetails?.eventName || "--";
+    primaryDetails?.title || `${event?.eventName || "Event"} Photos`;
+  const displayEventName = event?.eventName || primaryDetails?.eventName || "--";
   const displayCategory =
-    event.eventTypeName || primaryDetails?.category || "General";
-  const displayDate = event.eventDate
+    event?.eventTypeName || primaryDetails?.category || "General";
+  const displayDate = event?.eventDate
     ? dayjs(event.eventDate).format("DD MMMM YYYY")
     : primaryDetails?.takenDate
     ? dayjs(primaryDetails.takenDate).format("DD MMMM YYYY")
@@ -231,7 +231,7 @@ export default function EventPhotoDetailsDialog({
         >
           <CircularProgress size={40} sx={{ color: "#4a3f6b" }} />
           <Typography variant="body2" color="text.secondary">
-            Loading photos for {event.eventName}...
+            Loading photos for {event?.eventName || "event"}...
           </Typography>
         </Box>
       ) : currentImages.length > 0 ? (
@@ -694,7 +694,7 @@ export default function EventPhotoDetailsDialog({
             </Typography>
             <Typography variant="body2" color="text.secondary">
               There are currently no photos uploaded for{" "}
-              <strong>{event.eventName}</strong>.
+              <strong>{event?.eventName || "this event"}</strong>.
             </Typography>
           </Box>
         </Box>
