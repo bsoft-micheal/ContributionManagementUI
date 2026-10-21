@@ -3,6 +3,7 @@ import {
   Box,
   Typography,
   Grid,
+  Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
@@ -137,7 +138,7 @@ export default function RateUpdateModal({
     <AppDialog
       open={open}
       onClose={onClose}
-      title={`Update Rate - ${item.expenseItem || "Expense Item"}`}
+      title="Update Rate"
       maxWidth="sm"
       actions={
         <Box sx={{ display: "flex", justifyContent: "center", gap: 1.5, width: "100%" }}>
@@ -181,13 +182,27 @@ export default function RateUpdateModal({
               {item.category || item.eventTypeName || "--"}
             </Typography>
           </Box>
-          <Box sx={{ textAlign: "right" }}>
+          <Box sx={{ textAlign: "right", minWidth: 0, maxWidth: "60%" }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
               Expense Item
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
-              {item.expenseItem || "--"}
-            </Typography>
+            <Tooltip title={item.expenseItem && item.expenseItem.length > 25 ? item.expenseItem : ""} arrow>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: theme.palette.text.primary,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  cursor: item.expenseItem && item.expenseItem.length > 25 ? "pointer" : "default",
+                }}
+              >
+                {item.expenseItem && item.expenseItem.length > 25
+                  ? `${item.expenseItem.slice(0, 25)}...`
+                  : item.expenseItem || "--"}
+              </Typography>
+            </Tooltip>
           </Box>
         </Box>
 

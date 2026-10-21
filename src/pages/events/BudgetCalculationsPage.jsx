@@ -402,9 +402,23 @@ export default function BudgetCalculationsPage() {
       label: "Expense Item",
       key: "expenseItem",
       render: (row) => (
-        <Typography variant="body2" fontWeight={700}>
-          {row.expenseItem}
-        </Typography>
+        <Tooltip title={row.expenseItem && row.expenseItem.length > 25 ? row.expenseItem : ""} arrow>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            sx={{
+              maxWidth: 240,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              cursor: row.expenseItem && row.expenseItem.length > 25 ? "pointer" : "default",
+            }}
+          >
+            {row.expenseItem && row.expenseItem.length > 25
+              ? `${row.expenseItem.slice(0, 25)}...`
+              : row.expenseItem || "--"}
+          </Typography>
+        </Tooltip>
       ),
     },
     {
