@@ -38,7 +38,9 @@ import {
   getContributionsByEventAsync,
 } from "../../services/contributionService";
 import { useAuth } from "../../contexts/AuthContext";
-import { getRightsForPage } from "../../utils/rightsHelper";
+import { getRightsForPage, getRightsForFeatureId } from "../../utils/rightsHelper";
+import { MENU_FEATURE_IDS } from "../../constants";
+import FilterListIcon from "@mui/icons-material/FilterList";
 import EventFormDialog from "../../components/events/EventFormDialog";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
 import { useAppToast } from "../../components/common/AppToast";
@@ -133,16 +135,34 @@ export default function CalendarPage({ isEmbedded = false }) {
   const theme = useTheme();
   const toast = useAppToast();
   const { authState } = useAuth();
-  const hasWriteAccess = useMemo(() => {
-    return getRightsForPage("Calendar", authState?.role).write;
-  }, [authState?.role]);
+  const currentMonth = dayjs().month() + 1;
+  const currentYear = dayjs().year();
 
-  const [filters, setFilters] = useState({
-    month: dayjs().month() + 1,
-    year: dayjs().year(),
+  // Rights & Permissions (Feature ID 5 - Calendar)
+  const activeRole = authState?.role;
+  const calendarRights = useMemo(() => {
+    return getRightsForFeatureId(MENU_FEATURE_IDS.CALENDAR, activeRole);
+  }, [activeRole]);
+
+  const canView = !calendarRights.deny && (calendarRights.read || calendarRights.write);
+  const hasWriteAccess = !calendarRights.deny && calendarRights.write;
+
+  // Draft filter states (bound to input fields)
+  const [filterMonth, setFilterMonth] = useState(currentMonth);
+  const [filterYear, setFilterYear] = useState(currentYear);
+  const [filterCategory, setFilterCategory] = useState("ALL");
+  const [filterSearch, setFilterSearch] = useState("");
+
+  // Applied filter state (drives data fetching, calendar grid & sidebar)
+  const [appliedFilters, setAppliedFilters] = useState({
+    month: currentMonth,
+    year: currentYear,
+    category: "ALL",
+    search: "",
   });
-  const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
+
+  const categoryFilter = appliedFilters.category;
+  const searchQuery = appliedFilters.search;
 
   const [events, setEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
@@ -163,11 +183,11 @@ export default function CalendarPage({ isEmbedded = false }) {
   const [bdayCelebrationOpen, setBdayCelebrationOpen] = useState(false);
   const [celebrantsForCelebration, setCelebrantsForCelebration] = useState([]);
 
-  const loadCalendarData = async () => {
+  const loadCalendarData = async (activeFilters = appliedFilters) => {
     try {
       const apiParams = {
-        month: filters.month === 0 ? null : filters.month,
-        year: filters.year === 0 ? null : filters.year,
+        month: activeFilters.month === 0 ? null : activeFilters.month,
+        year: activeFilters.year === 0 ? null : activeFilters.year,
       };
       const [{ data: resData }, contribsData] = await Promise.all([
         apiClient.get("/events/getAllEventAsync", {
@@ -183,6 +203,32 @@ export default function CalendarPage({ isEmbedded = false }) {
     }
   };
 
+  const handleApplyFilter = () => {
+    const next = {
+      month: filterMonth,
+      year: filterYear,
+      category: filterCategory,
+      search: filterSearch.trim(),
+    };
+    setAppliedFilters(next);
+    loadCalendarData(next);
+  };
+
+  const handleClearFilter = () => {
+    setFilterYear(0);
+    setFilterMonth(0);
+    setFilterCategory("ALL");
+    setFilterSearch("");
+    const reset = {
+      month: 0,
+      year: 0,
+      category: "ALL",
+      search: "",
+    };
+    setAppliedFilters(reset);
+    loadCalendarData(reset);
+  };
+
   const handleEventDeleted = (deletedEventId) => {
     setEvents((prev) => prev.filter((e) => e.eventId !== deletedEventId));
     setDetailedEventsMap((prev) => {
@@ -192,12 +238,12 @@ export default function CalendarPage({ isEmbedded = false }) {
     });
     setViewDialogOpen(false);
     setSelectedEvent(null);
-    loadCalendarData();
+    loadCalendarData(appliedFilters);
   };
 
   useEffect(() => {
-    loadCalendarData();
-  }, [filters]);
+    loadCalendarData(appliedFilters);
+  }, []);
 
   useEffect(() => {
     async function loadEventTypesAndMembers() {
@@ -227,8 +273,8 @@ export default function CalendarPage({ isEmbedded = false }) {
   const filteredEvents = useMemo(() => {
     let list = (events || []).filter((e) => !e.isDeleted);
 
-    if (categoryFilter !== "ALL") {
-      const filterLower = categoryFilter.toLowerCase();
+    if (appliedFilters.category !== "ALL") {
+      const filterLower = appliedFilters.category.toLowerCase();
       list = list.filter((e) => {
         const typeName = (e.eventTypeName || "").toLowerCase();
         return (
@@ -239,8 +285,8 @@ export default function CalendarPage({ isEmbedded = false }) {
       });
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    if (appliedFilters.search.trim()) {
+      const q = appliedFilters.search.toLowerCase().trim();
       list = list.filter((e) => {
         const nameMatch = (e.eventName || "").toLowerCase().includes(q);
         const typeMatch = (e.eventTypeName || "").toLowerCase().includes(q);
@@ -250,7 +296,7 @@ export default function CalendarPage({ isEmbedded = false }) {
     }
 
     return list;
-  }, [events, categoryFilter, searchQuery]);
+  }, [events, appliedFilters.category, appliedFilters.search]);
 
   // Extract celebrants for birthday events
   const getCelebrantsForEvent = (eventItem) => {
@@ -315,14 +361,15 @@ export default function CalendarPage({ isEmbedded = false }) {
   // Calendar 7x5 days grid
   const calendarDays = useMemo(() => {
     const targetMonth =
-      filters.month === 0 ? dayjs().month() + 1 : filters.month;
-    const targetYear = filters.year === 0 ? dayjs().year() : filters.year;
+      appliedFilters.month === 0 ? dayjs().month() + 1 : appliedFilters.month;
+    const targetYear =
+      appliedFilters.year === 0 ? dayjs().year() : appliedFilters.year;
     const startOfMonth = dayjs(
       `${targetYear}-${String(targetMonth).padStart(2, "0")}-01`
     );
     const startDay = startOfMonth.startOf("week");
     return Array.from({ length: 35 }, (_, index) => startDay.add(index, "day"));
-  }, [filters]);
+  }, [appliedFilters.month, appliedFilters.year]);
 
   const monthOptions = [
     { label: "All Months", value: 0 },
@@ -332,7 +379,6 @@ export default function CalendarPage({ isEmbedded = false }) {
     })),
   ];
 
-  const currentYear = dayjs().year();
   const yearOptions = [
     { label: "All Years", value: 0 },
     ...Array.from({ length: 11 }, (_, i) => {
@@ -366,52 +412,72 @@ export default function CalendarPage({ isEmbedded = false }) {
     return list;
   }, [eventTypes, events]);
 
-  // Keep categoryFilter valid if options change
+  // Keep filterCategory valid if options change
   useEffect(() => {
-    if (categoryOptions.length > 0 && categoryFilter !== "ALL") {
+    if (categoryOptions.length > 0 && filterCategory !== "ALL") {
       const exists = categoryOptions.some(
-        (opt) => opt.value.toLowerCase() === categoryFilter.toLowerCase()
+        (opt) => opt.value.toLowerCase() === filterCategory.toLowerCase()
       );
       if (!exists) {
-        setCategoryFilter("ALL");
+        setFilterCategory("ALL");
       }
     }
-  }, [categoryOptions, categoryFilter]);
+  }, [categoryOptions, filterCategory]);
 
   // Stepper handlers
   const handlePrevMonth = () => {
-    setFilters((prev) => {
-      const m = prev.month === 0 ? dayjs().month() + 1 : prev.month;
-      const y = prev.year === 0 ? dayjs().year() : prev.year;
-      if (m === 1) {
-        return { month: 12, year: y - 1 };
-      }
-      return { month: m - 1, year: y };
-    });
+    const curM = appliedFilters.month === 0 ? dayjs().month() + 1 : appliedFilters.month;
+    const curY = appliedFilters.year === 0 ? dayjs().year() : appliedFilters.year;
+    const nextMonth = curM === 1 ? 12 : curM - 1;
+    const nextYear = curM === 1 ? curY - 1 : curY;
+
+    setFilterMonth(nextMonth);
+    setFilterYear(nextYear);
+    const next = {
+      ...appliedFilters,
+      month: nextMonth,
+      year: nextYear,
+    };
+    setAppliedFilters(next);
+    loadCalendarData(next);
   };
 
   const handleNextMonth = () => {
-    setFilters((prev) => {
-      const m = prev.month === 0 ? dayjs().month() + 1 : prev.month;
-      const y = prev.year === 0 ? dayjs().year() : prev.year;
-      if (m === 12) {
-        return { month: 1, year: y + 1 };
-      }
-      return { month: m + 1, year: y };
-    });
+    const curM = appliedFilters.month === 0 ? dayjs().month() + 1 : appliedFilters.month;
+    const curY = appliedFilters.year === 0 ? dayjs().year() : appliedFilters.year;
+    const nextMonth = curM === 12 ? 1 : curM + 1;
+    const nextYear = curM === 12 ? curY + 1 : curY;
+
+    setFilterMonth(nextMonth);
+    setFilterYear(nextYear);
+    const next = {
+      ...appliedFilters,
+      month: nextMonth,
+      year: nextYear,
+    };
+    setAppliedFilters(next);
+    loadCalendarData(next);
   };
 
   const handleGoToToday = () => {
-    setFilters({
-      month: dayjs().month() + 1,
-      year: dayjs().year(),
-    });
+    const nextMonth = dayjs().month() + 1;
+    const nextYear = dayjs().year();
+
+    setFilterMonth(nextMonth);
+    setFilterYear(nextYear);
+    const next = {
+      ...appliedFilters,
+      month: nextMonth,
+      year: nextYear,
+    };
+    setAppliedFilters(next);
+    loadCalendarData(next);
   };
 
   const displayedMonthName =
-    filters.month === 0
+    appliedFilters.month === 0
       ? "All Months"
-      : dayjs().month(filters.month - 1).format("MMMM");
+      : dayjs().month(appliedFilters.month - 1).format("MMMM");
 
   // Helper to determine if an event or member has pending payment (strictly based on unpaid amount > 0)
   const isItemPaymentPending = (item) => {
@@ -422,7 +488,7 @@ export default function CalendarPage({ isEmbedded = false }) {
       if (item.colorType?.toLowerCase().includes("birthday")) {
         const itemMonth = item.celebrant
           ? parseMemberDob(item.celebrant.dateOfBirth)?.month()
-          : (filters.month === 0 ? dayjs().month() : filters.month - 1);
+          : (appliedFilters.month === 0 ? dayjs().month() : appliedFilters.month - 1);
 
         targetEvent = events.find((e) => {
           const isBday =
@@ -531,7 +597,7 @@ export default function CalendarPage({ isEmbedded = false }) {
     }
 
     // Birthday member DOBs directly on calendar grid cells
-    if (categoryFilter === "ALL" || categoryFilter.toLowerCase().includes("birthday")) {
+    if (appliedFilters.category === "ALL" || appliedFilters.category.toLowerCase().includes("birthday")) {
       for (const member of activeMembers) {
         const dob = parseMemberDob(member.dateOfBirth);
         if (!dob) continue;
@@ -557,8 +623,9 @@ export default function CalendarPage({ isEmbedded = false }) {
   // Compile Birthday Members List for the 25% sidebar panel with status (Completed, Today, Upcoming)
   const birthdayMembers = useMemo(() => {
     const targetMonth =
-      filters.month === 0 ? dayjs().month() + 1 : filters.month;
-    const targetYear = filters.year === 0 ? dayjs().year() : filters.year;
+      appliedFilters.month === 0 ? dayjs().month() + 1 : appliedFilters.month;
+    const targetYear =
+      appliedFilters.year === 0 ? dayjs().year() : appliedFilters.year;
     const today = dayjs().startOf("day");
 
     const seenKeys = new Set();
@@ -572,7 +639,7 @@ export default function CalendarPage({ isEmbedded = false }) {
 
     const calculateStatus = (dob) => {
       if (!dob) return "upcoming";
-      const bdayMonth = filters.month === 0 ? dob.month() + 1 : targetMonth;
+      const bdayMonth = appliedFilters.month === 0 ? dob.month() + 1 : targetMonth;
       const bdayDate = dayjs(
         `${targetYear}-${String(bdayMonth).padStart(2, "0")}-${String(dob.date()).padStart(2, "0")}`
       ).startOf("day");
@@ -587,7 +654,7 @@ export default function CalendarPage({ isEmbedded = false }) {
       const dob = parseMemberDob(mem.dateOfBirth);
       if (!dob) continue;
 
-      if (filters.month === 0 || dob.month() + 1 === targetMonth) {
+      if (appliedFilters.month === 0 || dob.month() + 1 === targetMonth) {
         const key = getDedupeKey(mem, dob);
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
@@ -615,7 +682,7 @@ export default function CalendarPage({ isEmbedded = false }) {
         for (const c of celebrants) {
           const dob = parseMemberDob(c.dateOfBirth);
           if (!dob) continue;
-          if (filters.month === 0 || dob.month() + 1 === targetMonth) {
+          if (appliedFilters.month === 0 || dob.month() + 1 === targetMonth) {
             const key = getDedupeKey(c, dob);
             if (!seenKeys.has(key)) {
               seenKeys.add(key);
@@ -637,7 +704,7 @@ export default function CalendarPage({ isEmbedded = false }) {
     // Sort chronologically by day of month (1st to 31st)
     list.sort((a, b) => a.dayOfMonth - b.dayOfMonth);
     return list;
-  }, [activeMembers, filteredEvents, filters]);
+  }, [activeMembers, filteredEvents, appliedFilters.month, appliedFilters.year]);
 
   // Cache for detailed event details and contributions
   const [detailedEventsMap, setDetailedEventsMap] = useState({});
@@ -767,8 +834,8 @@ export default function CalendarPage({ isEmbedded = false }) {
   // Compile Unified Sidebar Items (Birthdays + All Scheduled Events & Participants)
   const unifiedSidebarItems = useMemo(() => {
     const today = dayjs().startOf("day");
-    const targetMonth = filters.month === 0 ? dayjs().month() + 1 : filters.month;
-    const targetYear = filters.year === 0 ? dayjs().year() : filters.year;
+    const targetMonth = appliedFilters.month === 0 ? dayjs().month() + 1 : appliedFilters.month;
+    const targetYear = appliedFilters.year === 0 ? dayjs().year() : appliedFilters.year;
 
     const calculateEventStatus = (dateStr) => {
       if (!dateStr) return "upcoming";
@@ -778,8 +845,8 @@ export default function CalendarPage({ isEmbedded = false }) {
       return "upcoming";
     };
 
-    const isAll = !categoryFilter || categoryFilter === "ALL";
-    const isOnlyBirthday = !isAll && (categoryFilter || "").toLowerCase().includes("birthday");
+    const isAll = !appliedFilters.category || appliedFilters.category === "ALL";
+    const isOnlyBirthday = !isAll && (appliedFilters.category || "").toLowerCase().includes("birthday");
 
     const items = [];
     const seenItemKeys = new Set();
@@ -816,8 +883,8 @@ export default function CalendarPage({ isEmbedded = false }) {
         if (isBday) return;
 
         const evDate = dayjs(ev.eventDate);
-        if (filters.month !== 0 && evDate.month() + 1 !== targetMonth) return;
-        if (filters.year !== 0 && evDate.year() !== targetYear) return;
+        if (appliedFilters.month !== 0 && evDate.month() + 1 !== targetMonth) return;
+        if (appliedFilters.year !== 0 && evDate.year() !== targetYear) return;
 
         const detailed = detailedEventsMap[ev.eventId] || ev;
         const eventCategory = ev.eventTypeName || ev.eventName || "Event";
@@ -875,9 +942,7 @@ export default function CalendarPage({ isEmbedded = false }) {
     // Sort all items chronologically by day of month (1st to 31st)
     items.sort((a, b) => a.dayOfMonth - b.dayOfMonth);
     return items;
-  }, [categoryFilter, birthdayMembers, filteredEvents, detailedEventsMap, filters, members, activeMembers]);
-
-
+  }, [appliedFilters.category, birthdayMembers, filteredEvents, detailedEventsMap, appliedFilters.month, appliedFilters.year, members, activeMembers]);
 
   const handleDateClick = (day) => {
     if (!hasWriteAccess) return;
@@ -893,6 +958,30 @@ export default function CalendarPage({ isEmbedded = false }) {
     setSelectedEvent(eventItem);
     setViewDialogOpen(true);
   };
+
+  if (!canView) {
+    if (isEmbedded) {
+      return (
+        <Box sx={{ p: 4, textAlign: "center" }}>
+          <Typography variant="subtitle1" color="text.secondary" fontWeight={600}>
+            You do not have permission to view the Event Calendar.
+          </Typography>
+        </Box>
+      );
+    }
+    return (
+      <div className="page-shell">
+        <Box sx={{ p: 4, textAlign: "center" }}>
+          <Typography variant="h6" color="error" fontWeight={700}>
+            Access Restricted
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            You do not have permission to view the Event Calendar.
+          </Typography>
+        </Box>
+      </div>
+    );
+  }
 
   return (
     <div className={isEmbedded ? undefined : "page-shell"}>
@@ -957,54 +1046,56 @@ export default function CalendarPage({ isEmbedded = false }) {
             }}
           >
             {/* Filter controls row */}
-            <Grid container spacing={1.5} alignItems="center">
-              <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+            <Grid container spacing={1.5} alignItems="flex-end">
+              <Grid size={{ xs: 6, sm: 3, md: 2, lg: 1.5 }}>
                 <AppSelect
                   size="small"
                   label="Year"
-                  value={filters.year}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      year: Number(e.target.value),
-                    }))
-                  }
+                  value={filterYear}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterYear(val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
+                  }}
+                  onClear={() => setFilterYear(0)}
                   options={yearOptions}
                   fullWidth
                 />
               </Grid>
-              <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+              <Grid size={{ xs: 6, sm: 3, md: 2, lg: 1.8 }}>
                 <AppSelect
                   size="small"
                   label="Month"
-                  value={filters.month}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      month: Number(e.target.value),
-                    }))
-                  }
+                  value={filterMonth}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterMonth(val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
+                  }}
+                  onClear={() => setFilterMonth(0)}
                   options={monthOptions}
                   fullWidth
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 2.8, lg: 2.5 }}>
                 <AppSelect
                   size="small"
                   label="Event Type"
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  onClear={() => setFilterCategory("ALL")}
                   options={categoryOptions}
                   fullWidth
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 3, lg: 3.2 }}>
                 <AppInput
                   size="small"
                   label="Search"
                   placeholder="Search Events..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={filterSearch}
+                  onChange={(e) => setFilterSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleApplyFilter();
+                  }}
                   slotProps={{
                     input: {
                       startAdornment: (
@@ -1018,6 +1109,59 @@ export default function CalendarPage({ isEmbedded = false }) {
                   }}
                   fullWidth
                 />
+              </Grid>
+              <Grid size={{ xs: 12, sm: "auto", md: "auto" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    height: 34,
+                    pb: "1px",
+                  }}
+                >
+                  <AppButton
+                    variant="contained"
+                    size="small"
+                    startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
+                    onClick={handleApplyFilter}
+                    disabled={!canView}
+                    sx={{
+                      height: 34,
+                      minHeight: 34,
+                      fontWeight: 700,
+                      fontSize: "0.78rem",
+                      px: 2,
+                      whiteSpace: "nowrap",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    Filter
+                  </AppButton>
+                  <AppButton
+                    variant="outlined"
+                    size="small"
+                    onClick={handleClearFilter}
+                    disabled={!canView}
+                    sx={{
+                      height: 34,
+                      minHeight: 34,
+                      fontWeight: 700,
+                      fontSize: "0.78rem",
+                      px: 1.8,
+                      whiteSpace: "nowrap",
+                      borderRadius: "8px",
+                      color: "#ef4444",
+                      borderColor: "rgba(239, 68, 68, 0.4)",
+                      "&:hover": {
+                        borderColor: "#ef4444",
+                        bgcolor: "rgba(239, 68, 68, 0.05)",
+                      },
+                    }}
+                  >
+                    Clear Filter
+                  </AppButton>
+                </Box>
               </Grid>
             </Grid>
           </Box>
@@ -1090,8 +1234,7 @@ export default function CalendarPage({ isEmbedded = false }) {
                       color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
                     }}
                   >
-                    {displayedMonthName}{" "}
-                    {filters.year === 0 ? dayjs().year() : filters.year}
+                    {displayedMonthName}{!appliedFilters.year || appliedFilters.year === 0 ? "" : ` ${appliedFilters.year}`}
                   </Typography>
 
                   <IconButton
@@ -1180,7 +1323,7 @@ export default function CalendarPage({ isEmbedded = false }) {
                 >
                   {calendarDays.map((day) => {
                     const dayItems = getDayItems(day);
-                    const isCurrentMonth = filters.month === 0 || day.month() + 1 === filters.month;
+                    const isCurrentMonth = appliedFilters.month === 0 || day.month() + 1 === appliedFilters.month;
                     const isDifferentMonth = !isCurrentMonth;
                     const isToday = day.isSame(dayjs(), "day");
 
@@ -1513,17 +1656,17 @@ export default function CalendarPage({ isEmbedded = false }) {
                 }}
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {!categoryFilter || categoryFilter === "ALL" ? (
+                  {!appliedFilters.category || appliedFilters.category === "ALL" ? (
                     <CalendarMonthRoundedIcon
                       sx={{ color: "#7c3aed", fontSize: "1.25rem" }}
                     />
-                  ) : (categoryFilter || "").toLowerCase().includes("birthday") ? (
+                  ) : (appliedFilters.category || "").toLowerCase().includes("birthday") ? (
                     <CakeRoundedIcon
                       sx={{ color: "#ec4899", fontSize: "1.25rem" }}
                     />
                   ) : (
                     <Typography component="span" sx={{ fontSize: "1.2rem", lineHeight: 1 }}>
-                      {getEventTypeInfo(categoryFilter).emoji || "👏"}
+                      {getEventTypeInfo(appliedFilters.category).emoji || "👏"}
                     </Typography>
                   )}
                   <Typography
@@ -1535,23 +1678,23 @@ export default function CalendarPage({ isEmbedded = false }) {
                       letterSpacing: "-0.01em",
                     }}
                   >
-                    {!categoryFilter || categoryFilter === "ALL"
+                    {!appliedFilters.category || appliedFilters.category === "ALL"
                       ? "Event Members List"
-                      : (categoryFilter || "").toLowerCase().includes("birthday")
+                      : (appliedFilters.category || "").toLowerCase().includes("birthday")
                         ? "Birthday Members List"
-                        : `${getEventTypeInfo(categoryFilter).label || categoryFilter} Members List`}
+                        : `${getEventTypeInfo(appliedFilters.category).label || appliedFilters.category} Members List`}
                   </Typography>
                 </Box>
                 <Box
                   sx={{
                     bgcolor: (theme) =>
-                      !categoryFilter || categoryFilter === "ALL"
+                      !appliedFilters.category || appliedFilters.category === "ALL"
                         ? "primary.main"
-                        : (categoryFilter || "").toLowerCase().includes("birthday")
+                        : (appliedFilters.category || "").toLowerCase().includes("birthday")
                           ? theme.palette.mode === "dark"
                             ? "rgba(255, 255, 255, 0.15)"
                             : "primary.main"
-                          : getEventTypeInfo(categoryFilter).color || "primary.main",
+                          : getEventTypeInfo(appliedFilters.category).color || "primary.main",
                     color: "#ffffff",
                     borderRadius: "10px",
                     px: 1,

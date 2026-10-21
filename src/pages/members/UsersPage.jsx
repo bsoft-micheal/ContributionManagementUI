@@ -1148,8 +1148,9 @@ export default function UsersPage() {
                   placeholder="Select Role"
                   value={filterRole}
                   onChange={(e) => {
-                    setFilterRole(e.target.value);
+                    setFilterRole(e.target.value || "");
                   }}
+                  onClear={() => setFilterRole("")}
                   options={[{ label: "All Roles", value: "" }, ...userRolesList]}
                   size="small"
                   fullWidth
@@ -1163,8 +1164,9 @@ export default function UsersPage() {
                   placeholder="Select Status"
                   value={filterStatus}
                   onChange={(e) => {
-                    setFilterStatus(e.target.value);
+                    setFilterStatus(e.target.value || "");
                   }}
+                  onClear={() => setFilterStatus("")}
                   options={[
                     { label: "All Statuses", value: "" },
                     { label: "Active", value: "true" },

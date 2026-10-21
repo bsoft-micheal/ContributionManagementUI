@@ -485,11 +485,11 @@ export default function BudgetCalculationsPage() {
                 <AppSelect
                   label="Select Event Type"
                   value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
+                  onChange={(e) => setFilterCategory(e.target.value || "ALL")}
+                  onClear={() => setFilterCategory("ALL")}
                   options={categoryFilterOptions}
                   size="small"
                   placeholder="Select Event Type"
-                  required
                   fullWidth
                 />
               </Box>

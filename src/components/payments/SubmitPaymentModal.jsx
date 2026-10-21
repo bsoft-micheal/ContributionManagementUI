@@ -13,6 +13,7 @@ import {
   FormControlLabel,
   Divider,
   Alert,
+  InputAdornment,
 } from "@mui/material";
 import {
   ReceiptLong as ReceiptIcon,
@@ -38,6 +39,7 @@ import AppDateInput from "../common/AppDateInput";
 import AppTextArea from "../common/AppTextArea";
 import AppButton from "../common/AppButton";
 import AppDialog from "../common/AppDialog";
+import AppConfirmDialog from "../common/AppConfirmDialog";
 import { useAppToast } from "../common/AppToast";
 import { useNotifications } from "../../contexts/NotificationContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -109,7 +111,7 @@ export default function SubmitPaymentModal({
     eventCategory: initialEventCategory || "",
     eventName: initialEventName || "",
     memberName: initialMemberName || authState?.fullName || "",
-    amount: initialAmount || "",
+    amount: "",
     paymentMode: "",
     utr: "",
     paymentDate: dayjs(),
@@ -130,6 +132,7 @@ export default function SubmitPaymentModal({
   ]);
   const [activeQrModal, setActiveQrModal] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [rowToDelete, setRowToDelete] = useState(null);
 
   const allocatedSplitSum = useMemo(() => {
     return Math.round(splitRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0) * 100) / 100;
@@ -137,6 +140,11 @@ export default function SubmitPaymentModal({
 
   const targetAmount = Number(formData.amount) || 0;
   const splitDifference = Math.round((targetAmount - allocatedSplitSum) * 100) / 100;
+
+  const isAddRowDisabled = useMemo(() => {
+    if (targetAmount <= 0) return true;
+    return splitDifference <= 0;
+  }, [targetAmount, splitDifference]);
 
   const maxPayableDue = useMemo(() => {
     if (!duesSummary) return null;
@@ -443,7 +451,17 @@ export default function SubmitPaymentModal({
       }
 
       const defaultFirstMode = dynamicPaymentModes.length > 0 ? dynamicPaymentModes[0]?.value : "GPay";
-      const initialSplitAmt = isPaidInitial ? "0.00" : (resolvedAmount ? String(resolvedAmount) : "");
+      const hasDuesContext = Boolean(
+        initialTotalDue !== undefined ||
+        initialCurrentDue !== undefined ||
+        initialPreviousArrears !== undefined
+      );
+      // If dues context exists, user MUST choose payment scope first; do not pre-fill amount
+      const initialSplitAmt = isPaidInitial
+        ? "0.00"
+        : hasDuesContext
+        ? ""
+        : (resolvedAmount ? String(resolvedAmount) : "");
 
       setFormData((prev) => ({
         ...prev,
@@ -452,7 +470,7 @@ export default function SubmitPaymentModal({
         eventCategory: matchedCategory || prev.eventCategory,
         eventName: matchedEvName || prev.eventName,
         memberName: resolvedMemName || prev.memberName,
-        amount: initialSplitAmt || prev.amount,
+        amount: initialSplitAmt,
         paymentMode: prev.paymentMode || defaultFirstMode,
         paymentDate: dayjs(),
         utr: "",
@@ -463,6 +481,7 @@ export default function SubmitPaymentModal({
       setSplitRows([
         { id: 1, mode: defaultFirstMode, amount: initialSplitAmt, utr: "" },
       ]);
+      setPaymentScope("");
       setErrors({});
     }
   }, [
@@ -645,15 +664,18 @@ export default function SubmitPaymentModal({
               baseAmount: baseAmt,
               arrearBreakdown: safePrevArrears === 0 ? [] : breakdown,
             });
-            if (!paymentScope) setPaymentScope(safePrevArrears > 0 ? "AllOutstanding" : "CurrentEvent");
 
-            const resolvedDuesAmount = (isPaidStatus && safePrevArrears === 0) || total === 0
-              ? "0.00"
-              : (total > 0
-                ? String(total)
-                : currentEvDue > 0
-                ? String(currentEvDue)
-                : (res.amount ? String(res.amount) : prev.amount));
+            let resolvedDuesAmount = "";
+            if ((isPaidStatus && safePrevArrears === 0) || total === 0) {
+              resolvedDuesAmount = "0.00";
+            } else if (paymentScope) {
+              resolvedDuesAmount =
+                total > 0
+                  ? String(total)
+                  : currentEvDue > 0
+                  ? String(currentEvDue)
+                  : (res.amount ? String(res.amount) : "");
+            }
 
             setFormData((prev) => ({
               ...prev,
@@ -664,13 +686,15 @@ export default function SubmitPaymentModal({
 
             if ((isPaidStatus && safePrevArrears === 0) || total === 0) {
               setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "0.00" })));
-            } else {
+            } else if (resolvedDuesAmount) {
               setSplitRows((rows) => {
                 if (rows.length <= 1) {
                   return [{ ...(rows[0] || { id: 1, mode: dynamicPaymentModes[0]?.value || "GPay", utr: "" }), amount: resolvedDuesAmount }];
                 }
                 return rows;
               });
+            } else {
+              setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "" })));
             }
           } else if (matchedEvent) {
             const base = Number(matchedEvent.baseAmount || matchedEvent.totalExpectedAmount || 0);
@@ -685,13 +709,14 @@ export default function SubmitPaymentModal({
               baseAmount: currentEvDue,
               arrearBreakdown: initialArrearBreakdown || [],
             });
+            const resolvedFallbackAmount = paymentScope ? String(currentEvDue) : "";
             setFormData((prev) => ({
               ...prev,
-              amount: prev.amount || String(currentEvDue),
+              amount: resolvedFallbackAmount,
             }));
             setSplitRows((rows) => {
               if (rows.length <= 1) {
-                return [{ ...(rows[0] || { id: 1, mode: dynamicPaymentModes[0]?.value || "GPay", utr: "" }), amount: String(currentEvDue) }];
+                return [{ ...(rows[0] || { id: 1, mode: dynamicPaymentModes[0]?.value || "GPay", utr: "" }), amount: resolvedFallbackAmount }];
               }
               return rows;
             });
@@ -784,6 +809,15 @@ export default function SubmitPaymentModal({
     const curSum = splitRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     const targetAmt = Number(formData.amount) || 0;
     const remaining = Math.max(0, Math.round((targetAmt - curSum) * 100) / 100);
+
+    if (targetAmt <= 0) {
+      toast.warning("Please choose a payment scope and enter/select an amount first.");
+      return;
+    }
+    if (remaining <= 0) {
+      toast.warning("All amount is already allocated across existing rows.");
+      return;
+    }
 
     const usedModes = new Set(splitRows.map((r) => (r.mode || "").toLowerCase()));
     const availableMode = dynamicPaymentModes.find(
@@ -886,16 +920,21 @@ export default function SubmitPaymentModal({
 
   const validateForm = () => {
     const errs = {};
-    if (!formData.memberName || !formData.memberName.trim()) errs.memberName = "Member Name is required";
-    if (!formData.eventCategory || !formData.eventCategory.trim()) errs.eventCategory = "Event Category is required";
-    if (!formData.eventName || !formData.eventName.trim()) errs.eventName = "Event Name is required";
+    if (!formData.memberName || !formData.memberName.trim()) errs.memberName = "This field is required";
+    if (!formData.eventCategory || !formData.eventCategory.trim()) errs.eventCategory = "This field is required";
+    if (!formData.eventName || !formData.eventName.trim()) errs.eventName = "This field is required";
+    if (duesSummary && (duesSummary.previousArrears > 0 || duesSummary.totalDue > 0) && !paymentScope) {
+      errs.paymentScope = "This field is required";
+    }
     
     const targetAmt = Math.round((Number(formData.amount) || 0) * 100) / 100;
     const maxDue = maxPayableDue !== null && maxPayableDue !== undefined
       ? Math.round(Number(maxPayableDue) * 100) / 100
       : null;
 
-    if (!formData.amount || isNaN(Number(formData.amount)) || targetAmt <= 0) {
+    if (!formData.amount || !String(formData.amount).trim()) {
+      errs.amount = "This field is required";
+    } else if (isNaN(Number(formData.amount)) || targetAmt <= 0) {
       errs.amount = "Contribution amount must be greater than ₹0.00";
     } else if (maxDue !== null && maxDue > 0 && Math.round(targetAmt * 100) > Math.round(maxDue * 100)) {
       const fmtMax = maxDue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1131,8 +1170,9 @@ export default function SubmitPaymentModal({
         toast.error(`File ${file.name} is not an image file`);
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`File ${file.name} exceeds 5 MB size limit`);
+      const MAX_IMAGE_SIZE = 6 * 1024 * 1024; // 6MB
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast.error(`File ${file.name} exceeds maximum limit of 6 MB`);
         return;
       }
 
@@ -1315,6 +1355,8 @@ export default function SubmitPaymentModal({
               label="Payment Date"
               value={formData.paymentDate}
               onChange={(newVal) => setFormData((prev) => ({ ...prev, paymentDate: newVal }))}
+              disableFuture
+              maxDate={dayjs()}
               required
             />
           </Grid>
@@ -1328,8 +1370,18 @@ export default function SubmitPaymentModal({
                 label="Payment Target / Scope"
                 placeholder="Select payment target"
                 value={paymentScope}
-                onChange={(e) => handlePaymentScopeChange(e.target.value)}
+                onChange={(e) => {
+                  handlePaymentScopeChange(e.target.value);
+                  setErrors((prev) => {
+                    if (!prev.paymentScope) return prev;
+                    const next = { ...prev };
+                    delete next.paymentScope;
+                    return next;
+                  });
+                }}
                 options={paymentScopeOptions}
+                error={!!errors.paymentScope}
+                helperText={errors.paymentScope}
                 required
               />
             </Grid>
@@ -1373,7 +1425,9 @@ export default function SubmitPaymentModal({
                 errors.amount ||
                 (isFullySettled
                   ? " All dues settled"
-                  : duesSummary?.totalDue
+                  : !paymentScope && duesSummary && (duesSummary.previousArrears > 0 || duesSummary.totalDue > 0)
+                  ? "Please select a payment target scope above"
+                  : Number(formData.amount || 0) > 0
                   ? `Fixed from target scope: ₹${Number(formData.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                   : "")
               }
@@ -1416,7 +1470,7 @@ export default function SubmitPaymentModal({
                   <ReceiptIcon sx={{ fontSize: 16 }} />
                 </Box>
                 <Typography variant="subtitle2" fontWeight={800} sx={{ letterSpacing: "-0.01em" }}>
-                  Live Contribution & Dues Status
+                  Dues Status
                 </Typography>
               </Stack>
               {duesSummary.status && (
@@ -1566,24 +1620,37 @@ export default function SubmitPaymentModal({
                         : "#dc2626",
                   }}
                 />
-                <Button
-                  size="small"
-                  variant="contained"
-                  onClick={handleAddSplitRow}
-                  startIcon={<AddIcon sx={{ fontSize: 14 }} />}
-                  sx={{
-                    fontSize: "0.72rem",
-                    fontWeight: 800,
-                    py: 0.4,
-                    px: 1.2,
-                    bgcolor: "#7c3aed !important",
-                    "&:hover": { bgcolor: "#6d28d9 !important" },
-                    borderRadius: "8px",
-                    textTransform: "none",
-                  }}
+                <Tooltip
+                  title={
+                    isAddRowDisabled
+                      ? (targetAmount <= 0
+                        ? "Select payment target scope first"
+                        : "All amount is already allocated")
+                      : "Add payment mode row"
+                  }
                 >
-                  Add Row
-                </Button>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={handleAddSplitRow}
+                      disabled={isAddRowDisabled}
+                      startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+                      sx={{
+                        fontSize: "0.72rem",
+                        fontWeight: 800,
+                        py: 0.4,
+                        px: 1.2,
+                        bgcolor: isAddRowDisabled ? undefined : "#7c3aed !important",
+                        "&:hover": { bgcolor: isAddRowDisabled ? undefined : "#6d28d9 !important" },
+                        borderRadius: "8px",
+                        textTransform: "none",
+                      }}
+                    >
+                      Add Row
+                    </Button>
+                  </span>
+                </Tooltip>
               </Stack>
             </Box>
 
@@ -1635,30 +1702,30 @@ export default function SubmitPaymentModal({
                           <Box sx={{ flex: 1 }}>
                             <AppInput
                               label={isRowCash ? "Cash Note" : "UTR/Ref"}
-                              placeholder={isRowCash ? "Handover note " : "12-digit UTR ref"}
+                              placeholder={isRowCash ? "Handover note" : "12-digit UTR ref"}
                               value={row.utr}
                               onChange={(e) => handleSplitRowChange(row.id, "utr", e.target.value)}
                               size="small"
                               required={!isRowCash}
                               maxLength={isRowCash ? 50 : 12}
+                              endAdornment={
+                                isRowCash ? (
+                                  <InputAdornment position="end" sx={{ mr: 0.5 }}>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        fontSize: "0.68rem",
+                                        fontWeight: 700,
+                                        color: (row.utr || "").length >= 50 ? "warning.main" : "text.secondary",
+                                        userSelect: "none",
+                                      }}
+                                    >
+                                      {(row.utr || "").length}/50
+                                    </Typography>
+                                  </InputAdornment>
+                                ) : undefined
+                              }
                             />
-                            {isRowCash && (
-                              <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.3, px: 0.2 }}>
-                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
-                                  
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    fontSize: "0.65rem",
-                                    fontWeight: 700,
-                                    color: (row.utr || "").length >= 50 ? "warning.main" : "text.secondary",
-                                  }}
-                                >
-                                  {(row.utr || "").length}/50
-                                </Typography>
-                              </Box>
-                            )}
                           </Box>
                           {!isRowCash && (
                             <Tooltip title={`Open QR Scanner for ${row.mode} (₹${row.amount || 0})`}>
@@ -1703,7 +1770,7 @@ export default function SubmitPaymentModal({
                           <span>
                             <IconButton
                               size="small"
-                              onClick={() => handleRemoveSplitRow(row.id)}
+                              onClick={() => setRowToDelete(row.id)}
                               disabled={splitRows.length <= 1}
                               sx={{
                                 color: splitRows.length > 1 ? "error.main" : "text.disabled",
@@ -1820,58 +1887,51 @@ export default function SubmitPaymentModal({
 
               {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) < 3 && (
                 <Grid size={{ xs: 12, sm: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 4 : 12 }}>
-                  <Paper
-                    variant="outlined"
+                  <Box
                     component="label"
                     sx={{
-                      p: 2,
-                      minHeight: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 115 : "auto",
+                      border: errors.screenshot ? "1.5px dashed #ef4444" : "1.5px dashed",
+                      borderColor: errors.screenshot
+                        ? "#ef4444"
+                        : ((t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)")),
                       borderRadius: "10px",
-                      borderStyle: "dashed",
-                      borderWidth: errors.screenshot ? "1.5px" : "1px",
-                      borderColor: errors.screenshot ? "error.main" : undefined,
+                      p: 1.1,
+                      minHeight: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 115 : 46,
                       display: "flex",
-                      flexDirection: "column",
+                      flexDirection: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? "column" : "row",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: 0.8,
+                      gap: 1,
                       cursor: "pointer",
                       bgcolor: errors.screenshot
-                        ? (t) => (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.04)")
-                        : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc"),
+                        ? "rgba(239, 68, 68, 0.05)"
+                        : ((t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)")),
+                      transition: "all 0.2s ease",
                       "&:hover": {
-                        bgcolor: errors.screenshot
-                          ? (t) => (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.08)")
-                          : "rgba(99, 102, 241, 0.04)",
-                        borderColor: errors.screenshot ? "error.main" : "#6366f1",
+                        borderColor: errors.screenshot
+                          ? "#dc2626"
+                          : ((t) => (t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b")),
+                        bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.07)"),
                       },
                     }}
                   >
-                    <input type="file" accept="image/*" multiple hidden onChange={handleScreenshotUpload} />
-                    <UploadIcon sx={{ color: errors.screenshot ? "error.main" : "#6366f1", fontSize: "1.4rem" }} />
+                    <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple hidden onChange={handleScreenshotUpload} />
+                    <UploadIcon
+                      sx={{
+                        fontSize: 20,
+                        color: errors.screenshot
+                          ? "#ef4444"
+                          : ((t) => (t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b")),
+                      }}
+                    />
                     <Typography
                       variant="caption"
-                      textAlign="center"
-                      fontWeight={700}
-                      sx={{
-                        fontSize: "0.72rem",
-                        color: errors.screenshot ? "error.main" : "text.secondary",
-                      }}
+                      fontWeight={600}
+                      sx={{ color: errors.screenshot ? "#ef4444" : "text.secondary" }}
                     >
-                      {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? "+ Add Image" : "Click to upload payment screenshot (PNG, JPG)"}
+                      {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? "+ Add Image (Max 6MB)" : "Click to attach image (Max 6MB)"}
                     </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontSize: "0.65rem",
-                        color: errors.screenshot ? "error.main" : "text.secondary",
-                      }}
-                    >
-                      {isImageMandatory
-                        ? "Select up to 3 images (Mandatory for UPI)"
-                        : "Select up to 3 images (Optional for Cash)"}
-                    </Typography>
-                  </Paper>
+                  </Box>
                 </Grid>
               )}
             </Grid>
@@ -2045,6 +2105,22 @@ export default function SubmitPaymentModal({
           )}
         </Box>
       </AppDialog>
+
+      {/* ── Delete Confirmation Dialog for Payment Mode Rows ── */}
+      <AppConfirmDialog
+        open={Boolean(rowToDelete)}
+        onClose={() => setRowToDelete(null)}
+        onConfirm={() => {
+          if (rowToDelete) {
+            handleRemoveSplitRow(rowToDelete);
+            setRowToDelete(null);
+          }
+        }}
+        title="Delete Payment Mode Row"
+        content="Are you sure you want to remove this payment mode row?"
+        confirmText="Delete"
+        confirmColor="error"
+      />
     </AppDialog>
   );
 }

@@ -1018,8 +1018,12 @@ export default function GalleryPage() {
                   label="Select Event Type"
                   value={filterCategory}
                   onChange={(e) => {
-                    const newCategory = e.target.value;
+                    const newCategory = e.target.value || "ALL";
                     setFilterCategory(newCategory);
+                    setFilterEvent("ALL");
+                  }}
+                  onClear={() => {
+                    setFilterCategory("ALL");
                     setFilterEvent("ALL");
                   }}
                   options={categoryOptions}
@@ -1033,8 +1037,9 @@ export default function GalleryPage() {
                   label="Select Event Name"
                   value={filterEvent}
                   onChange={(e) => {
-                    setFilterEvent(e.target.value);
+                    setFilterEvent(e.target.value || "ALL");
                   }}
+                  onClear={() => setFilterEvent("ALL")}
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event Name"

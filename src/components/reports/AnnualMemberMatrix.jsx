@@ -33,6 +33,7 @@ import {
   HelpOutline as HelpOutlineIcon,
   OpenInNew as OpenInNewIcon,
   ArrowForward as ArrowForwardIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 import AppSelect from "../common/AppSelect";
 import AppButton from "../common/AppButton";
@@ -70,10 +71,15 @@ export default function AnnualMemberMatrix({
   /* ── Filter States ── */
   const currentYear = dayjs().year();
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [appliedYear, setAppliedYear] = useState(currentYear);
   const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [filterEventType, setFilterEventType] = useState("ALL");
+  const [appliedEventType, setAppliedEventType] = useState("ALL");
   const [filterWorkType, setFilterWorkType] = useState("ALL");
+  const [appliedWorkType, setAppliedWorkType] = useState("ALL");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState("ALL");
+  const [appliedPaymentStatus, setAppliedPaymentStatus] = useState("ALL");
   const [viewMetric, setViewMetric] = useState("paid"); // "paid" | "pending" | "expected"
 
   /* ── Collect Available Years Dynamically ── */
@@ -126,16 +132,8 @@ export default function AnnualMemberMatrix({
   /* ── Payment Status Options ── */
   const paymentStatusOptions = [
     { label: "All Statuses", value: "ALL" },
-    { label: "Fully Settled (Paid)", value: "PAID" },
-    { label: "Has Pending Dues", value: "PENDING" },
-    { label: "Zero / No Events", value: "NO_EVENTS" },
-  ];
-
-  /* ── View Metric Options ── */
-  const viewMetricOptions = [
-    { label: "Paid (₹)", value: "paid" },
-    { label: "Pending (₹)", value: "pending" },
-    { label: "Expected (₹)", value: "expected" },
+    { label: "Paid", value: "PAID" },
+    { label: "Unpaid", value: "UNPAID" },
   ];
 
   /* ── Helpers to Resolve Event Metadata ── */
@@ -229,8 +227,8 @@ export default function AnnualMemberMatrix({
       });
     }
 
-    // 4. Process each member against the 12 calendar months for selectedYear & filters
-    const yearNum = Number(selectedYear);
+    // 4. Process each member against the 12 calendar months for appliedYear & filters
+    const yearNum = Number(appliedYear);
 
     const rows = targetPool.map((m) => {
       // Initialize 12 monthly slots (month 1 = index 0 .. month 12 = index 11)
@@ -259,7 +257,7 @@ export default function AnnualMemberMatrix({
 
         // Event Type filter
         const evType = resolveCategory(ev);
-        if (filterEventType !== "ALL" && evType.toLowerCase() !== filterEventType.toLowerCase()) {
+        if (appliedEventType !== "ALL" && evType.toLowerCase() !== appliedEventType.toLowerCase()) {
           return;
         }
 
@@ -333,8 +331,8 @@ export default function AnnualMemberMatrix({
     // 5. Apply Fine-Tuning Filters (Search, WorkType, ComplianceStatus)
     return rows.filter((r) => {
       // Search term
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase().trim();
+      if (appliedSearchTerm.trim()) {
+        const q = appliedSearchTerm.toLowerCase().trim();
         const matchName = r.memberName.toLowerCase().includes(q);
         const matchEmail = (r.email || "").toLowerCase().includes(q);
         const matchUser = (r.username || "").toLowerCase().includes(q);
@@ -342,15 +340,14 @@ export default function AnnualMemberMatrix({
       }
 
       // Work type
-      if (filterWorkType !== "ALL") {
-        if ((r.workType || "").toLowerCase() !== filterWorkType.toLowerCase()) return false;
+      if (appliedWorkType !== "ALL") {
+        if ((r.workType || "").toLowerCase() !== appliedWorkType.toLowerCase()) return false;
       }
 
       // Payment status
-      if (filterPaymentStatus !== "ALL") {
-        if (filterPaymentStatus === "PAID" && (r.annualStatus !== "PAID" || r.totalAnnualExpected === 0)) return false;
-        if (filterPaymentStatus === "PENDING" && r.annualStatus !== "PENDING") return false;
-        if (filterPaymentStatus === "NO_EVENTS" && r.annualStatus !== "NO_EVENTS") return false;
+      if (appliedPaymentStatus !== "ALL") {
+        if (appliedPaymentStatus === "PAID" && (r.annualStatus !== "PAID" || r.totalAnnualExpected === 0)) return false;
+        if (appliedPaymentStatus === "UNPAID" && r.totalAnnualPending === 0) return false;
       }
 
       return true;
@@ -358,11 +355,11 @@ export default function AnnualMemberMatrix({
   }, [
     report,
     usersList,
-    selectedYear,
-    filterEventType,
-    filterWorkType,
-    filterPaymentStatus,
-    searchTerm,
+    appliedYear,
+    appliedEventType,
+    appliedWorkType,
+    appliedPaymentStatus,
+    appliedSearchTerm,
     isMember,
     currentUserId,
     currentUserName,
@@ -449,18 +446,31 @@ export default function AnnualMemberMatrix({
     totalsRow["Status"] = "OVERALL";
     matrixSheet.push(totalsRow);
 
-    exportSheets(`annual-member-matrix-${selectedYear}.xlsx`, [
-      { name: `Matrix ${selectedYear}`, data: matrixSheet },
+    exportSheets(`annual-member-matrix-${appliedYear}.xlsx`, [
+      { name: `Matrix ${appliedYear}`, data: matrixSheet },
     ]);
   };
 
-  /* ── Reset Filters ── */
-  const handleResetFilters = () => {
+  /* ── Filter & Clear Handlers ── */
+  const handleApplyFilter = () => {
+    setAppliedYear(selectedYear);
+    setAppliedSearchTerm(searchTerm);
+    setAppliedEventType(filterEventType);
+    setAppliedWorkType(filterWorkType);
+    setAppliedPaymentStatus(filterPaymentStatus);
+  };
+
+  const handleClearFilter = () => {
     setSelectedYear(currentYear);
+    setAppliedYear(currentYear);
     setSearchTerm("");
+    setAppliedSearchTerm("");
     setFilterEventType("ALL");
+    setAppliedEventType("ALL");
     setFilterWorkType("ALL");
+    setAppliedWorkType("ALL");
     setFilterPaymentStatus("ALL");
+    setAppliedPaymentStatus("ALL");
     setViewMetric("paid");
   };
 
@@ -502,42 +512,140 @@ export default function AnnualMemberMatrix({
       badgeBorder = isDark ? "rgba(245, 158, 11, 0.3)" : "rgba(245, 158, 11, 0.25)";
     }
 
-    // Rich Tooltip content
+    // Rich Tooltip content with fixed header and scrollable event list
     const tooltipContent = (
-      <Box sx={{ p: 1, maxWidth: 300 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#fff", borderBottom: "1px solid rgba(255,255,255,0.15)", pb: 0.5, mb: 1 }}>
-          {monthData.monthName} {selectedYear}
-        </Typography>
-        <Stack spacing={1}>
-          {monthData.events.map((ev, i) => (
-            <Box key={i} sx={{ fontSize: "0.75rem", lineHeight: 1.4 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700, color: "#fff", fontSize: "0.8rem" }}>
-                {ev.eventName}
-              </Typography>
-              <Box sx={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.7)", mt: 0.25 }}>
-                <span>Type: {ev.categoryName}</span>
-                <span>{ev.formattedDate}</span>
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.25 }}>
-                <span style={{ color: "rgba(255,255,255,0.8)" }}>Expected: {INR(ev.expectedAmount)}</span>
-                <span style={{ color: ev.isPaid ? "#34d399" : "#fb7185", fontWeight: 700 }}>
-                  {ev.isPaid ? `Paid: ${INR(ev.paidAmount)}` : `Due: ${INR(ev.pendingAmount)}`}
-                </span>
-              </Box>
-              {ev.paymentMode && (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", display: "block" }}>
-                  Mode: {ev.paymentMode} {ev.paymentDate ? `(${formatGridDate(ev.paymentDate)})` : ""}
+      <Box sx={{ width: 320, maxWidth: "90vw" }}>
+        {/* Fixed Header */}
+        <Box
+          sx={{
+            px: 1.5,
+            py: 1,
+            bgcolor: "#1e293b",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderTopLeftRadius: "10px",
+            borderTopRightRadius: "10px",
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#fff", fontSize: "0.82rem" }}>
+            {monthData.monthName} {appliedYear || selectedYear}
+          </Typography>
+          <Chip
+            label={`${monthData.events.length} ${monthData.events.length === 1 ? "Event" : "Events"}`}
+            size="small"
+            sx={{
+              height: 20,
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              bgcolor: "rgba(255, 255, 255, 0.12)",
+              color: "rgba(255, 255, 255, 0.9)",
+              borderRadius: "6px",
+            }}
+          />
+        </Box>
+
+        {/* Scrollable Event List */}
+        <Box
+          sx={{
+            p: 1.5,
+            maxHeight: 260,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            "&::-webkit-scrollbar": {
+              width: "6px",
+            },
+            "&::-webkit-scrollbar-track": {
+              background: "rgba(255, 255, 255, 0.05)",
+              borderRadius: "4px",
+            },
+            "&::-webkit-scrollbar-thumb": {
+              background: "rgba(255, 255, 255, 0.28)",
+              borderRadius: "4px",
+            },
+            "&::-webkit-scrollbar-thumb:hover": {
+              background: "rgba(255, 255, 255, 0.5)",
+            },
+          }}
+        >
+          <Stack spacing={1}>
+            {monthData.events.map((ev, i) => (
+              <Box key={i} sx={{ fontSize: "0.75rem", lineHeight: 1.4 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: "#fff", fontSize: "0.8rem" }}>
+                  {ev.eventName}
                 </Typography>
-              )}
-              {i < monthData.events.length - 1 && <Divider sx={{ my: 0.5, borderColor: "rgba(255,255,255,0.1)" }} />}
-            </Box>
-          ))}
-        </Stack>
+                <Box sx={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.7)", mt: 0.25 }}>
+                  <span>Type: {ev.categoryName}</span>
+                  <span>{ev.formattedDate}</span>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.25 }}>
+                  <span style={{ color: "rgba(255,255,255,0.8)" }}>Expected: {INR(ev.expectedAmount)}</span>
+                  <span style={{ color: ev.isPaid ? "#34d399" : "#fb7185", fontWeight: 700 }}>
+                    {ev.isPaid ? `Paid: ${INR(ev.paidAmount)}` : `Due: ${INR(ev.pendingAmount)}`}
+                  </span>
+                </Box>
+                {ev.paymentMode && (
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", display: "block" }}>
+                    Mode: {ev.paymentMode} {ev.paymentDate ? `(${formatGridDate(ev.paymentDate)})` : ""}
+                  </Typography>
+                )}
+                {i < monthData.events.length - 1 && <Divider sx={{ my: 0.75, borderColor: "rgba(255,255,255,0.1)" }} />}
+              </Box>
+            ))}
+          </Stack>
+        </Box>
       </Box>
     );
 
     return (
-      <Tooltip title={tooltipContent} arrow placement="top" enterDelay={150}>
+      <Tooltip
+        title={tooltipContent}
+        arrow
+        placement="top"
+        enterDelay={150}
+        leaveDelay={250}
+        interactive
+        slotProps={{
+          popper: {
+            sx: {
+              pointerEvents: "auto",
+              zIndex: 9999,
+            },
+            modifiers: [
+              {
+                name: "preventOverflow",
+                options: {
+                  boundary: "window",
+                  altAxis: true,
+                  padding: 8,
+                },
+              },
+              {
+                name: "flip",
+                options: {
+                  fallbackPlacements: ["bottom", "top", "right", "left"],
+                },
+              },
+            ],
+          },
+          tooltip: {
+            sx: {
+              bgcolor: "#1e293b",
+              p: 0,
+              maxWidth: "none",
+              borderRadius: "10px",
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+            },
+          },
+          arrow: {
+            sx: {
+              color: "#1e293b",
+            },
+          },
+        }}
+      >
         <Box
           sx={{
             display: "inline-flex",
@@ -581,7 +689,7 @@ export default function AnnualMemberMatrix({
           boxShadow: isDark ? "none" : "0 2px 8px rgba(0, 0, 0, 0.02)",
         }}
       >
-        {/* Top Header: Title, Badges & Display Mode Selector */}
+        {/* Top Header: Title & Badges */}
         <Box
           sx={{
             display: "flex",
@@ -615,7 +723,7 @@ export default function AnnualMemberMatrix({
             </Typography>
             <Chip
               size="small"
-              label={selectedYear}
+              label={appliedYear}
               sx={{
                 fontWeight: 800,
                 fontSize: "0.72rem",
@@ -638,46 +746,6 @@ export default function AnnualMemberMatrix({
               }}
             />
           </Box>
-
-          {/* Metric View Mode Toggle (Paid vs Pending vs Expected) */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", textTransform: "uppercase", fontSize: "0.68rem" }}>
-              Display Mode:
-            </Typography>
-            <Box
-              sx={{
-                display: "inline-flex",
-                p: "3px",
-                borderRadius: "8px",
-                bgcolor: isDark ? "rgba(0, 0, 0, 0.3)" : "#f1f5f9",
-                border: "1px solid",
-                borderColor: isDark ? "rgba(255, 255, 255, 0.05)" : "#e2e8f0",
-              }}
-            >
-              {viewMetricOptions.map((opt) => (
-                <ButtonBase
-                  key={opt.value}
-                  onClick={() => setViewMetric(opt.value)}
-                  sx={{
-                    px: 1.5,
-                    py: 0.45,
-                    borderRadius: "6px",
-                    fontSize: "0.75rem",
-                    fontWeight: viewMetric === opt.value ? 700 : 600,
-                    color: viewMetric === opt.value
-                      ? "#ffffff"
-                      : isDark ? "text.secondary" : "#64748b",
-                    bgcolor: viewMetric === opt.value
-                      ? "#6366f1"
-                      : "transparent",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {opt.label}
-                </ButtonBase>
-              ))}
-            </Box>
-          </Box>
         </Box>
 
         {/* Filter Controls Row: Unified, perfectly aligned */}
@@ -689,7 +757,49 @@ export default function AnnualMemberMatrix({
             gap: 1.5,
           }}
         >
-          {/* 1. Member Search Input */}
+          {/* 1. Year Selector */}
+          <Box sx={{ width: { xs: "100%", sm: 110, md: 120 } }}>
+            <AppSelect
+              label="Year"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              options={availableYears}
+              allowClear={false}
+              clearable={false}
+            />
+          </Box>
+
+          {/* 2. Event Type Filter */}
+          <Box sx={{ width: { xs: "100%", sm: 170, md: 190 } }}>
+            <AppSelect
+              label="Event Type"
+              value={filterEventType}
+              onChange={(e) => setFilterEventType(e.target.value)}
+              options={eventTypeOptions}
+            />
+          </Box>
+
+          {/* 3. Work Type Filter */}
+          <Box sx={{ width: { xs: "100%", sm: 130, md: 140 } }}>
+            <AppSelect
+              label="Work Type"
+              value={filterWorkType}
+              onChange={(e) => setFilterWorkType(e.target.value)}
+              options={workTypeOptions}
+            />
+          </Box>
+
+          {/* 4. Payment Status Filter */}
+          <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+            <AppSelect
+              label="Payment Status"
+              value={filterPaymentStatus}
+              onChange={(e) => setFilterPaymentStatus(e.target.value)}
+              options={paymentStatusOptions}
+            />
+          </Box>
+
+          {/* 5. Member Search Input (placed right after Payment Status) */}
           <Box sx={{ width: { xs: "100%", sm: 220, md: 240 } }}>
             <Typography
               variant="caption"
@@ -711,6 +821,11 @@ export default function AnnualMemberMatrix({
               placeholder="Search by name, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleApplyFilter();
+                }
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -755,49 +870,7 @@ export default function AnnualMemberMatrix({
             />
           </Box>
 
-          {/* 2. Year Selector */}
-          <Box sx={{ width: { xs: "100%", sm: 110, md: 120 } }}>
-            <AppSelect
-              label="Year"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              options={availableYears}
-              allowClear={false}
-              clearable={false}
-            />
-          </Box>
-
-          {/* 3. Event Type Filter */}
-          <Box sx={{ width: { xs: "100%", sm: 170, md: 190 } }}>
-            <AppSelect
-              label="Event Type"
-              value={filterEventType}
-              onChange={(e) => setFilterEventType(e.target.value)}
-              options={eventTypeOptions}
-            />
-          </Box>
-
-          {/* 4. Work Type Filter */}
-          <Box sx={{ width: { xs: "100%", sm: 130, md: 140 } }}>
-            <AppSelect
-              label="Work Type"
-              value={filterWorkType}
-              onChange={(e) => setFilterWorkType(e.target.value)}
-              options={workTypeOptions}
-            />
-          </Box>
-
-          {/* 5. Payment Status Filter */}
-          <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
-            <AppSelect
-              label="Payment Status"
-              value={filterPaymentStatus}
-              onChange={(e) => setFilterPaymentStatus(e.target.value)}
-              options={paymentStatusOptions}
-            />
-          </Box>
-
-          {/* 6. Action Buttons: Reset & Export */}
+          {/* 6. Action Buttons: Filter, Clear & Export Excel */}
           <Box
             sx={{
               display: "flex",
@@ -809,28 +882,46 @@ export default function AnnualMemberMatrix({
               height: 34,
             }}
           >
-            <Tooltip title="Reset all fine-tuning filters to default">
+            <AppButton
+              size="small"
+              variant="contained"
+              startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
+              onClick={handleApplyFilter}
+              sx={{
+                height: 34,
+                minHeight: 34,
+                fontWeight: 700,
+                fontSize: "0.78rem",
+                px: 2,
+                borderRadius: "8px",
+              }}
+            >
+              Filter
+            </AppButton>
+
+            <Tooltip title="Clear filters and reset">
               <AppButton
                 size="small"
                 variant="outlined"
-                startIcon={<RestartAltIcon sx={{ fontSize: 17 }} />}
-                onClick={handleResetFilters}
+                startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
+                onClick={handleClearFilter}
                 sx={{
                   height: 34,
                   minHeight: 34,
-                  fontSize: "0.78rem",
                   fontWeight: 700,
-                  px: 1.6,
-                  borderRadius: "10px",
+                  fontSize: "0.78rem",
+                  px: 1.8,
+                  borderRadius: "8px",
                   color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.35)",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
                   "&:hover": {
                     borderColor: "#ef4444",
+                    color: "#ef4444",
                     bgcolor: "rgba(239, 68, 68, 0.06)",
                   },
                 }}
               >
-                Reset
+                Clear
               </AppButton>
             </Tooltip>
 
@@ -845,12 +936,12 @@ export default function AnnualMemberMatrix({
                 fontSize: "0.78rem",
                 fontWeight: 700,
                 px: 2,
-                borderRadius: "10px",
+                borderRadius: "8px",
                 boxShadow: "0 2px 8px rgba(99, 102, 241, 0.25)",
                 whiteSpace: "nowrap",
               }}
             >
-              Export Matrix (.xlsx)
+              Export Excel
             </AppButton>
           </Box>
         </Box>

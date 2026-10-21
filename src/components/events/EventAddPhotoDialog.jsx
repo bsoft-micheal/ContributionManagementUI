@@ -270,8 +270,8 @@ export default function EventAddPhotoDialog({
       newErrors.title = "Title must be at most 250 characters";
     }
 
-    if (!form.category) newErrors.category = "Event Type is required";
-    if (!form.eventName) newErrors.eventName = "Event Name is required";
+    if (!form.category) newErrors.category = "This field is required";
+    if (!form.eventName) newErrors.eventName = "This field is required";
 
     if (maxAllowedForEvent === 0) {
       toast.error(
