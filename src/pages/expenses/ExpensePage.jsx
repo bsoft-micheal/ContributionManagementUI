@@ -1853,9 +1853,22 @@ export default function ExpensePage() {
                       <ImageIcon sx={{ fontSize: 20, color: "#4a3f6b" }} />
                     </Box>
                     <Box sx={{ overflow: "hidden" }}>
-                      <Typography variant="caption" fontWeight={700} sx={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>
-                        {form.attachmentName || "Attached Image"}
-                      </Typography>
+                      <Tooltip title={form.attachmentName || "Attached Image"} arrow placement="top">
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          sx={{
+                            display: "block",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: 140,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {form.attachmentName || "Attached Image"}
+                        </Typography>
+                      </Tooltip>
                       <Typography variant="caption" sx={{ color: "#0284c7", fontSize: "0.66rem", display: "block" }}>
                         Click to preview
                       </Typography>

@@ -15,6 +15,7 @@ import {
   Select,
   MenuItem,
   Avatar,
+  Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
@@ -77,16 +78,23 @@ export default function RateHistoryModal({
   const latestHistory = historyList[0];
   const lastUpdatedOn = latestHistory?.changedOn
     ? formatGridDate(latestHistory.changedOn)
-    : item.createdAt || item.createdOn
-    ? formatGridDate(item.createdAt || item.createdOn)
+    : item.modifiedOn || item.ModifiedOn || item.createdAt || item.createdOn
+    ? formatGridDate(item.modifiedOn || item.ModifiedOn || item.createdAt || item.createdOn)
     : "--";
-  const lastUpdatedBy = latestHistory?.changedBy || item.createdBy || "--";
+  const lastUpdatedBy =
+    latestHistory?.modifiedBy ||
+    latestHistory?.changedBy ||
+    item.modifiedBy ||
+    item.ModifiedBy ||
+    item.createdBy ||
+    item.CreatedBy ||
+    "--";
 
   return (
     <AppDialog
       open={open}
       onClose={onClose}
-      title={`Rate History - ${item.expenseItem || "Expense Item"}`}
+      title="Rate History"
       maxWidth="md"
       actions={
         <Box sx={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
@@ -111,24 +119,40 @@ export default function RateHistoryModal({
             border: `1px solid ${theme.palette.divider}`,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
             <Avatar
               sx={{
                 bgcolor: theme.palette.mode === "dark" ? "#2d2448" : "#ede8f9",
                 color: theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                 width: 48,
                 height: 48,
+                flexShrink: 0,
               }}
             >
               <ReceiptLongRoundedIcon />
             </Avatar>
-            <Box>
+            <Box sx={{ minWidth: 0, maxWidth: { xs: 200, sm: 260 } }}>
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                 Expense Item
               </Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: theme.palette.text.primary, lineHeight: 1.2 }}>
-                {item.expenseItem}
-              </Typography>
+              <Tooltip title={item.expenseItem && item.expenseItem.length > 25 ? item.expenseItem : ""} arrow>
+                <Typography
+                  variant="subtitle1"
+                  sx={{
+                    fontWeight: 800,
+                    color: theme.palette.text.primary,
+                    lineHeight: 1.2,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    cursor: item.expenseItem && item.expenseItem.length > 25 ? "pointer" : "default",
+                  }}
+                >
+                  {item.expenseItem && item.expenseItem.length > 25
+                    ? `${item.expenseItem.slice(0, 25)}...`
+                    : item.expenseItem || "--"}
+                </Typography>
+              </Tooltip>
             </Box>
           </Box>
 
@@ -320,7 +344,7 @@ export default function RateHistoryModal({
 
                       <TableCell>
                         <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.8rem" }}>
-                          {row.changedBy || "--"}
+                          {row.modifiedBy || row.changedBy || item.modifiedBy || item.ModifiedBy || item.createdBy || item.CreatedBy || "--"}
                         </Typography>
                       </TableCell>
 

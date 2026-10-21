@@ -626,10 +626,23 @@ export default function EventAddExpenseDialog({
                           border: "1px solid #16a34a",
                         }}
                       />
-                      <Box>
-                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem" }}>
-                          {form.attachmentName || "Attached Receipt"}
-                        </Typography>
+                      <Box sx={{ overflow: "hidden" }}>
+                        <Tooltip title={form.attachmentName || "Attached Receipt"} arrow placement="top">
+                          <Typography
+                            variant="body2"
+                            fontWeight={700}
+                            sx={{
+                              fontSize: "0.82rem",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              maxWidth: 180,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {form.attachmentName || "Attached Receipt"}
+                          </Typography>
+                        </Tooltip>
                         <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
                           Click to replace image
                         </Typography>

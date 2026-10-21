@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import {
   Box,
   Typography,
@@ -14,8 +14,12 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AppInput from "./AppInput";
 import apiClient from "../../services/apiClient";
 import { useAppToast } from "./AppToast";
+import COMMON_STRINGS from "../../constants/commonStrings";
 
-export default function MfaSettings({ embedded = false, title = "Two-Factor Authentication (MFA)", onDevicesChange }) {
+const MfaSettings = forwardRef(function MfaSettings(
+  { embedded = false, title = "Two-Factor Authentication (MFA)", onDevicesChange },
+  ref
+) {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [setupData, setSetupData] = useState(null);
@@ -23,6 +27,7 @@ export default function MfaSettings({ embedded = false, title = "Two-Factor Auth
     deviceLabel: "",
     otp: "",
   });
+  const [errors, setErrors] = useState({});
   const toast = useAppToast();
 
   const fetchDevices = async () => {
@@ -49,6 +54,8 @@ export default function MfaSettings({ embedded = false, title = "Two-Factor Auth
   const handleStartSetup = async () => {
     try {
       setLoading(true);
+      setErrors({});
+      setVerifyForm({ deviceLabel: "", otp: "" });
       const res = await apiClient.get("/mfa/setupMfaAsync");
       const data = res.data?.data !== undefined ? res.data.data : res.data;
       setSetupData(data);
@@ -59,30 +66,96 @@ export default function MfaSettings({ embedded = false, title = "Two-Factor Auth
     }
   };
 
-  const handleVerifySetup = async () => {
-    if (!verifyForm.otp || verifyForm.otp.length !== 6) {
-      toast.error("Please enter a valid 6-digit code");
-      return;
+  const validateForm = () => {
+    const newErrors = {};
+
+    // 1. Device Label (Optional)
+    if (verifyForm.deviceLabel !== undefined && verifyForm.deviceLabel !== null && verifyForm.deviceLabel.length > 0) {
+      const trimmedLabel = verifyForm.deviceLabel.trim();
+      if (!trimmedLabel) {
+        newErrors.deviceLabel = "Device label cannot contain only spaces";
+      } else if (trimmedLabel.length < 2) {
+        newErrors.deviceLabel = "Device label must be at least 2 characters";
+      } else if (trimmedLabel.length > 50) {
+        newErrors.deviceLabel = "Device label cannot exceed 50 characters";
+      }
     }
+
+    // 2. 6-Digit Code (Mandatory)
+    const rawOtp = verifyForm.otp ?? "";
+    const trimmedOtp = rawOtp.trim();
+
+    if (!trimmedOtp) {
+      newErrors.otp = "This field is required";
+    } else if (!/^\d{6}$/.test(rawOtp)) {
+      newErrors.otp = "Enter a valid 6-digit code";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleDeviceLabelChange = (e) => {
+    const val = e.target.value.slice(0, 50);
+    setVerifyForm((prev) => ({ ...prev, deviceLabel: val }));
+    if (errors.deviceLabel) {
+      const trimmed = val.trim();
+      if (!val || (trimmed.length >= 2 && trimmed.length <= 50)) {
+        setErrors((prev) => ({ ...prev, deviceLabel: "" }));
+      }
+    }
+  };
+
+  const handleOtpChange = (e) => {
+    const val = e.target.value;
+    setVerifyForm((prev) => ({ ...prev, otp: val }));
+    if (errors.otp) {
+      if (/^\d{6}$/.test(val)) {
+        setErrors((prev) => ({ ...prev, otp: "" }));
+      } else if (errors.otp === "This field is required" && val.trim()) {
+        setErrors((prev) => ({ ...prev, otp: "" }));
+      }
+    }
+  };
+
+  const handleVerifySetup = async () => {
+    if (loading) return false;
+
+    const isValid = validateForm();
+    if (!isValid) return false;
 
     try {
       setLoading(true);
       await apiClient.post("/mfa/verifySetupMfaAsync", {
         secretKey: setupData.secretKey,
-        deviceLabel: verifyForm.deviceLabel || "Authenticator App",
-        otp: verifyForm.otp,
+        deviceLabel: verifyForm.deviceLabel?.trim() || "Authenticator App",
+        otp: (verifyForm.otp ?? "").trim(),
       });
 
       toast.success("MFA Device added successfully");
       setSetupData(null);
       setVerifyForm({ deviceLabel: "", otp: "" });
+      setErrors({});
       fetchDevices();
+      return true;
     } catch (err) {
-      toast.error(err.response?.data?.message || "Invalid OTP code");
+      const msg = err.response?.data?.message || "Invalid OTP code";
+      setErrors((prev) => ({ ...prev, otp: msg }));
+      toast.error(msg);
+      return false;
     } finally {
       setLoading(false);
     }
   };
+
+  useImperativeHandle(ref, () => ({
+    get isSettingUp() {
+      return Boolean(setupData);
+    },
+    validate: validateForm,
+    verifyAndSave: handleVerifySetup,
+  }));
+
 
   const handleRemoveDevice = async (id) => {
     try {
@@ -233,27 +306,43 @@ export default function MfaSettings({ embedded = false, title = "Two-Factor Auth
               <AppInput
                 label="Device Label (Optional)"
                 value={verifyForm.deviceLabel}
-                onChange={(e) => setVerifyForm({ ...verifyForm, deviceLabel: e.target.value })}
+                maxLength={50}
+                onChange={handleDeviceLabelChange}
                 placeholder="e.g. My iPhone"
+                error={Boolean(errors.deviceLabel)}
+                helperText={errors.deviceLabel}
               />
             </Box>
             <Box sx={{ flex: 1 }}>
               <AppInput
                 label="6-Digit Code"
                 value={verifyForm.otp}
-                onChange={(e) => setVerifyForm({ ...verifyForm, otp: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                onChange={handleOtpChange}
                 placeholder="123456"
-                maxLength={6}
                 required
+                error={Boolean(errors.otp)}
+                helperText={errors.otp}
               />
             </Box>
           </Box>
 
           <Box sx={{ display: "flex", gap: 2, justifyContent: "center" }}>
-            <Button onClick={() => setSetupData(null)} color="inherit" disabled={loading}>
+            <Button
+              onClick={() => {
+                setSetupData(null);
+                setVerifyForm({ deviceLabel: "", otp: "" });
+                setErrors({});
+              }}
+              color="inherit"
+              disabled={loading}
+            >
               Cancel
             </Button>
-            <Button variant="contained" onClick={handleVerifySetup} disabled={loading || verifyForm.otp.length !== 6}>
+            <Button
+              variant="contained"
+              onClick={handleVerifySetup}
+              disabled={loading}
+            >
               {loading ? "Verifying..." : "Verify & Save"}
             </Button>
           </Box>
@@ -261,4 +350,6 @@ export default function MfaSettings({ embedded = false, title = "Two-Factor Auth
       )}
     </Box>
   );
-}
+});
+
+export default MfaSettings;

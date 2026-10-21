@@ -16,6 +16,7 @@ import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import { getEventsAsync, getEventByIdAsync } from "../../services/eventService";
 import { useAppToast } from "../../components/common/AppToast";
+import { COMMON_STRINGS } from "../../constants";
 
 export default function ContributionCalculationPage() {
   const theme = useTheme();
@@ -151,8 +152,7 @@ export default function ContributionCalculationPage() {
         shareRatio,
         appliedPct,
         isNewEntrant: Boolean(matchedTier),
-        createdBy: memberInfo?.createdBy || memberInfo?.CreatedBy || ep.createdBy || ep.CreatedBy || "--",
-        createdAt: memberInfo?.createdAt || memberInfo?.CreatedAt || memberInfo?.createdOn || memberInfo?.CreatedOn || ep.createdAt || ep.createdOn || null,
+        createdAt: ep.createdAt || ep.createdOn || ep.CreatedAt || ep.CreatedOn || null,
       };
     });
 
@@ -184,6 +184,27 @@ export default function ContributionCalculationPage() {
 
     const roundedShares = distributeRoundedTotal(totalAmount, rawShares);
 
+      const rowCreatedAt =
+        epContribution?.createdAt ||
+        epContribution?.createdOn ||
+        epContribution?.CreatedAt ||
+        epContribution?.CreatedOn ||
+        p.createdAt ||
+        selectedEventDetails?.createdAt ||
+        selectedEventDetails?.createdOn ||
+        selectedEventDetails?.CreatedAt ||
+        selectedEventDetails?.CreatedOn ||
+        selectedEventDetails?.eventDate ||
+        null;
+
+      return {
+        ...p,
+        createdAt: rowCreatedAt,
+        createdOn: rowCreatedAt,
+        tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
+        calculatedAmount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimals
+      };
+    });
     const calculated = enrichedParticipants.map((p, idx) => ({
       ...p,
       tenureFormatted: p.tenure >= 0 ? p.tenure.toFixed(2) : "0.00",
@@ -260,11 +281,6 @@ export default function ContributionCalculationPage() {
       render: (row) => formatWholeCurrency(row.calculatedAmount || 0),
     },
     {
-      label: "Created By",
-      key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
-    },
-    {
       label: "Created On",
       key: "createdAt",
       render: (row) => formatGridDate(row.createdAt || row.CreatedAt || row.createdOn || row.CreatedOn),
@@ -274,7 +290,7 @@ export default function ContributionCalculationPage() {
   return (
     <div className="page-shell">
       <AppDataTable
-        title="Contribution Calculation"
+        title={COMMON_STRINGS.CONTRIBUTION_CALCULATION.TITLE}
         columns={columns}
         data={calculationData}
         loading={loading}

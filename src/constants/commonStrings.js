@@ -103,6 +103,10 @@ export const COMMON_STRINGS = {
     EMPTY_VALUE: "--",
     SELECT_ALL: "All",
     SELECT_OPTION: "Select an option"
+  },
+  CONTRIBUTION_CALCULATION: {
+    TITLE: "Contribution Share Rules",
+    MENU_LABEL: "Contribution Share Rules"
   }
 };
 

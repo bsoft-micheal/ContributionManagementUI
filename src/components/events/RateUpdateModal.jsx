@@ -3,6 +3,7 @@ import {
   Box,
   Typography,
   Grid,
+  Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
@@ -20,7 +21,7 @@ import { formatWholeCurrency, formatWholeNumber } from "../../utils/roundingHelp
 
 const formatRateAmount = (value) => {
   if (value === undefined || value === null || value === "") return "";
-  const cleanVal = String(value).replace(/[^0-9]/g, "").slice(0, 8);
+  const cleanVal = String(value).replace(/[^0-9]/g, "").slice(0, 5);
   if (!cleanVal) return "";
   const num = Number(cleanVal);
   if (isNaN(num)) return "";
@@ -54,13 +55,13 @@ export default function RateUpdateModal({
   if (!item) return null;
 
   const currentRateNum = Number(item.rate ?? 0);
-  const newRateNum = newRate === "" ? null : Number(String(newRate).replace(/[^0-9]/g, "").slice(0, 8));
+  const newRateNum = newRate === "" ? null : Number(String(newRate).replace(/[^0-9]/g, "").slice(0, 5));
   
   const isRateChanged =
     newRateNum !== null &&
     !isNaN(newRateNum) &&
     newRateNum !== currentRateNum &&
-    newRateNum <= 10000000 &&
+    newRateNum <= 99999 &&
     !errors.newRate;
   const isIncrease = newRateNum !== null && newRateNum > currentRateNum;
   const isDecrease = newRateNum !== null && newRateNum < currentRateNum;
@@ -80,12 +81,14 @@ export default function RateUpdateModal({
       errs.newRate = "New rate must be greater than or equal to 0";
     } else if (newRateNum === currentRateNum) {
       errs.newRate = "New rate must be different from the current rate.";
-    } else if (newRateNum > 10000000) {
-      errs.newRate = "Rate cannot exceed 10,000,000";
+    } else if (String(newRateNum).length > 5 || newRateNum > 99999) {
+      errs.newRate = "Rate cannot exceed 5 characters";
     }
 
     if (!effectiveFrom || !dayjs(effectiveFrom).isValid()) {
       errs.effectiveFrom = "Effective from date is required";
+    } else if (dayjs(effectiveFrom).isAfter(dayjs(), "day")) {
+      errs.effectiveFrom = "Future dates are not allowed";
     }
 
     const trimmedReason = (changeReason || "").trim();
@@ -103,13 +106,6 @@ export default function RateUpdateModal({
 
   const handleUpdate = async () => {
     if (!validate()) {
-      if (newRateNum === currentRateNum) {
-        toast.error("New rate must be different from the current rate.");
-      } else if (!changeReason?.trim()) {
-        toast.error("Please enter the reason for the rate change.");
-      } else {
-        toast.error("Please fill all required fields correctly.");
-      }
       return;
     }
 
@@ -143,7 +139,7 @@ export default function RateUpdateModal({
     <AppDialog
       open={open}
       onClose={onClose}
-      title={`Update Rate - ${item.expenseItem || "Expense Item"}`}
+      title="Update Rate"
       maxWidth="sm"
       actions={
         <Box sx={{ display: "flex", justifyContent: "center", gap: 1.5, width: "100%" }}>
@@ -187,13 +183,27 @@ export default function RateUpdateModal({
               {item.category || item.eventTypeName || "--"}
             </Typography>
           </Box>
-          <Box sx={{ textAlign: "right" }}>
+          <Box sx={{ textAlign: "right", minWidth: 0, maxWidth: "60%" }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
               Expense Item
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
-              {item.expenseItem || "--"}
-            </Typography>
+            <Tooltip title={item.expenseItem && item.expenseItem.length > 25 ? item.expenseItem : ""} arrow>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: theme.palette.text.primary,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  cursor: item.expenseItem && item.expenseItem.length > 25 ? "pointer" : "default",
+                }}
+              >
+                {item.expenseItem && item.expenseItem.length > 25
+                  ? `${item.expenseItem.slice(0, 25)}...`
+                  : item.expenseItem || "--"}
+              </Typography>
+            </Tooltip>
           </Box>
         </Box>
 
@@ -239,15 +249,16 @@ export default function RateUpdateModal({
               fullWidth
               value={formatRateAmount(newRate)}
               onChange={(e) => {
-                const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
+                const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 5);
                 setNewRate(raw);
                 const num = raw === "" ? null : Number(raw);
                 let err = "";
-                if (num !== null && num > 10000000) {
-                  err = "Rate cannot exceed 10,000,000";
+                if (num !== null && (String(num).length > 5 || num > 99999)) {
+                  err = "Rate cannot exceed 5 characters";
                 }
                 setErrors((p) => ({ ...p, newRate: err }));
               }}
+              maxLength={6}
               required
               error={!!errors.newRate}
               helperText={errors.newRate}
@@ -300,6 +311,8 @@ export default function RateUpdateModal({
             setEffectiveFrom(newVal);
             if (errors.effectiveFrom) setErrors((p) => ({ ...p, effectiveFrom: "" }));
           }}
+          disableFuture
+          maxDate={dayjs()}
           required
           error={!!errors.effectiveFrom}
           helperText={errors.effectiveFrom}

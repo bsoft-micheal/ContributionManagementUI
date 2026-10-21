@@ -42,25 +42,18 @@ export default function useUnsavedChanges({
   }, [isDirty]);
 
   /**
-   * Triggers cancel flow. If form has unsaved changes, opens confirmation modal.
-   * If clean, immediately invokes onQuit or custom fallback.
-   * @param {Function} [customQuitFn] Optional custom quit callback for specific buttons (e.g. back icon vs cancel button).
+   * Triggers cancel flow. Disables confirmation modal completely as requested;
+   * immediately invokes onQuit or custom fallback.
+   * @param {Function} [customQuitFn] Optional custom quit callback for specific buttons.
    */
   const handleCancelRequest = useCallback(
     (customQuitFn) => {
-      const dirty = checkIsDirty();
       const quitFn = typeof customQuitFn === "function" ? customQuitFn : onQuit;
-
-      if (dirty) {
-        setPendingQuitCallback(() => quitFn);
-        setShowDialog(true);
-      } else {
-        if (typeof quitFn === "function") {
-          quitFn();
-        }
+      if (typeof quitFn === "function") {
+        quitFn();
       }
     },
-    [checkIsDirty, onQuit]
+    [onQuit]
   );
 
   /**
@@ -84,30 +77,9 @@ export default function useUnsavedChanges({
   }, [pendingQuitCallback, onQuit]);
 
   /**
-   * Ready-to-render Dialog component for ease of use.
+   * Dialog component renders null to completely eliminate the unsaved changes popup.
    */
-  const UnsavedChangesDialog = useCallback(
-    () => (
-      <AppUnsavedChangesDialog
-        open={showDialog}
-        onKeepEditing={handleKeepEditing}
-        onQuitChanges={handleConfirmQuit}
-        title={title}
-        content={content}
-        keepEditingText={keepEditingText}
-        quitChangesText={quitChangesText}
-      />
-    ),
-    [
-      showDialog,
-      handleKeepEditing,
-      handleConfirmQuit,
-      title,
-      content,
-      keepEditingText,
-      quitChangesText,
-    ]
-  );
+  const UnsavedChangesDialog = useCallback(() => null, []);
 
   return {
     showUnsavedDialog: showDialog,
