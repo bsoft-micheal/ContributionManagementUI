@@ -43,7 +43,7 @@ import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
 import AppDateInput from "../common/AppDateInput";
 import AppTextArea from "../common/AppTextArea";
-import AppButton from "../common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../common/AppButton";
 import AppDialog from "../common/AppDialog";
 import AppConfirmDialog from "../common/AppConfirmDialog";
 import { useAppToast } from "../common/AppToast";
@@ -1224,11 +1224,8 @@ export default function SubmitPaymentModal({
       maxWidth="md"
       actions={
         <Stack direction="row" spacing={1.5}>
-          <AppButton variant="outlined" onClick={onClose}>
-            Cancel
-          </AppButton>
-          <AppButton
-            variant="contained"
+          <AppCancelButton onClick={onClose} />
+          <AppSaveButton
             onClick={handleSubmitProof}
             disabled={submitting || isFullySettled}
             sx={{
@@ -1247,7 +1244,7 @@ export default function SubmitPaymentModal({
             }}
           >
             {submitting ? "Saving..." : isFullySettled ? "✓ All Dues Settled" : "Save"}
-          </AppButton>
+          </AppSaveButton>
         </Stack>
       }
     >

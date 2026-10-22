@@ -1810,138 +1810,255 @@ export default function ReportsPage({ mode = "event" }) {
     return text;
   }, [filters]);
 
-  return (
-    <div className="page-shell">
-      <Card
+  const activeColumns = mode === "payment-history"
+    ? paymentHistoryColumns
+    : mode === "member"
+      ? memberColumns
+      : mode === "pending"
+        ? pendingColumns
+        : eventColumns;
+
+  const activeData = mode === "payment-history"
+    ? filteredPaymentHistory
+    : mode === "member"
+      ? filteredMemberContributions
+      : mode === "pending"
+        ? (report?.pendingDues ?? [])
+        : filteredEventCollections;
+
+  const exportButton = (
+    <AppButton
+      size="small"
+      variant="contained"
+      disabled={!canExport || !hasData || loading}
+      disabledTooltip={!canExport ? "You don't have permission to export" : "Record not found"}
+      onClick={handleExport}
+      startIcon={<FileDownloadIcon sx={{ fontSize: 18 }} />}
+      sx={{
+        bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15) !important" : "#2a1b4d !important"),
+        color: "#ffffff !important",
+        borderRadius: "6px !important",
+        fontSize: "0.78rem !important",
+        fontWeight: 700,
+        height: 32,
+        px: 2,
+        whiteSpace: "nowrap",
+        textTransform: "none",
+        boxShadow: "none !important",
+        "&:hover": {
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25) !important" : "#1a1033 !important"),
+        },
+      }}
+    >
+      Export Excel
+    </AppButton>
+  );
+
+  const filterPanel = (
+    <Stack spacing={2} sx={{ width: "100%" }}>
+      {/* Navigation Segmented Track */}
+      <Box
         sx={{
-          overflow: "hidden",
-          borderRadius: "16px",
+          display: "inline-flex",
+          p: "4px",
+          borderRadius: "8px",
+          bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(74, 63, 107, 0.05)",
           border: "1px solid",
-          borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
-          boxShadow: isDark
-            ? "0 4px 24px -2px rgba(0, 0, 0, 0.5)"
-            : "0 4px 20px -2px rgba(0, 0, 0, 0.04)",
+          borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(74, 63, 107, 0.12)",
+          gap: 0.6,
+          width: "fit-content",
+          flexWrap: "wrap",
         }}
       >
+        {navTabs.map((tab) => (
+          <SegmentedTab
+            key={tab.path}
+            label={tab.label}
+            icon={tab.icon}
+            isActive={mode === tab.modeKey || (!mode && tab.modeKey === "event")}
+            onClick={() => navigate(tab.path)}
+          />
+        ))}
+      </Box>
 
-        {/* ── Executive Header Banner ── */}
-        <Box
+      {/* Inline Filter Controls */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "flex-end",
+          flexWrap: "wrap",
+          gap: 1.2,
+          width: "100%",
+        }}
+      >
+        <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+          <AppDateInput
+            label="From Date"
+            placeholder="From Date"
+            value={filterFromDate}
+            onChange={(val) => setFilterFromDate(val)}
+            clearable
+          />
+        </Box>
+        <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+          <AppDateInput
+            label="To Date"
+            placeholder="To Date"
+            value={filterToDate}
+            onChange={(val) => setFilterToDate(val)}
+            clearable
+          />
+        </Box>
+        <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+          <AppSelect
+            label="Event Type"
+            value={filterEventType}
+            onChange={(e) => handleEventTypeChange(e.target.value || "ALL")}
+            onClear={() => handleEventTypeChange("ALL")}
+            options={eventTypeOptions}
+          />
+        </Box>
+        <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+          <AppSelect
+            label="Event"
+            value={filterEvent}
+            onChange={(e) => setFilterEvent(e.target.value || "ALL")}
+            onClear={() => setFilterEvent("ALL")}
+            options={eventOptions}
+          />
+        </Box>
+        {mode === "member" && (
+          <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+            <AppSelect
+              label="Payment Status"
+              value={filterPaymentStatus}
+              onChange={(e) => setFilterPaymentStatus(e.target.value || "ALL")}
+              onClear={() => setFilterPaymentStatus("ALL")}
+              options={paymentStatusOptions}
+            />
+          </Box>
+        )}
+        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
+          <AppButton
+            variant="contained"
+            size="small"
+            startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
+            onClick={() =>
+              setFilters({
+                fromDate: filterFromDate,
+                toDate: filterToDate,
+                eventType: filterEventType,
+                event: filterEvent,
+                paymentStatus: filterPaymentStatus,
+              })
+            }
+            sx={{
+              height: 34,
+              minHeight: 34,
+              fontWeight: 700,
+              fontSize: "0.75rem",
+              px: 2,
+              whiteSpace: "nowrap",
+              bgcolor: "#4a3f6b !important",
+              "&:hover": { bgcolor: "#3b325c !important" },
+            }}
+          >
+            Filter
+          </AppButton>
+          <AppButton
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              setFilterFromDate(null);
+              setFilterToDate(null);
+              setFilterEventType("ALL");
+              setFilterEvent("ALL");
+              setFilterPaymentStatus("ALL");
+              setFilters({
+                fromDate: null,
+                toDate: null,
+                eventType: "ALL",
+                event: "ALL",
+                paymentStatus: "ALL",
+              });
+            }}
+            sx={{
+              color: "#ef4444",
+              borderColor: "rgba(239, 68, 68, 0.4)",
+              height: 34,
+              minHeight: 34,
+              fontWeight: 700,
+              fontSize: "0.75rem",
+              px: 2,
+              whiteSpace: "nowrap",
+              "&:hover": {
+                borderColor: "#ef4444",
+                bgcolor: "rgba(239, 68, 68, 0.05)",
+              },
+            }}
+          >
+            Clear Filter
+          </AppButton>
+        </Box>
+      </Box>
+    </Stack>
+  );
+
+  return (
+    <div className="page-shell">
+      {mode === "annual-matrix" ? (
+        <Paper
+          elevation={0}
           sx={{
-            p: { xs: 2, md: 3 },
-            pb: { xs: 2, md: 2.5 },
-            background: isDark
-              ? "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(30, 26, 46, 0.6) 100%)"
-              : "#ffffff",
-            borderBottom: "1px solid " + theme.palette.divider,
+            border: theme.palette.mode === "dark" ? `1px solid ${theme.palette.divider}` : "1px solid rgba(224, 224, 224, 1)",
+            borderRadius: "8px",
+            overflow: "hidden",
+            bgcolor: theme.palette.background.paper,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {/* Top Row: Title, Period Badge & Export Action */}
+          {/* Top Header Bar matching Events Page */}
           <Box
             sx={{
+              background: theme.palette.mode === "dark"
+                ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
+                : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+              borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
+              color: "#ffffff",
+              px: 3,
+              py: 1,
               display: "flex",
+              alignItems: "center",
               justifyContent: "space-between",
-              alignItems: { xs: "flex-start", sm: "center" },
-              flexDirection: { xs: "column", sm: "row" },
-              gap: 2,
-              mb: 2.5,
+              minHeight: 46,
             }}
           >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <Box
-                sx={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "12px",
-                  background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 4px 14px rgba(124, 58, 237, 0.35)",
-                  flexShrink: 0,
-                }}
-              >
-                <AssessmentIcon sx={{ fontSize: 24 }} />
-              </Box>
-              <Box>
-                <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-                  <Typography
-                    variant="h4"
-                    fontWeight={700}
-                    sx={{
-                      fontSize: { xs: "1.5rem", sm: "1.625rem" },
-                      letterSpacing: "-0.02em",
-                      color: "text.primary",
-                      lineHeight: 1.25,
-                    }}
-                  >
-                    {pageTitle}
-                  </Typography>
-                  <Chip
-                    size="small"
-                    label={periodLabel}
-                    sx={{
-                      fontWeight: 700,
-                      fontSize: "0.72rem",
-                      bgcolor: isDark ? "rgba(124,58,237,0.2)" : "rgba(124,58,237,0.1)",
-                      color: "primary.main",
-                      borderRadius: "6px",
-                      height: 22,
-                    }}
-                  />
-                </Stack>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.78rem" }}>
-                  Detailed financial records & data collection report
-                </Typography>
-              </Box>
-            </Box>
-
-            <AppButton
-              size="small"
-              variant="contained"
-              disabled={!canExport || !hasData || loading}
-              disabledTooltip={!canExport ? "You don't have permission to export" : "Record not found"}
-              onClick={handleExport}
-              startIcon={<FileDownloadIcon sx={{ fontSize: 18 }} />}
-              sx={{
-                fontWeight: 700,
-                px: 2,
-                py: 0.8,
-                borderRadius: "8px",
-                boxShadow: "0 4px 14px rgba(124, 58, 237, 0.25)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Export Excel
-            </AppButton>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: "0.9375rem", letterSpacing: "-0.005em" }}>
+              {pageTitle}
+            </Typography>
           </Box>
 
-          {/* Bottom Row: Unified Toolbar (Navigation Tabs + Inline Filters) */}
+          {/* Filter Panel with Navigation Tabs */}
           <Box
             sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-end",
-              flexWrap: "wrap",
-              gap: 2,
-              p: 1.25,
-              borderRadius: "12px",
-              bgcolor: isDark ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
-              border: "1px solid",
-              borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#e2e8f0",
-              boxShadow: isDark ? "none" : "0 1px 4px rgba(0, 0, 0, 0.03)",
+              bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#fcfcff",
+              px: 3,
+              py: 2,
+              borderBottom: `1px solid ${theme.palette.divider}`,
             }}
           >
-            {/* Left: Navigation Segmented Track */}
             <Box
               sx={{
                 display: "inline-flex",
                 p: "4px",
-                borderRadius: "10px",
-                bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "#ffffff",
+                borderRadius: "8px",
+                bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(74, 63, 107, 0.05)",
                 border: "1px solid",
-                borderColor: isDark ? "rgba(255, 255, 255, 0.05)" : "#e2e8f0",
+                borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(74, 63, 107, 0.12)",
                 gap: 0.6,
+                width: "fit-content",
+                flexWrap: "wrap",
               }}
             >
               {navTabs.map((tab) => (
@@ -1949,218 +2066,38 @@ export default function ReportsPage({ mode = "event" }) {
                   key={tab.path}
                   label={tab.label}
                   icon={tab.icon}
-                  isActive={mode === tab.modeKey || (!mode && tab.modeKey === "event")}
+                  isActive={mode === tab.modeKey}
                   onClick={() => navigate(tab.path)}
                 />
               ))}
             </Box>
-
-            {/* Right: Inline Filter Controls */}
-            {mode !== "annual-matrix" ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "flex-end",
-                  flexWrap: "wrap",
-                  gap: 1.2,
-                }}
-              >
-                <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
-                  <AppDateInput
-                    label="From Date"
-                    placeholder="From Date"
-                    value={filterFromDate}
-                    onChange={(val) => setFilterFromDate(val)}
-                    clearable
-                  />
-                </Box>
-                <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
-                  <AppDateInput
-                    label="To Date"
-                    placeholder="To Date"
-                    value={filterToDate}
-                    onChange={(val) => setFilterToDate(val)}
-                    clearable
-                  />
-                </Box>
-                <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
-                  <AppSelect
-                    label="Event Type"
-                    value={filterEventType}
-                    onChange={(e) => handleEventTypeChange(e.target.value || "ALL")}
-                    onClear={() => handleEventTypeChange("ALL")}
-                    options={eventTypeOptions}
-                  />
-                </Box>
-                <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
-                  <AppSelect
-                    label="Event"
-                    value={filterEvent}
-                    onChange={(e) => setFilterEvent(e.target.value || "ALL")}
-                    onClear={() => setFilterEvent("ALL")}
-                    options={eventOptions}
-                  />
-                </Box>
-                {mode === "member" && (
-                  <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
-                    <AppSelect
-                      label="Payment Status"
-                      value={filterPaymentStatus}
-                      onChange={(e) => setFilterPaymentStatus(e.target.value || "ALL")}
-                      onClear={() => setFilterPaymentStatus("ALL")}
-                      options={paymentStatusOptions}
-                    />
-                  </Box>
-                )}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <AppButton
-                    variant="contained"
-                    size="small"
-                    startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
-                    onClick={() => setFilters({ fromDate: filterFromDate, toDate: filterToDate, eventType: filterEventType, event: filterEvent, paymentStatus: filterPaymentStatus })}
-                    sx={{
-                      height: 34,
-                      minHeight: 34,
-                      fontWeight: 700,
-                      px: 2,
-                      borderRadius: "8px",
-                    }}
-                  >
-                    Filter
-                  </AppButton>
-                  <Tooltip title="Clear filters and reset">
-                    <AppButton
-                      variant="outlined"
-                      size="small"
-                      startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
-                      onClick={() => {
-                        setFilterFromDate(null);
-                        setFilterToDate(null);
-                        setFilterEventType("ALL");
-                        setFilterEvent("ALL");
-                        setFilterPaymentStatus("ALL");
-                        setFilters({ fromDate: null, toDate: null, eventType: "ALL", event: "ALL", paymentStatus: "ALL" });
-                      }}
-                      sx={{
-                        height: 34,
-                        minHeight: 34,
-                        fontWeight: 700,
-                        px: 1.8,
-                        borderRadius: "8px",
-                        color: "#ef4444",
-                        borderColor: "rgba(239, 68, 68, 0.4)",
-                        "&:hover": {
-                          borderColor: "#ef4444",
-                          color: "#ef4444",
-                          bgcolor: "rgba(239, 68, 68, 0.06)",
-                        },
-                      }}
-                    >
-                      Clear
-                    </AppButton>
-                  </Tooltip>
-                </Box>
-              </Box>
-            ) : (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Chip
-                  icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />}
-                  label="Full Year Calendar (Jan — Dec)"
-                  variant="outlined"
-                  color="primary"
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: "0.78rem",
-                    height: 34,
-                    borderRadius: "8px",
-                    px: 0.5,
-                  }}
-                />
-              </Box>
-            )}
           </Box>
-        </Box>
 
-        {/* ── Main Content Area ── */}
-        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-          {loading ? (
-            !globalLoading ? (
-              <Stack alignItems="center" justifyContent="center" sx={{ py: 12 }}>
-                <CircularProgress size={42} thickness={4} />
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontWeight: 600 }}>
-                  Loading report analytics...
-                </Typography>
-              </Stack>
-            ) : (
-              <Box sx={{ minHeight: 300 }} />
-            )
-          ) : !hasData ? (
-            <Card
-              sx={{
-                p: { xs: 5, sm: 7 },
-                textAlign: "center",
-                borderRadius: "16px",
-                bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#ffffff",
-                border: "1px solid",
-                borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
-                boxShadow: isDark ? "none" : "0 4px 16px rgba(0,0,0,0.03)",
-                my: 2,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  bgcolor: isDark ? "rgba(124, 58, 237, 0.15)" : "rgba(124, 58, 237, 0.08)",
-                  color: "#7c3aed",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  mb: 2,
-                }}
-              >
-                <EventIcon sx={{ fontSize: 32 }} />
-              </Box>
-              <Typography variant="h6" fontWeight={700} sx={{ color: "text.primary", fontSize: "1.05rem" }}>
-                Record not found
-              </Typography>
-            </Card>
-          ) : (
-            <Box sx={{ width: "100%", mt: 1 }}>
-              {(mode === "event" || !mode) && (
-                <AppDataTable title="Event Collections" columns={eventColumns} data={filteredEventCollections} loading={false} />
-              )}
-              {mode === "member" && (
-                <AppDataTable title={isMember ? "My Contribution History" : "Member Contributions"} columns={memberColumns} data={filteredMemberContributions} loading={false} />
-              )}
-              {mode === "payment-history" && (
-                <AppDataTable
-                  title={isMember ? "My Payment Transactions" : "Event Payment Audit"}
-                  columns={paymentHistoryColumns}
-                  data={filteredPaymentHistory}
-                  loading={false}
-                />
-              )}
-              {mode === "pending" && (
-                <AppDataTable title="Pending Dues & Defaulters" columns={pendingColumns} data={report?.pendingDues ?? []} loading={false} />
-              )}
-              {mode === "annual-matrix" && (
-                <AnnualMemberMatrix
-                  report={report}
-                  usersList={usersList}
-                  eventsList={eventsList}
-                  eventTypesList={eventTypesList}
-                  isMember={isMember}
-                  currentUserId={currentUserId}
-                  currentUserName={currentUserName}
-                  onOpenMemberDetails={(m) => openBreakdownModal(m, "all")}
-                />
-              )}
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+          {/* Annual Matrix Content */}
+          <Box sx={{ p: 2.5 }}>
+            <AnnualMemberMatrix
+              report={report}
+              usersList={usersList}
+              eventsList={eventsList}
+              eventTypesList={eventTypesList}
+              isMember={isMember}
+              currentUserId={currentUserId}
+              currentUserName={currentUserName}
+              onOpenMemberDetails={(m) => openBreakdownModal(m, "all")}
+            />
+          </Box>
+        </Paper>
+      ) : (
+        <AppDataTable
+          title={pageTitle}
+          columns={activeColumns}
+          data={activeData}
+          loading={loading}
+          allowExport={canExport}
+          actions={exportButton}
+          filterPanel={filterPanel}
+        />
+      )}
 
       {/* ── Member Event Breakdown Modal ── */}
       <Dialog

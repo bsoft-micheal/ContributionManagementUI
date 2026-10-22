@@ -12,7 +12,7 @@ import {
 
 import { useAppToast } from "../../components/common/AppToast";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import {
   FilterList as FilterListIcon,
@@ -778,7 +778,7 @@ export default function UserRightsPage() {
                 size="small"
                 startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
                 onClick={handleApplyFilter}
-                sx={{ height: 34, minHeight: 34, fontWeight: 700, fontSize: "0.78rem", px: 2, borderRadius: "8px" }}
+                sx={{ height: 34, minHeight: 34, fontWeight: 700, fontSize: "0.75rem", px: 2, borderRadius: "8px" }}
               >
                 Filter
               </AppButton>
@@ -790,8 +790,8 @@ export default function UserRightsPage() {
                   height: 34,
                   minHeight: 34,
                   fontWeight: 700,
-                  fontSize: "0.78rem",
-                  px: 1.8,
+                  fontSize: "0.75rem",
+                  px: 2,
                   borderRadius: "8px",
                   color: "#ef4444",
                   borderColor: "rgba(239, 68, 68, 0.4)",
@@ -800,30 +800,11 @@ export default function UserRightsPage() {
               >
                 Clear Filter
               </AppButton>
-              <AppButton
-                variant="contained"
-                size="small"
-                startIcon={<SaveIcon sx={{ fontSize: 18 }} />}
+              <AppSaveButton
                 onClick={handleSave}
                 loading={saving}
                 disabled={saving || loading}
-                sx={{
-                  height: 34,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: "0.78rem",
-                  px: 2.2,
-                  borderRadius: "8px",
-                  bgcolor: "#31275d !important",
-                  color: "#ffffff !important",
-                  boxShadow: "0 2px 8px rgba(49, 39, 93, 0.3)",
-                  "&:hover": {
-                    bgcolor: "#241c46 !important",
-                  },
-                }}
-              >
-                Save
-              </AppButton>
+              />
               <AppButton
                 variant="outlined"
                 size="small"

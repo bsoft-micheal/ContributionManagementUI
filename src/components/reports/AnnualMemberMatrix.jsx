@@ -683,10 +683,10 @@ export default function AnnualMemberMatrix({
         sx={{
           p: 2,
           mb: 2.5,
-          borderRadius: "14px",
+          borderRadius: "8px",
           bgcolor: isDark ? "rgba(30, 26, 46, 0.4)" : "#ffffff",
           border: "1px solid",
-          borderColor: isDark ? "rgba(255, 255, 255, 0.07)" : "#e2e8f0",
+          borderColor: isDark ? "rgba(255, 255, 255, 0.07)" : "rgba(224, 224, 224, 1)",
           boxShadow: isDark ? "none" : "0 2px 8px rgba(0, 0, 0, 0.02)",
         }}
       >
@@ -900,31 +900,28 @@ export default function AnnualMemberMatrix({
               Filter
             </AppButton>
 
-            <Tooltip title="Clear filters and reset">
-              <AppButton
-                size="small"
-                variant="outlined"
-                startIcon={<RestartAltIcon sx={{ fontSize: 18 }} />}
-                onClick={handleClearFilter}
-                sx={{
-                  height: 34,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: "0.78rem",
-                  px: 1.8,
-                  borderRadius: "8px",
+            <AppButton
+              size="small"
+              variant="outlined"
+              onClick={handleClearFilter}
+              sx={{
+                height: 34,
+                minHeight: 34,
+                fontWeight: 700,
+                fontSize: "0.75rem",
+                px: 2,
+                borderRadius: "8px",
+                color: "#ef4444",
+                borderColor: "rgba(239, 68, 68, 0.4)",
+                "&:hover": {
+                  borderColor: "#ef4444",
                   color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    color: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.06)",
-                  },
-                }}
-              >
-                Clear
-              </AppButton>
-            </Tooltip>
+                  bgcolor: "rgba(239, 68, 68, 0.05)",
+                },
+              }}
+            >
+              Clear Filter
+            </AppButton>
 
             <AppButton
               size="small"
@@ -953,9 +950,9 @@ export default function AnnualMemberMatrix({
         component={Paper}
         elevation={0}
         sx={{
-          borderRadius: "14px",
+          borderRadius: "8px",
           border: "1px solid",
-          borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+          borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(224, 224, 224, 1)",
           bgcolor: isDark ? "#171422" : "#ffffff",
           maxHeight: "72vh",
           overflow: "auto",

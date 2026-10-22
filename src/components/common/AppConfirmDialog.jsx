@@ -41,10 +41,10 @@ export default function AppConfirmDialog({
               ? "0 20px 50px rgba(0,0,0,0.5)"
               : "0 16px 40px rgba(57, 47, 90, 0.15)",
           bgcolor: (theme) =>
-            theme.palette.mode === "dark" ? "#1e293b" : "#ffffff",
+            theme.palette.mode === "dark" ? "#161b2e" : "#ffffff",
           border: (theme) =>
             theme.palette.mode === "dark"
-              ? "1px solid rgba(255, 255, 255, 0.08)"
+              ? "1px solid rgba(255, 255, 255, 0.16)"
               : "1px solid rgba(0, 0, 0, 0.04)",
         },
       }}
@@ -153,8 +153,9 @@ export default function AppConfirmDialog({
             height: "42px",
             bgcolor: isErrorColor
               ? "#dc2626 !important"
-              : "#392f5a !important",
+              : (theme) => (theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#392f5a !important"),
             color: "#ffffff !important",
+            border: (theme) => (theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none"),
             textTransform: "none",
             px: 3.5,
             fontSize: "0.95rem",
@@ -166,7 +167,7 @@ export default function AppConfirmDialog({
             "&:hover": {
               bgcolor: isErrorColor
                 ? "#b91c1c !important"
-                : "#2e244d !important",
+                : (theme) => (theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#2e244d !important"),
               boxShadow: isErrorColor
                 ? "0 4px 12px rgba(220, 38, 38, 0.4)"
                 : "0 4px 12px rgba(57, 47, 90, 0.35)",

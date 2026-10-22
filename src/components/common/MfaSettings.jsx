@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AppInput from "./AppInput";
+import { AppCancelButton, AppSaveButton } from "./AppButton";
 import apiClient from "../../services/apiClient";
 import { useAppToast } from "./AppToast";
 import COMMON_STRINGS from "../../constants/commonStrings";
@@ -386,24 +387,20 @@ const MfaSettings = forwardRef(function MfaSettings(
           </Box>
 
           <Box sx={{ display: "flex", gap: 2, justifyContent: "center" }}>
-            <Button
+            <AppCancelButton
               onClick={() => {
                 setSetupData(null);
                 setVerifyForm({ deviceLabel: "", otp: "" });
                 setErrors({});
               }}
-              color="inherit"
               disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
+            />
+            <AppSaveButton
               onClick={handleVerifySetup}
               disabled={loading}
             >
               {loading ? "Verifying..." : "Verify & Save"}
-            </Button>
+            </AppSaveButton>
           </Box>
         </Box>
       )}

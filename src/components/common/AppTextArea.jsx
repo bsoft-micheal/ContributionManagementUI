@@ -68,9 +68,9 @@ export default function AppTextArea({
           }}
           sx={{
             "& .MuiOutlinedInput-root": {
-              fontSize: "0.82rem",
+              fontSize: "0.84375rem",
               bgcolor: "background.paper",
-              borderRadius: "6px",
+              borderRadius: "8px",
               height: "auto",
               position: "relative",
               "& .MuiOutlinedInput-input": {

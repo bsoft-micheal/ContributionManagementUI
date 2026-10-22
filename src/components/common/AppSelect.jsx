@@ -166,14 +166,23 @@ export default function AppSelect({
         }}
         sx={{
           "& .MuiOutlinedInput-root": {
-            fontSize: "0.875rem",
+            fontSize: "0.84375rem",
             bgcolor: "background.paper",
-            borderRadius: "12px",
-            height: size === "small" ? 34 : 40,
+            borderRadius: "8px",
+            height: size === "small" ? 36 : 42,
+            minHeight: size === "small" ? 36 : 42,
+            maxHeight: size === "small" ? 36 : 42,
+            boxSizing: "border-box",
             color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             "& .MuiSelect-select": {
-              py: size === "small" ? 0.7 : 1,
-              pr: showClearButton ? "52px !important" : "28px !important",
+              height: "100%",
+              boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              py: 0,
+              px: 1.5,
+              fontSize: "0.84375rem",
+              pr: showClearButton ? "52px !important" : "32px !important",
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             },
             "& .MuiSelect-nativeInput": {

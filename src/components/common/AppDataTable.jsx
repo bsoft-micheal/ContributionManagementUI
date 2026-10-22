@@ -633,8 +633,9 @@ export default function AppDataTable({
       <Box
         sx={{
           background: theme.palette.mode === "dark"
-            ? "linear-gradient(90deg, #171b2d 0%, #1d2338 100%)"
+            ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
             : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+          borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
           color: "#ffffff",
           px: 3,
           py: 1,
@@ -656,7 +657,8 @@ export default function AppDataTable({
           <Box
             sx={{
               "& .MuiButton-root": {
-                bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12) !important" : "#2a1b4d !important",
+                bgcolor: theme.palette.mode === "dark" ? "#5a4c82 !important" : "#2a1b4d !important",
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.25) !important" : "none",
                 color: "#ffffff !important",
                 borderRadius: "4px !important",
                 fontSize: "0.75rem !important",
@@ -669,7 +671,7 @@ export default function AppDataTable({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 0.5,
-                "&:hover": { bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2) !important" : "#1a1033 !important" },
+                "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6a5c96 !important" : "#1a1033 !important" },
               },
               "& .MuiButton-root.Mui-disabled, & .MuiButton-root:disabled": {
                 bgcolor: "rgba(255, 255, 255, 0.08) !important",
@@ -1412,7 +1414,7 @@ export default function AppDataTable({
               sx={{
                 border: (theme) =>
                   theme.palette.mode === "dark"
-                    ? "1.5px solid rgba(2, 2, 2, 0.4)"
+                    ? "1.5px solid rgba(255, 255, 255, 0.4)"
                     : "1.5px solid #4a3f6b",
                 borderRadius: "6px",
                 color: (theme) =>
@@ -1458,7 +1460,7 @@ export default function AppDataTable({
                 borderRadius: "6px",
                 p: 0.5,
                 color: (theme) =>
-                  theme.palette.mode === "dark" ? "#252121ff" : "#4a3f6b",
+                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
                 "&:hover": {
                   borderColor: (theme) =>
                     theme.palette.mode === "dark" ? "#ffffff" : "#3b325c",

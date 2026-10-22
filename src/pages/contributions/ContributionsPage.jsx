@@ -44,7 +44,7 @@ import {
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import { getContributionsAsync, getContributionsByEventAsync, recordPaymentAsync } from "../../services/contributionService";
 import { getSupportTicketsAsync } from "../../services/supportTicketService";
 import { getEventsAsync } from "../../services/eventService";
@@ -1939,10 +1939,8 @@ export default function ContributionsPage() {
         title="Contribution Collections "
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>Cancel</AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
+            <AppCancelButton onClick={() => setDialogOpen(false)} />
+            <AppSaveButton
               onClick={handlePay}
               disabled={
                 payment.paymentMode === "Split" && (
@@ -1959,7 +1957,7 @@ export default function ContributionsPage() {
               }}
             >
               Save
-            </AppButton>
+            </AppSaveButton>
           </>
         }
       >
@@ -2317,12 +2315,10 @@ export default function ContributionsPage() {
 
             return (
               <Stack direction="row" spacing={1.5} alignItems="center">
-                <AppButton variant="outlined" onClick={() => setStatusModalOpen(false)}>
+                <AppCancelButton onClick={() => setStatusModalOpen(false)}>
                   Close
-                </AppButton>
-                <AppButton
-                  variant="contained"
-                  startIcon={<SaveIcon />}
+                </AppCancelButton>
+                <AppSaveButton
                   loading={statusSaving}
                   disabled={isZeroAmount}
                   disabledTooltip={
@@ -2344,7 +2340,7 @@ export default function ContributionsPage() {
                   }}
                 >
                   Save
-                </AppButton>
+                </AppSaveButton>
               </Stack>
             );
           })()

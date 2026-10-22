@@ -43,7 +43,7 @@ import { hasActionPermission } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppTextArea from "../../components/common/AppTextArea";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -1248,11 +1248,8 @@ export default function SupportTicketsPage() {
         allowExport={canExportTicket}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppButton
-              variant="contained"
-              size="small"
+            <AppAddButton
               disabled={!canAddTicket}
-              startIcon={<AddIcon />}
               onClick={() => {
                 const firstTicketType = dbTicketTypes.find((t) => t.isActive !== false)?.typeName || "";
                 const firstStatus = dbStatuses.find((s) => s.isActive !== false)?.statusName || "";
@@ -1279,9 +1276,7 @@ export default function SupportTicketsPage() {
                 setErrors({});
                 setDialogOpen(true);
               }}
-            >
-              Add
-            </AppButton>
+            />
           </Stack>
         }
         filterPanel={
@@ -1364,7 +1359,6 @@ export default function SupportTicketsPage() {
                 <AppButton
                   variant="outlined"
                   size="small"
-                  startIcon={<RestartAltIcon />}
                   onClick={() => {
                     setFilterType("ALL");
                     setFilterPriority("ALL");
@@ -1406,21 +1400,17 @@ export default function SupportTicketsPage() {
         maxWidth="sm"
         actions={
           <Stack direction="row" spacing={1.5}>
-            <AppButton
-              variant="outlined"
+            <AppCancelButton
               disabled={isSaving}
               onClick={() => handleCancelRequest(handleCloseDialog)}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
+            />
+            <AppSaveButton
               loading={isSaving}
               disabled={isSaving}
               onClick={handleSaveTicket}
             >
               {editingTicket ? "Update" : "Save"}
-            </AppButton>
+            </AppSaveButton>
           </Stack>
         }
       >

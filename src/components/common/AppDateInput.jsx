@@ -576,20 +576,25 @@ export default function AppDateInput({
             },
             sx: {
               "& .MuiOutlinedInput-root": {
-                fontSize: size === "small" ? "0.68rem" : "0.74rem",
+                fontSize: "0.84375rem",
                 bgcolor: "background.paper",
-                borderRadius: "12px",
-                height: size === "small" ? 34 : 40,
-                pr: "4px !important",
+                borderRadius: "8px",
+                height: size === "small" ? 36 : 42,
+                minHeight: size === "small" ? 36 : 42,
+                maxHeight: size === "small" ? 36 : 42,
+                boxSizing: "border-box",
+                pr: "6px !important",
                 pl: "2px",
                 color: (theme) =>
                   theme.palette.mode === "dark" ? "#ffffff" : "inherit",
                 "& input, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
                   cursor: disabled ? "default" : "pointer",
-                  py: size === "small" ? 0.5 : 0.8,
-                  pl: size === "small" ? 1 : 1.2,
+                  height: "100%",
+                  boxSizing: "border-box",
+                  py: 0,
+                  pl: 1.2,
                   pr: 0.2,
-                  fontSize: size === "small" ? "0.68rem" : "0.74rem",
+                  fontSize: "0.84375rem",
                   fontVariantNumeric: "tabular-nums",
                   letterSpacing: "-0.01em",
                   color: (theme) =>
@@ -600,7 +605,7 @@ export default function AppDateInput({
                         ? "rgba(255, 255, 255, 0.45)"
                         : "#94a3b8",
                     opacity: 1,
-                    fontSize: size === "small" ? "0.68rem" : "0.74rem",
+                    fontSize: "0.84375rem",
                   },
                 },
                 "& .MuiInputAdornment-root": {

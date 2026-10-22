@@ -36,7 +36,7 @@ import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppTextArea from "../../components/common/AppTextArea";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { useAppToast } from "../../components/common/AppToast";
@@ -970,13 +970,9 @@ export default function SubmitPaymentPage() {
         data={transactions}
         loading={loading}
         actions={
-          <AppButton
-            variant="contained"
-            startIcon={<AddIcon />}
+          <AppAddButton
             onClick={() => setFormModalOpen(true)}
-          >
-            Add
-          </AppButton>
+          />
         }
       />
 
@@ -1169,12 +1165,10 @@ export default function SubmitPaymentPage() {
 
             return (
               <Stack direction="row" spacing={1.5} alignItems="center">
-                <AppButton variant="outlined" onClick={() => setStatusModalOpen(false)}>
+                <AppCancelButton onClick={() => setStatusModalOpen(false)}>
                   Close
-                </AppButton>
-                <AppButton
-                  variant="contained"
-                  startIcon={<SaveIcon />}
+                </AppCancelButton>
+                <AppSaveButton
                   disabled={isZeroAmount}
                   disabledTooltip={isZeroAmount ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first." : ""}
                   onClick={() => {
@@ -1191,7 +1185,7 @@ export default function SubmitPaymentPage() {
                   }}
                 >
                   Save
-                </AppButton>
+                </AppSaveButton>
               </Stack>
             );
           })()

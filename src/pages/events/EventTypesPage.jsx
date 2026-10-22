@@ -6,7 +6,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -577,15 +577,10 @@ export default function EventTypesPage() {
         data={types}
         loading={loading}
         actions={
-          <AppButton
-            size="small"
-            variant="contained"
+          <AppAddButton
             disabled={!hasWriteAccess}
-            startIcon={<AddIcon />}
             onClick={handleOpenAddDialog}
-          >
-            {COMMON_STRINGS.ACTIONS.ADD}
-          </AppButton>
+          />
         }
       />
 
@@ -595,39 +590,14 @@ export default function EventTypesPage() {
         title={form.eventTypeId ? "Edit Event Type" : "Add Event Type"}
         actions={
           <>
-            <AppButton
-              variant="outlined"
+            <AppCancelButton
               onClick={() => handleCancelRequest(handleCloseDialog)}
-              sx={{
-                borderRadius: "8px",
-                px: 3,
-                fontWeight: 700,
-                textTransform: "none",
-                borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "rgba(74, 63, 107, 0.4)",
-                color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                "&:hover": {
-                  borderColor: "#4a3f6b",
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74, 63, 107, 0.04)"
-                }
-              }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
+            />
+            <AppSaveButton
               onClick={handleSubmit}
-              sx={{
-                borderRadius: "8px",
-                px: 3,
-                fontWeight: 700,
-                textTransform: "none",
-                bgcolor: "#4a3f6b !important",
-                "&:hover": { bgcolor: "#3b325c !important" }
-              }}
             >
-              Save
-            </AppButton>
+              {form.eventTypeId ? "Update" : "Save"}
+            </AppSaveButton>
           </>
         }
       >
@@ -692,9 +662,9 @@ export default function EventTypesPage() {
               sx={{
                 p: 0.1,
                 transform: "scale(0.85)",
-                color: "#4a3f6b",
+                color: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.6)" : "#4a3f6b"),
                 "&.Mui-checked": {
-                  color: "#4a3f6b",
+                  color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
                 },
               }}
             />

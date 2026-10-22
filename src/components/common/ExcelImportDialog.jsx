@@ -22,7 +22,7 @@ import {
   Error as ErrorIcon,
 } from "@mui/icons-material";
 import AppDialog from "./AppDialog";
-import AppButton from "./AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "./AppButton";
 import { useAppToast } from "./AppToast";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
@@ -270,22 +270,16 @@ export default function ExcelImportDialog({
             <AppButton variant="outlined" onClick={handleClear} disabled={loading}>
               Upload Different File
             </AppButton>
-            <AppButton
-              variant="contained"
+            <AppSaveButton
+              startIcon={null}
               onClick={handleConfirm}
               disabled={loading || validCount === 0}
-              sx={{
-                bgcolor: "#4a3f6b !important",
-                "&:hover": { bgcolor: "#3b325c !important" },
-              }}
             >
               Import {validCount} Records
-            </AppButton>
+            </AppSaveButton>
           </>
         ) : (
-          <AppButton variant="outlined" onClick={onClose}>
-            Cancel
-          </AppButton>
+          <AppCancelButton onClick={onClose} />
         )
       }
     >

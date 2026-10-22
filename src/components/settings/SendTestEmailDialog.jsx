@@ -15,7 +15,7 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import AppDialog from "../common/AppDialog";
 import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
-import AppButton from "../common/AppButton";
+import AppButton, { AppCancelButton } from "../common/AppButton";
 import { useAppToast } from "../common/AppToast";
 import {
   resolveCategoryTemplate,
@@ -134,9 +134,7 @@ export default function SendTestEmailDialog({
       maxWidth="md"
       actions={
         <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
-          <AppButton variant="outlined" onClick={onClose} color="inherit">
-            Cancel
-          </AppButton>
+          <AppCancelButton onClick={onClose} />
           <AppButton
             variant="contained"
             startIcon={sending ? <CircularProgress size={16} color="inherit" /> : <SendOutlinedIcon />}

@@ -28,7 +28,7 @@ import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppMultiSelect from "../../components/common/AppMultiSelect";
 import AppDateInput from "../../components/common/AppDateInput";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -1101,7 +1101,7 @@ export default function UserFormPage() {
                             ? "rgba(255, 255, 255, 0.4)"
                             : "#4a3f6b",
                         "&.Mui-checked": {
-                          color: "#4a3f6b",
+                          color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                         },
                         "&.Mui-disabled": {
                           color: (theme) =>
@@ -1155,7 +1155,7 @@ export default function UserFormPage() {
                             ? "rgba(255, 255, 255, 0.4)"
                             : "#4a3f6b",
                         "&.Mui-checked": {
-                          color: "#4a3f6b",
+                          color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                         },
                         "&.Mui-disabled": {
                           color: (theme) =>
@@ -1339,12 +1339,12 @@ export default function UserFormPage() {
                             minWidth: "auto",
                             height: 28,
                             borderRadius: "6px",
-                            borderColor: "#4a3f6b",
-                            color: "#4a3f6b",
+                            borderColor: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                            color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                             fontWeight: 600,
                             "&:hover": {
-                              bgcolor: "rgba(74, 63, 107, 0.08)",
-                              borderColor: "#4a3f6b",
+                              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(196, 181, 253, 0.12)" : "rgba(74, 63, 107, 0.08)",
+                              borderColor: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                             },
                           }}
                         >
@@ -1487,45 +1487,16 @@ export default function UserFormPage() {
             justifyContent="center"
             sx={{ mt: 1.5 }}
           >
-            <AppButton
-              variant="outlined"
+            <AppCancelButton
               onClick={handleCancel}
               disabled={saving}
-              sx={{
-                px: 3,
-                py: 0.8,
-                borderRadius: "8px",
-                borderColor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.2)"
-                    : "#d8d8e5",
-                color: (theme) =>
-                  theme.palette.mode === "dark" ? "#cbd5e1" : "#334155",
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "transparent" : "#ffffff",
-                fontWeight: 600,
-                fontSize: "0.85rem",
-                "&:hover": {
-                  borderColor: "#4a3f6b",
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.05)"
-                      : "#f8fafc",
-                },
-              }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
+            />
+            <AppSaveButton
               disabled={saving}
               onClick={handleSubmit}
-              sx={{
-                px: 3.5,
-              }}
             >
               {saving ? "Saving…" : isEdit ? "Update" : "Save"}
-            </AppButton>
+            </AppSaveButton>
           </Stack>
         </Box>
       </Paper>

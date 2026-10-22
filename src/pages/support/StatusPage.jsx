@@ -12,7 +12,7 @@ import {
 import { useAppToast } from "../../components/common/AppToast";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import AppInput from "../../components/common/AppInput";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -426,20 +426,10 @@ export default function StatusPage() {
         title={form.statusId ? "Edit Status" : "Add Status"}
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSubmit}
-              sx={{
-                bgcolor: "#4a3f6b !important",
-                "&:hover": { bgcolor: "#3b325c !important" },
-              }}
-            >
+            <AppCancelButton onClick={() => setDialogOpen(false)} />
+            <AppSaveButton onClick={handleSubmit}>
               {form.statusId ? "Update" : "Save"}
-            </AppButton>
+            </AppSaveButton>
           </>
         }
       >

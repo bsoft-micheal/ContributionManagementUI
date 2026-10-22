@@ -617,21 +617,21 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
         />
       </Box>
 
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <AppButton
           variant="contained"
           size="small"
           onClick={onFilter}
           disabled={loading}
-          startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
+          startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
           sx={{
-            height: 36,
-            minHeight: 36,
-            px: 2.5,
+            height: 34,
+            minHeight: 34,
+            px: 2,
             borderRadius: "8px",
-            fontWeight: 600,
-            fontSize: "0.84375rem",
-            letterSpacing: "0.01em",
+            fontWeight: 700,
+            fontSize: "0.75rem",
+            whiteSpace: "nowrap",
             bgcolor: "#4a3f6b !important",
             "&:hover": {
               bgcolor: "#3b325c !important",
@@ -647,19 +647,19 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
           onClick={onClear}
           disabled={loading}
           sx={{
-            height: 36,
-            minHeight: 36,
+            height: 34,
+            minHeight: 34,
             px: 2,
             borderRadius: "8px",
             color: "#ef4444",
-            border: `1.5px solid ${isDark ? "rgba(239, 68, 68, 0.45)" : "rgba(239, 68, 68, 0.35)"}`,
-            fontWeight: 600,
-            fontSize: "0.84375rem",
-            letterSpacing: "0.01em",
+            borderColor: "rgba(239, 68, 68, 0.4)",
+            fontWeight: 700,
+            fontSize: "0.75rem",
+            whiteSpace: "nowrap",
             "&:hover": {
-              border: "1.5px solid #ef4444",
+              borderColor: "#ef4444",
               bgcolor: isDark ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.05)",
-              color: "#dc2626",
+              color: "#ef4444",
             },
           }}
         >

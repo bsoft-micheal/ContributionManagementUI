@@ -69,7 +69,7 @@ import AppSelect from "../../components/common/AppSelect";
 import AppMultiSelect from "../../components/common/AppMultiSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppTextArea from "../../components/common/AppTextArea";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import {
@@ -2820,22 +2820,7 @@ export default function EventFormPage({
                                 : "Auto calculated")
                             }
                             disabled
-                            multiline
-                            minRows={1}
-                            maxRows={2}
                             placeholder="Auto calculated"
-                            sx={{
-                              "& .MuiOutlinedInput-root": {
-                                minHeight: 38,
-                                height: "auto",
-                                py: 0.6,
-                                px: 1,
-                                bgcolor: (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "rgba(255, 255, 255, 0.05)"
-                                    : "#f8fafd",
-                              },
-                            }}
                           />
                         </Grid>
                         <Grid size={{ xs: 12, sm: 6 }}>
@@ -3045,22 +3030,7 @@ export default function EventFormPage({
                               : "Auto calculated")
                           }
                           disabled
-                          multiline
-                          minRows={1}
-                          maxRows={2}
                           placeholder="Auto calculated"
-                          sx={{
-                            "& .MuiOutlinedInput-root": {
-                              minHeight: 38,
-                              height: "auto",
-                              py: 0.6,
-                              px: 1,
-                              bgcolor: (theme) =>
-                                theme.palette.mode === "dark"
-                                  ? "rgba(255, 255, 255, 0.05)"
-                                  : "#f8fafd",
-                            },
-                          }}
                         />
                       ) : hasMultipleCelebrantDates ? (
                         <AppInput
@@ -3073,22 +3043,7 @@ export default function EventFormPage({
                               : "Auto calculated from celebrant dates")
                           }
                           disabled
-                          multiline
-                          minRows={1}
-                          maxRows={2}
                           placeholder="Auto calculated from celebrant dates"
-                          sx={{
-                            "& .MuiOutlinedInput-root": {
-                              minHeight: 38,
-                              height: "auto",
-                              py: 0.6,
-                              px: 1,
-                              bgcolor: (theme) =>
-                                theme.palette.mode === "dark"
-                                  ? "rgba(255, 255, 255, 0.05)"
-                                  : "#f8fafd",
-                            },
-                          }}
                         />
                       ) : (
                         <AppDateInput
@@ -4291,51 +4246,21 @@ export default function EventFormPage({
               theme.palette.mode === "dark" ? "divider" : "#e8e5f2",
           }}
         >
-          <AppButton
-            variant="outlined"
+          <AppCancelButton
             onClick={handleCancel}
             disabled={saving}
-            sx={{
-              minWidth: 120,
-              borderRadius: "8px",
-              px: 3.5,
-              py: 0.85,
-              minHeight: 40,
-              borderColor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#d8d8e5",
-              color: (theme) => (theme.palette.mode === "dark" ? "#cbd5e1" : "#334155"),
-              fontWeight: 600,
-              fontSize: "0.88rem",
-              "&:hover": {
-                borderColor: "#4a3f6b",
-              },
-            }}
           >
             {readOnly ? (isDialog ? "Close" : "Back to Events") : "Cancel"}
-          </AppButton>
+          </AppCancelButton>
           {(isEdit ? canEditEvent : canAddEvent) && canEdit && (
             <Tooltip title={isEdit && hasPayments ? "Cannot edit event after payments have been received" : ""}>
               <span>
-                <AppButton
-                  variant="contained"
-                  startIcon={<SaveIcon sx={{ fontSize: "1.1rem" }} />}
+                <AppSaveButton
                   onClick={handleSubmit}
                   disabled={saving || (isEdit && hasPayments)}
-                  sx={{
-                    bgcolor: isEdit && hasPayments ? "#94a3b8 !important" : "#342b54 !important",
-                    color: "#ffffff !important",
-                    "&:hover": { bgcolor: isEdit && hasPayments ? "#94a3b8 !important" : "#241d3b !important" },
-                    minWidth: 130,
-                    borderRadius: "8px",
-                    px: 3.8,
-                    py: 0.85,
-                    minHeight: 40,
-                    fontWeight: 600,
-                    fontSize: "0.88rem",
-                  }}
                 >
                   {saving ? "Saving..." : isEdit ? "Update" : "Save"}
-                </AppButton>
+                </AppSaveButton>
               </span>
             </Tooltip>
           )}
