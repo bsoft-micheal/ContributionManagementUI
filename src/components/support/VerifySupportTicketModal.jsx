@@ -285,9 +285,7 @@ export default function VerifySupportTicketModal({
           });
         }
       } else {
-        const newTicketNo =
-          ticketInfo?.ticketNo ||
-          `TKT-${dayjs().format("YYYY")}-${String(Math.floor(Math.random() * 900) + 100)}`;
+        const newTicketNo = ticketInfo?.ticketNo || "TKT0001";
         await createSupportTicketAsync({
           ticketNo: newTicketNo,
           memberName: ticketInfo?.memberName || initialData?.memberName || "Member",
