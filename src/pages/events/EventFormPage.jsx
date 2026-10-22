@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Grid,
   Box,
@@ -640,6 +640,8 @@ export default function EventFormPage({
             baseAmount: initialBaseAmount,
             participantIds: pIds,
           });
+          setSelectedParticipantIds(pIds);
+          participantsInitializedRef.current = true;
         } else {
           // Creating a new event
           const defaultDate = propEvent?.eventDate ? dayjs(propEvent.eventDate) : dayjs();
@@ -799,11 +801,13 @@ export default function EventFormPage({
 
   // Selected participants for non-birthday events (allows deselecting members)
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
+  const participantsInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (activeMembers.length > 0 && isEdit) {
+    if (!participantsInitializedRef.current && activeMembers.length > 0 && isEdit) {
       if (form.participantIds && form.participantIds.length > 0) {
         setSelectedParticipantIds(form.participantIds);
+        participantsInitializedRef.current = true;
       }
     }
   }, [activeMembers, form.participantIds, isEdit]);
@@ -828,6 +832,7 @@ export default function EventFormPage({
           updated.push(id);
         }
       });
+      setForm((formPrev) => ({ ...formPrev, participantIds: updated }));
       return updated;
     });
   };
@@ -852,6 +857,7 @@ export default function EventFormPage({
           updated.push(id);
         }
       });
+      setForm((formPrev) => ({ ...formPrev, participantIds: updated }));
       return updated;
     });
   };
@@ -861,7 +867,9 @@ export default function EventFormPage({
     if (!hasMarriageSelected && marriageCelebrantIds.length > 0) {
       setSelectedParticipantIds((prev) => {
         const toAdd = marriageCelebrantIds.filter((id) => !prev.includes(id));
-        return [...prev, ...toAdd];
+        const updated = [...prev, ...toAdd];
+        setForm((formPrev) => ({ ...formPrev, participantIds: updated }));
+        return updated;
       });
       setMarriageCelebrantIds([]);
     }
@@ -871,7 +879,9 @@ export default function EventFormPage({
     if (!hasSendOffSelected && sendOffMemberIds.length > 0) {
       setSelectedParticipantIds((prev) => {
         const toAdd = sendOffMemberIds.filter((id) => !prev.includes(id));
-        return [...prev, ...toAdd];
+        const updated = [...prev, ...toAdd];
+        setForm((formPrev) => ({ ...formPrev, participantIds: updated }));
+        return updated;
       });
       setSendOffMemberIds([]);
     }
@@ -973,20 +983,30 @@ export default function EventFormPage({
 
   // Handler to deselect/remove a member from non-birthday event
   const handleRemoveParticipant = (memberId) => {
-    setSelectedParticipantIds((prev) => prev.filter((id) => id !== memberId));
+    setSelectedParticipantIds((prev) => {
+      const updated = prev.filter((id) => id !== memberId);
+      setForm((formPrev) => ({ ...formPrev, participantIds: updated }));
+      return updated;
+    });
   };
 
   // Handler to add back a deselected member
   const handleAddParticipant = (memberId) => {
     const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
     if (allExempt.has(memberId)) return;
-    setSelectedParticipantIds((prev) => (prev.includes(memberId) ? prev : [...prev, memberId]));
+    setSelectedParticipantIds((prev) => {
+      const updated = prev.includes(memberId) ? prev : [...prev, memberId];
+      setForm((formPrev) => ({ ...formPrev, participantIds: updated }));
+      return updated;
+    });
   };
 
   // Handler to reset/select all members (excluding exempt celebrants)
   const handleSelectAllParticipants = () => {
     const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
-    setSelectedParticipantIds(activeMembers.filter((m) => !allExempt.has(m.memberId)).map((m) => m.memberId));
+    const updated = activeMembers.filter((m) => !allExempt.has(m.memberId)).map((m) => m.memberId);
+    setSelectedParticipantIds(updated);
+    setForm((formPrev) => ({ ...formPrev, participantIds: updated }));
   };
 
   // Excluded (not attending) members for non-birthday events
@@ -1432,7 +1452,7 @@ export default function EventFormPage({
       updatedName = sanitizeEventName(updatedName);
     }
 
-    const initialParticipants = isEdit ? (form.participantIds || selectedParticipantIds || []) : [];
+    const initialParticipants = isEdit ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || [])) : [];
     if (!isEdit) {
       setSelectedParticipantIds([]);
     }
@@ -1529,7 +1549,7 @@ export default function EventFormPage({
       updatedName = sanitizeEventName(updatedName);
     }
 
-    const initialParticipants = isEdit ? (form.participantIds || selectedParticipantIds || []) : [];
+    const initialParticipants = isEdit ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || [])) : [];
     if (!isEdit) {
       setSelectedParticipantIds([]);
     }
@@ -1854,8 +1874,7 @@ export default function EventFormPage({
         baseAmount: plannedBudget,
         useAvailableBalance: Boolean(useAvailableBalance),
         allocatedAmount: useAvailableBalance ? Number(effectiveDeduction) : 0,
-        participantIds:
-          finalParticipantIds.length > 0 ? finalParticipantIds : form.participantIds,
+        participantIds: finalParticipantIds,
         contributionOverrides: contributionOverrides,
       };
 
@@ -2363,6 +2382,7 @@ export default function EventFormPage({
                         const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
                         const filteredVal = (val || []).filter((id) => !allExempt.has(id));
                         setSelectedParticipantIds(filteredVal);
+                        setForm((prev) => ({ ...prev, participantIds: filteredVal }));
                         if (errors.participantIds) {
                           setErrors((prev) => ({ ...prev, participantIds: "" }));
                         }
