@@ -30,6 +30,7 @@ import {
   InfoOutlined as InfoIcon,
 } from "@mui/icons-material";
 import SubmitPaymentModal from "../../components/payments/SubmitPaymentModal";
+import ViewContributionModal from "../../components/contributions/ViewContributionModal";
 import AddSupportTicketModal from "../../components/support/AddSupportTicketModal";
 import VerifySupportTicketModal from "../../components/support/VerifySupportTicketModal";
 import AppTextArea from "../../components/common/AppTextArea";
@@ -159,6 +160,11 @@ export default function ContributionsPage() {
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
   const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
+
+  // View Contribution Details Modal State
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewModalRow, setViewModalRow] = useState(null);
+  const [viewModalTx, setViewModalTx] = useState(null);
 
   // Submit Payment Details Modal State
   const [submitPaymentModalOpen, setSubmitPaymentModalOpen] = useState(false);
@@ -333,6 +339,89 @@ export default function ContributionsPage() {
     });
   };
 
+  const normalizeModeName = (mode) => {
+    if (!mode) return "";
+    const trimmed = String(mode).trim();
+    const lower = trimmed.toLowerCase();
+
+    // Match against dynamic DB payment modes first
+    if (Array.isArray(paymentModes) && paymentModes.length > 0) {
+      const matched = paymentModes.find(
+        (m) =>
+          (m.paymentModeName && m.paymentModeName.trim().toLowerCase() === lower) ||
+          (m.name && m.name.trim().toLowerCase() === lower) ||
+          (m.paymentModeId && String(m.paymentModeId).toLowerCase() === lower)
+      );
+      if (matched) {
+        return matched.paymentModeName || matched.name;
+      }
+    }
+
+    if (lower.includes("gpay") || lower.includes("google")) return "GPay";
+    if (lower.includes("phonepe") || lower.includes("phone")) return "PhonePe";
+    if (lower.includes("paytm")) return "Paytm";
+    if (lower.includes("cash")) return "Cash";
+    if (lower.includes("split")) return "Split";
+    if (lower.includes("upi")) return "UPI";
+
+    return trimmed;
+  };
+
+  const getResolvedPaymentMode = (c, matchedTx) => {
+    const tx = matchedTx !== undefined ? matchedTx : findContributionTransaction(c);
+
+    // 1. Check if multiple splits exist in matchedTx or row
+    const splits = tx?.splits || c?.splits;
+    if (Array.isArray(splits) && splits.length > 1) {
+      return "Split";
+    }
+
+    // 2. Check for [Split Breakdown: ...] in notes
+    const notes = String(tx?.notes || c?.notes || "");
+    const splitMatch = notes.match(/\[Split Breakdown:\s*([^\]]+)\]/i);
+    if (splitMatch) {
+      const rawBreakdown = splitMatch[1];
+      const items = rawBreakdown.split(",").map((s) => s.trim()).filter(Boolean);
+      if (items.length > 1) {
+        return "Split";
+      }
+      if (items.length === 1) {
+        const modePart = items[0].split(":")[0]?.trim();
+        if (modePart) return normalizeModeName(modePart);
+      }
+    }
+
+    // 3. Check if multiple amounts are recorded (e.g. cash + upi)
+    const cashAmt = Number(c?.cashAmount || tx?.cashAmount || 0);
+    const upiAmt = Number(c?.upiAmount || tx?.upiAmount || 0);
+    if (cashAmt > 0 && upiAmt > 0) {
+      return "Split";
+    }
+
+    // 4. If single split row
+    if (Array.isArray(splits) && splits.length === 1 && splits[0]?.mode) {
+      return normalizeModeName(splits[0].mode);
+    }
+
+    // 5. Check raw mode
+    const rawMode = String(c?.paymentMode || tx?.paymentMode || "").trim();
+    if (rawMode && rawMode !== "-" && rawMode !== "--" && rawMode.toLowerCase() !== "none") {
+      if (rawMode.toLowerCase().includes("split")) {
+        return "Split";
+      }
+      if (rawMode.toLowerCase() === "upi" || rawMode.toLowerCase() === "online") {
+        const lowerNotes = notes.toLowerCase();
+        if (lowerNotes.includes("gpay") || lowerNotes.includes("google pay")) return "GPay";
+        if (lowerNotes.includes("phonepe") || lowerNotes.includes("phone pe")) return "PhonePe";
+        if (lowerNotes.includes("paytm")) return "Paytm";
+        if (lowerNotes.includes("cash")) return "Cash";
+      }
+      return normalizeModeName(rawMode);
+    }
+
+    return "";
+  };
+
   const findRaisedSupportTicket = (c) => {
     if (!c || !Array.isArray(supportTickets) || supportTickets.length === 0) return null;
 
@@ -430,22 +519,26 @@ export default function ContributionsPage() {
     if (!c) return false;
     const matchedTx = tx !== null ? tx : findContributionTransaction(c);
 
+    const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
+    const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
+
+    // If status is rejected or pending, it can NEVER be verified!
+    if (rawStatus === "rejected" || txStatus === "rejected" || rawStatus === "pending" || txStatus === "pending") {
+      return false;
+    }
+
     // CRITICAL: A member who has NOT paid can NEVER be shown as Verified!
     if (!hasContributionPayment(c, matchedTx)) {
       return false;
     }
 
     const key = `${c.memberId}_${c.eventId}`;
-    const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
-    const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
 
     return Boolean(
-      verifiedKeys.has(key) ||
-      c.isVerified === true ||
-      (c.verifiedBy && String(c.verifiedBy).trim() !== "") ||
-      (matchedTx?.verifiedBy && String(matchedTx.verifiedBy).trim() !== "") ||
+      rawStatus === "verified" ||
       txStatus === "verified" ||
-      rawStatus === "verified"
+      (c.isVerified === true && rawStatus !== "rejected" && txStatus !== "rejected") ||
+      (verifiedKeys.has(key) && rawStatus !== "rejected" && txStatus !== "rejected")
     );
   };
 
@@ -575,12 +668,17 @@ export default function ContributionsPage() {
       let paidAmount = 0;
       const cash = Number(c.cashAmount) || 0;
       const upi = Number(c.upiAmount) || 0;
-      const txAmt = Number(matchedTx?.amount) || 0;
+      const allTxns = findAllContributionTransactions(c, txList, c.eventId || (selectedEventId !== "ALL" ? selectedEventId : ""));
+      const totalTxAmt = allTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+      const txAmt = totalTxAmt > 0 ? totalTxAmt : Number(matchedTx?.amount || 0);
+      const rawPaid = Number(c.paidAmount) || Number(c.totalReceivedAmount) || 0;
       if (cash > 0 || upi > 0) {
         paidAmount = cash + upi;
       } else if (txAmt > 0) {
         paidAmount = txAmt;
-      } else if (isPaid) {
+      } else if (rawPaid > 0) {
+        paidAmount = rawPaid;
+      } else if (isPaid || isRejected) {
         paidAmount = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
       }
 
@@ -588,6 +686,13 @@ export default function ContributionsPage() {
         ...currentContribution,
         paymentStatus: resolvedStatus,
         isVerified,
+        verifiedBy: currentContribution.verifiedBy || matchedTx?.verifiedBy,
+        verifiedOn: currentContribution.verifiedOn || matchedTx?.verifiedOn,
+        auditRemarks: currentContribution.auditRemarks || matchedTx?.auditRemarks || matchedTx?.notes || currentContribution.notes,
+        notes: matchedTx?.notes || currentContribution.notes,
+        rejectionReason: isRejected
+          ? (currentContribution.rejectionReason || matchedTx?.notes || currentContribution.notes)
+          : currentContribution.rejectionReason,
         paidAmount,
         previousUnpaid,
         previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
@@ -668,6 +773,14 @@ export default function ContributionsPage() {
       arrearBreakdown: prevArrears === 0 ? [] : (row?.previousUnpaidItems || []),
     });
     setSubmitPaymentModalOpen(true);
+  };
+
+  const handleOpenViewModal = (row) => {
+    if (!row) return;
+    const matchedTx = findContributionTransaction(row);
+    setViewModalRow(row);
+    setViewModalTx(matchedTx);
+    setViewModalOpen(true);
   };
 
   useEffect(() => {
@@ -1090,7 +1203,7 @@ export default function ContributionsPage() {
       );
     }
 
-    return 0;
+    return Number(matchedTx?.amount || row.paidAmount || row.totalReceivedAmount || row.amount || 0);
   }, []);
 
   const getModalStatusOptions = (row) => {
@@ -1201,19 +1314,26 @@ export default function ContributionsPage() {
     }
 
     const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "Admin";
-    const noteText = customNotes !== undefined
-      ? customNotes
-      : (auditRemarks || `Status updated to ${newStatus} by ${verifier}.`);
+    const trimmedNotes = customNotes && String(customNotes).trim() ? String(customNotes).trim() : (auditRemarks && String(auditRemarks).trim() ? String(auditRemarks).trim() : "");
+    const noteText = trimmedNotes || (String(newStatus).toLowerCase() === "rejected" ? `Rejected by ${verifier}.` : `Status updated to ${newStatus} by ${verifier}.`);
 
     const targetKey = `${target.memberId}_${target.eventId}`;
-    setVerifiedKeys((prev) => new Set(prev).add(targetKey));
+    if (String(newStatus).toLowerCase() === "verified") {
+      setVerifiedKeys((prev) => new Set(prev).add(targetKey));
+    } else {
+      setVerifiedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(targetKey);
+        return next;
+      });
+    }
 
     const isMarkingPaid = ["paid", "verified", "closed", "completed"].includes(String(newStatus).toLowerCase());
 
     const matchedTxnForValidation = findContributionTransaction(target);
     const actualReceived = getActualReceivedAmount(target, matchedTxnForValidation);
 
-    if (actualReceived <= 0) {
+    if (actualReceived <= 0 && String(newStatus).toLowerCase() !== "rejected") {
       toast.error("Payment has not been received (Received Amount: ₹0.00). You cannot verify or save this status.");
       return;
     }
@@ -1230,12 +1350,28 @@ export default function ContributionsPage() {
           const updatedStatus = isVerified ? "Verified" : (isMarkingPaid ? "Paid" : newStatus);
           const isPaid = isMarkingPaid;
           const arrears = c.previousUnpaid || 0;
+          const splitAmount = (Number(c.cashAmount || 0) + Number(c.upiAmount || 0));
+          const preservedPaid =
+            splitAmount > 0
+              ? splitAmount
+              : (Number(c.paidAmount || 0) > 0
+                ? Number(c.paidAmount)
+                : (actualReceived > 0
+                  ? actualReceived
+                  : (Number(target.paidAmount || 0) > 0
+                    ? Number(target.paidAmount)
+                    : Number(c.amount || 0))));
+
           return {
             ...c,
+            paidAmount: preservedPaid,
             paymentStatus: updatedStatus,
             statusName: updatedStatus,
             isVerified: isVerified,
             verifiedBy: isVerified ? verifier : c.verifiedBy,
+            auditRemarks: noteText,
+            notes: noteText,
+            rejectionReason: String(newStatus).toLowerCase() === "rejected" ? noteText : c.rejectionReason,
             paymentDate: isPaid ? (c.paymentDate || new Date().toISOString()) : c.paymentDate,
             paymentMode: c.paymentMode && c.paymentMode !== "None" ? c.paymentMode : (isPaid ? "Cash" : c.paymentMode),
             totalAccumulated: isPaid ? arrears : (Number(c.amount || 0) + arrears),
@@ -1310,7 +1446,7 @@ export default function ContributionsPage() {
               (m) => (m.transactionId || m.id) === (t.transactionId || t.id)
             );
             if (wasVerified) {
-              return { ...t, status: statusToSend, verifiedBy: verifier };
+              return { ...t, status: statusToSend, verifiedBy: verifier, notes: noteText, auditRemarks: noteText };
             }
             return t;
           });
@@ -1367,16 +1503,17 @@ export default function ContributionsPage() {
       label: "Action",
       render: (row) => {
         const matchedTx = findContributionTransaction(row);
+        const statusStr = String(row?.paymentStatus || row?.status || row?.statusName || matchedTx?.status || "").trim().toLowerCase();
         const isVerifiedRow = isContributionVerified(row, matchedTx);
+        const isActuallyVerified = statusStr === "verified" || (isVerifiedRow && statusStr !== "rejected");
         const hasSubmitted = hasSubmittedPayment(row, matchedTx);
         const hasDirectPaid = isContributionPaid(row, matchedTx);
-        const statusStr = String(row?.paymentStatus || row?.status || row?.statusName || "").trim().toLowerCase();
         const isPaidStatus = statusStr === "paid" || statusStr === "verified" || statusStr === "completed" || statusStr === "closed" || row?.paymentStatus === 2;
         const isSettledByAmount = Number(row?.paidAmount || 0) > 0 && (row?.totalAccumulated === undefined || Number(row?.totalAccumulated) <= 0);
-        const isPaidMember = Boolean(isVerifiedRow || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount);
+        const isPaidMember = Boolean(isActuallyVerified || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount);
 
         const tooltipTitle = isPaidMember
-          ? (isVerifiedRow
+          ? (isActuallyVerified
               ? "Payment Verified & Settled"
               : (hasSubmitted && statusStr === "pending")
               ? "Payment Proof Submitted (Pending Verification)"
@@ -1385,6 +1522,27 @@ export default function ContributionsPage() {
 
         return (
           <Box sx={{ display: "flex", gap: 0.6, alignItems: "center" }}>
+            {/* View Contribution & Payment Details Icon */}
+            <Tooltip title={canViewContribution !== false ? "View Details" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: canViewContribution === false ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={canViewContribution === false}
+                  onClick={() => handleOpenViewModal(row)}
+                >
+                  <ViewIcon
+                    sx={{
+                      fontSize: "1.1rem",
+                      color: canViewContribution !== false
+                        ? actionIconColor
+                        : (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+
             {canAddContribution && (
               <Tooltip title={tooltipTitle}>
                 <span style={{ display: "inline-flex", cursor: isPaidMember ? "not-allowed" : "pointer" }}>
@@ -1419,11 +1577,11 @@ export default function ContributionsPage() {
             )}
 
             {canUpdateContribution && (
-              <Tooltip title={isVerifiedRow ? "Already Verified" : "Authority Status Update"}>
+              <Tooltip title={isActuallyVerified ? "Already Verified" : "Authority Status Update"}>
                 <span>
                   <IconButton
                     size="small"
-                    disabled={isVerifiedRow}
+                    disabled={isActuallyVerified}
                     onClick={() => {
                       setStatusModalRow(row);
                       setStatusChangeValue("");
@@ -1433,12 +1591,12 @@ export default function ContributionsPage() {
                     }}
                     sx={{
                       p: 0.4,
-                      color: isVerifiedRow ? "#9ca3af" : "#16a34a",
-                      bgcolor: isVerifiedRow ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.08)",
+                      color: isActuallyVerified ? "#9ca3af" : "#16a34a",
+                      bgcolor: isActuallyVerified ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.08)",
                       borderRadius: "6px",
                       "&:hover": {
-                        bgcolor: isVerifiedRow ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.18)",
-                        color: isVerifiedRow ? "#9ca3af" : "#15803d",
+                        bgcolor: isActuallyVerified ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.18)",
+                        color: isActuallyVerified ? "#9ca3af" : "#15803d",
                       },
                     }}
                   >
@@ -1609,7 +1767,8 @@ export default function ContributionsPage() {
       key: "paidAmount",
       align: "right",
       render: (row) => {
-        const matchedTx = findContributionTransaction(row);
+        const allTxns = findAllContributionTransactions(row);
+        const matchedTx = allTxns[0] || findContributionTransaction(row);
         const isVerified = isContributionVerified(row, matchedTx);
         const isPaid =
           isContributionPaid(row, matchedTx) ||
@@ -1619,6 +1778,11 @@ export default function ContributionsPage() {
           String(row?.paymentStatus || "").toLowerCase() === "paid" ||
           String(row?.statusName || "").toLowerCase() === "paid";
 
+        const isRejected =
+          String(matchedTx?.status || "").toLowerCase() === "rejected" ||
+          String(row?.paymentStatus || "").toLowerCase() === "rejected" ||
+          String(row?.statusName || "").toLowerCase() === "rejected";
+
         const activeEv = (events || []).find(
           (e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId)
         );
@@ -1627,16 +1791,18 @@ export default function ContributionsPage() {
         let paidAmount = 0;
         const cash = Number(row.cashAmount) || 0;
         const upi = Number(row.upiAmount) || 0;
-        const txAmt = Number(matchedTx?.amount) || 0;
+        const totalTxAmt = allTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+        const txAmt = totalTxAmt > 0 ? totalTxAmt : (Number(matchedTx?.amount) || 0);
+        const rawPaid = Number(row.paidAmount) || Number(row.totalReceivedAmount) || 0;
 
         if (cash > 0 || upi > 0) {
           paidAmount = cash + upi;
         } else if (txAmt > 0) {
           paidAmount = txAmt;
-        } else if (isPaid) {
+        } else if (rawPaid > 0) {
+          paidAmount = rawPaid;
+        } else if (isPaid || isRejected) {
           paidAmount = eventAmount > 0 ? eventAmount : Number(row.amount || 0);
-        } else if (row.paidAmount !== undefined && row.paidAmount !== null && Number(row.paidAmount) > 0) {
-          paidAmount = Number(row.paidAmount);
         }
 
         const paidEventName =
@@ -1659,16 +1825,14 @@ export default function ContributionsPage() {
                 Payment Date: {formatGridDate(row.paymentDate || matchedTx?.paymentDate)}
               </Typography>
             )}
-            {(row.paymentMode || matchedTx?.paymentMode) && (
-              <Typography variant="caption" sx={{ display: "block", color: "#cbd5e1", fontSize: "0.72rem" }}>
-                Payment Mode: {row.paymentMode || matchedTx?.paymentMode}
-              </Typography>
-            )}
-            {matchedTx?.utr && (
-              <Typography variant="caption" sx={{ display: "block", color: "#93c5fd", fontSize: "0.7rem", mt: 0.2 }}>
-                Ref / UTR: {matchedTx.utr}
-              </Typography>
-            )}
+            {(() => {
+              const displayMode = getResolvedPaymentMode(row, matchedTx);
+              return displayMode ? (
+                <Typography variant="caption" sx={{ display: "block", color: "#cbd5e1", fontSize: "0.72rem" }}>
+                  Payment Mode: {displayMode}
+                </Typography>
+              ) : null;
+            })()}
           </Box>
         ) : (
           `Pending payment for ${paidEventName}`
@@ -1778,11 +1942,7 @@ export default function ContributionsPage() {
         const hasSubmitted = hasSubmittedPayment(row);
         let resolvedMode = "-";
         if (isPaid || hasSubmitted) {
-          if (row.paymentMode && row.paymentMode !== "None" && row.paymentMode !== "-") {
-            resolvedMode = row.paymentMode;
-          } else if (matchedTx?.paymentMode) {
-            resolvedMode = matchedTx.paymentMode;
-          }
+          resolvedMode = getResolvedPaymentMode(row, matchedTx) || "-";
         }
 
         if (resolvedMode === "-" || resolvedMode === "None") {
@@ -2242,6 +2402,24 @@ export default function ContributionsPage() {
         member={members.find((m) => m.memberId === selectedContributionForQr?.memberId)}
       />
 
+      {/* ── View Contribution Details Modal ── */}
+      <ViewContributionModal
+        open={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setViewModalRow(null);
+          setViewModalTx(null);
+        }}
+        row={viewModalRow}
+        matchedTx={viewModalTx}
+        events={events}
+        onPay={canAddContribution ? () => {
+          const target = viewModalRow;
+          setViewModalOpen(false);
+          if (target) handleOpenSubmitPaymentModal(target);
+        } : undefined}
+      />
+
       {/* ── Submit Payment Details Modal ── */}
       <SubmitPaymentModal
         open={submitPaymentModalOpen}
@@ -2320,9 +2498,9 @@ export default function ContributionsPage() {
                 </AppCancelButton>
                 <AppSaveButton
                   loading={statusSaving}
-                  disabled={isZeroAmount}
+                  disabled={isZeroAmount && String(statusChangeValue).toLowerCase() !== "rejected"}
                   disabledTooltip={
-                    isZeroAmount
+                    isZeroAmount && String(statusChangeValue).toLowerCase() !== "rejected"
                       ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first."
                       : ""
                   }
