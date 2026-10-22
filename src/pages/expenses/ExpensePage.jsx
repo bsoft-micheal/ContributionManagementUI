@@ -289,7 +289,8 @@ export default function ExpensePage() {
             : item.id || `EXP-${String(idx + 1).padStart(3, "0")}`,
           expenseId: item.expenseId || item.id,
           eventName: item.eventName || "",
-          category: item.category || "",
+          category: item.category || item.eventTypeName || item.categoryName || "",
+          eventTypeName: item.category || item.eventTypeName || item.categoryName || "",
           amount: item.amount || 0,
           rawExpenseDate: item.expenseDate,
           expenseDate: item.expenseDate ? dayjs(item.expenseDate).format("YYYY-MM-DD") : "",
@@ -1143,6 +1144,11 @@ export default function ExpensePage() {
       ),
     },
     {
+      label: "Event Type",
+      key: "category",
+      render: (row) => row.category || row.eventTypeName || "--",
+    },
+    {
       label: "Event Name",
       key: "eventName",
       render: (row) => (
@@ -1150,10 +1156,6 @@ export default function ExpensePage() {
           {row.eventName}
         </Typography>
       ),
-    },
-    {
-      label: "Category",
-      key: "category",
     },
     {
       label: "Amount",
@@ -1327,6 +1329,7 @@ export default function ExpensePage() {
         data={filteredExpenses}
         loading={loading}
         allowExport={canExportExpense}
+        searchPlaceholder="Search by Expense ID ,..."
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             <AppAddButton
@@ -1363,7 +1366,7 @@ export default function ExpensePage() {
             >
               <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
                 <AppSelect
-                  label="Select Event Type"
+                  label="Event Type"
                   value={filterCategory}
                   onChange={(e) => {
                     setFilterCategory(e.target.value || "ALL");
@@ -1380,7 +1383,7 @@ export default function ExpensePage() {
               </Box>
               <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
                 <AppSelect
-                  label="Select Event Name"
+                  label="Event Name"
                   value={filterEvent}
                   onChange={(e) => {
                     setFilterEvent(e.target.value || "ALL");
@@ -1393,7 +1396,7 @@ export default function ExpensePage() {
               </Box>
               <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
                 <AppSelect
-                  label="Select Status"
+                  label="Expense Status"
                   value={filterStatus}
                   onChange={(e) => {
                     setFilterStatus(e.target.value || "ALL");
