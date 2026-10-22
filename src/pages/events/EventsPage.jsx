@@ -21,6 +21,7 @@ import {
   ReceiptLong as ReceiptLongIcon,
   PostAdd as AddExpenseIcon,
   NotificationsActive as NotificationsActiveIcon,
+  CalculateRounded as CalculateRoundedIcon,
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -34,7 +35,7 @@ import AppButton from "../../components/common/AppButton";
 import { MENU_FEATURE_IDS } from "../../constants";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
-import { hasActionPermission } from "../../utils/rightsHelper";
+import { hasActionPermission, getRightsForFeatureId } from "../../utils/rightsHelper";
 import { getEventsAsync, deleteEventAsync, sendRemindersForEventAsync } from "../../services/eventService";
 import { getExpensesAsync } from "../../services/expenseService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
@@ -174,6 +175,7 @@ export default function EventsPage() {
   const canViewPhotos = hasActionPermission("View Photos", MENU_FEATURE_IDS.EVENT_VIEW_PHOTOS, activeRole).canView;
   const canAddExpense = hasActionPermission("Add Expense", MENU_FEATURE_IDS.EVENT_ADD_EXPENSE, activeRole).canExecute;
   const canViewExpense = hasActionPermission("View Expense", MENU_FEATURE_IDS.EVENT_VIEW_EXPENSE, activeRole).canView;
+  const canViewShareRules = getRightsForFeatureId(MENU_FEATURE_IDS.CALCULATION, activeRole).read !== false;
 
   const navigate = useNavigate();
   const toast = useAppToast();
@@ -523,7 +525,7 @@ export default function EventsPage() {
   const columns = [
     {
       label: "Action",
-      sx: { width: 245, minWidth: 245 },
+      sx: { width: 280, minWidth: 280 },
       render: (row) => {
         const hasPaid = Boolean(
           row.hasPaidContributions ||
@@ -669,6 +671,22 @@ export default function EventsPage() {
                   }}
                 >
                   <ReceiptLongIcon sx={{ fontSize: "1.1rem", color: canViewExpense ? actionIconColor : "#94a3b8" }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={canViewShareRules ? (COMMON_STRINGS.CONTRIBUTION_CALCULATION?.TITLE || "Contribution Share Rules") : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: !canViewShareRules ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={!canViewShareRules}
+                  onClick={() => {
+                    navigate(`/contribution-calculation?eventId=${row.eventId}`, {
+                      state: { eventId: row.eventId },
+                    });
+                  }}
+                >
+                  <CalculateRoundedIcon sx={{ fontSize: "1.1rem", color: canViewShareRules ? actionIconColor : "#94a3b8" }} />
                 </IconButton>
               </span>
             </Tooltip>
