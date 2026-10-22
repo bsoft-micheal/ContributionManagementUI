@@ -262,8 +262,9 @@ export default function MyContributionSummaryPage() {
         <Box
           sx={{
             background: theme.palette.mode === "dark"
-              ? "linear-gradient(90deg, #171b2d 0%, #1d2338 100%)"
+              ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
               : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+            borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
             color: "#fff",
             px: 2.5,
             py: 0.5,
@@ -308,12 +309,13 @@ export default function MyContributionSummaryPage() {
               size="small"
               variant="contained"
               sx={{
-                bgcolor: "#2a1b4d",
+                bgcolor: theme.palette.mode === "dark" ? "#5a4c82 !important" : "#2a1b4d !important",
+                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.25) !important" : "none",
                 borderRadius: "3px",
                 fontSize: "0.75rem",
                 py: 0.3,
                 px: 2,
-                "&:hover": { bgcolor: "#1a1033" },
+                "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6a5c96 !important" : "#1a1033 !important" },
               }}
               onClick={handleExport}
             >

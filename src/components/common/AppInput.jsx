@@ -202,14 +202,20 @@ export default function AppInput({
         size={size}
         sx={{
           "& .MuiOutlinedInput-root": {
-            fontSize: "0.875rem",
+            fontSize: "0.84375rem",
             bgcolor: "background.paper",
-            borderRadius: "12px",
-            height: props.multiline ? "auto" : (size === "small" ? 34 : 40),
-            minHeight: size === "small" ? 34 : 40,
+            borderRadius: "8px",
+            height: props.multiline ? "auto" : (size === "small" ? 36 : 42),
+            minHeight: props.multiline ? "auto" : (size === "small" ? 36 : 42),
+            maxHeight: props.multiline ? "auto" : (size === "small" ? 36 : 42),
+            boxSizing: "border-box",
             color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
             "& input, & textarea, & .MuiInputBase-input, & .MuiOutlinedInput-input": {
-              py: size === "small" ? 0.8 : 1.2,
+              py: props.multiline ? 1 : 0,
+              px: 1.5,
+              height: props.multiline ? "auto" : "100%",
+              boxSizing: "border-box",
+              fontSize: "0.84375rem",
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
               "&[type=number]": {
                 MozAppearance: "textfield",
@@ -221,6 +227,7 @@ export default function AppInput({
               "&::placeholder, &::-webkit-input-placeholder": {
                 color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
                 opacity: 1,
+                fontSize: "0.84375rem",
                 fontWeight: 400,
               },
               "&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus, &:-webkit-autofill:active": {

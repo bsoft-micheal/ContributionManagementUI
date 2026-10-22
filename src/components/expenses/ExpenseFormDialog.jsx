@@ -24,7 +24,7 @@ import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
 import AppDateInput from "../common/AppDateInput";
 import AppTextArea from "../common/AppTextArea";
-import AppButton from "../common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../common/AppButton";
 import AppConfirmDialog from "../common/AppConfirmDialog";
 import { roundToWhole, formatWholeCurrency } from "../../utils/roundingHelper";
 import { useAppToast } from "../common/AppToast";
@@ -563,12 +563,10 @@ export default function ExpenseFormDialog({
                 Note: Expense exceeds budget by {formatWholeCurrency(projectedExtraSpent)}
               </Typography>
             )}
-            <AppButton variant="outlined" onClick={handleCloseAttempt} disabled={saving}>
-              Cancel
-            </AppButton>
-            <AppButton variant="contained" onClick={handleSaveExpense} disabled={saving}>
+            <AppCancelButton onClick={handleCloseAttempt} disabled={saving} />
+            <AppSaveButton onClick={handleSaveExpense} disabled={saving}>
               {saving ? "Saving..." : editingExpense ? "Update" : "Save"}
-            </AppButton>
+            </AppSaveButton>
           </Stack>
         }
       >

@@ -42,7 +42,7 @@ dayjs.extend(customParseFormat);
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton } from "../../components/common/AppButton";
 import AppSwitch from "../../components/common/AppSwitch";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
@@ -1133,15 +1133,10 @@ export default function UsersPage() {
             >
               Import Excel
             </AppButton>
-            <AppButton
-              variant="contained"
-              size="small"
+            <AppAddButton
               disabled={!canAddUser}
-              startIcon={<PersonAddIcon />}
               onClick={openCreate}
-            >
-              Add User
-            </AppButton>
+            />
           </Stack>
         }
         filterPanel={

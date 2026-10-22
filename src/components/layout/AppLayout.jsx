@@ -44,7 +44,7 @@ import AppDialog from "../common/AppDialog";
 import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
 import AppDateInput from "../common/AppDateInput";
-import AppButton from "../common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../common/AppButton";
 import AppImageUpload from "../common/AppImageUpload";
 import { useAppToast } from "../common/AppToast";
 import { validateForm, validateEmail } from "../../utils/validation";
@@ -91,14 +91,14 @@ export default function AppLayout() {
   const SIDEBAR = React.useMemo(() => {
     if (theme.palette.mode === "dark") {
       return {
-        bg: "#121628",
-        active: "#ffffff",
-        activeBg: "rgba(141, 150, 184, 0.14)",
-        hover: "rgba(255, 255, 255, 0.04)",
-        text: "#d6dbef",
-        activeText: "#e7ebf7",
-        icon: "#ffffff",
-        activeIcon: "#ffffff",
+        bg: "#101426",
+        active: "#c4b5fd",
+        activeBg: "rgba(196, 181, 253, 0.16)",
+        hover: "rgba(255, 255, 255, 0.05)",
+        text: "#b3bdd6",
+        activeText: "#ffffff",
+        icon: "#8a94b8",
+        activeIcon: "#c4b5fd",
         divider: "rgba(255,255,255,0.08)",
         logoutHover: "rgba(239, 68, 68, 0.14)",
       };
@@ -1074,17 +1074,8 @@ export default function AppLayout() {
         showCloseIcon={false}
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setProfileDialogOpen(false)}>
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSaveProfile}
-              sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}
-            >
-              Save
-            </AppButton>
+            <AppCancelButton onClick={() => setProfileDialogOpen(false)} />
+            <AppSaveButton onClick={handleSaveProfile} />
           </>
         }
       >
@@ -1208,17 +1199,13 @@ export default function AppLayout() {
         showCloseIcon={true}
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setChangePasswordDialogOpen(false)}>
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
+            <AppCancelButton onClick={() => setChangePasswordDialogOpen(false)} />
+            <AppSaveButton
               onClick={handleChangePassword}
               loading={changePasswordLoading}
-              sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}
             >
               Update
-            </AppButton>
+            </AppSaveButton>
           </>
         }
       >

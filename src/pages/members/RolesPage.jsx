@@ -6,7 +6,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -180,15 +180,10 @@ export default function RolesPage() {
         data={roles}
         loading={loading}
         actions={
-          <AppButton
-            size="small"
-            variant="contained"
+          <AppAddButton
             disabled={!hasWriteAccess}
-            startIcon={<AddIcon />}
             onClick={() => { setForm(initialForm); setErrors({}); setDialogOpen(true); }}
-          >
-            {COMMON_STRINGS.ACTIONS.ADD}
-          </AppButton>
+          />
         }
       />
 
@@ -199,8 +194,8 @@ export default function RolesPage() {
         maxWidth="xs"
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>{COMMON_STRINGS.ACTIONS.CANCEL}</AppButton>
-            <AppButton variant="contained" startIcon={<SaveIcon />} onClick={handleSubmit} sx={{ bgcolor: "#4a3f6b !important", "&:hover": { bgcolor: "#3b325c !important" } }}>{COMMON_STRINGS.ACTIONS.SAVE}</AppButton>
+            <AppCancelButton onClick={() => setDialogOpen(false)}>{COMMON_STRINGS.ACTIONS.CANCEL}</AppCancelButton>
+            <AppSaveButton onClick={handleSubmit}>{COMMON_STRINGS.ACTIONS.SAVE}</AppSaveButton>
           </>
         }
       >

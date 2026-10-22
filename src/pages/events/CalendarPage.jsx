@@ -1005,8 +1005,9 @@ export default function CalendarPage({ isEmbedded = false }) {
           sx={{
             background: (theme) =>
               theme.palette.mode === "dark"
-                ? "linear-gradient(90deg, #171b2d 0%, #1d2338 100%)"
+                ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
                 : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+            borderBottom: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
             color: "#ffffff",
             px: { xs: 2.5, sm: 3 },
             py: 1,
@@ -1130,7 +1131,7 @@ export default function CalendarPage({ isEmbedded = false }) {
                       height: 34,
                       minHeight: 34,
                       fontWeight: 700,
-                      fontSize: "0.78rem",
+                      fontSize: "0.75rem",
                       px: 2,
                       whiteSpace: "nowrap",
                       borderRadius: "8px",
@@ -1147,8 +1148,8 @@ export default function CalendarPage({ isEmbedded = false }) {
                       height: 34,
                       minHeight: 34,
                       fontWeight: 700,
-                      fontSize: "0.78rem",
-                      px: 1.8,
+                      fontSize: "0.75rem",
+                      px: 2,
                       whiteSpace: "nowrap",
                       borderRadius: "8px",
                       color: "#ef4444",

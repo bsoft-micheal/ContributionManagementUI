@@ -18,7 +18,7 @@ import {
 import dayjs from "dayjs";
 
 import AppDialog from "../common/AppDialog";
-import AppButton from "../common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../common/AppButton";
 import AppSelect from "../common/AppSelect";
 import AppTextArea from "../common/AppTextArea";
 import { useAppToast } from "../common/AppToast";
@@ -333,21 +333,15 @@ export default function VerifySupportTicketModal({
         maxWidth="sm"
         actions={
           <Stack direction="row" spacing={1.5} sx={{ justifyContent: "center" }}>
-            <AppButton
-              variant="outlined"
+            <AppCancelButton
               disabled={isSaving}
               onClick={onClose}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
+            />
+            <AppSaveButton
               loading={isSaving}
               disabled={isSaving}
               onClick={handleSave}
-            >
-              Save
-            </AppButton>
+            />
           </Stack>
         }
       >

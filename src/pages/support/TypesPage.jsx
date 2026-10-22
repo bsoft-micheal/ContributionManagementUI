@@ -20,7 +20,7 @@ import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { getRightsForPage } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -1229,10 +1229,8 @@ export default function TypesPage() {
               size={{ xs: 12, sm: 6, md: 3, lg: 2.5 }}
               sx={{ display: "flex", justifyContent: { xs: "flex-start", sm: "flex-end" } }}
             >
-              <AppButton
-                variant="contained"
+              <AppAddButton
                 disabled={!hasWriteAccess}
-                startIcon={<AddIcon />}
                 onClick={() => {
                   if (activeTab === "ticketTypes") {
                     setTicketTypeForm(initialTicketTypeForm);
@@ -1252,17 +1250,7 @@ export default function TypesPage() {
                     setPaymentModeDialogOpen(true);
                   }
                 }}
-                sx={{
-                  whiteSpace: "nowrap",
-                  px: 3,
-                  py: 1,
-                  fontWeight: 700,
-                  bgcolor: "#4a3f6b !important",
-                  "&:hover": { bgcolor: "#3b325c !important" },
-                }}
-              >
-                Add
-              </AppButton>
+              />
             </Grid>
           </Grid>
         </CardContent>
@@ -1321,16 +1309,10 @@ export default function TypesPage() {
         maxWidth="xs"
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setTicketTypeDialogOpen(false)}>
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleTicketTypeSubmit}
-            >
-              Save
-            </AppButton>
+            <AppCancelButton onClick={() => setTicketTypeDialogOpen(false)} />
+            <AppSaveButton onClick={handleTicketTypeSubmit}>
+              {ticketTypeForm.ticketTypeId ? "Update" : "Save"}
+            </AppSaveButton>
           </>
         }
       >
@@ -1390,16 +1372,10 @@ export default function TypesPage() {
         maxWidth="xs"
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setWorkTypeDialogOpen(false)}>
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleWorkTypeSubmit}
-            >
-              Save
-            </AppButton>
+            <AppCancelButton onClick={() => setWorkTypeDialogOpen(false)} />
+            <AppSaveButton onClick={handleWorkTypeSubmit}>
+              {workTypeForm.workTypeId ? "Update" : "Save"}
+            </AppSaveButton>
           </>
         }
       >
@@ -1459,16 +1435,10 @@ export default function TypesPage() {
         maxWidth="xs"
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setPriorityDialogOpen(false)}>
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handlePrioritySubmit}
-            >
-              Save
-            </AppButton>
+            <AppCancelButton onClick={() => setPriorityDialogOpen(false)} />
+            <AppSaveButton onClick={handlePrioritySubmit}>
+              {priorityForm.priorityId ? "Update" : "Save"}
+            </AppSaveButton>
           </>
         }
       >
@@ -1528,16 +1498,10 @@ export default function TypesPage() {
         maxWidth="xs"
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setPaymentModeDialogOpen(false)}>
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handlePaymentModeSubmit}
-            >
-              Save
-            </AppButton>
+            <AppCancelButton onClick={() => setPaymentModeDialogOpen(false)} />
+            <AppSaveButton onClick={handlePaymentModeSubmit}>
+              {paymentModeForm.paymentModeId ? "Update" : "Save"}
+            </AppSaveButton>
           </>
         }
       >

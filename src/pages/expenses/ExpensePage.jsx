@@ -44,8 +44,9 @@ import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppTextArea from "../../components/common/AppTextArea";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
+import MetricCard from "../../components/MetricCard";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import useUnsavedChanges from "../../hooks/useUnsavedChanges";
@@ -1320,80 +1321,6 @@ export default function ExpensePage() {
 
   return (
     <div className="page-shell">
-      {/* Event Budget Tracking Summary Widget */}
-      {pageBudgetSummary && (
-        <Box
-          sx={{
-            mb: 2.5,
-            p: 2,
-            borderRadius: 2.5,
-            bgcolor: (t) => t.palette.mode === "dark" ? "rgba(30, 41, 59, 0.7)" : "#ffffff",
-            border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(226, 232, 240, 0.8)"}`,
-            boxShadow: (t) => t.palette.mode === "dark" ? "0 4px 20px rgba(0, 0, 0, 0.3)" : "0 2px 12px rgba(0, 0, 0, 0.04)",
-          }}
-        >
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.875rem", color: "text.primary" }}>
-              Budget Tracking Summary {pageBudgetSummary.isSpecificEvent ? `— ${pageBudgetSummary.title}` : `(All Events)`}
-            </Typography>
-            {pageBudgetSummary.extraSpent > 0 && (
-              <Chip
-                size="small"
-                label={`Budget Exceeded by ${formatWholeCurrency(pageBudgetSummary.extraSpent)}`}
-                sx={{
-                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
-                  color: "#ef4444",
-                  fontWeight: 800,
-                  fontSize: "0.72rem",
-                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                }}
-              />
-            )}
-          </Box>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(124, 58, 237, 0.1)" : "rgba(124, 58, 237, 0.04)", border: "1px solid rgba(124, 58, 237, 0.2)" }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
-                  {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: "primary.main", fontSize: "1.1rem" }}>
-                  {formatWholeCurrency(pageBudgetSummary.expected)}
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(2, 132, 199, 0.1)" : "rgba(2, 132, 199, 0.04)", border: "1px solid rgba(2, 132, 199, 0.2)" }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
-                  {COMMON_STRINGS.EXPENSES?.TOTAL_SPENT || "Total Spent"}
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: "info.main", fontSize: "1.1rem" }}>
-                  {formatWholeCurrency(pageBudgetSummary.spent)}
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(16, 185, 129, 0.1)" : "rgba(16, 185, 129, 0.04)", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
-                  {COMMON_STRINGS.EXPENSES?.REMAINING_BUDGET || "Remaining Budget"}
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: pageBudgetSummary.remaining > 0 ? "success.main" : "text.secondary", fontSize: "1.1rem" }}>
-                  {formatWholeCurrency(pageBudgetSummary.remaining)}
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: (t) => pageBudgetSummary.extraSpent > 0 ? (t.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.05)") : (t.palette.mode === "dark" ? "rgba(100, 116, 139, 0.1)" : "rgba(100, 116, 139, 0.04)"), border: (t) => pageBudgetSummary.extraSpent > 0 ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(100, 116, 139, 0.2)" }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
-                  {COMMON_STRINGS.EXPENSES?.EXTRA_AMOUNT_SPENT || "Extra Amount Spent"}
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: pageBudgetSummary.extraSpent > 0 ? "error.main" : "text.secondary", fontSize: "1.1rem" }}>
-                  {formatWholeCurrency(pageBudgetSummary.extraSpent)}
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
-        </Box>
-      )}
       <AppDataTable
         title="Expense Details"
         columns={columns}
@@ -1402,11 +1329,8 @@ export default function ExpensePage() {
         allowExport={canExportExpense}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppButton
-              variant="contained"
-              size="small"
+            <AppAddButton
               disabled={!canAddExpense}
-              startIcon={<AddIcon />}
               onClick={() => {
                 if (!canAddExpense) {
                   toast.error("You do not have permission to add expenses.");
@@ -1423,15 +1347,21 @@ export default function ExpensePage() {
                 setErrors({});
                 setDialogOpen(true);
               }}
-            >
-              Add
-            </AppButton>
+            />
           </Stack>
         }
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 180 }}>
+          <Stack spacing={2} sx={{ width: "100%" }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "flex-end",
+                flexWrap: "wrap",
+                gap: 1.2,
+                width: "100%",
+              }}
+            >
+              <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
                 <AppSelect
                   label="Select Event Type"
                   value={filterCategory}
@@ -1446,10 +1376,9 @@ export default function ExpensePage() {
                   options={categoryOptions}
                   size="small"
                   placeholder="Select Event Type"
-                  fullWidth
                 />
               </Box>
-              <Box sx={{ minWidth: 200 }}>
+              <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
                 <AppSelect
                   label="Select Event Name"
                   value={filterEvent}
@@ -1460,10 +1389,9 @@ export default function ExpensePage() {
                   options={eventOptions}
                   size="small"
                   placeholder="Select Event Name"
-                  fullWidth
                 />
               </Box>
-              <Box sx={{ minWidth: 160 }}>
+              <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
                 <AppSelect
                   label="Select Status"
                   value={filterStatus}
@@ -1474,57 +1402,110 @@ export default function ExpensePage() {
                   options={statusOptions}
                   size="small"
                   placeholder="Select Status"
-                  fullWidth
                 />
               </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                startIcon={<FilterListIcon />}
-                onClick={() => {
-                  setAppliedEvent(filterEvent);
-                  setAppliedCategory(filterCategory);
-                  setAppliedStatus(filterStatus);
-                }}
+              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
+                  onClick={() => {
+                    setAppliedEvent(filterEvent);
+                    setAppliedCategory(filterCategory);
+                    setAppliedStatus(filterStatus);
+                  }}
+                  sx={{
+                    height: 34,
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                    border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                  }}
+                >
+                  Filter
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    setFilterEvent("ALL");
+                    setFilterCategory("ALL");
+                    setFilterStatus("ALL");
+                    setAppliedEvent("ALL");
+                    setAppliedCategory("ALL");
+                    setAppliedStatus("ALL");
+                  }}
+                  sx={{
+                    color: "#ef4444",
+                    borderColor: "rgba(239, 68, 68, 0.4)",
+                    height: 34,
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                    "&:hover": {
+                      borderColor: "#ef4444",
+                      bgcolor: "rgba(239, 68, 68, 0.05)",
+                    },
+                  }}
+                >
+                  Clear Filter
+                </AppButton>
+              </Box>
+            </Box>
+
+            {/* 4 Summary Budget KPI Cards Under the Filter */}
+            {pageBudgetSummary && (
+              <Box
                 sx={{
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                }}
-              >
-                Filter
-              </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setFilterEvent("ALL");
-                  setFilterCategory("ALL");
-                  setFilterStatus("ALL");
-                  setAppliedEvent("ALL");
-                  setAppliedCategory("ALL");
-                  setAppliedStatus("ALL");
-                }}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)",
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0, 1fr))",
+                    md: "repeat(4, minmax(0, 1fr))",
                   },
+                  gap: 1.5,
+                  pt: 0.5,
                 }}
               >
-                Clear Filter
-              </AppButton>
-            </Grid>
-          </Grid>
+                <MetricCard
+                  label="Expected Budget"
+                  value={formatWholeCurrency(pageBudgetSummary.expected)}
+                  accent="#6366f1"
+                />
+                <MetricCard
+                  label="Total Spent"
+                  value={formatWholeCurrency(pageBudgetSummary.spent)}
+                  accent="#0284c7"
+                />
+                <MetricCard
+                  label="Remaining Budget"
+                  value={formatWholeCurrency(pageBudgetSummary.remaining)}
+                  accent="#10b981"
+                />
+                <MetricCard
+                  label="Extra Amount Spent"
+                  value={formatWholeCurrency(pageBudgetSummary.extraSpent)}
+                  accent={pageBudgetSummary.extraSpent > 0 ? "#f43f5e" : "#64748b"}
+                  badge={
+                    pageBudgetSummary.extraSpent > 0 ? (
+                      <Chip
+                        size="small"
+                        label={`+${formatWholeCurrency(pageBudgetSummary.extraSpent)}`}
+                        color="error"
+                        sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700 }}
+                      />
+                    ) : null
+                  }
+                />
+              </Box>
+            )}
+          </Stack>
         }
       />
 
@@ -1790,18 +1771,14 @@ export default function ExpensePage() {
         maxWidth="sm"
         actions={
           <Stack direction="row" spacing={1.5}>
-            <AppButton
-              variant="outlined"
+            <AppCancelButton
               onClick={() => {
                 setStatusDialogOpen(false);
                 setStatusExpense(null);
                 setStatusRemarks("");
               }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
+            />
+            <AppSaveButton
               onClick={handleUpdateExpenseStatus}
             >
               {newStatus.toLowerCase().includes("verif")
@@ -1809,7 +1786,7 @@ export default function ExpensePage() {
                 : newStatus.toLowerCase().includes("approv")
                   ? "Approve Expense"
                   : "Save Status"}
-            </AppButton>
+            </AppSaveButton>
           </Stack>
         }
       >

@@ -20,7 +20,7 @@ import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
 import AppDateInput from "../common/AppDateInput";
 import AppTextArea from "../common/AppTextArea";
-import AppButton from "../common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../common/AppButton";
 import AppConfirmDialog from "../common/AppConfirmDialog";
 import { useAppToast } from "../common/AppToast";
 import { getGalleryPhotosAsync, createGalleryPhotoAsync } from "../../services/galleryService";
@@ -416,27 +416,16 @@ export default function EventAddPhotoDialog({
       maxWidth="md"
       actions={
         <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
-          <AppButton
-            variant="outlined"
+          <AppCancelButton
             onClick={onClose}
             disabled={saving}
-            sx={{ minWidth: 90 }}
-          >
-            Cancel
-          </AppButton>
-          <AppButton
-            variant="contained"
+          />
+          <AppSaveButton
             onClick={handleSave}
             disabled={saving || maxAllowedForEvent <= 0}
-            sx={{
-              minWidth: 110,
-              bgcolor: "#342b54 !important",
-              color: "#ffffff !important",
-              "&:hover": { bgcolor: "#241d3b !important" },
-            }}
           >
-            {saving ? "Uploading..." : "Save "}
-          </AppButton>
+            {saving ? "Uploading..." : "Save"}
+          </AppSaveButton>
         </Stack>
       }
     >

@@ -52,7 +52,10 @@ export default function AppDialog({
       {/* ── Header ────────────────────────────────────────────────── */}
       <Box
         sx={{
-          bgcolor: theme.palette.mode === "dark" ? "#1d2338" : "#4a3f6b",
+          background: theme.palette.mode === "dark"
+            ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
+            : "#4a3f6b",
+          borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
           px: 2.5,
           py: 1.25,
           display: "flex",
@@ -65,7 +68,7 @@ export default function AppDialog({
         <Typography
           variant="subtitle2"
           fontWeight={700}
-          sx={{ color: theme.palette.mode === "dark" ? theme.palette.text.primary : "#ffffff", fontSize: "0.9rem" }}
+          sx={{ color: "#ffffff", fontSize: "0.9rem" }}
         >
           {title}
         </Typography>
@@ -74,12 +77,12 @@ export default function AppDialog({
             size="small"
             onClick={onClose}
             sx={{
-              color: theme.palette.mode === "dark" ? theme.palette.text.secondary : "rgba(255,255,255,0.7)",
+              color: theme.palette.mode === "dark" ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.7)",
               p: 0.5,
               borderRadius: "6px",
               "&:hover": {
-                color: theme.palette.mode === "dark" ? theme.palette.text.primary : "#ffffff",
-                bgcolor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.12)"
+                color: "#ffffff",
+                bgcolor: "rgba(255,255,255,0.12)",
               },
             }}
           >

@@ -31,7 +31,7 @@ import { formatWholeCurrency, roundToWhole } from "../../utils/roundingHelper";
 import { useAppToast } from "../../components/common/AppToast";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton } from "../../components/common/AppButton";
 import { MENU_FEATURE_IDS } from "../../constants";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
@@ -1004,15 +1004,10 @@ export default function EventsPage() {
         data={displayedEvents}
         allowExport={canExportEvent}
         actions={
-          <AppButton
-            size="small"
-            variant="contained"
+          <AppAddButton
             disabled={!canAddEvent}
-            startIcon={<AddIcon />}
             onClick={() => navigate("/events/add")}
-          >
-            Add
-          </AppButton>
+          />
         }
         filterPanel={
           <Stack spacing={2} sx={{ width: "100%" }}>
@@ -1082,10 +1077,11 @@ export default function EventsPage() {
                   startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
                   onClick={handleApplyFilter}
                   sx={{
-                    height: 36,
+                    height: 34,
+                    minHeight: 34,
                     fontWeight: 700,
                     fontSize: "0.75rem",
-                    px: 1.8,
+                    px: 2,
                     whiteSpace: "nowrap",
                     bgcolor: "#4a3f6b !important",
                     "&:hover": { bgcolor: "#3b325c !important" },
@@ -1100,10 +1096,11 @@ export default function EventsPage() {
                   sx={{
                     color: "#ef4444",
                     borderColor: "rgba(239, 68, 68, 0.4)",
-                    height: 36,
+                    height: 34,
+                    minHeight: 34,
                     fontWeight: 700,
                     fontSize: "0.75rem",
-                    px: 1.8,
+                    px: 2,
                     whiteSpace: "nowrap",
                     "&:hover": {
                       borderColor: "#ef4444",

@@ -11,7 +11,7 @@ import TrendingDownRoundedIcon from "@mui/icons-material/TrendingDownRounded";
 import dayjs from "dayjs";
 
 import AppDialog from "../common/AppDialog";
-import AppButton from "../common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton } from "../common/AppButton";
 import AppInput from "../common/AppInput";
 import AppTextArea from "../common/AppTextArea";
 import AppDateInput from "../common/AppDateInput";
@@ -143,22 +143,13 @@ export default function RateUpdateModal({
       maxWidth="sm"
       actions={
         <Box sx={{ display: "flex", justifyContent: "center", gap: 1.5, width: "100%" }}>
-          <AppButton variant="outlined" onClick={onClose} disabled={submitting}>
-            Cancel
-          </AppButton>
-          <AppButton
-            variant="contained"
+          <AppCancelButton onClick={onClose} disabled={submitting} />
+          <AppSaveButton
             onClick={handleUpdate}
             disabled={submitting}
-            sx={{
-              bgcolor: "#4a3f6b !important",
-              "&:hover": { bgcolor: "#3b325c !important" },
-              fontWeight: 700,
-              px: 2.5,
-            }}
           >
             {submitting ? "Updating..." : "Update"}
-          </AppButton>
+          </AppSaveButton>
         </Box>
       }
     >

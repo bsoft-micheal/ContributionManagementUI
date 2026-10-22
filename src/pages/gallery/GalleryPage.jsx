@@ -36,7 +36,7 @@ import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppTextArea from "../../components/common/AppTextArea";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -1137,11 +1137,8 @@ export default function GalleryPage() {
         loading={loading}
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppButton
-              variant="contained"
-              size="small"
+            <AppAddButton
               disabled={!canAddPhoto}
-              startIcon={<AddIcon />}
               onClick={() => {
                 setEditingPhoto(null);
                 setForm(initialForm);
@@ -1149,9 +1146,7 @@ export default function GalleryPage() {
                 setErrors({});
                 setDialogOpen(true);
               }}
-            >
-              Add
-            </AppButton>
+            />
           </Stack>
         }
         filterPanel={
@@ -1246,19 +1241,15 @@ export default function GalleryPage() {
         maxWidth="md"
         actions={
           <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ width: "100%" }}>
-            <AppButton
-              variant="outlined"
+            <AppCancelButton
               onClick={() => handleCancelRequest(handleCloseDialog)}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
+            />
+            <AppSaveButton
               onClick={handleSavePhoto}
               disabled={saving}
             >
               {saving ? "Saving..." : (editingPhoto ? "Update" : "Save")}
-            </AppButton>
+            </AppSaveButton>
           </Stack>
         }
       >

@@ -225,23 +225,24 @@ export default function AppMultiSelect({
         }}
         sx={{
           "& .MuiOutlinedInput-root": {
-            fontSize: "0.82rem",
+            fontSize: "0.84375rem",
             bgcolor: "background.paper",
             borderRadius: "8px",
             minHeight: size === "small" ? 36 : 42,
             maxHeight: `${maxHeight + 20}px !important`,
+            boxSizing: "border-box",
             overflow: "hidden",
             "& .MuiSelect-select": {
               display: "flex",
               flexWrap: "wrap",
               gap: 0.6,
-              py: size === "small" ? "6px !important" : "8px !important",
+              py: size === "small" ? "4px !important" : "6px !important",
               pr: "38px !important",
-              minHeight: size === "small" ? "26px" : "32px",
+              minHeight: size === "small" ? "26px" : "30px",
               maxHeight: `${maxHeight + 10}px !important`,
               overflowY: "auto !important",
               boxSizing: "border-box",
-              alignItems: "flex-start",
+              alignItems: "center",
               "&::-webkit-scrollbar": {
                 width: "5px",
               },

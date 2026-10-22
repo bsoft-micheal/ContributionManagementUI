@@ -16,7 +16,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -550,11 +550,8 @@ export default function BudgetCalculationsPage() {
           </Grid>
         }
         actions={
-          <AppButton
-            size="small"
-            variant="contained"
+          <AppAddButton
             disabled={!hasWriteAccess}
-            startIcon={<AddIcon />}
             onClick={() => {
               const defaultCat =
                 filterCategory && filterCategory !== "ALL"
@@ -571,9 +568,7 @@ export default function BudgetCalculationsPage() {
               setErrors({});
               setDialogOpen(true);
             }}
-          >
-            Add
-          </AppButton>
+          />
         }
       />
 
@@ -588,20 +583,10 @@ export default function BudgetCalculationsPage() {
         }
         actions={
           <>
-            <AppButton variant="outlined" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSubmit}
-              sx={{
-                bgcolor: "#4a3f6b !important",
-                "&:hover": { bgcolor: "#3b325c !important" },
-              }}
-            >
-              Save
-            </AppButton>
+            <AppCancelButton onClick={() => setDialogOpen(false)} />
+            <AppSaveButton onClick={handleSubmit}>
+              {form.budgetCalculationId ? "Update" : "Save"}
+            </AppSaveButton>
           </>
         }
       >

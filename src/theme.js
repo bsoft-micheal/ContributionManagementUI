@@ -15,17 +15,17 @@ const lightTokens = {
 };
 
 const darkTokens = {
-  background: "#0f1220",
-  surface: "#171b2d",
-  surfaceAlt: "#1d2338",
+  background: "#0c0e1a",
+  surface: "#161b2e",
+  surfaceAlt: "#1e243d",
   text: "#ffffff",
-  mutedText: "#a3acc7",
-  border: "rgba(255, 255, 255, 0.12)",
-  borderStrong: "rgba(255, 255, 255, 0.22)",
-  sidebarBg: "#121628",
+  mutedText: "#b3bdd6",
+  border: "rgba(255, 255, 255, 0.16)",
+  borderStrong: "rgba(255, 255, 255, 0.28)",
+  sidebarBg: "#101426",
   sidebarText: "#d6dbef",
-  sidebarMuted: "#8d96b8",
-  sidebarHover: "rgba(255, 255, 255, 0.04)",
+  sidebarMuted: "#9aa3c4",
+  sidebarHover: "rgba(255, 255, 255, 0.06)",
 };
 
 export const typographyTokens = {
@@ -293,24 +293,28 @@ export function createAppTheme(mode = "light") {
             transition: "all 0.2s ease",
             "&.Mui-disabled": {
               opacity: "0.7 !important",
+              cursor: "not-allowed !important",
+              pointerEvents: "none",
             },
           },
           containedPrimary: {
             background: mode === "dark"
-              ? "linear-gradient(135deg, #5b6482 0%, #373d52 100%)"
+              ? "linear-gradient(135deg, #6d5ca0 0%, #52447d 100%)"
               : "linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%)",
+            color: "#ffffff !important",
+            border: mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
             "&:hover": {
               background: mode === "dark"
-                ? "linear-gradient(135deg, #66708d 0%, #40465d 100%)"
+                ? "linear-gradient(135deg, #7d6bb3 0%, #605191 100%)"
                 : "linear-gradient(135deg, #5c4f82 0%, #3a3065 100%)",
               boxShadow: mode === "dark"
-                ? "0 10px 24px rgba(0, 0, 0, 0.24)"
+                ? "0 10px 24px rgba(0, 0, 0, 0.35)"
                 : "0 10px 24px rgba(74, 63, 107, 0.25)",
             },
             "&.Mui-disabled": {
               color: "rgba(255, 255, 255, 0.85) !important",
               background: mode === "dark"
-                ? "linear-gradient(135deg, rgba(91, 100, 130, 0.75) 0%, rgba(55, 61, 82, 0.75) 100%) !important"
+                ? "linear-gradient(135deg, rgba(109, 92, 160, 0.6) 0%, rgba(82, 68, 125, 0.6) 100%) !important"
                 : "linear-gradient(135deg, rgba(74, 63, 107, 0.7) 0%, rgba(45, 37, 80, 0.7) 100%) !important",
             },
           },
@@ -319,8 +323,12 @@ export function createAppTheme(mode = "light") {
       MuiIconButton: {
         styleOverrides: {
           root: {
+            transition: "all 0.15s ease",
+            borderRadius: 10,
             "&.Mui-disabled": {
-              opacity: "0.7 !important",
+              opacity: "0.65 !important",
+              cursor: "not-allowed !important",
+              pointerEvents: "none",
               color: mode === "dark" ? "rgba(255, 255, 255, 0.45) !important" : "#94a3b8 !important",
               "& .MuiSvgIcon-root": {
                 color: mode === "dark" ? "rgba(255, 255, 255, 0.45) !important" : "#94a3b8 !important",
@@ -375,6 +383,7 @@ export function createAppTheme(mode = "light") {
             fontSize: typographyTokens.bodyText.fontSize,
             fontWeight: 400,
             lineHeight: 1.5,
+            color: mode === "dark" ? "#ffffff" : "inherit",
           },
           head: {
             fontFamily: typographyTokens.fontFamily,
@@ -382,6 +391,8 @@ export function createAppTheme(mode = "light") {
             fontSize: typographyTokens.label.fontSize,
             letterSpacing: "0.04em",
             textTransform: "none",
+            backgroundColor: mode === "dark" ? "#1e243d" : "#faf9fd",
+            color: mode === "dark" ? "#ffffff" : "#1e1a2e",
           },
         },
       },
@@ -437,7 +448,7 @@ export function createAppTheme(mode = "light") {
         styleOverrides: {
           root: {
             "& .MuiOutlinedInput-root": {
-              borderRadius: 12,
+              borderRadius: 8,
               backgroundColor: "var(--app-surface)",
               "& fieldset": {
                 borderColor: mode === "dark" ? "rgba(231, 235, 247, 0.25)" : "rgba(74, 63, 107, 0.28)",
@@ -476,7 +487,7 @@ export function createAppTheme(mode = "light") {
       MuiSelect: {
         styleOverrides: {
           outlined: {
-            borderRadius: 12,
+            borderRadius: 8,
           },
           nativeInput: {
             opacity: "0 !important",
@@ -489,37 +500,44 @@ export function createAppTheme(mode = "light") {
           },
         },
       },
-      MuiButton: {
+      MuiOutlinedInput: {
         styleOverrides: {
           root: {
-            "&.Mui-disabled": {
-              cursor: "not-allowed !important",
-              pointerEvents: "none",
+            borderRadius: 8,
+            backgroundColor: "var(--app-surface)",
+            "& fieldset": {
+              borderColor: mode === "dark" ? "rgba(255, 255, 255, 0.22)" : "rgba(74, 63, 107, 0.28)",
+              borderWidth: "1.5px",
+            },
+            "&:hover fieldset": {
+              borderColor: mode === "dark" ? "#c4b5fd" : "#6f5bd3",
+            },
+            "&.Mui-focused fieldset": {
+              borderColor: mode === "dark" ? "#a78bfa" : "#6f5bd3",
+            },
+            "& .MuiOutlinedInput-input": {
+              color: mode === "dark" ? "#ffffff" : "#1e1a2e",
             },
           },
         },
       },
-      MuiIconButton: {
+      MuiCheckbox: {
         styleOverrides: {
           root: {
-            transition: "all 0.15s ease",
-            borderRadius: 10,
-            "&.Mui-disabled": {
-              opacity: "0.65 !important",
-              cursor: "not-allowed !important",
-              pointerEvents: "none",
-              color: mode === "dark" ? "rgba(255, 255, 255, 0.45) !important" : "#94a3b8 !important",
-              "& .MuiSvgIcon-root": {
-                color: mode === "dark" ? "rgba(255, 255, 255, 0.45) !important" : "#94a3b8 !important",
-              },
+            color: mode === "dark" ? "rgba(255, 255, 255, 0.6)" : "rgba(74, 63, 107, 0.6)",
+            "&.Mui-checked": {
+              color: mode === "dark" ? "#c4b5fd" : "#4a3f6b",
             },
           },
         },
       },
-      MuiSvgIcon: {
+      MuiRadio: {
         styleOverrides: {
           root: {
-            color: mode === "dark" ? "#ffffff" : "inherit",
+            color: mode === "dark" ? "rgba(255, 255, 255, 0.6)" : "rgba(74, 63, 107, 0.6)",
+            "&.Mui-checked": {
+              color: mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+            },
           },
         },
       },
