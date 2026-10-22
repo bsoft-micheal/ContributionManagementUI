@@ -1327,6 +1327,7 @@ export default function ExpensePage() {
         data={filteredExpenses}
         loading={loading}
         allowExport={canExportExpense}
+        searchPlaceholder="Search by Expense ID ,..."
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             <AppAddButton
@@ -1363,7 +1364,7 @@ export default function ExpensePage() {
             >
               <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
                 <AppSelect
-                  label="Select Event Type"
+                  label="Event Type"
                   value={filterCategory}
                   onChange={(e) => {
                     setFilterCategory(e.target.value || "ALL");
@@ -1380,7 +1381,7 @@ export default function ExpensePage() {
               </Box>
               <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
                 <AppSelect
-                  label="Select Event Name"
+                  label="Event Name"
                   value={filterEvent}
                   onChange={(e) => {
                     setFilterEvent(e.target.value || "ALL");
@@ -1393,7 +1394,7 @@ export default function ExpensePage() {
               </Box>
               <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
                 <AppSelect
-                  label="Select Status"
+                  label="Expense Status"
                   value={filterStatus}
                   onChange={(e) => {
                     setFilterStatus(e.target.value || "ALL");
