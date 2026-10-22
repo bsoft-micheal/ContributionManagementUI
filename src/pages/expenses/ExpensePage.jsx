@@ -327,31 +327,46 @@ export default function ExpensePage() {
       if (Array.isArray(membersRes)) setMembersList(membersRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
 
-      let finalStatuses = Array.isArray(statusesRes) ? statusesRes : [];
-      if (finalStatuses.length === 0) {
+      let rawStatuses = Array.isArray(statusesRes) ? statusesRes : [];
+      if (rawStatuses.length === 0) {
         const allStatuses = await getStatusesAsync(true).catch(() => []);
         if (Array.isArray(allStatuses) && allStatuses.length > 0) {
-          finalStatuses = allStatuses;
+          rawStatuses = allStatuses.filter((s) => {
+            const mod = (s.module || "").toLowerCase();
+            return mod.includes("expense") || mod.includes("general") || !mod;
+          });
+          if (rawStatuses.length === 0) {
+            rawStatuses = allStatuses;
+          }
         }
       }
-      // Strictly only "Pending" and "Verified" for expenses
-      finalStatuses = finalStatuses.filter((s) => {
-        const name = (s.statusName || "").trim().toLowerCase();
-        return name === "pending" || name === "verified";
-      });
-      const existingMap = new Map();
-      finalStatuses.forEach((s) => existingMap.set((s.statusName || "").trim().toLowerCase(), s));
+
+      // Dynamically load active statuses from DB without hardcoding
+      const seen = new Set();
       const cleanList = [];
-      if (existingMap.has("pending")) {
-        cleanList.push(existingMap.get("pending"));
-      } else {
-        cleanList.push({ statusId: "pending", statusName: "Pending", isActive: true });
+      for (const s of rawStatuses) {
+        if (!s || !s.statusName || s.isActive === false) continue;
+        const name = s.statusName.trim();
+        const key = name.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          cleanList.push({
+            statusId: s.statusId || s.id || key,
+            statusName: name,
+            module: s.module,
+            isActive: true,
+          });
+        }
       }
-      if (existingMap.has("verified")) {
-        cleanList.push(existingMap.get("verified"));
-      } else {
-        cleanList.push({ statusId: "verified", statusName: "Verified", isActive: true });
+
+      // Fallback only if the database query returned nothing
+      if (cleanList.length === 0) {
+        cleanList.push(
+          { statusId: "pending", statusName: "Pending", isActive: true },
+          { statusId: "verified", statusName: "Verified", isActive: true }
+        );
       }
+
       setStatusesList(cleanList);
     } catch {
       toast.error("Failed to load lookup data.");
@@ -398,31 +413,44 @@ export default function ExpensePage() {
     }
   }, [location.state, membersList, authState, loggedInUserName]);
 
-  // Filter panel status options (Only "All Statuses", "Pending", "Verified")
+  // Filter panel status options dynamically populated from the statuses table
   const statusOptions = useMemo(() => {
+    const list = statusesList.map((s) => ({
+      label: s.statusName,
+      value: s.statusName,
+    }));
     return [
       { label: "All Statuses", value: "ALL" },
-      { label: "Pending", value: "Pending" },
-      { label: "Verified", value: "Verified" },
+      ...list,
     ];
-  }, []);
+  }, [statusesList]);
 
-  // Form status options for Add/Edit dialog (Only Pending and Verified)
+  // Form status options for Add/Edit dialog dynamically populated from the statuses table
   const dynamicStatusOptions = useMemo(() => {
-    return [
-      { label: "Pending", value: "Pending" },
-      { label: "Verified", value: "Verified" },
-    ];
-  }, []);
+    return statusesList.map((s) => ({
+      label: s.statusName,
+      value: s.statusName,
+    }));
+  }, [statusesList]);
 
-  // Dedicated status options for the Verify / Status dialog (Only Pending and Verified)
+  // Dedicated status options for the Verify / Status dialog dynamically populated from the statuses table
   const verificationStatusOptions = useMemo(() => {
-    return [
+    const list = statusesList.map((s) => ({
+      label: s.statusName,
+      value: s.statusName,
+    }));
+    const options = [
       { label: "Select Status", value: "" },
-      { label: "Verified", value: "Verified" },
-      { label: "Pending", value: "Pending" },
+      ...list,
     ];
-  }, []);
+    if (
+      statusExpense?.status &&
+      !options.some((o) => o.value.toLowerCase() === String(statusExpense.status).toLowerCase().trim())
+    ) {
+      options.push({ label: statusExpense.status, value: statusExpense.status });
+    }
+    return options;
+  }, [statusesList, statusExpense]);
 
   // Event Type options for the Add/Edit form
   const formEventTypeOptions = useMemo(() => {
@@ -650,7 +678,7 @@ export default function ExpensePage() {
     const list = expenses.filter((item) => {
       if (appliedEvent !== "ALL" && item.eventName !== appliedEvent) return false;
       if (appliedCategory !== "ALL" && item.category !== appliedCategory) return false;
-      if (appliedStatus !== "ALL" && item.status !== appliedStatus) return false;
+      if (appliedStatus !== "ALL" && (item.status || "").trim().toLowerCase() !== appliedStatus.trim().toLowerCase()) return false;
       return true;
     });
 
