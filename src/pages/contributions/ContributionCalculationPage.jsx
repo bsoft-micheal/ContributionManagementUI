@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { Box, Grid, Typography, Card, CardContent, Divider, Chip, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { FilterList as FilterListIcon } from "@mui/icons-material";
@@ -20,6 +21,10 @@ import { COMMON_STRINGS } from "../../constants";
 
 export default function ContributionCalculationPage() {
   const theme = useTheme();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const lastParamIdRef = useRef(null);
+
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [events, setEvents] = useState([]);
@@ -46,9 +51,17 @@ export default function ContributionCalculationPage() {
       setMembers(mems);
       setRoles(rls);
       setEvents(evts);
+
+      const targetEventId = searchParams.get("eventId") || location.state?.eventId;
+      lastParamIdRef.current = targetEventId;
       if (evts.length > 0) {
-        setSelectedEventId(evts[0].eventId);
-        setFilterEventId(evts[0].eventId);
+        const matched = targetEventId ? evts.find(e => String(e.eventId) === String(targetEventId)) : null;
+        const initialId = matched ? matched.eventId : (targetEventId || evts[0].eventId);
+        setSelectedEventId(initialId);
+        setFilterEventId(initialId);
+      } else if (targetEventId) {
+        setSelectedEventId(targetEventId);
+        setFilterEventId(targetEventId);
       }
     } catch (error) {
       toast.error("Failed to load calculation data.");
@@ -57,9 +70,25 @@ export default function ContributionCalculationPage() {
     }
   }
 
+  // React to route/query param changes while mounted
+  useEffect(() => {
+    const targetEventId = searchParams.get("eventId") || location.state?.eventId;
+    if (targetEventId && targetEventId !== lastParamIdRef.current && events.length > 0) {
+      lastParamIdRef.current = targetEventId;
+      const matched = events.find(e => String(e.eventId) === String(targetEventId));
+      const targetId = matched ? matched.eventId : targetEventId;
+      setSelectedEventId(targetId);
+      setFilterEventId(targetId);
+    }
+  }, [searchParams, location.state, events]);
+
   useEffect(() => {
     if (selectedEventId) {
       loadEventDetails();
+    } else {
+      setSelectedEventDetails(null);
+      setCalculationData([]);
+      setFullShareAmount(0);
     }
   }, [selectedEventId]);
 
