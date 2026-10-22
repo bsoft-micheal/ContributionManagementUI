@@ -26,18 +26,30 @@ import { hasActionPermission } from "../../utils/rightsHelper";
 import { deleteEventAsync, getEventByIdAsync } from "../../services/eventService";
 import { getContributionsByEventAsync } from "../../services/contributionService";
 import { getMembersAsync } from "../../services/memberService";
+import { getEventTypesAsync } from "../../services/eventTypeService";
 import { COMMON_STRINGS, TOAST_MESSAGES } from "../../constants";
 
-export default function EventDetailsDialog({ open, onClose, event, members = [], onDeleteSuccess }) {
+export default function EventDetailsDialog({ open, onClose, event, members = [], eventTypes = [], onDeleteSuccess }) {
   const navigate = useNavigate();
   const toast = useAppToast();
   const { authState } = useAuth();
   const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [internalMembers, setInternalMembers] = useState([]);
+  const [internalEventTypes, setInternalEventTypes] = useState([]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [detailedEvent, setDetailedEvent] = useState(null);
+
+  useEffect(() => {
+    if (open && (!eventTypes || eventTypes.length === 0)) {
+      getEventTypesAsync()
+        .then((res) => {
+          if (Array.isArray(res)) setInternalEventTypes(res);
+        })
+        .catch(() => {});
+    }
+  }, [open, eventTypes]);
 
   useEffect(() => {
     if (open && event?.eventId) {
@@ -183,6 +195,95 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     extractCelebrantsMeta(activeEvent?.description) ||
     extractCelebrantsMeta(event?.description);
 
+  // Extract multiple event dates from DTO property, JSON string, or HTML comment
+  const parseEventDates = (evt) => {
+    if (evt?.eventTypeDates && typeof evt.eventTypeDates === "object") {
+      return evt.eventTypeDates;
+    }
+    if (evt?.eventDates) {
+      if (typeof evt.eventDates === "object" && !Array.isArray(evt.eventDates)) {
+        return evt.eventDates;
+      }
+      try {
+        const parsed = JSON.parse(evt.eventDates);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    const desc = evt?.description || "";
+    const match = desc.match(/<!--eventDates:(.*?)-->/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    return null;
+  };
+
+  const parsedEventDates = parseEventDates(activeEvent) || parseEventDates(event);
+
+  const parseMemberDates = (evt) => {
+    if (evt?.eventTypeMemberDates && typeof evt.eventTypeMemberDates === "object") {
+      return evt.eventTypeMemberDates;
+    }
+    const desc = evt?.description || "";
+    const match = desc.match(/<!--memberDates:(.*?)-->/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed && typeof parsed === "object") return parsed;
+      } catch {}
+    }
+    if (parsedEventDates) {
+      const obj = {};
+      Object.entries(parsedEventDates).forEach(([k, v]) => {
+        if (v && typeof v === "object" && !Array.isArray(v)) {
+          obj[k] = v;
+        }
+      });
+      if (Object.keys(obj).length > 0) return obj;
+    }
+    return null;
+  };
+
+  const parsedMemberDates = parseMemberDates(activeEvent) || parseMemberDates(event);
+
+  const getEventDateForType = (typeName, fallbackDate) => {
+    if (!parsedEventDates) return fallbackDate;
+    if (parsedEventDates[typeName]) {
+      const val = parsedEventDates[typeName];
+      if (typeof val === "object" && val !== null) {
+        return Array.from(new Set(Object.values(val).filter(Boolean))).map(formatViewDate).join(", ");
+      }
+      return formatViewDate(val);
+    }
+    const lowerType = (typeName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    for (const [k, v] of Object.entries(parsedEventDates)) {
+      if (k.toLowerCase().replace(/[^a-z0-9]/g, "") === lowerType) {
+        if (typeof v === "object" && v !== null) {
+          return Array.from(new Set(Object.values(v).filter(Boolean))).map(formatViewDate).join(", ");
+        }
+        return formatViewDate(v);
+      }
+    }
+    return fallbackDate;
+  };
+
+  const getEventDateForMember = (typeName, memberId, fallbackDate) => {
+    if (parsedMemberDates) {
+      const lowerType = (typeName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      for (const [k, v] of Object.entries(parsedMemberDates)) {
+        if (k.toLowerCase().replace(/[^a-z0-9]/g, "") === lowerType && typeof v === "object" && v !== null) {
+          if (v[memberId]) return formatViewDate(v[memberId]);
+        }
+      }
+      if (parsedMemberDates[typeName] && typeof parsedMemberDates[typeName] === "object") {
+        if (parsedMemberDates[typeName][memberId]) return formatViewDate(parsedMemberDates[typeName][memberId]);
+      }
+    }
+    return getEventDateForType(typeName, fallbackDate);
+  };
+
   // Helper to parse celebrants list directly from description string:
   // e.g. "Birthday celebration (4 Office, 0 WFH) for Albin (30 Sep), Michael Antony Raj C (18 Sep)... Planned Budget: ..."
   const parseCelebrantsFromDescription = (desc) => {
@@ -317,57 +418,93 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     });
   };
 
-  const getTableMembers = () => {
-    if (isBirthday) {
-      return getTableCelebrants();
-    }
+  // Helper to normalize any role/event type key into its canonical display name
+  const getCanonicalRoleName = (key) => {
+    if (!key) return "";
+    const cleaned = String(key).toLowerCase().replace(/[\s_-]/g, "");
+    if (cleaned.includes("birthday")) return "Birthday";
+    if (cleaned.includes("marriage") || cleaned.includes("wedding")) return "Marriage";
+    if (cleaned.includes("sendoff") || cleaned.includes("farewell") || cleaned.includes("relieving")) return "Send Off";
+    const matched = (eventTypes || internalEventTypes || []).find((t) => {
+      const tClean = String(t.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
+      return tClean === cleaned || cleaned.includes(tClean) || tClean.includes(cleaned);
+    });
+    if (matched) return matched.eventTypeName;
+    const spaced = String(key).replace(/([A-Z])/g, " $1").trim();
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  };
 
+  const getTableMembers = () => {
     const currentEvent = detailedEvent || event;
     if (!currentEvent) return [];
 
-    const eventDateFormatted = currentEvent?.eventDate
+    const defaultEventDate = currentEvent?.eventDate
       ? dayjs(currentEvent.eventDate).format("DD/MM/YYYY")
       : "--";
+    const eventDateFormatted = defaultEventDate;
 
-    // 1. Check for specific featured members (Send-off / Relieving or Marriage)
-    const sendOffIds = Array.isArray(celebrantsMeta?.sendOff) ? celebrantsMeta.sendOff : [];
-    const marriageIds = Array.isArray(celebrantsMeta?.marriage) ? celebrantsMeta.marriage : [];
+    // Merged celebrants metadata from backend DTO or description tag
+    const mergedCelebrants = {
+      ...(currentEvent?.eventTypeMembers || {}),
+      ...(celebrantsMeta || {}),
+    };
 
-    const featuredMembers = [];
+    // Group and deduplicate celebrant IDs by canonical role name to prevent duplicates (e.g. "Send Off" vs "sendOff")
+    const canonicalCelebrants = {};
+    Object.entries(mergedCelebrants).forEach(([rawKey, memberIds]) => {
+      if (!Array.isArray(memberIds) || memberIds.length === 0) return;
+      const roleName = getCanonicalRoleName(rawKey);
+      if (!roleName || roleName.toLowerCase() === "birthday") return;
 
-    if (sendOffIds.length > 0) {
-      sendOffIds.forEach((sId) => {
-        const matched = allMembers.find((m) => m.memberId === sId);
-        if (matched) {
-          featuredMembers.push({
-            id: sId,
-            name: matched.name,
-            dateValue: eventDateFormatted,
-            workType: matched.workType || matched.memberType || "Office",
-            roleType: "Send-off",
-          });
+      if (!canonicalCelebrants[roleName]) {
+        canonicalCelebrants[roleName] = [];
+      }
+      memberIds.forEach((mId) => {
+        if (!canonicalCelebrants[roleName].includes(mId)) {
+          canonicalCelebrants[roleName].push(mId);
         }
+      });
+    });
+
+    const hasFeaturedCelebrants = Object.keys(canonicalCelebrants).length > 0;
+
+    const result = [];
+
+    // 1. If it includes birthday, add birthday celebrants
+    if (isBirthday) {
+      const bdayCelebrants = getTableCelebrants().map((c) => ({
+        ...c,
+        roleType: "Birthday",
+        dateValue: c.dobFormatted,
+      }));
+      result.push(...bdayCelebrants);
+    }
+
+    // 2. Add celebrants for all other featured canonical event types without duplicate rows
+    if (hasFeaturedCelebrants) {
+      Object.entries(canonicalCelebrants).forEach(([roleName, memberIds]) => {
+        memberIds.forEach((mId) => {
+          // Avoid duplicate member in the same role
+          if (result.some((r) => r.memberId === mId && r.roleType === roleName)) return;
+
+          const matched = allMembers.find((m) => m.memberId === mId);
+          if (matched) {
+            result.push({
+              id: `${roleName}-${mId}`,
+              memberId: mId,
+              name: matched.name,
+              dateValue: getEventDateForMember(roleName, mId, defaultEventDate),
+              workType: matched.workType || matched.memberType || "Office",
+              roleType: roleName,
+            });
+          }
+        });
       });
     }
 
-    if (marriageIds.length > 0) {
-      marriageIds.forEach((mId) => {
-        const matched = allMembers.find((m) => m.memberId === mId);
-        if (matched) {
-          featuredMembers.push({
-            id: mId,
-            name: matched.name,
-            dateValue: eventDateFormatted,
-            workType: matched.workType || matched.memberType || "Office",
-            roleType: "Marriage",
-          });
-        }
-      });
-    }
-
-    // If specific featured members (Send-off / Marriage) are defined, display only those particular members!
-    if (featuredMembers.length > 0) {
-      return featuredMembers.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    // If celebrants (birthday and/or featured) exist, return them
+    if (result.length > 0) {
+      return result;
     }
 
     // 2. Fallback to participating members if no specific send-off or marriage members are designated
@@ -440,27 +577,30 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
 
   const tableMembers = getTableMembers();
 
-  // Determine the nature of members listed in the table
-  const hasSendOffInTable = tableMembers.some((m) => m.roleType === "Send-off");
-  const hasMarriageInTable = tableMembers.some((m) => m.roleType === "Marriage");
+  // Determine dynamic roles in the table
+  const uniqueRoles = Array.from(new Set(tableMembers.map((m) => m.roleType).filter(Boolean)));
+  const hasMultipleRoles = uniqueRoles.length > 1;
+  const isSingleBirthday = uniqueRoles.length === 1 && uniqueRoles[0] === "Birthday";
+  const hasMarriageInTable = uniqueRoles.some((r) => r.toLowerCase().includes("marriage"));
+  const hasSendOffInTable = uniqueRoles.some((r) => r.toLowerCase().includes("send"));
 
-  const tableMembersLabel = isBirthday
-    ? `${tableMembers.length} Birthday Celebrant${tableMembers.length !== 1 ? "s" : ""}`
-    : hasSendOffInTable && hasMarriageInTable
-    ? `${tableMembers.length} Send-off & Marriage Celebrant${tableMembers.length !== 1 ? "s" : ""}`
-    : hasSendOffInTable
-    ? `${tableMembers.length} Send-off Member${tableMembers.length !== 1 ? "s" : ""}`
-    : hasMarriageInTable
-    ? `${tableMembers.length} Marriage Celebrant${tableMembers.length !== 1 ? "s" : ""}`
+  const tableMembersLabel = uniqueRoles.length > 1
+    ? `${tableMembers.length} Celebrants (${uniqueRoles.join(", ")})`
+    : uniqueRoles.length === 1
+    ? `${tableMembers.length} ${uniqueRoles[0]} Celebrant${tableMembers.length !== 1 ? "s" : ""}`
     : `${tableMembers.length} Participating Member${tableMembers.length !== 1 ? "s" : ""}`;
 
-  const tableMemberColumnTitle = isBirthday
+  const tableMemberColumnTitle = isSingleBirthday
     ? "Birthday Member"
-    : hasSendOffInTable && !hasMarriageInTable
-    ? "Send-off Member"
-    : hasMarriageInTable && !hasSendOffInTable
-    ? "Marriage Celebrant"
-    : "Member Name";
+    : uniqueRoles.length === 1
+    ? `${uniqueRoles[0]} Celebrant`
+    : "Celebrant / Member Name";
+
+  const dateColumnTitle = isSingleBirthday
+    ? "Date of Birth"
+    : hasMultipleRoles
+    ? "Event Date / DOB"
+    : "Event Date";
 
   // Overview summary text for description — always strip internal contrib metadata
   const getOverviewText = () => {
@@ -547,22 +687,35 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                   const set = new Set();
                   const rawType = event?.eventTypeName || event?.category || "";
                   if (rawType) {
-                    rawType.split(/[,&/]+/).map((s) => s.trim()).filter(Boolean).forEach((c) => set.add(c));
+                    rawType.split(/[,&/]+/).map((s) => s.trim()).filter(Boolean).forEach((c) => set.add(getCanonicalRoleName(c)));
                   }
                   const name = String(event?.eventName || "").toLowerCase();
                   if (name.includes("birthday")) set.add("Birthday");
+                  if (name.includes("marriage") || name.includes("wedding")) set.add("Marriage");
+                  if (name.includes("send off") || name.includes("send-off") || name.includes("sendoff") || name.includes("relieving")) set.add("Send Off");
                   if (name.includes("farewell")) set.add("Farewell");
 
-                  const cats = Array.from(set);
+                  if (parsedEventDates && typeof parsedEventDates === "object") {
+                    Object.keys(parsedEventDates).forEach((k) => {
+                      const cName = getCanonicalRoleName(k);
+                      if (cName) set.add(cName);
+                    });
+                  }
+                  if (uniqueRoles && uniqueRoles.length > 0) {
+                    uniqueRoles.forEach((r) => set.add(getCanonicalRoleName(r)));
+                  }
+
+                  const cats = Array.from(set).filter(Boolean);
                   if (cats.length === 0) cats.push("Custom Event");
 
                   return cats.map((cat, idx) => {
                     const norm = cat.toLowerCase();
                     const isBday = norm.includes("birthday");
-                    const isFarewell = norm.includes("farewell");
-                    const color = isBday ? "#7c3aed" : isFarewell ? "#0284c7" : "#4a3f6b";
-                    const bgcolor = isBday ? "rgba(124, 58, 237, 0.12)" : isFarewell ? "rgba(2, 132, 199, 0.12)" : "rgba(74, 63, 107, 0.12)";
-                    const borderColor = isBday ? "rgba(124, 58, 237, 0.3)" : isFarewell ? "rgba(2, 132, 199, 0.3)" : "rgba(74, 63, 107, 0.3)";
+                    const isFarewell = norm.includes("farewell") || norm.includes("send off") || norm.includes("send-off");
+                    const isMarriage = norm.includes("marriage") || norm.includes("wedding");
+                    const color = isBday ? "#7c3aed" : isMarriage ? "#db2777" : isFarewell ? "#0284c7" : "#4a3f6b";
+                    const bgcolor = isBday ? "rgba(124, 58, 237, 0.12)" : isMarriage ? "rgba(219, 39, 119, 0.12)" : isFarewell ? "rgba(2, 132, 199, 0.12)" : "rgba(74, 63, 107, 0.12)";
+                    const borderColor = isBday ? "rgba(124, 58, 237, 0.3)" : isMarriage ? "rgba(219, 39, 119, 0.3)" : isFarewell ? "rgba(2, 132, 199, 0.3)" : "rgba(74, 63, 107, 0.3)";
 
                     return (
                       <Chip
@@ -587,7 +740,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
           </Grid>
 
           {/* Date */}
-          <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+          <Grid size={{ xs: 6, sm: 3, md: parsedEventDates && Object.keys(parsedEventDates).length > 1 ? 3 : 2 }}>
             <Box>
               <Typography
                 variant="caption"
@@ -599,11 +752,36 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                   mb: 0.2,
                 }}
               >
-                Date
+                {parsedEventDates && Object.keys(parsedEventDates).length > 1 ? "Event Dates" : "Date"}
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                {formatViewDate(event?.eventDate)}
-              </Typography>
+              {parsedEventDates && Object.keys(parsedEventDates).length > 1 ? (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: 0.2 }}>
+                  {Object.entries(parsedEventDates).map(([tName, dVal]) => (
+                    <Box key={tName} sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                      <Chip
+                        size="small"
+                        label={tName}
+                        sx={{
+                          height: 18,
+                          fontSize: "0.65rem",
+                          fontWeight: 700,
+                          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(124, 58, 237, 0.2)" : "rgba(74, 63, 107, 0.1)",
+                          color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                        }}
+                      />
+                      <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.75rem" }}>
+                        {typeof dVal === "object" && dVal !== null
+                          ? Array.from(new Set(Object.values(dVal).filter(Boolean))).map(formatViewDate).join(", ")
+                          : formatViewDate(dVal)}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              ) : (
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  {formatViewDate(event?.eventDate)}
+                </Typography>
+              )}
             </Box>
           </Grid>
 
@@ -821,7 +999,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                           {tableMemberColumnTitle}
                         </TableCell>
                         <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
-                          {isBirthday ? "Date of Birth" : "Event Date"}
+                          {dateColumnTitle}
                         </TableCell>
                         <TableCell sx={{ fontWeight: 800, fontSize: "0.72rem", py: 0.8, width: 110, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1b1828" : "#f5f4fb" }}>
                           Work Type
@@ -843,14 +1021,51 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                             {index + 1}
                           </TableCell>
                           <TableCell sx={{ fontSize: "0.78rem", py: 0.8, fontWeight: 700 }}>
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                               <Typography component="span" sx={{ fontWeight: 700, fontSize: "0.78rem", color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.primary" }}>
                                 {celebrant.name}
                               </Typography>
+                              {celebrant.roleType && (
+                                <Chip
+                                  size="small"
+                                  label={celebrant.roleType}
+                                  sx={{
+                                    height: 18,
+                                    fontSize: "0.62rem",
+                                    fontWeight: 700,
+                                    bgcolor: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? celebrant.roleType === "Birthday"
+                                          ? "rgba(168, 85, 247, 0.2)"
+                                          : celebrant.roleType.toLowerCase().includes("marriage")
+                                          ? "rgba(236, 72, 153, 0.2)"
+                                          : "rgba(14, 165, 233, 0.2)"
+                                        : celebrant.roleType === "Birthday"
+                                        ? "rgba(168, 85, 247, 0.12)"
+                                        : celebrant.roleType.toLowerCase().includes("marriage")
+                                        ? "rgba(236, 72, 153, 0.12)"
+                                        : "rgba(14, 165, 233, 0.12)",
+                                    color: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? celebrant.roleType === "Birthday"
+                                          ? "#d8b4fe"
+                                          : celebrant.roleType.toLowerCase().includes("marriage")
+                                          ? "#f472b6"
+                                          : "#38bdf8"
+                                        : celebrant.roleType === "Birthday"
+                                        ? "#7e22ce"
+                                        : celebrant.roleType.toLowerCase().includes("marriage")
+                                        ? "#db2777"
+                                        : "#0284c7",
+                                    borderRadius: "4px",
+                                    "& .MuiChip-label": { px: 0.6 },
+                                  }}
+                                />
+                              )}
                             </Box>
                           </TableCell>
                           <TableCell sx={{ fontSize: "0.78rem", py: 0.8, fontWeight: 600, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.primary" }}>
-                            {isBirthday ? celebrant.dobFormatted : celebrant.dateValue}
+                            {celebrant.dateValue || (isSingleBirthday ? celebrant.dobFormatted : "--")}
                           </TableCell>
                           <TableCell sx={{ fontSize: "0.75rem", py: 0.8 }}>
                             <Chip

@@ -270,10 +270,12 @@ const getItemStyle = (name = "") => {
 };
 
 function extractContribAmounts(description) {
-  if (!description) return { cleanDesc: "", amounts: null, celebrants: null };
+  if (!description) return { cleanDesc: "", amounts: null, celebrants: null, eventDates: null, memberDates: null };
   let cleanDesc = description;
   let amounts = null;
   let celebrants = null;
+  let eventDates = null;
+  let memberDates = null;
 
   const matchContrib = description.match(/<!--contrib:(.*?)-->/);
   if (matchContrib) {
@@ -295,27 +297,56 @@ function extractContribAmounts(description) {
     }
   }
 
-  return { cleanDesc, amounts, celebrants };
+  const matchDates = description.match(/<!--eventDates:(.*?)-->/);
+  if (matchDates) {
+    try {
+      eventDates = JSON.parse(matchDates[1]);
+      cleanDesc = cleanDesc.replace(/<!--eventDates:.*?-->/g, "").trim();
+    } catch {
+      // Ignore parse error
+    }
+  }
+
+  const matchMemberDates = description.match(/<!--memberDates:(.*?)-->/);
+  if (matchMemberDates) {
+    try {
+      memberDates = JSON.parse(matchMemberDates[1]);
+      cleanDesc = cleanDesc.replace(/<!--memberDates:.*?-->/g, "").trim();
+    } catch {
+      // Ignore parse error
+    }
+  }
+
+  return { cleanDesc, amounts, celebrants, eventDates, memberDates };
 }
 
 function formatDescriptionWithContrib(userDesc, amountsObj, celebrantsObj) {
   let clean = (userDesc || "")
-    .replace(/<!--contrib:.*?-->/g, "")
-    .replace(/<!--celebrants:.*?-->/g, "")
+    .replace(/<!--contrib:.*?-->/gi, "")
+    .replace(/<!--celebrants:.*?-->/gi, "")
+    .replace(/<!--eventDates:.*?-->/gi, "")
+    .replace(/<!--memberDates:.*?-->/gi, "")
     .trim();
 
   const tags = [];
   if (amountsObj && Object.keys(amountsObj).length > 0) {
     tags.push(`<!--contrib:${JSON.stringify(amountsObj)}-->`);
   }
-  if (celebrantsObj && (celebrantsObj.marriage?.length > 0 || celebrantsObj.sendOff?.length > 0)) {
+  if (celebrantsObj && Object.keys(celebrantsObj).length > 0) {
     tags.push(`<!--celebrants:${JSON.stringify(celebrantsObj)}-->`);
   }
 
-  if (tags.length > 0) {
-    return `${clean}${clean ? " " : ""}${tags.join(" ")}`;
+  const tagsStr = tags.join(" ");
+  if (tagsStr) {
+    // Keep description strictly within 1000 characters
+    const maxCleanLen = Math.max(0, 990 - tagsStr.length - 1);
+    if (clean.length > maxCleanLen) {
+      clean = clean.slice(0, maxCleanLen).trim();
+    }
+    return clean ? `${clean} ${tagsStr}` : tagsStr;
   }
-  return clean;
+
+  return clean.length > 1000 ? clean.slice(0, 1000) : clean;
 }
 
 export default function EventFormPage({
@@ -365,6 +396,9 @@ export default function EventFormPage({
   const [extraExpenseItems, setExtraExpenseItems] = useState([]);
   const [marriageCelebrantIds, setMarriageCelebrantIds] = useState([]);
   const [sendOffMemberIds, setSendOffMemberIds] = useState([]);
+  const [eventTypeDates, setEventTypeDates] = useState({});
+  const [eventTypeMembers, setEventTypeMembers] = useState({});
+  const [eventTypeMemberDates, setEventTypeMemberDates] = useState({});
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -512,8 +546,104 @@ export default function EventFormPage({
           setTotalMembers(activeMems.length);
           setExempt(settingsData?.birthdayMembersExempt !== undefined ? Boolean(settingsData.birthdayMembersExempt) : getDefaultBirthdayExempt());
 
-          const eventTypeIdsList = detailedEvent.eventTypeIds && detailedEvent.eventTypeIds.length > 0
-            ? detailedEvent.eventTypeIds
+          // Extract metadata stored in description HTML comments
+          const { cleanDesc, amounts: savedContribAmounts, celebrants: savedCelebrants, eventDates: savedDatesFromDesc, memberDates: savedMemberDatesFromDesc } = extractContribAmounts(detailedEvent.description);
+
+          // Parse eventDates JSON if present
+          const parsedMemberDates = {};
+          const parsedTypeDates = {};
+          if (detailedEvent.eventDates && detailedEvent.eventDates.trim().startsWith("{")) {
+            try {
+              const parsed = JSON.parse(detailedEvent.eventDates);
+              Object.entries(parsed).forEach(([k, v]) => {
+                const matchedType = (typesData || []).find(
+                  (t) => t.eventTypeName?.toLowerCase() === k.toLowerCase() || t.eventTypeId === k
+                );
+                if (v && typeof v === "object" && !Array.isArray(v)) {
+                  parsedMemberDates[k] = v;
+                  if (matchedType) {
+                    parsedMemberDates[matchedType.eventTypeId] = v;
+                    parsedMemberDates[matchedType.eventTypeName] = v;
+                  }
+                } else if (typeof v === "string") {
+                  parsedTypeDates[k] = v;
+                  if (matchedType) {
+                    parsedTypeDates[matchedType.eventTypeId] = v;
+                    parsedTypeDates[matchedType.eventTypeName] = v;
+                  }
+                }
+              });
+            } catch {}
+          }
+
+          // Match helper
+          const matchTypeByNameOrKey = (key) => {
+            if (!key) return null;
+            const clean = String(key).toLowerCase().replace(/[\s_-]/g, "");
+            return (typesData || []).find((t) => {
+              if (t.eventTypeId === key) return true;
+              const tClean = String(t.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
+              return tClean === clean || clean.includes(tClean) || tClean.includes(clean);
+            });
+          };
+
+          // Discover all event type IDs associated with this event
+          const discoveredTypeIds = [];
+          const addTypeId = (tid) => {
+            if (tid && !discoveredTypeIds.includes(tid)) {
+              discoveredTypeIds.push(tid);
+            }
+          };
+
+          // 1. Primary eventTypeId
+          if (detailedEvent.eventTypeId) {
+            addTypeId(detailedEvent.eventTypeId);
+          }
+
+          // 2. EventTypeIds if returned by DTO
+          if (Array.isArray(detailedEvent.eventTypeIds) && detailedEvent.eventTypeIds.length > 0) {
+            detailedEvent.eventTypeIds.forEach(addTypeId);
+          }
+
+          // 3. Saved contrib amounts (keys are eventTypeIds)
+          if (savedContribAmounts && typeof savedContribAmounts === "object") {
+            Object.keys(savedContribAmounts).forEach((tid) => {
+              const matched = matchTypeByNameOrKey(tid);
+              if (matched) addTypeId(matched.eventTypeId);
+            });
+          }
+
+          // 4. From event dates / member dates / celebrants keys
+          const checkSources = [
+            detailedEvent.eventTypeDates,
+            detailedEvent.eventTypeMemberDates,
+            detailedEvent.eventTypeMembers,
+            savedCelebrants,
+            savedDatesFromDesc,
+            savedMemberDatesFromDesc,
+            parsedMemberDates,
+            parsedTypeDates,
+          ];
+          checkSources.forEach((src) => {
+            if (src && typeof src === "object") {
+              Object.keys(src).forEach((k) => {
+                const matched = matchTypeByNameOrKey(k);
+                if (matched) addTypeId(matched.eventTypeId);
+              });
+            }
+          });
+
+          // 5. From eventName or description mentions (e.g. Birthday, Marriage, Send Off)
+          const nameAndDesc = `${detailedEvent.eventName || ""} ${detailedEvent.description || ""}`.toLowerCase();
+          (typesData || []).forEach((t) => {
+            const tClean = (t.eventTypeName || "").toLowerCase().trim();
+            if (tClean && nameAndDesc.includes(tClean)) {
+              addTypeId(t.eventTypeId);
+            }
+          });
+
+          const eventTypeIdsList = discoveredTypeIds.length > 0
+            ? discoveredTypeIds
             : detailedEvent.eventTypeId
               ? [detailedEvent.eventTypeId]
               : defaultTypeId
@@ -530,10 +660,125 @@ export default function EventFormPage({
           let savedBaseAmount = Math.round(Number(detailedEvent.baseAmount || 0));
           let initialBaseAmount = savedBaseAmount > 0 ? String(savedBaseAmount) : "";
 
-          const { cleanDesc, amounts: savedContribAmounts, celebrants: savedCelebrants } = extractContribAmounts(detailedEvent.description);
-          if (savedCelebrants) {
-            if (Array.isArray(savedCelebrants.marriage)) setMarriageCelebrantIds(savedCelebrants.marriage);
-            if (Array.isArray(savedCelebrants.sendOff)) setSendOffMemberIds(savedCelebrants.sendOff);
+          // Compile and normalize all member lists / celebrants
+          const rawCelebrants = {
+            ...(savedCelebrants || {}),
+            ...(detailedEvent.eventTypeMembers || {}),
+          };
+          const normalizedMembers = {};
+          Object.entries(rawCelebrants).forEach(([k, v]) => {
+            if (Array.isArray(v) && v.length > 0) {
+              normalizedMembers[k] = v;
+              const matchedType = matchTypeByNameOrKey(k);
+              if (matchedType) {
+                normalizedMembers[matchedType.eventTypeId] = v;
+                normalizedMembers[matchedType.eventTypeName] = v;
+              }
+            }
+          });
+
+          // Also check if parsedMemberDates has members
+          Object.entries(parsedMemberDates).forEach(([k, v]) => {
+            if (v && typeof v === "object" && !Array.isArray(v)) {
+              const memIds = Object.keys(v);
+              if (memIds.length > 0) {
+                const matchedType = matchTypeByNameOrKey(k);
+                if (matchedType) {
+                  if (!normalizedMembers[matchedType.eventTypeId]) normalizedMembers[matchedType.eventTypeId] = memIds;
+                  if (!normalizedMembers[matchedType.eventTypeName]) normalizedMembers[matchedType.eventTypeName] = memIds;
+                }
+                if (!normalizedMembers[k]) normalizedMembers[k] = memIds;
+              }
+            }
+          });
+
+          // Restore marriage celebrants
+          const marriageType = (typesData || []).find((t) => {
+            const n = (t.eventTypeName || "").toLowerCase();
+            return n.includes("marriage") || n.includes("wedding");
+          });
+          const marriageList = (
+            (marriageType && (normalizedMembers[marriageType.eventTypeId] || normalizedMembers[marriageType.eventTypeName])) ||
+            normalizedMembers["Marriage"] ||
+            normalizedMembers["marriage"] ||
+            savedCelebrants?.marriage ||
+            savedCelebrants?.Marriage ||
+            detailedEvent.eventTypeMembers?.marriage ||
+            detailedEvent.eventTypeMembers?.Marriage ||
+            (parsedMemberDates["Marriage"] ? Object.keys(parsedMemberDates["Marriage"]) : []) ||
+            []
+          );
+          if (Array.isArray(marriageList) && marriageList.length > 0) {
+            setMarriageCelebrantIds(marriageList);
+          }
+
+          // Restore send-off celebrants
+          const sendOffType = (typesData || []).find((t) => {
+            const n = (t.eventTypeName || "").toLowerCase();
+            return n.includes("send-off") || n.includes("send off") || n.includes("relieving") || n.includes("farewell");
+          });
+          const sendOffList = (
+            (sendOffType && (normalizedMembers[sendOffType.eventTypeId] || normalizedMembers[sendOffType.eventTypeName])) ||
+            normalizedMembers["Send Off"] ||
+            normalizedMembers["Send-off"] ||
+            normalizedMembers["sendOff"] ||
+            normalizedMembers["send_off"] ||
+            normalizedMembers["sendoff"] ||
+            savedCelebrants?.sendOff ||
+            savedCelebrants?.send_off ||
+            savedCelebrants?.sendoff ||
+            savedCelebrants?.["Send Off"] ||
+            savedCelebrants?.["Send-off"] ||
+            detailedEvent.eventTypeMembers?.sendOff ||
+            detailedEvent.eventTypeMembers?.send_off ||
+            detailedEvent.eventTypeMembers?.sendoff ||
+            detailedEvent.eventTypeMembers?.["Send Off"] ||
+            detailedEvent.eventTypeMembers?.["Send-off"] ||
+            (parsedMemberDates["Send Off"] ? Object.keys(parsedMemberDates["Send Off"]) : []) ||
+            (parsedMemberDates["Send-off"] ? Object.keys(parsedMemberDates["Send-off"]) : []) ||
+            (parsedMemberDates["sendOff"] ? Object.keys(parsedMemberDates["sendOff"]) : []) ||
+            []
+          );
+          if (Array.isArray(sendOffList) && sendOffList.length > 0) {
+            setSendOffMemberIds(sendOffList);
+          }
+
+          if (Object.keys(normalizedMembers).length > 0) {
+            setEventTypeMembers(normalizedMembers);
+          }
+
+          // Normalize and populate member dates
+          const normalizedMbrDates = {
+            ...(savedMemberDatesFromDesc || {}),
+            ...(detailedEvent.eventTypeMemberDates || {}),
+            ...parsedMemberDates,
+          };
+          Object.entries(normalizedMbrDates).forEach(([k, v]) => {
+            const matchedType = matchTypeByNameOrKey(k);
+            if (matchedType) {
+              normalizedMbrDates[matchedType.eventTypeId] = v;
+              normalizedMbrDates[matchedType.eventTypeName] = v;
+            }
+          });
+          if (Object.keys(normalizedMbrDates).length > 0) {
+            setEventTypeMemberDates(normalizedMbrDates);
+          }
+
+          // Normalize and populate event dates
+          const normalizedDates = {
+            ...(savedDatesFromDesc || {}),
+            ...(detailedEvent.eventTypeDates || {}),
+            ...parsedTypeDates,
+          };
+          Object.entries(normalizedDates).forEach(([k, v]) => {
+            const matchedType = matchTypeByNameOrKey(k);
+            if (matchedType) {
+              normalizedDates[matchedType.eventTypeId] = v;
+              normalizedDates[matchedType.eventTypeName] = v;
+            }
+          });
+          if (Object.keys(normalizedDates).length > 0) {
+            setEventTypeDates(normalizedDates);
           }
 
           const editNonBdays = (typesData || []).filter(
@@ -808,6 +1053,124 @@ export default function EventFormPage({
     }
   }, [activeMembers, form.participantIds, isEdit]);
 
+  // Dynamic Member & Date helpers for any selected event type without hardcoding
+  const getMemberFieldLabel = (type) => {
+    const name = String(type?.eventTypeName || "").toLowerCase();
+    const cat = String(type?.category || "").toLowerCase();
+    if (name.includes("marriage") || cat.includes("marriage") || name.includes("wedding") || cat.includes("wedding")) {
+      return "Marriage Celebrants";
+    }
+    if (name.includes("send-off") || name.includes("send off") || name.includes("sendoff") || name.includes("relieving") || name.includes("farewell") || cat.includes("send-off") || cat.includes("farewell") || cat.includes("relieving")) {
+      return "Send-off / Relieving Members";
+    }
+    return `${type?.eventTypeName || "Event"} Celebrants / Members`;
+  };
+
+  const getMemberFieldPlaceholder = (type) => {
+    const name = String(type?.eventTypeName || "").toLowerCase();
+    if (name.includes("marriage") || name.includes("wedding")) {
+      return "Select members celebrating marriage";
+    }
+    if (name.includes("send-off") || name.includes("send off") || name.includes("relieving") || name.includes("farewell")) {
+      return "Select members having send-off";
+    }
+    return `Select members for ${type?.eventTypeName || "event"}`;
+  };
+
+  const getSelectedTypeMembers = (type) => {
+    if (!type) return [];
+    if (eventTypeMembers[type.eventTypeId] && eventTypeMembers[type.eventTypeId].length > 0) {
+      return eventTypeMembers[type.eventTypeId];
+    }
+    if (eventTypeMembers[type.eventTypeName] && eventTypeMembers[type.eventTypeName].length > 0) {
+      return eventTypeMembers[type.eventTypeName];
+    }
+    const name = String(type.eventTypeName || "").toLowerCase();
+    if (name.includes("marriage") || name.includes("wedding")) {
+      return marriageCelebrantIds;
+    }
+    if (name.includes("send-off") || name.includes("send off") || name.includes("relieving") || name.includes("farewell")) {
+      return sendOffMemberIds;
+    }
+    return [];
+  };
+
+  const handleEventTypeDateChange = (typeId, newDate) => {
+    const dateStr = newDate && dayjs(newDate).isValid() ? dayjs(newDate).format("YYYY-MM-DD") : (newDate || "");
+    setEventTypeDates((prev) => ({
+      ...prev,
+      [typeId]: dateStr,
+    }));
+    // If members exist, propagate default date to any member without a specific date
+    setEventTypeMemberDates((prev) => {
+      const typeMemberDates = { ...(prev[typeId] || {}) };
+      const currentMems = eventTypeMembers[typeId] || [];
+      currentMems.forEach((mId) => {
+        if (!typeMemberDates[mId] && dateStr) {
+          typeMemberDates[mId] = dateStr;
+        }
+      });
+      return {
+        ...prev,
+        [typeId]: typeMemberDates,
+      };
+    });
+    if (errors[`eventDate_${typeId}`]) {
+      setErrors((prev) => ({ ...prev, [`eventDate_${typeId}`]: "" }));
+    }
+  };
+
+  const handleMemberDateChange = (typeId, memberId, newDate) => {
+    const dateStr = newDate && dayjs(newDate).isValid() ? dayjs(newDate).format("YYYY-MM-DD") : "";
+    setEventTypeMemberDates((prev) => ({
+      ...prev,
+      [typeId]: {
+        ...(prev[typeId] || {}),
+        [memberId]: dateStr,
+      },
+    }));
+    if (errors[`eventDate_${typeId}_${memberId}`]) {
+      setErrors((prev) => ({ ...prev, [`eventDate_${typeId}_${memberId}`]: "" }));
+    }
+  };
+
+  const handleEventTypeMembersChange = (type, val) => {
+    const cleanIds = (typeof val === "string" ? val.split(",") : val || []).filter(Boolean);
+    const typeId = type.eventTypeId;
+    const name = String(type.eventTypeName || "").toLowerCase();
+
+    setEventTypeMembers((prev) => ({
+      ...prev,
+      [typeId]: cleanIds,
+      [type.eventTypeName]: cleanIds,
+    }));
+
+    // Auto-populate default date for newly selected members if not already set
+    setEventTypeMemberDates((prev) => {
+      const typeMemberDates = { ...(prev[typeId] || {}) };
+      const defaultDate = eventTypeDates[typeId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+      cleanIds.forEach((mId) => {
+        if (!typeMemberDates[mId] && defaultDate) {
+          typeMemberDates[mId] = defaultDate;
+        }
+      });
+      return {
+        ...prev,
+        [typeId]: typeMemberDates,
+      };
+    });
+
+    if (name.includes("marriage") || name.includes("wedding")) {
+      setMarriageCelebrantIds(cleanIds);
+    } else if (name.includes("send-off") || name.includes("send off") || name.includes("relieving") || name.includes("farewell")) {
+      setSendOffMemberIds(cleanIds);
+    }
+
+    if (errors[`members_${typeId}`]) {
+      setErrors((prev) => ({ ...prev, [`members_${typeId}`]: "" }));
+    }
+  };
+
   // Handle Marriage Celebrants change
   const handleMarriageCelebrantsChange = (e) => {
     const val = typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value;
@@ -815,6 +1178,31 @@ export default function EventFormPage({
     const removedCelebrantIds = marriageCelebrantIds.filter((id) => !newIds.includes(id));
 
     setMarriageCelebrantIds(newIds);
+    const typeId = form.eventTypeId;
+    setEventTypeMembers((prev) => ({
+      ...prev,
+      marriage: newIds,
+      Marriage: newIds,
+      ...(typeId ? { [typeId]: newIds } : {}),
+    }));
+
+    // Auto-populate default date for newly selected members if not already set
+    setEventTypeMemberDates((prev) => {
+      const typeMemberDates = { ...(prev[typeId] || prev["marriage"] || prev["Marriage"] || {}) };
+      const defaultDate = (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "") || (eventTypeDates[typeId] || "");
+      newIds.forEach((mId) => {
+        if (!typeMemberDates[mId] && defaultDate) {
+          typeMemberDates[mId] = defaultDate;
+        }
+      });
+      return {
+        ...prev,
+        ...(typeId ? { [typeId]: typeMemberDates } : {}),
+        marriage: typeMemberDates,
+        Marriage: typeMemberDates,
+      };
+    });
+
     if (errors.marriageCelebrantIds) {
       setErrors((prev) => ({ ...prev, marriageCelebrantIds: "" }));
     }
@@ -839,6 +1227,31 @@ export default function EventFormPage({
     const removedSendOffIds = sendOffMemberIds.filter((id) => !newIds.includes(id));
 
     setSendOffMemberIds(newIds);
+    const typeId = form.eventTypeId;
+    setEventTypeMembers((prev) => ({
+      ...prev,
+      sendOff: newIds,
+      "Send Off": newIds,
+      ...(typeId ? { [typeId]: newIds } : {}),
+    }));
+
+    // Auto-populate default date for newly selected members if not already set
+    setEventTypeMemberDates((prev) => {
+      const typeMemberDates = { ...(prev[typeId] || prev["sendOff"] || prev["Send Off"] || {}) };
+      const defaultDate = (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "") || (eventTypeDates[typeId] || "");
+      newIds.forEach((mId) => {
+        if (!typeMemberDates[mId] && defaultDate) {
+          typeMemberDates[mId] = defaultDate;
+        }
+      });
+      return {
+        ...prev,
+        ...(typeId ? { [typeId]: typeMemberDates } : {}),
+        sendOff: typeMemberDates,
+        "Send Off": typeMemberDates,
+      };
+    });
+
     if (errors.sendOffMemberIds) {
       setErrors((prev) => ({ ...prev, sendOffMemberIds: "" }));
     }
@@ -1033,6 +1446,47 @@ export default function EventFormPage({
       .map(([dateStr, count]) => (count > 1 ? `${dateStr} (${count})` : dateStr))
       .join(", ");
   }, [monthCelebrants]);
+
+  // For non-birthday events: whether multiple celebrants are selected requiring separate dates
+  const hasMultipleCelebrantDates = useMemo(() => {
+    if (isBirthday) return false;
+    return nonBirthdaySelectedTypes.some((t) => {
+      const mems = getSelectedTypeMembers(t);
+      return mems.length > 1;
+    });
+  }, [isBirthday, nonBirthdaySelectedTypes, eventTypeMembers, marriageCelebrantIds, sendOffMemberIds]);
+
+  // Non-birthday comma-separated celebrant dates summary (formatted like birthday dates: e.g. "22 Oct, 25 Oct")
+  const celebrantDatesSummary = useMemo(() => {
+    if (isBirthday || nonBirthdaySelectedTypes.length === 0) return "";
+    const allDates = [];
+    nonBirthdaySelectedTypes.forEach((t) => {
+      const typeId = t.eventTypeId;
+      const mems = getSelectedTypeMembers(t);
+      mems.forEach((mId) => {
+        const d = eventTypeMemberDates[typeId]?.[mId] ||
+          eventTypeMemberDates[t.eventTypeName]?.[mId] ||
+          eventTypeMemberDates["marriage"]?.[mId] ||
+          eventTypeMemberDates["Marriage"]?.[mId] ||
+          eventTypeMemberDates["sendOff"]?.[mId] ||
+          eventTypeMemberDates["Send Off"]?.[mId] ||
+          (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+        if (d && dayjs(d).isValid()) {
+          allDates.push(dayjs(d));
+        }
+      });
+    });
+    if (allDates.length === 0) return "";
+    allDates.sort((a, b) => a.valueOf() - b.valueOf());
+    const counts = new Map();
+    allDates.forEach((d) => {
+      const s = d.format("D MMM");
+      counts.set(s, (counts.get(s) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([s, c]) => (c > 1 ? `${s} (${c})` : s))
+      .join(", ");
+  }, [isBirthday, nonBirthdaySelectedTypes, eventTypeMemberDates, eventTypeMembers, marriageCelebrantIds, sendOffMemberIds, form.eventDate]);
 
 
   // Calculation counts
@@ -1673,6 +2127,23 @@ export default function EventFormPage({
       eventDate: validDate,
       eventName: newEventName,
     }));
+    if (validDate && form.eventTypeId) {
+      const dateStr = dayjs(validDate).format("YYYY-MM-DD");
+      setEventTypeDates((prev) => ({ ...prev, [form.eventTypeId]: dateStr }));
+      setEventTypeMemberDates((prev) => {
+        const typeMemberDates = { ...(prev[form.eventTypeId] || {}) };
+        const currentMems = getSelectedTypeMembers(selectedTypes[0]);
+        if (currentMems.length <= 1) {
+          currentMems.forEach((mId) => {
+            typeMemberDates[mId] = dateStr;
+          });
+        }
+        return {
+          ...prev,
+          [form.eventTypeId]: typeMemberDates,
+        };
+      });
+    }
     setErrors((p) => ({ ...p, eventDate: validDate ? "" : "This field is required" }));
   };
 
@@ -1708,23 +2179,81 @@ export default function EventFormPage({
       newErrors.eventName = "Event Name cannot exceed 250 characters";
     }
 
-    // 3. Mandatory Event Date Validation
-    if (!form.eventDate || !dayjs(form.eventDate).isValid()) {
-      newErrors.eventDate = requiredMsg;
-    } else if (!isEdit && dayjs(form.eventDate).isBefore(dayjs().startOf("day"))) {
-      newErrors.eventDate = "Cannot create an event for a past date";
-    }
+    // 3. Mandatory Event Date & Celebrant Validation
+    if (allowMultipleEvents && selectedTypes.length > 1) {
+      if (isBirthday) {
+        if (!form.eventDate || !dayjs(form.eventDate).isValid()) {
+          newErrors.eventDate = requiredMsg;
+        } else if (!isEdit && dayjs(form.eventDate).isBefore(dayjs().startOf("day"))) {
+          newErrors.eventDate = "Cannot create an event for a past date";
+        }
+      }
+      nonBirthdaySelectedTypes.forEach((t) => {
+        const mems = getSelectedTypeMembers(t);
+        if (!mems || mems.length === 0) {
+          newErrors[`members_${t.eventTypeId}`] = `Please select at least one member for ${t.eventTypeName}`;
+        } else if (mems.length > 1) {
+          mems.forEach((mId) => {
+            const mDate = eventTypeMemberDates[t.eventTypeId]?.[mId] || eventTypeDates[t.eventTypeId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+            const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+            const mName = matchedMember?.name || "Member";
+            if (!mDate || !dayjs(mDate).isValid()) {
+              newErrors[`eventDate_${t.eventTypeId}_${mId}`] = `Please select ${t.eventTypeName} date for ${mName}`;
+            } else if (!isEdit && dayjs(mDate).isBefore(dayjs().startOf("day"))) {
+              newErrors[`eventDate_${t.eventTypeId}_${mId}`] = "Cannot create an event for a past date";
+            }
+          });
+        } else {
+          const singleMId = mems[0];
+          const d = eventTypeMemberDates[t.eventTypeId]?.[singleMId] || eventTypeDates[t.eventTypeId];
+          if (!d || !dayjs(d).isValid()) {
+            newErrors[`eventDate_${t.eventTypeId}`] = `${t.eventTypeName} date is required`;
+          } else if (!isEdit && dayjs(d).isBefore(dayjs().startOf("day"))) {
+            newErrors[`eventDate_${t.eventTypeId}`] = "Cannot create an event for a past date";
+          }
+        }
+      });
+    } else {
+      if (hasMultipleCelebrantDates) {
+        nonBirthdaySelectedTypes.forEach((t) => {
+          const mems = getSelectedTypeMembers(t);
+          if (mems.length > 1) {
+            mems.forEach((mId) => {
+              const mDate = eventTypeMemberDates[t.eventTypeId]?.[mId] ||
+                eventTypeMemberDates[t.eventTypeName]?.[mId] ||
+                eventTypeMemberDates["marriage"]?.[mId] ||
+                eventTypeMemberDates["Marriage"]?.[mId] ||
+                eventTypeMemberDates["sendOff"]?.[mId] ||
+                eventTypeMemberDates["Send Off"]?.[mId] ||
+                (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+              const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+              const mName = matchedMember?.name || "Member";
+              if (!mDate || !dayjs(mDate).isValid()) {
+                newErrors[`eventDate_${t.eventTypeId}_${mId}`] = `Please select ${t.eventTypeName} date for ${mName}`;
+              } else if (!isEdit && dayjs(mDate).isBefore(dayjs().startOf("day"))) {
+                newErrors[`eventDate_${t.eventTypeId}_${mId}`] = "Cannot create an event for a past date";
+              }
+            });
+          }
+        });
+      } else {
+        if (!form.eventDate || !dayjs(form.eventDate).isValid()) {
+          newErrors.eventDate = requiredMsg;
+        } else if (!isEdit && dayjs(form.eventDate).isBefore(dayjs().startOf("day"))) {
+          newErrors.eventDate = "Cannot create an event for a past date";
+        }
+      }
 
-    // 3a. Mandatory Celebrant Validation for Marriage and Send-off
-    if (hasMarriageSelected && marriageCelebrantIds.length === 0) {
-      newErrors.marriageCelebrantIds = "Please select at least one marriage celebrant";
-    }
-    if (hasSendOffSelected && sendOffMemberIds.length === 0) {
-      newErrors.sendOffMemberIds = "Please select at least one send-off / relieving member";
+      if (hasMarriageSelected && marriageCelebrantIds.length === 0) {
+        newErrors.marriageCelebrantIds = "Please select at least one marriage celebrant";
+      }
+      if (hasSendOffSelected && sendOffMemberIds.length === 0) {
+        newErrors.sendOffMemberIds = "Please select at least one send-off / relieving member";
+      }
     }
 
     // 4. Participant validation for non-birthday events if an event type is chosen
-    if (!isBirthday && (form.eventTypeId || form.eventTypeIds?.length > 0) && selectedParticipantIds.length === 0) {
+    if (!isBirthday && (form.eventTypeId || form.eventTypeIds?.length > 0) && selectedParticipantIds.length === 0 && (!allowMultipleEvents || selectedTypes.length <= 1)) {
       newErrors.participantIds = "Please select at least one participating member";
     }
 
@@ -1837,18 +2366,114 @@ export default function EventFormPage({
           ? [form.eventTypeId]
           : [];
 
+      const datesMap = {};
+      const membersMap = {};
+      const memberDatesMap = {};
+      const combinedDatesObj = {};
+
+      if (isBirthday) {
+        const bdayDates = celebrantDatesCsv || (form.eventDate ? dayjs(form.eventDate).format("DD/MM/YYYY") : "");
+        datesMap["Birthday"] = bdayDates;
+        combinedDatesObj["Birthday"] = bdayDates;
+      }
+
+      nonBirthdaySelectedTypes.forEach((t) => {
+        const mems = getSelectedTypeMembers(t);
+        if (mems.length > 0) {
+          membersMap[t.eventTypeName] = mems;
+
+          const perMemberDates = {};
+          const datesList = [];
+          mems.forEach((mId) => {
+            const mDate = eventTypeMemberDates[t.eventTypeId]?.[mId] || eventTypeMemberDates[t.eventTypeName]?.[mId] || eventTypeDates[t.eventTypeId] || eventTypeDates[t.eventTypeName] || (form.eventDate ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+            if (mDate) {
+              const formattedMDate = dayjs(mDate).isValid() ? dayjs(mDate).format("YYYY-MM-DD") : String(mDate);
+              perMemberDates[mId] = formattedMDate;
+              datesList.push(formattedMDate);
+            }
+          });
+
+          if (Object.keys(perMemberDates).length > 0) {
+            memberDatesMap[t.eventTypeName] = perMemberDates;
+            datesMap[t.eventTypeName] = datesList.join(", ");
+            combinedDatesObj[t.eventTypeName] = mems.length > 1 ? perMemberDates : (datesList[0] || "");
+          } else {
+            const d = eventTypeDates[t.eventTypeId] || eventTypeDates[t.eventTypeName];
+            if (d) {
+              const formattedD = dayjs(d).isValid() ? dayjs(d).format("YYYY-MM-DD") : String(d);
+              datesMap[t.eventTypeName] = formattedD;
+              combinedDatesObj[t.eventTypeName] = formattedD;
+            }
+          }
+        } else {
+          const d = eventTypeDates[t.eventTypeId] || eventTypeDates[t.eventTypeName];
+          if (d) {
+            const formattedD = dayjs(d).isValid() ? dayjs(d).format("YYYY-MM-DD") : String(d);
+            datesMap[t.eventTypeName] = formattedD;
+            combinedDatesObj[t.eventTypeName] = formattedD;
+          }
+        }
+      });
+
+      if (marriageCelebrantIds.length > 0) {
+        membersMap["marriage"] = marriageCelebrantIds;
+      }
+      if (sendOffMemberIds.length > 0) {
+        membersMap["sendOff"] = sendOffMemberIds;
+      }
+
+      let primaryEventDate = form.eventDate;
+      if (!isBirthday && nonBirthdaySelectedTypes.length > 0) {
+        const firstValidDate = nonBirthdaySelectedTypes
+          .map((t) => {
+            const mems = getSelectedTypeMembers(t);
+            if (mems.length > 0) {
+              return eventTypeMemberDates[t.eventTypeId]?.[mems[0]] || eventTypeMemberDates[t.eventTypeName]?.[mems[0]] || eventTypeDates[t.eventTypeId] || eventTypeDates[t.eventTypeName];
+            }
+            return eventTypeDates[t.eventTypeId] || eventTypeDates[t.eventTypeName];
+          })
+          .find((d) => d && dayjs(d).isValid());
+        if (firstValidDate) {
+          primaryEventDate = firstValidDate;
+        }
+      }
+
+      // Compact celebrants metadata without duplicate keys or dates for description HTML comments
+      const compactCelebrants = {};
+      if (marriageCelebrantIds.length > 0) {
+        compactCelebrants["marriage"] = marriageCelebrantIds;
+      }
+      if (sendOffMemberIds.length > 0) {
+        compactCelebrants["sendOff"] = sendOffMemberIds;
+      }
+      nonBirthdaySelectedTypes.forEach((t) => {
+        const cleanName = (t.eventTypeName || "").trim();
+        const low = cleanName.toLowerCase().replace(/[\s_-]/g, "");
+        if (low !== "marriage" && low !== "sendoff") {
+          const mems = getSelectedTypeMembers(t);
+          if (mems.length > 0) {
+            compactCelebrants[cleanName] = mems;
+          }
+        }
+      });
+
       const finalDescription = formatDescriptionWithContrib(
         form.description?.trim(),
         otherEventAmounts,
-        { marriage: marriageCelebrantIds, sendOff: sendOffMemberIds }
+        compactCelebrants
       );
 
       const payload = {
         eventName: form.eventName.trim(),
         eventTypeId: finalTypeIds[0] || form.eventTypeId,
         eventTypeIds: finalTypeIds,
-        eventDate: dayjs(form.eventDate).hour(12).toISOString(),
-        eventDates: isBirthday ? (celebrantDatesCsv || null) : null,
+        eventDate: dayjs(primaryEventDate).hour(12).toISOString(),
+        eventDates: Object.keys(combinedDatesObj).length > 0
+          ? JSON.stringify(combinedDatesObj)
+          : (isBirthday ? (celebrantDatesCsv || null) : null),
+        eventTypeDates: datesMap,
+        eventTypeMembers: membersMap,
+        eventTypeMemberDates: memberDatesMap,
         description: finalDescription,
         status: form.status || "Planned",
         baseAmount: plannedBudget,
@@ -2159,221 +2784,549 @@ export default function EventFormPage({
                   />
                 </Grid>
 
-                {/* Row 2: Event Date & Total Active Members */}
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  {isBirthday && selectedTypes.length === 1 ? (
-                    <AppInput
-                      label="Event Date"
-                      required
-                      value={
-                        celebrantDatesCsv ||
-                        (form.eventDate && dayjs(form.eventDate).isValid()
-                          ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
-                          : "Auto calculated")
-                      }
-                      disabled
-                      multiline
-                      minRows={1}
-                      maxRows={2}
-                      placeholder="Auto calculated"
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          minHeight: 38,
-                          height: "auto",
-                          py: 0.6,
-                          px: 1,
-                          bgcolor: (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "rgba(255, 255, 255, 0.05)"
-                              : "#f8fafd",
-                        },
-                        "& textarea": {
-                          fontSize: "0.82rem",
-                          fontWeight: 600,
-                          lineHeight: 1.4,
-                          maxHeight: 48,
-                          overflowY: "auto !important",
-                          cursor: "default",
-                          color: (theme) =>
-                            theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
-                          "&::-webkit-scrollbar": {
-                            width: "4px",
-                          },
-                          "&::-webkit-scrollbar-thumb": {
-                            backgroundColor: "rgba(124, 58, 237, 0.35)",
-                            borderRadius: "4px",
-                          },
-                        },
-                      }}
-                    />
-                  ) : (
-                    <AppDateInput
-                      label="Event Date"
-                      required
-                      clearable
-                      value={form.eventDate}
-                      disablePast={!isEdit}
-                      minDate={!isEdit ? dayjs().startOf("day") : undefined}
-                      onChange={handleDateChange}
-                      error={!!errors.eventDate}
-                      helperText={errors.eventDate}
-                    />
-                  )}
-                </Grid>
-
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppInput
-                    label="Total Active Members"
-                    placeholder="Auto calculated"
-                    type="text"
-                    value={totalMembers}
-                    disabled
-                  />
-                </Grid>
-
-                {/* Row 3: Office Members & WFH Members */}
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppInput
-                    label={isBirthday ? "Office Birthday Members" : "Office Members"}
-                    placeholder="Auto calculated"
-                    type="text"
-                    value={isBirthday ? officeBirthdays : officeMembers}
-                    disabled
-                  />
-                </Grid>
-
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <AppInput
-                    label={isBirthday ? "WFH Birthday Members" : "WFH Members"}
-                    placeholder="Auto calculated"
-                    type="text"
-                    value={isBirthday ? wfhBirthdays : wfhMembers}
-                    disabled
-                  />
-                </Grid>
-
-                {/* Subsection: Additional Event Contributions (Only for event types without configured expense items) */}
-                {typesWithoutExpenseItems.length > 0 && (
+                {/* In multiple events mode with >1 types selected, render each type with its own separate date and member field */}
+                {allowMultipleEvents && selectedTypes.length > 1 ? (
                   <>
-
-                    {typesWithoutExpenseItems.map((type) => {
-                      const rawVal =
-                        otherEventAmounts[type.eventTypeId] !== undefined
-                          ? otherEventAmounts[type.eventTypeId]
-                          : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
-                      const fieldError =
-                        errors[`baseAmount_${type.eventTypeId}`] ||
-                        (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
-
-                      const inputLabel =
-                        typesWithoutExpenseItems.length === 1
-                          ? "Expected Amount"
-                          : `${type.eventTypeName} Expected Amount`;
-
-                      const inputPlaceholder =
-                        typesWithoutExpenseItems.length === 1
-                          ? "Enter total expected amount (e.g. 5000)"
-                          : `Enter ${type.eventTypeName.toLowerCase()} expected amount (₹)`;
-
-                      return (
-                        <Grid
-                          size={{ xs: 12, sm: typesWithoutExpenseItems.length > 1 ? 6 : 6 }}
-                          key={type.eventTypeId}
-                        >
+                    {/* Birthday details if Birthday is selected */}
+                    {isBirthday && (
+                      <>
+                        <Grid size={{ xs: 12, sm: 6 }}>
                           <AppInput
-                            label={inputLabel}
-                            placeholder={inputPlaceholder}
+                            label="Birthday Event Date"
                             required
-                            fullWidth
-                            value={rawVal}
-                            onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
-                            inputProps={{
-                              maxLength: 10,
-                              inputMode: "decimal",
-                            }}
-                            startAdornment={
-                              <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
-                                ₹
-                              </Typography>
+                            value={
+                              celebrantDatesCsv ||
+                              (form.eventDate && dayjs(form.eventDate).isValid()
+                                ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
+                                : "Auto calculated")
                             }
-                            error={!!fieldError}
-                            helperText={fieldError}
+                            disabled
+                            multiline
+                            minRows={1}
+                            maxRows={2}
+                            placeholder="Auto calculated"
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                minHeight: 38,
+                                height: "auto",
+                                py: 0.6,
+                                px: 1,
+                                bgcolor: (theme) =>
+                                  theme.palette.mode === "dark"
+                                    ? "rgba(255, 255, 255, 0.05)"
+                                    : "#f8fafd",
+                              },
+                            }}
                           />
                         </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <AppInput
+                            label="Total Active Members"
+                            placeholder="Auto calculated"
+                            type="text"
+                            value={totalMembers}
+                            disabled
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <AppInput
+                            label="Office Birthday Members"
+                            placeholder="Auto calculated"
+                            type="text"
+                            value={officeBirthdays}
+                            disabled
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <AppInput
+                            label="WFH Birthday Members"
+                            placeholder="Auto calculated"
+                            type="text"
+                            value={wfhBirthdays}
+                            disabled
+                          />
+                        </Grid>
+                      </>
+                    )}
+
+                    {!isBirthday && (
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <AppInput
+                          label="Total Active Members"
+                          placeholder="Auto calculated"
+                          type="text"
+                          value={totalMembers}
+                          disabled
+                        />
+                      </Grid>
+                    )}
+
+                    {/* Dedicated Date & Member selector per non-birthday event type (dynamic, not hardcoded) */}
+                    {nonBirthdaySelectedTypes.map((type) => {
+                      const typeId = type.eventTypeId;
+                      const memsVal = getSelectedTypeMembers(type);
+                      const hasAmountField = typesWithoutExpenseItems.some((t) => t.eventTypeId === typeId);
+                      const rawAmt = otherEventAmounts[typeId] !== undefined ? otherEventAmounts[typeId] : "";
+                      const amtErr = errors[`baseAmount_${typeId}`] || "";
+
+                      // When multiple members are selected for this event type:
+                      // Show the Member MultiSelect, and render an individual date picker for EACH person!
+                      if (memsVal.length > 1) {
+                        return (
+                          <React.Fragment key={typeId}>
+                            <Grid size={{ xs: 12 }}>
+                              <AppMultiSelect
+                                label={getMemberFieldLabel(type)}
+                                placeholder={getMemberFieldPlaceholder(type)}
+                                value={memsVal}
+                                onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
+                                options={allActiveMemberOptions}
+                                maxHeight={145}
+                                required
+                                error={!!errors[`members_${typeId}`]}
+                                helperText={
+                                  errors[`members_${typeId}`] ||
+                                  `${memsVal.length} members (exempt from contributing)`
+                                }
+                              />
+                            </Grid>
+
+                            {/* Render distinct Date field for each selected member */}
+                            {memsVal.map((mId) => {
+                              const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+                              const memberName = matchedMember?.name || "Member";
+                              const mDateVal = eventTypeMemberDates[typeId]?.[mId] || eventTypeDates[typeId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+                              const mDateErr = errors[`eventDate_${typeId}_${mId}`];
+
+                              return (
+                                <Grid size={{ xs: 12, sm: 6 }} key={mId}>
+                                  <AppDateInput
+                                    label={`${memberName} - ${type.eventTypeName} Date`}
+                                    required
+                                    clearable
+                                    value={mDateVal}
+                                    disablePast={!isEdit}
+                                    minDate={!isEdit ? dayjs().startOf("day") : undefined}
+                                    onChange={(d) => handleMemberDateChange(typeId, mId, d)}
+                                    error={!!mDateErr}
+                                    helperText={mDateErr || `${type.eventTypeName} date for ${memberName}`}
+                                  />
+                                </Grid>
+                              );
+                            })}
+
+                            {hasAmountField && (
+                              <Grid size={{ xs: 12, sm: 6 }}>
+                                <AppInput
+                                  label={`${type.eventTypeName} Expected Amount`}
+                                  placeholder={`Enter ${type.eventTypeName.toLowerCase()} expected amount (₹)`}
+                                  required
+                                  fullWidth
+                                  value={rawAmt}
+                                  onChange={(e) => handleOtherEventAmountChange(typeId, e.target.value)}
+                                  inputProps={{ maxLength: 10, inputMode: "decimal" }}
+                                  startAdornment={
+                                    <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
+                                      ₹
+                                    </Typography>
+                                  }
+                                  error={!!amtErr}
+                                  helperText={amtErr}
+                                />
+                              </Grid>
+                            )}
+                          </React.Fragment>
+                        );
+                      }
+
+                      // When 0 or 1 member selected:
+                      const singleMId = memsVal.length === 1 ? memsVal[0] : null;
+                      const singleMember = singleMId ? (activeMembers.find((m) => m.memberId === singleMId) || members.find((m) => m.memberId === singleMId)) : null;
+                      const dateVal = singleMId
+                        ? (eventTypeMemberDates[typeId]?.[singleMId] || eventTypeDates[typeId] || "")
+                        : (eventTypeDates[typeId] || "");
+                      const dateLabel = singleMember
+                        ? `${singleMember.name} - ${type.eventTypeName} Date`
+                        : `${type.eventTypeName} Date`;
+
+                      return (
+                        <React.Fragment key={typeId}>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <AppDateInput
+                              label={dateLabel}
+                              required
+                              clearable
+                              value={dateVal}
+                              disablePast={!isEdit}
+                              minDate={!isEdit ? dayjs().startOf("day") : undefined}
+                              onChange={(d) => {
+                                handleEventTypeDateChange(typeId, d);
+                                if (singleMId) {
+                                  handleMemberDateChange(typeId, singleMId, d);
+                                }
+                              }}
+                              error={!!errors[`eventDate_${typeId}`] || (singleMId && !!errors[`eventDate_${typeId}_${singleMId}`])}
+                              helperText={errors[`eventDate_${typeId}`] || (singleMId && errors[`eventDate_${typeId}_${singleMId}`])}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <AppMultiSelect
+                              label={getMemberFieldLabel(type)}
+                              placeholder={getMemberFieldPlaceholder(type)}
+                              value={memsVal}
+                              onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
+                              options={allActiveMemberOptions}
+                              maxHeight={145}
+                              required
+                              error={!!errors[`members_${typeId}`]}
+                              helperText={
+                                errors[`members_${typeId}`] ||
+                                (memsVal.length > 0
+                                  ? `${memsVal.length} member (exempt from contributing)`
+                                  : "")
+                              }
+                            />
+                          </Grid>
+                          {hasAmountField && (
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                              <AppInput
+                                label={`${type.eventTypeName} Expected Amount`}
+                                placeholder={`Enter ${type.eventTypeName.toLowerCase()} expected amount (₹)`}
+                                required
+                                fullWidth
+                                value={rawAmt}
+                                onChange={(e) => handleOtherEventAmountChange(typeId, e.target.value)}
+                                inputProps={{ maxLength: 10, inputMode: "decimal" }}
+                                startAdornment={
+                                  <Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>
+                                    ₹
+                                  </Typography>
+                                }
+                                error={!!amtErr}
+                                helperText={amtErr}
+                              />
+                            </Grid>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </>
-                )}
+                ) : (
+                  <>
+                    {/* Row 2: Event Date & Total Active Members (Single Event Mode) */}
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      {isBirthday ? (
+                        <AppInput
+                          label="Event Date"
+                          required
+                          value={
+                            celebrantDatesCsv ||
+                            (form.eventDate && dayjs(form.eventDate).isValid()
+                              ? `${dayjs(form.eventDate).format("MMMM YYYY")} (No Celebrants)`
+                              : "Auto calculated")
+                          }
+                          disabled
+                          multiline
+                          minRows={1}
+                          maxRows={2}
+                          placeholder="Auto calculated"
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              minHeight: 38,
+                              height: "auto",
+                              py: 0.6,
+                              px: 1,
+                              bgcolor: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(255, 255, 255, 0.05)"
+                                  : "#f8fafd",
+                            },
+                          }}
+                        />
+                      ) : hasMultipleCelebrantDates ? (
+                        <AppInput
+                          label="Event Dates"
+                          required
+                          value={
+                            celebrantDatesSummary ||
+                            (form.eventDate && dayjs(form.eventDate).isValid()
+                              ? dayjs(form.eventDate).format("DD/MM/YYYY")
+                              : "Auto calculated from celebrant dates")
+                          }
+                          disabled
+                          multiline
+                          minRows={1}
+                          maxRows={2}
+                          placeholder="Auto calculated from celebrant dates"
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              minHeight: 38,
+                              height: "auto",
+                              py: 0.6,
+                              px: 1,
+                              bgcolor: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(255, 255, 255, 0.05)"
+                                  : "#f8fafd",
+                            },
+                          }}
+                        />
+                      ) : (
+                        <AppDateInput
+                          label="Event Date"
+                          required
+                          clearable
+                          value={form.eventDate}
+                          disablePast={!isEdit}
+                          minDate={!isEdit ? dayjs().startOf("day") : undefined}
+                          onChange={handleDateChange}
+                          error={!!errors.eventDate}
+                          helperText={errors.eventDate}
+                        />
+                      )}
+                    </Grid>
 
-                {/* Dynamically load celebrant fields ONLY for selected event types */}
-                {hasMarriageSelected && (
-                  <Grid size={{ xs: 12, sm: hasSendOffSelected ? 6 : 6 }}>
-                    <AppMultiSelect
-                      label="Marriage Celebrants"
-                      placeholder="Select members celebrating marriage"
-                      value={marriageCelebrantIds}
-                      onChange={handleMarriageCelebrantsChange}
-                      options={allActiveMemberOptions}
-                      maxHeight={145}
-                      required
-                      error={!!errors.marriageCelebrantIds}
-                      helperText={
-                        errors.marriageCelebrantIds ||
-                        (marriageCelebrantIds.length > 0
-                          ? `${marriageCelebrantIds.length} celebrant${marriageCelebrantIds.length > 1 ? "s" : ""} (exempt from contributing)`
-                          : "")
-                      }
-                    />
-                  </Grid>
-                )}
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <AppInput
+                        label="Total Active Members"
+                        placeholder="Auto calculated"
+                        type="text"
+                        value={totalMembers}
+                        disabled
+                      />
+                    </Grid>
 
-                {hasSendOffSelected && (
-                  <Grid size={{ xs: 12, sm: hasMarriageSelected ? 6 : 6 }}>
-                    <AppMultiSelect
-                      label="Send-off / Relieving Members"
-                      placeholder="Select members having send-off"
-                      value={sendOffMemberIds}
-                      onChange={handleSendOffMembersChange}
-                      options={allActiveMemberOptions}
-                      maxHeight={145}
-                      required
-                      error={!!errors.sendOffMemberIds}
-                      helperText={
-                        errors.sendOffMemberIds ||
-                        (sendOffMemberIds.length > 0
-                          ? `${sendOffMemberIds.length} member${sendOffMemberIds.length > 1 ? "s" : ""} (exempt from contributing)`
-                          : "")
-                      }
-                    />
-                  </Grid>
-                )}
+                    {/* Row 3: Office Members & WFH Members */}
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <AppInput
+                        label={isBirthday ? "Office Birthday Members" : "Office Members"}
+                        placeholder="Auto calculated"
+                        type="text"
+                        value={isBirthday ? officeBirthdays : officeMembers}
+                        disabled
+                      />
+                    </Grid>
 
-                {/* Participating Members MultiSelect (for non-birthday events or multiple event mode) */}
-                {hasSelectedType && !isBirthday && (
-                  <Grid size={{ xs: 12 }}>
-                    <AppMultiSelect
-                      label="Participating Members"
-                      placeholder="Select Participating Members"
-                      value={selectedParticipantIds}
-                      onChange={(e) => {
-                        const val =
-                          typeof e.target.value === "string"
-                            ? e.target.value.split(",")
-                            : e.target.value;
-                        const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
-                        const filteredVal = (val || []).filter((id) => !allExempt.has(id));
-                        setSelectedParticipantIds(filteredVal);
-                        if (errors.participantIds) {
-                          setErrors((prev) => ({ ...prev, participantIds: "" }));
-                        }
-                      }}
-                      options={memberOptions}
-                      maxHeight={145}
-                      required
-                      error={!!errors.participantIds}
-                      helperText={errors.participantIds}
-                    />
-                  </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <AppInput
+                        label={isBirthday ? "WFH Birthday Members" : "WFH Members"}
+                        placeholder="Auto calculated"
+                        type="text"
+                        value={isBirthday ? wfhBirthdays : wfhMembers}
+                        disabled
+                      />
+                    </Grid>
+
+                    {/* Single mode types without expense items */}
+                    {typesWithoutExpenseItems.length > 0 && (
+                      <>
+                        {typesWithoutExpenseItems.map((type) => {
+                          const rawVal =
+                            otherEventAmounts[type.eventTypeId] !== undefined
+                              ? otherEventAmounts[type.eventTypeId]
+                              : (nonBirthdaySelectedTypes.length === 1 ? form.baseAmount : "");
+                          const fieldError =
+                            errors[`baseAmount_${type.eventTypeId}`] ||
+                            (nonBirthdaySelectedTypes.length === 1 ? errors.baseAmount : "");
+
+                          return (
+                            <Grid size={{ xs: 12, sm: 6 }} key={type.eventTypeId}>
+                              <AppInput
+                                label={typesWithoutExpenseItems.length === 1 ? "Expected Amount" : `${type.eventTypeName} Expected Amount`}
+                                placeholder={typesWithoutExpenseItems.length === 1 ? "Enter total expected amount (e.g. 5000)" : `Enter ${type.eventTypeName.toLowerCase()} expected amount (₹)`}
+                                required
+                                fullWidth
+                                value={rawVal}
+                                onChange={(e) => handleOtherEventAmountChange(type.eventTypeId, e.target.value)}
+                                inputProps={{ maxLength: 10, inputMode: "decimal" }}
+                                startAdornment={<Typography sx={{ mr: 0.5, fontWeight: 700, color: "text.secondary" }}>₹</Typography>}
+                                error={!!fieldError}
+                                helperText={fieldError}
+                              />
+                            </Grid>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {hasMarriageSelected && (
+                      <>
+                        <Grid size={{ xs: 12 }}>
+                          <AppMultiSelect
+                            label="Marriage Celebrants"
+                            placeholder="Select members celebrating marriage"
+                            value={marriageCelebrantIds}
+                            onChange={handleMarriageCelebrantsChange}
+                            options={allActiveMemberOptions}
+                            maxHeight={145}
+                            required
+                            error={!!errors.marriageCelebrantIds}
+                            helperText={
+                              errors.marriageCelebrantIds ||
+                              (marriageCelebrantIds.length > 0
+                                ? `${marriageCelebrantIds.length} celebrant${marriageCelebrantIds.length > 1 ? "s" : ""} (exempt from contributing)`
+                                : "")
+                            }
+                          />
+                        </Grid>
+                        {marriageCelebrantIds.length > 1 &&
+                          marriageCelebrantIds.map((mId) => {
+                            const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+                            const memberName = matchedMember?.name || "Member";
+                            const typeId = form.eventTypeId;
+                            const mDateVal = eventTypeMemberDates[typeId]?.[mId] ||
+                              eventTypeMemberDates["marriage"]?.[mId] ||
+                              eventTypeMemberDates["Marriage"]?.[mId] ||
+                              (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+                            const mDateErr = errors[`eventDate_${typeId}_${mId}`] || errors[`eventDate_${mId}`];
+
+                            return (
+                              <Grid size={{ xs: 12, sm: 6 }} key={mId}>
+                                <AppDateInput
+                                  label={`${memberName} - Marriage Date`}
+                                  required
+                                  clearable
+                                  value={mDateVal}
+                                  disablePast={!isEdit}
+                                  minDate={!isEdit ? dayjs().startOf("day") : undefined}
+                                  onChange={(d) => handleMemberDateChange(typeId, mId, d)}
+                                  error={!!mDateErr}
+                                  helperText={mDateErr || `Marriage date for ${memberName}`}
+                                />
+                              </Grid>
+                            );
+                          })}
+                      </>
+                    )}
+
+                    {hasSendOffSelected && (
+                      <>
+                        <Grid size={{ xs: 12 }}>
+                          <AppMultiSelect
+                            label="Send-off / Relieving Members"
+                            placeholder="Select members having send-off"
+                            value={sendOffMemberIds}
+                            onChange={handleSendOffMembersChange}
+                            options={allActiveMemberOptions}
+                            maxHeight={145}
+                            required
+                            error={!!errors.sendOffMemberIds}
+                            helperText={
+                              errors.sendOffMemberIds ||
+                              (sendOffMemberIds.length > 0
+                                ? `${sendOffMemberIds.length} member${sendOffMemberIds.length > 1 ? "s" : ""} (exempt from contributing)`
+                                : "")
+                            }
+                          />
+                        </Grid>
+                        {sendOffMemberIds.length > 1 &&
+                          sendOffMemberIds.map((mId) => {
+                            const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+                            const memberName = matchedMember?.name || "Member";
+                            const typeId = form.eventTypeId;
+                            const mDateVal = eventTypeMemberDates[typeId]?.[mId] ||
+                              eventTypeMemberDates["sendOff"]?.[mId] ||
+                              eventTypeMemberDates["Send Off"]?.[mId] ||
+                              (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+                            const mDateErr = errors[`eventDate_${typeId}_${mId}`] || errors[`eventDate_${mId}`];
+
+                            return (
+                              <Grid size={{ xs: 12, sm: 6 }} key={mId}>
+                                <AppDateInput
+                                  label={`${memberName} - Send Off Date`}
+                                  required
+                                  clearable
+                                  value={mDateVal}
+                                  disablePast={!isEdit}
+                                  minDate={!isEdit ? dayjs().startOf("day") : undefined}
+                                  onChange={(d) => handleMemberDateChange(typeId, mId, d)}
+                                  error={!!mDateErr}
+                                  helperText={mDateErr || `Send off date for ${memberName}`}
+                                />
+                              </Grid>
+                            );
+                          })}
+                      </>
+                    )}
+
+                    {/* Any other custom non-birthday event type (dynamic, not hardcoded) */}
+                    {nonBirthdaySelectedTypes
+                      .filter((t) => {
+                        const n = (t.eventTypeName || "").toLowerCase();
+                        return !n.includes("marriage") && !n.includes("wedding") && !n.includes("send") && !n.includes("farewell") && !n.includes("relieving");
+                      })
+                      .map((type) => {
+                        const typeId = type.eventTypeId;
+                        const memsVal = getSelectedTypeMembers(type);
+                        return (
+                          <React.Fragment key={typeId}>
+                            <Grid size={{ xs: 12 }}>
+                              <AppMultiSelect
+                                label={getMemberFieldLabel(type)}
+                                placeholder={getMemberFieldPlaceholder(type)}
+                                value={memsVal}
+                                onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
+                                options={allActiveMemberOptions}
+                                maxHeight={145}
+                                required
+                                error={!!errors[`members_${typeId}`]}
+                                helperText={
+                                  errors[`members_${typeId}`] ||
+                                  (memsVal.length > 0 ? `${memsVal.length} members (exempt from contributing)` : "")
+                                }
+                              />
+                            </Grid>
+                            {memsVal.length > 1 &&
+                              memsVal.map((mId) => {
+                                const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+                                const memberName = matchedMember?.name || "Member";
+                                const mDateVal = eventTypeMemberDates[typeId]?.[mId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+                                const mDateErr = errors[`eventDate_${typeId}_${mId}`];
+
+                                return (
+                                  <Grid size={{ xs: 12, sm: 6 }} key={mId}>
+                                    <AppDateInput
+                                      label={`${memberName} - ${type.eventTypeName} Date`}
+                                      required
+                                      clearable
+                                      value={mDateVal}
+                                      disablePast={!isEdit}
+                                      minDate={!isEdit ? dayjs().startOf("day") : undefined}
+                                      onChange={(d) => handleMemberDateChange(typeId, mId, d)}
+                                      error={!!mDateErr}
+                                      helperText={mDateErr || `${type.eventTypeName} date for ${memberName}`}
+                                    />
+                                  </Grid>
+                                );
+                              })}
+                          </React.Fragment>
+                        );
+                      })}
+
+                    {hasSelectedType && !isBirthday && (
+                      <Grid size={{ xs: 12 }}>
+                        <AppMultiSelect
+                          label="Participating Members"
+                          placeholder="Select Participating Members"
+                          value={selectedParticipantIds}
+                          onChange={(e) => {
+                            const val = typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value;
+                            const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+                            const filteredVal = (val || []).filter((id) => !allExempt.has(id));
+                            setSelectedParticipantIds(filteredVal);
+                            if (errors.participantIds) {
+                              setErrors((prev) => ({ ...prev, participantIds: "" }));
+                            }
+                          }}
+                          options={memberOptions}
+                          maxHeight={145}
+                          required
+                          error={!!errors.participantIds}
+                          helperText={errors.participantIds}
+                        />
+                      </Grid>
+                    )}
+                  </>
                 )}
               </Grid>
 
