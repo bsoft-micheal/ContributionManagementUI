@@ -60,9 +60,9 @@ const initialForm = {
   email: "",
   phone: "",
   gender: "",
-  workType: "Office",
-  dateOfBirth: dayjs().subtract(18, "year"),
-  joiningDate: dayjs(),
+  workType: "",
+  dateOfBirth: null,
+  joiningDate: null,
   createMemberProfile: false,
   enableMultipleRoles: false,
   roleName: "",
@@ -162,16 +162,18 @@ export default function UserFormPage() {
   }, [roles]);
 
   const typeOptions = React.useMemo(() => {
-    if (workTypes && workTypes.length > 0) {
-      return workTypes.map((t) => ({
-        label: t.workTypeName || t.typeName || t.name,
-        value: t.workTypeName || t.typeName || t.name,
-      }));
-    }
-    return [
-      { label: "Office", value: "Office" },
-      { label: "WFH", value: "WFH" },
-    ];
+    const list = Array.isArray(workTypes)
+      ? workTypes
+      : Array.isArray(workTypes?.$values)
+      ? workTypes.$values
+      : [];
+    return list
+      .filter((t) => t && t.isActive !== false)
+      .map((t) => {
+        const name = t.workTypeName || t.typeName || t.name || "";
+        return { label: name, value: name };
+      })
+      .filter((opt) => Boolean(opt.value));
   }, [workTypes]);
 
   function getRoleNameById(roleId, customRoles = roles) {
@@ -217,14 +219,7 @@ export default function UserFormPage() {
       } else {
         setHasExistingLogin(false);
         setIsChangingPassword(false);
-        const defaultFormData = {
-          ...initialForm,
-          workType:
-            loadedWorkTypes.length > 0
-              ? loadedWorkTypes[0].workTypeName || loadedWorkTypes[0].name
-              : "Office",
-        };
-        setForm(defaultFormData);
+        setForm(initialForm);
       }
     } catch (error) {
       console.error("Error loading user form data:", error);
@@ -345,23 +340,18 @@ export default function UserFormPage() {
       username: hasAccess ? (row.username || row.Username || "") : "",
       email: row.email || row.Email || "",
       phone: row.phone || row.Phone || "",
-      gender: row.gender || row.Gender || "Male",
-      workType:
-        row.workType ||
-        row.WorkType ||
-        (loadedWorkTypes.length > 0
-          ? loadedWorkTypes[0].workTypeName || loadedWorkTypes[0].name
-          : "Office"),
+      gender: row.gender || row.Gender || "",
+      workType: row.workType || row.WorkType || "",
       dateOfBirth: row.dateOfBirth
         ? dayjs(row.dateOfBirth)
         : row.DateOfBirth
         ? dayjs(row.DateOfBirth)
-        : dayjs().subtract(18, "year"),
+        : null,
       joiningDate: row.joiningDate
         ? dayjs(row.joiningDate)
         : row.JoiningDate
         ? dayjs(row.JoiningDate)
-        : dayjs(),
+        : null,
       createMemberProfile: hasAccess,
       enableMultipleRoles: hasMultiple,
       roleName: singleRole,
@@ -496,59 +486,38 @@ export default function UserFormPage() {
 
   function fieldChange(field, value) {
     if (field === "joiningDate") {
-      const isJoiningToday =
-        value &&
-        dayjs(value).isValid() &&
-        dayjs(value).isSame(dayjs(), "day");
-
-      let nextWorkType = form.workType;
-      if (isJoiningToday && !form.workType) {
-        nextWorkType = "Office";
-      }
-
       const updatedForm = {
         ...form,
         joiningDate: value,
-        workType: nextWorkType,
       };
       setForm(updatedForm);
 
       const joinErr = validateSingleField("joiningDate", value, updatedForm);
-      const workErr = validateSingleField("workType", nextWorkType, updatedForm);
 
       setErrors((prev) => ({
         ...prev,
         joiningDate: joinErr,
-        workType: workErr,
       }));
       return;
     }
     if (field === "dobAndJoining") {
       const dobVal = value.dateOfBirth;
       const joinVal = value.joiningDate;
-      const isJoiningToday = joinVal && dayjs(joinVal).isSame(dayjs(), "day");
-      let nextWorkType = form.workType;
-      if (isJoiningToday && !form.workType) {
-        nextWorkType = "Office";
-      }
 
       const updatedForm = {
         ...form,
         dateOfBirth: dobVal,
         joiningDate: joinVal,
-        workType: nextWorkType,
       };
       setForm(updatedForm);
 
       const dobErr = validateSingleField("dateOfBirth", dobVal, updatedForm);
       const joinErr = validateSingleField("joiningDate", joinVal, updatedForm);
-      const workErr = validateSingleField("workType", nextWorkType, updatedForm);
 
       setErrors((prev) => ({
         ...prev,
         dateOfBirth: dobErr,
         joiningDate: joinErr,
-        workType: workErr,
       }));
       return;
     }
@@ -961,7 +930,7 @@ export default function UserFormPage() {
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <AppInput
                   label="Name"
-                  placeholder="Enter name"
+                  placeholder="Enter Name"
                   value={form.fullName}
                   onChange={(e) => fieldChange("fullName", e.target.value)}
                   restrictType="letteronly"
@@ -975,7 +944,7 @@ export default function UserFormPage() {
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <AppInput
                   label="Email"
-                  placeholder="Enter email address"
+                  placeholder="Enter Email"
                   value={form.email}
                   onChange={(e) => fieldChange("email", e.target.value)}
                   maxLength={254}
@@ -988,7 +957,7 @@ export default function UserFormPage() {
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <AppInput
                   label="Phone Number"
-                  placeholder="Enter 10-digit mobile number"
+                  placeholder="Enter Phone Number"
                   value={form.phone}
                   onChange={(e) => fieldChange("phone", e.target.value)}
                   restrictType="numberonly"
@@ -1003,7 +972,7 @@ export default function UserFormPage() {
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <AppSelect
                   label="Gender"
-                  placeholder="Select gender"
+                  placeholder="Select Gender"
                   value={form.gender}
                   onChange={(e) => fieldChange("gender", e.target.value)}
                   options={GENDER_OPTIONS}
@@ -1046,7 +1015,7 @@ export default function UserFormPage() {
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <AppSelect
                   label="Work Type"
-                  placeholder="Select work type"
+                  placeholder="Select Work Type"
                   value={form.workType}
                   onChange={(e) => fieldChange("workType", e.target.value)}
                   options={typeOptions}
@@ -1198,7 +1167,7 @@ export default function UserFormPage() {
                     <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                       <AppMultiSelect
                         label="Secondary Role"
-                        placeholder="Select secondary roles"
+                        placeholder="Select Secondary Role"
                         value={form.secondaryRoles}
                         onChange={(e) => handleSecondaryRolesChange(e.target.value)}
                         options={userRolesList}
@@ -1223,7 +1192,7 @@ export default function UserFormPage() {
                             }))
                             : [
                               {
-                                label: "Select Secondary Roles First",
+                                label: "Select Secondary Role First",
                                 value: "",
                                 disabled: true,
                               },
@@ -1262,7 +1231,7 @@ export default function UserFormPage() {
                 <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <AppInput
                     label="Username"
-                    placeholder="Enter username"
+                    placeholder="Enter Username"
                     value={form.username}
                     onChange={(e) => fieldChange("username", e.target.value)}
                     restrictType="username"
@@ -1365,8 +1334,8 @@ export default function UserFormPage() {
                         }
                         placeholder={
                           hasExistingLogin
-                            ? "Enter new password (8–12 characters)"
-                            : "Enter password (8–12 characters)"
+                            ? "Enter New Password"
+                            : "Enter Password"
                         }
                         type={showPassword ? "text" : "password"}
                         value={form.newPassword}
@@ -1405,7 +1374,7 @@ export default function UserFormPage() {
                             ? "Confirm New Password"
                             : "Confirm Password"
                         }
-                        placeholder="Re-enter password"
+                        placeholder="Enter Confirm Password"
                         type={showConfirm ? "text" : "password"}
                         value={form.confirmPassword}
                         onChange={(e) =>

@@ -38,13 +38,14 @@ export default function AppMultiSelect({
           options.some((o) => o.value === v && o.disabled)
         );
         onChange({ target: { value: disabledSelected } });
+        // Do not close when deselecting all
       } else {
         // Select all selectable options
         const selectableVals = selectableOptions.map((o) => o.value);
         const merged = Array.from(new Set([...(value || []), ...selectableVals]));
         onChange({ target: { value: merged } });
+        setOpen(false); // Close when choosing Select All
       }
-      // Keep menu open so user can continue toggling selections without reopening
     } else {
       onChange(event);
     }
