@@ -728,33 +728,76 @@ export default function EventsPage() {
       render: (row) => {
         const categories = getEventCategories(row, eventTypes);
 
+        // Parse eventDates if stored as JSON dictionary of dates
+        let datesByType = null;
+        if (row.eventDates && typeof row.eventDates === "string" && row.eventDates.trim().startsWith("{")) {
+          try {
+            datesByType = JSON.parse(row.eventDates);
+          } catch {
+            datesByType = null;
+          }
+        } else if (row.eventTypeDates && typeof row.eventTypeDates === "object") {
+          datesByType = row.eventTypeDates;
+        }
+
+        if (!datesByType && row.description && row.description.includes("<!--eventDates:")) {
+          const match = row.description.match(/<!--eventDates:(.*?)-->/);
+          if (match) {
+            try {
+              datesByType = JSON.parse(match[1]);
+            } catch {}
+          }
+        }
+
         return (
           <Box sx={{ py: 0.3, display: "flex", flexDirection: "column", gap: 0.8 }}>
             {categories.map((cat, idx) => {
               const cfg = getCategoryChipConfig(cat);
-              const isBirthdayCat = String(cat || "").toLowerCase().includes("birthday");
+              const catLower = String(cat || "").toLowerCase().trim();
+              const isBirthdayCat = catLower.includes("birthday");
 
               let dateDisplay = "";
-              if (isBirthdayCat && row.eventDates) {
-                const rawList = String(row.eventDates)
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean);
 
-                const countsMap = new Map();
-                rawList.forEach((d) => {
-                  const match = d.match(/^(.*?)(?:\s*\((\d+)\))?$/);
-                  const datePart = match && match[1] ? match[1].trim() : d;
-                  const count = match && match[2] ? Number(match[2]) : 1;
-                  countsMap.set(datePart, (countsMap.get(datePart) || 0) + count);
+              if (datesByType) {
+                const matchKey = Object.keys(datesByType).find((k) => {
+                  const kLow = k.toLowerCase().trim();
+                  return kLow === catLower || catLower.includes(kLow) || kLow.includes(catLower);
                 });
+                if (matchKey && datesByType[matchKey]) {
+                  const val = datesByType[matchKey];
+                  if (typeof val === "object" && val !== null) {
+                    const distinctDates = Array.from(new Set(Object.values(val).filter(Boolean)));
+                    dateDisplay = distinctDates.map((d) => formatGridDate(d)).join(", ");
+                  } else if (dayjs(val).isValid()) {
+                    dateDisplay = formatGridDate(val);
+                  } else {
+                    dateDisplay = String(val);
+                  }
+                }
+              }
 
-                const formattedParts = Array.from(countsMap.entries()).map(([dateStr, count]) =>
-                  count > 1 ? `${dateStr} (${count})` : dateStr
-                );
-                dateDisplay = formattedParts.join(", ");
-              } else {
-                dateDisplay = formatGridDate(row.eventDate);
+              if (!dateDisplay) {
+                if (isBirthdayCat && row.eventDates && !row.eventDates.trim().startsWith("{")) {
+                  const rawList = String(row.eventDates)
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+
+                  const countsMap = new Map();
+                  rawList.forEach((d) => {
+                    const match = d.match(/^(.*?)(?:\s*\((\d+)\))?$/);
+                    const datePart = match && match[1] ? match[1].trim() : d;
+                    const count = match && match[2] ? Number(match[2]) : 1;
+                    countsMap.set(datePart, (countsMap.get(datePart) || 0) + count);
+                  });
+
+                  const formattedParts = Array.from(countsMap.entries()).map(([dateStr, count]) =>
+                    count > 1 ? `${dateStr} (${count})` : dateStr
+                  );
+                  dateDisplay = formattedParts.join(", ");
+                } else {
+                  dateDisplay = formatGridDate(row.eventDate);
+                }
               }
 
               return (
