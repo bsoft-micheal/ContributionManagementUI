@@ -73,18 +73,13 @@ export default function EventAddPhotoDialog({
       event.category ||
       event.categoryName ||
       (Array.isArray(event.eventTypeNames) && event.eventTypeNames[0]) ||
-      "Birthday";
-
-    const initialEventDate = event.eventDate ? dayjs(event.eventDate) : dayjs();
-
-    const rawDefaultTitle = `${event.eventName || "Event"} Celebration Photos`;
-    const cleanDefaultTitle = rawDefaultTitle.replace(/[^A-Za-z\s]/g, "").slice(0, 50);
+      "";
 
     setForm({
-      title: cleanDefaultTitle,
-      eventName: event.eventName || "",
+      title: "",
+      eventName: event.eventName || event.name || "",
       category: initialCat,
-      takenDate: initialEventDate.isValid() ? initialEventDate : null,
+      takenDate: null,
       imageUrl: "",
       imageUrls: [],
       description: "",
@@ -290,7 +285,7 @@ export default function EventAddPhotoDialog({
     } else if (!/^[A-Za-z\s]+$/.test(form.title.trim())) {
       newErrors.title = "Only letters and spaces are allowed";
     } else if (form.title.trim().length > 250) {
-      newErrors.title = "Title must be at most 250 characters";
+      newErrors.title = "Photo Title must be at most 250 characters";
     }
 
     if (!form.category) newErrors.category = "This field is required";
@@ -423,7 +418,7 @@ export default function EventAddPhotoDialog({
       <AppDialog
       open={open}
       onClose={saving ? undefined : onClose}
-      title={`Add Photos — ${event?.eventName || "Event"}`}
+      title="Add Photos"
       maxWidth="md"
       actions={
         <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
@@ -453,11 +448,12 @@ export default function EventAddPhotoDialog({
               </Alert>
             </Grid>
           )}
-          {/* Row 1: Title & Event Date */}
+
+          {/* Row 1: Photo Title & Event Type */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
-              label="Title"
-              placeholder="e.g. Birthday celebration moments"
+              label="Photo Title"
+              placeholder="Enter the Title"
               value={form.title}
               maxLength={250}
               onKeyDown={(e) => {
@@ -472,7 +468,7 @@ export default function EventAddPhotoDialog({
                 if (/[^A-Za-z\s]/.test(raw)) {
                   setErrors((p) => ({ ...p, title: "Only letters and spaces are allowed" }));
                 } else if (raw.length > 250) {
-                  setErrors((p) => ({ ...p, title: "Title must be at most 250 characters" }));
+                  setErrors((p) => ({ ...p, title: "Photo Title must be at most 250 characters" }));
                 } else {
                   setErrors((p) => (p.title || p.form ? { ...p, title: "", form: "" } : p));
                 }
@@ -484,8 +480,27 @@ export default function EventAddPhotoDialog({
           </Grid>
 
           <Grid size={{ xs: 12, sm: 6 }}>
+            <AppInput
+              label="Event Type"
+              value={form.category}
+              disabled
+              required
+            />
+          </Grid>
+
+          {/* Row 2: Event Name & Photo Date */}
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <AppInput
+              label="Event Name"
+              value={form.eventName}
+              disabled
+              required
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, sm: 6 }}>
             <AppDateInput
-              label="Event Date"
+              label="Photo Date"
               value={form.takenDate}
               onChange={(newVal, err) => {
                 setForm((c) => ({ ...c, takenDate: newVal }));
@@ -503,28 +518,25 @@ export default function EventAddPhotoDialog({
             />
           </Grid>
 
-          {/* Row 2: Event Type and Event Name */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppInput
-              label="Event Type"
-              value={form.category}
-              disabled
-              required
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <AppInput
-              label="Event Name"
-              value={form.eventName}
-              disabled
-              required
-            />
-          </Grid>
-
-          {/* Row 3: Multi-Photo Upload Area */}
+          {/* Row 3: Description */}
           <Grid size={{ xs: 12 }}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
+            <AppTextArea
+              label="Description"
+              placeholder="Enter photo or moment description..."
+              value={form.description}
+              onChange={(e) => {
+                if (e.target.value.length <= 500) {
+                  setForm((c) => ({ ...c, description: e.target.value }));
+                }
+              }}
+              maxLength={500}
+              minRows={2}
+            />
+          </Grid>
+
+          {/* Row 4: Multi-Photo Upload Area */}
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8, flexWrap: "wrap", gap: 1 }}>
               <Typography
                 variant="caption"
                 sx={{
@@ -533,7 +545,7 @@ export default function EventAddPhotoDialog({
                   fontSize: "0.74rem",
                 }}
               >
-                Upload Photos{" "}
+                Upload Images {existingEventPhotoCount > 0 ? `(Max ${maxAllowedForEvent} for this entry, Total 5 per event)` : "(Max 5 images per event, up to 10MB)"}{" "}
                 <Box
                   component="span"
                   sx={{
@@ -552,32 +564,36 @@ export default function EventAddPhotoDialog({
                   label={`${remainingMBFormatted} MB remaining of 10 MB`}
                   size="small"
                   sx={{
-                    fontWeight: 700,
-                    fontSize: "0.74rem",
+                    height: 20,
+                    fontSize: "0.65rem",
+                    fontWeight: 800,
                     bgcolor: remainingMB < 1 ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 185, 129, 0.12)",
                     color: remainingMB < 1 ? "#ef4444" : "#10b981",
                     border: "1px solid",
                     borderColor: remainingMB < 1 ? "rgba(239, 68, 68, 0.25)" : "rgba(16, 185, 129, 0.25)",
                   }}
                 />
-                <Chip
-                  label={`Photos for Event: ${existingEventPhotoCount + currentSelectedImages.length} / 5 max`}
-                  size="small"
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: "0.74rem",
-                    bgcolor:
-                      existingEventPhotoCount >= 5
-                        ? "rgba(239, 68, 68, 0.12)"
-                        : "rgba(124, 58, 237, 0.12)",
-                    color: existingEventPhotoCount >= 5 ? "#ef4444" : "#7c3aed",
-                    border: "1px solid",
-                    borderColor:
-                      existingEventPhotoCount >= 5
-                        ? "rgba(239, 68, 68, 0.25)"
-                        : "rgba(124, 58, 237, 0.25)",
-                  }}
-                />
+                {currentSelectedImages.length > 0 && (
+                  <Chip
+                    label={`${currentSelectedImages.length} of ${maxAllowedForEvent} uploaded (Event Total: ${existingEventPhotoCount + currentSelectedImages.length}/5)`}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: "0.65rem",
+                      fontWeight: 800,
+                      bgcolor:
+                        (existingEventPhotoCount + currentSelectedImages.length) >= 5
+                          ? "rgba(22, 163, 74, 0.12)"
+                          : "rgba(124, 58, 237, 0.12)",
+                      color: (existingEventPhotoCount + currentSelectedImages.length) >= 5 ? "#16a34a" : "#7c3aed",
+                      border: "1px solid",
+                      borderColor:
+                        (existingEventPhotoCount + currentSelectedImages.length) >= 5
+                          ? "rgba(22, 163, 74, 0.25)"
+                          : "rgba(124, 58, 237, 0.25)",
+                    }}
+                  />
+                )}
               </Stack>
             </Box>
             <input
@@ -839,7 +855,7 @@ export default function EventAddPhotoDialog({
                       variant="caption"
                       sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block", mt: 0.4 }}
                     >
-                      Select up to {maxAllowedForEvent} image(s) • Max 5 photos per event • Maximum 10MB total • JPG, PNG
+                      Select up to {maxAllowedForEvent} image(s) • Max 5 photos per event • {remainingMBFormatted} MB remaining of 10 MB limit • JPG, PNG, WebP
                     </Typography>
                   </Box>
                 )}
@@ -859,23 +875,6 @@ export default function EventAddPhotoDialog({
                 {errors.imageUrl}
               </FormHelperText>
             )}
-          </Grid>
-
-          {/* Row 5: Description */}
-          <Grid size={{ xs: 12 }}>
-            <AppTextArea
-              label="Description"
-              placeholder="Optional photo caption or memory details..."
-              value={form.description}
-              onChange={(e) => {
-                if (e.target.value.length <= 500) {
-                  setForm((c) => ({ ...c, description: e.target.value }));
-                }
-              }}
-              maxLength={500}
-              minRows={2}
-              maxRows={3}
-            />
           </Grid>
         </Grid>
       )}
