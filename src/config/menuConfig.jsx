@@ -73,7 +73,7 @@ export const navigationItems = [
       { featureId: MENU_FEATURE_IDS.EVENT_TYPES, label: "Event Types", path: "/event-types", icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: MENU_FEATURE_IDS.BUDGET_CALCULATION, label: "Budget Calculations", path: "/budget-calculations", icon: <CalculateRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: MENU_FEATURE_IDS.TYPES, label: "Types", path: "/types", icon: <CategoryRoundedIcon sx={{ fontSize: "1rem" }} /> },
-      { featureId: MENU_FEATURE_IDS.STATUS, label: "Status", path: "/status", icon: <RuleRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      // { featureId: MENU_FEATURE_IDS.STATUS, label: "Status", path: "/status", icon: <RuleRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: MENU_FEATURE_IDS.EXIT_PROCESS, label: "Exit Process", path: "/exit-process", icon: <PersonRemoveRoundedIcon sx={{ fontSize: "1rem" }} /> },
       { featureId: MENU_FEATURE_IDS.SETTINGS, label: "Settings", path: "/settings", icon: <SettingsRoundedIcon sx={{ fontSize: "1rem" }} /> },
     ]

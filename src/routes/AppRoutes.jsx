@@ -62,7 +62,7 @@ export default function AppRoutes() {
         <Route path="/budget-calculations" element={<ProtectedRoute><BudgetCalculationsPage /></ProtectedRoute>} />
         <Route path="/types" element={<ProtectedRoute><TypesPage /></ProtectedRoute>} />
         <Route path="/ticket-types" element={<ProtectedRoute><TypesPage /></ProtectedRoute>} />
-        <Route path="/status" element={<ProtectedRoute><StatusPage /></ProtectedRoute>} />
+        {/* <Route path="/status" element={<ProtectedRoute><StatusPage /></ProtectedRoute>} /> */}
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/my-contributions" element={<ProtectedRoute><MyContributionSummaryPage /></ProtectedRoute>} />
         <Route path="/reports" element={<Navigate to="/reports/event-collection-audit" replace />} />
