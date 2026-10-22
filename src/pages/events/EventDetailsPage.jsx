@@ -156,8 +156,17 @@ export default function EventDetailsPage() {
         }
         title={eventDetails.eventName}
         description={`${(eventDetails.description || "").replace(/<!--[\s\S]*?-->/g, "").trim()} Scheduled for ${
-          eventDetails.eventDates
-            ? String(eventDetails.eventDates)
+          (() => {
+            if (eventDetails.eventDates) {
+              try {
+                const parsed = JSON.parse(eventDetails.eventDates);
+                if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                  return Object.entries(parsed)
+                    .map(([type, d]) => `${type}: ${formatViewDate(d)}`)
+                    .join(", ");
+                }
+              } catch {}
+              return String(eventDetails.eventDates)
                 .split(",")
                 .map((s) => s.trim())
                 .filter(Boolean)
@@ -167,8 +176,10 @@ export default function EventDetailsPage() {
                   const count = match && match[2] ? Number(match[2]) : 1;
                   return count > 1 ? `${datePart} (${count})` : datePart;
                 })
-                .join(", ")
-            : formatViewDate(eventDetails.eventDate)
+                .join(", ");
+            }
+            return formatViewDate(eventDetails.eventDate);
+          })()
         }.`}
         actions={
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
