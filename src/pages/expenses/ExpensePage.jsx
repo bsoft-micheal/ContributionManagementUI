@@ -289,7 +289,8 @@ export default function ExpensePage() {
             : item.id || `EXP-${String(idx + 1).padStart(3, "0")}`,
           expenseId: item.expenseId || item.id,
           eventName: item.eventName || "",
-          category: item.category || "",
+          category: item.category || item.eventTypeName || item.categoryName || "",
+          eventTypeName: item.category || item.eventTypeName || item.categoryName || "",
           amount: item.amount || 0,
           rawExpenseDate: item.expenseDate,
           expenseDate: item.expenseDate ? dayjs(item.expenseDate).format("YYYY-MM-DD") : "",
@@ -1143,6 +1144,11 @@ export default function ExpensePage() {
       ),
     },
     {
+      label: "Event Type",
+      key: "category",
+      render: (row) => row.category || row.eventTypeName || "--",
+    },
+    {
       label: "Event Name",
       key: "eventName",
       render: (row) => (
@@ -1150,10 +1156,6 @@ export default function ExpensePage() {
           {row.eventName}
         </Typography>
       ),
-    },
-    {
-      label: "Category",
-      key: "category",
     },
     {
       label: "Amount",
