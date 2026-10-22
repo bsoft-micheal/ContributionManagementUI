@@ -16,6 +16,30 @@ import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
 import dayjs from "dayjs";
 
 /**
+ * Safely parse any date representation to a valid dayjs object
+ */
+function toDayjs(val) {
+  if (!val) return null;
+  if (dayjs.isDayjs(val)) return val.isValid() ? val : null;
+  if (val instanceof Date) {
+    const d = dayjs(val);
+    return d.isValid() ? d : null;
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
+      const [d, m, y] = trimmed.split("/").map(Number);
+      const parsed = dayjs(new Date(y, m - 1, d));
+      if (parsed.isValid()) return parsed;
+    }
+    const parsed = dayjs(trimmed);
+    if (parsed.isValid()) return parsed;
+  }
+  return null;
+}
+
+/**
  * Custom action bar with "Today" button (with icon) on left, Cancel & OK on right
  */
 function CustomActionBar({ onSetToday, onCancel, onAccept, onSelectToday, className }) {
@@ -177,6 +201,10 @@ function CustomCalendarHeader({
   view,
   onViewChange,
   disabled,
+  minDate,
+  maxDate,
+  disableFuture,
+  disablePast,
 }) {
   const month = currentMonth
     ? dayjs.isDayjs(currentMonth)
@@ -184,23 +212,59 @@ function CustomCalendarHeader({
       : dayjs(currentMonth)
     : dayjs();
 
+  const effectiveMaxDate = maxDate
+    ? toDayjs(maxDate)
+    : disableFuture
+    ? dayjs().endOf("day")
+    : null;
+
+  const effectiveMinDate = minDate
+    ? toDayjs(minDate)
+    : disablePast
+    ? dayjs().startOf("day")
+    : null;
+
+  const isNextMonthDisabled = Boolean(
+    disabled ||
+      (effectiveMaxDate &&
+        month.add(1, "month").startOf("month").isAfter(effectiveMaxDate, "day"))
+  );
+
+  const isNextYearDisabled = Boolean(
+    disabled ||
+      (effectiveMaxDate &&
+        month.add(1, "year").startOf("year").isAfter(effectiveMaxDate, "day"))
+  );
+
+  const isPrevMonthDisabled = Boolean(
+    disabled ||
+      (effectiveMinDate &&
+        month.subtract(1, "month").endOf("month").isBefore(effectiveMinDate, "day"))
+  );
+
+  const isPrevYearDisabled = Boolean(
+    disabled ||
+      (effectiveMinDate &&
+        month.subtract(1, "year").endOf("year").isBefore(effectiveMinDate, "day"))
+  );
+
   const handlePrevMonth = () => {
-    if (!onMonthChange) return;
+    if (!onMonthChange || isPrevMonthDisabled) return;
     onMonthChange(month.subtract(1, "month"), "left");
   };
 
   const handleNextMonth = () => {
-    if (!onMonthChange) return;
+    if (!onMonthChange || isNextMonthDisabled) return;
     onMonthChange(month.add(1, "month"), "right");
   };
 
   const handlePrevYear = () => {
-    if (!onMonthChange) return;
+    if (!onMonthChange || isPrevYearDisabled) return;
     onMonthChange(month.subtract(1, "year"), "left");
   };
 
   const handleNextYear = () => {
-    if (!onMonthChange) return;
+    if (!onMonthChange || isNextYearDisabled) return;
     onMonthChange(month.add(1, "year"), "right");
   };
 
@@ -232,9 +296,11 @@ function CustomCalendarHeader({
         <IconButton
           size="small"
           onClick={handlePrevMonth}
-          disabled={disabled}
+          disabled={isPrevMonthDisabled}
           sx={{
             p: 0.4,
+            opacity: isPrevMonthDisabled ? 0.38 : 1,
+            pointerEvents: isPrevMonthDisabled ? "none" : "auto",
             color: (theme) =>
               theme.palette.mode === "dark" ? "#e7ebf7" : "#1d1b20",
             "&:hover": {
@@ -278,9 +344,11 @@ function CustomCalendarHeader({
         <IconButton
           size="small"
           onClick={handleNextMonth}
-          disabled={disabled}
+          disabled={isNextMonthDisabled}
           sx={{
             p: 0.4,
+            opacity: isNextMonthDisabled ? 0.38 : 1,
+            pointerEvents: isNextMonthDisabled ? "none" : "auto",
             color: (theme) =>
               theme.palette.mode === "dark" ? "#e7ebf7" : "#1d1b20",
             "&:hover": {
@@ -300,9 +368,11 @@ function CustomCalendarHeader({
         <IconButton
           size="small"
           onClick={handlePrevYear}
-          disabled={disabled}
+          disabled={isPrevYearDisabled}
           sx={{
             p: 0.4,
+            opacity: isPrevYearDisabled ? 0.38 : 1,
+            pointerEvents: isPrevYearDisabled ? "none" : "auto",
             color: (theme) =>
               theme.palette.mode === "dark" ? "#e7ebf7" : "#1d1b20",
             "&:hover": {
@@ -346,9 +416,11 @@ function CustomCalendarHeader({
         <IconButton
           size="small"
           onClick={handleNextYear}
-          disabled={disabled}
+          disabled={isNextYearDisabled}
           sx={{
             p: 0.4,
+            opacity: isNextYearDisabled ? 0.38 : 1,
+            pointerEvents: isNextYearDisabled ? "none" : "auto",
             color: (theme) =>
               theme.palette.mode === "dark" ? "#e7ebf7" : "#1d1b20",
             "&:hover": {
@@ -364,30 +436,6 @@ function CustomCalendarHeader({
       </Box>
     </Box>
   );
-}
-
-/**
- * Safely parse any date representation to a valid dayjs object
- */
-function toDayjs(val) {
-  if (!val) return null;
-  if (dayjs.isDayjs(val)) return val.isValid() ? val : null;
-  if (val instanceof Date) {
-    const d = dayjs(val);
-    return d.isValid() ? d : null;
-  }
-  if (typeof val === "string") {
-    const trimmed = val.trim();
-    if (!trimmed) return null;
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
-      const [d, m, y] = trimmed.split("/").map(Number);
-      const parsed = dayjs(new Date(y, m - 1, d));
-      if (parsed.isValid()) return parsed;
-    }
-    const parsed = dayjs(trimmed);
-    if (parsed.isValid()) return parsed;
-  }
-  return null;
 }
 
 export default function AppDateInput({
@@ -406,6 +454,7 @@ export default function AppDateInput({
   maxDate,
   disableFuture,
   disablePast,
+  closeOnSelect = true,
   clearable = false,
   startAdornment,
   sx: customSx = {},
@@ -420,16 +469,34 @@ export default function AppDateInput({
   const dayjsVal = toDayjs(value);
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
+  const effectiveMax = maxDate
+    ? toDayjs(maxDate)
+    : disableFuture
+    ? dayjs().endOf("day")
+    : null;
+
+  const effectiveMin = minDate
+    ? toDayjs(minDate)
+    : disablePast
+    ? dayjs().startOf("day")
+    : null;
+
   const handleChange = (newValue) => {
     if (onChange) {
       if (newValue && newValue.isValid()) {
-        const min = minDate ? toDayjs(minDate) : (disablePast ? dayjs().startOf("day") : null);
-        if (min && newValue.isBefore(min, "day")) {
+        if (effectiveMin && newValue.isBefore(effectiveMin, "day")) {
           onChange(null, "Cannot select a past date");
+          return;
+        }
+        if (effectiveMax && newValue.isAfter(effectiveMax, "day")) {
+          onChange(null, "Future dates are not allowed");
           return;
         }
       }
       onChange(newValue && newValue.isValid() ? newValue : null);
+    }
+    if (closeOnSelect && newValue && newValue.isValid()) {
+      setPickerOpen(false);
     }
   };
 
@@ -471,16 +538,18 @@ export default function AppDateInput({
         open={pickerOpen}
         onOpen={() => setPickerOpen(true)}
         onClose={() => setPickerOpen(false)}
-        minDate={minDate ? toDayjs(minDate) : undefined}
-        maxDate={maxDate ? toDayjs(maxDate) : undefined}
+        minDate={effectiveMin || undefined}
+        maxDate={effectiveMax || undefined}
         disableFuture={disableFuture}
         disablePast={disablePast}
         onError={(newError) => {
           if (newError === "minDate" || newError === "disablePast") {
             if (onChange) onChange(null, "Cannot select a past date");
+          } else if (newError === "maxDate" || newError === "disableFuture") {
+            if (onChange) onChange(null, "Future dates are not allowed");
           }
         }}
-        closeOnSelect={false}
+        closeOnSelect={closeOnSelect}
         showDaysOutsideCurrentMonth
         dayOfWeekFormatter={(date) =>
           date ? (date.format ? date.format("dd")[0] : dayjs(date).format("dd")[0]) : ""
@@ -492,6 +561,13 @@ export default function AppDateInput({
           ...props.slots,
         }}
         slotProps={{
+          calendarHeader: {
+            minDate: effectiveMin || undefined,
+            maxDate: effectiveMax || undefined,
+            disableFuture,
+            disablePast,
+            ...customSlotProps.calendarHeader,
+          },
           field: {
             clearable: clearable,
             ...customSlotProps.field,

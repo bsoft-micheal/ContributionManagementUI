@@ -8,6 +8,7 @@ import {
   Stack,
   Chip,
   CircularProgress,
+  FormHelperText,
 } from "@mui/material";
 import {
   CloudUploadOutlined as CloudUploadIcon,
@@ -32,7 +33,7 @@ const initialForm = {
   title: "",
   eventName: "",
   category: "",
-  takenDate: dayjs(),
+  takenDate: null,
   imageUrl: "",
   imageUrls: [],
   description: "",
@@ -83,7 +84,7 @@ export default function EventAddPhotoDialog({
       title: cleanDefaultTitle,
       eventName: event.eventName || "",
       category: initialCat,
-      takenDate: initialEventDate.isValid() ? initialEventDate : dayjs(),
+      takenDate: initialEventDate.isValid() ? initialEventDate : null,
       imageUrl: "",
       imageUrls: [],
       description: "",
@@ -294,6 +295,18 @@ export default function EventAddPhotoDialog({
 
     if (!form.category) newErrors.category = "This field is required";
     if (!form.eventName) newErrors.eventName = "This field is required";
+
+    if (!form.takenDate) {
+      newErrors.takenDate = filed;
+    } else {
+      const parsedDate = dayjs(form.takenDate);
+      if (!parsedDate.isValid()) {
+        newErrors.takenDate = "Invalid date";
+      } else if (parsedDate.isAfter(dayjs().endOf("day"))) {
+        newErrors.takenDate = "Future dates are not allowed";
+      }
+    }
+
     if (form.description && form.description.length > 500) {
       newErrors.description = "Description cannot exceed 500 characters";
     }
@@ -313,16 +326,14 @@ export default function EventAddPhotoDialog({
         : [];
 
     if (currentImages.length === 0) {
-      newErrors.imageUrl =
-        maxAllowedForEvent > 0
-          ? `Please upload at least 1 image file (up to ${maxAllowedForEvent} photo(s))`
-          : "Event limit reached (Max 5 photos per event)";
+      newErrors.imageUrl = filed;
     } else if (currentImages.length > maxAllowedForEvent) {
       newErrors.imageUrl = `You can only upload up to ${maxAllowedForEvent} photo(s) (Event already has ${existingEventPhotoCount} photos, total max 5 per event).`;
     }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      toast.error("Please fill required field");
       return;
     }
 
@@ -449,9 +460,13 @@ export default function EventAddPhotoDialog({
               placeholder="e.g. Birthday celebration moments"
               value={form.title}
               maxLength={250}
-              showCount
+              onKeyDown={(e) => {
+                if (e.key === " " && (!form.title || form.title.length === 0)) {
+                  e.preventDefault();
+                }
+              }}
               onChange={(e) => {
-                const raw = e.target.value;
+                const raw = e.target.value.replace(/^\s+/, "");
                 const sanitized = raw.replace(/[^A-Za-z\s]/g, "").slice(0, 250);
                 setForm((c) => ({ ...c, title: sanitized }));
                 if (/[^A-Za-z\s]/.test(raw)) {
@@ -472,9 +487,18 @@ export default function EventAddPhotoDialog({
             <AppDateInput
               label="Event Date"
               value={form.takenDate}
-              onChange={(newVal) => {
+              onChange={(newVal, err) => {
                 setForm((c) => ({ ...c, takenDate: newVal }));
+                if (err) {
+                  setErrors((p) => ({ ...p, takenDate: err }));
+                } else if (newVal && errors.takenDate) {
+                  setErrors((p) => ({ ...p, takenDate: "" }));
+                }
               }}
+              disableFuture
+              maxDate={dayjs().endOf("day")}
+              error={!!errors.takenDate}
+              helperText={errors.takenDate}
               required
             />
           </Grid>
@@ -817,17 +841,23 @@ export default function EventAddPhotoDialog({
                     >
                       Select up to {maxAllowedForEvent} image(s) • Max 5 photos per event • Maximum 10MB total • JPG, PNG
                     </Typography>
-                    {errors.imageUrl && (
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "error.main", fontWeight: 700, mt: 0.6, display: "block" }}
-                      >
-                        {errors.imageUrl}
-                      </Typography>
-                    )}
                   </Box>
                 )}
               </Box>
+            )}
+            {errors.imageUrl && (
+              <FormHelperText
+                error
+                sx={{
+                  fontSize: "0.75rem",
+                  fontWeight: 400,
+                  mt: 0.5,
+                  ml: 0.5,
+                  color: (theme) => (theme.palette.mode === "dark" ? "#f87171 !important" : "#ef4444 !important"),
+                }}
+              >
+                {errors.imageUrl}
+              </FormHelperText>
             )}
           </Grid>
 

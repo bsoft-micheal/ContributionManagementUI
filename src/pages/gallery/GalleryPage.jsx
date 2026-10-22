@@ -8,6 +8,7 @@ import {
   Stack,
   Chip,
   Alert,
+  FormHelperText,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -110,11 +111,56 @@ const initialForm = {
   title: "",
   eventName: "",
   category: "",
-  takenDate: dayjs(),
+  takenDate: null,
   imageUrl: "",
   imageUrls: [],
   description: "",
 };
+
+function OverflowTitleCell({ title }) {
+  const textRef = useRef(null);
+  const [isOverflowed, setIsOverflowed] = useState(false);
+
+  const checkOverflow = () => {
+    if (textRef.current) {
+      const hasOverflow = textRef.current.scrollWidth > textRef.current.clientWidth;
+      setIsOverflowed(hasOverflow);
+    }
+  };
+
+  useEffect(() => {
+    checkOverflow();
+    window.addEventListener("resize", checkOverflow);
+    return () => window.removeEventListener("resize", checkOverflow);
+  }, [title]);
+
+  const content = (
+    <Typography
+      ref={textRef}
+      onMouseEnter={checkOverflow}
+      variant="body2"
+      fontWeight={700}
+      sx={{
+        color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        display: "block",
+        cursor: isOverflowed ? "pointer" : "default",
+      }}
+    >
+      {title}
+    </Typography>
+  );
+
+  return isOverflowed ? (
+    <Tooltip title={title} arrow placement="top">
+      {content}
+    </Tooltip>
+  ) : (
+    content
+  );
+}
 
 export default function GalleryPage() {
   const { authState } = useAuth();
@@ -459,7 +505,7 @@ export default function GalleryPage() {
     });
     const items = Array.from(set);
     return [
-      { label: "All Categories", value: "ALL" },
+      { label: "All Type", value: "ALL" },
       ...items.map((c) => ({ label: c, value: c })),
     ];
   }, [eventTypesList, photos, filterCategory]);
@@ -853,6 +899,18 @@ export default function GalleryPage() {
 
     if (!form.category) newErrors.category = filed;
     if (!form.eventName) newErrors.eventName = filed;
+
+    if (!form.takenDate) {
+      newErrors.takenDate = filed;
+    } else {
+      const parsedDate = dayjs(form.takenDate);
+      if (!parsedDate.isValid()) {
+        newErrors.takenDate = "Invalid date";
+      } else if (parsedDate.isAfter(dayjs().endOf("day"))) {
+        newErrors.takenDate = "Future dates are not allowed";
+      }
+    }
+
     if (form.description && form.description.length > 500) {
       newErrors.description = "Description cannot exceed 500 characters";
     }
@@ -870,15 +928,14 @@ export default function GalleryPage() {
       : (form.imageUrl ? [form.imageUrl] : []);
 
     if (currentImages.length === 0) {
-      newErrors.imageUrl = maxAllowed > 0
-        ? `Please upload at least 1 image file (up to ${maxAllowed} image(s), max 10MB)`
-        : "Event limit reached (Max 5 photos per event)";
+      newErrors.imageUrl = filed;
     } else if (currentImages.length > maxAllowed) {
       newErrors.imageUrl = `Event "${form.eventName}" already has ${existingCount} photos. You can only upload up to ${maxAllowed} photo(s) (Total max 5 per event).`;
     }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      toast.error("Please fill required field");
       return;
     }
 
@@ -1020,75 +1077,11 @@ export default function GalleryPage() {
     {
       label: "Title",
       key: "title",
-      render: (row) => {
-        const titleStr = row.title || "";
-        const isLong = titleStr.length > 30;
-        const displayTitle = isLong ? `${titleStr.slice(0, 30)}...` : titleStr;
-
-        return (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, maxWidth: 320 }}>
-            {isLong ? (
-              <Tooltip title={titleStr} arrow placement="top">
-                <Typography
-                  variant="body2"
-                  fontWeight={700}
-                  sx={{
-                    color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
-                    cursor: "pointer",
-                  }}
-                >
-                  {displayTitle}
-                </Typography>
-              </Tooltip>
-            ) : (
-              <Typography
-                variant="body2"
-                fontWeight={700}
-                sx={{
-                  color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
-                }}
-              >
-                {displayTitle}
-              </Typography>
-            )}
-            {row.images && row.images.length > 1 && (
-              <Chip
-                label={`${row.images.length} photos`}
-                size="small"
-                sx={{
-                  height: 18,
-                  fontSize: "0.65rem",
-                  fontWeight: 700,
-                  flexShrink: 0,
-                  bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74,63,107,0.08)"),
-                  color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
-                }}
-              />
-            )}
-          </Box>
-        );
-      },
-    },
-    {
-      label: "Event Name",
-      key: "eventName",
-      render: (row) => {
-        const nameStr = row.eventName || "--";
-        const isLong = nameStr.length > 30;
-        const displayName = isLong ? `${nameStr.slice(0, 30)}...` : nameStr;
-
-        return isLong ? (
-          <Tooltip title={nameStr} arrow placement="top">
-            <Typography variant="body2" fontWeight={600} sx={{ cursor: "pointer" }}>
-              {displayName}
-            </Typography>
-          </Tooltip>
-        ) : (
-          <Typography variant="body2" fontWeight={600}>
-            {displayName}
-          </Typography>
-        );
-      },
+      render: (row) => (
+        <Box sx={{ minWidth: 0, maxWidth: { xs: 200, sm: 300, md: 450, lg: 550 } }}>
+          <OverflowTitleCell title={row.title || ""} />
+        </Box>
+      ),
     },
     {
       label: "Event Type",
@@ -1110,6 +1103,27 @@ export default function GalleryPage() {
           {row.category}
         </Typography>
       ),
+    },
+    {
+      label: "Event Name",
+      key: "eventName",
+      render: (row) => {
+        const nameStr = row.eventName || "--";
+        const isLong = nameStr.length > 30;
+        const displayName = isLong ? `${nameStr.slice(0, 30)}...` : nameStr;
+
+        return isLong ? (
+          <Tooltip title={nameStr} arrow placement="top">
+            <Typography variant="body2" fontWeight={600} sx={{ cursor: "pointer" }}>
+              {displayName}
+            </Typography>
+          </Tooltip>
+        ) : (
+          <Typography variant="body2" fontWeight={600}>
+            {displayName}
+          </Typography>
+        );
+      },
     },
     {
       label: "Date",
@@ -1135,6 +1149,7 @@ export default function GalleryPage() {
         columns={columns}
         data={filteredPhotos}
         loading={loading}
+        searchPlaceholder="Search by Event name..."
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             <AppAddButton
@@ -1154,7 +1169,7 @@ export default function GalleryPage() {
             <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
               <Box sx={{ minWidth: 180 }}>
                 <AppSelect
-                  label="Select Event Type"
+                  label="Event Type"
                   value={filterCategory}
                   onChange={(e) => {
                     const newCategory = e.target.value || "ALL";
@@ -1167,13 +1182,13 @@ export default function GalleryPage() {
                   }}
                   options={categoryOptions}
                   size="small"
-                  placeholder="Select Category"
+                  placeholder="Select Type"
                   fullWidth
                 />
               </Box>
               <Box sx={{ minWidth: 220 }}>
                 <AppSelect
-                  label="Select Event Name"
+                  label="Event Name"
                   value={filterEvent}
                   onChange={(e) => {
                     setFilterEvent(e.target.value || "ALL");
@@ -1267,9 +1282,13 @@ export default function GalleryPage() {
               placeholder="Enter the Title"
               value={form.title}
               maxLength={250}
-              showCount
+              onKeyDown={(e) => {
+                if (e.key === " " && (!form.title || form.title.length === 0)) {
+                  e.preventDefault();
+                }
+              }}
               onChange={(e) => {
-                const raw = e.target.value;
+                const raw = e.target.value.replace(/^\s+/, "");
                 const sanitized = raw.replace(/[^A-Za-z\s]/g, "").slice(0, 250);
                 setForm((c) => (c.title === sanitized ? c : { ...c, title: sanitized }));
                 if (/[^A-Za-z\s]/.test(raw)) {
@@ -1347,9 +1366,18 @@ export default function GalleryPage() {
             <AppDateInput
               label="Photo Date"
               value={form.takenDate}
-              onChange={(newVal) => {
+              onChange={(newVal, err) => {
                 setForm((c) => ({ ...c, takenDate: newVal }));
+                if (err) {
+                  setErrors((p) => ({ ...p, takenDate: err }));
+                } else if (newVal) {
+                  setErrors((p) => ({ ...p, takenDate: "" }));
+                }
               }}
+              disableFuture
+              maxDate={dayjs().endOf("day")}
+              error={!!errors.takenDate}
+              helperText={errors.takenDate}
               required
             />
           </Grid>
@@ -1657,7 +1685,7 @@ export default function GalleryPage() {
                     <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block", mt: 0.4 }}>
                       Select up to {maxPhotosForForm} image(s) • Max 5 photos per event • {remainingMBFormatted} MB remaining of 10 MB limit • JPG, PNG, WebP
                     </Typography>
-                    {errors.imageUrl && (
+                    {errors.imageUrl && errors.imageUrl !== "This field is required" && (
                       <Typography variant="caption" sx={{ color: "error.main", fontWeight: 700, mt: 0.6, display: "block" }}>
                         {errors.imageUrl}
                       </Typography>
@@ -1665,6 +1693,23 @@ export default function GalleryPage() {
                   </>
                 )}
               </Box>
+            )}
+            {errors.imageUrl && (
+              <FormHelperText
+                error
+                sx={{
+                  fontSize: "0.75rem",
+                  fontWeight: 400,
+                  mt: 0.5,
+                  ml: 0.5,
+                  color: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "#f87171 !important"
+                      : "#ef4444 !important",
+                }}
+              >
+                {errors.imageUrl}
+              </FormHelperText>
             )}
           </Grid>
         </Grid>
@@ -1726,40 +1771,27 @@ export default function GalleryPage() {
               const activeImg = currentImages[activeViewImageIndex] || currentImages[0];
               if (!activeImg) return null;
 
-              return (
-                <>
+              if (currentImages.length > 1) {
+                return (
                   <AppButton
                     variant="outlined"
                     startIcon={<DownloadIcon />}
                     onClick={() => {
-                      handleDownloadImage(
-                        activeImg,
-                        `${selectedPhoto.title || "gallery-photo"}-${activeViewImageIndex + 1}`
-                      );
+                      currentImages.forEach((img, i) => {
+                        setTimeout(() => {
+                          handleDownloadImage(
+                            img,
+                            `${selectedPhoto.title || "gallery-photo"}-${i + 1}`
+                          );
+                        }, i * 350);
+                      });
                     }}
                   >
-                    Download Current Photo
+                    Download All ({currentImages.length})
                   </AppButton>
-                  {currentImages.length > 1 && (
-                    <AppButton
-                      variant="outlined"
-                      startIcon={<DownloadIcon />}
-                      onClick={() => {
-                        currentImages.forEach((img, i) => {
-                          setTimeout(() => {
-                            handleDownloadImage(
-                              img,
-                              `${selectedPhoto.title || "gallery-photo"}-${i + 1}`
-                            );
-                          }, i * 350);
-                        });
-                      }}
-                    >
-                      Download All ({currentImages.length})
-                    </AppButton>
-                  )}
-                </>
-              );
+                );
+              }
+              return null;
             })()}
             <AppButton
               variant="contained"
