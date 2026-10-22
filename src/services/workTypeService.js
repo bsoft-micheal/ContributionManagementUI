@@ -5,7 +5,11 @@ export const getWorkTypesAsync = async (activeOnly = false) => {
     ? "/work-types/getAllWorkTypeAsync?activeOnly=true"
     : "/work-types/getAllWorkTypeAsync";
   const result = await getApi(url);
-  return result || [];
+  if (Array.isArray(result)) return result;
+  if (result && Array.isArray(result.$values)) return result.$values;
+  if (result && Array.isArray(result.items)) return result.items;
+  if (result && Array.isArray(result.data)) return result.data;
+  return [];
 };
 
 export const getWorkTypeByIdAsync = async (id) => {

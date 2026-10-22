@@ -262,7 +262,7 @@ export default function MembersPage() {
               >
                 <Box sx={{ minWidth: 200 }}>
                   <AppSelect
-                    label="Filter by Role"
+                    label="User Role"
                     placeholder="Select Role"
                     value={filterRoleId}
                     onChange={(e) => setFilterRoleId(e.target.value || "")}
