@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  Alert,
 } from "@mui/material";
 import {
   CloudUpload as CloudUploadIcon,
@@ -27,7 +28,7 @@ import AppTextArea from "../common/AppTextArea";
 import { useAppToast } from "../common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNotifications } from "../../contexts/NotificationContext";
-import { createSupportTicketAsync } from "../../services/supportTicketService";
+import { createSupportTicketAsync, getSupportTicketsAsync } from "../../services/supportTicketService";
 import { getMembersAsync } from "../../services/memberService";
 import { getEventsAsync } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
@@ -76,6 +77,7 @@ export default function AddSupportTicketModal({
   const [eventTypesList, setEventTypesList] = useState([]);
   const [dbTicketTypes, setDbTicketTypes] = useState([]);
   const [dbPriorities, setDbPriorities] = useState([]);
+  const [existingTickets, setExistingTickets] = useState([]);
 
   // Attachment states
   const fileInputRef = useRef(null);
@@ -95,12 +97,13 @@ export default function AddSupportTicketModal({
 
     const fetchLookupData = async () => {
       try {
-        const [membersRes, eventsRes, eventTypesRes, ticketTypesRes, prioritiesRes] = await Promise.all([
+        const [membersRes, eventsRes, eventTypesRes, ticketTypesRes, prioritiesRes, ticketsRes] = await Promise.all([
           getMembersAsync().catch(() => []),
           getEventsAsync().catch(() => []),
           getEventTypesAsync().catch(() => []),
           getTicketTypesAsync(true).catch(() => []),
           getPrioritiesAsync(true).catch(() => []),
+          getSupportTicketsAsync().catch(() => []),
         ]);
 
         if (!isMounted) return;
@@ -109,6 +112,7 @@ export default function AddSupportTicketModal({
         if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
         if (Array.isArray(ticketTypesRes)) setDbTicketTypes(ticketTypesRes);
         if (Array.isArray(prioritiesRes)) setDbPriorities(prioritiesRes);
+        if (Array.isArray(ticketsRes)) setExistingTickets(ticketsRes);
       } catch {
         // Fallback silently if lookups fail
       }
@@ -265,17 +269,57 @@ export default function AddSupportTicketModal({
     return list;
   }, [eventsList, form.eventType, form.relatedEvent]);
 
-  // Ticket Type options
+  // Helper: Find active/unverified ticket for a specific ticket type
+  const getUnverifiedTicketForType = (typeVal) => {
+    if (!typeVal) return null;
+    const cleanType = String(typeVal).trim().toLowerCase();
+    const rawMemberName = (form.memberName || authState?.fullName || authState?.username || "").trim().toLowerCase();
+    const rawMemberId = String(form.memberId || authState?.memberId || authState?.user?.userId || "").trim().toLowerCase();
+
+    return (existingTickets || []).find((t) => {
+      const s = String(t.status || "").trim().toLowerCase();
+      const isVerified = ["verified", "resolved", "closed"].some((v) => s.includes(v));
+      if (isVerified) return false;
+
+      const tType = String(t.ticketType || "").trim().toLowerCase();
+      if (tType !== cleanType) return false;
+
+      if (isMemberRole && userRole !== "admin" && userRole !== "organizer") return true;
+
+      const tName = (t.memberName || "").trim().toLowerCase();
+      const tId = String(t.memberId || "").trim().toLowerCase();
+      const tCreatedBy = (t.createdBy || "").trim().toLowerCase();
+
+      return (rawMemberName && (tName === rawMemberName || tCreatedBy === rawMemberName)) ||
+             (rawMemberId && (tId === rawMemberId || tCreatedBy === rawMemberId));
+    });
+  };
+
+  // Ticket Type options with active ticket status
   const ticketTypeOptions = useMemo(() => {
     const fromDb = Array.isArray(dbTicketTypes)
       ? dbTicketTypes
         .filter((t) => t.typeName && t.isActive !== false)
-        .map((t) => ({ label: t.typeName, value: t.typeName }))
+        .map((t) => {
+          const active = getUnverifiedTicketForType(t.typeName);
+          return {
+            label: active ? `${t.typeName} (Active: ${active.ticketNo})` : t.typeName,
+            value: t.typeName,
+            disabled: Boolean(active),
+          };
+        })
       : [];
 
     if (fromDb.length > 0) return fromDb;
-    return DEFAULT_TICKET_TYPES.map((t) => ({ label: t, value: t }));
-  }, [dbTicketTypes]);
+    return DEFAULT_TICKET_TYPES.map((t) => {
+      const active = getUnverifiedTicketForType(t);
+      return {
+        label: active ? `${t} (Active: ${active.ticketNo})` : t,
+        value: t,
+        disabled: Boolean(active),
+      };
+    });
+  }, [dbTicketTypes, form.memberName, form.memberId, existingTickets, authState, isMemberRole, userRole]);
 
   // Priority options
   const priorityOptions = useMemo(() => {
@@ -367,10 +411,15 @@ export default function AddSupportTicketModal({
     setPreviewModalOpen(true);
   };
 
+  const unverifiedTicketForSelectedType = useMemo(() => {
+    return getUnverifiedTicketForType(form.ticketType);
+  }, [existingTickets, form.ticketType, form.memberName, form.memberId, authState, isMemberRole, userRole]);
+
   const handleSaveTicket = async () => {
     const newErrors = {};
     if (!form.memberName) newErrors.memberName = "This field is required";
     if (!form.eventType) newErrors.eventType = "This field is required";
+    if (!form.relatedEvent || !String(form.relatedEvent).trim()) newErrors.relatedEvent = "This field is required";
     if (!form.ticketType) newErrors.ticketType = "This field is required";
     if (!form.priority || !String(form.priority).trim()) newErrors.priority = "This field is required";
     if (!form.description || !form.description.trim()) newErrors.description = "This field is required";
@@ -378,6 +427,14 @@ export default function AddSupportTicketModal({
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS || "Please fill in all required fields.");
+      return;
+    }
+
+    const existingUnverified = getUnverifiedTicketForType(form.ticketType);
+    if (existingUnverified) {
+      toast.warning(
+        `You already have an active support ticket (${existingUnverified.ticketNo}) for ticket type "${existingUnverified.ticketType}". A new ticket for this type can only be created after the existing ticket is verified.`
+      );
       return;
     }
 
@@ -389,8 +446,8 @@ export default function AddSupportTicketModal({
         if (matched) resolvedMemberId = matched.memberId || matched.id || "";
       }
 
-      const randomSuffix = String(Math.floor(Math.random() * 900) + 100);
-      const newTicketNo = `TKT-${dayjs().format("YYYY")}-${randomSuffix}`;
+      const nextCount = (existingTickets?.length || 0) + 1;
+      const newTicketNo = `TKT${String(nextCount).padStart(4, "0")}`;
 
       const created = await createSupportTicketAsync({
         ticketNo: newTicketNo,
@@ -454,13 +511,22 @@ export default function AddSupportTicketModal({
             />
             <AppSaveButton
               loading={isSaving}
-              disabled={isSaving}
+              disabled={isSaving || Boolean(unverifiedTicketForSelectedType)}
               onClick={handleSaveTicket}
             />
           </Stack>
         }
       >
         <Grid container spacing={2}>
+          {unverifiedTicketForSelectedType && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="warning" sx={{ borderRadius: "8px", fontWeight: 600 }}>
+                {isMemberRole
+                  ? `You currently have an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}". Please wait until it is verified before submitting another ticket for this type.`
+                  : `Member already has an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}". It must be verified before creating a new ticket for this type.`}
+              </Alert>
+            </Grid>
+          )}
           {/* Name */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
@@ -513,6 +579,10 @@ export default function AddSupportTicketModal({
                       ? matchingEvents[0].eventName || matchingEvents[0].name || matchingEvents[0].title
                       : "";
 
+                  if (newRelatedEvent) {
+                    setErrors((p) => ({ ...p, relatedEvent: "" }));
+                  }
+
                   return {
                     ...c,
                     eventType: selectedType,
@@ -536,10 +606,13 @@ export default function AddSupportTicketModal({
               allowClear={true}
               onChange={(e) => {
                 const selectedName = e.target.value;
+                if (errors.relatedEvent) setErrors((p) => ({ ...p, relatedEvent: "" }));
                 const matched = (eventsList || []).find(
                   (ev) => (ev.eventName || ev.name || ev.title) === selectedName
                 );
                 const matchedType = matched?.eventTypeName || matched?.categoryName || matched?.eventType || "";
+
+                if (matchedType && errors.eventType) setErrors((p) => ({ ...p, eventType: "" }));
 
                 setForm((c) => ({
                   ...c,
@@ -548,6 +621,9 @@ export default function AddSupportTicketModal({
                 }));
               }}
               options={eventNameOptions}
+              error={Boolean(errors.relatedEvent)}
+              helperText={errors.relatedEvent}
+              required
             />
           </Grid>
 

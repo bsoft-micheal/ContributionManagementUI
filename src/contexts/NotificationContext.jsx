@@ -9,12 +9,12 @@ const DEFAULT_NOTIFICATIONS = [
     id: "notif-101",
     type: "TICKET_RAISED",
     title: "New Support Ticket Raised",
-    message: "Member Rahul Sharma raised a Support Ticket (#TKT-2026-004) regarding Payment Transaction #TXN-2026-008 (Pending).",
+    message: "Member Rahul Sharma raised a Support Ticket (#TKT0004) regarding Payment Transaction #TXN-2026-008 (Pending).",
     timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 mins ago
     isRead: false,
     targetRole: "Authority",
     link: "/support-tickets",
-    ticketNo: "TKT-2026-004",
+    ticketNo: "TKT0004",
   },
   {
     id: "notif-102",
@@ -30,11 +30,12 @@ const DEFAULT_NOTIFICATIONS = [
     id: "notif-103",
     type: "TICKET_RESOLVED",
     title: "Support Ticket Resolved",
-    message: "Support ticket #TKT-2026-002 was marked as Resolved.",
+    message: "Support ticket #TKT0002 was marked as Resolved.",
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
     isRead: true,
     targetRole: "All",
     link: "/support-tickets",
+    ticketNo: "TKT0002",
   }
 ];
 
