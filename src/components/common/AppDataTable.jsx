@@ -357,7 +357,8 @@ export default function AppDataTable({
   filterPanel,
   allowExport = true,
   allowPagination = true,
-  searchPlaceholder = "Search by username...",
+  searchPlaceholder = "Search by username..",
+  searchWidth,
   initialRowsPerPage = 15,
   emptyMessage,
 }) {
@@ -855,7 +856,7 @@ export default function AppDataTable({
               ),
               sx: {
                 height: 32,
-                width: { xs: "100%", sm: 200 },
+                width: searchWidth || { xs: "100%", sm: 220, md: 250 },
                 fontSize: "0.78rem",
                 borderRadius: "4px",
                 bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#ffffff",

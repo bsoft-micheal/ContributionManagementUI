@@ -126,8 +126,8 @@ const initialForm = {
   phone: "",
   gender: "",
   workType: "",
-  dateOfBirth: dayjs().subtract(18, "year"),
-  joiningDate: dayjs(),
+  dateOfBirth: null,
+  joiningDate: null,
   createMemberProfile: false, // Enable User Access (OFF by default)
   enableMultipleRoles: false, // Enable Multiple Roles (OFF by default)
   roleName: "",
@@ -204,15 +204,18 @@ export default function UsersPage() {
   };
 
   const typeOptions = useMemo(() => {
-    if (workTypes && workTypes.length > 0) {
-      return workTypes
-        .filter((w) => w.isActive !== false)
-        .map((w) => ({ label: w.workTypeName, value: w.workTypeName }));
-    }
-    return [
-      { label: "Office", value: "Office" },
-      { label: "WFH", value: "WFH" },
-    ];
+    const list = Array.isArray(workTypes)
+      ? workTypes
+      : Array.isArray(workTypes?.$values)
+      ? workTypes.$values
+      : [];
+    return list
+      .filter((w) => w && w.isActive !== false)
+      .map((w) => {
+        const name = w.workTypeName || w.typeName || w.name || "";
+        return { label: name, value: name };
+      })
+      .filter((opt) => Boolean(opt.value));
   }, [workTypes]);
 
   const templateValidations = useMemo(() => {
@@ -265,7 +268,7 @@ export default function UsersPage() {
       }),
       "Work Type": {
         type: "list",
-        formulae: [`"${workTypesStr || "Office,WFH"}"`],
+        formulae: [`"${workTypesStr}"`],
         promptTitle: "Work Type",
         prompt: "Select Work Type from dropdown.",
         errorTitle: "Invalid Work Type",
@@ -702,8 +705,8 @@ export default function UsersPage() {
         email: userToToggle.email,
         roleName: userToToggle.roleName,
         phone: userToToggle.phone || "",
-        gender: userToToggle.gender || "Male",
-        workType: userToToggle.workType || "Office",
+        gender: userToToggle.gender || "",
+        workType: userToToggle.workType || "",
         dateOfBirth: userToToggle.dateOfBirth,
         joiningDate: userToToggle.joiningDate,
         isActive: !userToToggle.isActive,
@@ -821,7 +824,7 @@ export default function UsersPage() {
     }
 
     // 6. Work Type
-    let normalizedType = typeOptions[0]?.value || "Office";
+    let normalizedType = typeOptions[0]?.value || "";
     if (rawType) {
       const matchedType = typeOptions.find((t) => t.value.toLowerCase() === rawType.toLowerCase());
       if (matchedType) {
@@ -1148,7 +1151,7 @@ export default function UsersPage() {
               {/* Role filter */}
               <Box sx={{ minWidth: 180 }}>
                 <AppSelect
-                  label="Filter by Role"
+                  label="User Role"
                   placeholder="Select Role"
                   value={filterRole}
                   onChange={(e) => {
@@ -1164,7 +1167,7 @@ export default function UsersPage() {
               {/* Status filter */}
               <Box sx={{ minWidth: 160 }}>
                 <AppSelect
-                  label="Filter by Status"
+                  label=" User Status"
                   placeholder="Select Status"
                   value={filterStatus}
                   onChange={(e) => {

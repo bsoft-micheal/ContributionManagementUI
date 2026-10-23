@@ -1591,7 +1591,7 @@ export default function ReportsPage({ mode = "event" }) {
           const row = {
             "Member Name": mName,
             "Email": u.email || "—",
-            "Work Type": u.workType || "Office",
+            "Work Type": u.workType || "—",
           };
 
           let totalPaid = 0;

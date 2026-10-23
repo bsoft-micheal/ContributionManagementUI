@@ -12,6 +12,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  Alert,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -293,11 +294,9 @@ export default function SupportTicketsPage() {
       const data = await getSupportTicketsAsync();
       if (Array.isArray(data)) {
         const mapped = data.map((item, idx) => ({
-          id: item.ticketId
-            ? `TKT-${String(idx + 1).padStart(3, "0")}`
-            : item.id || `TKT-${String(idx + 1).padStart(3, "0")}`,
+          id: item.ticketId || item.id || `TKT${String(idx + 1).padStart(4, "0")}`,
           ticketId: item.ticketId || item.id,
-          ticketNo: item.ticketNo || `TKT-2026-${String(idx + 1).padStart(3, "0")}`,
+          ticketNo: item.ticketNo || `TKT${String(idx + 1).padStart(4, "0")}`,
           memberName: item.memberName || "",
           memberId: item.memberId || "",
           eventId: item.eventId || item.EventId || null,
@@ -651,8 +650,99 @@ export default function SupportTicketsPage() {
     });
   }, [filteredTickets, eventsList, eventTypesList]);
 
+  const isTicketVerified = (status) => {
+    const s = String(status || "").trim().toLowerCase();
+    return ["verified", "resolved", "closed"].some((v) => s.includes(v));
+  };
+
+  // Helper: Find active/unverified ticket for a specific ticket type
+  const getUnverifiedTicketForType = (typeVal, targetMemberName, targetMemberId) => {
+    if (!typeVal) return null;
+    const cleanType = String(typeVal).trim().toLowerCase();
+    const loggedIn = getLoggedInMember();
+    const mName = String(targetMemberName || loggedIn.name || authState?.fullName || authState?.username || "").trim().toLowerCase();
+    const mId = String(targetMemberId || loggedIn.id || authState?.memberId || authState?.user?.userId || "").trim().toLowerCase();
+
+    return (tickets || []).find((t) => {
+      if (isTicketVerified(t.status)) return false;
+
+      const tType = String(t.ticketType || "").trim().toLowerCase();
+      if (tType !== cleanType) return false;
+
+      if (isMemberRole && !isAdminOrOrg) return true;
+
+      const tName = (t.memberName || "").trim().toLowerCase();
+      const tId = String(t.memberId || "").trim().toLowerCase();
+      const tCreatedBy = (t.createdBy || "").trim().toLowerCase();
+
+      const matchesName = mName && (tName === mName || tCreatedBy === mName);
+      const matchesId = mId && (tId === mId || tCreatedBy === mId);
+
+      return matchesName || matchesId;
+    });
+  };
+
+  // Active unverified tickets for current member
+  const memberActiveUnverifiedTickets = useMemo(() => {
+    const loggedIn = getLoggedInMember();
+    const mName = String(loggedIn.name || authState?.fullName || authState?.username || "").trim().toLowerCase();
+    const mId = String(loggedIn.id || authState?.memberId || authState?.user?.userId || "").trim().toLowerCase();
+
+    return (tickets || []).filter((t) => {
+      if (isTicketVerified(t.status)) return false;
+      if (isMemberRole && !isAdminOrOrg) return true;
+
+      const tName = (t.memberName || "").trim().toLowerCase();
+      const tId = String(t.memberId || "").trim().toLowerCase();
+      const tCreatedBy = (t.createdBy || "").trim().toLowerCase();
+
+      const matchesName = mName && (tName === mName || tCreatedBy === mName);
+      const matchesId = mId && (tId === mId || tCreatedBy === mId);
+
+      return matchesName || matchesId;
+    });
+  }, [tickets, authState, isMemberRole, isAdminOrOrg, membersList]);
+
+  // Check if unverified ticket exists for currently selected form.ticketType
+  const unverifiedTicketForSelectedType = useMemo(() => {
+    if (editingTicket) return null;
+    return getUnverifiedTicketForType(form.ticketType, form.memberName, form.memberId);
+  }, [form.ticketType, form.memberName, form.memberId, editingTicket, tickets, authState, isMemberRole, isAdminOrOrg, membersList]);
+
+  // List of active ticket types from master data
+  const masterTicketTypeNames = useMemo(() => {
+    return (dbTicketTypes || [])
+      .filter((t) => t.isActive !== false && t.typeName)
+      .map((t) => t.typeName);
+  }, [dbTicketTypes]);
+
+  // Whether all available ticket types already have active tickets
+  const allTicketTypesOccupied = useMemo(() => {
+    if (!masterTicketTypeNames.length) return false;
+    const loggedIn = getLoggedInMember();
+    return masterTicketTypeNames.every((typeName) => Boolean(getUnverifiedTicketForType(typeName, loggedIn.name, loggedIn.id)));
+  }, [masterTicketTypeNames, tickets, authState, isMemberRole, isAdminOrOrg, membersList]);
+
+  // Ticket type options with status for Add/Edit dialog
+  const dialogTicketTypeOptions = useMemo(() => {
+    const loggedIn = getLoggedInMember();
+    const targetName = form.memberName || loggedIn.name;
+    const targetId = form.memberId || loggedIn.id;
+
+    return (dbTicketTypes || [])
+      .filter((t) => t.typeName && t.isActive !== false)
+      .map((t) => {
+        const activeTicket = getUnverifiedTicketForType(t.typeName, targetName, targetId);
+        return {
+          label: activeTicket && !editingTicket ? `${t.typeName} (Active: ${activeTicket.ticketNo})` : t.typeName,
+          value: t.typeName,
+          disabled: Boolean(activeTicket) && !editingTicket,
+        };
+      });
+  }, [dbTicketTypes, form.memberName, form.memberId, editingTicket, tickets, authState, isMemberRole, isAdminOrOrg, membersList]);
+
   const handleEditTicket = (row) => {
-    const isVerified = ["verified", "resolved", "closed"].includes((row?.status || "").trim().toLowerCase());
+    const isVerified = isTicketVerified(row?.status);
     if (isVerified) {
       toast.warning("Cannot edit a verified ticket.");
       return;
@@ -683,7 +773,7 @@ export default function SupportTicketsPage() {
   };
 
   const handleDeleteRequest = (row) => {
-    const isVerified = ["verified", "resolved", "closed"].includes((row?.status || "").trim().toLowerCase());
+    const isVerified = isTicketVerified(row?.status);
     if (isVerified) {
       toast.warning("Cannot delete a verified ticket.");
       return;
@@ -716,7 +806,9 @@ export default function SupportTicketsPage() {
     const newErrors = {};
     if (!form.memberName) newErrors.memberName = "This field is required";
     if (!form.eventType) newErrors.eventType = "This field is required";
+    if (!form.relatedEvent || !String(form.relatedEvent).trim()) newErrors.relatedEvent = "This field is required";
     if (!form.ticketType) newErrors.ticketType = "This field is required";
+    if (!form.priority || !String(form.priority).trim()) newErrors.priority = "This field is required";
     if (!form.description || !form.description.trim()) newErrors.description = "This field is required";
 
     if (Object.keys(newErrors).length > 0) {
@@ -731,6 +823,23 @@ export default function SupportTicketsPage() {
       if (!resolvedMemberId && form.memberName) {
         const matched = membersList.find((m) => (m.name || m.memberName) === form.memberName);
         if (matched) resolvedMemberId = matched.memberId || matched.id || "";
+      }
+
+      // Check if user already has an active unverified ticket for this ticket type before creating
+      if (!editingTicket) {
+        const existingUnverified = getUnverifiedTicketForType(
+          form.ticketType,
+          form.memberName,
+          resolvedMemberId || form.memberId
+        );
+
+        if (existingUnverified) {
+          toast.warning(
+            `You already have an active support ticket (${existingUnverified.ticketNo}) for ticket type "${existingUnverified.ticketType}". A new ticket for this type can only be created after the existing ticket is verified.`
+          );
+          setIsSaving(false);
+          return;
+        }
       }
 
       if (editingTicket) {
@@ -749,8 +858,8 @@ export default function SupportTicketsPage() {
         });
         toast.success(TOAST_MESSAGES.SUPPORT.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
-        const nextIdx = tickets.length + 1;
-        const newTicketNo = `TKT-2026-${String(nextIdx).padStart(3, "0")}`;
+        const nextIdx = (tickets?.length || 0) + 1;
+        const newTicketNo = `TKT${String(nextIdx).padStart(4, "0")}`;
 
         const created = await createSupportTicketAsync({
           ticketNo: newTicketNo,
@@ -1064,7 +1173,7 @@ export default function SupportTicketsPage() {
       render: (row) => row.ticketNo || "--",
     },
     {
-      label: "User Name",
+      label: "Name",
       key: "memberName",
       render: (row) => {
         let name = row.memberName;
@@ -1246,37 +1355,52 @@ export default function SupportTicketsPage() {
         data={processedTickets}
         loading={loading}
         allowExport={canExportTicket}
+        searchPlaceholder="Search by Ticket No..."
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppAddButton
-              disabled={!canAddTicket}
-              onClick={() => {
-                const firstTicketType = dbTicketTypes.find((t) => t.isActive !== false)?.typeName || "";
-                const firstStatus = dbStatuses.find((s) => s.isActive !== false)?.statusName || "";
-                const loggedIn = getLoggedInMember();
-                const defaultEvent = eventsList.length > 0 ? eventsList[0] : null;
-                const defaultEventName = defaultEvent ? (defaultEvent.eventName || defaultEvent.name || defaultEvent.title || "") : "";
-                const defaultEventType = defaultEvent ? (defaultEvent.eventTypeName || defaultEvent.categoryName || defaultEvent.eventType || "") : "";
-                const defaultEventId = defaultEvent ? (defaultEvent.eventId || defaultEvent.id || null) : null;
+            <Tooltip
+              title={
+                !canAddTicket
+                  ? "Disabled"
+                  : isMemberRole && allTicketTypesOccupied
+                  ? "You have active tickets for all ticket types. Wait until existing tickets are verified to submit new ones."
+                  : "Add Support Ticket"
+              }
+            >
+              <span>
+                <AppAddButton
+                  disabled={!canAddTicket || (isMemberRole && allTicketTypesOccupied)}
+                  onClick={() => {
+                    if (isMemberRole && allTicketTypesOccupied) {
+                      toast.warning(
+                        "You have active support tickets for all available ticket types. You can only create a new ticket after an existing ticket is verified."
+                      );
+                      return;
+                    }
+                    const loggedIn = getLoggedInMember();
+                    const firstStatus = dbStatuses.find((s) => s.isActive !== false)?.statusName || "";
 
-                const addFormData = {
-                  ...initialForm,
-                  memberName: loggedIn.name || authState?.fullName || "",
-                  memberId: loggedIn.id || "",
-                  eventId: defaultEventId,
-                  relatedEvent: defaultEventName,
-                  eventType: defaultEventType,
-                  ticketType: "",
-                  status: firstStatus,
-                  description: "",
-                };
-                setEditingTicket(null);
-                setForm(addFormData);
-                savedFormRef.current = addFormData;
-                setErrors({});
-                setDialogOpen(true);
-              }}
-            />
+                    const addFormData = {
+                      ...initialForm,
+                      memberName: loggedIn.name || authState?.fullName || "",
+                      memberId: loggedIn.id || "",
+                      eventId: null,
+                      relatedEvent: "",
+                      eventType: "",
+                      ticketType: "",
+                      priority: "",
+                      status: firstStatus,
+                      description: "",
+                    };
+                    setEditingTicket(null);
+                    setForm(addFormData);
+                    savedFormRef.current = addFormData;
+                    setErrors({});
+                    setDialogOpen(true);
+                  }}
+                />
+              </span>
+            </Tooltip>
           </Stack>
         }
         filterPanel={
@@ -1284,7 +1408,7 @@ export default function SupportTicketsPage() {
             <Grid size={{ xs: 12 }} sx={{ display: "flex", alignItems: "flex-end", gap: 1.5, flexWrap: "wrap" }}>
               <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
                 <AppSelect
-                  label="Select Ticket Type"
+                  label="Ticket Type"
                   value={filterType}
                   onChange={(e) => {
                     setFilterType(e.target.value);
@@ -1297,7 +1421,7 @@ export default function SupportTicketsPage() {
               </Box>
               <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
                 <AppSelect
-                  label="Select Priority"
+                  label="Ticket Priority"
                   value={filterPriority}
                   onChange={(e) => {
                     setFilterPriority(e.target.value);
@@ -1310,7 +1434,7 @@ export default function SupportTicketsPage() {
               </Box>
               <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
                 <AppSelect
-                  label="Select Status"
+                  label="Ticket Status"
                   value={filterStatus}
                   onChange={(e) => {
                     setFilterStatus(e.target.value);
@@ -1323,7 +1447,7 @@ export default function SupportTicketsPage() {
               </Box>
               <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
                 <AppSelect
-                  label="Select Event"
+                  label="Event Name"
                   value={filterEvent}
                   onChange={(e) => {
                     setFilterEvent(e.target.value);
@@ -1406,7 +1530,7 @@ export default function SupportTicketsPage() {
             />
             <AppSaveButton
               loading={isSaving}
-              disabled={isSaving}
+              disabled={isSaving || (!editingTicket && Boolean(unverifiedTicketForSelectedType))}
               onClick={handleSaveTicket}
             >
               {editingTicket ? "Update" : "Save"}
@@ -1415,6 +1539,15 @@ export default function SupportTicketsPage() {
         }
       >
         <Grid container spacing={2}>
+          {!editingTicket && unverifiedTicketForSelectedType && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="warning" sx={{ borderRadius: "8px", fontWeight: 600 }}>
+                {isMemberRole
+                  ? `You currently have an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}". Please wait until it is verified before submitting another ticket for this type.`
+                  : `Member already has an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}". It must be verified before creating a new ticket for this type.`}
+              </Alert>
+            </Grid>
+          )}
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppSelect
               label="Name"
@@ -1462,6 +1595,10 @@ export default function SupportTicketsPage() {
                     (ev) => (ev.eventName || ev.name || ev.title) === newRelatedEvent
                   );
 
+                  if (newRelatedEvent) {
+                    setErrors((p) => ({ ...p, relatedEvent: "" }));
+                  }
+
                   return {
                     ...c,
                     eventType: selectedType,
@@ -1483,10 +1620,13 @@ export default function SupportTicketsPage() {
               value={form.relatedEvent}
               onChange={(e) => {
                 const selectedName = e.target.value;
+                if (errors.relatedEvent) setErrors((p) => ({ ...p, relatedEvent: "" }));
                 const matched = (eventsList || []).find(
                   (ev) => (ev.eventName || ev.name || ev.title) === selectedName
                 );
                 const matchedType = matched?.eventTypeName || matched?.categoryName || matched?.eventType || "";
+
+                if (matchedType && errors.eventType) setErrors((p) => ({ ...p, eventType: "" }));
 
                 setForm((c) => ({
                   ...c,
@@ -1496,6 +1636,9 @@ export default function SupportTicketsPage() {
                 }));
               }}
               options={eventNameOptions}
+              error={Boolean(errors.relatedEvent)}
+              helperText={errors.relatedEvent}
+              required
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
@@ -1507,7 +1650,7 @@ export default function SupportTicketsPage() {
                 setForm((c) => ({ ...c, ticketType: e.target.value }));
                 if (errors.ticketType) setErrors((p) => ({ ...p, ticketType: "" }));
               }}
-              options={ticketTypeOptions.filter((o) => o.value !== "ALL")}
+              options={dialogTicketTypeOptions}
               error={Boolean(errors.ticketType)}
               helperText={errors.ticketType}
               required
