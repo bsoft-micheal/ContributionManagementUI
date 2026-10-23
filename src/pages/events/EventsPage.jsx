@@ -1003,6 +1003,7 @@ export default function EventsPage() {
         columns={columns}
         data={displayedEvents}
         allowExport={canExportEvent}
+        searchPlaceholder="Search by event name..."
         actions={
           <AppAddButton
             disabled={!canAddEvent}

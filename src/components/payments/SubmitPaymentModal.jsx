@@ -1341,7 +1341,7 @@ export default function SubmitPaymentModal({
       (formData.screenshots && formData.screenshots.length > 0) ||
       (typeof formData.screenshot === "string" && formData.screenshot.trim().length > 0);
     if (isImageMandatory && !hasScreenshots) {
-      errs.screenshot = "At least 1 payment screenshot / receipt slip is mandatory for UPI / online payments.";
+      errs.screenshot = "This field is required";
     }
 
     setErrors(errs);
@@ -1438,7 +1438,7 @@ export default function SubmitPaymentModal({
       };
 
       const res = await submitPaymentProofAsync(payload);
-      toast.success("Payment submission recorded and synchronized with Contribution ledger successfully!");
+      toast.success("Payment successfull");
 
       addNotification({
         type: "PAYMENT_PENDING",
@@ -2257,10 +2257,14 @@ export default function SubmitPaymentModal({
             {errors.screenshot && (
               <Typography
                 variant="caption"
-                color="error"
-                sx={{ display: "block", mt: 0.8, fontWeight: 700 }}
+                sx={{
+                  display: "block",
+                  mt: 0.5,
+                  fontSize: "0.75rem",
+                  color: (theme) => (theme.palette.mode === "dark" ? "#f87171" : "#ef4444"),
+                }}
               >
-                ⚠️ {errors.screenshot}
+                {errors.screenshot}
               </Typography>
             )}
           </Grid>

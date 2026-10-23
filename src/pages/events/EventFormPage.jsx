@@ -3368,7 +3368,7 @@ export default function EventFormPage({
               <Box sx={{ mt: 1.8 }}>
                 <AppTextArea
                   label="Description"
-                  placeholder="Enter optional description..."
+                  placeholder="Enter description..."
                   value={form.description}
                   onChange={(e) => {
                     if (e.target.value.length <= 500) {

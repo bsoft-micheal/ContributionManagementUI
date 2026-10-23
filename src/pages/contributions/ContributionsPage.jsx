@@ -600,9 +600,9 @@ export default function ContributionsPage() {
     return hasContributionPayment(c);
   };
 
-  const hasSubmittedPayment = (c) => {
+  const hasSubmittedPayment = (c, tx = null) => {
     if (!c) return false;
-    return hasContributionPayment(c);
+    return hasContributionPayment(c, tx);
   };
 
   const getContributionOutstanding = (c, activeEv) => {
@@ -1274,7 +1274,7 @@ export default function ContributionsPage() {
       );
     }
 
-    return Number(matchedTx?.amount || row.paidAmount || row.totalReceivedAmount || row.amount || 0);
+    return Number(matchedTx?.amount || row.paidAmount || row.totalReceivedAmount || 0);
   }, []);
 
   const getModalStatusOptions = (row) => {
@@ -1575,13 +1575,52 @@ export default function ContributionsPage() {
       render: (row) => {
         const matchedTx = findContributionTransaction(row);
         const statusStr = String(row?.paymentStatus || row?.status || row?.statusName || matchedTx?.status || "").trim().toLowerCase();
+        const isRejected =
+          statusStr === "rejected" ||
+          String(matchedTx?.status || "").toLowerCase() === "rejected" ||
+          String(row?.paymentStatus || "").toLowerCase() === "rejected" ||
+          String(row?.statusName || "").toLowerCase() === "rejected";
+
         const isVerifiedRow = isContributionVerified(row, matchedTx);
-        const isActuallyVerified = statusStr === "verified" || (isVerifiedRow && statusStr !== "rejected");
+        const isActuallyVerified = statusStr === "verified" || (isVerifiedRow && !isRejected);
         const hasSubmitted = hasSubmittedPayment(row, matchedTx);
         const hasDirectPaid = isContributionPaid(row, matchedTx);
-        const isPaidStatus = statusStr === "paid" || statusStr === "verified" || statusStr === "completed" || statusStr === "closed" || row?.paymentStatus === 2;
+        const isPaidStatus =
+          statusStr === "paid" ||
+          statusStr === "verified" ||
+          statusStr === "completed" ||
+          statusStr === "closed" ||
+          row?.paymentStatus === 2;
+
+        const actualReceivedAmt = getActualReceivedAmount(row, matchedTx);
+        const hasPositiveReceivedAmt = actualReceivedAmt > 0;
         const isSettledByAmount = Number(row?.paidAmount || 0) > 0 && (row?.totalAccumulated === undefined || Number(row?.totalAccumulated) <= 0);
-        const isPaidMember = Boolean(isActuallyVerified || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount);
+
+        // Member has payment recorded, payment proof submitted, or is settled/paid
+        const hasMemberPaid = Boolean(
+          isActuallyVerified ||
+          isPaidStatus ||
+          hasDirectPaid ||
+          hasSubmitted ||
+          isSettledByAmount ||
+          hasPositiveReceivedAmt ||
+          (Number(row?.paidAmount || 0) > 0) ||
+          (Number(row?.totalReceivedAmount || 0) > 0) ||
+          (row?.paymentMode && row?.paymentMode !== "-" && row?.paymentMode !== "--" && String(row?.paymentMode).toLowerCase() !== "none")
+        );
+
+        const isPaidMember = Boolean(isActuallyVerified || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount || hasPositiveReceivedAmt);
+
+        // Verify icon is disabled ONLY when already verified, or if the member has not paid yet (unless rejected, which can be re-evaluated/updated)
+        const isVerifyDisabled = isActuallyVerified || (!hasMemberPaid && !isRejected);
+
+        const verifyTooltipTitle = isActuallyVerified
+          ? "Already Verified"
+          : isRejected
+          ? "Authority Status Update (Payment Rejected)"
+          : !hasMemberPaid
+          ? "Payment Not Received (Verification Disabled)"
+          : "Authority Status Update";
 
         const tooltipTitle = isPaidMember
           ? (isActuallyVerified
@@ -1648,11 +1687,11 @@ export default function ContributionsPage() {
             )}
 
             {canUpdateContribution && (
-              <Tooltip title={isActuallyVerified ? "Already Verified" : "Authority Status Update"}>
-                <span>
+              <Tooltip title={verifyTooltipTitle}>
+                <span style={{ display: "inline-flex", cursor: isVerifyDisabled ? "not-allowed" : "pointer" }}>
                   <IconButton
                     size="small"
-                    disabled={isActuallyVerified}
+                    disabled={isVerifyDisabled}
                     onClick={() => {
                       setStatusModalRow(row);
                       setStatusChangeValue("");
@@ -1662,12 +1701,17 @@ export default function ContributionsPage() {
                     }}
                     sx={{
                       p: 0.4,
-                      color: isActuallyVerified ? "#9ca3af" : "#16a34a",
-                      bgcolor: isActuallyVerified ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.08)",
+                      color: isVerifyDisabled ? "#9ca3af" : "#16a34a",
+                      bgcolor: isVerifyDisabled ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.08)",
                       borderRadius: "6px",
+                      "&.Mui-disabled": {
+                        color: "#9ca3af",
+                        bgcolor: "rgba(156, 163, 175, 0.08)",
+                        opacity: 0.65,
+                      },
                       "&:hover": {
-                        bgcolor: isActuallyVerified ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.18)",
-                        color: isActuallyVerified ? "#9ca3af" : "#15803d",
+                        bgcolor: isVerifyDisabled ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.18)",
+                        color: isVerifyDisabled ? "#9ca3af" : "#15803d",
                       },
                     }}
                   >

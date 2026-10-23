@@ -357,7 +357,7 @@ export default function AppDataTable({
   filterPanel,
   allowExport = true,
   allowPagination = true,
-  searchPlaceholder = "Search by username..",
+  searchPlaceholder,
   searchWidth,
   initialRowsPerPage = 15,
   emptyMessage,
@@ -376,6 +376,22 @@ export default function AppDataTable({
   const [order, setOrder] = useState("asc");
   const [search, setSearch] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const resolvedSearchPlaceholder = useMemo(() => {
+    if (searchPlaceholder) return searchPlaceholder;
+    if (title) {
+      const cleanTitle = title.replace(/details|history|summary|list|manage|page/gi, "").trim();
+      const lower = cleanTitle.toLowerCase();
+      if (lower.includes("event type")) return "Search by event type...";
+      if (lower.includes("event")) return "Search by event name...";
+      if (lower.includes("member") || lower.includes("user")) return "Search by username / member...";
+      if (lower.includes("payment") || lower.includes("contribution")) return "Search by member, event, status...";
+      if (lower.includes("expense")) return "Search by expense...";
+      if (lower.includes("ticket")) return "Search by ticket...";
+      if (cleanTitle) return `Search by ${cleanTitle.toLowerCase()}...`;
+    }
+    return "Search...";
+  }, [searchPlaceholder, title]);
 
   // Reset pagination to first page whenever input data is filtered or changed
   useEffect(() => {
@@ -444,6 +460,23 @@ export default function AppDataTable({
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter((row) => {
+        // Direct field checks for event name and common primary identifiers
+        const primaryFields = [
+          row?.eventName,
+          row?.EventName,
+          row?.eventTypeName,
+          row?.category,
+          row?.categoryName,
+          row?.name,
+          row?.title,
+          row?.memberName,
+          row?.fullName,
+          row?.username,
+        ];
+        if (primaryFields.some((f) => typeof f === "string" && f.toLowerCase().includes(q))) {
+          return true;
+        }
+
         // Search across defined table columns
         const matchInColumns = (columns || []).some((col) => {
           if (!col) return false;
@@ -845,7 +878,7 @@ export default function AppDataTable({
 
           <TextField
             size="small"
-            placeholder={searchPlaceholder}
+            placeholder={resolvedSearchPlaceholder}
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(0); }}
             InputProps={{

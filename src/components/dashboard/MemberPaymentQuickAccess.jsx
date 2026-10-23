@@ -626,7 +626,7 @@ export default function MemberPaymentQuickAccess({
         <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
           {/* Total Expected Amount - Hidden for Member role, preserved for Admin / Organizer */}
           {!isMemberRole && (
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 4 }}>
               <Paper
                 onClick={() => { setStatusFilter("all"); setPage(0); }}
                 elevation={0}
@@ -689,8 +689,8 @@ export default function MemberPaymentQuickAccess({
             </Grid>
           )}
 
-          {/* Pending / Unpaid */}
-          <Grid size={{ xs: 12, sm: isMemberRole ? 4 : 6, md: isMemberRole ? 4 : 3 }}>
+          {/* Pending */}
+          <Grid size={{ xs: 12, sm: isMemberRole ? 6 : 4, md: isMemberRole ? 6 : 4 }}>
             <Paper
               onClick={() => { setStatusFilter("pending"); setPage(0); }}
               elevation={0}
@@ -756,7 +756,7 @@ export default function MemberPaymentQuickAccess({
           </Grid>
 
           {/* Paid */}
-          <Grid size={{ xs: 12, sm: isMemberRole ? 4 : 6, md: isMemberRole ? 4 : 3 }}>
+          <Grid size={{ xs: 12, sm: isMemberRole ? 6 : 4, md: isMemberRole ? 6 : 4 }}>
             <Paper
               onClick={() => { setStatusFilter("paid"); setPage(0); }}
               elevation={0}
@@ -816,72 +816,6 @@ export default function MemberPaymentQuickAccess({
                   }}
                 >
                   {stats.paidCount} Members
-                </Typography>
-              </Box>
-            </Paper>
-          </Grid>
-
-          {/* Rejected */}
-          <Grid size={{ xs: 12, sm: isMemberRole ? 4 : 6, md: isMemberRole ? 4 : 3 }}>
-            <Paper
-              onClick={() => { setStatusFilter("rejected"); setPage(0); }}
-              elevation={0}
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                cursor: "pointer",
-                border: "1.5px solid",
-                borderColor: statusFilter === "rejected" ? "#dc2626" : isDark ? "rgba(220,38,38,0.25)" : "rgba(220,38,38,0.2)",
-                bgcolor: statusFilter === "rejected"
-                  ? isDark ? "rgba(220,38,38,0.18)" : "rgba(220,38,38,0.08)"
-                  : isDark ? "rgba(220,38,38,0.04)" : "rgba(220,38,38,0.03)",
-                transition: "all 0.2s ease",
-                "&:hover": { borderColor: "#dc2626" },
-              }}
-            >
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography
-                  variant="caption"
-                  color="error.main"
-                  fontWeight={600}
-                  textTransform="none"
-                  sx={{
-                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    fontSize: "0.75rem",
-                    letterSpacing: "0.01em",
-                  }}
-                >
-                  Rejected
-                </Typography>
-                <CancelIcon sx={{ fontSize: 16, color: "#dc2626" }} />
-              </Stack>
-              <Box sx={{ mt: 0.5 }}>
-                <Typography
-                  component="div"
-                  fontWeight={700}
-                  sx={{
-                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    fontSize: { xs: "1.05rem", sm: "1.15rem", md: "1.2rem" },
-                    letterSpacing: "-0.015em",
-                    color: isDark ? "#ffffff" : "#0f172a",
-                    lineHeight: 1.25,
-                  }}
-                >
-                  ₹{formatAmount(stats.rejectedAmount)}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  fontWeight={400}
-                  sx={{
-                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    display: "block",
-                    mt: 0.25,
-                    fontSize: "0.7rem",
-                    lineHeight: 1.4,
-                    color: "#dc2626",
-                  }}
-                >
-                  {stats.rejectedCount} Payments
                 </Typography>
               </Box>
             </Paper>
@@ -1116,7 +1050,6 @@ export default function MemberPaymentQuickAccess({
                     <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Event Name</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Amount</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Payment Details</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1252,24 +1185,6 @@ export default function MemberPaymentQuickAccess({
                                   border: "1px solid rgba(245,158,11,0.35)",
                                 }}
                               />
-                            )}
-                          </TableCell>
-
-                          {/* Payment Details */}
-                          <TableCell>
-                            {item.isRejected ? (
-                              <Typography variant="caption" sx={{ color: "#dc2626", fontWeight: 600 }}>
-                                {item.rejectionReason || "Payment Rejected"}
-                              </Typography>
-                            ) : item.isPaid ? (
-                              <Typography variant="caption" color="text.secondary">
-                                {item.paymentDate ? new Date(item.paymentDate).toLocaleDateString() : "Completed"}
-                                {item.paymentMode ? ` • ${item.paymentMode}` : ""}
-                              </Typography>
-                            ) : (
-                              <Typography variant="caption" color="text.secondary">
-                                Outstanding
-                              </Typography>
                             )}
                           </TableCell>
                         </TableRow>
