@@ -23,7 +23,12 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
   const { authState, switchRole, fetchProfile } = useAuth();
   const { showLoader, hideLoader } = useNavigationLoading();
   const toast = useAppToast();
-  const [selectedRole, setSelectedRole] = useState("");
+  // Determine currently active role
+  const currentActiveRole = targetUser
+    ? (targetUser.roleName || targetUser.role || "")
+    : (authState?.role || authState?.roleName || authState?.activeRole || "");
+
+  const [selectedRole, setSelectedRole] = useState(() => currentActiveRole || "");
   const [switching, setSwitching] = useState(false);
   const [fetchedUserData, setFetchedUserData] = useState(null);
   const [loadingUserRoles, setLoadingUserRoles] = useState(false);
@@ -70,7 +75,7 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
   // Determine effective user data (freshly fetched, or target user or current logged in authState)
   const effectiveUser = fetchedUserData || targetUser || authState;
 
-  // Extract roles list, filtering against active master roles
+  // Extract roles list, filtering against active master roles, sorted with Active role first
   const rolesList = React.useMemo(() => {
     if (!effectiveUser) return [];
 
@@ -92,22 +97,33 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
       set.add(clean);
     };
 
-    if (Array.isArray(effectiveUser.roles)) effectiveUser.roles.forEach(addRole);
-    if (Array.isArray(effectiveUser.Roles)) effectiveUser.Roles.forEach(addRole);
+    // Current active role first
+    if (currentActiveRole) addRole(currentActiveRole);
+
+    // Primary roles
     if (Array.isArray(effectiveUser.primaryRoles)) effectiveUser.primaryRoles.forEach(addRole);
     if (Array.isArray(effectiveUser.PrimaryRoles)) effectiveUser.PrimaryRoles.forEach(addRole);
+
+    // User assigned roles
+    if (Array.isArray(effectiveUser.roles)) effectiveUser.roles.forEach(addRole);
+    if (Array.isArray(effectiveUser.Roles)) effectiveUser.Roles.forEach(addRole);
     if (Array.isArray(effectiveUser.secondaryRoles)) effectiveUser.secondaryRoles.forEach(addRole);
     if (Array.isArray(effectiveUser.SecondaryRoles)) effectiveUser.SecondaryRoles.forEach(addRole);
     if (effectiveUser.role) addRole(effectiveUser.role);
     if (effectiveUser.roleName) addRole(effectiveUser.roleName);
 
-    return Array.from(set);
-  }, [effectiveUser, activeMasterRoles]);
+    const rawList = Array.from(set);
+    const activeLower = (currentActiveRole || "").toLowerCase();
 
-  // Determine currently active role
-  const currentActiveRole = targetUser
-    ? (targetUser.roleName || targetUser.role || "")
-    : (authState?.role || authState?.roleName || "");
+    // Sort so that the currently active role is ALWAYS first in the list
+    return rawList.sort((a, b) => {
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      if (aLower === activeLower) return -1;
+      if (bLower === activeLower) return 1;
+      return a.localeCompare(b);
+    });
+  }, [effectiveUser, activeMasterRoles, currentActiveRole]);
 
   // Determine primary roles list for badges
   const primaryRoles = React.useMemo(() => {
@@ -126,19 +142,18 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
       effectiveUser.PrimaryRoles.forEach(addP);
     }
     const filteredList = list.filter((p) => rolesList.some((r) => r.toLowerCase() === p.toLowerCase()));
-    if (filteredList.length === 0 && rolesList.length > 0) {
-      filteredList.push(rolesList[0]);
+    if (filteredList.length === 0 && currentActiveRole && rolesList.some((r) => r.toLowerCase() === currentActiveRole.toLowerCase())) {
+      filteredList.push(currentActiveRole);
     }
     return filteredList;
-  }, [effectiveUser, rolesList]);
+  }, [effectiveUser, rolesList, currentActiveRole]);
 
   useEffect(() => {
     if (open) {
-      if (currentActiveRole && rolesList.some((r) => r.toLowerCase() === currentActiveRole.toLowerCase())) {
-        const found = rolesList.find((r) => r.toLowerCase() === currentActiveRole.toLowerCase());
-        setSelectedRole(found || currentActiveRole);
-      } else if (rolesList.length > 0) {
-        setSelectedRole(rolesList[0]);
+      const activeRoleToSelect = currentActiveRole || (rolesList.length > 0 ? rolesList[0] : "");
+      if (activeRoleToSelect) {
+        const found = rolesList.find((r) => r.toLowerCase() === activeRoleToSelect.toLowerCase());
+        setSelectedRole(found || activeRoleToSelect);
       }
       setSwitching(false);
     }
