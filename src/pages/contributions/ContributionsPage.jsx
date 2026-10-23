@@ -128,9 +128,11 @@ export default function ContributionsPage() {
   const [auditRemarks, setAuditRemarks] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState("");
+  const [auditRemarksError, setAuditRemarksError] = useState("");
   const [dbStatuses, setDbStatuses] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [verifiedKeys, setVerifiedKeys] = useState(() => new Set());
+  const [approvedKeys, setApprovedKeys] = useState(() => new Set());
   const [previewImageSrc, setPreviewImageSrc] = useState(null);
   const [supportTicketModalOpen, setSupportTicketModalOpen] = useState(false);
   const [selectedTicketRow, setSelectedTicketRow] = useState(null);
@@ -576,13 +578,39 @@ export default function ContributionsPage() {
       }
     }
 
-    // Backend status indicating paid or verified
+    // Backend status indicating paid, verified, or approved
     const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
-    if (rawStatus === "paid" || rawStatus === "verified" || rawStatus === "closed" || rawStatus === "completed") {
+    if (rawStatus === "paid" || rawStatus === "verified" || rawStatus === "approved" || rawStatus === "closed" || rawStatus === "completed") {
       return true;
     }
 
     return false;
+  };
+
+  const isContributionApproved = (c, tx = null) => {
+    if (!c) return false;
+    const matchedTx = tx !== null ? tx : findContributionTransaction(c);
+
+    const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
+    const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
+
+    // If status is rejected or pending, it can NEVER be approved!
+    if (rawStatus === "rejected" || txStatus === "rejected" || rawStatus === "pending" || txStatus === "pending") {
+      return false;
+    }
+
+    if (!hasContributionPayment(c, matchedTx)) {
+      return false;
+    }
+
+    const key = `${c.memberId}_${c.eventId}`;
+
+    return Boolean(
+      rawStatus === "approved" ||
+      txStatus === "approved" ||
+      (c.isApproved === true && rawStatus !== "rejected" && txStatus !== "rejected") ||
+      (approvedKeys.has(key) && rawStatus !== "rejected" && txStatus !== "rejected")
+    );
   };
 
   const isContributionVerified = (c, tx = null) => {
@@ -616,7 +644,7 @@ export default function ContributionsPage() {
     if (!c) return false;
     if (typeof c === "string") {
       const s = c.trim().toLowerCase();
-      return s === "paid" || s === "verified" || s === "closed" || s === "completed";
+      return s === "paid" || s === "verified" || s === "approved" || s === "closed" || s === "completed";
     }
     return hasContributionPayment(c);
   };
@@ -716,6 +744,12 @@ export default function ContributionsPage() {
         String(c.paymentStatus || "").toLowerCase() === "rejected" ||
         String(c.statusName || "").toLowerCase() === "rejected";
 
+      const isApproved =
+        String(matchedTx?.status || "").toLowerCase() === "approved" ||
+        String(c.paymentStatus || "").toLowerCase() === "approved" ||
+        String(c.statusName || "").toLowerCase() === "approved" ||
+        (isContributionApproved(currentContribution, matchedTx) && !isRejected);
+
       const isPaid =
         isContributionPaid(currentContribution, matchedTx) ||
         hasSubmittedPayment(currentContribution, matchedTx) ||
@@ -723,11 +757,14 @@ export default function ContributionsPage() {
         String(c.paymentStatus || "").toLowerCase() === "paid" ||
         String(c.statusName || "").toLowerCase() === "paid" ||
         String(c.status || "").toLowerCase() === "paid" ||
-        isVerified;
+        isVerified ||
+        isApproved;
 
       let resolvedStatus = "Pending";
       if (isRejected) {
         resolvedStatus = "Rejected";
+      } else if (isApproved) {
+        resolvedStatus = "Approved";
       } else if (isVerified) {
         resolvedStatus = "Verified";
       } else if (isPaid) {
@@ -767,6 +804,8 @@ export default function ContributionsPage() {
         previousUnpaid,
         previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
         totalAccumulated: currentOutstanding + previousUnpaid,
+        screenshot: currentContribution.screenshot || matchedTx?.screenshot || (allTxns.find((t) => t.screenshot)?.screenshot) || null,
+        screenshots: currentContribution.screenshots || matchedTx?.screenshots || (allTxns.find((t) => t.screenshots)?.screenshots) || null,
       };
     });
 
@@ -794,7 +833,10 @@ export default function ContributionsPage() {
     return enriched.filter((c) => {
       const statusLower = String(c.paymentStatus || "").toLowerCase();
       if (filterLower === "paid") {
-        return statusLower === "paid" || statusLower === "verified";
+        return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
+      }
+      if (filterLower === "approved") {
+        return statusLower === "approved";
       }
       if (filterLower === "pending") {
         return statusLower === "pending";
@@ -810,6 +852,27 @@ export default function ContributionsPage() {
     });
   }, [rawContributions, allContributions, events, transactions, appliedStatus]);
 
+  const filterStatusOptions = useMemo(() => {
+    const list = [{ label: "All Statuses", value: "ALL" }];
+    const seen = new Set();
+    (dbStatuses || []).forEach((s) => {
+      const name = (s.statusName || s.name || "").trim();
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push({ label: name, value: name });
+      }
+    });
+    if (list.length === 1) {
+      ["Paid", "Pending", "Verified", "Rejected", "Approved"].forEach((s) => {
+        if (!seen.has(s.toLowerCase())) {
+          seen.add(s.toLowerCase());
+          list.push({ label: s, value: s });
+        }
+      });
+    }
+    return list;
+  }, [dbStatuses]);
+
   const handleOpenSubmitPaymentModal = (row) => {
     if (!row) return;
     const matchedTx = findContributionTransaction(row);
@@ -817,9 +880,12 @@ export default function ContributionsPage() {
     const hasSubmitted = hasSubmittedPayment(row, matchedTx);
     const hasDirectPaid = isContributionPaid(row, matchedTx);
     const statusStr = String(row?.paymentStatus || row?.status || row?.statusName || "").trim().toLowerCase();
-    const isPaidStatus = statusStr === "paid" || statusStr === "verified" || statusStr === "completed" || statusStr === "closed" || row?.paymentStatus === 2;
+    const isApprovedRow =
+      String(row?.paymentStatus || row?.status || row?.statusName || matchedTx?.status || "").trim().toLowerCase() === "approved" ||
+      isContributionApproved(row, matchedTx);
+    const isPaidStatus = statusStr === "paid" || statusStr === "verified" || statusStr === "approved" || statusStr === "completed" || statusStr === "closed" || row?.paymentStatus === 2;
     const isSettledByAmount = Number(row?.paidAmount || 0) > 0 && (row?.totalAccumulated === undefined || Number(row?.totalAccumulated) <= 0);
-    const isPaidMember = Boolean(isVerifiedRow || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount);
+    const isPaidMember = Boolean(isApprovedRow || isVerifiedRow || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount);
 
     if (isPaidMember) {
       toast.info("This contribution has already been fully paid and settled.");
@@ -856,11 +922,16 @@ export default function ContributionsPage() {
     if (!row) return;
     const allTxns = findAllContributionTransactions(row);
     let matchedTx = allTxns[0] || findContributionTransaction(row);
+    const txWithScreenshot = allTxns.find((t) => t.screenshot || t.screenshots);
+    const foundScreenshot = row.screenshot || row.screenshots || matchedTx?.screenshot || matchedTx?.screenshots || txWithScreenshot?.screenshot || txWithScreenshot?.screenshots || null;
+
     if (allTxns.length > 1) {
       matchedTx = {
         ...(matchedTx || {}),
         isSplitGroup: true,
         paymentMode: "Split",
+        screenshot: matchedTx?.screenshot || foundScreenshot,
+        screenshots: matchedTx?.screenshots || (Array.isArray(foundScreenshot) ? foundScreenshot : (foundScreenshot ? [foundScreenshot] : null)),
         splits: allTxns.map((t) => ({
           id: t.txnNumber || t.id,
           mode: normalizeModeName(t.paymentMode) || t.paymentMode || "UPI",
@@ -869,8 +940,13 @@ export default function ContributionsPage() {
           notes: t.notes || "",
         })),
       };
+    } else if (matchedTx && !matchedTx.screenshot && foundScreenshot) {
+      matchedTx = {
+        ...matchedTx,
+        screenshot: foundScreenshot,
+      };
     }
-    setViewModalRow(row);
+    setViewModalRow({ ...row, screenshot: row.screenshot || foundScreenshot });
     setViewModalTx(matchedTx);
     setViewModalOpen(true);
   };
@@ -904,7 +980,7 @@ export default function ContributionsPage() {
 
         try {
           const [stRes, txRes, ticketsRes] = await Promise.all([
-            getStatusesAsync(true, "Contribution").catch(() => []),
+            getStatusesAsync(true).catch(() => []),
             getPaymentTransactionsAsync().catch(() => []),
             getSupportTicketsAsync().catch(() => []),
           ]);
@@ -914,8 +990,10 @@ export default function ContributionsPage() {
         } catch {
           // fallback
         }
-      } catch {
-        toast.error("Failed to load events and contributions data.");
+      } catch (err) {
+        if (!err?.isRateLimit && err?.response?.status !== 429) {
+          toast.error("Failed to load events and contributions data.");
+        }
       }
     }
 
@@ -944,7 +1022,7 @@ export default function ContributionsPage() {
 
   useEffect(() => {
     if (!statusModalOpen) return;
-    getStatusesAsync(true, "Contribution")
+    getStatusesAsync(true)
       .then((res) => {
         if (Array.isArray(res) && res.length > 0) {
           setDbStatuses(res);
@@ -952,6 +1030,18 @@ export default function ContributionsPage() {
       })
       .catch(() => {});
   }, [statusModalOpen]);
+
+  useEffect(() => {
+    const handleStatusUpdated = () => {
+      getStatusesAsync(true)
+        .then((res) => {
+          if (Array.isArray(res)) setDbStatuses(res);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("status_updated", handleStatusUpdated);
+    return () => window.removeEventListener("status_updated", handleStatusUpdated);
+  }, []);
 
 
 
@@ -1303,69 +1393,79 @@ export default function ContributionsPage() {
     const actualReceivedAmt = getActualReceivedAmount(row, matchedTx);
     const isAmountReceived = actualReceivedAmt > 0;
 
-    // Allowed statuses for Authority Status Update modal: Pending, Rejected, Verified (Paid is strictly excluded)
-    const allowed = ["pending", "verified", "rejected"];
+    // The authority review workflow explicitly requires: Approved, Rejected, Pending
+    const allowedAuthorityStatuses = ["approved", "rejected", "pending"];
 
     let options = [];
 
     if (Array.isArray(dbStatuses) && dbStatuses.length > 0) {
       options = dbStatuses
         .filter((s) => {
-          const name = String(s.statusName || "").toLowerCase().trim();
-          return s.statusName && s.isActive !== false && allowed.includes(name) && name !== "paid";
+          if (!s.statusName || s.isActive === false) return false;
+          const nameLower = s.statusName.trim().toLowerCase();
+          return allowedAuthorityStatuses.includes(nameLower);
         })
         .map((s) => {
           const name = s.statusName.trim();
-          const isVerificationStatus = name.toLowerCase() === "verified";
+          const isApproval = name.toLowerCase() === "approved";
           return {
-            label: !isAmountReceived && isVerificationStatus
+            label: !isAmountReceived && isApproval
               ? `${name} (Payment not received)`
               : name,
             value: name,
-            disabled: !isAmountReceived && isVerificationStatus,
+            disabled: !isAmountReceived && isApproval,
           };
         });
     }
 
-    // Ensure all 3 required statuses (Pending, Verified, Rejected) exist in options
-    const existingValues = new Set(options.map((o) => o.value.toLowerCase()));
+    const orderMap = { approved: 1, rejected: 2, pending: 3 };
 
-    if (!existingValues.has("pending")) {
-      options.push({ label: "Pending", value: "Pending", disabled: false });
+    // Deduplicate options by case-insensitive value
+    const uniqueOptions = [];
+    const seen = new Set();
+    for (const opt of options) {
+      const valLower = opt.value.toLowerCase();
+      if (!seen.has(valLower)) {
+        seen.add(valLower);
+        uniqueOptions.push(opt);
+      }
     }
-    if (!existingValues.has("verified")) {
-      options.push({
-        label: isAmountReceived ? "Verified" : "Verified (Payment not received)",
-        value: "Verified",
+
+    // Ensure all 3 authority statuses are present
+    if (!seen.has("approved")) {
+      uniqueOptions.push({
+        label: !isAmountReceived ? "Approved (Payment not received)" : "Approved",
+        value: "Approved",
         disabled: !isAmountReceived,
       });
+      seen.add("approved");
     }
-    if (!existingValues.has("rejected")) {
-      options.push({ label: "Rejected", value: "Rejected", disabled: false });
+    if (!seen.has("rejected")) {
+      uniqueOptions.push({ label: "Rejected", value: "Rejected", disabled: false });
+      seen.add("rejected");
     }
-
-    // Sort to keep consistent order: Pending, Verified, Rejected
-    const order = ["pending", "verified", "rejected"];
-    options.sort((a, b) => order.indexOf(a.value.toLowerCase()) - order.indexOf(b.value.toLowerCase()));
-
-    // Never display "Paid" even if row's current paymentStatus is "Paid"
-    if (
-      row?.paymentStatus &&
-      String(row.paymentStatus).toLowerCase().trim() !== "paid" &&
-      !options.some((o) => o.value.toLowerCase() === String(row.paymentStatus).toLowerCase().trim())
-    ) {
-      return [{ label: String(row.paymentStatus), value: String(row.paymentStatus) }, ...options];
+    if (!seen.has("pending")) {
+      uniqueOptions.push({ label: "Pending", value: "Pending", disabled: false });
+      seen.add("pending");
     }
 
-    return options;
+    // Sort to canonical order: Approved, Rejected, Pending
+    uniqueOptions.sort((a, b) => {
+      const ordA = orderMap[a.value.toLowerCase()] || 99;
+      const ordB = orderMap[b.value.toLowerCase()] || 99;
+      return ordA - ordB;
+    });
+
+    return uniqueOptions;
   };
+
   const renderStatusBadge = (status) => {
     let color = "#b45309";
     let bg = "rgba(234,179,8,0.12)";
 
     const st = String(status || "").toLowerCase().trim();
 
-    if (st === "paid" || st === "verified" || st === "closed") {
+    if (st === "paid" || st === "verified" || st === "closed" || st === "approved") {
       color = "#16a34a";
       bg = "rgba(22,163,74,0.12)";
     } else if (st === "in progress") {
@@ -1410,6 +1510,16 @@ export default function ContributionsPage() {
     const noteText = trimmedNotes || (String(newStatus).toLowerCase() === "rejected" ? `Rejected by ${verifier}.` : `Status updated to ${newStatus} by ${verifier}.`);
 
     const targetKey = `${target.memberId}_${target.eventId}`;
+    if (String(newStatus).toLowerCase() === "approved") {
+      setApprovedKeys((prev) => new Set(prev).add(targetKey));
+    } else {
+      setApprovedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(targetKey);
+        return next;
+      });
+    }
+
     if (String(newStatus).toLowerCase() === "verified") {
       setVerifiedKeys((prev) => new Set(prev).add(targetKey));
     } else {
@@ -1420,7 +1530,7 @@ export default function ContributionsPage() {
       });
     }
 
-    const isMarkingPaid = ["paid", "verified", "closed", "completed"].includes(String(newStatus).toLowerCase());
+    const isMarkingPaid = ["paid", "verified", "approved", "closed", "completed"].includes(String(newStatus).toLowerCase());
 
     const matchedTxnForValidation = findContributionTransaction(target);
     const actualReceived = getActualReceivedAmount(target, matchedTxnForValidation);
@@ -1438,8 +1548,9 @@ export default function ContributionsPage() {
           (String(c.memberId).toLowerCase() === String(target.memberId).toLowerCase() &&
             String(c.eventId).toLowerCase() === String(target.eventId).toLowerCase())
         ) {
+          const isApproved = String(newStatus).toLowerCase() === "approved";
           const isVerified = String(newStatus).toLowerCase() === "verified";
-          const updatedStatus = isVerified ? "Verified" : (isMarkingPaid ? "Paid" : newStatus);
+          const updatedStatus = isApproved ? "Approved" : (isVerified ? "Verified" : (isMarkingPaid ? "Paid" : newStatus));
           const isPaid = isMarkingPaid;
           const arrears = c.previousUnpaid || 0;
           const splitAmount = (Number(c.cashAmount || 0) + Number(c.upiAmount || 0));
@@ -1465,7 +1576,8 @@ export default function ContributionsPage() {
             paymentStatus: updatedStatus,
             statusName: updatedStatus,
             isVerified: isVerified,
-            verifiedBy: isVerified ? verifier : c.verifiedBy,
+            isApproved: isApproved,
+            verifiedBy: (isVerified || isApproved) ? verifier : c.verifiedBy,
             auditRemarks: noteText,
             notes: c.notes || noteText,
             rejectionReason: String(newStatus).toLowerCase() === "rejected" ? noteText : c.rejectionReason,
@@ -1491,7 +1603,7 @@ export default function ContributionsPage() {
       } catch { }
 
       const matchedTxns = findAllContributionTransactions(target, freshTxns);
-      const statusToSend = isMarkingPaid ? "Verified" : newStatus;
+      const statusToSend = String(newStatus).toLowerCase() === "approved" ? "Approved" : (isMarkingPaid ? "Verified" : newStatus);
 
       if (matchedTxns.length > 0) {
         await Promise.all(
@@ -1531,6 +1643,8 @@ export default function ContributionsPage() {
       setStatusModalOpen(false);
       setStatusModalRow(null);
       setAuditRemarks("");
+      setStatusError("");
+      setAuditRemarksError("");
 
       // Fetch latest transactions — critical: use this for both state + enrichment
       let latestTxns = freshTxns;
@@ -1614,6 +1728,14 @@ export default function ContributionsPage() {
           String(row?.paymentStatus || "").toLowerCase() === "rejected" ||
           String(row?.statusName || "").toLowerCase() === "rejected";
 
+        const isApprovedRow = isContributionApproved(row, matchedTx);
+        const isApproved =
+          statusStr === "approved" ||
+          String(matchedTx?.status || "").toLowerCase() === "approved" ||
+          String(row?.paymentStatus || "").toLowerCase() === "approved" ||
+          String(row?.statusName || "").toLowerCase() === "approved" ||
+          (isApprovedRow && !isRejected);
+
         const isVerifiedRow = isContributionVerified(row, matchedTx);
         const isActuallyVerified = statusStr === "verified" || (isVerifiedRow && !isRejected);
         const hasSubmitted = hasSubmittedPayment(row, matchedTx);
@@ -1621,6 +1743,7 @@ export default function ContributionsPage() {
         const isPaidStatus =
           statusStr === "paid" ||
           statusStr === "verified" ||
+          statusStr === "approved" ||
           statusStr === "completed" ||
           statusStr === "closed" ||
           row?.paymentStatus === 2;
@@ -1631,6 +1754,7 @@ export default function ContributionsPage() {
 
         // Member has payment recorded, payment proof submitted, or is settled/paid
         const hasMemberPaid = Boolean(
+          isApproved ||
           isActuallyVerified ||
           isPaidStatus ||
           hasDirectPaid ||
@@ -1642,12 +1766,14 @@ export default function ContributionsPage() {
           (row?.paymentMode && row?.paymentMode !== "-" && row?.paymentMode !== "--" && String(row?.paymentMode).toLowerCase() !== "none")
         );
 
-        const isPaidMember = Boolean(isActuallyVerified || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount || hasPositiveReceivedAmt);
+        const isPaidMember = Boolean(isApproved || isActuallyVerified || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount || hasPositiveReceivedAmt);
 
-        // Verify icon is disabled ONLY when already verified, or if the member has not paid yet (unless rejected, which can be re-evaluated/updated)
-        const isVerifyDisabled = isActuallyVerified || (!hasMemberPaid && !isRejected);
+        // Verify icon is disabled when already approved, already verified, or if the member has not paid yet (unless rejected, which can be re-evaluated/updated)
+        const isVerifyDisabled = isApproved || isActuallyVerified || (!hasMemberPaid && !isRejected);
 
-        const verifyTooltipTitle = isActuallyVerified
+        const verifyTooltipTitle = isApproved
+          ? "Already Approved"
+          : isActuallyVerified
           ? "Already Verified"
           : isRejected
           ? "Authority Status Update (Payment Rejected)"
@@ -1730,6 +1856,7 @@ export default function ContributionsPage() {
                       setStatusChangeValue("");
                       setAuditRemarks("");
                       setStatusError("");
+                      setAuditRemarksError("");
                       setStatusModalOpen(true);
                     }}
                     sx={{
@@ -1789,52 +1916,6 @@ export default function ContributionsPage() {
                 </IconButton>
               </Tooltip>
             )}
-
-            {/* Verify Support Ticket Icon - Only visible when member has actually raised a support ticket */}
-            {(() => {
-              const raisedTicket = findRaisedSupportTicket(row);
-              if (!canVerifySupportTicket || !raisedTicket) return null;
-
-              return (
-                <Tooltip title={`Verify Support Ticket (${raisedTicket.ticketNo || "Raised"})`}>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      const activeEvent = events.find((e) => String(e.eventId) === String(row.eventId || (selectedEventId !== "ALL" ? selectedEventId : "")));
-                      setSelectedVerifyTicketRow({
-                        ...raisedTicket,
-                        memberName: raisedTicket.memberName || row.memberName,
-                        memberId: raisedTicket.memberId || row.memberId,
-                        ticketId: raisedTicket.ticketId || raisedTicket.id,
-                        ticketNo: raisedTicket.ticketNo,
-                        attachment: raisedTicket.attachment,
-                        description: raisedTicket.description || raisedTicket.Description || "",
-                        status: raisedTicket.status || "Open",
-                        ticketType: raisedTicket.ticketType || "Payment Issue",
-                        priority: raisedTicket.priority || "Medium",
-                        relatedEvent: raisedTicket.relatedEvent || raisedTicket.eventName || row.eventName || activeEvent?.eventName || activeEvent?.title || "",
-                        eventName: raisedTicket.eventName || raisedTicket.relatedEvent || row.eventName || activeEvent?.eventName || "",
-                        contributionId: row.contributionId,
-                        paymentStatus: row.paymentStatus,
-                      });
-                      setVerifyTicketModalOpen(true);
-                    }}
-                    sx={{
-                      p: 0.4,
-                      color: "#0284c7",
-                      bgcolor: "rgba(2, 132, 199, 0.1)",
-                      borderRadius: "6px",
-                      "&:hover": {
-                        bgcolor: "rgba(2, 132, 199, 0.22)",
-                        color: "#0369a1",
-                      },
-                    }}
-                  >
-                    <SupportAgentIcon sx={{ fontSize: "1.15rem" }} />
-                  </IconButton>
-                </Tooltip>
-              );
-            })()}
           </Box>
         );
       },
@@ -1861,23 +1942,35 @@ export default function ContributionsPage() {
       key: "paymentStatus",
       render: (row) => {
         const matchedTx = findContributionTransaction(row);
+        const statusStr = String(row?.paymentStatus || row?.status || row?.statusName || matchedTx?.status || "").trim().toLowerCase();
+        const isRejected =
+          statusStr === "rejected" ||
+          String(matchedTx?.status || "").toLowerCase() === "rejected" ||
+          String(row?.paymentStatus || "").toLowerCase() === "rejected" ||
+          String(row?.statusName || "").toLowerCase() === "rejected";
+
+        const isApproved =
+          statusStr === "approved" ||
+          String(matchedTx?.status || "").toLowerCase() === "approved" ||
+          String(row?.paymentStatus || "").toLowerCase() === "approved" ||
+          String(row?.statusName || "").toLowerCase() === "approved" ||
+          (isContributionApproved(row, matchedTx) && !isRejected);
+
         const isVerified = isContributionVerified(row, matchedTx);
         const isPaid =
           isContributionPaid(row, matchedTx) ||
           hasSubmittedPayment(row, matchedTx) ||
+          isApproved ||
           isVerified ||
           row?.paymentStatus === 2 ||
           String(row?.paymentStatus || "").toLowerCase() === "paid" ||
           String(row?.statusName || "").toLowerCase() === "paid";
 
-        const isRejected =
-          String(matchedTx?.status || "").toLowerCase() === "rejected" ||
-          String(row?.paymentStatus || "").toLowerCase() === "rejected" ||
-          String(row?.statusName || "").toLowerCase() === "rejected";
-
         let displayStatus = "Pending";
         if (isRejected) {
           displayStatus = "Rejected";
+        } else if (isApproved) {
+          displayStatus = "Approved";
         } else if (isVerified) {
           displayStatus = "Verified";
         } else if (isPaid) {
@@ -1886,10 +1979,10 @@ export default function ContributionsPage() {
 
         const color = isRejected
           ? "#dc2626"
-          : (isVerified ? "#16a34a" : (isPaid ? "#059669" : "#b45309"));
+          : (isApproved ? "#059669" : (isVerified ? "#16a34a" : (isPaid ? "#059669" : "#b45309")));
         const bg = isRejected
           ? "rgba(220,38,38,0.08)"
-          : (isVerified ? "rgba(22,163,74,0.12)" : (isPaid ? "rgba(5,150,105,0.08)" : "rgba(234,179,8,0.12)"));
+          : (isApproved ? "rgba(5,150,105,0.14)" : (isVerified ? "rgba(22,163,74,0.12)" : (isPaid ? "rgba(5,150,105,0.08)" : "rgba(234,179,8,0.12)")));
 
         return (
           <Typography
@@ -1917,19 +2010,25 @@ export default function ContributionsPage() {
       render: (row) => {
         const allTxns = findAllContributionTransactions(row);
         const matchedTx = allTxns[0] || findContributionTransaction(row);
-        const isVerified = isContributionVerified(row, matchedTx);
-        const isPaid =
-          isContributionPaid(row, matchedTx) ||
-          hasSubmittedPayment(row, matchedTx) ||
-          isVerified ||
-          row?.paymentStatus === 2 ||
-          String(row?.paymentStatus || "").toLowerCase() === "paid" ||
-          String(row?.statusName || "").toLowerCase() === "paid";
-
         const isRejected =
           String(matchedTx?.status || "").toLowerCase() === "rejected" ||
           String(row?.paymentStatus || "").toLowerCase() === "rejected" ||
           String(row?.statusName || "").toLowerCase() === "rejected";
+
+        const isApproved =
+          String(row?.paymentStatus || "").toLowerCase() === "approved" ||
+          String(row?.statusName || "").toLowerCase() === "approved" ||
+          (isContributionApproved(row, matchedTx) && !isRejected);
+
+        const isVerified = isContributionVerified(row, matchedTx);
+        const isPaid =
+          isContributionPaid(row, matchedTx) ||
+          hasSubmittedPayment(row, matchedTx) ||
+          isApproved ||
+          isVerified ||
+          row?.paymentStatus === 2 ||
+          String(row?.paymentStatus || "").toLowerCase() === "paid" ||
+          String(row?.statusName || "").toLowerCase() === "paid";
 
         const activeEv = (events || []).find(
           (e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId)
@@ -2227,12 +2326,7 @@ export default function ContributionsPage() {
                     setFilterStatus(event.target.value || "ALL");
                   }}
                   onClear={() => setFilterStatus("ALL")}
-                  options={[
-                    { label: "All Statuses", value: "ALL" },
-                    { label: "Paid", value: "Paid" },
-                    { label: "Pending", value: "Pending" },
-                    { label: "Rejected", value: "Rejected" },
-                  ]}
+                  options={filterStatusOptions}
                   fullWidth
                 />
               </Box>
@@ -2668,6 +2762,7 @@ export default function ContributionsPage() {
           setStatusChangeValue("");
           setAuditRemarks("");
           setStatusError("");
+          setAuditRemarksError("");
         }}
         title="Authority Status Update"
         maxWidth="md"
@@ -2676,6 +2771,9 @@ export default function ContributionsPage() {
             const matchedTx = statusModalRow ? findContributionTransaction(statusModalRow) : null;
             const actualReceivedAmt = getActualReceivedAmount(statusModalRow, matchedTx);
             const isZeroAmount = actualReceivedAmt <= 0;
+            const isVerificationTarget = ["verified", "paid", "closed", "completed", "approved"].includes(
+              String(statusChangeValue).toLowerCase()
+            );
 
             return (
               <Stack direction="row" spacing={1.5} alignItems="center">
@@ -2684,22 +2782,30 @@ export default function ContributionsPage() {
                 </AppCancelButton>
                 <AppSaveButton
                   loading={statusSaving}
-                  disabled={isZeroAmount && String(statusChangeValue).toLowerCase() !== "rejected"}
+                  disabled={isZeroAmount && isVerificationTarget}
                   disabledTooltip={
-                    isZeroAmount && String(statusChangeValue).toLowerCase() !== "rejected"
+                    isZeroAmount && isVerificationTarget
                       ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first."
                       : ""
                   }
                   onClick={() => {
+                    let hasError = false;
                     if (!statusChangeValue || !String(statusChangeValue).trim()) {
                       setStatusError("This field is required");
+                      hasError = true;
+                    }
+                    if (!auditRemarks || !String(auditRemarks).trim()) {
+                      setAuditRemarksError("This field is required");
+                      hasError = true;
+                    }
+                    if (hasError) {
                       toast.error("This field is required");
                       return;
                     }
                     handleStatusUpdate(
                       statusModalRow,
                       statusChangeValue,
-                      auditRemarks
+                      auditRemarks.trim()
                     );
                   }}
                 >
@@ -3403,8 +3509,14 @@ export default function ContributionsPage() {
                 label="Audit Remarks / Notes"
                 placeholder="Enter remarks or status update notes..."
                 value={auditRemarks}
-                onChange={(e) => setAuditRemarks(e.target.value)}
+                onChange={(e) => {
+                  setAuditRemarks(e.target.value);
+                  if (auditRemarksError) setAuditRemarksError("");
+                }}
                 rows={3}
+                required
+                error={Boolean(auditRemarksError)}
+                helperText={auditRemarksError || ""}
               />
             </Paper>
           </Box>

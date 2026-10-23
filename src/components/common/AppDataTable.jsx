@@ -556,11 +556,17 @@ export default function AppDataTable({
     return result;
   }, [data, search, columnFilters, orderBy, order]);
 
+  const isAll = rowsPerPage === -1 || rowsPerPage === "all";
+  const effectiveRowsPerPage = isAll ? (processedData.length > 0 ? processedData.length : 1) : Number(rowsPerPage);
+
   const paginatedData = allowPagination
-    ? processedData.slice(
-      page * rowsPerPage,
-      page * rowsPerPage + rowsPerPage
-    )
+    ? (isAll
+        ? processedData
+        : processedData.slice(
+          page * effectiveRowsPerPage,
+          page * effectiveRowsPerPage + effectiveRowsPerPage
+        )
+      )
     : processedData;
 
   // Re-order columns so pinned left are first, then normal (Action first), then pinned right, then filter by visibility
@@ -640,9 +646,9 @@ export default function AppDataTable({
 
   // Pagination metrics
   const totalRows = processedData.length;
-  const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
-  const startRow = totalRows === 0 ? 0 : page * rowsPerPage + 1;
-  const endRow = Math.min((page + 1) * rowsPerPage, totalRows);
+  const totalPages = isAll ? 1 : (Math.ceil(totalRows / effectiveRowsPerPage) || 1);
+  const startRow = totalRows === 0 ? 0 : (isAll ? 1 : page * effectiveRowsPerPage + 1);
+  const endRow = isAll ? totalRows : Math.min((page + 1) * effectiveRowsPerPage, totalRows);
 
   return (
     <Paper
@@ -1146,10 +1152,44 @@ export default function AppDataTable({
       </Menu>
 
       {/* ── 3. Table ──────────────────────────────────────────────────────── */}
-      <Box sx={{ overflowX: "auto", flexGrow: isFullscreen ? 1 : 0, position: "relative", minHeight: loading ? 220 : "auto" }}>
-        <Table size="small">
+      <Box
+        sx={{
+          overflowX: "auto",
+          overflowY: "auto",
+          maxHeight: isFullscreen
+            ? "calc(100vh - 160px)"
+            : (isAll || rowsPerPage >= 25 ? "calc(100vh - 330px)" : "calc(100vh - 330px)"),
+          minHeight: loading ? 220 : "auto",
+          flexGrow: isFullscreen ? 1 : 0,
+          position: "relative",
+          "&::-webkit-scrollbar": {
+            width: "8px",
+            height: "8px",
+          },
+          "&::-webkit-scrollbar-track": {
+            background:
+              theme.palette.mode === "dark"
+                ? "rgba(255,255,255,0.03)"
+                : "rgba(0,0,0,0.03)",
+          },
+          "&::-webkit-scrollbar-thumb": {
+            background:
+              theme.palette.mode === "dark"
+                ? "rgba(255,255,255,0.22)"
+                : "rgba(74,63,107,0.35)",
+            borderRadius: "4px",
+            "&:hover": {
+              background:
+                theme.palette.mode === "dark"
+                  ? "rgba(255,255,255,0.38)"
+                  : "rgba(74,63,107,0.55)",
+            },
+          },
+        }}
+      >
+        <Table size="small" stickyHeader>
           <TableHead>
-            <TableRow sx={{ bgcolor: theme.palette.mode === "dark" ? surfaceAlt : "#eef4f8" }}>
+            <TableRow sx={{ bgcolor: theme.palette.mode === "dark" ? "#1e2235" : "#eef4f8" }}>
               {orderedColumns.map((column, index) => (
                 <TableCell
                   key={index}
@@ -1159,6 +1199,7 @@ export default function AppDataTable({
                     fontSize: "0.75rem",
                     textTransform: "none",
                     color: theme.palette.mode === "dark" ? "#ffffff" : "#1e293b",
+                    bgcolor: theme.palette.mode === "dark" ? "#1e2235 !important" : "#eef4f8 !important",
                     py: 1,
                     px: 2,
                     borderRight: theme.palette.mode === "dark"
@@ -1169,6 +1210,9 @@ export default function AppDataTable({
                       : "1px solid rgba(224, 224, 224, 1)",
                     "&:last-child": { borderRight: "none" },
                     whiteSpace: "nowrap",
+                    position: "sticky",
+                    top: 0,
+                    zIndex: pinnedColumns[column.label] ? 5 : 3,
                     ...column.sx,
                     ...getPinStyles(column, true),
                   }}
@@ -1318,7 +1362,8 @@ export default function AppDataTable({
               <Select
                 value={rowsPerPage}
                 onChange={(e) => {
-                  setRowsPerPage(Number(e.target.value));
+                  const val = e.target.value === "all" || e.target.value === -1 ? -1 : Number(e.target.value);
+                  setRowsPerPage(val);
                   setPage(0);
                 }}
                 size="small"
@@ -1343,6 +1388,9 @@ export default function AppDataTable({
                     {val}
                   </MenuItem>
                 ))}
+                <MenuItem value={-1} sx={{ fontSize: "0.75rem" }}>
+                  All
+                </MenuItem>
               </Select>
             </Box>
             <Typography variant="caption" sx={{ fontWeight: 700, color: theme.palette.mode === "dark" ? "#d6dbef" : "#4a3f6b", fontSize: "0.75rem" }}>
@@ -1354,7 +1402,7 @@ export default function AppDataTable({
           <Stack direction="row" alignItems="center" spacing={0.8}>
             <IconButton
               size="small"
-              disabled={page === 0}
+              disabled={isAll || page === 0}
               onClick={() => setPage(0)}
               sx={{
                 border: (theme) =>
@@ -1390,7 +1438,7 @@ export default function AppDataTable({
             </IconButton>
             <Button
               size="small"
-              disabled={page === 0}
+              disabled={isAll || page === 0}
               onClick={() => setPage((prev) => prev - 1)}
               sx={{
                 border: (theme) =>
@@ -1444,7 +1492,7 @@ export default function AppDataTable({
             </Typography>
             <Button
               size="small"
-              disabled={page >= totalPages - 1}
+              disabled={isAll || page >= totalPages - 1}
               onClick={() => setPage((prev) => prev + 1)}
               sx={{
                 border: (theme) =>
@@ -1485,7 +1533,7 @@ export default function AppDataTable({
             </Button>
             <IconButton
               size="small"
-              disabled={page >= totalPages - 1}
+              disabled={isAll || page >= totalPages - 1}
               onClick={() => setPage(totalPages - 1)}
               sx={{
                 border: (theme) =>

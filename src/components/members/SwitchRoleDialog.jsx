@@ -9,7 +9,6 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import { useAuth } from "../../contexts/AuthContext";
@@ -75,7 +74,7 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
   // Determine effective user data (freshly fetched, or target user or current logged in authState)
   const effectiveUser = fetchedUserData || targetUser || authState;
 
-  // Extract roles list, filtering against active master roles, sorted with Active role first
+  // Extract roles list, strictly following the master roles order from Roles page (activeMasterRoles)
   const rolesList = React.useMemo(() => {
     if (!effectiveUser) return [];
 
@@ -97,12 +96,11 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
       set.add(clean);
     };
 
-    // Current active role first
-    if (currentActiveRole) addRole(currentActiveRole);
-
     // Primary roles
     if (Array.isArray(effectiveUser.primaryRoles)) effectiveUser.primaryRoles.forEach(addRole);
     if (Array.isArray(effectiveUser.PrimaryRoles)) effectiveUser.PrimaryRoles.forEach(addRole);
+    if (effectiveUser.primaryRole) addRole(effectiveUser.primaryRole);
+    if (effectiveUser.PrimaryRole) addRole(effectiveUser.PrimaryRole);
 
     // User assigned roles
     if (Array.isArray(effectiveUser.roles)) effectiveUser.roles.forEach(addRole);
@@ -111,16 +109,32 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
     if (Array.isArray(effectiveUser.SecondaryRoles)) effectiveUser.SecondaryRoles.forEach(addRole);
     if (effectiveUser.role) addRole(effectiveUser.role);
     if (effectiveUser.roleName) addRole(effectiveUser.roleName);
+    if (currentActiveRole) addRole(currentActiveRole);
 
     const rawList = Array.from(set);
-    const activeLower = (currentActiveRole || "").toLowerCase();
 
-    // Sort so that the currently active role is ALWAYS first in the list
+    // Master order map matching the Roles table (Image 1)
+    const masterOrderMap = new Map();
+    if (activeMasterRoles && activeMasterRoles.length > 0) {
+      activeMasterRoles.forEach((r, idx) => {
+        const name = (r.roleName || r.name || "").trim().toLowerCase();
+        if (name && !masterOrderMap.has(name)) {
+          masterOrderMap.set(name, idx);
+        }
+      });
+    } else {
+      ["admin", "member", "organizer"].forEach((name, idx) => {
+        masterOrderMap.set(name, idx);
+      });
+    }
+
+    // Sort strictly by the master order so the order NEVER shifts when switching roles
     return rawList.sort((a, b) => {
       const aLower = a.toLowerCase();
       const bLower = b.toLowerCase();
-      if (aLower === activeLower) return -1;
-      if (bLower === activeLower) return 1;
+      const aIdx = masterOrderMap.has(aLower) ? masterOrderMap.get(aLower) : 999;
+      const bIdx = masterOrderMap.has(bLower) ? masterOrderMap.get(bLower) : 999;
+      if (aIdx !== bIdx) return aIdx - bIdx;
       return a.localeCompare(b);
     });
   }, [effectiveUser, activeMasterRoles, currentActiveRole]);
@@ -141,12 +155,35 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
     if (effectiveUser?.PrimaryRoles && Array.isArray(effectiveUser.PrimaryRoles)) {
       effectiveUser.PrimaryRoles.forEach(addP);
     }
+    if (effectiveUser?.primaryRole) addP(effectiveUser.primaryRole);
+    if (effectiveUser?.PrimaryRole) addP(effectiveUser.PrimaryRole);
+
     const filteredList = list.filter((p) => rolesList.some((r) => r.toLowerCase() === p.toLowerCase()));
-    if (filteredList.length === 0 && currentActiveRole && rolesList.some((r) => r.toLowerCase() === currentActiveRole.toLowerCase())) {
-      filteredList.push(currentActiveRole);
+    if (filteredList.length > 0) {
+      return filteredList;
     }
-    return filteredList;
-  }, [effectiveUser, rolesList, currentActiveRole]);
+
+    // Fallback: check authState if effectiveUser didn't provide primary roles
+    if (authState?.primaryRoles && Array.isArray(authState.primaryRoles)) {
+      authState.primaryRoles.forEach(addP);
+    }
+    if (authState?.PrimaryRoles && Array.isArray(authState.PrimaryRoles)) {
+      authState.PrimaryRoles.forEach(addP);
+    }
+    if (authState?.primaryRole) addP(authState.primaryRole);
+    if (authState?.PrimaryRole) addP(authState.PrimaryRole);
+
+    const authFiltered = list.filter((p) => rolesList.some((r) => r.toLowerCase() === p.toLowerCase()));
+    if (authFiltered.length > 0) {
+      return authFiltered;
+    }
+
+    // If no primary role was designated, fallback to first in rolesList
+    if (rolesList.length > 0) {
+      return [rolesList[0]];
+    }
+    return [];
+  }, [effectiveUser, rolesList, authState]);
 
   useEffect(() => {
     if (open) {
@@ -278,7 +315,6 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
           <Stack spacing={1.2}>
             {rolesList.map((r) => {
               const isSelected = selectedRole.toLowerCase() === r.toLowerCase();
-              const isActive = String(currentActiveRole).toLowerCase() === r.toLowerCase();
               const isPrimary = primaryRoles.some((p) => p.toLowerCase() === r.toLowerCase());
 
               return (
@@ -351,38 +387,20 @@ export default function SwitchRoleDialog({ open, onClose, targetUser, onSuccess 
                     </Typography>
                   </Stack>
 
-                  <Stack direction="row" spacing={0.8} alignItems="center">
-                    {isPrimary && (
-                      <Chip
-                        label="Primary"
-                        size="small"
-                        sx={{
-                          height: 22,
-                          fontSize: "0.68rem",
-                          fontWeight: 800,
-                          bgcolor: "rgba(16, 185, 129, 0.12)",
-                          color: "#10b981",
-                          borderRadius: "4px",
-                        }}
-                      />
-                    )}
-
-                    {isActive && (
-                      <Chip
-                        label="Active"
-                        size="small"
-                        icon={<CheckCircleRoundedIcon sx={{ fontSize: "0.85rem !important", color: "#7c3aed !important" }} />}
-                        sx={{
-                          height: 22,
-                          fontSize: "0.68rem",
-                          fontWeight: 800,
-                          bgcolor: "rgba(124, 58, 237, 0.12)",
-                          color: "#7c3aed",
-                          borderRadius: "4px",
-                        }}
-                      />
-                    )}
-                  </Stack>
+                  {isPrimary && (
+                    <Chip
+                      label="Primary"
+                      size="small"
+                      sx={{
+                        height: 22,
+                        fontSize: "0.68rem",
+                        fontWeight: 800,
+                        bgcolor: "rgba(16, 185, 129, 0.12)",
+                        color: "#10b981",
+                        borderRadius: "4px",
+                      }}
+                    />
+                  )}
                 </Box>
               );
             })}

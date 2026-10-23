@@ -29,6 +29,7 @@ import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import AppCancelButton from "../common/AppCancelButton";
 import { formatWholeCurrency, formatWholeNumber } from "../../utils/roundingHelper";
+import { getImageUrl } from "../../services/apiClient";
 
 const getModeColor = (name) => {
   const lower = String(name || "").toLowerCase().replace(/[\s\-_/]+/g, "");
@@ -56,30 +57,237 @@ export default function ViewContributionModal({
   if (!row) return null;
 
   // Resolve status
-  const rawStatus = String(row.paymentStatus || matchedTx?.status || "").toLowerCase().trim();
-  const isVerified =
-    row.isVerified === true ||
-    rawStatus === "verified" ||
-    Boolean(row.verifiedBy && String(row.verifiedBy).trim() !== "");
+  const rawStatus = String(row.paymentStatus || row.status || row.statusName || matchedTx?.status || "").toLowerCase().trim();
+  const isRejected =
+    rawStatus === "rejected" ||
+    String(row.paymentStatus || "").toLowerCase() === "rejected" ||
+    String(row.status || "").toLowerCase() === "rejected" ||
+    String(row.statusName || "").toLowerCase() === "rejected" ||
+    String(matchedTx?.status || "").toLowerCase() === "rejected";
 
-  const isRejected = rawStatus === "rejected";
+  const isApproved =
+    !isRejected &&
+    (rawStatus === "approved" ||
+      String(row.paymentStatus || "").toLowerCase() === "approved" ||
+      String(row.status || "").toLowerCase() === "approved" ||
+      String(row.statusName || "").toLowerCase() === "approved" ||
+      String(matchedTx?.status || "").toLowerCase() === "approved" ||
+      row.isApproved === true ||
+      matchedTx?.isApproved === true);
+
+  const isVerified =
+    !isRejected &&
+    !isApproved &&
+    (row.isVerified === true ||
+      rawStatus === "verified" ||
+      String(row.paymentStatus || "").toLowerCase() === "verified" ||
+      String(row.status || "").toLowerCase() === "verified" ||
+      String(row.statusName || "").toLowerCase() === "verified" ||
+      String(matchedTx?.status || "").toLowerCase() === "verified" ||
+      Boolean(row.verifiedBy && String(row.verifiedBy).trim() !== ""));
+
   const isPaid =
-    isVerified ||
-    rawStatus === "paid" ||
-    rawStatus === "2" ||
-    row.paymentStatus === 2 ||
-    (Number(row.paidAmount || 0) > 0 && !isRejected);
+    !isRejected &&
+    (isApproved ||
+      isVerified ||
+      rawStatus === "paid" ||
+      rawStatus === "2" ||
+      row.paymentStatus === 2 ||
+      String(row.paymentStatus || "").toLowerCase() === "paid" ||
+      String(row.status || "").toLowerCase() === "paid" ||
+      String(row.statusName || "").toLowerCase() === "paid" ||
+      Number(row.paidAmount || 0) > 0 ||
+      (matchedTx && Number(matchedTx.amount || 0) > 0));
 
   let displayStatus = "Pending";
   if (isRejected) displayStatus = "Rejected";
+  else if (isApproved) displayStatus = "Approved";
   else if (isVerified) displayStatus = "Verified";
   else if (isPaid) displayStatus = "Paid";
+  else displayStatus = "Not Paid";
 
-  // Financial metrics
-  const targetAmount = Number(row.amount || 0);
-  const actualPaidAmount = Number(row.paidAmount || matchedTx?.amount || 0);
-  const arrears = Number(row.previousUnpaid || row.previousArrears || matchedTx?.previousArrears || 0);
-  const totalDue = Number(row.totalAccumulated ?? row.totalDue ?? (targetAmount + arrears));
+  // Event info & financial metrics
+  const currentEvent =
+    (events || []).find((e) => String(e.eventId || e.id) === String(row.eventId)) || null;
+
+  const eventBaseAmount = Number(
+    currentEvent?.baseAmount ||
+    currentEvent?.amount ||
+    currentEvent?.contributionAmount ||
+    0
+  );
+
+  const targetAmount = Number(row.amount || 0) > 0 ? Number(row.amount) : eventBaseAmount;
+  const actualPaidAmount = Number(
+    row.paidAmount ||
+    matchedTx?.amount ||
+    row.totalReceivedAmount ||
+    (isPaid && targetAmount > 0 ? targetAmount : 0)
+  );
+
+  const arrears = Number(
+    row.previousUnpaid || row.previousArrears || matchedTx?.previousArrears || row.previousAmount || 0
+  );
+
+  // Arrears breakdown list for rich hover tooltip
+  const rawArrearsList =
+    row.previousUnpaidItems ||
+    row.arrearBreakdown ||
+    matchedTx?.arrearBreakdown ||
+    matchedTx?.previousUnpaidItems ||
+    row.arrearsList ||
+    [];
+
+  let parsedArrearsList = [];
+  if (Array.isArray(rawArrearsList)) {
+    parsedArrearsList = rawArrearsList;
+  } else if (typeof rawArrearsList === "string" && rawArrearsList.trim().startsWith("[")) {
+    try {
+      parsedArrearsList = JSON.parse(rawArrearsList);
+    } catch {
+      parsedArrearsList = [];
+    }
+  }
+
+  const validArrearItems = parsedArrearsList.filter(
+    (item) => Number(item?.amount || item?.dueAmount || item?.due || 0) > 0 || item?.eventName || item?.title
+  );
+
+  const getArrearItemName = (item) => {
+    if (item?.eventName) return item.eventName;
+    if (item?.title) return item.title;
+    if (item?.eventCategory) return item.eventCategory;
+    if (item?.name) return item.name;
+    if (item?.eventId) {
+      const ev = (events || []).find((e) => String(e.eventId || e.id) === String(item.eventId));
+      if (ev?.eventName || ev?.title) return ev.eventName || ev.title;
+    }
+    return "Previous Event";
+  };
+
+  const getArrearItemAmount = (item) => {
+    if (!item) return 0;
+    const ev = (events || []).find((e) => String(e.eventId || e.id) === String(item.eventId));
+    const evAmt = Number(ev?.baseAmount || ev?.amount || ev?.contributionAmount || 0);
+    const itemAmt = Number(item.amount || item.dueAmount || item.due || 0);
+    return itemAmt > 0 ? itemAmt : (evAmt > 0 ? evAmt : arrears);
+  };
+
+  const arrearsTooltipContent = validArrearItems.length > 0 ? (
+    <Box sx={{ p: 0.8, minWidth: 180 }}>
+      <Typography
+        variant="caption"
+        fontWeight={800}
+        sx={{
+          display: "block",
+          color: "#f87171",
+          mb: 0.6,
+          borderBottom: "1px solid rgba(255,255,255,0.2)",
+          pb: 0.4,
+          fontSize: "0.76rem",
+          letterSpacing: "0.02em",
+        }}
+      >
+        Unpaid Previous Events:
+      </Typography>
+      {validArrearItems.map((item, idx) => {
+        const itemAmt = getArrearItemAmount(item);
+        return (
+          <Box
+            key={idx}
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 1.5,
+              fontSize: "0.74rem",
+              py: 0.3,
+            }}
+          >
+            <span style={{ color: "#e2e8f0" }}>• {getArrearItemName(item)}</span>
+            <span style={{ fontWeight: 800, color: "#fff" }}>
+              {formatWholeCurrency(itemAmt > 0 ? itemAmt : arrears)}
+            </span>
+          </Box>
+        );
+      })}
+      <Box
+        sx={{
+          borderTop: "1px solid rgba(255,255,255,0.2)",
+          mt: 0.6,
+          pt: 0.4,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontWeight: 800,
+          fontSize: "0.76rem",
+          color: "#fca5a5",
+        }}
+      >
+        <span>Total Arrears:</span>
+        <span>{formatWholeCurrency(arrears)}</span>
+      </Box>
+    </Box>
+  ) : arrears > 0 ? (
+    <Box sx={{ p: 0.6, minWidth: 150 }}>
+      <Typography variant="caption" fontWeight={700} sx={{ color: "#cbd5e1", display: "block" }}>
+        Previous Pending Arrears:
+      </Typography>
+      <Typography variant="body2" fontWeight={800} sx={{ color: "#fca5a5", mt: 0.3 }}>
+        {formatWholeCurrency(arrears)}
+      </Typography>
+    </Box>
+  ) : (
+    "No previous arrears"
+  );
+
+  const totalDue = isPaid && arrears === 0
+    ? 0
+    : Number(row.totalAccumulated ?? row.totalDue ?? Math.max(0, targetAmount + arrears - (isPaid ? actualPaidAmount : 0)));
+
+  const balanceDue = totalDue > 0 ? totalDue : (isPaid ? 0 : targetAmount + arrears);
+
+  const renderStatusBadge = (status) => {
+    const st = String(status || displayStatus || "").toLowerCase().trim();
+    let color = "#b45309";
+    let bg = "rgba(234,179,8,0.12)";
+
+    if (st === "approved" || isApproved) {
+      color = "#16a34a";
+      bg = "rgba(22,163,74,0.12)";
+    } else if (st === "paid" || st === "verified" || st === "closed") {
+      color = "#16a34a";
+      bg = "rgba(22,163,74,0.12)";
+    } else if (st === "in progress") {
+      color = "#6366f1";
+      bg = "rgba(99,102,241,0.12)";
+    } else if (st === "failed" || st === "rejected") {
+      color = "#dc2626";
+      bg = "rgba(220,38,38,0.12)";
+    }
+
+    let label = "Not Paid (Pending)";
+    if (st === "approved" || isApproved) label = "Approved";
+    else if (st === "verified" || isVerified) label = "Verified";
+    else if (st === "paid" || isPaid) label = "Paid";
+    else if (st === "rejected" || isRejected) label = "Rejected";
+    else if (st === "in progress") label = "In Progress";
+
+    return (
+      <Chip
+        label={label}
+        size="small"
+        sx={{
+          bgcolor: bg,
+          color: color,
+          fontWeight: 800,
+          fontSize: "0.76rem",
+          height: 24,
+          borderRadius: "6px",
+        }}
+      />
+    );
+  };
 
   // Authority Audit & Verification Details
   const verifier =
@@ -87,7 +295,7 @@ export default function ViewContributionModal({
     matchedTx?.verifiedBy ||
     row.recordedBy ||
     matchedTx?.recordedBy ||
-    (isVerified ? "Authority Officer" : "");
+    (isApproved || isVerified ? "Authority Officer" : "");
 
   const verifyDateRaw = row.verifiedOn || row.verifiedDate || matchedTx?.verifiedOn || matchedTx?.verifiedDate;
   const verifyDateFormatted = verifyDateRaw ? dayjs(verifyDateRaw).format("DD/MM/YYYY") : "";
@@ -475,9 +683,6 @@ export default function ViewContributionModal({
   const cashHandoverNote = getCleanCashNote();
 
   // Event Breakdown (Current Event + Previous Events covered)
-  const currentEvent =
-    events.find((e) => String(e.eventId || e.id) === String(row.eventId)) || null;
-
   const currentEventName =
     row.eventName ||
     currentEvent?.eventName ||
@@ -509,17 +714,85 @@ export default function ViewContributionModal({
           : [])
       : [];
 
-  // Screenshots
-  const rawScreenshots =
-    row.screenshots ||
-    matchedTx?.screenshots ||
-    row.screenshot ||
-    matchedTx?.screenshot;
-  const screenshots = Array.isArray(rawScreenshots)
-    ? rawScreenshots
-    : rawScreenshots
-    ? [rawScreenshots]
-    : [];
+  // Screenshots resolution using getImageUrl and checking all sources
+  const screenshots = (() => {
+    const list = [];
+    const seen = new Set();
+
+    const addImg = (val) => {
+      if (!val) return;
+      if (Array.isArray(val)) {
+        val.forEach(addImg);
+        return;
+      }
+      if (typeof val === "string") {
+        const trimmed = val.trim();
+        if (!trimmed || trimmed === "-" || trimmed === "--" || trimmed === "null" || trimmed === "undefined") return;
+
+        // Try parsing JSON array if string starts with '['
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+              parsed.forEach(addImg);
+              return;
+            }
+          } catch {
+            // continue
+          }
+        }
+
+        // Check for comma-separated URLs
+        if (trimmed.includes(",") && !trimmed.startsWith("data:image")) {
+          trimmed.split(",").forEach((part) => addImg(part.trim()));
+          return;
+        }
+
+        const resolved = getImageUrl(trimmed);
+        if (resolved && !seen.has(resolved)) {
+          seen.add(resolved);
+          list.push(resolved);
+        }
+      }
+    };
+
+    // 1. Check row
+    addImg(row?.screenshot);
+    addImg(row?.screenshots);
+    addImg(row?.receiptImage);
+    addImg(row?.attachment);
+
+    // 2. Check matchedTx
+    addImg(matchedTx?.screenshot);
+    addImg(matchedTx?.screenshots);
+    addImg(matchedTx?.attachment);
+
+    // 3. Check allTransactions matching this member + event
+    if (Array.isArray(allTransactions) && allTransactions.length > 0) {
+      const rowMemId = String(row?.memberId || row?.userId || matchedTx?.userId || matchedTx?.memberId || "").trim().toLowerCase();
+      const rowMemName = String(row?.memberName || matchedTx?.memberName || "").trim().toLowerCase();
+      const rowEvId = String(row?.eventId || matchedTx?.eventId || "").trim().toLowerCase();
+      const rowEvName = String(row?.eventName || matchedTx?.eventName || "").trim().toLowerCase();
+
+      allTransactions.forEach((t) => {
+        const tMemId = String(t.memberId || t.userId || "").trim().toLowerCase();
+        const tMemName = String(t.memberName || "").trim().toLowerCase();
+        const mMatch = (rowMemId && tMemId && rowMemId === tMemId) || (rowMemName && tMemName && rowMemName === tMemName);
+        if (!mMatch) return;
+
+        const tEvId = String(t.eventId || "").trim().toLowerCase();
+        const tEvName = String(t.eventName || "").trim().toLowerCase();
+        const evMatch = (rowEvId && tEvId && rowEvId === tEvId) || (rowEvName && tEvName && (rowEvName === tEvName || rowEvName.includes(tEvName) || tEvName.includes(rowEvName)));
+        if (!evMatch) return;
+
+        addImg(t.screenshot);
+        addImg(t.screenshots);
+        addImg(t.attachment);
+      });
+    }
+
+    return list;
+  })();
 
   const handleCopyUtr = (text) => {
     if (!text) return;
@@ -544,8 +817,6 @@ export default function ViewContributionModal({
         }
       >
         <Stack spacing={2.2} sx={{ pt: 0.5 }}>
-
-
           {/* ── Event & Contributor Details ── */}
           <Paper
             variant="outlined"
@@ -586,6 +857,110 @@ export default function ViewContributionModal({
                   {resolvedEventType}
                 </Typography>
               </Grid>
+
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Payment Status
+                </Typography>
+                <Box sx={{ mt: 0.3 }}>
+                  {renderStatusBadge(displayStatus)}
+                </Box>
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Event Contribution Amount
+                </Typography>
+                <Typography variant="body2" fontWeight={800} color="primary.main" sx={{ fontSize: "0.95rem" }}>
+                  {formatWholeCurrency(targetAmount)}
+                </Typography>
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {isPaid ? "Total Received Amount" : "Received Amount"}
+                </Typography>
+                <Typography variant="body2" fontWeight={800} sx={{ color: isPaid ? "#16a34a" : "text.secondary", fontSize: "0.95rem" }}>
+                  {formatWholeCurrency(actualPaidAmount)}
+                </Typography>
+              </Grid>
+
+              {arrears > 0 && (
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                    Previous Arrears
+                  </Typography>
+                  <Tooltip
+                    title={arrearsTooltipContent}
+                    arrow
+                    enterDelay={100}
+                    placement="top"
+                    componentsProps={{
+                      tooltip: {
+                        sx: {
+                          bgcolor: "#1e1b4b",
+                          color: "#fff",
+                          p: 1.2,
+                          borderRadius: "8px",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                          border: "1px solid rgba(255,255,255,0.15)",
+                        },
+                      },
+                      arrow: {
+                        sx: {
+                          color: "#1e1b4b",
+                        },
+                      },
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      fontWeight={800}
+                      color="warning.main"
+                      sx={{
+                        cursor: "help",
+                        textDecoration: "underline dotted",
+                        display: "inline-block",
+                        fontSize: "0.95rem",
+                      }}
+                    >
+                      {formatWholeCurrency(arrears)}
+                    </Typography>
+                  </Tooltip>
+                </Grid>
+              )}
+
+              {balanceDue > 0 && (
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                    Total Due / Balance
+                  </Typography>
+                  <Tooltip
+                    title={
+                      arrears > 0
+                        ? `Total Balance Due: ${formatWholeCurrency(balanceDue)} (includes ${formatWholeCurrency(arrears)} previous arrears)`
+                        : `Total Balance Due: ${formatWholeCurrency(balanceDue)}`
+                    }
+                    arrow
+                    enterDelay={100}
+                    placement="top"
+                  >
+                    <Typography
+                      variant="body2"
+                      fontWeight={800}
+                      color="error.main"
+                      sx={{
+                        fontSize: "0.95rem",
+                        cursor: arrears > 0 ? "help" : "default",
+                        textDecoration: arrears > 0 ? "underline dotted" : "none",
+                        display: "inline-block",
+                      }}
+                    >
+                      {formatWholeCurrency(balanceDue)}
+                    </Typography>
+                  </Tooltip>
+                </Grid>
+              )}
 
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">
@@ -812,12 +1187,12 @@ export default function ViewContributionModal({
             >
               <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 0.8 }}>
                 <ReceiptIcon sx={{ fontSize: 18, color: "primary.main" }} />
-                Attached Payment Receipts({screenshots.length})
+                Attached Payment Receipts ({screenshots.length})
               </Typography>
 
               <Grid container spacing={1.5}>
                 {screenshots.map((imgSrc, idx) => (
-                  <Grid key={idx} size={{ xs: 6, sm: 4 }}>
+                  <Grid key={idx} size={{ xs: 12, sm: 6, md: 4 }}>
                     <Box
                       onClick={() => setPreviewImage(imgSrc)}
                       sx={{
@@ -826,10 +1201,13 @@ export default function ViewContributionModal({
                         overflow: "hidden",
                         border: "1.5px solid",
                         borderColor: "divider",
-                        height: 120,
+                        height: 180,
+                        bgcolor: (t) => t.palette.mode === "dark" ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
                         cursor: "pointer",
+                        transition: "all 0.2s ease",
                         "&:hover": {
                           borderColor: "primary.main",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                           "& .preview-overlay": { opacity: 1 },
                         },
                       }}
@@ -841,7 +1219,7 @@ export default function ViewContributionModal({
                         sx={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "cover",
+                          objectFit: "contain",
                           display: "block",
                         }}
                       />
@@ -859,10 +1237,10 @@ export default function ViewContributionModal({
                           transition: "opacity 0.2s ease",
                         }}
                       >
-                        <Stack direction="row" spacing={0.5} alignItems="center">
-                          <ZoomInIcon sx={{ fontSize: 18 }} />
+                        <Stack direction="row" spacing={0.6} alignItems="center">
+                          <ZoomInIcon sx={{ fontSize: 20 }} />
                           <Typography variant="caption" fontWeight={700}>
-                            Preview
+                            Click to Inspect
                           </Typography>
                         </Stack>
                       </Box>
@@ -879,7 +1257,7 @@ export default function ViewContributionModal({
       <AppDialog
         open={Boolean(previewImage)}
         onClose={() => setPreviewImage(null)}
-        title="Receipt Screenshot Preview"
+        title="Attached Payment Receipt Screenshot"
         maxWidth="md"
         actions={
           <AppCancelButton onClick={() => setPreviewImage(null)}>
@@ -892,7 +1270,9 @@ export default function ViewContributionModal({
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            p: 1,
+            p: 1.5,
+            bgcolor: (t) => (t.palette.mode === "dark" ? "#090d16" : "#f1f5f9"),
+            borderRadius: "8px",
             maxHeight: "75vh",
             overflow: "auto",
           }}
@@ -904,8 +1284,9 @@ export default function ViewContributionModal({
             sx={{
               maxWidth: "100%",
               maxHeight: "70vh",
-              borderRadius: "8px",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+              objectFit: "contain",
+              borderRadius: "6px",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.25)",
             }}
           />
         </Box>

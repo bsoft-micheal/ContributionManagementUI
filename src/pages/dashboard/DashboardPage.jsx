@@ -754,8 +754,10 @@ export default function DashboardPage() {
     try {
       const data = await getDashboardSummaryAsync({ month, year });
       setSummary(data);
-    } catch {
-      toast.error("Failed to load dashboard data");
+    } catch (err) {
+      if (!err?.isRateLimit && err?.response?.status !== 429) {
+        toast.error("Failed to load dashboard data");
+      }
     } finally {
       setLoading(false);
     }
@@ -908,10 +910,30 @@ export default function DashboardPage() {
     }
 
     if (key === "eventType") {
+      let autoEventId = "ALL";
+      if (normalizedVal && normalizedVal !== "ALL") {
+        const allEventsList = summary?.upcomingEvents ?? [];
+        const matchingEvents = allEventsList.filter(
+          (e) => (e.eventTypeName || "").toLowerCase() === normalizedVal.toLowerCase()
+        );
+        const uniqueEvents = [];
+        const seen = new Set();
+        matchingEvents.forEach((e) => {
+          const val = e.eventId ? String(e.eventId) : e.eventName;
+          if (val && !seen.has(val)) {
+            seen.add(val);
+            uniqueEvents.push(e);
+          }
+        });
+        if (uniqueEvents.length === 1) {
+          autoEventId = uniqueEvents[0].eventId ? String(uniqueEvents[0].eventId) : uniqueEvents[0].eventName;
+        }
+      }
+
       setPendingFilters((prev) => ({
         ...prev,
         eventType: normalizedVal,
-        eventId: "ALL", // Automatically reset selected event when event type changes
+        eventId: autoEventId,
       }));
     } else {
       setPendingFilters((prev) => ({ ...prev, [key]: normalizedVal }));
@@ -1521,32 +1543,32 @@ export default function DashboardPage() {
                     label="Paid Amount"
                     value={formatWholeCurrency(totalCollected)}
                     accent="#10b981"
-                    onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-                    actionText="My Payments →"
+                    onClick={totalCollected > 0 && events.length > 0 ? () => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); } : undefined}
+                    actionText={totalCollected > 0 && events.length > 0 ? "My Payments →" : undefined}
                   />
                   {/* Member Card 2: Unpaid Amount */}
                   <MetricCard
                     label="Unpaid Amount"
                     value={formatWholeCurrency(totalPending)}
                     accent="#f43f5e"
-                    onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-                    actionText="View Unpaid →"
+                    onClick={totalPending > 0 && events.length > 0 ? () => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); } : undefined}
+                    actionText={totalPending > 0 && events.length > 0 ? "View Unpaid →" : undefined}
                   />
                   {/* Member Card 3: Total Expenses */}
                   <MetricCard
                     label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
                     value={formatWholeCurrency(totalExpenses)}
                     accent="#f59e0b"
-                    onClick={() => navigate("/expense")}
-                    actionText="Expenses →"
+                    onClick={totalExpenses > 0 ? () => navigate("/expense") : undefined}
+                    actionText={totalExpenses > 0 ? "Expenses →" : undefined}
                   />
                   {/* Member Card 4: Total Events */}
                   <MetricCard
                     label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
                     value={events.length}
                     accent="#8b5cf6"
-                    onClick={() => navigate("/events")}
-                    actionText="View Events →"
+                    onClick={events.length > 0 ? () => navigate("/events") : undefined}
+                    actionText={events.length > 0 ? "View Events →" : undefined}
                   />
                 </>
               ) : (
@@ -1556,32 +1578,32 @@ export default function DashboardPage() {
                     label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Expected Amount"}
                     value={formatWholeCurrency(totalExpected)}
                     accent="#6366f1"
-                    onClick={() => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); }}
-                    actionText="All Members →"
+                    onClick={totalExpected > 0 && events.length > 0 ? () => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); } : undefined}
+                    actionText={totalExpected > 0 && events.length > 0 ? "All Members →" : undefined}
                   />
                   {/* Other Roles: Card 2: Collection Amount */}
                   <MetricCard
                     label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Collection Amount"}
                     value={formatWholeCurrency(totalCollected)}
                     accent="#10b981"
-                    onClick={() => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); }}
-                    actionText="View Paid →"
+                    onClick={totalCollected > 0 && events.length > 0 ? () => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); } : undefined}
+                    actionText={totalCollected > 0 && events.length > 0 ? "View Paid →" : undefined}
                   />
                   {/* Other Roles: Card 3: Pending Amount */}
                   <MetricCard
                     label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Pending Amount"}
                     value={formatWholeCurrency(totalPending)}
                     accent="#f43f5e"
-                    onClick={() => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); }}
-                    actionText="View Unpaid →"
+                    onClick={totalPending > 0 && events.length > 0 ? () => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); } : undefined}
+                    actionText={totalPending > 0 && events.length > 0 ? "View Unpaid →" : undefined}
                   />
                   {/* Other Roles: Card 4: Total Expenses */}
                   <MetricCard
                     label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
                     value={formatWholeCurrency(totalExpenses)}
                     accent="#f59e0b"
-                    onClick={() => navigate("/expense")}
-                    actionText="Expenses →"
+                    onClick={totalExpenses > 0 ? () => navigate("/expense") : undefined}
+                    actionText={totalExpenses > 0 ? "Expenses →" : undefined}
                   />
                   {/* Other Roles: Card 5: Amount in Hand */}
                   <MetricCard
@@ -1589,15 +1611,15 @@ export default function DashboardPage() {
                     value={formatWholeCurrency(totalRemaining)}
                     accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
                     badge={usedInHandBadge}
-                    actionText="Amount In Hand →"
+                    actionText={totalRemaining !== 0 ? "Amount In Hand →" : undefined}
                   />
                   {/* Other Roles: Card 6: Total Events */}
                   <MetricCard
                     label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
                     value={events.length}
                     accent="#8b5cf6"
-                    onClick={() => navigate("/events")}
-                    actionText="View Events →"
+                    onClick={events.length > 0 ? () => navigate("/events") : undefined}
+                    actionText={events.length > 0 ? "View Events →" : undefined}
                   />
                 </>
               )}
@@ -1640,7 +1662,7 @@ export default function DashboardPage() {
       {/* Quick Access Slide-Over Drawer */}
       <Drawer
         anchor="right"
-        open={quickAccessDrawerOpen}
+        open={quickAccessDrawerOpen && events.length > 0}
         onClose={() => setQuickAccessDrawerOpen(false)}
         PaperProps={{
           sx: {

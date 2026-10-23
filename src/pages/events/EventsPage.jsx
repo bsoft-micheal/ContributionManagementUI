@@ -41,6 +41,8 @@ import { getExpensesAsync } from "../../services/expenseService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
 import { getUsersAsync } from "../../services/userService";
+import { getGalleryPhotosAsync } from "../../services/galleryService";
+import { extractImages } from "../gallery/GalleryPage";
 import AppDataTable from "../../components/common/AppDataTable";
 import MetricCard from "../../components/MetricCard";
 import EventDetailsDialog from "../../components/events/EventDetailsDialog";
@@ -184,12 +186,13 @@ export default function EventsPage() {
   async function loadData(targetFilters) {
     const activeFilters = targetFilters || filters;
     try {
-      const [eventsData, types, membersData, usersData, expensesData] = await Promise.all([
+      const [eventsData, types, membersData, usersData, expensesData, galleryPhotosData] = await Promise.all([
         getEventsAsync({ month: activeFilters.month, year: activeFilters.year }),
         getEventTypesAsync(),
         getMembersAsync(),
         getUsersAsync().catch(() => []),
         getExpensesAsync().catch(() => []),
+        getGalleryPhotosAsync().catch(() => []),
       ]);
       const combinedMembers = Array.isArray(membersData) ? [...membersData] : [];
       const existingIds = new Set(
@@ -271,6 +274,21 @@ export default function EventsPage() {
         });
         const eventExpenseTotal = matchedExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
+        // Dynamically compute photos count for this event
+        const matchedPhotos = (galleryPhotosData || []).filter((item) => {
+          const itemEvent = (item.eventName || "").trim().toLowerCase();
+          const itemId = String(item.eventId || "").trim().toLowerCase();
+          return (
+            (targetEventName && itemEvent === targetEventName) ||
+            (targetEventId && itemId && itemId === targetEventId)
+          );
+        });
+        let totalPhotosCount = 0;
+        matchedPhotos.forEach((entry) => {
+          const imgs = entry.images?.length > 0 ? entry.images : extractImages(entry.imageUrl);
+          totalPhotosCount += (imgs?.length || 1);
+        });
+
         const expAmount = Math.max(Number(e.expenseAmount || 0), eventExpenseTotal);
         const allocatedAmt = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
         const rawBudget = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
@@ -300,6 +318,8 @@ export default function EventsPage() {
           hasPaidContributions: hasPaidContrib,
           paidContributionsCount: Number(e.paidContributionsCount || e.PaidContributionsCount || 0),
           expenseAmount: expAmount,
+          expensesCount: matchedExpenses.length,
+          photosCount: totalPhotosCount,
           remainingAmount: remainingAmt,
           pendingAmount: pendingAmt,
           totalPaidAmount: paidAmt,
@@ -629,21 +649,41 @@ export default function EventsPage() {
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title={canViewPhotos ? "View Photos" : "Disabled"}>
-              <span style={{ display: "inline-flex", cursor: !canViewPhotos ? "not-allowed" : "pointer" }}>
-                <IconButton
-                  size="small"
-                  sx={{ p: 0.3 }}
-                  disabled={!canViewPhotos}
-                  onClick={() => {
-                    setPhotoEvent(row);
-                    setPhotoDetailsDialogOpen(true);
-                  }}
+            {(() => {
+              const hasPhotos = Number(row.photosCount || 0) > 0;
+              const isPhotoViewable = canViewPhotos && hasPhotos;
+              return (
+                <Tooltip
+                  title={
+                    !canViewPhotos
+                      ? "Disabled"
+                      : !hasPhotos
+                      ? "No photos available"
+                      : "View Photos"
+                  }
                 >
-                  <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: canViewPhotos ? actionIconColor : "#94a3b8" }} />
-                </IconButton>
-              </span>
-            </Tooltip>
+                  <span style={{ display: "inline-flex", cursor: !isPhotoViewable ? "not-allowed" : "pointer" }}>
+                    <IconButton
+                      size="small"
+                      sx={{
+                        p: 0.3,
+                        opacity: isPhotoViewable ? 1 : 0.38,
+                        cursor: !isPhotoViewable ? "not-allowed !important" : "pointer",
+                        pointerEvents: !isPhotoViewable ? "none" : "auto",
+                      }}
+                      disabled={!isPhotoViewable}
+                      onClick={() => {
+                        if (!isPhotoViewable) return;
+                        setPhotoEvent(row);
+                        setPhotoDetailsDialogOpen(true);
+                      }}
+                    >
+                      <PhotoLibraryIcon sx={{ fontSize: "1.1rem", color: isPhotoViewable ? actionIconColor : "#94a3b8" }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              );
+            })()}
             <Tooltip title={canAddExpense ? "Add Expense" : "Disabled"}>
               <span style={{ display: "inline-flex", cursor: !canAddExpense ? "not-allowed" : "pointer" }}>
                 <IconButton
@@ -659,21 +699,41 @@ export default function EventsPage() {
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title={canViewExpense ? "View Expense" : "Disabled"}>
-              <span style={{ display: "inline-flex", cursor: !canViewExpense ? "not-allowed" : "pointer" }}>
-                <IconButton
-                  size="small"
-                  sx={{ p: 0.3 }}
-                  disabled={!canViewExpense}
-                  onClick={() => {
-                    setExpenseEvent(row);
-                    setExpenseDetailsDialogOpen(true);
-                  }}
+            {(() => {
+              const hasExpenses = Number(row.expensesCount || 0) > 0 || Number(row.expenseAmount || 0) > 0;
+              const isExpenseViewable = canViewExpense && hasExpenses;
+              return (
+                <Tooltip
+                  title={
+                    !canViewExpense
+                      ? "Disabled"
+                      : !hasExpenses
+                      ? "No expenses recorded"
+                      : "View Expense"
+                  }
                 >
-                  <ReceiptLongIcon sx={{ fontSize: "1.1rem", color: canViewExpense ? actionIconColor : "#94a3b8" }} />
-                </IconButton>
-              </span>
-            </Tooltip>
+                  <span style={{ display: "inline-flex", cursor: !isExpenseViewable ? "not-allowed" : "pointer" }}>
+                    <IconButton
+                      size="small"
+                      sx={{
+                        p: 0.3,
+                        opacity: isExpenseViewable ? 1 : 0.38,
+                        cursor: !isExpenseViewable ? "not-allowed !important" : "pointer",
+                        pointerEvents: !isExpenseViewable ? "none" : "auto",
+                      }}
+                      disabled={!isExpenseViewable}
+                      onClick={() => {
+                        if (!isExpenseViewable) return;
+                        setExpenseEvent(row);
+                        setExpenseDetailsDialogOpen(true);
+                      }}
+                    >
+                      <ReceiptLongIcon sx={{ fontSize: "1.1rem", color: isExpenseViewable ? actionIconColor : "#94a3b8" }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              );
+            })()}
             <Tooltip title={canViewShareRules ? (COMMON_STRINGS.CONTRIBUTION_CALCULATION?.TITLE || "Contribution Share Rules") : "Disabled"}>
               <span style={{ display: "inline-flex", cursor: !canViewShareRules ? "not-allowed" : "pointer" }}>
                 <IconButton

@@ -1041,6 +1041,7 @@ export default function GalleryPage() {
                 </IconButton>
               </span>
             </Tooltip>
+            {/* The delete icon is commented out as requested. Can be re-enabled if needed in the future.
             <Tooltip
               title={
                 !canDeletePhoto
@@ -1070,6 +1071,7 @@ export default function GalleryPage() {
                 </IconButton>
               </span>
             </Tooltip>
+            */}
           </Box>
         );
       },
@@ -1174,7 +1176,30 @@ export default function GalleryPage() {
                   onChange={(e) => {
                     const newCategory = e.target.value || "ALL";
                     setFilterCategory(newCategory);
-                    setFilterEvent("ALL");
+                    if (newCategory !== "ALL") {
+                      const unique = new Set();
+                      eventsList.forEach((ev) => {
+                        const typeName = (ev.eventTypeName || ev.categoryName || "").trim().toLowerCase();
+                        if (typeName === newCategory.trim().toLowerCase()) {
+                          const name = ev.name || ev.eventName;
+                          if (name) unique.add(name);
+                        }
+                      });
+                      photos.forEach((p) => {
+                        const pCat = (p.category || "").trim().toLowerCase();
+                        if (pCat === newCategory.trim().toLowerCase()) {
+                          if (p.eventName) unique.add(p.eventName);
+                        }
+                      });
+                      const matchedNames = Array.from(unique);
+                      if (matchedNames.length === 1) {
+                        setFilterEvent(matchedNames[0]);
+                      } else {
+                        setFilterEvent("ALL");
+                      }
+                    } else {
+                      setFilterEvent("ALL");
+                    }
                   }}
                   onClear={() => {
                     setFilterCategory("ALL");
@@ -1311,10 +1336,25 @@ export default function GalleryPage() {
               value={form.category}
               onChange={(e) => {
                 const newCategory = e.target.value;
+                let autoEventName = "";
+                if (newCategory) {
+                  const set = new Set();
+                  (eventsList || []).forEach((ev) => {
+                    const typeName = (ev.eventTypeName || ev.categoryName || "").trim().toLowerCase();
+                    if (typeName === newCategory.trim().toLowerCase()) {
+                      const name = ev.name || ev.eventName;
+                      if (name) set.add(name);
+                    }
+                  });
+                  const matchedNames = Array.from(set);
+                  if (matchedNames.length === 1) {
+                    autoEventName = matchedNames[0];
+                  }
+                }
                 setForm((c) => ({
                   ...c,
                   category: newCategory,
-                  eventName: "",
+                  eventName: autoEventName,
                 }));
                 if (errors.category) setErrors((p) => ({ ...p, category: "" }));
                 if (errors.eventName) setErrors((p) => ({ ...p, eventName: "" }));
