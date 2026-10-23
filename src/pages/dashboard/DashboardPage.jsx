@@ -43,6 +43,7 @@ import { getMembersAsync } from "../../services/memberService";
 import { useAppToast } from "../../components/common/AppToast";
 import AppDataTable from "../../components/common/AppDataTable";
 import BirthdayCelebrationModal from "../../components/common/BirthdayCelebrationModal";
+import AppOverflowTooltip from "../../components/common/AppOverflowTooltip";
 import MemberPaymentQuickAccess from "../../components/dashboard/MemberPaymentQuickAccess";
 import FinancialBarChart from "../../components/dashboard/FinancialBarChart";
 import { useAuth } from "../../contexts/AuthContext";
@@ -249,27 +250,23 @@ function InteractiveDonutChart({
           justifyContent: "center",
           px: 1.5,
           textAlign: "center",
-          pointerEvents: "none",
           transition: "all 0.22s ease",
         }}
       >
         {/* Item Title */}
-        <Tooltip title={display?.label || display?.title || ""}>
-          <Typography
-            noWrap
-            sx={{
-              maxWidth: 114,
-              fontSize: "0.78125rem",
-              fontWeight: 600,
-              color: isDark ? "#93c5fd" : "#6366f1",
-              lineHeight: 1.25,
-              letterSpacing: "0.01em",
-              mb: 0.3,
-            }}
-          >
-            {display?.label || display?.title || "Details"}
-          </Typography>
-        </Tooltip>
+        <AppOverflowTooltip
+          text={display?.label || display?.title || "Details"}
+          sx={{
+            maxWidth: 114,
+            fontSize: "0.78125rem",
+            fontWeight: 600,
+            color: isDark ? "#93c5fd" : "#6366f1",
+            lineHeight: 1.25,
+            letterSpacing: "0.01em",
+            mb: 0.3,
+            textAlign: "center",
+          }}
+        />
 
         {/* Amount */}
         <Typography
@@ -447,9 +444,16 @@ function EventMiniCard({ event, index }) {
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="body2" fontWeight={800} noWrap sx={{ maxWidth: 170, fontSize: "0.82rem" }}>
-              {event.eventName}
-            </Typography>
+            <AppOverflowTooltip
+              text={event.eventName}
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                maxWidth: "calc(100% - 90px)",
+                fontSize: "0.82rem",
+                fontWeight: 800,
+              }}
+            />
             <Chip
               label={allPaid ? "✓ Settled" : `${event.pendingContributionsCount} pending`}
               size="small"
@@ -1310,7 +1314,16 @@ export default function DashboardPage() {
     },
     {
       label: "Event Name", key: "eventName",
-      render: (row) => row.eventName || "--",
+      render: (row) => (
+        <AppOverflowTooltip
+          text={row.eventName || "--"}
+          sx={{
+            maxWidth: { xs: 160, sm: 240, md: 320, lg: 420 },
+            fontWeight: 600,
+            fontSize: "inherit",
+          }}
+        />
+      ),
     },
     { label: "Event Date", key: "eventDate", render: (row) => formatGridDate(row.eventDate) },
     ...(isMember ? [
@@ -1368,7 +1381,15 @@ export default function DashboardPage() {
     {
       label: "Created By",
       key: "createdBy",
-      render: (row) => row.createdBy || row.CreatedBy || "--",
+      render: (row) => (
+        <AppOverflowTooltip
+          text={row.createdBy || row.CreatedBy || "--"}
+          sx={{
+            maxWidth: { xs: 120, sm: 160, md: 220 },
+            fontSize: "inherit",
+          }}
+        />
+      ),
     },
     {
       label: "Created On",

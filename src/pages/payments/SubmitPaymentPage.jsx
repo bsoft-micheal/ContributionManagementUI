@@ -604,7 +604,13 @@ export default function SubmitPaymentPage() {
           ? formData.paymentDate.toISOString()
           : new Date().toISOString(),
         screenshot: formData.screenshot || null,
-        notes: formData.notes.trim() || null,
+        notes: (() => {
+          const isCashMode = String(formData.paymentMode || "").toLowerCase().includes("cash");
+          const cashTag = isCashMode && formData.notes.trim() && !formData.notes.includes("[Cash Note:")
+            ? `[Cash Note: ${formData.notes.trim()}]`
+            : "";
+          return [formData.notes.trim(), cashTag].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(" ") || null;
+        })(),
       };
 
       const res = await submitPaymentProofAsync(payload);

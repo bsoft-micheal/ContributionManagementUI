@@ -11,7 +11,6 @@ import {
   Chip,
 } from "@mui/material";
 import {
-  Visibility as ViewIcon,
   ConfirmationNumberOutlined as TicketIcon,
   PaymentRounded as PaymentRoundedIcon,
   FilterList as FilterListIcon,
@@ -127,13 +126,22 @@ export default function PaymentsPage() {
   }, [eventsList]);
 
   const statusOptions = useMemo(() => {
-    return [
-      { label: "All Statuses", value: "ALL" },
-      ...(dbStatuses || []).map((s) => ({
-        label: s.statusName || s.name || s.status_name,
-        value: s.statusName || s.name || s.status_name,
-      })),
-    ];
+    const list = [{ label: "All Statuses", value: "ALL" }];
+    const seen = new Set();
+    (dbStatuses || []).forEach((s) => {
+      const name = s.statusName || s.name || s.status_name;
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push({ label: name, value: name });
+      }
+    });
+    ["Pending", "Verified", "Rejected"].forEach((s) => {
+      if (!seen.has(s.toLowerCase())) {
+        seen.add(s.toLowerCase());
+        list.push({ label: s, value: s });
+      }
+    });
+    return list;
   }, [dbStatuses]);
 
 
@@ -459,73 +467,298 @@ export default function PaymentsPage() {
 
   const columns = [
     {
-      label: "Action",
-      render: (row) => (
-        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-          <Tooltip title={canViewPaymentHistory ? "View Details" : "Disabled"}>
-            <span style={{ display: "inline-flex", cursor: !canViewPaymentHistory ? "not-allowed" : "pointer" }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!canViewPaymentHistory}
-                onClick={() => {
-                  if (!canViewPaymentHistory) return;
-                  setSelectedTxn(row);
-                  setViewDialogOpen(true);
-                }}
-              >
-                <ViewIcon
-                  sx={{
-                    fontSize: "1.05rem",
-                    color: (theme) =>
-                      canViewPaymentHistory
-                        ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")
-                        : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
-                  }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      ),
-    },
-    {
       label: "Transaction ID",
       key: "id",
-      render: (row) => (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-          <Typography
-            variant="body2"
-            fontWeight={700}
-            sx={{
-              color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
-              cursor: "pointer",
-              fontSize: "0.8rem",
-              "&:hover": { textDecoration: "underline" },
-            }}
-            onClick={() => {
-              setSelectedTxn(row);
-              setViewDialogOpen(true);
-            }}
-          >
-            {row.id}
-          </Typography>
-          {(row.isSplitGroup || row.parentTxnNumber) && (
-            <Chip
-              label="Split"
-              size="small"
+      render: (row) => {
+        const isSplit = row.isSplitGroup && Array.isArray(row.splits) && row.splits.length > 0;
+
+        const tooltipContent = (
+          <Box sx={{ p: 0.5, minWidth: 320, maxWidth: 400, display: "flex", flexDirection: "column", gap: 1.25 }}>
+            {/* Header: Title / ID + Status */}
+            <Box
               sx={{
-                height: 18,
-                fontSize: "0.68rem",
-                fontWeight: 700,
-                bgcolor: "rgba(99, 102, 241, 0.1)",
-                color: "#6366f1",
-                border: "1px solid rgba(99, 102, 241, 0.25)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 1.5,
+                borderBottom: (t) => `1px solid ${t.palette.divider}`,
+                pb: 1,
               }}
-            />
-          )}
-        </Box>
-      ),
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={800}
+                  sx={{
+                    color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#1e293b"),
+                    fontFamily: "monospace",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {row.id}
+                </Typography>
+                {isSplit && (
+                  <Chip
+                    label={`Split (${row.splits.length})`}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      bgcolor: "rgba(99, 102, 241, 0.12)",
+                      color: "#6366f1",
+                      border: "1px solid rgba(99, 102, 241, 0.25)",
+                    }}
+                  />
+                )}
+              </Box>
+              <Box>{renderStatusBadge(row.status)}</Box>
+            </Box>
+
+            {/* Core Details Grid */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 1.2,
+                bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#f8fafc"),
+                p: 1.25,
+                borderRadius: "8px",
+                border: (t) => `1px solid ${t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "#e2e8f0"}`,
+              }}
+            >
+              <Box>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block" }}>
+                  Member Name
+                </Typography>
+                <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.78rem" }}>
+                  {row.memberName || "--"}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block" }}>
+                  Event Name
+                </Typography>
+                <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.78rem" }}>
+                  {row.eventName || "--"}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block" }}>
+                  Amount
+                </Typography>
+                <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.82rem", color: "success.main" }}>
+                  {formatWholeCurrency(row.amount)}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block" }}>
+                  Payment Mode
+                </Typography>
+                <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.78rem" }}>
+                  {row.paymentMode || "--"}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block" }}>
+                  Payment Date
+                </Typography>
+                <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
+                  {row.paymentDate ? formatGridDate(row.paymentDate) : "--"}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block" }}>
+                  Verified By
+                </Typography>
+                <Typography variant="caption" fontWeight={600} sx={{ fontSize: "0.75rem" }}>
+                  {row.verifiedBy && row.verifiedBy !== "-" && row.verifiedBy !== "--" ? row.verifiedBy : "--"}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Split Details Breakdown (if Split) */}
+            {isSplit && (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                <Typography
+                  variant="caption"
+                  fontWeight={800}
+                  sx={{ color: "#6366f1", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.03em" }}
+                >
+                  Split Breakdown ({row.splits.length} parts):
+                </Typography>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.6 }}>
+                  {row.splits.map((s, idx) => (
+                    <Box
+                      key={s.id || idx}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#ffffff"),
+                        p: 0.75,
+                        borderRadius: "6px",
+                        border: (t) =>
+                          `1px solid ${t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "#e2e8f0"}`,
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
+                        >
+                          {s.id || s.txnNumber}
+                        </Typography>
+                        {s.paymentMode && (
+                          <Chip
+                            label={s.paymentMode}
+                            size="small"
+                            sx={{
+                              height: 18,
+                              fontSize: "0.65rem",
+                              fontWeight: 700,
+                              bgcolor: (t) =>
+                                t.palette.mode === "dark" ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.08)",
+                              color: "#6366f1",
+                            }}
+                          />
+                        )}
+                      </Box>
+                      <Box sx={{ textAlign: "right" }}>
+                        <Typography variant="caption" fontWeight={800} sx={{ color: "success.main", fontSize: "0.78rem" }}>
+                          {formatWholeCurrency(s.amount)}
+                        </Typography>
+                        {s.utr && s.utr !== "-" && s.utr !== "--" && (
+                          <Typography
+                            variant="caption"
+                            sx={{ display: "block", color: "text.secondary", fontSize: "0.68rem" }}
+                          >
+                            Ref: {s.utr}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* Single Transaction Reference (if not split) */}
+            {!isSplit && row.utr && row.utr !== "-" && row.utr !== "--" && (
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 0.5 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
+                  Ref / UTR No:
+                </Typography>
+                <Typography variant="caption" fontWeight={700} sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>
+                  {row.utr}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Footer Hint */}
+            {canViewPaymentHistory && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "text.secondary",
+                  fontSize: "0.68rem",
+                  pt: 0.75,
+                  borderTop: (t) => `1px dashed ${t.palette.divider}`,
+                  textAlign: "center",
+                  display: "block",
+                }}
+              >
+                Click to view full transaction modal
+              </Typography>
+            )}
+          </Box>
+        );
+
+        return (
+          <Tooltip
+            arrow
+            interactive
+            enterDelay={100}
+            leaveDelay={200}
+            placement="right-start"
+            componentsProps={{
+              tooltip: {
+                sx: {
+                  bgcolor: (t) => (t.palette.mode === "dark" ? "#1e293b" : "#ffffff"),
+                  color: "text.primary",
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+                  border: (t) =>
+                    `1px solid ${t.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "#e2e8f0"}`,
+                  borderRadius: "12px",
+                  p: 1.5,
+                  maxWidth: 420,
+                },
+              },
+              arrow: {
+                sx: {
+                  color: (t) => (t.palette.mode === "dark" ? "#1e293b" : "#ffffff"),
+                },
+              },
+            }}
+            title={tooltipContent}
+          >
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.75,
+                width: "100%",
+                cursor: canViewPaymentHistory ? "pointer" : "default",
+                py: 0.25,
+              }}
+              onClick={() => {
+                if (!canViewPaymentHistory) return;
+                setSelectedTxn(row);
+                setViewDialogOpen(true);
+              }}
+            >
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{
+                  color: (t) => (t.palette.mode === "dark" ? "#818cf8" : "#4f46e5"),
+                  fontSize: "0.8rem",
+                  textDecoration: "underline",
+                  textDecorationColor: "rgba(99, 102, 241, 0.3)",
+                  textUnderlineOffset: "3px",
+                  "&:hover": {
+                    color: "#4338ca",
+                    textDecorationColor: "#4338ca",
+                  },
+                }}
+              >
+                {row.id}
+              </Typography>
+              {(row.isSplitGroup || row.parentTxnNumber) && (
+                <Chip
+                  label="Split"
+                  size="small"
+                  sx={{
+                    height: 18,
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    bgcolor: "rgba(99, 102, 241, 0.1)",
+                    color: "#6366f1",
+                    border: "1px solid rgba(99, 102, 241, 0.25)",
+                    cursor: "pointer",
+                  }}
+                />
+              )}
+            </Box>
+          </Tooltip>
+        );
+      },
     },
     {
       label: "Member Name",
@@ -775,115 +1008,67 @@ export default function PaymentsPage() {
       >
         {selectedTxn && (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                p: 1.5,
-                borderRadius: "10px",
-                bgcolor: (t) =>
-                  t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                border: (t) => `1px solid ${t.palette.divider}`,
-              }}
-            >
-              <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Transaction Number
-                </Typography>
-                <Typography
-                  variant="subtitle1"
-                  fontWeight={800}
-                  color={(t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")}
-                >
-                  {selectedTxn.id}
-                </Typography>
-              </Box>
-              <Box>{renderStatusBadge(selectedTxn.status)}</Box>
-            </Box>
-
-            {selectedTxn.isSplitGroup && selectedTxn.splits?.length > 0 ? (
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: "10px",
-                  bgcolor: (t) =>
-                    t.palette.mode === "dark" ? "rgba(99, 102, 241, 0.08)" : "rgba(99, 102, 241, 0.04)",
-                  border: "1px solid rgba(99, 102, 241, 0.25)",
-                }}
-              >
-                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#6366f1" }}>
-                    Split Payment Breakdown ({selectedTxn.splits.length} parts)
-                  </Typography>
-                  <Chip
-                    label={`Total: ${formatWholeCurrency(selectedTxn.amount)}`}
-                    size="small"
-                    sx={{
-                      fontWeight: 800,
-                      bgcolor: "rgba(99, 102, 241, 0.15)",
-                      color: "#6366f1",
-                    }}
-                  />
-                </Stack>
-
-                <Stack spacing={1}>
-                  {selectedTxn.splits.map((split, sIdx) => (
-                    <Box
-                      key={split.id || sIdx}
-                      sx={{
-                        p: 1.25,
-                        borderRadius: "8px",
-                        bgcolor: (t) =>
-                          t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#ffffff",
-                        border: (t) => `1px solid ${t.palette.divider}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        flexWrap: "wrap",
-                        gap: 1,
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.8rem", color: "text.primary" }}>
-                          {split.id || split.txnNumber}
-                        </Typography>
-                        {renderPaymentModeBadge(split.paymentMode)}
-                      </Box>
-
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                        {split.utr && split.utr !== "-" && split.utr !== "--" && (
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
-                            Ref: <strong>{split.utr}</strong>
-                          </Typography>
-                        )}
-                        <Typography variant="body2" fontWeight={800} sx={{ color: "success.main" }}>
-                          {formatWholeCurrency(split.amount)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
-            ) : selectedTxn.parentTxnNumber && (
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: "8px",
-                  bgcolor: (t) => t.palette.mode === "dark" ? "rgba(99, 102, 241, 0.1)" : "rgba(99, 102, 241, 0.05)",
-                  border: "1px dashed rgba(99, 102, 241, 0.3)",
-                }}
-              >
-                <Typography variant="caption" sx={{ color: "#6366f1", fontWeight: 700, display: "block" }}>
-                  Multi-Mode Payment Group: {selectedTxn.parentTxnNumber}
-                </Typography>
-                <Typography variant="body2" sx={{ fontSize: "0.78rem", color: "text.secondary", mt: 0.3 }}>
-                  This transaction is a child breakdown item of payment group {selectedTxn.parentTxnNumber}. Group verification updates all split components together.
-                </Typography>
-              </Box>
-            )}
-
             <Grid container spacing={2}>
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Transaction ID
+                </Typography>
+                {selectedTxn.isSplitGroup && selectedTxn.splits?.length > 0 ? (
+                  <Box sx={{ mt: 0.5, display: "flex", flexDirection: "column", gap: 0.6 }}>
+                    {selectedTxn.splits.map((s, idx) => (
+                      <Box key={s.id || idx} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          sx={{
+                            color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                            fontFamily: "monospace",
+                            fontSize: "0.84rem",
+                          }}
+                        >
+                          {s.id || s.txnNumber}
+                        </Typography>
+                        {s.paymentMode && (
+                          <Chip
+                            label={s.paymentMode}
+                            size="small"
+                            sx={{
+                              height: 18,
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              bgcolor: (t) =>
+                                t.palette.mode === "dark" ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.08)",
+                              color: "#6366f1",
+                              border: "1px solid rgba(99, 102, 241, 0.2)",
+                            }}
+                          />
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography
+                    variant="body2"
+                    fontWeight={700}
+                    sx={{
+                      color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                      fontFamily: "monospace",
+                      fontSize: "0.85rem",
+                      mt: 0.5,
+                    }}
+                  >
+                    {selectedTxn.id || selectedTxn.txnNumber || "--"}
+                  </Typography>
+                )}
+              </Grid>
+
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Verification Status
+                </Typography>
+                <Box sx={{ mt: 0.5 }}>{renderStatusBadge(selectedTxn.status)}</Box>
+              </Grid>
+
               <Grid size={{ xs: 6 }}>
                 <Typography variant="caption" color="text.secondary">
                   Member Name
@@ -922,25 +1107,83 @@ export default function PaymentsPage() {
                 <Typography variant="caption" color="text.secondary">
                   UTR / Reference No
                 </Typography>
-                <Box sx={{ mt: 0.5, display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
-                  {renderUtrReferenceBadges(selectedTxn.utr)}
-                  {selectedTxn.utr && selectedTxn.utr !== "-" && selectedTxn.utr !== "--" && (
-                    <Tooltip title="Copy Reference">
-                      <IconButton
-                        size="small"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(selectedTxn.utr);
-                            toast.success("Reference copied to clipboard!");
-                          } catch {
-                            toast.error("Failed to copy reference");
-                          }
-                        }}
-                        sx={{ p: 0.3 }}
-                      >
-                        <CopyIcon sx={{ fontSize: 15, color: "#64748b" }} />
-                      </IconButton>
-                    </Tooltip>
+                <Box sx={{ mt: 0.5, display: "flex", flexDirection: "column", gap: 0.75 }}>
+                  {selectedTxn.isSplitGroup && selectedTxn.splits?.length > 0 ? (
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.6 }}>
+                      {selectedTxn.splits.map((s, idx) => (
+                        <Box
+                          key={s.id || idx}
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.75,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <Chip
+                            label={s.id || s.txnNumber}
+                            size="small"
+                            sx={{
+                              height: 20,
+                              fontFamily: "monospace",
+                              fontWeight: 700,
+                              fontSize: "0.72rem",
+                              bgcolor: (t) =>
+                                t.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "#f1f5f9",
+                              color: (t) => (t.palette.mode === "dark" ? "#cbd5e1" : "#475569"),
+                              border: (t) => `1px solid ${t.palette.divider}`,
+                            }}
+                          />
+                          {renderUtrReferenceBadges(
+                            s.utr && s.utr !== "-" && s.utr !== "--"
+                              ? (s.utr.includes(":") ? s.utr : `${s.paymentMode || "Ref"}: ${s.utr}`)
+                              : `${s.paymentMode || "Ref"}: --`
+                          )}
+                        </Box>
+                      ))}
+                      {selectedTxn.utr && selectedTxn.utr !== "-" && selectedTxn.utr !== "--" && (
+                        <Box sx={{ mt: 0.2 }}>
+                          <Tooltip title="Copy References">
+                            <IconButton
+                              size="small"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(selectedTxn.utr);
+                                  toast.success("Reference copied to clipboard!");
+                                } catch {
+                                  toast.error("Failed to copy reference");
+                                }
+                              }}
+                              sx={{ p: 0.3 }}
+                            >
+                              <CopyIcon sx={{ fontSize: 15, color: "#64748b" }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      )}
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+                      {renderUtrReferenceBadges(selectedTxn.utr)}
+                      {selectedTxn.utr && selectedTxn.utr !== "-" && selectedTxn.utr !== "--" && (
+                        <Tooltip title="Copy Reference">
+                          <IconButton
+                            size="small"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(selectedTxn.utr);
+                                toast.success("Reference copied to clipboard!");
+                              } catch {
+                                toast.error("Failed to copy reference");
+                              }
+                            }}
+                            sx={{ p: 0.3 }}
+                          >
+                            <CopyIcon sx={{ fontSize: 15, color: "#64748b" }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
                   )}
                 </Box>
               </Grid>
@@ -971,25 +1214,7 @@ export default function PaymentsPage() {
                 </Typography>
               </Grid>
 
-              {selectedTxn.notes && (
-                <Grid size={{ xs: 12 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Notes
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      p: 1.5,
-                      borderRadius: "8px",
-                      bgcolor: (t) =>
-                        t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc",
-                      border: (t) => `1px solid ${t.palette.divider}`,
-                    }}
-                  >
-                    {selectedTxn.notes}
-                  </Typography>
-                </Grid>
-              )}
+
 
               {selectedTxn.screenshot && (
                 <Grid size={{ xs: 12 }}>

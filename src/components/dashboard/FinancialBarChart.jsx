@@ -20,6 +20,7 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import SavingsIcon from "@mui/icons-material/Savings";
 import { formatWholeCurrency } from "../../utils/roundingHelper";
+import AppOverflowTooltip from "../common/AppOverflowTooltip";
 
 // Curated solid colors for Pie Chart (modeled directly on Google Charts reference image)
 const PIE_COLORS = [
@@ -461,46 +462,20 @@ export default function FinancialBarChart({
                         const isHovered = hoveredBar === item.id;
 
                         return (
-                          <Stack
+                          <Box
                             key={item.id}
-                            alignItems="center"
                             onMouseEnter={() => setHoveredBar(item.id)}
                             onMouseLeave={() => setHoveredBar(null)}
                             sx={{
                               height: "100%",
-                              justifyContent: "flex-end",
+                              display: "flex",
+                              alignItems: "flex-end",
+                              justifyContent: "center",
                               width: { xs: 55, sm: 68 },
                               cursor: "pointer",
-                              transition: "transform 0.2s ease",
-                              "&:hover": {
-                                transform: "translateY(-4px)",
-                              },
+                              position: "relative",
                             }}
                           >
-                            {/* Value badge above column */}
-                            <Box
-                              sx={{
-                                mb: 0.6,
-                                px: 0.8,
-                                py: 0.15,
-                                borderRadius: 1,
-                                bgcolor: isHovered
-                                  ? item.color
-                                  : isDark
-                                  ? "rgba(255,255,255,0.08)"
-                                  : "rgba(0,0,0,0.04)",
-                                color: isHovered ? "#ffffff" : "text.primary",
-                                fontSize: "0.75rem",
-                                fontWeight: 600,
-                                whiteSpace: "nowrap",
-                                boxShadow: isHovered ? `0 4px 12px ${alpha(item.color, 0.4)}` : "none",
-                                transition: "all 0.2s ease",
-                              }}
-                            >
-                              {item.formattedValue}
-                            </Box>
-
-                            {/* The Bar */}
                             <Tooltip
                               title={
                                 <Box sx={{ p: 0.5, minWidth: 160 }}>
@@ -556,9 +531,18 @@ export default function FinancialBarChart({
                               }
                               arrow
                               placement="top"
+                              disableInteractive
+                              enterDelay={80}
+                              leaveDelay={50}
                               slotProps={{
+                                popper: {
+                                  sx: {
+                                    pointerEvents: "none",
+                                  },
+                                },
                                 tooltip: {
                                   sx: {
+                                    pointerEvents: "none",
                                     bgcolor: isDark ? "#1e293b" : "#ffffff",
                                     color: isDark ? "#ffffff" : "#0f172a",
                                     border: isDark
@@ -576,6 +560,7 @@ export default function FinancialBarChart({
                                 },
                                 arrow: {
                                   sx: {
+                                    pointerEvents: "none",
                                     color: isDark ? "#1e293b" : "#ffffff",
                                     "&:before": {
                                       border: isDark
@@ -586,31 +571,66 @@ export default function FinancialBarChart({
                                 },
                               }}
                             >
-                              <Box
+                              <Stack
+                                alignItems="center"
                                 sx={{
-                                  width: { xs: 30, sm: 42 },
-                                  height: `${visualHeight}px`,
-                                  background: item.bgGradient,
-                                  borderRadius: "6px 6px 0 0",
-                                  boxShadow: isHovered
-                                    ? `0 0 16px ${alpha(item.color, 0.6)}`
-                                    : `0 2px 6px ${alpha(item.color, 0.25)}`,
-                                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-                                  position: "relative",
-                                  "&:after": {
-                                    content: '""',
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    height: 3,
-                                    bgcolor: "rgba(255,255,255,0.4)",
-                                    borderRadius: "6px 6px 0 0",
-                                  },
+                                  justifyContent: "flex-end",
+                                  width: "100%",
+                                  transform: isHovered ? "translateY(-4px)" : "translateY(0)",
+                                  transition: "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                                  pointerEvents: "none",
                                 }}
-                              />
+                              >
+                                {/* Value badge above column */}
+                                <Box
+                                  sx={{
+                                    mb: 0.6,
+                                    px: 0.8,
+                                    py: 0.15,
+                                    borderRadius: 1,
+                                    bgcolor: isHovered
+                                      ? item.color
+                                      : isDark
+                                      ? "rgba(255,255,255,0.08)"
+                                      : "rgba(0,0,0,0.04)",
+                                    color: isHovered ? "#ffffff" : "text.primary",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 600,
+                                    whiteSpace: "nowrap",
+                                    boxShadow: isHovered ? `0 4px 12px ${alpha(item.color, 0.4)}` : "none",
+                                    transition: "all 0.2s ease",
+                                  }}
+                                >
+                                  {item.formattedValue}
+                                </Box>
+
+                                {/* The Bar */}
+                                <Box
+                                  sx={{
+                                    width: { xs: 30, sm: 42 },
+                                    height: `${visualHeight}px`,
+                                    background: item.bgGradient,
+                                    borderRadius: "6px 6px 0 0",
+                                    boxShadow: isHovered
+                                      ? `0 0 16px ${alpha(item.color, 0.6)}`
+                                      : `0 2px 6px ${alpha(item.color, 0.25)}`,
+                                    transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                                    position: "relative",
+                                    "&:after": {
+                                      content: '""',
+                                      position: "absolute",
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      height: 3,
+                                      bgcolor: "rgba(255,255,255,0.4)",
+                                      borderRadius: "6px 6px 0 0",
+                                    },
+                                  }}
+                                />
+                              </Stack>
                             </Tooltip>
-                          </Stack>
+                          </Box>
                         );
                       })}
                     </Box>
@@ -643,26 +663,26 @@ export default function FinancialBarChart({
                         spacing={0.4}
                         sx={{ width: { xs: 60, sm: 76 }, textAlign: "center" }}
                       >
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0 }}>
                           <Box
                             sx={{
                               width: 7,
                               height: 7,
                               borderRadius: "50%",
                               bgcolor: item.color,
+                              flexShrink: 0,
                             }}
                           />
-                          <Typography
-                            variant="caption"
-                            fontWeight={700}
+                          <AppOverflowTooltip
+                            text={item.label}
                             sx={{
                               fontSize: "0.72rem",
+                              fontWeight: 700,
                               color: hoveredBar === item.id ? item.color : "text.primary",
                               lineHeight: 1.15,
+                              maxWidth: 110,
                             }}
-                          >
-                            {item.label}
-                          </Typography>
+                          />
                         </Stack>
                       </Stack>
                     ))}
@@ -685,7 +705,7 @@ export default function FinancialBarChart({
                   gap: 1.5,
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={1.2}>
+                <Stack direction="row" alignItems="center" spacing={1.2} sx={{ minWidth: 0, flexShrink: 0 }}>
                   <Box
                     sx={{
                       width: 28,
@@ -695,20 +715,28 @@ export default function FinancialBarChart({
                       placeItems: "center",
                       bgcolor: alpha(activeBarDetail.color, 0.15),
                       color: activeBarDetail.color,
+                      flexShrink: 0,
                     }}
                   >
                     {activeBarDetail.icon}
                   </Box>
-                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem", color: isDark ? "#ffffff" : "#0f172a" }}>
+                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem", color: isDark ? "#ffffff" : "#0f172a", whiteSpace: "nowrap" }}>
                     {activeBarDetail.label}:{" "}
                     <Box component="span" sx={{ color: activeBarDetail.color, fontWeight: 800 }}>
                       {activeBarDetail.formattedValue}
                     </Box>
                   </Typography>
                 </Stack>
-                <Typography variant="caption" sx={{ fontSize: "0.75rem", fontWeight: 600, color: isDark ? "rgba(255, 255, 255, 0.78)" : "#334155" }}>
-                  {activeBarDetail.helper}
-                </Typography>
+                <AppOverflowTooltip
+                  text={activeBarDetail.helper}
+                  sx={{
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    color: isDark ? "rgba(255, 255, 255, 0.78)" : "#334155",
+                    maxWidth: { xs: "100%", sm: 460, md: 580 },
+                    textAlign: { xs: "left", sm: "right" },
+                  }}
+                />
               </Box>
             </Box>
           </Grid>
@@ -857,9 +885,18 @@ export default function FinancialBarChart({
                           }
                           arrow
                           placement="top"
+                          disableInteractive
+                          enterDelay={80}
+                          leaveDelay={50}
                           slotProps={{
+                            popper: {
+                              sx: {
+                                pointerEvents: "none",
+                              },
+                            },
                             tooltip: {
                               sx: {
+                                pointerEvents: "none",
                                 bgcolor: isDark ? "#1e293b" : "#ffffff",
                                 color: isDark ? "#ffffff" : "#0f172a",
                                 border: isDark
@@ -877,6 +914,7 @@ export default function FinancialBarChart({
                             },
                             arrow: {
                               sx: {
+                                pointerEvents: "none",
                                 color: isDark ? "#1e293b" : "#ffffff",
                                 "&:before": {
                                   border: isDark
@@ -974,9 +1012,18 @@ export default function FinancialBarChart({
                                 }
                                 arrow
                                 placement="top"
+                                disableInteractive
+                                enterDelay={80}
+                                leaveDelay={50}
                                 slotProps={{
+                                  popper: {
+                                    sx: {
+                                      pointerEvents: "none",
+                                    },
+                                  },
                                   tooltip: {
                                     sx: {
+                                      pointerEvents: "none",
                                       bgcolor: isDark ? "#1e293b" : "#ffffff",
                                       color: isDark ? "#ffffff" : "#0f172a",
                                       border: isDark
@@ -994,6 +1041,7 @@ export default function FinancialBarChart({
                                   },
                                   arrow: {
                                     sx: {
+                                      pointerEvents: "none",
                                       color: isDark ? "#1e293b" : "#ffffff",
                                       "&:before": {
                                         border: isDark
@@ -1091,20 +1139,17 @@ export default function FinancialBarChart({
                           />
 
                           {/* Label & Value */}
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              noWrap
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <AppOverflowTooltip
+                              text={slice.label}
                               sx={{
                                 fontSize: "0.78125rem",
-                                maxWidth: 130,
+                                fontWeight: 500,
+                                maxWidth: { xs: 160, sm: 220, md: 280, lg: 320 },
                                 color: isHovered ? slice.color : "text.primary",
+                                transition: "color 0.15s ease",
                               }}
-                              title={slice.label}
-                            >
-                              {slice.label}
-                            </Typography>
+                            />
                             <Typography
                               variant="caption"
                               color="text.secondary"
