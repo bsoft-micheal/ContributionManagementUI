@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Card, CardContent, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { toPascalCase } from "../utils/textHelper";
+import AppOverflowTooltip from "./common/AppOverflowTooltip";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import CreditCardRoundedIcon from "@mui/icons-material/CreditCardRounded";
@@ -144,8 +145,8 @@ export default function MetricCard({
             minWidth: 0,
           }}
         >
-          <Typography
-            component="div"
+          <AppOverflowTooltip
+            text={typeof value === "string" || typeof value === "number" ? String(value) : ""}
             sx={{
               color: valueColor || (isDark ? "#ffffff" : "#0f172a"),
               fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -153,14 +154,10 @@ export default function MetricCard({
               fontSize: { xs: "1.32rem", sm: "1.44rem" },
               letterSpacing: "-0.02em",
               lineHeight: 1.15,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
             }}
-            title={typeof value === "string" ? value : undefined}
           >
             {value}
-          </Typography>
+          </AppOverflowTooltip>
           {badge}
         </Box>
 

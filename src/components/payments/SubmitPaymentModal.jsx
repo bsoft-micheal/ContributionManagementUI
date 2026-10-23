@@ -1399,10 +1399,19 @@ export default function SubmitPaymentModal({
         }
       }
 
+      const cashSplitRow = isMultiSplit ? splitRows.find((r) => String(r.mode || "").toLowerCase().includes("cash")) : null;
+      const rawCashNote = cashSplitRow ? (cashSplitRow.notes?.trim() || (cashSplitRow.utr && cashSplitRow.utr.toUpperCase() !== "CASH" ? cashSplitRow.utr.trim() : "")) : "";
+      const cashTag = rawCashNote ? `[Cash Note: ${rawCashNote}]` : "";
+
       const splitNote = isMultiSplit
         ? `[Split Breakdown: ${splitRows.map((r) => `${r.mode}: ₹${r.amount}${r.utr ? ` (Ref: ${r.utr})` : ""}`).join(", ")}]`
         : "";
-      const combinedNotes = [formData.notes.trim(), splitNote].filter(Boolean).join("\n");
+
+      const isSingleCash = !isMultiSplit && String(formData.paymentMode || "").toLowerCase().includes("cash");
+      const singleCashNote = isSingleCash ? (formData.notes.trim() || (formData.utr && formData.utr.toUpperCase() !== "CASH" ? formData.utr.trim() : "")) : "";
+      const singleCashTag = singleCashNote && !formData.notes.includes("[Cash Note:") ? `[Cash Note: ${singleCashNote}]` : "";
+
+      const combinedNotes = [formData.notes.trim(), isMultiSplit ? cashTag : singleCashTag, splitNote].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join("\n");
 
       const screenshotsList = formData.screenshots && formData.screenshots.length > 0
         ? formData.screenshots

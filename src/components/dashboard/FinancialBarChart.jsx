@@ -20,6 +20,7 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import SavingsIcon from "@mui/icons-material/Savings";
 import { formatWholeCurrency } from "../../utils/roundingHelper";
+import AppOverflowTooltip from "../common/AppOverflowTooltip";
 
 // Curated solid colors for Pie Chart (modeled directly on Google Charts reference image)
 const PIE_COLORS = [
@@ -643,26 +644,26 @@ export default function FinancialBarChart({
                         spacing={0.4}
                         sx={{ width: { xs: 60, sm: 76 }, textAlign: "center" }}
                       >
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0 }}>
                           <Box
                             sx={{
                               width: 7,
                               height: 7,
                               borderRadius: "50%",
                               bgcolor: item.color,
+                              flexShrink: 0,
                             }}
                           />
-                          <Typography
-                            variant="caption"
-                            fontWeight={700}
+                          <AppOverflowTooltip
+                            text={item.label}
                             sx={{
                               fontSize: "0.72rem",
+                              fontWeight: 700,
                               color: hoveredBar === item.id ? item.color : "text.primary",
                               lineHeight: 1.15,
+                              maxWidth: 110,
                             }}
-                          >
-                            {item.label}
-                          </Typography>
+                          />
                         </Stack>
                       </Stack>
                     ))}
@@ -685,7 +686,7 @@ export default function FinancialBarChart({
                   gap: 1.5,
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={1.2}>
+                <Stack direction="row" alignItems="center" spacing={1.2} sx={{ minWidth: 0, flexShrink: 0 }}>
                   <Box
                     sx={{
                       width: 28,
@@ -695,20 +696,28 @@ export default function FinancialBarChart({
                       placeItems: "center",
                       bgcolor: alpha(activeBarDetail.color, 0.15),
                       color: activeBarDetail.color,
+                      flexShrink: 0,
                     }}
                   >
                     {activeBarDetail.icon}
                   </Box>
-                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem", color: isDark ? "#ffffff" : "#0f172a" }}>
+                  <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.82rem", color: isDark ? "#ffffff" : "#0f172a", whiteSpace: "nowrap" }}>
                     {activeBarDetail.label}:{" "}
                     <Box component="span" sx={{ color: activeBarDetail.color, fontWeight: 800 }}>
                       {activeBarDetail.formattedValue}
                     </Box>
                   </Typography>
                 </Stack>
-                <Typography variant="caption" sx={{ fontSize: "0.75rem", fontWeight: 600, color: isDark ? "rgba(255, 255, 255, 0.78)" : "#334155" }}>
-                  {activeBarDetail.helper}
-                </Typography>
+                <AppOverflowTooltip
+                  text={activeBarDetail.helper}
+                  sx={{
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    color: isDark ? "rgba(255, 255, 255, 0.78)" : "#334155",
+                    maxWidth: { xs: "100%", sm: 460, md: 580 },
+                    textAlign: { xs: "left", sm: "right" },
+                  }}
+                />
               </Box>
             </Box>
           </Grid>
@@ -1091,20 +1100,17 @@ export default function FinancialBarChart({
                           />
 
                           {/* Label & Value */}
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              noWrap
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <AppOverflowTooltip
+                              text={slice.label}
                               sx={{
                                 fontSize: "0.78125rem",
-                                maxWidth: 130,
+                                fontWeight: 500,
+                                maxWidth: { xs: 160, sm: 220, md: 280, lg: 320 },
                                 color: isHovered ? slice.color : "text.primary",
+                                transition: "color 0.15s ease",
                               }}
-                              title={slice.label}
-                            >
-                              {slice.label}
-                            </Typography>
+                            />
                             <Typography
                               variant="caption"
                               color="text.secondary"

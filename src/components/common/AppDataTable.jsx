@@ -48,6 +48,7 @@ import * as XLSX from "xlsx";
 import { formatGridDate, formatGridDateTime } from "../../utils/dateHelper";
 import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 import { toPascalCase } from "../../utils/textHelper";
+import AppOverflowTooltip from "./AppOverflowTooltip";
 
 // ─── Printout & PDF Helper ──────────────────────────────────────────────────
 function printTable(title, columns, data) {
@@ -1225,18 +1226,18 @@ export default function AppDataTable({
                       ) : column.render ? (
                         column.render(row, rowIndex, allowPagination ? page * rowsPerPage + rowIndex + 1 : rowIndex + 1)
                       ) : (
-                        <Typography
-                          variant="body2"
+                        <AppOverflowTooltip
+                          text={
+                            column.type === "date" || column.key === "createdOn" || column.key === "createdAt" || column.key === "CreatedOn" || column.key === "CreatedAt" || column.label === "Created On" || column.label === "Created At"
+                              ? formatGridDate(row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? row.createdOn ?? row.CreatedOn ?? row.createdAt ?? row.CreatedAt)
+                              : column.type === "datetime"
+                                ? formatGridDateTime(row[column.key])
+                                : (column.key === "createdBy" || column.label === "Created By")
+                                  ? (row.createdBy || row.CreatedBy || row.createdByName || row.CreatedByName || row.createdByUser || row.CreatedByUser || row.created_by || row.Created_By || "--")
+                                  : (row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? "--")
+                          }
                           sx={{ fontSize: "inherit", color: "inherit" }}
-                        >
-                          {column.type === "date" || column.key === "createdOn" || column.key === "createdAt" || column.key === "CreatedOn" || column.key === "CreatedAt" || column.label === "Created On" || column.label === "Created At"
-                            ? formatGridDate(row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? row.createdOn ?? row.CreatedOn ?? row.createdAt ?? row.CreatedAt)
-                            : column.type === "datetime"
-                              ? formatGridDateTime(row[column.key])
-                              : (column.key === "createdBy" || column.label === "Created By")
-                                ? (row.createdBy || row.CreatedBy || row.createdByName || row.CreatedByName || row.createdByUser || row.CreatedByUser || row.created_by || row.Created_By || "--")
-                                : (row[column.key] ?? (typeof column.key === "string" && column.key.length > 0 ? (row[column.key[0].toUpperCase() + column.key.slice(1)] ?? row[column.key[0].toLowerCase() + column.key.slice(1)]) : undefined) ?? "--")}
-                        </Typography>
+                        />
                       )}
                     </TableCell>
                   ))}
