@@ -19,12 +19,17 @@ import {
   Alert,
   Menu,
   MenuItem,
+  Collapse,
 } from "@mui/material";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 import SaveIcon from "@mui/icons-material/Save";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
@@ -57,27 +62,9 @@ import AppPageLoader from "../common/AppPageLoader";
 import dayjs from "dayjs";
 import logo from "../../assets/logo_image.png";
 
-const drawerWidth = 240;
-
-// ─── Sidebar colours (matches table header #4a3f6b family) ──────────────────
-const SIDEBAR = {
-  bg: "#1e1a2e",   // Very dark purple-navy
-  active: "#4a3f6b",   // Mid purple — exact table header
-  activeBg: "rgba(74, 63, 107, 0.25)",
-  hover: "rgba(255, 255, 255, 0.05)",
-  text: "#c4bde0",   // Muted lavender
-  activeText: "#ffffff",
-  icon: "#7b72a8",   // Faded purple icon
-  activeIcon: "#c4bde0",
-  divider: "rgba(255,255,255,0.08)",
-  logoutHover: "rgba(220,38,38,0.15)",
-};
-
 export default function AppLayout() {
   const theme = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [flyoutAnchorEl, setFlyoutAnchorEl] = useState(null);
-  const [activeFlyoutItem, setActiveFlyoutItem] = useState(null);
   const { authState, logout, updateProfile, switchRole, isSwitchingRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -88,33 +75,46 @@ export default function AppLayout() {
   const activeRole = authState?.role || authState?.roleName;
   const isUnassignedRole = !hasRoleAssignedRights(activeRole);
 
-  const SIDEBAR = React.useMemo(() => {
+  // Top Navbar Colors (Preserves the signature Contribution Management dark purple theme)
+  const NAVBAR = React.useMemo(() => {
     if (theme.palette.mode === "dark") {
       return {
         bg: "#101426",
+        border: "rgba(255, 255, 255, 0.08)",
         active: "#c4b5fd",
         activeBg: "rgba(196, 181, 253, 0.16)",
+        activeBorder: "rgba(196, 181, 253, 0.35)",
         hover: "rgba(255, 255, 255, 0.05)",
         text: "#b3bdd6",
         activeText: "#ffffff",
         icon: "#8a94b8",
         activeIcon: "#c4b5fd",
-        divider: "rgba(255,255,255,0.08)",
-        logoutHover: "rgba(239, 68, 68, 0.14)",
+        dropdownBg: "#101426",
+        dropdownBorder: "rgba(255, 255, 255, 0.08)",
+        divider: "rgba(255, 255, 255, 0.08)",
+        cardBg: "rgba(255, 255, 255, 0.04)",
+        avatarBg: "#c4b5fd",
+        avatarColor: "#101426",
       };
     }
 
     return {
-      bg: "#1e1a2e",
-      active: "#4a3f6b",
-      activeBg: "rgba(74, 63, 107, 0.25)",
+      bg: "#1e1a2e", // Original very dark purple-navy
+      border: "rgba(255, 255, 255, 0.08)",
+      active: "#4a3f6b", // Original mid-purple (matches table header)
+      activeBg: "rgba(74, 63, 107, 0.35)", // Original active purple background
+      activeBorder: "rgba(167, 139, 250, 0.35)",
       hover: "rgba(255, 255, 255, 0.05)",
-      text: "#c4bde0",
+      text: "#c4bde0", // Original muted lavender
       activeText: "#ffffff",
-      icon: "#7b72a8",
+      icon: "#7b72a8", // Original faded purple icon
       activeIcon: "#c4bde0",
-      divider: "rgba(255,255,255,0.08)",
-      logoutHover: "rgba(220,38,38,0.15)",
+      dropdownBg: "#1e1a2e", // Original flyout background
+      dropdownBorder: "rgba(255, 255, 255, 0.08)",
+      divider: "rgba(255, 255, 255, 0.08)",
+      cardBg: "rgba(255, 255, 255, 0.04)",
+      avatarBg: "#4a3f6b", // Original purple avatar
+      avatarColor: "#ffffff",
     };
   }, [theme.palette.mode]);
 
@@ -318,74 +318,91 @@ export default function AppLayout() {
     }
   }, [changePasswordDialogOpen]);
 
-  const hoverTimeoutRef = useRef(null);
+  const dropdownTimeoutRef = useRef(null);
+  const [dropdownAnchorEl, setDropdownAnchorEl] = useState(null);
+  const [activeDropdownItem, setActiveDropdownItem] = useState(null);
+  const [isDropdownPinned, setIsDropdownPinned] = useState(false);
+  const [mobileSubmenuOpen, setMobileSubmenuOpen] = useState({});
 
-  const handleCloseFlyout = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
+  const handleCloseDropdown = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+      dropdownTimeoutRef.current = null;
     }
-    setFlyoutAnchorEl(null);
-    setActiveFlyoutItem(null);
+    setDropdownAnchorEl(null);
+    setActiveDropdownItem(null);
+    setIsDropdownPinned(false);
   };
 
-  const handleParentMouseEnter = (item, event) => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setFlyoutAnchorEl(event.currentTarget);
-    setActiveFlyoutItem(item);
-  };
-
-  const handleParentMouseLeave = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-    hoverTimeoutRef.current = setTimeout(() => {
-      handleCloseFlyout();
-    }, 250);
-  };
-
-  const handleFlyoutMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-  };
-
-  const handleFlyoutMouseLeave = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-    hoverTimeoutRef.current = setTimeout(() => {
-      handleCloseFlyout();
-    }, 250);
-  };
-
-  const handleItemMouseEnter = () => {
-    handleCloseFlyout();
-  };
-
-  const handleParentClick = (item, event) => {
-    if (activeFlyoutItem?.id === item.id) {
-      handleCloseFlyout();
+  // Click on parent module (e.g. Events, Finance, Tools)
+  const handleParentNavClick = (item, event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (activeDropdownItem?.id === item.id) {
+      handleCloseDropdown();
     } else {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-        hoverTimeoutRef.current = null;
+      if (dropdownTimeoutRef.current) {
+        clearTimeout(dropdownTimeoutRef.current);
+        dropdownTimeoutRef.current = null;
       }
-      setFlyoutAnchorEl(event.currentTarget);
-      setActiveFlyoutItem(item);
+      setDropdownAnchorEl(event.currentTarget);
+      setActiveDropdownItem(item);
+      setIsDropdownPinned(true);
     }
   };
 
-  // Close flyout on path change or component unmount
+  const handleDropdownMouseEnter = (item, event) => {
+    if (isDropdownPinned && activeDropdownItem?.id === item.id) return;
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+      dropdownTimeoutRef.current = null;
+    }
+    setDropdownAnchorEl(event.currentTarget);
+    setActiveDropdownItem(item);
+  };
+
+  const handleDropdownMouseLeave = () => {
+    if (isDropdownPinned) return; // If opened by click, stay open until user clicks or clicks away!
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+    }
+    dropdownTimeoutRef.current = setTimeout(() => {
+      handleCloseDropdown();
+    }, 300);
+  };
+
+  const handleMenuMouseEnter = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+      dropdownTimeoutRef.current = null;
+    }
+  };
+
+  const handleMenuMouseLeave = () => {
+    if (isDropdownPinned) return; // If opened by click, stay open until user clicks or clicks away!
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+    }
+    dropdownTimeoutRef.current = setTimeout(() => {
+      handleCloseDropdown();
+    }, 300);
+  };
+
+  const handleSubmoduleClick = (path) => {
+    handleCloseDropdown();
+    navigate(path);
+  };
+
+  const toggleMobileSubmenu = (id) => {
+    setMobileSubmenuOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Close dropdown on path change or component unmount
   React.useEffect(() => {
-    handleCloseFlyout();
+    handleCloseDropdown();
     return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
+      if (dropdownTimeoutRef.current) {
+        clearTimeout(dropdownTimeoutRef.current);
       }
     };
   }, [location.pathname]);
@@ -623,72 +640,201 @@ export default function AppLayout() {
     );
   };
 
-  const renderNavItem = (item) => {
-    const activeRole = authState?.role || authState?.roleName;
-    if (item.adminOnly && String(activeRole || "").toLowerCase() !== "admin") return null;
+  const renderTopNavItem = (item) => {
+    const role = authState?.role || authState?.roleName;
+    if (item.adminOnly && String(role || "").toLowerCase() !== "admin") return null;
 
     if (item.path) {
-      const rights = getRightsForPath(item.path, activeRole);
+      const rights = getRightsForPath(item.path, role);
       if (rights.deny) return null;
     }
 
     if (item.children) {
       const visibleChildren = item.children.filter((child) => {
-        if (child.adminOnly && String(activeRole || "").toLowerCase() !== "admin") return false;
-        const rights = getRightsForPath(child.path, activeRole);
+        if (child.adminOnly && String(role || "").toLowerCase() !== "admin") return false;
+        const rights = getRightsForPath(child.path, role);
         return !rights.deny;
       });
       if (visibleChildren.length === 0) return null;
 
-      const isFlyoutOpen = Boolean(flyoutAnchorEl && activeFlyoutItem?.id === item.id);
+      const isOpen = Boolean(dropdownAnchorEl && activeDropdownItem?.id === item.id);
       const active = isChildActive(item);
 
       return (
-        <ListItemButton
+        <Box
           key={item.id}
-          onClick={(e) => handleParentClick(item, e)}
-          onMouseEnter={(e) => handleParentMouseEnter(item, e)}
-          onMouseLeave={handleParentMouseLeave}
-          selected={active || isFlyoutOpen}
-          sx={{
-            borderRadius: "8px",
-            mb: 0.5,
-            py: 0.9,
-            px: 1.5,
-            transition: "all 0.15s ease",
-            "&.Mui-selected": {
-              bgcolor: SIDEBAR.activeBg,
-              borderLeft: `3px solid ${SIDEBAR.active}`,
-              pl: "calc(12px - 3px)",
-              "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
-              "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 600 },
-              "&:hover": { bgcolor: SIDEBAR.activeBg },
-            },
-            "&:not(.Mui-selected)": {
-              borderLeft: "3px solid transparent",
-              color: SIDEBAR.text,
-              "& .MuiListItemIcon-root": { color: SIDEBAR.icon },
-              "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 500 },
-            },
-            "&:hover": { bgcolor: SIDEBAR.hover },
-          }}
+          onMouseEnter={(e) => handleDropdownMouseEnter(item, e)}
+          onMouseLeave={handleDropdownMouseLeave}
+          sx={{ display: "inline-block" }}
         >
-          <ListItemIcon sx={{ minWidth: 36, color: active || isFlyoutOpen ? SIDEBAR.activeIcon : SIDEBAR.icon }}>
-            {item.icon}
-          </ListItemIcon>
-          <ListItemText
-            primary={item.label}
-            primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: active || isFlyoutOpen ? 600 : 500 }}
-          />
-          <ChevronRightRoundedIcon
+          <Box
+            component="button"
+            type="button"
+            onClick={(e) => handleParentNavClick(item, e)}
             sx={{
-              fontSize: "1.15rem",
-              color: active || isFlyoutOpen ? SIDEBAR.activeIcon : SIDEBAR.icon,
-              transform: isFlyoutOpen ? "translateX(2px)" : "none",
-              transition: "transform 0.2s ease, color 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: 0.7,
+              px: 1.3,
+              py: 0.65,
+              border: active || isOpen ? `1px solid ${NAVBAR.activeBorder}` : "1px solid transparent",
+              bgcolor: active || isOpen ? NAVBAR.activeBg : "transparent",
+              color: active || isOpen ? NAVBAR.activeText : NAVBAR.text,
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: active || isOpen ? 600 : 500,
+              fontFamily: "inherit",
+              whiteSpace: "nowrap",
+              transition: "all 0.15s ease",
+              outline: "none",
+              "& .nav-item-icon": {
+                color: active || isOpen ? NAVBAR.activeIcon : NAVBAR.icon,
+                display: "flex",
+                alignItems: "center",
+                transition: "color 0.15s ease",
+              },
+              "&:hover": {
+                bgcolor: active || isOpen ? NAVBAR.activeBg : NAVBAR.hover,
+                color: NAVBAR.activeText,
+                "& .nav-item-icon": { color: NAVBAR.activeIcon },
+              },
             }}
-          />
-        </ListItemButton>
+          >
+            <Box className="nav-item-icon">{item.icon}</Box>
+            <span>{item.label}</span>
+            <KeyboardArrowDownRoundedIcon
+              sx={{
+                fontSize: "1.05rem",
+                transition: "transform 0.2s ease",
+                transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                color: active || isOpen ? NAVBAR.activeIcon : NAVBAR.icon,
+                ml: -0.2,
+              }}
+            />
+          </Box>
+        </Box>
+      );
+    }
+
+    const active = isItemActive(item);
+    return (
+      <Box
+        key={item.path}
+        component="button"
+        onClick={() => {
+          handleCloseDropdown();
+          navigate(item.path);
+        }}
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 0.7,
+          px: 1.3,
+          py: 0.65,
+          border: active ? `1px solid ${NAVBAR.activeBorder}` : "1px solid transparent",
+          bgcolor: active ? NAVBAR.activeBg : "transparent",
+          color: active ? NAVBAR.activeText : NAVBAR.text,
+          borderRadius: "8px",
+          cursor: "pointer",
+          fontSize: "0.85rem",
+          fontWeight: active ? 600 : 500,
+          fontFamily: "inherit",
+          whiteSpace: "nowrap",
+          transition: "all 0.15s ease",
+          outline: "none",
+          "& .nav-item-icon": {
+            color: active ? NAVBAR.activeIcon : NAVBAR.icon,
+            display: "flex",
+            alignItems: "center",
+            transition: "color 0.15s ease",
+          },
+          "&:hover": {
+            bgcolor: active ? NAVBAR.activeBg : NAVBAR.hover,
+            color: NAVBAR.activeText,
+            "& .nav-item-icon": { color: NAVBAR.activeIcon },
+          },
+        }}
+      >
+        <Box className="nav-item-icon">{item.icon}</Box>
+        <span>{item.label}</span>
+      </Box>
+    );
+  };
+
+  const renderMobileNavItem = (item) => {
+    const role = authState?.role || authState?.roleName;
+    if (item.adminOnly && String(role || "").toLowerCase() !== "admin") return null;
+
+    if (item.path) {
+      const rights = getRightsForPath(item.path, role);
+      if (rights.deny) return null;
+    }
+
+    if (item.children) {
+      const visibleChildren = item.children.filter((child) => {
+        if (child.adminOnly && String(role || "").toLowerCase() !== "admin") return false;
+        const rights = getRightsForPath(child.path, role);
+        return !rights.deny;
+      });
+      if (visibleChildren.length === 0) return null;
+
+      const isSubOpen = Boolean(mobileSubmenuOpen[item.id]);
+      const active = isChildActive(item);
+
+      return (
+        <Box key={item.id} sx={{ mb: 0.5 }}>
+          <ListItemButton
+            onClick={() => toggleMobileSubmenu(item.id)}
+            sx={{
+              borderRadius: "8px",
+              py: 0.8,
+              px: 1.5,
+              color: active ? NAVBAR.activeText : NAVBAR.text,
+              bgcolor: active ? NAVBAR.activeBg : "transparent",
+              "& .MuiListItemIcon-root": { color: active ? NAVBAR.activeIcon : NAVBAR.icon },
+              "&:hover": { bgcolor: NAVBAR.hover },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 34 }}>
+              {item.icon}
+            </ListItemIcon>
+            <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: "0.88rem", fontWeight: active ? 600 : 500 }} />
+            {isSubOpen ? <ExpandLessRoundedIcon sx={{ fontSize: "1.1rem" }} /> : <ExpandMoreRoundedIcon sx={{ fontSize: "1.1rem" }} />}
+          </ListItemButton>
+          <Collapse in={isSubOpen} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding sx={{ pl: 2, pt: 0.3 }}>
+              {visibleChildren.map((child) => {
+                const childActive = location.pathname === child.path;
+                return (
+                  <ListItemButton
+                    key={child.path}
+                    onClick={() => {
+                      navigate(child.path);
+                      setMobileOpen(false);
+                    }}
+                    sx={{
+                      borderRadius: "6px",
+                      py: 0.6,
+                      px: 1.5,
+                      my: 0.2,
+                      color: childActive ? NAVBAR.activeText : NAVBAR.text,
+                      bgcolor: childActive ? NAVBAR.activeBg : "transparent",
+                      borderLeft: childActive ? `3px solid ${NAVBAR.active}` : "3px solid transparent",
+                      "& .MuiListItemIcon-root": { color: childActive ? NAVBAR.activeIcon : NAVBAR.icon },
+                      "&:hover": { bgcolor: NAVBAR.hover },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 30 }}>
+                      {child.icon}
+                    </ListItemIcon>
+                    <ListItemText primary={child.label} primaryTypographyProps={{ fontSize: "0.82rem", fontWeight: childActive ? 600 : 500 }} />
+                  </ListItemButton>
+                );
+              })}
+            </List>
+          </Collapse>
+        </Box>
       );
     }
 
@@ -696,362 +842,584 @@ export default function AppLayout() {
     return (
       <ListItemButton
         key={item.path}
-        onMouseEnter={handleItemMouseEnter}
         onClick={() => {
-          handleCloseFlyout();
           navigate(item.path);
           setMobileOpen(false);
         }}
-        selected={active}
         sx={{
           borderRadius: "8px",
           mb: 0.5,
-          py: 0.9,
+          py: 0.8,
           px: 1.5,
-          transition: "all 0.15s ease",
-          "&.Mui-selected": {
-            bgcolor: SIDEBAR.activeBg,
-            borderLeft: `3px solid ${SIDEBAR.active}`,
-            pl: "calc(12px - 3px)",
-            "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
-            "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 600 },
-            "&:hover": { bgcolor: SIDEBAR.activeBg },
-          },
-          "&:not(.Mui-selected)": {
-            borderLeft: "3px solid transparent",
-            "& .MuiListItemIcon-root": { color: SIDEBAR.icon },
-            "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 500 },
-          },
-          "&:hover": { bgcolor: SIDEBAR.hover },
+          color: active ? NAVBAR.activeText : NAVBAR.text,
+          bgcolor: active ? NAVBAR.activeBg : "transparent",
+          borderLeft: active ? `3px solid ${NAVBAR.active}` : "3px solid transparent",
+          "& .MuiListItemIcon-root": { color: active ? NAVBAR.activeIcon : NAVBAR.icon },
+          "&:hover": { bgcolor: NAVBAR.hover },
         }}
       >
-        <ListItemIcon sx={{ minWidth: 36, color: active ? SIDEBAR.activeIcon : SIDEBAR.icon }}>
+        <ListItemIcon sx={{ minWidth: 34 }}>
           {item.icon}
         </ListItemIcon>
-        <ListItemText
-          primary={item.label}
-          primaryTypographyProps={{
-            fontSize: "0.875rem",
-            fontWeight: active ? 600 : 500,
-          }}
-        />
+        <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: "0.88rem", fontWeight: active ? 600 : 500 }} />
       </ListItemButton>
     );
   };
 
-  const drawer = (
-    <Box sx={{ minHeight: "100%", display: "flex", flexDirection: "column", bgcolor: SIDEBAR.bg }}>
-
-      {/* ── Brand ─────────────────────────────────────────────────────────── */}
-      <Box onMouseEnter={handleItemMouseEnter} sx={{ px: 2.5, py: 3, display: "flex", alignItems: "center", gap: { xs: 1.2, md: 1.8 } }}>
-        {/* Mobile menu toggle close button */}
-        <Box sx={{ display: { xs: "block", md: "none" }, mr: 0.5 }}>
-          <IconButton
-            onClick={() => setMobileOpen(false)}
-            sx={{
-              color: SIDEBAR.text,
-              p: 0.8,
-              borderRadius: "8px",
-              bgcolor: "rgba(255, 255, 255, 0.03)",
-              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)", color: theme.palette.mode === "dark" ? "#e7ebf7" : "#ffffff" }
-            }}
-          >
-            <MenuRoundedIcon />
-          </IconButton>
-        </Box>
-
-        <Box sx={{
-          width: 46, height: 46, borderRadius: "10px",
-          border: "1.5px solid #ffffff",
-          display: "flex",
-          alignItems: "center", justifyContent: "center",
-          overflow: "hidden", flexShrink: 0,
-          p: 0
-        }}>
-          <img src={logo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        </Box>
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 900, color: SIDEBAR.activeText, lineHeight: 1, fontSize: "0.95rem", letterSpacing: "0.02em" }}>
-            Contribution
-          </Typography>
-          <Typography variant="body2" sx={{ fontWeight: 800, color: theme.palette.mode === "dark" ? SIDEBAR.text : "#a78bfa", lineHeight: 1.3, fontSize: "0.88rem", letterSpacing: "0.01em" }}>
-            Management
-          </Typography>
-        </Box>
-      </Box>
-
-      <Divider sx={{ borderColor: SIDEBAR.divider, mx: 2, mb: 1 }} />
-
-      {/* ── Nav Items ─────────────────────────────────────────────────────── */}
-      <List sx={{ px: 1.5, flexGrow: 1, py: 0 }}>
-        {isUnassignedRole ? (
-          <Box sx={{ px: 1.5, py: 3, textAlign: "center" }}>
-            <Typography
-              variant="caption"
-              sx={{
-                color: "rgba(255, 255, 255, 0.45)",
-                fontSize: "0.75rem",
-                fontWeight: 500,
-                display: "block",
-                lineHeight: 1.4,
-              }}
-            >
-              No permissions assigned
-            </Typography>
-          </Box>
-        ) : (
-          navigationItems.map((item) => renderNavItem(item))
-        )}
-      </List>
-
-      <Divider sx={{ borderColor: SIDEBAR.divider, mx: 2, mt: 1 }} />
-
-      {/* ── User Card + Logout ────────────────────────────────────────────── */}
-      <Box sx={{ px: 1.5, py: 1.5 }}>
-        {/* User info row */}
-        <Box
-          onMouseEnter={handleItemMouseEnter}
-          onClick={(e) => setProfileMenuAnchor(e.currentTarget)}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 0.6,
-            px: 1,
-            py: 0.8,
-            mb: 0.5,
-            borderRadius: "8px",
-            cursor: "pointer",
-            "&:hover": { bgcolor: "rgba(255,255,255,0.05)" },
-            transition: "all 0.15s ease"
-          }}
-        >
-          <Avatar src={getImageUrl(authState?.profileImage)} sx={{ width: 34, height: 34, bgcolor: SIDEBAR.active, fontSize: "0.85rem", fontWeight: 800 }}>
-            {(authState?.fullName ?? "A")[0].toUpperCase()}
-          </Avatar>
-          <Box sx={{ overflow: "hidden", flexGrow: 1, minWidth: 0, mr: 0.5 }}>
-            <Typography variant="body2" fontWeight={800} sx={{ color: theme.palette.mode === "dark" ? "#e7ebf7" : "#ffffff", fontSize: "0.82rem" }} noWrap>
-              {authState?.fullName?.split(" ")[0] ?? "User"}
-            </Typography>
-            <Typography variant="caption" sx={{ color: SIDEBAR.text, fontSize: "0.68rem", fontWeight: 600 }} noWrap>
-              {authState?.role}
-            </Typography>
-          </Box>
-          {hasMultipleRoles && (
-            <Tooltip title={otherRoleName ? `Switch to ${otherRoleName}` : "Switch Role"}>
-              <IconButton
-                size="small"
-                onClick={handleQuickSwitchRole}
-                sx={{
-                  color: SIDEBAR.text,
-                  p: 0.6,
-                  borderRadius: "6px",
-                  "&:hover": { bgcolor: SIDEBAR.hover, color: "#10b981" },
-                  transition: "all 0.2s ease",
-                }}
-              >
-                <SwapHorizRoundedIcon sx={{ fontSize: "1.15rem" }} />
-              </IconButton>
-            </Tooltip>
-          )}
-          <Tooltip title="Log Out">
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation(); // Prevent opening profile menu!
-                handleLogout();
-              }}
-              sx={{
-                color: SIDEBAR.text,
-                p: 0.6,
-                borderRadius: "6px",
-                "&:hover": { bgcolor: SIDEBAR.logoutHover, color: "#f87171" },
-                transition: "all 0.2s ease",
-              }}
-            >
-              <LogoutRoundedIcon sx={{ fontSize: "1.1rem" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={isDark ? "Switch to Day Theme" : "Switch to Night Theme"}>
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleMode();
-              }}
-              sx={{
-                color: SIDEBAR.text,
-                p: 0.6,
-                borderRadius: "6px",
-                "&:hover": { bgcolor: SIDEBAR.hover, color: theme.palette.mode === "dark" ? "#e7ebf7" : "#ffffff" },
-                transition: "all 0.2s ease",
-              }}
-            >
-              {isDark ? <LightModeOutlinedIcon sx={{ fontSize: "1.05rem" }} /> : <DarkModeOutlinedIcon sx={{ fontSize: "1.05rem" }} />}
-            </IconButton>
-          </Tooltip>
-        </Box>
-
-        {/* Profile Menu Popup */}
-        <Menu
-          anchorEl={profileMenuAnchor}
-          open={Boolean(profileMenuAnchor)}
-          onClose={() => setProfileMenuAnchor(null)}
-          anchorOrigin={{
-            vertical: "top",
-            horizontal: "left",
-          }}
-          transformOrigin={{
-            vertical: "bottom",
-            horizontal: "left",
-          }}
-          PaperProps={{
-            sx: {
-              minWidth: 200,
-              borderRadius: "12px",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-              border: (theme) =>
-                `1px solid ${theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(74, 63, 107, 0.12)"
-                }`,
-              py: 0.8,
-            },
-          }}
-        >
-          <MenuItem
-            onClick={() => {
-              setProfileMenuAnchor(null);
-              setProfileDialogOpen(true);
-            }}
-            sx={{ fontSize: "0.85rem", fontWeight: 600, py: 1, gap: 1.5 }}
-          >
-            <AccountCircleOutlinedIcon sx={{ fontSize: "1.15rem", color: "#7c3aed" }} />
-            <span>My Profile</span>
-          </MenuItem>
-
-          {hasMultipleRoles && (
-            <MenuItem
-              onClick={(e) => {
-                setProfileMenuAnchor(null);
-                handleQuickSwitchRole(e);
-              }}
-              sx={{
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                py: 1,
-                gap: 1.5,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                <SwapHorizRoundedIcon sx={{ fontSize: "1.15rem", color: "#10b981" }} />
-                <span>Switch Role</span>
-              </Box>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, ml: 1 }}>
-                ↔
-              </Typography>
-            </MenuItem>
-          )}
-
-          <MenuItem
-            onClick={() => {
-              setProfileMenuAnchor(null);
-              setChangePasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-              setChangePasswordErrors({});
-              setShowCurrentPassword(false);
-              setShowNewPassword(false);
-              setShowConfirmPassword(false);
-              setChangePasswordDialogOpen(true);
-            }}
-            sx={{ fontSize: "0.85rem", fontWeight: 600, py: 1, gap: 1.5 }}
-          >
-            <LockResetIcon sx={{ fontSize: "1.15rem", color: "#3b82f6" }} />
-            <span>Change Password</span>
-          </MenuItem>
-
-          <Divider sx={{ my: 0.5 }} />
-
-          <MenuItem
-            onClick={() => {
-              setProfileMenuAnchor(null);
-              handleLogout();
-            }}
-            sx={{ fontSize: "0.85rem", fontWeight: 600, py: 1, gap: 1.5, color: "#ef4444" }}
-          >
-            <LogoutRoundedIcon sx={{ fontSize: "1.15rem", color: "#ef4444" }} />
-            <span>Logout</span>
-          </MenuItem>
-        </Menu>
-      </Box>
-    </Box>
-  );
-
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", bgcolor: "background.default" }}>
       {/* Role Switching Fullscreen Transition Loader */}
       {isSwitchingRole && <AppPageLoader fullScreen opaque text="Switching role..." />}
 
-      {/* Mobile hamburger */}
-      <Box sx={{ display: { xs: "flex", md: "none" }, position: "fixed", top: 12, left: 12, zIndex: 1300 }}>
-        {!mobileOpen && (
-          <IconButton
-            onClick={() => setMobileOpen(true)}
-            sx={{ bgcolor: SIDEBAR.bg, color: theme.palette.mode === "dark" ? theme.palette.text.primary : "#fff", borderRadius: "8px", "&:hover": { bgcolor: SIDEBAR.active } }}
+      {/* ── Top Horizontal Navigation Bar (Preserves Signature Theme) ────── */}
+      <Box
+        component="header"
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: 1100,
+          width: "100%",
+          bgcolor: NAVBAR.bg,
+          borderBottom: `1px solid ${NAVBAR.border}`,
+          boxShadow: theme.palette.mode === "dark"
+            ? "0 4px 20px rgba(0,0,0,0.6)"
+            : "0 2px 14px rgba(18, 14, 34, 0.25)",
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: { xs: 1.5, sm: 2, md: 3 },
+            height: 58,
+            width: "100%",
+            boxSizing: "border-box",
+          }}
+        >
+          {/* Left: Mobile hamburger & Original Brand Logo */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {/* Hamburger button for mobile/tablet */}
+            <IconButton
+              onClick={() => setMobileOpen(true)}
+              sx={{
+                display: { xs: "inline-flex", md: "none" },
+                color: NAVBAR.text,
+                p: 0.8,
+                borderRadius: "8px",
+                bgcolor: "rgba(255, 255, 255, 0.03)",
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)", color: "#ffffff" },
+              }}
+            >
+              <MenuRoundedIcon sx={{ fontSize: "1.3rem" }} />
+            </IconButton>
+
+            {/* Original Brand Logo & Name */}
+            <Box
+              onClick={() => navigate("/")}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1.4,
+                cursor: "pointer",
+                mr: { xs: 1, md: 2.5 },
+                flexShrink: 0,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "8px",
+                  border: "1.5px solid #ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  p: 0,
+                }}
+              >
+                <img
+                  src={logo}
+                  alt="Logo"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </Box>
+              <Box sx={{ display: { xs: "none", sm: "flex" }, flexDirection: "column" }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 900,
+                    color: "#ffffff",
+                    lineHeight: 1,
+                    fontSize: "0.92rem",
+                    letterSpacing: "0.02em",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Contribution
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 800,
+                    color: theme.palette.mode === "dark" ? "#b3bdd6" : "#a78bfa",
+                    lineHeight: 1.3,
+                    fontSize: "0.82rem",
+                    letterSpacing: "0.01em",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Management
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+
+          {/* Center: Desktop Horizontal Modules with Icons */}
+          <Box
+            sx={{
+              display: { xs: "none", md: "flex" },
+              alignItems: "center",
+              gap: 0.6,
+              flexGrow: 1,
+              overflowX: "auto",
+              py: 0.5,
+              "&::-webkit-scrollbar": { display: "none" },
+              msOverflowStyle: "none",
+              scrollbarWidth: "none",
+            }}
           >
-            <MenuRoundedIcon />
-          </IconButton>
-        )}
+            {isUnassignedRole ? (
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", fontStyle: "italic", px: 2 }}>
+                No permissions assigned
+              </Typography>
+            ) : (
+              navigationItems.map((item) => renderTopNavItem(item))
+            )}
+          </Box>
+
+          {/* Right: Original User card info, avatar, role switch, theme toggle */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 0.6, sm: 1 }, flexShrink: 0 }}>
+            {/* Multi-role quick switch */}
+            {hasMultipleRoles && (
+              <Tooltip title={otherRoleName ? `Switch to ${otherRoleName}` : "Switch Role"}>
+                <IconButton
+                  size="small"
+                  onClick={handleQuickSwitchRole}
+                  sx={{
+                    color: NAVBAR.text,
+                    p: 0.7,
+                    borderRadius: "6px",
+                    "&:hover": { bgcolor: NAVBAR.hover, color: "#10b981" },
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <SwapHorizRoundedIcon sx={{ fontSize: "1.15rem" }} />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {/* Theme Toggle Button */}
+            <Tooltip title={isDark ? "Switch to Day Theme" : "Switch to Night Theme"}>
+              <IconButton
+                size="small"
+                onClick={toggleMode}
+                sx={{
+                  color: NAVBAR.text,
+                  p: 0.7,
+                  borderRadius: "6px",
+                  "&:hover": { bgcolor: NAVBAR.hover, color: "#ffffff" },
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {isDark ? <LightModeOutlinedIcon sx={{ fontSize: "1.1rem" }} /> : <DarkModeOutlinedIcon sx={{ fontSize: "1.1rem" }} />}
+              </IconButton>
+            </Tooltip>
+
+            {/* User Profile Greeting & Avatar (Original Style & Colors) */}
+            <Box
+              onClick={(e) => setProfileMenuAnchor(e.currentTarget)}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                cursor: "pointer",
+                py: 0.4,
+                px: 1,
+                borderRadius: "8px",
+                transition: "all 0.15s ease",
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.05)" },
+              }}
+            >
+              <Box sx={{ display: { xs: "none", sm: "block" }, textAlign: "right" }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "#ffffff",
+                    fontWeight: 700,
+                    fontSize: "0.82rem",
+                    lineHeight: 1.2,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {authState?.fullName || "User"}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: NAVBAR.text,
+                    fontSize: "0.68rem",
+                    fontWeight: 600,
+                    display: "block",
+                    lineHeight: 1,
+                  }}
+                >
+                  {authState?.role || "Member"}
+                </Typography>
+              </Box>
+
+              <Avatar
+                src={getImageUrl(authState?.profileImage)}
+                sx={{
+                  width: 34,
+                  height: 34,
+                  bgcolor: NAVBAR.avatarBg,
+                  color: NAVBAR.avatarColor,
+                  fontSize: "0.85rem",
+                  fontWeight: 800,
+                }}
+              >
+                {(authState?.fullName ?? "U")[0].toUpperCase()}
+              </Avatar>
+
+              <KeyboardArrowDownRoundedIcon
+                sx={{
+                  color: NAVBAR.text,
+                  fontSize: "1.1rem",
+                  ml: -0.5,
+                }}
+              />
+            </Box>
+
+            {/* Profile Dropdown Menu */}
+            <Menu
+              anchorEl={profileMenuAnchor}
+              open={Boolean(profileMenuAnchor)}
+              onClose={() => setProfileMenuAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+              PaperProps={{
+                sx: {
+                  minWidth: 210,
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+                  border: (theme) =>
+                    `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(74, 63, 107, 0.15)"}`,
+                  py: 0.8,
+                  mt: 0.8,
+                },
+              }}
+            >
+              <Box sx={{ px: 2, py: 1 }}>
+                <Typography variant="body2" fontWeight={700} noWrap>
+                  {authState?.fullName || "User"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                  Role: {authState?.role || "Member"}
+                </Typography>
+              </Box>
+
+              <Divider sx={{ my: 0.5 }} />
+
+              <MenuItem
+                onClick={() => {
+                  setProfileMenuAnchor(null);
+                  setProfileDialogOpen(true);
+                }}
+                sx={{ fontSize: "0.85rem", fontWeight: 600, py: 0.9, gap: 1.5 }}
+              >
+                <AccountCircleOutlinedIcon sx={{ fontSize: "1.15rem", color: "#7c3aed" }} />
+                <span>My Profile</span>
+              </MenuItem>
+
+              {hasMultipleRoles && (
+                <MenuItem
+                  onClick={(e) => {
+                    setProfileMenuAnchor(null);
+                    handleQuickSwitchRole(e);
+                  }}
+                  sx={{
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    py: 0.9,
+                    gap: 1.5,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <SwapHorizRoundedIcon sx={{ fontSize: "1.15rem", color: "#10b981" }} />
+                    <span>Switch Role</span>
+                  </Box>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, ml: 1 }}>
+                    ↔
+                  </Typography>
+                </MenuItem>
+              )}
+
+              <MenuItem
+                onClick={() => {
+                  setProfileMenuAnchor(null);
+                  setChangePasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                  setChangePasswordErrors({});
+                  setShowCurrentPassword(false);
+                  setShowNewPassword(false);
+                  setShowConfirmPassword(false);
+                  setChangePasswordDialogOpen(true);
+                }}
+                sx={{ fontSize: "0.85rem", fontWeight: 600, py: 0.9, gap: 1.5 }}
+              >
+                <LockResetIcon sx={{ fontSize: "1.15rem", color: "#3b82f6" }} />
+                <span>Change Password</span>
+              </MenuItem>
+
+              <Divider sx={{ my: 0.5 }} />
+
+              <MenuItem
+                onClick={() => {
+                  setProfileMenuAnchor(null);
+                  handleLogout();
+                }}
+                sx={{ fontSize: "0.85rem", fontWeight: 600, py: 0.9, gap: 1.5, color: "#ef4444" }}
+              >
+                <LogoutRoundedIcon sx={{ fontSize: "1.15rem", color: "#ef4444" }} />
+                <span>Logout</span>
+              </MenuItem>
+            </Menu>
+          </Box>
+        </Box>
       </Box>
 
-      {/* ── Sidebar ───────────────────────────────────────────────────────── */}
-      <Box component="nav" sx={{ width: { md: drawerWidth }, minWidth: { md: drawerWidth }, flexShrink: 0 }}>
-        {/* Mobile */}
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={() => setMobileOpen(false)}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            display: { xs: "block", md: "none" },
-            "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", border: "none", bgcolor: SIDEBAR.bg },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        {/* Desktop */}
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: "none", md: "block" },
-            width: drawerWidth,
-            flexShrink: 0,
-            "& .MuiDrawer-paper": {
-              width: drawerWidth,
-              boxSizing: "border-box",
-              border: "none",
-              bgcolor: SIDEBAR.bg,
-              boxShadow: "2px 0 16px rgba(0,0,0,0.12)",
+      {/* ── Submodule Dropdown Popper (Directly Below Top Nav Item) ──────── */}
+      <Popper
+        open={Boolean(dropdownAnchorEl && activeDropdownItem)}
+        anchorEl={dropdownAnchorEl}
+        placement="bottom-start"
+        style={{ zIndex: 1300 }}
+        modifiers={[
+          {
+            name: "offset",
+            options: {
+              offset: [0, 6],
             },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
-      </Box>
+          },
+        ]}
+      >
+        <ClickAwayListener onClickAway={handleCloseDropdown}>
+          <Paper
+            onMouseEnter={handleMenuMouseEnter}
+            onMouseLeave={handleMenuMouseLeave}
+            elevation={8}
+            sx={{
+              bgcolor: NAVBAR.dropdownBg,
+              color: NAVBAR.text,
+              borderRadius: "10px",
+              boxShadow: theme.palette.mode === "dark"
+                ? "0 14px 40px rgba(0,0,0,0.7), 0 0 1px rgba(255,255,255,0.15)"
+                : "0 14px 40px rgba(18, 14, 34, 0.45), 0 0 1px rgba(255,255,255,0.1)",
+              border: `1px solid ${NAVBAR.dropdownBorder}`,
+              p: 0.6,
+              minWidth: 190,
+              position: "relative",
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                top: -10,
+                left: 0,
+                right: 0,
+                height: 12,
+              },
+            }}
+          >
+            <List component="div" disablePadding>
+              {activeDropdownItem?.children
+                ?.filter((child) => {
+                  const role = authState?.role || authState?.roleName;
+                  if (child.adminOnly && String(role || "").toLowerCase() !== "admin") return false;
+                  const rights = getRightsForPath(child.path, role);
+                  return !rights.deny;
+                })
+                .map((child) => {
+                  const childActive =
+                    location.pathname === child.path ||
+                    (child.path !== "/" && location.pathname.startsWith(child.path + "/"));
 
-      {/* ── Main Content ──────────────────────────────────────────────────── */}
+                  return (
+                    <ListItemButton
+                      key={child.path}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSubmoduleClick(child.path);
+                      }}
+                      selected={childActive}
+                      sx={{
+                        borderRadius: "8px",
+                        mb: 0.3,
+                        py: 0.75,
+                        px: 1.4,
+                        transition: "all 0.15s ease",
+                        "&.Mui-selected": {
+                          bgcolor: NAVBAR.activeBg,
+                          borderLeft: `3px solid ${NAVBAR.active}`,
+                          pl: "calc(11.2px - 3px)",
+                          "& .MuiListItemIcon-root": { color: NAVBAR.activeIcon },
+                          "& .MuiListItemText-primary": { color: NAVBAR.activeText, fontWeight: 600 },
+                          "&:hover": { bgcolor: NAVBAR.activeBg },
+                        },
+                        "&:not(.Mui-selected)": {
+                          borderLeft: "3px solid transparent",
+                          color: NAVBAR.text,
+                          "& .MuiListItemIcon-root": { color: NAVBAR.icon },
+                          "& .MuiListItemText-primary": { color: NAVBAR.text, fontWeight: 500 },
+                        },
+                        "&:hover": {
+                          bgcolor: NAVBAR.hover,
+                          "& .MuiListItemText-primary": { color: NAVBAR.activeText },
+                          "& .MuiListItemIcon-root": { color: NAVBAR.activeIcon },
+                        },
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32, color: childActive ? NAVBAR.activeIcon : NAVBAR.icon }}>
+                        {child.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={child.label}
+                        primaryTypographyProps={{
+                          fontSize: "0.85rem",
+                          fontWeight: childActive ? 600 : 500,
+                        }}
+                      />
+                    </ListItemButton>
+                  );
+                })}
+            </List>
+          </Paper>
+        </ClickAwayListener>
+      </Popper>
+
+      {/* ── Mobile Navigation Drawer (For Small Screens) ─────────────────── */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: "block", md: "none" },
+          "& .MuiDrawer-paper": {
+            width: 280,
+            boxSizing: "border-box",
+            bgcolor: NAVBAR.bg,
+            color: NAVBAR.text,
+          },
+        }}
+      >
+        <Box sx={{ p: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <img src={logo} alt="Logo" style={{ width: 28, height: 28, objectFit: "contain" }} />
+            <Typography variant="subtitle1" fontWeight={800} color="#ffffff">
+              Contribution
+            </Typography>
+          </Box>
+          <IconButton onClick={() => setMobileOpen(false)} sx={{ color: "#ffffff" }}>
+            <CloseRoundedIcon />
+          </IconButton>
+        </Box>
+
+        <Divider sx={{ borderColor: NAVBAR.divider, mx: 2, mb: 1.5 }} />
+
+        {/* User Card */}
+        <Box sx={{ px: 2, py: 1, mx: 1.5, mb: 1.5, bgcolor: NAVBAR.cardBg, borderRadius: "10px", display: "flex", alignItems: "center", gap: 1.2 }}>
+          <Avatar src={getImageUrl(authState?.profileImage)} sx={{ width: 36, height: 36, bgcolor: NAVBAR.avatarBg, color: NAVBAR.avatarColor, fontWeight: 800 }}>
+            {(authState?.fullName ?? "U")[0].toUpperCase()}
+          </Avatar>
+          <Box sx={{ overflow: "hidden" }}>
+            <Typography variant="body2" fontWeight={800} color="#ffffff" noWrap>
+              {authState?.fullName || "User"}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)" }}>
+              {authState?.role || "Member"}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Mobile Navigation List */}
+        <List sx={{ px: 1.5, flexGrow: 1 }}>
+          {navigationItems.map((item) => renderMobileNavItem(item))}
+        </List>
+
+        <Divider sx={{ borderColor: NAVBAR.divider, mx: 2, mt: 1 }} />
+
+        {/* Mobile Drawer Footer Actions */}
+        <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1 }}>
+          <Box
+            onClick={() => {
+              setMobileOpen(false);
+              setProfileDialogOpen(true);
+            }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              p: 1,
+              borderRadius: "8px",
+              cursor: "pointer",
+              "&:hover": { bgcolor: NAVBAR.hover },
+            }}
+          >
+            <AccountCircleOutlinedIcon sx={{ fontSize: "1.2rem", color: "#a78bfa" }} />
+            <Typography variant="body2" fontWeight={600} color="#ffffff">
+              My Profile
+            </Typography>
+          </Box>
+
+          <Box
+            onClick={() => {
+              setMobileOpen(false);
+              handleLogout();
+            }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              p: 1,
+              borderRadius: "8px",
+              cursor: "pointer",
+              color: "#ef4444",
+              "&:hover": { bgcolor: "rgba(239, 68, 68, 0.15)" },
+            }}
+          >
+            <LogoutRoundedIcon sx={{ fontSize: "1.2rem", color: "#ef4444" }} />
+            <Typography variant="body2" fontWeight={600}>
+              Logout
+            </Typography>
+          </Box>
+        </Box>
+      </Drawer>
+
+      {/* ── Main Content (100% Full Width Below Top Navbar) ─────────────── */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 2, md: 3 },
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          minWidth: 0, // Prevent table from overflowing flexbox
-          minHeight: "100vh",
+          width: "100%",
+          minWidth: 0,
+          p: { xs: 2, sm: 2.5, md: 3 },
           bgcolor: "background.default",
           position: "relative",
+          minHeight: "calc(100vh - 56px)",
         }}
       >
         {isLoading && <AppPageLoader fullScreen={true} text={loadingMessage || "Loading..."} />}
@@ -1426,115 +1794,6 @@ export default function AppLayout() {
         open={switchRoleDialogOpen}
         onClose={() => setSwitchRoleDialogOpen(false)}
       />
-
-
-
-      {/* ── Submodule Flyout Popper (Right Side) ─────────────────────────── */}
-      <Popper
-        open={Boolean(flyoutAnchorEl && activeFlyoutItem)}
-        anchorEl={flyoutAnchorEl}
-        placement="right-start"
-        style={{ zIndex: 1400 }}
-        modifiers={[
-          {
-            name: "offset",
-            options: {
-              offset: [0, 8],
-            },
-          },
-        ]}
-      >
-        <ClickAwayListener onClickAway={handleCloseFlyout}>
-          <Paper
-            onMouseEnter={handleFlyoutMouseEnter}
-            onMouseLeave={handleFlyoutMouseLeave}
-            elevation={8}
-            sx={{
-              bgcolor: SIDEBAR.bg,
-              color: SIDEBAR.text,
-              borderRadius: "12px",
-              boxShadow: theme.palette.mode === "dark"
-                ? "0 14px 40px rgba(0,0,0,0.7), 0 0 1px rgba(255,255,255,0.15)"
-                : "0 14px 40px rgba(18, 14, 34, 0.45), 0 0 1px rgba(255,255,255,0.1)",
-              border: `1px solid ${SIDEBAR.divider}`,
-              minWidth: 190,
-              p: 0.5,
-              backgroundImage: "none",
-              position: "relative",
-              "&::before": {
-                content: '""',
-                position: "absolute",
-                top: -8,
-                bottom: -8,
-                left: -14,
-                width: 16,
-              },
-            }}
-          >
-            {activeFlyoutItem && (
-              <List component="div" disablePadding>
-                {activeFlyoutItem.children
-                  ?.filter((child) => {
-                    if (child.adminOnly && authState?.role !== "Admin") return false;
-                    const rights = getRightsForPath(child.path, authState?.role);
-                    return !rights.deny;
-                  })
-                  .map((child) => {
-                    const childActive = location.pathname === child.path;
-                    return (
-                      <ListItemButton
-                        key={child.path}
-                        onClick={() => {
-                          navigate(child.path);
-                          handleCloseFlyout();
-                          setMobileOpen(false);
-                        }}
-                        selected={childActive}
-                        sx={{
-                          borderRadius: "8px",
-                          mb: 0.3,
-                          py: 0.7,
-                          px: 1.4,
-                          transition: "all 0.15s ease",
-                          "&.Mui-selected": {
-                            bgcolor: SIDEBAR.activeBg,
-                            borderLeft: `3px solid ${SIDEBAR.active}`,
-                            pl: "calc(11.2px - 3px)",
-                            "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
-                            "& .MuiListItemText-primary": { color: SIDEBAR.activeText, fontWeight: 600 },
-                            "&:hover": { bgcolor: SIDEBAR.activeBg },
-                          },
-                          "&:not(.Mui-selected)": {
-                            borderLeft: "3px solid transparent",
-                            color: SIDEBAR.text,
-                            "& .MuiListItemIcon-root": { color: SIDEBAR.icon },
-                            "& .MuiListItemText-primary": { color: SIDEBAR.text, fontWeight: 500 },
-                          },
-                          "&:hover": {
-                            bgcolor: SIDEBAR.hover,
-                            "& .MuiListItemText-primary": { color: SIDEBAR.activeText },
-                            "& .MuiListItemIcon-root": { color: SIDEBAR.activeIcon },
-                          },
-                        }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 32, color: childActive ? SIDEBAR.activeIcon : SIDEBAR.icon }}>
-                          {child.icon}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={child.label}
-                          primaryTypographyProps={{
-                            fontSize: "0.875rem",
-                            fontWeight: childActive ? 600 : 500,
-                          }}
-                        />
-                      </ListItemButton>
-                    );
-                  })}
-              </List>
-            )}
-          </Paper>
-        </ClickAwayListener>
-      </Popper>
-    </Box >
+    </Box>
   );
 }
