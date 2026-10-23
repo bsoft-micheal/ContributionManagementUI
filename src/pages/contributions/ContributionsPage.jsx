@@ -30,6 +30,7 @@ import {
   InfoOutlined as InfoIcon,
 } from "@mui/icons-material";
 import SubmitPaymentModal from "../../components/payments/SubmitPaymentModal";
+import ViewContributionModal from "../../components/contributions/ViewContributionModal";
 import AddSupportTicketModal from "../../components/support/AddSupportTicketModal";
 import VerifySupportTicketModal from "../../components/support/VerifySupportTicketModal";
 import AppTextArea from "../../components/common/AppTextArea";
@@ -159,6 +160,11 @@ export default function ContributionsPage() {
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
   const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
+
+  // View Contribution Details Modal State
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewModalRow, setViewModalRow] = useState(null);
+  const [viewModalTx, setViewModalTx] = useState(null);
 
   // Submit Payment Details Modal State
   const [submitPaymentModalOpen, setSubmitPaymentModalOpen] = useState(false);
@@ -333,6 +339,159 @@ export default function ContributionsPage() {
     });
   };
 
+  const normalizeModeName = (mode) => {
+    if (!mode) return "";
+    const trimmed = String(mode).trim();
+    const lower = trimmed.toLowerCase();
+
+    // Match against dynamic DB payment modes first
+    if (Array.isArray(paymentModes) && paymentModes.length > 0) {
+      const matched = paymentModes.find(
+        (m) =>
+          (m.paymentModeName && m.paymentModeName.trim().toLowerCase() === lower) ||
+          (m.name && m.name.trim().toLowerCase() === lower) ||
+          (m.paymentModeId && String(m.paymentModeId).toLowerCase() === lower)
+      );
+      if (matched) {
+        return matched.paymentModeName || matched.name;
+      }
+    }
+
+    if (lower.includes("gpay") || lower.includes("google")) return "GPay";
+    if (lower.includes("phonepe") || lower.includes("phone")) return "PhonePe";
+    if (lower.includes("paytm")) return "Paytm";
+    if (lower.includes("cash")) return "Cash";
+    if (lower.includes("split")) return "Split";
+    if (lower.includes("upi")) return "UPI";
+
+    return trimmed;
+  };
+
+  const getModeColor = (name) => {
+    const lower = String(name || "").toLowerCase().replace(/[\s\-_/]+/g, "");
+    if (lower.includes("gpay") || lower.includes("google")) return "#2563eb";
+    if (lower.includes("phonepe") || lower.includes("phone")) return "#7c3aed";
+    if (lower.includes("paytm")) return "#0284c7";
+    if (lower.includes("upi") || lower.includes("bhim")) return "#ea580c";
+    if (lower.includes("bank") || lower.includes("transfer") || lower.includes("neft") || lower.includes("imps")) return "#059669";
+    if (lower.includes("cash")) return "#16a34a";
+    return "#4a3f6b";
+  };
+
+  const resolvePaymentMethodName = (modeRaw, utrRaw = "", notesRaw = "") => {
+    if (modeRaw === 1 || modeRaw === "1") return "Cash";
+    if (modeRaw === 5 || modeRaw === "5") return "Split";
+    if (modeRaw === 3 || modeRaw === "3") return "Bank Transfer";
+    if (modeRaw === 4 || modeRaw === "4") return "Card";
+
+    const str = String(modeRaw || "").trim().toLowerCase();
+    const utrStr = String(utrRaw || "").toLowerCase();
+    const notesStr = String(notesRaw || "").toLowerCase();
+
+    if (str.includes("split")) return "Split";
+    if (str.includes("cash")) return "Cash";
+    if (str.includes("gpay") || str.includes("google")) return "GPay";
+    if (str.includes("phonepe") || str.includes("phone")) return "PhonePe";
+    if (str.includes("paytm")) return "Paytm";
+    if (str.includes("bank") || str.includes("transfer") || str.includes("neft") || str.includes("imps")) return "Bank Transfer";
+    if (str.includes("card")) return "Card";
+
+    if (str === "upi" || str === "online" || !str || str === "none" || str === "2" || str === "0") {
+      if (utrStr.includes("gpay") || notesStr.includes("gpay") || notesStr.includes("google pay")) return "GPay";
+      if (utrStr.includes("phonepe") || notesStr.includes("phonepe") || notesStr.includes("phone pe")) return "PhonePe";
+      if (utrStr.includes("paytm") || notesStr.includes("paytm")) return "Paytm";
+      if (utrStr.includes("cash") || notesStr.includes("cash")) return "Cash";
+      if (str === "upi" || str === "online" || str === "2") return "UPI";
+    }
+
+    return String(modeRaw || "Cash").trim();
+  };
+
+  const getResolvedPaymentMode = (c, matchedTx) => {
+    const tx = matchedTx !== undefined ? matchedTx : findContributionTransaction(c);
+    const allTxns = findAllContributionTransactions(c);
+
+    // 1. Multiple transactions or splits = Split
+    if (allTxns.length > 1) {
+      return "Split";
+    }
+
+    const splits = tx?.splits || c?.splits;
+    if (Array.isArray(splits) && splits.length > 1) {
+      return "Split";
+    }
+
+    if (tx?.isSplitGroup || tx?.parentTxnNumber || tx?.transactionGroupId) {
+      return "Split";
+    }
+
+    if (c?.paymentMode === 5 || c?.paymentMode === "5" || tx?.paymentMode === 5 || tx?.paymentMode === "5") {
+      return "Split";
+    }
+
+    // 2. Check for [Split Breakdown: ...] in notes
+    const notes = String(tx?.notes || c?.notes || "");
+    const splitMatch = notes.match(/\[Split Breakdown:\s*([^\]]+)\]/i);
+    if (splitMatch) {
+      const rawBreakdown = splitMatch[1];
+      const items = rawBreakdown.split(",").map((s) => s.trim()).filter(Boolean);
+      if (items.length > 1) {
+        return "Split";
+      }
+      if (items.length === 1) {
+        const modePart = items[0].split(":")[0]?.trim();
+        if (modePart) return resolvePaymentMethodName(modePart);
+      }
+    }
+
+    // 3. Check if multiple amounts are recorded (e.g. cash + upi)
+    const cashAmt = Number(c?.cashAmount || tx?.cashAmount || 0);
+    const upiAmt = Number(c?.upiAmount || tx?.upiAmount || 0);
+    if (cashAmt > 0 && upiAmt > 0) {
+      return "Split";
+    }
+
+    // 4. If single split row
+    if (Array.isArray(splits) && splits.length === 1 && splits[0]?.mode) {
+      return resolvePaymentMethodName(splits[0].mode, splits[0].utr, splits[0].notes);
+    }
+
+    // 5. Check raw mode — Prioritize specific transaction mode (e.g. GPay, PhonePe)
+    // over generic Contribution enum values (like generic UPI/2).
+    const isGenericMode = (m) => {
+      if (!m || m === "-" || m === "--") return true;
+      const s = String(m).trim().toLowerCase();
+      return s === "none" || s === "upi" || s === "online" || s === "2" || s === "0";
+    };
+
+    const txMode = String(tx?.paymentMode || "").trim();
+    const cModeName = String(c?.paymentModeName || "").trim();
+    const cMode = String(c?.paymentMode || "").trim();
+
+    let rawMode = "";
+    if (txMode && !isGenericMode(txMode)) {
+      rawMode = txMode;
+    } else if (cModeName && !isGenericMode(cModeName)) {
+      rawMode = cModeName;
+    } else if (cMode && !isGenericMode(cMode)) {
+      rawMode = cMode;
+    } else {
+      rawMode = txMode || cModeName || cMode;
+    }
+
+    const rawUtr = String(c?.utrNumber || c?.referenceNo || tx?.utr || tx?.transactionRef || "").trim();
+    if (rawMode && rawMode !== "-" && rawMode !== "--" && rawMode.toLowerCase() !== "none" && rawMode.toLowerCase() !== "0") {
+      return resolvePaymentMethodName(rawMode, rawUtr, notes);
+    }
+
+    if (rawUtr || notes) {
+      const resolved = resolvePaymentMethodName("", rawUtr, notes);
+      if (resolved && resolved !== "Cash") return resolved;
+    }
+
+    return "";
+  };
+
   const findRaisedSupportTicket = (c) => {
     if (!c || !Array.isArray(supportTickets) || supportTickets.length === 0) return null;
 
@@ -430,22 +589,26 @@ export default function ContributionsPage() {
     if (!c) return false;
     const matchedTx = tx !== null ? tx : findContributionTransaction(c);
 
+    const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
+    const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
+
+    // If status is rejected or pending, it can NEVER be verified!
+    if (rawStatus === "rejected" || txStatus === "rejected" || rawStatus === "pending" || txStatus === "pending") {
+      return false;
+    }
+
     // CRITICAL: A member who has NOT paid can NEVER be shown as Verified!
     if (!hasContributionPayment(c, matchedTx)) {
       return false;
     }
 
     const key = `${c.memberId}_${c.eventId}`;
-    const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
-    const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
 
     return Boolean(
-      verifiedKeys.has(key) ||
-      c.isVerified === true ||
-      (c.verifiedBy && String(c.verifiedBy).trim() !== "") ||
-      (matchedTx?.verifiedBy && String(matchedTx.verifiedBy).trim() !== "") ||
+      rawStatus === "verified" ||
       txStatus === "verified" ||
-      rawStatus === "verified"
+      (c.isVerified === true && rawStatus !== "rejected" && txStatus !== "rejected") ||
+      (verifiedKeys.has(key) && rawStatus !== "rejected" && txStatus !== "rejected")
     );
   };
 
@@ -458,9 +621,9 @@ export default function ContributionsPage() {
     return hasContributionPayment(c);
   };
 
-  const hasSubmittedPayment = (c) => {
+  const hasSubmittedPayment = (c, tx = null) => {
     if (!c) return false;
-    return hasContributionPayment(c);
+    return hasContributionPayment(c, tx);
   };
 
   const getContributionOutstanding = (c, activeEv) => {
@@ -575,12 +738,17 @@ export default function ContributionsPage() {
       let paidAmount = 0;
       const cash = Number(c.cashAmount) || 0;
       const upi = Number(c.upiAmount) || 0;
-      const txAmt = Number(matchedTx?.amount) || 0;
+      const allTxns = findAllContributionTransactions(c, txList, c.eventId || (selectedEventId !== "ALL" ? selectedEventId : ""));
+      const totalTxAmt = allTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+      const txAmt = totalTxAmt > 0 ? totalTxAmt : Number(matchedTx?.amount || 0);
+      const rawPaid = Number(c.paidAmount) || Number(c.totalReceivedAmount) || 0;
       if (cash > 0 || upi > 0) {
         paidAmount = cash + upi;
       } else if (txAmt > 0) {
         paidAmount = txAmt;
-      } else if (isPaid) {
+      } else if (rawPaid > 0) {
+        paidAmount = rawPaid;
+      } else if (isPaid || isRejected) {
         paidAmount = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
       }
 
@@ -588,6 +756,13 @@ export default function ContributionsPage() {
         ...currentContribution,
         paymentStatus: resolvedStatus,
         isVerified,
+        verifiedBy: currentContribution.verifiedBy || matchedTx?.verifiedBy,
+        verifiedOn: currentContribution.verifiedOn || matchedTx?.verifiedOn,
+        auditRemarks: currentContribution.auditRemarks || matchedTx?.auditRemarks || matchedTx?.notes || currentContribution.notes,
+        notes: matchedTx?.notes || currentContribution.notes,
+        rejectionReason: isRejected
+          ? (currentContribution.rejectionReason || matchedTx?.notes || currentContribution.notes)
+          : currentContribution.rejectionReason,
         paidAmount,
         previousUnpaid,
         previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
@@ -623,6 +798,13 @@ export default function ContributionsPage() {
       }
       if (filterLower === "pending") {
         return statusLower === "pending";
+      }
+      if (filterLower === "rejected") {
+        return (
+          statusLower === "rejected" ||
+          String(c.status || "").toLowerCase() === "rejected" ||
+          String(c.statusName || "").toLowerCase() === "rejected"
+        );
       }
       return statusLower === filterLower;
     });
@@ -668,6 +850,29 @@ export default function ContributionsPage() {
       arrearBreakdown: prevArrears === 0 ? [] : (row?.previousUnpaidItems || []),
     });
     setSubmitPaymentModalOpen(true);
+  };
+
+  const handleOpenViewModal = (row) => {
+    if (!row) return;
+    const allTxns = findAllContributionTransactions(row);
+    let matchedTx = allTxns[0] || findContributionTransaction(row);
+    if (allTxns.length > 1) {
+      matchedTx = {
+        ...(matchedTx || {}),
+        isSplitGroup: true,
+        paymentMode: "Split",
+        splits: allTxns.map((t) => ({
+          id: t.txnNumber || t.id,
+          mode: normalizeModeName(t.paymentMode) || t.paymentMode || "UPI",
+          amount: Number(t.amount) || 0,
+          utr: t.utr || "-",
+          notes: t.notes || "",
+        })),
+      };
+    }
+    setViewModalRow(row);
+    setViewModalTx(matchedTx);
+    setViewModalOpen(true);
   };
 
   useEffect(() => {
@@ -1090,7 +1295,7 @@ export default function ContributionsPage() {
       );
     }
 
-    return 0;
+    return Number(matchedTx?.amount || row.paidAmount || row.totalReceivedAmount || 0);
   }, []);
 
   const getModalStatusOptions = (row) => {
@@ -1201,19 +1406,26 @@ export default function ContributionsPage() {
     }
 
     const verifier = authState?.fullName || authState?.username || authState?.user?.name || authState?.user?.username || "Admin";
-    const noteText = customNotes !== undefined
-      ? customNotes
-      : (auditRemarks || `Status updated to ${newStatus} by ${verifier}.`);
+    const trimmedNotes = customNotes && String(customNotes).trim() ? String(customNotes).trim() : (auditRemarks && String(auditRemarks).trim() ? String(auditRemarks).trim() : "");
+    const noteText = trimmedNotes || (String(newStatus).toLowerCase() === "rejected" ? `Rejected by ${verifier}.` : `Status updated to ${newStatus} by ${verifier}.`);
 
     const targetKey = `${target.memberId}_${target.eventId}`;
-    setVerifiedKeys((prev) => new Set(prev).add(targetKey));
+    if (String(newStatus).toLowerCase() === "verified") {
+      setVerifiedKeys((prev) => new Set(prev).add(targetKey));
+    } else {
+      setVerifiedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(targetKey);
+        return next;
+      });
+    }
 
     const isMarkingPaid = ["paid", "verified", "closed", "completed"].includes(String(newStatus).toLowerCase());
 
     const matchedTxnForValidation = findContributionTransaction(target);
     const actualReceived = getActualReceivedAmount(target, matchedTxnForValidation);
 
-    if (actualReceived <= 0) {
+    if (actualReceived <= 0 && String(newStatus).toLowerCase() !== "rejected") {
       toast.error("Payment has not been received (Received Amount: ₹0.00). You cannot verify or save this status.");
       return;
     }
@@ -1230,14 +1442,35 @@ export default function ContributionsPage() {
           const updatedStatus = isVerified ? "Verified" : (isMarkingPaid ? "Paid" : newStatus);
           const isPaid = isMarkingPaid;
           const arrears = c.previousUnpaid || 0;
+          const splitAmount = (Number(c.cashAmount || 0) + Number(c.upiAmount || 0));
+          const preservedPaid =
+            splitAmount > 0
+              ? splitAmount
+              : (Number(c.paidAmount || 0) > 0
+                ? Number(c.paidAmount)
+                : (actualReceived > 0
+                  ? actualReceived
+                  : (Number(target.paidAmount || 0) > 0
+                    ? Number(target.paidAmount)
+                    : Number(c.amount || 0))));
+
+          const origTxMode = matchedTxnForValidation?.paymentMode;
+          const currentMode = origTxMode && !["none", "0"].includes(String(origTxMode).toLowerCase())
+            ? origTxMode
+            : (c.paymentModeName || (c.paymentMode && c.paymentMode !== "None" ? c.paymentMode : (isPaid ? "Cash" : c.paymentMode)));
+
           return {
             ...c,
+            paidAmount: preservedPaid,
             paymentStatus: updatedStatus,
             statusName: updatedStatus,
             isVerified: isVerified,
             verifiedBy: isVerified ? verifier : c.verifiedBy,
+            auditRemarks: noteText,
+            notes: c.notes || noteText,
+            rejectionReason: String(newStatus).toLowerCase() === "rejected" ? noteText : c.rejectionReason,
             paymentDate: isPaid ? (c.paymentDate || new Date().toISOString()) : c.paymentDate,
-            paymentMode: c.paymentMode && c.paymentMode !== "None" ? c.paymentMode : (isPaid ? "Cash" : c.paymentMode),
+            paymentMode: currentMode,
             totalAccumulated: isPaid ? arrears : (Number(c.amount || 0) + arrears),
           };
         }
@@ -1267,7 +1500,7 @@ export default function ContributionsPage() {
             return verifyPaymentTransactionAsync(txnId, {
               status: statusToSend,
               verifiedBy: verifier,
-              notes: noteText,
+              notes: trimmedNotes ? (txn.notes ? `${txn.notes} | ${trimmedNotes}` : trimmedNotes) : txn.notes,
             });
           })
         );
@@ -1306,11 +1539,18 @@ export default function ContributionsPage() {
         if (Array.isArray(txRes2)) {
           // Patch the verified transactions optimistically in case backend has slight delay
           const patchedTxns = txRes2.map((t) => {
-            const wasVerified = matchedTxns.some(
+            const origMatch = matchedTxns.find(
               (m) => (m.transactionId || m.id) === (t.transactionId || t.id)
             );
-            if (wasVerified) {
-              return { ...t, status: statusToSend, verifiedBy: verifier };
+            if (origMatch) {
+              return {
+                ...t,
+                status: statusToSend,
+                verifiedBy: verifier,
+                notes: t.notes || origMatch.notes || noteText,
+                auditRemarks: noteText,
+                paymentMode: t.paymentMode || origMatch.paymentMode,
+              };
             }
             return t;
           });
@@ -1367,16 +1607,56 @@ export default function ContributionsPage() {
       label: "Action",
       render: (row) => {
         const matchedTx = findContributionTransaction(row);
+        const statusStr = String(row?.paymentStatus || row?.status || row?.statusName || matchedTx?.status || "").trim().toLowerCase();
+        const isRejected =
+          statusStr === "rejected" ||
+          String(matchedTx?.status || "").toLowerCase() === "rejected" ||
+          String(row?.paymentStatus || "").toLowerCase() === "rejected" ||
+          String(row?.statusName || "").toLowerCase() === "rejected";
+
         const isVerifiedRow = isContributionVerified(row, matchedTx);
+        const isActuallyVerified = statusStr === "verified" || (isVerifiedRow && !isRejected);
         const hasSubmitted = hasSubmittedPayment(row, matchedTx);
         const hasDirectPaid = isContributionPaid(row, matchedTx);
-        const statusStr = String(row?.paymentStatus || row?.status || row?.statusName || "").trim().toLowerCase();
-        const isPaidStatus = statusStr === "paid" || statusStr === "verified" || statusStr === "completed" || statusStr === "closed" || row?.paymentStatus === 2;
+        const isPaidStatus =
+          statusStr === "paid" ||
+          statusStr === "verified" ||
+          statusStr === "completed" ||
+          statusStr === "closed" ||
+          row?.paymentStatus === 2;
+
+        const actualReceivedAmt = getActualReceivedAmount(row, matchedTx);
+        const hasPositiveReceivedAmt = actualReceivedAmt > 0;
         const isSettledByAmount = Number(row?.paidAmount || 0) > 0 && (row?.totalAccumulated === undefined || Number(row?.totalAccumulated) <= 0);
-        const isPaidMember = Boolean(isVerifiedRow || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount);
+
+        // Member has payment recorded, payment proof submitted, or is settled/paid
+        const hasMemberPaid = Boolean(
+          isActuallyVerified ||
+          isPaidStatus ||
+          hasDirectPaid ||
+          hasSubmitted ||
+          isSettledByAmount ||
+          hasPositiveReceivedAmt ||
+          (Number(row?.paidAmount || 0) > 0) ||
+          (Number(row?.totalReceivedAmount || 0) > 0) ||
+          (row?.paymentMode && row?.paymentMode !== "-" && row?.paymentMode !== "--" && String(row?.paymentMode).toLowerCase() !== "none")
+        );
+
+        const isPaidMember = Boolean(isActuallyVerified || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount || hasPositiveReceivedAmt);
+
+        // Verify icon is disabled ONLY when already verified, or if the member has not paid yet (unless rejected, which can be re-evaluated/updated)
+        const isVerifyDisabled = isActuallyVerified || (!hasMemberPaid && !isRejected);
+
+        const verifyTooltipTitle = isActuallyVerified
+          ? "Already Verified"
+          : isRejected
+          ? "Authority Status Update (Payment Rejected)"
+          : !hasMemberPaid
+          ? "Payment Not Received (Verification Disabled)"
+          : "Authority Status Update";
 
         const tooltipTitle = isPaidMember
-          ? (isVerifiedRow
+          ? (isActuallyVerified
               ? "Payment Verified & Settled"
               : (hasSubmitted && statusStr === "pending")
               ? "Payment Proof Submitted (Pending Verification)"
@@ -1385,6 +1665,27 @@ export default function ContributionsPage() {
 
         return (
           <Box sx={{ display: "flex", gap: 0.6, alignItems: "center" }}>
+            {/* View Contribution & Payment Details Icon */}
+            <Tooltip title={canViewContribution !== false ? "View Details" : "Disabled"}>
+              <span style={{ display: "inline-flex", cursor: canViewContribution === false ? "not-allowed" : "pointer" }}>
+                <IconButton
+                  size="small"
+                  sx={{ p: 0.3 }}
+                  disabled={canViewContribution === false}
+                  onClick={() => handleOpenViewModal(row)}
+                >
+                  <ViewIcon
+                    sx={{
+                      fontSize: "1.1rem",
+                      color: canViewContribution !== false
+                        ? actionIconColor
+                        : (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+
             {canAddContribution && (
               <Tooltip title={tooltipTitle}>
                 <span style={{ display: "inline-flex", cursor: isPaidMember ? "not-allowed" : "pointer" }}>
@@ -1419,11 +1720,11 @@ export default function ContributionsPage() {
             )}
 
             {canUpdateContribution && (
-              <Tooltip title={isVerifiedRow ? "Already Verified" : "Authority Status Update"}>
-                <span>
+              <Tooltip title={verifyTooltipTitle}>
+                <span style={{ display: "inline-flex", cursor: isVerifyDisabled ? "not-allowed" : "pointer" }}>
                   <IconButton
                     size="small"
-                    disabled={isVerifiedRow}
+                    disabled={isVerifyDisabled}
                     onClick={() => {
                       setStatusModalRow(row);
                       setStatusChangeValue("");
@@ -1433,12 +1734,17 @@ export default function ContributionsPage() {
                     }}
                     sx={{
                       p: 0.4,
-                      color: isVerifiedRow ? "#9ca3af" : "#16a34a",
-                      bgcolor: isVerifiedRow ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.08)",
+                      color: isVerifyDisabled ? "#9ca3af" : "#16a34a",
+                      bgcolor: isVerifyDisabled ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.08)",
                       borderRadius: "6px",
+                      "&.Mui-disabled": {
+                        color: "#9ca3af",
+                        bgcolor: "rgba(156, 163, 175, 0.08)",
+                        opacity: 0.65,
+                      },
                       "&:hover": {
-                        bgcolor: isVerifiedRow ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.18)",
-                        color: isVerifiedRow ? "#9ca3af" : "#15803d",
+                        bgcolor: isVerifyDisabled ? "rgba(156, 163, 175, 0.08)" : "rgba(22, 163, 74, 0.18)",
+                        color: isVerifyDisabled ? "#9ca3af" : "#15803d",
                       },
                     }}
                   >
@@ -1609,7 +1915,8 @@ export default function ContributionsPage() {
       key: "paidAmount",
       align: "right",
       render: (row) => {
-        const matchedTx = findContributionTransaction(row);
+        const allTxns = findAllContributionTransactions(row);
+        const matchedTx = allTxns[0] || findContributionTransaction(row);
         const isVerified = isContributionVerified(row, matchedTx);
         const isPaid =
           isContributionPaid(row, matchedTx) ||
@@ -1619,6 +1926,11 @@ export default function ContributionsPage() {
           String(row?.paymentStatus || "").toLowerCase() === "paid" ||
           String(row?.statusName || "").toLowerCase() === "paid";
 
+        const isRejected =
+          String(matchedTx?.status || "").toLowerCase() === "rejected" ||
+          String(row?.paymentStatus || "").toLowerCase() === "rejected" ||
+          String(row?.statusName || "").toLowerCase() === "rejected";
+
         const activeEv = (events || []).find(
           (e) => String(e.eventId || e.id) === String(row.eventId || selectedEventId)
         );
@@ -1627,16 +1939,18 @@ export default function ContributionsPage() {
         let paidAmount = 0;
         const cash = Number(row.cashAmount) || 0;
         const upi = Number(row.upiAmount) || 0;
-        const txAmt = Number(matchedTx?.amount) || 0;
+        const totalTxAmt = allTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+        const txAmt = totalTxAmt > 0 ? totalTxAmt : (Number(matchedTx?.amount) || 0);
+        const rawPaid = Number(row.paidAmount) || Number(row.totalReceivedAmount) || 0;
 
         if (cash > 0 || upi > 0) {
           paidAmount = cash + upi;
         } else if (txAmt > 0) {
           paidAmount = txAmt;
-        } else if (isPaid) {
+        } else if (rawPaid > 0) {
+          paidAmount = rawPaid;
+        } else if (isPaid || isRejected) {
           paidAmount = eventAmount > 0 ? eventAmount : Number(row.amount || 0);
-        } else if (row.paidAmount !== undefined && row.paidAmount !== null && Number(row.paidAmount) > 0) {
-          paidAmount = Number(row.paidAmount);
         }
 
         const paidEventName =
@@ -1659,16 +1973,14 @@ export default function ContributionsPage() {
                 Payment Date: {formatGridDate(row.paymentDate || matchedTx?.paymentDate)}
               </Typography>
             )}
-            {(row.paymentMode || matchedTx?.paymentMode) && (
-              <Typography variant="caption" sx={{ display: "block", color: "#cbd5e1", fontSize: "0.72rem" }}>
-                Payment Mode: {row.paymentMode || matchedTx?.paymentMode}
-              </Typography>
-            )}
-            {matchedTx?.utr && (
-              <Typography variant="caption" sx={{ display: "block", color: "#93c5fd", fontSize: "0.7rem", mt: 0.2 }}>
-                Ref / UTR: {matchedTx.utr}
-              </Typography>
-            )}
+            {(() => {
+              const displayMode = getResolvedPaymentMode(row, matchedTx);
+              return displayMode ? (
+                <Typography variant="caption" sx={{ display: "block", color: "#cbd5e1", fontSize: "0.72rem" }}>
+                  Payment Mode: {displayMode}
+                </Typography>
+              ) : null;
+            })()}
           </Box>
         ) : (
           `Pending payment for ${paidEventName}`
@@ -1773,19 +2085,32 @@ export default function ContributionsPage() {
       label: "Payment Mode",
       key: "paymentMode",
       render: (row) => {
-        const matchedTx = findContributionTransaction(row);
-        const isPaid = isContributionPaid(row);
-        const hasSubmitted = hasSubmittedPayment(row);
+        const allTxns = findAllContributionTransactions(row);
+        const matchedTx = allTxns[0] || findContributionTransaction(row);
+        const isPaid = isContributionPaid(row, matchedTx);
+        const hasSubmitted = hasSubmittedPayment(row, matchedTx);
         let resolvedMode = "-";
         if (isPaid || hasSubmitted) {
-          if (row.paymentMode && row.paymentMode !== "None" && row.paymentMode !== "-") {
-            resolvedMode = row.paymentMode;
-          } else if (matchedTx?.paymentMode) {
-            resolvedMode = matchedTx.paymentMode;
+          resolvedMode = getResolvedPaymentMode(row, matchedTx);
+          if (!resolvedMode || resolvedMode === "-" || resolvedMode === "None") {
+            const isGeneric = (m) => {
+              if (!m || m === "-" || m === "--") return true;
+              const s = String(m).trim().toLowerCase();
+              return s === "none" || s === "upi" || s === "online" || s === "2" || s === "0";
+            };
+            const txMode = matchedTx?.paymentMode;
+            const cMode = row.paymentModeName || row.paymentMode;
+            const raw = (!isGeneric(txMode) ? txMode : null) ||
+                        (!isGeneric(cMode) ? cMode : null) ||
+                        txMode ||
+                        cMode;
+            const utr = row.utrNumber || row.referenceNo || matchedTx?.utr || matchedTx?.transactionRef;
+            const notes = row.notes || matchedTx?.notes;
+            resolvedMode = resolvePaymentMethodName(raw, utr, notes);
           }
         }
 
-        if (resolvedMode === "-" || resolvedMode === "None") {
+        if (!resolvedMode || resolvedMode === "-" || resolvedMode === "None") {
           return <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.8rem" }}>--</Typography>;
         }
 
@@ -1796,31 +2121,50 @@ export default function ContributionsPage() {
           const upiAmount = row.upiAmount || matchedTx?.upiAmount;
           const cashInfo = cashAmount ? `${formatWholeCurrency(cashAmount)} Cash` : "";
           const upiInfo = upiAmount ? `${formatWholeCurrency(upiAmount)} UPI` : "";
-          const splitLabel = cashInfo && upiInfo ? `Split (${cashInfo} + ${upiInfo})` : "Split";
-          const tooltipText = cashInfo && upiInfo ? `Split Payment: ${cashInfo} and ${upiInfo}` : "Split Payment (Partial Cash + Partial UPI)";
+          const tooltipText = cashInfo && upiInfo ? `Split Payment: ${cashInfo} + ${upiInfo}` : "Split Payment";
 
           return (
-            <Tooltip title={tooltipText}>
+            <Tooltip title={tooltipText} arrow enterDelay={100}>
               <Box
                 component="span"
                 sx={{
                   display: "inline-block",
-                  px: 1,
+                  px: 1.2,
                   py: 0.3,
                   borderRadius: "4px",
                   fontSize: "0.72rem",
                   fontWeight: 800,
-                  color: "#4f46e5",
-                  bgcolor: "rgba(79, 70, 229, 0.08)",
-                  border: "1px solid rgba(79, 70, 229, 0.25)",
+                  color: "#6366f1",
+                  bgcolor: "rgba(99, 102, 241, 0.1)",
+                  border: "1px solid rgba(99, 102, 241, 0.3)",
+                  cursor: "help",
                 }}
               >
-                {splitLabel}
+                Split
               </Box>
             </Tooltip>
           );
         }
-        return resolvedMode !== "None" ? resolvedMode : "-";
+
+        const modeColor = getModeColor(resolvedMode);
+        return (
+          <Box
+            component="span"
+            sx={{
+              display: "inline-block",
+              px: 1.2,
+              py: 0.3,
+              borderRadius: "4px",
+              fontSize: "0.72rem",
+              fontWeight: 800,
+              color: modeColor,
+              bgcolor: `${modeColor}14`,
+              border: `1px solid ${modeColor}35`,
+            }}
+          >
+            {resolvedMode}
+          </Box>
+        );
       },
     },
     {
@@ -1887,6 +2231,7 @@ export default function ContributionsPage() {
                     { label: "All Statuses", value: "ALL" },
                     { label: "Paid", value: "Paid" },
                     { label: "Pending", value: "Pending" },
+                    { label: "Rejected", value: "Rejected" },
                   ]}
                   fullWidth
                 />
@@ -2242,6 +2587,25 @@ export default function ContributionsPage() {
         member={members.find((m) => m.memberId === selectedContributionForQr?.memberId)}
       />
 
+      {/* ── View Contribution Details Modal ── */}
+      <ViewContributionModal
+        open={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setViewModalRow(null);
+          setViewModalTx(null);
+        }}
+        row={viewModalRow}
+        matchedTx={viewModalTx}
+        allTransactions={transactions}
+        events={events}
+        onPay={canAddContribution ? () => {
+          const target = viewModalRow;
+          setViewModalOpen(false);
+          if (target) handleOpenSubmitPaymentModal(target);
+        } : undefined}
+      />
+
       {/* ── Submit Payment Details Modal ── */}
       <SubmitPaymentModal
         open={submitPaymentModalOpen}
@@ -2320,9 +2684,9 @@ export default function ContributionsPage() {
                 </AppCancelButton>
                 <AppSaveButton
                   loading={statusSaving}
-                  disabled={isZeroAmount}
+                  disabled={isZeroAmount && String(statusChangeValue).toLowerCase() !== "rejected"}
                   disabledTooltip={
-                    isZeroAmount
+                    isZeroAmount && String(statusChangeValue).toLowerCase() !== "rejected"
                       ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first."
                       : ""
                   }
@@ -2362,7 +2726,8 @@ export default function ContributionsPage() {
 
               {/* Submitted Payment Details Summary Card */}
               {(() => {
-                const matchedTx = findContributionTransaction(statusModalRow);
+                const allRelatedTxns = findAllContributionTransactions(statusModalRow);
+                const matchedTx = allRelatedTxns[0] || findContributionTransaction(statusModalRow);
                 const actualReceivedAmt = getActualReceivedAmount(statusModalRow, matchedTx);
                 const rawStatus = statusModalRow?.paymentStatus;
                 const isPaidOrVerified =
@@ -2374,10 +2739,8 @@ export default function ContributionsPage() {
 
                 const cashAmt = Number(matchedTx?.cashAmount || statusModalRow?.cashAmount || 0);
                 const upiAmt = Number(matchedTx?.upiAmount || statusModalRow?.upiAmount || 0);
-                const splitSum = cashAmt + upiAmt;
 
                 const rawMode = statusModalRow?.paymentMode || matchedTx?.paymentMode;
-                const modeStr = (rawMode && rawMode !== "-" && rawMode !== "--") ? rawMode : "None";
                 const totalDueAmt = Number(statusModalRow?.totalDue || statusModalRow?.amount || matchedTx?.amount || 0);
                 const hasSubmittedProof = Boolean(
                   (matchedTx && Number(matchedTx.amount) > 0) ||
@@ -2388,15 +2751,297 @@ export default function ContributionsPage() {
 
                 const utrVal = statusModalRow?.utrNumber || statusModalRow?.referenceNo || statusModalRow?.utr || matchedTx?.utr || matchedTx?.transactionRef || matchedTx?.referenceNo || "--";
                 const dateVal = statusModalRow?.paymentDate || matchedTx?.paymentDate || matchedTx?.createdOn;
-                const dateDisplay = dateVal ? dayjs(dateVal).format("DD/MM/YYYY hh:mm A") : (isPaidOrVerified ? "Today" : "--");
+                const dateDisplay = dateVal ? dayjs(dateVal).format("DD/MM/YYYY") : (isPaidOrVerified ? dayjs().format("DD/MM/YYYY") : "--");
                 const scopeVal = statusModalRow?.paymentScope || matchedTx?.paymentScope || (totalDueAmt > 100 ? "All Outstanding" : "Current Event");
                 const notesVal = statusModalRow?.notes || matchedTx?.notes || "";
-                const createdByVal = statusModalRow?.createdBy || statusModalRow?.recordedBy || matchedTx?.createdBy || matchedTx?.memberName || "Member";
+                const createdByVal = statusModalRow?.createdBy || statusModalRow?.recordedBy || matchedTx?.createdBy || matchedTx?.memberName || statusModalRow?.memberName || "Member";
                 const rawImgs = statusModalRow?.screenshots || matchedTx?.screenshots || statusModalRow?.screenshot || matchedTx?.screenshot;
                 const proofImgs = Array.isArray(rawImgs) ? rawImgs : (rawImgs ? [rawImgs] : []);
 
                 const primaryEvName = statusModalRow?.eventName || (events.find((e) => e.eventId === statusModalRow?.eventId)?.eventName) || "Current Event";
                 const currentEvAmt = Number(statusModalRow?.amount || statusModalRow?.currentEventDue || 0);
+
+                const resolvedEventType =
+                  statusModalRow?.eventTypeName ||
+                  statusModalRow?.eventType ||
+                  statusModalRow?.categoryName ||
+                  statusModalRow?.eventCategory ||
+                  (events.find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId)))?.eventTypeName ||
+                  (events.find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId)))?.categoryName ||
+                  (events.find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId)))?.category ||
+                  "--";
+
+                // Parse structured splits or breakdown
+                let splitsList = [];
+                if (allRelatedTxns.length > 1) {
+                  splitsList = allRelatedTxns.map((t) => ({
+                    id: t.txnNumber || t.id,
+                    mode: resolvePaymentMethodName(t.paymentMode, t.utr, t.notes),
+                    amount: Number(t.amount) || 0,
+                    utr: t.utr || t.transactionRef || t.referenceNo || "",
+                    notes: t.notes,
+                  }));
+                } else if (Array.isArray(matchedTx?.splits) && matchedTx.splits.length > 0) {
+                  splitsList = matchedTx.splits.map((s) => ({
+                    ...s,
+                    mode: resolvePaymentMethodName(s.mode || s.paymentMode, s.utr, s.notes),
+                    amount: Number(s.amount) || 0,
+                    utr: s.utr || s.referenceNo || s.transactionRef || "",
+                  }));
+                } else if (Array.isArray(statusModalRow.splits) && statusModalRow.splits.length > 0) {
+                  splitsList = statusModalRow.splits.map((s) => ({
+                    ...s,
+                    mode: resolvePaymentMethodName(s.mode || s.paymentMode, s.utr, s.notes),
+                    amount: Number(s.amount) || 0,
+                    utr: s.utr || s.referenceNo || s.transactionRef || "",
+                  }));
+                }
+
+                if (splitsList.length === 0) {
+                  const match = notesVal.match(/\[Split Breakdown:\s*([^\]]+)\]/i);
+                  if (match && match[1]) {
+                    const items = match[1].split(",");
+                    splitsList = items.map((item, idx) => {
+                      const parts = item.trim().split(":");
+                      let mode = parts[0]?.trim() || `Mode ${idx + 1}`;
+                      mode = resolvePaymentMethodName(mode);
+                      const rest = parts.slice(1).join(":");
+                      const amtMatch = rest.match(/₹?([0-9.]+)/);
+                      const utrMatch = rest.match(/\(Ref:\s*([^)]+)\)/i) || rest.match(/\(UTR:\s*([^)]+)\)/i);
+                      return {
+                        mode,
+                        amount: amtMatch ? Number(amtMatch[1]) : 0,
+                        utr: utrMatch ? utrMatch[1].trim() : "",
+                      };
+                    });
+                  } else if (cashAmt > 0 && upiAmt > 0) {
+                    splitsList.push({ mode: "Cash", amount: cashAmt, utr: "" });
+                    splitsList.push({ mode: resolvePaymentMethodName("UPI", utrVal, notesVal), amount: upiAmt, utr: utrVal });
+                  }
+                }
+
+                // Build distinct digital UTR items for each mode (e.g. GPay UTR and PhonePe UTR)
+                const splitUtrMap = new Map();
+
+                allRelatedTxns.forEach((t) => {
+                  const m = resolvePaymentMethodName(t.paymentMode, t.utr, t.notes);
+                  const u = String(t.utr || t.transactionRef || t.referenceNo || "").trim();
+                  const isCash = m.toLowerCase().includes("cash");
+                  if (!isCash && u && u !== "-" && u !== "--" && u.toUpperCase() !== "SPLIT" && u.toUpperCase() !== "CASH") {
+                    if (!splitUtrMap.has(m)) {
+                      splitUtrMap.set(m, u);
+                    }
+                  }
+                });
+
+                const splitsArrays = [
+                  ...(Array.isArray(matchedTx?.splits) ? matchedTx.splits : []),
+                  ...(Array.isArray(statusModalRow?.splits) ? statusModalRow.splits : []),
+                  ...splitsList,
+                ];
+                splitsArrays.forEach((s) => {
+                  const m = resolvePaymentMethodName(s.mode || s.paymentMode, s.utr, s.notes);
+                  const u = String(s.utr || s.referenceNo || s.transactionRef || "").trim();
+                  const isCash = m.toLowerCase().includes("cash");
+                  if (!isCash && u && u !== "-" && u !== "--" && u.toUpperCase() !== "SPLIT" && u.toUpperCase() !== "CASH") {
+                    if (!splitUtrMap.has(m)) {
+                      splitUtrMap.set(m, u);
+                    }
+                  }
+                });
+
+                const allNotesToScan = [notesVal, matchedTx?.notes, statusModalRow?.notes].filter(Boolean);
+                allNotesToScan.forEach((n) => {
+                  const splitBreakdownMatch = n.match(/\[Split Breakdown:\s*([^\]]+)\]/i);
+                  if (splitBreakdownMatch && splitBreakdownMatch[1]) {
+                    const items = splitBreakdownMatch[1].split(",");
+                    items.forEach((item) => {
+                      const parts = item.trim().split(":");
+                      let m = parts[0]?.trim();
+                      m = resolvePaymentMethodName(m);
+                      const isCash = m.toLowerCase().includes("cash");
+                      if (!isCash) {
+                        const refMatch = item.match(/\(Ref:\s*([^)]+)\)/i) || item.match(/\(UTR:\s*([^)]+)\)/i);
+                        if (refMatch && refMatch[1]?.trim()) {
+                          const u = refMatch[1].trim();
+                          if (u && u !== "-" && u !== "--" && u.toUpperCase() !== "CASH" && u.toUpperCase() !== "SPLIT") {
+                            if (!splitUtrMap.has(m)) {
+                              splitUtrMap.set(m, u);
+                            }
+                          }
+                        }
+                      }
+                    });
+                  }
+                });
+
+                const allRawUtrs = [
+                  statusModalRow?.utrNumber,
+                  statusModalRow?.referenceNo,
+                  matchedTx?.utr,
+                  matchedTx?.transactionRef,
+                  matchedTx?.referenceNo,
+                ].filter(Boolean);
+
+                allRawUtrs.forEach((raw) => {
+                  const regex = /(Gpay|Phonepe|Paytm|UPI|Bank Transfer|Card)[\s:]+([A-Za-z0-9]+)/gi;
+                  let rm;
+                  while ((rm = regex.exec(raw)) !== null) {
+                    const m = resolvePaymentMethodName(rm[1]);
+                    const u = rm[2].trim();
+                    if (!splitUtrMap.has(m) && u && u.toUpperCase() !== "CASH" && u.toUpperCase() !== "SPLIT") {
+                      splitUtrMap.set(m, u);
+                    }
+                  }
+                });
+
+                if (splitUtrMap.size === 0 && utrVal && utrVal !== "--" && utrVal.toUpperCase() !== "SPLIT" && utrVal.toUpperCase() !== "CASH") {
+                  const singleDigitalMode = singleMethodName && !singleMethodName.toLowerCase().includes("cash") ? singleMethodName : "UPI";
+                  splitUtrMap.set(singleDigitalMode, utrVal);
+                }
+
+                const splitUtrs = Array.from(splitUtrMap.entries()).map(([mode, utr]) => ({ mode, utr }));
+
+                const isSplitPayment =
+                  splitsList.length > 1 ||
+                  Boolean(matchedTx?.isSplitGroup) ||
+                  Boolean(matchedTx?.parentTxnNumber) ||
+                  Boolean(matchedTx?.transactionGroupId) ||
+                  statusModalRow.paymentMode === 5 ||
+                  statusModalRow.paymentMode === "5" ||
+                  String(statusModalRow.paymentMode || "").toLowerCase().includes("split") ||
+                  String(matchedTx?.paymentMode || "").toLowerCase().includes("split") ||
+                  (cashAmt > 0 && upiAmt > 0);
+
+                const singleMethodName = resolvePaymentMethodName(rawMode, utrVal, notesVal);
+
+                // Clean Cash Handover Note extraction
+                const getCleanCashNote = () => {
+                  const knownAuditTexts = [
+                    statusModalRow?.rejectionReason,
+                    matchedTx?.rejectionReason,
+                    statusModalRow?.auditRemarks,
+                    matchedTx?.auditRemarks,
+                    auditRemarks,
+                  ]
+                    .filter((t) => typeof t === "string" && t.trim().length > 0)
+                    .map((t) => t.trim().toLowerCase());
+
+                  const isAuditOrRejectionNote = (text) => {
+                    if (!text || typeof text !== "string") return true;
+                    const trimmed = text.trim();
+                    if (!trimmed || trimmed === "-" || trimmed === "--") return true;
+                    const lower = trimmed.toLowerCase();
+
+                    for (const audit of knownAuditTexts) {
+                      if (lower === audit) return true;
+                      if (audit.length >= 3 && (lower.includes(audit) || audit.includes(lower))) return true;
+                    }
+
+                    if (/^(status updated|updated to|verified by|rejected by|reviewed by|rejected\b|verified\b)/i.test(lower)) {
+                      return true;
+                    }
+
+                    if (trimmed.startsWith("[") || trimmed.includes("Split Breakdown:") || trimmed.includes("Scope:")) {
+                      return true;
+                    }
+
+                    return false;
+                  };
+
+                  const allNotesSources = [
+                    ...splitsList.map((s) => s.notes),
+                    notesVal,
+                    matchedTx?.notes,
+                    statusModalRow?.notes,
+                    ...splitsList.map((s) => s.utr),
+                  ].filter((n) => typeof n === "string" && n.trim().length > 0);
+
+                  for (const raw of allNotesSources) {
+                    const match = raw.match(/\[Cash Note:\s*([^\]]+)\]/i);
+                    if (match && match[1]?.trim()) {
+                      const cleaned = match[1]
+                        .replace(/\[Scope:[^\]]+\]/gi, "")
+                        .replace(/\[Split Breakdown:[^\]]+\]/gi, "")
+                        .trim();
+                      if (cleaned && !isAuditOrRejectionNote(cleaned)) {
+                        return cleaned;
+                      }
+                    }
+                  }
+
+                  const cashSplit = splitsList.find((s) =>
+                    String(s.mode || "").toLowerCase().includes("cash")
+                  );
+
+                  if (cashSplit) {
+                    const candidate = cashSplit.cashNote || cashSplit.notes;
+                    if (typeof candidate === "string" && candidate.trim()) {
+                      let cleaned = candidate
+                        .replace(/\[Scope:[^\]]+\]/gi, "")
+                        .replace(/\[Split Breakdown:[^\]]+\]/gi, "")
+                        .replace(/\[Cash Note:\s*([^\]]+)\]/gi, "$1")
+                        .replace(/Status updated to [^.]+(\.|$)/gi, "")
+                        .trim();
+
+                      if (
+                        cleaned &&
+                        cleaned.toUpperCase() !== "CASH" &&
+                        !isAuditOrRejectionNote(cleaned)
+                      ) {
+                        return cleaned;
+                      }
+                    }
+
+                    if (
+                      cashSplit.utr &&
+                      typeof cashSplit.utr === "string" &&
+                      cashSplit.utr.trim().toUpperCase() !== "CASH" &&
+                      cashSplit.utr.trim() !== "-" &&
+                      cashSplit.utr.trim() !== "--" &&
+                      !cashSplit.utr.includes(":") &&
+                      !isAuditOrRejectionNote(cashSplit.utr)
+                    ) {
+                      return cashSplit.utr.trim();
+                    }
+                  }
+
+                  const isSingleCash = String(rawMode).toLowerCase().includes("cash") && !isSplitPayment;
+                  if (isSingleCash) {
+                    if (utrVal && typeof utrVal === "string") {
+                      const trimmedUtr = utrVal.trim();
+                      if (
+                        trimmedUtr &&
+                        trimmedUtr.toUpperCase() !== "CASH" &&
+                        trimmedUtr !== "-" &&
+                        trimmedUtr !== "--" &&
+                        trimmedUtr !== "SPLIT" &&
+                        !trimmedUtr.includes(":") &&
+                        !isAuditOrRejectionNote(trimmedUtr)
+                      ) {
+                        return trimmedUtr;
+                      }
+                    }
+
+                    const cleanNotesVal = notesVal
+                      .replace(/\[Scope:[^\]]+\]/gi, "")
+                      .replace(/\[Split Breakdown:[^\]]+\]/gi, "")
+                      .replace(/\[Cash Note:\s*([^\]]+)\]/gi, "$1")
+                      .trim();
+                    if (cleanNotesVal && cleanNotesVal.toUpperCase() !== "CASH" && !isAuditOrRejectionNote(cleanNotesVal)) {
+                      return cleanNotesVal;
+                    }
+                  }
+
+                  return "--";
+                };
+
+                const hasCashComponent =
+                  singleMethodName === "Cash" ||
+                  splitsList.some((s) => String(s.mode || "").toLowerCase().includes("cash")) ||
+                  cashAmt > 0;
+
+                const cashHandoverNote = getCleanCashNote();
 
                 const eventBreakdownItems = [];
                 if (currentEvAmt > 0) {
@@ -2452,8 +3097,110 @@ export default function ContributionsPage() {
                     </Box>
 
                     <Grid container spacing={2}>
-                      <Grid size={{ xs: 6, sm: 3 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 600 }}>
+                          Member / Contributor
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.85rem", color: "text.primary" }}>
+                          {statusModalRow.memberName || "Contributor"}
+                        </Typography>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 600 }}>
+                          Event Name
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} color="primary.main" sx={{ fontSize: "0.85rem" }}>
+                          {primaryEvName}
+                        </Typography>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 600 }}>
+                          Event Type
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.85rem", color: "text.primary" }}>
+                          {resolvedEventType}
+                        </Typography>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 600 }}>
+                          Payment Date
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.85rem", color: "text.primary" }}>
+                          {dateDisplay}
+                        </Typography>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 600, mb: 0.5 }}>
+                          Payment Method
+                        </Typography>
+                        <Box sx={{ mt: 0.2 }}>
+                          {isSplitPayment && splitsList.length > 0 ? (
+                            <Stack direction="row" spacing={0.8} alignItems="center" flexWrap="wrap" useFlexGap>
+                              <Chip
+                                label="Split"
+                                size="small"
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize: "0.78rem",
+                                  bgcolor: "rgba(99, 102, 241, 0.15)",
+                                  color: "#6366f1",
+                                  border: "1px solid rgba(99, 102, 241, 0.35)",
+                                }}
+                              />
+                              {splitsList.map((split, idx) => {
+                                const modeColor = getModeColor(split.mode);
+                                const labelText = split.amount > 0
+                                  ? `${split.mode}: ${formatWholeCurrency(split.amount)}`
+                                  : split.mode;
+                                return (
+                                  <Chip
+                                    key={idx}
+                                    label={labelText}
+                                    size="small"
+                                    sx={{
+                                      fontWeight: 700,
+                                      fontSize: "0.75rem",
+                                      bgcolor: `${modeColor}18`,
+                                      color: modeColor,
+                                      border: `1px solid ${modeColor}40`,
+                                    }}
+                                  />
+                                );
+                              })}
+                            </Stack>
+                          ) : (
+                            <Chip
+                              label={singleMethodName}
+                              size="small"
+                              sx={{
+                                fontWeight: 800,
+                                fontSize: "0.78rem",
+                                bgcolor: `${getModeColor(singleMethodName)}18`,
+                                color: getModeColor(singleMethodName),
+                                border: `1px solid ${getModeColor(singleMethodName)}40`,
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </Grid>
+
+                      {hasCashComponent && (
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 600 }}>
+                            Cash Handover Note
+                          </Typography>
+                          <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ fontSize: "0.85rem", mt: 0.4 }}>
+                            {cashHandoverNote}
+                          </Typography>
+                        </Grid>
+                      )}
+
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 600 }}>
                           {isPaidOrVerified ? "Total Received Amount" : (hasSubmittedProof ? "Submitted Claim Amount" : "Received Amount")}
                         </Typography>
                         <Tooltip
@@ -2495,6 +3242,7 @@ export default function ContributionsPage() {
                               gap: 0.4,
                               textDecoration: "underline dotted",
                               textUnderlineOffset: "3px",
+                              mt: 0.2,
                             }}
                           >
                             {formatWholeCurrency(actualReceivedAmt)}
@@ -2513,60 +3261,58 @@ export default function ContributionsPage() {
                         )}
                       </Grid>
 
-                      <Grid size={{ xs: 6, sm: 3 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
-                          Payment Method
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 600 }}>
+                          Ref / UTR Number
                         </Typography>
-                        <Chip
-                          label={modeStr}
-                          size="small"
-                          sx={{
-                            fontWeight: 700,
-                            fontSize: "0.7rem",
-                            bgcolor: modeStr === "None"
-                              ? (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(100,116,139,0.1)"
-                              : modeStr.toLowerCase().includes("cash")
-                                ? "rgba(22,163,74,0.1)"
-                                : "rgba(37,99,235,0.1)",
-                            color: modeStr === "None"
-                              ? (t) => t.palette.mode === "dark" ? "#cbd5e1" : "#64748b"
-                              : modeStr.toLowerCase().includes("cash")
-                                ? "#16a34a"
-                                : "#2563eb",
-                            mt: 0.2,
-                          }}
-                        />
-                        {(cashAmt > 0 || upiAmt > 0) && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem", mt: 0.4 }}>
-                            Cash: {formatWholeCurrency(cashAmt || 0)} | UPI: {formatWholeCurrency(upiAmt || 0)}
+                        {splitUtrs.length > 1 ? (
+                          <Box sx={{ mt: 0.3, display: "flex", flexDirection: "column", gap: 0.5 }}>
+                            {splitUtrs.map((item, idx) => {
+                              const itemColor = getModeColor(item.mode);
+                              return (
+                                <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+                                  <Typography variant="caption" sx={{ fontWeight: 800, color: itemColor, minWidth: 62, fontSize: "0.75rem" }}>
+                                    {item.mode}:
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight={800}
+                                    color="text.primary"
+                                    sx={{ fontSize: "0.82rem", fontFamily: "monospace", letterSpacing: "0.03em" }}
+                                  >
+                                    {item.utr}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        ) : splitUtrs.length === 1 ? (
+                          <Box sx={{ mt: 0.3, display: "flex", alignItems: "center", gap: 0.8 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 800, color: getModeColor(splitUtrs[0].mode), fontSize: "0.75rem" }}>
+                              {splitUtrs[0].mode}:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={800}
+                              color="text.primary"
+                              sx={{ fontSize: "0.85rem", letterSpacing: "0.02em", wordBreak: "break-all" }}
+                            >
+                              {splitUtrs[0].utr}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" fontWeight={800} color={utrVal && utrVal !== "--" && utrVal.toUpperCase() !== "SPLIT" && utrVal.toUpperCase() !== "CASH" ? "text.primary" : "text.secondary"} sx={{ fontSize: "0.85rem", mt: 0.3 }}>
+                            {utrVal && utrVal !== "--" && utrVal.toUpperCase() !== "SPLIT" && utrVal.toUpperCase() !== "CASH" ? utrVal : "--"}
                           </Typography>
                         )}
                       </Grid>
 
-                      <Grid size={{ xs: 6, sm: 3 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
-                          Submitted Date & Time
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.72rem", fontWeight: 600 }}>
+                          Submitted By
                         </Typography>
-                        <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.78rem", mt: 0.3 }}>
-                          {dateDisplay}
-                        </Typography>
-                      </Grid>
-
-                      <Grid size={{ xs: 6, sm: 3 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
-                          Ref / UTR Number
-                        </Typography>
-                        <Typography variant="body2" fontWeight={800} color="text.primary" sx={{ fontSize: "0.78rem", mt: 0.3, letterSpacing: "0.02em", wordBreak: "break-all" }}>
-                          {utrVal}
-                        </Typography>
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 12 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.68rem", fontWeight: 600 }}>
-                          Member / Submitted By
-                        </Typography>
-                        <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.78rem" }}>
-                          {statusModalRow.memberName}
+                        <Typography variant="body2" fontWeight={700} color="text.primary" sx={{ fontSize: "0.85rem", mt: 0.2 }}>
+                          {createdByVal}
                         </Typography>
                       </Grid>
 

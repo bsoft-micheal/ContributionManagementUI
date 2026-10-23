@@ -28,6 +28,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
+import CancelIcon from "@mui/icons-material/Cancel";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import CloseIcon from "@mui/icons-material/Close";
 import PhoneIcon from "@mui/icons-material/Phone";
@@ -43,6 +44,7 @@ import { getDashboardSummaryAsync } from "../../services/dashboardService";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppToast } from "../common/AppToast";
 import { formatWholeNumber, roundToWhole } from "../../utils/roundingHelper";
+import AppOverflowTooltip from "../common/AppOverflowTooltip";
 
 export default function MemberPaymentQuickAccess({
   events = [],
@@ -277,7 +279,9 @@ export default function MemberPaymentQuickAccess({
         }
       }
 
-      const isPaid = c.paymentStatus === 2 || String(c.paymentStatus).toLowerCase() === "paid" || String(c.paymentStatus).toLowerCase() === "completed";
+      const rawStatusStr = String(c.paymentStatus || c.status || c.statusName || "").toLowerCase();
+      const isRejected = rawStatusStr === "rejected" || c.isRejected === true;
+      const isPaid = !isRejected && (c.paymentStatus === 2 || rawStatusStr === "paid" || rawStatusStr === "completed" || rawStatusStr === "verified");
       const amount = Number(c.amount || c.Amount) || 0;
 
       list.push({
@@ -292,8 +296,10 @@ export default function MemberPaymentQuickAccess({
         categoryName,
         amount,
         isPaid,
+        isRejected,
         paymentDate: c.paymentDate || c.PaymentDate,
         paymentMode: c.paymentMode ?? c.PaymentMode,
+        rejectionReason: c.rejectionReason || c.auditRemarks || c.notes || "",
       });
     });
 
@@ -324,19 +330,23 @@ export default function MemberPaymentQuickAccess({
   const stats = useMemo(() => {
     const totalCount = eventScopedItems.length;
     const paidItems = eventScopedItems.filter((i) => i.isPaid);
-    const pendingItems = eventScopedItems.filter((i) => !i.isPaid);
+    const rejectedItems = eventScopedItems.filter((i) => i.isRejected);
+    const pendingItems = eventScopedItems.filter((i) => !i.isPaid && !i.isRejected);
 
     const totalAmount = eventScopedItems.reduce((s, i) => s + i.amount, 0);
     const paidAmount = paidItems.reduce((s, i) => s + i.amount, 0);
     const pendingAmount = pendingItems.reduce((s, i) => s + i.amount, 0);
+    const rejectedAmount = rejectedItems.reduce((s, i) => s + i.amount, 0);
 
     return {
       totalCount,
       paidCount: paidItems.length,
       pendingCount: pendingItems.length,
+      rejectedCount: rejectedItems.length,
       totalAmount,
       paidAmount,
       pendingAmount,
+      rejectedAmount,
     };
   }, [eventScopedItems]);
 
@@ -459,7 +469,8 @@ export default function MemberPaymentQuickAccess({
     return eventScopedItems.filter((item) => {
       // Status filter
       if (statusFilter === "paid" && !item.isPaid) return false;
-      if (statusFilter === "pending" && item.isPaid) return false;
+      if (statusFilter === "pending" && (item.isPaid || item.isRejected)) return false;
+      if (statusFilter === "rejected" && !item.isRejected) return false;
 
       // Search query
       if (search.trim()) {
@@ -615,7 +626,7 @@ export default function MemberPaymentQuickAccess({
         <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
           {/* Total Expected Amount - Hidden for Member role, preserved for Admin / Organizer */}
           {!isMemberRole && (
-            <Grid size={{ xs: 12, sm: 4 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 4 }}>
               <Paper
                 onClick={() => { setStatusFilter("all"); setPage(0); }}
                 elevation={0}
@@ -678,8 +689,8 @@ export default function MemberPaymentQuickAccess({
             </Grid>
           )}
 
-          {/* Pending / Unpaid */}
-          <Grid size={{ xs: 12, sm: isMemberRole ? 6 : 4 }}>
+          {/* Pending */}
+          <Grid size={{ xs: 12, sm: isMemberRole ? 6 : 4, md: isMemberRole ? 6 : 4 }}>
             <Paper
               onClick={() => { setStatusFilter("pending"); setPage(0); }}
               elevation={0}
@@ -688,18 +699,18 @@ export default function MemberPaymentQuickAccess({
                 borderRadius: 2,
                 cursor: "pointer",
                 border: "1.5px solid",
-                borderColor: statusFilter === "pending" ? "#ef4444" : isDark ? "rgba(239,68,68,0.25)" : "rgba(239,68,68,0.2)",
+                borderColor: statusFilter === "pending" ? "#f59e0b" : isDark ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.2)",
                 bgcolor: statusFilter === "pending"
-                  ? isDark ? "rgba(239,68,68,0.18)" : "rgba(239,68,68,0.08)"
-                  : isDark ? "rgba(239,68,68,0.04)" : "rgba(239,68,68,0.03)",
+                  ? isDark ? "rgba(245,158,11,0.18)" : "rgba(245,158,11,0.08)"
+                  : isDark ? "rgba(245,158,11,0.04)" : "rgba(245,158,11,0.03)",
                 transition: "all 0.2s ease",
-                "&:hover": { borderColor: "#ef4444" },
+                "&:hover": { borderColor: "#f59e0b" },
               }}
             >
               <Stack direction="row" alignItems="center" justifyContent="space-between">
                 <Typography
                   variant="caption"
-                  color="error.main"
+                  color="warning.main"
                   fontWeight={600}
                   textTransform="none"
                   sx={{
@@ -710,7 +721,7 @@ export default function MemberPaymentQuickAccess({
                 >
                   Pending / Unpaid
                 </Typography>
-                <HourglassEmptyIcon sx={{ fontSize: 16, color: "error.main" }} />
+                <HourglassEmptyIcon sx={{ fontSize: 16, color: "warning.main" }} />
               </Stack>
               <Box sx={{ mt: 0.5 }}>
                 <Typography
@@ -729,7 +740,7 @@ export default function MemberPaymentQuickAccess({
                 <Typography
                   variant="caption"
                   fontWeight={400}
-                  color="error.main"
+                  color="warning.main"
                   sx={{
                     fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                     display: "block",
@@ -745,7 +756,7 @@ export default function MemberPaymentQuickAccess({
           </Grid>
 
           {/* Paid */}
-          <Grid size={{ xs: 12, sm: isMemberRole ? 6 : 4 }}>
+          <Grid size={{ xs: 12, sm: isMemberRole ? 6 : 4, md: isMemberRole ? 6 : 4 }}>
             <Paper
               onClick={() => { setStatusFilter("paid"); setPage(0); }}
               elevation={0}
@@ -964,9 +975,15 @@ export default function MemberPaymentQuickAccess({
 
                           {/* Event */}
                           <TableCell>
-                            <Typography variant="body2" fontWeight={600} color="text.primary" noWrap sx={{ maxWidth: 220 }}>
-                              {item.eventName || "--"}
-                            </Typography>
+                            <AppOverflowTooltip
+                              text={item.eventName || "--"}
+                              sx={{
+                                maxWidth: { xs: 160, sm: 220, md: 280 },
+                                fontWeight: 600,
+                                fontSize: "0.82rem",
+                                color: "text.primary",
+                              }}
+                            />
                           </TableCell>
 
                           {/* Amount */}
@@ -1033,7 +1050,6 @@ export default function MemberPaymentQuickAccess({
                     <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Event Name</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Amount</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 800, fontSize: "0.78rem", textTransform: "none" }}>Payment Details</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1087,9 +1103,15 @@ export default function MemberPaymentQuickAccess({
 
                           {/* Event */}
                           <TableCell>
-                            <Typography variant="body2" fontWeight={600} color="text.primary" noWrap sx={{ maxWidth: 220 }}>
-                              {item.eventName}
-                            </Typography>
+                            <AppOverflowTooltip
+                              text={item.eventName || "--"}
+                              sx={{
+                                maxWidth: { xs: 160, sm: 220, md: 280 },
+                                fontWeight: 600,
+                                fontSize: "0.82rem",
+                                color: "text.primary",
+                              }}
+                            />
                             {item.categoryName && item.categoryName !== "--" && (
                               <Chip
                                 label={item.categoryName}
@@ -1121,7 +1143,21 @@ export default function MemberPaymentQuickAccess({
 
                           {/* Status */}
                           <TableCell align="center">
-                            {item.isPaid ? (
+                            {item.isRejected ? (
+                              <Chip
+                                icon={<CancelIcon sx={{ fontSize: "14px !important" }} />}
+                                label="Rejected"
+                                size="small"
+                                sx={{
+                                  height: 22,
+                                  fontSize: "0.72rem",
+                                  fontWeight: 800,
+                                  bgcolor: isDark ? "rgba(220,38,38,0.2)" : "rgba(220,38,38,0.12)",
+                                  color: "#dc2626",
+                                  border: "1px solid rgba(220,38,38,0.35)",
+                                }}
+                              />
+                            ) : item.isPaid ? (
                               <Chip
                                 icon={<CheckCircleIcon sx={{ fontSize: "14px !important" }} />}
                                 label="Paid"
@@ -1144,25 +1180,11 @@ export default function MemberPaymentQuickAccess({
                                   height: 22,
                                   fontSize: "0.72rem",
                                   fontWeight: 800,
-                                  bgcolor: isDark ? "rgba(239,68,68,0.2)" : "rgba(239,68,68,0.12)",
-                                  color: "#ef4444",
-                                  border: "1px solid rgba(239,68,68,0.35)",
+                                  bgcolor: isDark ? "rgba(245,158,11,0.2)" : "rgba(245,158,11,0.12)",
+                                  color: "#d97706",
+                                  border: "1px solid rgba(245,158,11,0.35)",
                                 }}
                               />
-                            )}
-                          </TableCell>
-
-                          {/* Payment Details */}
-                          <TableCell>
-                            {item.isPaid ? (
-                              <Typography variant="caption" color="text.secondary">
-                                {item.paymentDate ? new Date(item.paymentDate).toLocaleDateString() : "Completed"}
-                                {item.paymentMode ? ` • ${item.paymentMode}` : ""}
-                              </Typography>
-                            ) : (
-                              <Typography variant="caption" color="text.secondary">
-                                Outstanding
-                              </Typography>
                             )}
                           </TableCell>
                         </TableRow>

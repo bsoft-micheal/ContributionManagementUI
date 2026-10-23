@@ -43,8 +43,8 @@ export function formatWholeNumber(val) {
 }
 
 /**
- * Distributes an exact total amount among given raw shares using the Largest Remainder Method (Hare-Niemeyer).
- * Guarantees that sum(resultShares) === roundToWhole(totalAmount) exactly.
+ * Distributes whole-number shares by rounding each raw share using standard half-up rounding (>= 0.50 rounds up, else down).
+ * Prevents artificial discrepancies between members so that everyone with equal raw share receives identical amount.
  * @param {number|string} totalAmount 
  * @param {Array<number|string>} rawShares 
  * @returns {number[]}
@@ -53,34 +53,12 @@ export function distributeRoundedTotal(totalAmount, rawShares = []) {
   if (!rawShares || !rawShares.length) {
     return [];
   }
-
-  const target = roundToWhole(totalAmount);
-  const shares = rawShares.map(roundToWhole);
-  let diff = target - shares.reduce((sum, s) => sum + s, 0);
-
-  if (diff !== 0) {
-    const indexed = rawShares
-      .map((val, idx) => {
-        const num = Number(val) || 0;
-        const rem = num - Math.floor(num);
-        return { idx, rem };
-      })
-      .sort((a, b) => (diff > 0 ? b.rem - a.rem : a.rem - b.rem));
-
-    const step = diff > 0 ? 1 : -1;
-    let count = Math.abs(diff);
-
-    for (let i = 0; i < indexed.length && count > 0; i++) {
-      shares[indexed[i].idx] += step;
-      count--;
-    }
-  }
-
-  return shares;
+  return rawShares.map(roundToWhole);
 }
 
 /**
  * Splits a total amount equally across a given number of participants into whole numbers.
+ * Each participant receives an identical rounded whole-number share (>= .50 rounds up, < .50 rounds down).
  * Safely handles count <= 0.
  * @param {number|string} totalAmount 
  * @param {number} count 
@@ -91,7 +69,6 @@ export function distributeEqualSplit(totalAmount, count) {
   if (safeCount <= 0) {
     return [];
   }
-  const rawShare = (Number(totalAmount) || 0) / safeCount;
-  const rawShares = Array(safeCount).fill(rawShare);
-  return distributeRoundedTotal(totalAmount, rawShares);
+  const singleShare = roundToWhole((Number(totalAmount) || 0) / safeCount);
+  return Array(safeCount).fill(singleShare);
 }

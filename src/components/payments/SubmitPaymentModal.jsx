@@ -131,10 +131,54 @@ export default function SubmitPaymentModal({
   const [paymentScope, setPaymentScope] = useState("");
   const [copiedUpi, setCopiedUpi] = useState(false);
 
+  // Dynamic payment modes loaded from DB/API
+  const dynamicPaymentModes = useMemo(() => {
+    const list = [];
+    const set = new Set();
+    (dbPaymentModes || [])
+      .filter((m) => m.isActive !== false)
+      .forEach((m) => {
+        const name = m.paymentModeName || m.name || m.modeName;
+        if (name && !set.has(name.toLowerCase())) {
+          set.add(name.toLowerCase());
+          list.push({
+            label: name,
+            value: name,
+            color: getModeColor(name),
+          });
+        }
+      });
+    if (formData.paymentMode && !set.has(formData.paymentMode.toLowerCase())) {
+      set.add(formData.paymentMode.toLowerCase());
+      list.push({
+        label: formData.paymentMode,
+        value: formData.paymentMode,
+        color: getModeColor(formData.paymentMode),
+      });
+    }
+    if (!set.has("split")) {
+      set.add("split");
+      list.push({
+        label: "Split / Multi-Mode (Add Rows)",
+        value: "Split",
+        color: "#6366f1",
+      });
+    }
+
+    return list;
+  }, [dbPaymentModes, formData.paymentMode]);
+
+  // Selectable individual payment modes excluding "Split" (purely dynamic, no hardcoding)
+  const selectablePaymentModes = useMemo(() => {
+    return dynamicPaymentModes.filter(
+      (m) => String(m.value || "").trim().toLowerCase() !== "split"
+    );
+  }, [dynamicPaymentModes]);
+
   // Multi-Mode Split is exclusively used
   const [isMultiSplit, setIsMultiSplit] = useState(true);
   const [splitRows, setSplitRows] = useState([
-    { id: 1, mode: "GPay", amount: "", utr: "" },
+    { id: 1, mode: "", amount: "", utr: "" },
   ]);
   const [activeQrModal, setActiveQrModal] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
@@ -149,8 +193,13 @@ export default function SubmitPaymentModal({
 
   const isAddRowDisabled = useMemo(() => {
     if (targetAmount <= 0) return true;
-    return splitDifference <= 0;
-  }, [targetAmount, splitDifference]);
+    if (splitDifference <= 0) return true;
+    // Each payment mode can only have at most one row
+    if (selectablePaymentModes.length > 0 && splitRows.length >= selectablePaymentModes.length) {
+      return true;
+    }
+    return false;
+  }, [targetAmount, splitDifference, splitRows.length, selectablePaymentModes.length]);
 
   const maxPayableDue = useMemo(() => {
     if (!duesSummary) return null;
@@ -220,6 +269,17 @@ export default function SubmitPaymentModal({
       });
     }
   }, [isImageMandatory, errors.screenshot]);
+
+  useEffect(() => {
+    if (splitDifference === 0 && errors.split && errors.split.includes("Allocated breakdown total")) {
+      setErrors((prev) => {
+        if (!prev.split) return prev;
+        const next = { ...prev };
+        delete next.split;
+        return next;
+      });
+    }
+  }, [splitDifference, errors.split]);
 
   // Resolve QR Config based on Event Category or Event Name
   const resolvedCategory = useMemo(() => {
@@ -359,52 +419,16 @@ export default function SubmitPaymentModal({
     };
   }, [open]);
 
-  // Dynamic payment modes
-  const dynamicPaymentModes = useMemo(() => {
-    const list = [];
-    const set = new Set();
-    (dbPaymentModes || [])
-      .filter((m) => m.isActive !== false)
-      .forEach((m) => {
-        const name = m.paymentModeName || m.name || m.modeName;
-        if (name && !set.has(name.toLowerCase())) {
-          set.add(name.toLowerCase());
-          list.push({
-            label: name,
-            value: name,
-            color: getModeColor(name),
-          });
-        }
-      });
-    if (formData.paymentMode && !set.has(formData.paymentMode.toLowerCase())) {
-      set.add(formData.paymentMode.toLowerCase());
-      list.push({
-        label: formData.paymentMode,
-        value: formData.paymentMode,
-        color: getModeColor(formData.paymentMode),
-      });
-    }
-    if (!set.has("split")) {
-      set.add("split");
-      list.push({
-        label: "Split / Multi-Mode (Add Rows)",
-        value: "Split",
-        color: "#6366f1",
-      });
-    }
-
-    return list;
-  }, [dbPaymentModes, formData.paymentMode]);
-
-
+  // Synchronize dynamic payment modes
   useEffect(() => {
     if (dynamicPaymentModes.length > 0) {
       setFormData((prev) => {
+        if (!prev.paymentMode) return prev;
         const exists = dynamicPaymentModes.some(
-          (m) => m.value.toLowerCase() === (prev.paymentMode || "").toLowerCase()
+          (m) => m.value.toLowerCase() === prev.paymentMode.toLowerCase()
         );
-        if (!exists || !prev.paymentMode) {
-          return { ...prev, paymentMode: dynamicPaymentModes[0].value };
+        if (!exists) {
+          return { ...prev, paymentMode: "" };
         }
         return prev;
       });
@@ -456,7 +480,6 @@ export default function SubmitPaymentModal({
         }
       }
 
-      const defaultFirstMode = dynamicPaymentModes.length > 0 ? dynamicPaymentModes[0]?.value : "GPay";
       const hasDuesContext = Boolean(
         initialTotalDue !== undefined ||
         initialCurrentDue !== undefined ||
@@ -477,7 +500,7 @@ export default function SubmitPaymentModal({
         eventName: matchedEvName || prev.eventName,
         memberName: resolvedMemName || prev.memberName,
         amount: initialSplitAmt,
-        paymentMode: prev.paymentMode || defaultFirstMode,
+        paymentMode: "",
         paymentDate: dayjs(),
         utr: "",
         notes: "",
@@ -485,7 +508,7 @@ export default function SubmitPaymentModal({
         screenshots: [],
       }));
       setSplitRows([
-        { id: 1, mode: defaultFirstMode, amount: initialSplitAmt, utr: "" },
+        { id: 1, mode: "", amount: initialSplitAmt, utr: "" },
       ]);
       setPaymentScope("");
       setErrors({});
@@ -580,9 +603,108 @@ export default function SubmitPaymentModal({
     return list;
   }, [membersList, formData.memberId, formData.memberName]);
 
+  // Centralized helper to dynamically reset event-dependent state (scope, dues, amounts, split rows) without hardcoding
+  const resetEventDependentFields = (clearEventName = true) => {
+    const defaultMode = selectablePaymentModes[0]?.value || "";
+    setFormData((prev) => ({
+      ...prev,
+      ...(clearEventName ? { eventName: "", eventId: "" } : {}),
+      amount: "",
+    }));
+    setPaymentScope("");
+    setDuesSummary(null);
+    setSplitRows([
+      { id: 1, mode: defaultMode, amount: "", utr: "" },
+    ]);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (clearEventName) delete next.eventName;
+      delete next.amount;
+      delete next.paymentScope;
+      delete next.split;
+      return next;
+    });
+  };
+
+  const handleEventTypeChange = (newCategory) => {
+    if (!newCategory) {
+      // De-selecting Event Type clears eventCategory and ALL dependent fields
+      setFormData((prev) => ({ ...prev, eventCategory: "" }));
+      resetEventDependentFields(true);
+      return;
+    }
+
+    // Changing Event Type: check if currently selected event belongs to the newly selected category
+    const isCurrentEventInNewCategory = (eventsList || []).some(
+      (ev) =>
+        (ev.title || ev.name || ev.eventName) === formData.eventName &&
+        matchedEventCategory(ev).toLowerCase() === newCategory.toLowerCase()
+    );
+
+    setFormData((prev) => ({
+      ...prev,
+      eventCategory: newCategory,
+      ...(isCurrentEventInNewCategory ? {} : { eventName: "", eventId: "" }),
+    }));
+
+    if (!isCurrentEventInNewCategory) {
+      resetEventDependentFields(true);
+    }
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.eventCategory;
+      return next;
+    });
+  };
+
+  const handleEventNameChange = (selectedName) => {
+    if (!selectedName) {
+      // De-selecting Event Name clears event and all dependent fields
+      resetEventDependentFields(true);
+      return;
+    }
+
+    const matchedEvent = (eventsList || []).find(
+      (ev) => (ev.title || ev.name || ev.eventName) === selectedName
+    );
+    const matchedCategory = matchedEvent
+      ? matchedEventCategory(matchedEvent) || formData.eventCategory
+      : formData.eventCategory;
+    const evId = matchedEvent ? matchedEvent.id || matchedEvent.eventId || "" : "";
+
+    setFormData((prev) => ({
+      ...prev,
+      eventName: selectedName,
+      eventId: evId,
+      eventCategory: matchedCategory || prev.eventCategory,
+      amount: "",
+    }));
+
+    // Reset dependent fields for the newly chosen event so user chooses scope
+    setPaymentScope("");
+    setDuesSummary(null);
+    const defaultMode = selectablePaymentModes[0]?.value || "";
+    setSplitRows([{ id: 1, mode: defaultMode, amount: "", utr: "" }]);
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.eventName;
+      delete next.amount;
+      delete next.paymentScope;
+      delete next.split;
+      return next;
+    });
+  };
+
   // Dynamic Dues Context Loader
   useEffect(() => {
-    if (open && (formData.eventId || formData.eventName || formData.memberId || formData.memberName)) {
+    if (!open) return;
+    if (!formData.eventId && !formData.eventName) {
+      setDuesSummary(null);
+      return;
+    }
+    if (formData.memberId || formData.memberName) {
       const loadContext = async () => {
         try {
           const res = await getPaymentContextAsync({
@@ -672,15 +794,24 @@ export default function SubmitPaymentModal({
             });
 
             let resolvedDuesAmount = "";
+            let resolvedScope = paymentScope;
+
             if ((isPaidStatus && safePrevArrears === 0) || total === 0) {
               resolvedDuesAmount = "0.00";
+            } else if (!paymentScope && safePrevArrears === 0 && currentEvDue > 0) {
+              resolvedScope = "CurrentEvent";
+              setPaymentScope("CurrentEvent");
+              resolvedDuesAmount = String(currentEvDue);
             } else if (paymentScope) {
-              resolvedDuesAmount =
-                total > 0
-                  ? String(total)
-                  : currentEvDue > 0
-                  ? String(currentEvDue)
-                  : (res.amount ? String(res.amount) : "");
+              const currentDueRounded = roundToWhole(currentEvDue);
+              const arrearsRounded = roundToWhole(safePrevArrears);
+              if (paymentScope === "CurrentEvent") {
+                resolvedDuesAmount = String(currentDueRounded);
+              } else if (paymentScope === "PreviousArrears") {
+                resolvedDuesAmount = String(arrearsRounded);
+              } else {
+                resolvedDuesAmount = String(total);
+              }
             }
 
             setFormData((prev) => ({
@@ -695,7 +826,7 @@ export default function SubmitPaymentModal({
             } else if (resolvedDuesAmount) {
               setSplitRows((rows) => {
                 if (rows.length <= 1) {
-                  return [{ ...(rows[0] || { id: 1, mode: dynamicPaymentModes[0]?.value || "GPay", utr: "" }), amount: resolvedDuesAmount }];
+                  return [{ ...(rows[0] || { id: 1, mode: "", utr: "" }), amount: resolvedDuesAmount }];
                 }
                 return rows;
               });
@@ -715,14 +846,15 @@ export default function SubmitPaymentModal({
               baseAmount: currentEvDue,
               arrearBreakdown: initialArrearBreakdown || [],
             });
-            const resolvedFallbackAmount = paymentScope ? String(currentEvDue) : "";
+            setPaymentScope("CurrentEvent");
+            const resolvedFallbackAmount = String(currentEvDue);
             setFormData((prev) => ({
               ...prev,
               amount: resolvedFallbackAmount,
             }));
             setSplitRows((rows) => {
               if (rows.length <= 1) {
-                return [{ ...(rows[0] || { id: 1, mode: dynamicPaymentModes[0]?.value || "GPay", utr: "" }), amount: resolvedFallbackAmount }];
+                return [{ ...(rows[0] || { id: 1, mode: "", utr: "" }), amount: resolvedFallbackAmount }];
               }
               return rows;
             });
@@ -755,7 +887,7 @@ export default function SubmitPaymentModal({
 
     const fmt = (num) => formatWholeNumber(num);
 
-    if (total > 0) {
+    if (arrears > 0 && total > 0) {
       opts.push({
         label: `All Outstanding (₹${fmt(total)})`,
         value: "AllOutstanding",
@@ -777,7 +909,11 @@ export default function SubmitPaymentModal({
 
   const handlePaymentScopeChange = (scope) => {
     setPaymentScope(scope);
-    if (!duesSummary) return;
+    if (!duesSummary || !scope) {
+      setFormData((prev) => ({ ...prev, amount: "" }));
+      setSplitRows((rows) => [{ id: 1, mode: rows[0]?.mode || "", amount: "", utr: "" }]);
+      return;
+    }
     const isPaid = String(duesSummary.status || "").toLowerCase() === "paid";
     const currentDue = isPaid ? 0 : roundToWhole(duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : 0);
     const arrears = roundToWhole(duesSummary.previousArrears || 0);
@@ -792,9 +928,15 @@ export default function SubmitPaymentModal({
 
     setFormData((prev) => ({ ...prev, amount: roundToWhole(amt).toString() }));
     setErrors((prev) => {
-      if (!prev.amount) return prev;
       const next = { ...prev };
       delete next.amount;
+      delete next.paymentScope;
+      delete next.split;
+      Object.keys(next).forEach((k) => {
+        if (k.includes("_amount")) {
+          delete next[k];
+        }
+      });
       return next;
     });
 
@@ -807,6 +949,13 @@ export default function SubmitPaymentModal({
           amount: String(shares[i] || 0),
         }))
       );
+    } else {
+      setSplitRows((rows) => {
+        if (rows.length <= 1) {
+          return [{ ...(rows[0] || { id: 1, mode: rows[0]?.mode || "", utr: "" }), amount: roundToWhole(amt).toString() }];
+        }
+        return rows;
+      });
     }
   };
 
@@ -824,16 +973,6 @@ export default function SubmitPaymentModal({
       return;
     }
 
-    const usedModes = new Set(splitRows.map((r) => (r.mode || "").toLowerCase()));
-    const availableMode = dynamicPaymentModes.find(
-      (m) => m.value !== "Split" && !usedModes.has(m.value.toLowerCase())
-    );
-    const nextMode = availableMode
-      ? availableMode.value
-      : usedModes.has("cash")
-      ? "GPay"
-      : "Cash";
-
     const newId = Date.now() + Math.random();
     const rowAmt = remaining > 0 ? String(remaining) : "";
 
@@ -841,7 +980,7 @@ export default function SubmitPaymentModal({
       ...prev,
       {
         id: newId,
-        mode: nextMode,
+        mode: "",
         amount: rowAmt,
         utr: "",
       },
@@ -854,12 +993,33 @@ export default function SubmitPaymentModal({
       return;
     }
     setSplitRows((prev) => prev.filter((r) => r.id !== id));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.split;
+      delete next[`row_${id}_utr`];
+      delete next[`row_${id}_amount`];
+      delete next[`row_${id}_mode`];
+      return next;
+    });
   };
 
   const handleSplitRowChange = (id, field, value) => {
     let sanitized = value;
     if (field === "mode") {
-      const isNewCash = String(value || "").toLowerCase().includes("cash");
+      const modeValStr = String(value || "").trim().toLowerCase();
+      // Enforce 1 row per mode: Check if another row already uses this mode
+      const isAlreadyUsed = Boolean(
+        modeValStr &&
+        splitRows.some(
+          (r) => r.id !== id && r.mode && String(r.mode || "").trim().toLowerCase() === modeValStr
+        )
+      );
+      if (isAlreadyUsed) {
+        toast.warning(`Payment mode '${value}' is already added in another row. Each mode can only have one row.`);
+        return;
+      }
+
+      const isNewCash = modeValStr.includes("cash");
       const existingRow = splitRows.find((r) => r.id === id);
       const existingUtr = existingRow?.utr || "";
       const trimmedUtr = isNewCash
@@ -869,6 +1029,13 @@ export default function SubmitPaymentModal({
       setSplitRows((prev) =>
         prev.map((r) => (r.id === id ? { ...r, mode: value, utr: trimmedUtr } : r))
       );
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.split;
+        delete next[`row_${id}_mode`];
+        delete next[`row_${id}_utr`];
+        return next;
+      });
       return;
     }
     if (field === "amount") {
@@ -906,6 +1073,114 @@ export default function SubmitPaymentModal({
     setSplitRows((prev) =>
       prev.map((r) => (r.id === id ? { ...r, [field]: sanitized } : r))
     );
+    setErrors((prev) => {
+      const errorKey = `row_${id}_${field}`;
+      const next = { ...prev };
+      if (field === "utr") {
+        const row = splitRows.find((r) => r.id === id);
+        const isCash = String(row?.mode || "").toLowerCase().includes("cash");
+        if (!isCash) {
+          const cleanVal = sanitized.trim().toLowerCase();
+          const otherRow = splitRows.find(
+            (r) => r.id !== id && !String(r.mode || "").toLowerCase().includes("cash") && r.utr && r.utr.trim().toLowerCase() === cleanVal
+          );
+          if (cleanVal && otherRow) {
+            next[errorKey] = "Same UTR number cannot be used for different payment modes";
+            next[`row_${otherRow.id}_utr`] = "Same UTR number cannot be used for different payment modes";
+            return next;
+          } else {
+            if (next[errorKey] === "Same UTR number cannot be used for different payment modes") {
+              delete next[errorKey];
+            }
+            splitRows.forEach((r) => {
+              if (r.id !== id && next[`row_${r.id}_utr`] === "Same UTR number cannot be used for different payment modes") {
+                const hasOtherClash = splitRows.some(
+                  (other) =>
+                    other.id !== r.id &&
+                    other.id !== id &&
+                    !String(other.mode || "").toLowerCase().includes("cash") &&
+                    other.utr &&
+                    other.utr.trim().toLowerCase() === (r.utr || "").trim().toLowerCase()
+                );
+                if (!hasOtherClash) {
+                  delete next[`row_${r.id}_utr`];
+                }
+              }
+            });
+            if (sanitized.trim().length === 12) {
+              delete next[errorKey];
+              return next;
+            } else if (prev[errorKey]) {
+              next[errorKey] = sanitized.trim().length === 0 ? "This field is required" : "UTR number must be exactly 12 digits";
+              return next;
+            }
+          }
+        }
+      }
+      if (field === "amount") {
+        const otherRowsSum = roundToWhole(
+          splitRows
+            .filter((r) => r.id !== id)
+            .reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+        );
+        const newTotal = roundToWhole(otherRowsSum + (Number(sanitized) || 0));
+        const target = roundToWhole(formData.amount || 0);
+        if (newTotal === target && next.split && next.split.includes("Allocated breakdown total")) {
+          delete next.split;
+        }
+      }
+      if (next[errorKey]) {
+        delete next[errorKey];
+      }
+      return next;
+    });
+  };
+
+  const handleSplitRowBlur = (id, field) => {
+    if (field === "utr") {
+      const row = splitRows.find((r) => r.id === id);
+      const isCash = String(row?.mode || "").toLowerCase().includes("cash");
+      if (!isCash) {
+        if (!row?.utr || !row.utr.trim()) {
+          setErrors((prev) => ({
+            ...prev,
+            [`row_${id}_utr`]: "This field is required",
+          }));
+        } else if (row.utr.trim().length < 12) {
+          setErrors((prev) => ({
+            ...prev,
+            [`row_${id}_utr`]: "UTR number must be exactly 12 digits",
+          }));
+        } else {
+          const cleanUtr = row.utr.trim().toLowerCase();
+          const hasDuplicate = splitRows.some(
+            (r) =>
+              r.id !== id &&
+              !String(r.mode || "").toLowerCase().includes("cash") &&
+              r.utr &&
+              r.utr.trim().toLowerCase() === cleanUtr
+          );
+          if (hasDuplicate) {
+            setErrors((prev) => ({
+              ...prev,
+              [`row_${id}_utr`]: "Same UTR number cannot be used for different payment modes",
+            }));
+          } else {
+            setErrors((prev) => {
+              const next = { ...prev };
+              if (
+                next[`row_${id}_utr`] === "Same UTR number cannot be used for different payment modes" ||
+                next[`row_${id}_utr`] === "UTR number must be exactly 12 digits" ||
+                next[`row_${id}_utr`] === "This field is required"
+              ) {
+                delete next[`row_${id}_utr`];
+              }
+              return next;
+            });
+          }
+        }
+      }
+    }
   };
 
   const handleQuickSplitEvenly = () => {
@@ -920,6 +1195,16 @@ export default function SubmitPaymentModal({
         amount: String(shares[idx] || 0),
       }))
     );
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.split;
+      Object.keys(next).forEach((k) => {
+        if (k.includes("_amount")) {
+          delete next[k];
+        }
+      });
+      return next;
+    });
   };
 
   const validateForm = () => {
@@ -927,7 +1212,7 @@ export default function SubmitPaymentModal({
     if (!formData.memberName || !formData.memberName.trim()) errs.memberName = "This field is required";
     if (!formData.eventCategory || !formData.eventCategory.trim()) errs.eventCategory = "This field is required";
     if (!formData.eventName || !formData.eventName.trim()) errs.eventName = "This field is required";
-    if (duesSummary && (duesSummary.previousArrears > 0 || duesSummary.totalDue > 0) && !paymentScope) {
+    if (formData.eventName && !paymentScope && paymentScopeOptions.length > 0) {
       errs.paymentScope = "This field is required";
     }
     
@@ -936,10 +1221,8 @@ export default function SubmitPaymentModal({
       ? roundToWhole(maxPayableDue)
       : null;
 
-    if (!formData.amount || !String(formData.amount).trim()) {
-      errs.amount = "This field is required";
-    } else if (isNaN(Number(formData.amount)) || targetAmt <= 0) {
-      errs.amount = "Contribution amount must be greater than ₹0";
+    if (!formData.amount || !String(formData.amount).trim() || targetAmt <= 0) {
+      errs.amount = "Please choose a payment target scope to calculate contribution amount";
     } else if (maxDue !== null && maxDue > 0 && targetAmt > maxDue) {
       errs.amount = `Contribution amount (${formatWholeCurrency(targetAmt)}) cannot exceed the maximum payable due of ${formatWholeCurrency(maxDue)}`;
     } else if (targetAmt > 10000000) {
@@ -970,38 +1253,48 @@ export default function SubmitPaymentModal({
           errs.split = `Duplicate payment mode '${dupName}' selected. Please choose distinct payment modes per row or combine their amounts.`;
         }
 
+        // Check for duplicate UTR numbers across split rows
+        const utrSeen = {};
+        for (let i = 0; i < splitRows.length; i++) {
+          const r = splitRows[i];
+          const isRowCash = String(r.mode || "").toLowerCase().includes("cash");
+          if (!isRowCash && r.utr && r.utr.trim()) {
+            const cleanUtr = r.utr.trim().toLowerCase();
+            if (utrSeen[cleanUtr] !== undefined) {
+              const prevId = utrSeen[cleanUtr];
+              errs[`row_${r.id}_utr`] = "Same UTR number cannot be used for different payment modes";
+              errs[`row_${prevId}_utr`] = "Same UTR number cannot be used for different payment modes";
+            } else {
+              utrSeen[cleanUtr] = r.id;
+            }
+          }
+        }
+
         // Check individual rows
         for (let i = 0; i < splitRows.length; i++) {
           const r = splitRows[i];
           const rowAmt = Number(r.amount);
+          if (!r.mode || !String(r.mode).trim()) {
+            errs[`row_${r.id}_mode`] = "This field is required";
+          }
           if (!r.amount || isNaN(rowAmt) || rowAmt <= 0) {
-            errs.split = "Amount must be greater than ₹0";
-            break;
+            errs[`row_${r.id}_amount`] = "Amount must be greater than ₹0";
+          } else if (targetAmt > 0 && rowAmt > targetAmt) {
+            errs[`row_${r.id}_amount`] = `Cannot exceed ${formatWholeCurrency(targetAmt)}`;
+          } else if (rowAmt > 10000000) {
+            errs[`row_${r.id}_amount`] = "Amount cannot exceed ₹1,00,00,000 (1 Crore)";
           }
-          if (targetAmt > 0 && rowAmt > targetAmt) {
-            errs.split = `Amount (${formatWholeCurrency(rowAmt)}) cannot exceed Total Amount (${formatWholeCurrency(targetAmt)})`;
-            break;
-          }
-          if (rowAmt > 10000000) {
-            errs.split = "Amount cannot exceed ₹1,00,00,000 (1 Crore)";
-            break;
-          }
+
           const isRowCash = String(r.mode || "").toLowerCase().includes("cash");
           if (isRowCash) {
             if (r.utr && r.utr.length > 50) {
-              errs.split = "Cash Note cannot exceed 50 characters.";
-              break;
+              errs[`row_${r.id}_utr`] = "Cash Note cannot exceed 50 characters.";
             }
           } else {
             if (!r.utr || !r.utr.trim()) {
-              errs.split = "UTR / Reference number is mandatory for digital payments.";
-              break;
-            } else if (r.utr.trim().length < 6) {
-              errs.split = "UTR / Ref number must be at least 6 characters (e.g. 12-digit UTR).";
-              break;
-            } else if (r.utr.trim().length > 12) {
-              errs.split = "UTR / Ref number cannot exceed 12 characters.";
-              break;
+              errs[`row_${r.id}_utr`] = "This field is required";
+            } else if (r.utr.trim().length < 12) {
+              errs[`row_${r.id}_utr`] = "UTR number must be exactly 12 digits";
             }
           }
         }
@@ -1014,11 +1307,9 @@ export default function SubmitPaymentModal({
         }
       } else {
         if (!formData.utr || !formData.utr.trim()) {
-          errs.utr = "UPI / Reference Number is required for digital payments";
-        } else if (formData.utr.trim().length < 6) {
-          errs.utr = "UTR must be at least 6 characters";
-        } else if (formData.utr.trim().length > 12) {
-          errs.utr = "UTR cannot exceed 12 characters";
+          errs.utr = "This field is required";
+        } else if (formData.utr.trim().length < 12) {
+          errs.utr = "UTR number must be exactly 12 digits";
         }
       }
     }
@@ -1027,7 +1318,7 @@ export default function SubmitPaymentModal({
       (formData.screenshots && formData.screenshots.length > 0) ||
       (typeof formData.screenshot === "string" && formData.screenshot.trim().length > 0);
     if (isImageMandatory && !hasScreenshots) {
-      errs.screenshot = "At least 1 payment screenshot / receipt slip is mandatory for UPI / online payments.";
+      errs.screenshot = "This field is required";
     }
 
     setErrors(errs);
@@ -1059,7 +1350,7 @@ export default function SubmitPaymentModal({
           .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
         
         if (splitRows.length === 1) {
-          finalMode = splitRows[0].mode?.trim() || "GPay";
+          finalMode = splitRows[0].mode?.trim() || selectablePaymentModes[0]?.value || "";
           finalUtr = splitRows[0].utr?.trim() || (cashTotal > 0 ? "CASH" : "-");
         } else {
           finalMode = "Split";
@@ -1085,10 +1376,19 @@ export default function SubmitPaymentModal({
         }
       }
 
+      const cashSplitRow = isMultiSplit ? splitRows.find((r) => String(r.mode || "").toLowerCase().includes("cash")) : null;
+      const rawCashNote = cashSplitRow ? (cashSplitRow.notes?.trim() || (cashSplitRow.utr && cashSplitRow.utr.toUpperCase() !== "CASH" ? cashSplitRow.utr.trim() : "")) : "";
+      const cashTag = rawCashNote ? `[Cash Note: ${rawCashNote}]` : "";
+
       const splitNote = isMultiSplit
         ? `[Split Breakdown: ${splitRows.map((r) => `${r.mode}: ₹${r.amount}${r.utr ? ` (Ref: ${r.utr})` : ""}`).join(", ")}]`
         : "";
-      const combinedNotes = [formData.notes.trim(), splitNote].filter(Boolean).join("\n");
+
+      const isSingleCash = !isMultiSplit && String(formData.paymentMode || "").toLowerCase().includes("cash");
+      const singleCashNote = isSingleCash ? (formData.notes.trim() || (formData.utr && formData.utr.toUpperCase() !== "CASH" ? formData.utr.trim() : "")) : "";
+      const singleCashTag = singleCashNote && !formData.notes.includes("[Cash Note:") ? `[Cash Note: ${singleCashNote}]` : "";
+
+      const combinedNotes = [formData.notes.trim(), isMultiSplit ? cashTag : singleCashTag, splitNote].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join("\n");
 
       const screenshotsList = formData.screenshots && formData.screenshots.length > 0
         ? formData.screenshots
@@ -1115,7 +1415,7 @@ export default function SubmitPaymentModal({
       };
 
       const res = await submitPaymentProofAsync(payload);
-      toast.success("Payment submission recorded and synchronized with Contribution ledger successfully!");
+      toast.success("Payment successfull");
 
       addNotification({
         type: "PAYMENT_PENDING",
@@ -1255,16 +1555,9 @@ export default function SubmitPaymentModal({
             <AppSelect
               label="Event Type"
               value={formData.eventCategory}
-              onChange={(e) => {
-                const newCategory = e.target.value;
-                setFormData((prev) => ({
-                  ...prev,
-                  eventCategory: newCategory,
-                  eventName: "",
-                  eventId: "",
-                }));
-                if (errors.eventCategory) setErrors((prev) => ({ ...prev, eventCategory: "" }));
-              }}
+              onChange={(e) => handleEventTypeChange(e.target.value)}
+              onClear={() => handleEventTypeChange("")}
+              allowClear
               options={categoryOptions}
               placeholder="Select Event Type"
               error={!!errors.eventCategory}
@@ -1276,28 +1569,9 @@ export default function SubmitPaymentModal({
             <AppSelect
               label="Event Name"
               value={formData.eventName}
-              onChange={(e) => {
-                const selectedName = e.target.value;
-                const matchedEvent = (eventsList || []).find(
-                  (ev) => (ev.title || ev.name || ev.eventName) === selectedName
-                );
-                const matchedCategory = matchedEvent
-                  ? matchedEventCategory(matchedEvent) || formData.eventCategory
-                  : formData.eventCategory;
-                const evId = matchedEvent ? matchedEvent.id || matchedEvent.eventId || "" : "";
-                const baseAmt = matchedEvent
-                  ? String(matchedEvent.amount || matchedEvent.contributionAmount || "")
-                  : "";
-
-                setFormData((prev) => ({
-                  ...prev,
-                  eventName: selectedName,
-                  eventId: evId,
-                  eventCategory: matchedCategory || prev.eventCategory,
-                  amount: baseAmt || prev.amount,
-                }));
-                if (errors.eventName) setErrors((prev) => ({ ...prev, eventName: "" }));
-              }}
+              onChange={(e) => handleEventNameChange(e.target.value)}
+              onClear={() => handleEventNameChange("")}
+              allowClear
               options={filteredEventOptions}
               placeholder="Select Event Name"
               error={!!errors.eventName}
@@ -1316,6 +1590,11 @@ export default function SubmitPaymentModal({
                 value={formData.memberId || formData.memberName}
                 onChange={(e) => {
                   const val = e.target.value;
+                  if (!val) {
+                    setFormData((prev) => ({ ...prev, memberId: "", memberName: "" }));
+                    resetEventDependentFields(false);
+                    return;
+                  }
                   const matched = membersList.find(
                     (m) => String(m.id || m.memberId) === String(val) || (m.name || m.memberName) === val
                   );
@@ -1323,9 +1602,19 @@ export default function SubmitPaymentModal({
                     ...prev,
                     memberId: matched ? matched.id || matched.memberId || "" : "",
                     memberName: matched ? matched.name || matched.memberName || "" : val,
+                    amount: "",
                   }));
+                  setPaymentScope("");
+                  setDuesSummary(null);
+                  const defaultMode = selectablePaymentModes[0]?.value || "";
+                  setSplitRows([{ id: 1, mode: defaultMode, amount: "", utr: "" }]);
                   if (errors.memberName) setErrors((prev) => ({ ...prev, memberName: "" }));
                 }}
+                onClear={() => {
+                  setFormData((prev) => ({ ...prev, memberId: "", memberName: "" }));
+                  resetEventDependentFields(false);
+                }}
+                allowClear
                 options={contributorOptions}
                 placeholder="Select Contributor"
                 error={!!errors.memberName}
@@ -1359,68 +1648,62 @@ export default function SubmitPaymentModal({
 
         {/* Row 3: Payment Scope & Fixed Contribution Amount */}
         <Grid container spacing={2}>
-          {duesSummary && (duesSummary.previousArrears > 0 || duesSummary.totalDue > 0) && (
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppSelect
-                label="Payment Target / Scope"
-                placeholder="Select payment target"
-                value={paymentScope}
-                onChange={(e) => {
-                  handlePaymentScopeChange(e.target.value);
-                  setErrors((prev) => {
-                    if (!prev.paymentScope) return prev;
-                    const next = { ...prev };
-                    delete next.paymentScope;
-                    return next;
-                  });
-                }}
-                options={paymentScopeOptions}
-                error={!!errors.paymentScope}
-                helperText={errors.paymentScope}
-                required
-              />
-            </Grid>
-          )}
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <AppSelect
+              label="Payment Target / Scope"
+              placeholder={
+                !formData.eventName
+                  ? "Select event first"
+                  : paymentScopeOptions.length === 0
+                  ? "No active dues"
+                  : "Select payment target"
+              }
+              value={paymentScope}
+              onChange={(e) => {
+                handlePaymentScopeChange(e.target.value);
+                setErrors((prev) => {
+                  if (!prev.paymentScope) return prev;
+                  const next = { ...prev };
+                  delete next.paymentScope;
+                  return next;
+                });
+              }}
+              onClear={() => handlePaymentScopeChange("")}
+              allowClear
+              options={paymentScopeOptions}
+              disabled={!formData.eventName || !duesSummary || paymentScopeOptions.length === 0}
+              error={!!errors.paymentScope}
+              helperText={
+                errors.paymentScope ||
+                (!formData.eventName
+                  ? "Choose an event above to view payment scopes"
+                  : isFullySettled
+                  ? "All dues settled"
+                  : "")
+              }
+              required
+            />
+          </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
               label="Contribution Amount (₹)"
-              type={duesSummary ? "text" : "number"}
+              type="text"
               value={
-                duesSummary && !isNaN(Number(formData.amount)) && Number(formData.amount) > 0
+                !isNaN(Number(formData.amount)) && Number(formData.amount) > 0
                   ? formatWholeNumber(formData.amount)
-                  : formData.amount
+                  : "0"
               }
-              onChange={(e) => {
-                const val = e.target.value;
-                setFormData((prev) => ({ ...prev, amount: val }));
-                setErrors((prev) => {
-                  if (!prev.amount) return prev;
-                  const next = { ...prev };
-                  delete next.amount;
-                  return next;
-                });
-                const num = Number(val) || 0;
-                if (splitRows.length === 1) {
-                  setSplitRows([{ ...splitRows[0], amount: val }]);
-                } else if (splitRows.length > 1 && num > 0) {
-                  const shares = distributeEqualSplit(roundToWhole(num), splitRows.length);
-                  setSplitRows((rows) =>
-                    rows.map((r, i) => ({
-                      ...r,
-                      amount: String(shares[i] || 0),
-                    }))
-                  );
-                }
-              }}
-              disabled={!!duesSummary}
+              disabled={true}
               placeholder="0"
               error={!!errors.amount}
               helperText={
                 errors.amount ||
                 (isFullySettled
                   ? " All dues settled"
-                  : !paymentScope && duesSummary && (duesSummary.previousArrears > 0 || duesSummary.totalDue > 0)
-                  ? "Please select a payment target scope above"
+                  : !formData.eventName
+                  ? "Please select an event above to calculate amount"
+                  : !paymentScope
+                  ? "Please choose a payment target scope"
                   : Number(formData.amount || 0) > 0
                   ? `Fixed from target scope: ${formatWholeCurrency(formData.amount || 0)}`
                   : "")
@@ -1557,7 +1840,7 @@ export default function SubmitPaymentModal({
                 t.palette.mode === "dark" ? "rgba(30, 27, 46, 0.6)" : "rgba(74, 63, 107, 0.04)",
               border: "1.5px solid",
               borderColor: (t) =>
-                errors.split
+                errors.split && (splitDifference !== 0 || !errors.split.includes("Allocated breakdown total"))
                   ? "error.main"
                   : t.palette.mode === "dark"
                   ? "rgba(129, 140, 248, 0.3)"
@@ -1616,10 +1899,12 @@ export default function SubmitPaymentModal({
                 />
                 <Tooltip
                   title={
-                    isAddRowDisabled
-                      ? (targetAmount <= 0
-                        ? "Select payment target scope first"
-                        : "All amount is already allocated")
+                    targetAmount <= 0
+                      ? "Select payment target scope first"
+                      : selectablePaymentModes.length > 0 && splitRows.length >= selectablePaymentModes.length
+                      ? "All available payment modes have been added (1 row per mode)"
+                      : splitDifference <= 0
+                      ? "All amount is already allocated"
                       : "Add payment mode row"
                   }
                 >
@@ -1648,7 +1933,7 @@ export default function SubmitPaymentModal({
               </Stack>
             </Box>
 
-            {errors.split && (
+            {errors.split && (splitDifference !== 0 || !errors.split.includes("Allocated breakdown total")) && (
               <Typography variant="caption" color="error" sx={{ display: "block", mb: 1, fontWeight: 700 }}>
                 ⚠️ {errors.split}
               </Typography>
@@ -1669,14 +1954,28 @@ export default function SubmitPaymentModal({
                       borderColor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"),
                     }}
                   >
-                    <Grid container spacing={1.5} alignItems="center">
+                    <Grid container spacing={1.5} alignItems="flex-start">
                       <Grid size={{ xs: 12, sm: 3.5 }}>
                         <AppSelect
                           label={`Mode ${idx + 1}`}
-                          value={row.mode}
+                          value={row.mode || ""}
+                          placeholder="Select Payment Mode"
+                          allowClear
                           onChange={(e) => handleSplitRowChange(row.id, "mode", e.target.value)}
-                          options={dynamicPaymentModes.filter(m => m.value !== "Split").map(m => ({ label: m.label, value: m.value }))}
+                          onClear={() => handleSplitRowChange(row.id, "mode", "")}
+                          options={selectablePaymentModes.map((m) => {
+                            const isUsedInOtherRow = splitRows.some(
+                              (r) => r.id !== row.id && r.mode && String(r.mode || "").trim().toLowerCase() === String(m.value || "").trim().toLowerCase()
+                            );
+                            return {
+                              label: isUsedInOtherRow ? `${m.label} (Already added)` : m.label,
+                              value: m.value,
+                              disabled: isUsedInOtherRow,
+                            };
+                          })}
                           size="small"
+                          error={!!errors[`row_${row.id}_mode`]}
+                          helperText={errors[`row_${row.id}_mode`]}
                           required
                         />
                       </Grid>
@@ -1688,18 +1987,23 @@ export default function SubmitPaymentModal({
                           value={row.amount}
                           onChange={(e) => handleSplitRowChange(row.id, "amount", e.target.value)}
                           size="small"
+                          error={!!errors[`row_${row.id}_amount`]}
+                          helperText={errors[`row_${row.id}_amount`]}
                           required
                         />
                       </Grid>
                       <Grid size={{ xs: 10, sm: 5 }}>
-                        <Box sx={{ display: "flex", gap: 0.8, alignItems: "flex-end" }}>
+                        <Box sx={{ display: "flex", gap: 0.8, alignItems: "flex-start" }}>
                           <Box sx={{ flex: 1 }}>
                             <AppInput
                               label={isRowCash ? "Cash Note" : "UTR/Ref"}
                               placeholder={isRowCash ? "Handover note" : "12-digit UTR ref"}
                               value={row.utr}
                               onChange={(e) => handleSplitRowChange(row.id, "utr", e.target.value)}
+                              onBlur={() => handleSplitRowBlur(row.id, "utr")}
                               size="small"
+                              error={!!errors[`row_${row.id}_utr`]}
+                              helperText={errors[`row_${row.id}_utr`]}
                               required={!isRowCash}
                               maxLength={isRowCash ? 50 : 12}
                               endAdornment={
@@ -1721,7 +2025,7 @@ export default function SubmitPaymentModal({
                               }
                             />
                           </Box>
-                          {!isRowCash && (
+                          {!isRowCash && Boolean(row.mode) && (
                             <Tooltip title={`Open QR Scanner for ${row.mode} (₹${row.amount || 0})`}>
                               <Button
                                 size="small"
@@ -1736,8 +2040,8 @@ export default function SubmitPaymentModal({
                                 }}
                                 startIcon={<QrCodeIcon sx={{ fontSize: 15 }} />}
                                 sx={{
-                                  height: 38,
-                                  mb: "2px",
+                                  height: 36,
+                                  mt: "22px",
                                   borderRadius: "8px",
                                   fontSize: "0.72rem",
                                   fontWeight: 800,
@@ -1759,7 +2063,7 @@ export default function SubmitPaymentModal({
                           )}
                         </Box>
                       </Grid>
-                      <Grid size={{ xs: 2, sm: 1 }} sx={{ textAlign: "center", pt: { sm: 2 } }}>
+                      <Grid size={{ xs: 2, sm: 1 }} sx={{ textAlign: "center", pt: { sm: 2.8, xs: 1 } }}>
                         <Tooltip title={splitRows.length > 1 ? "Remove this row" : "At least 1 row required"}>
                           <span>
                             <IconButton
@@ -1933,10 +2237,14 @@ export default function SubmitPaymentModal({
             {errors.screenshot && (
               <Typography
                 variant="caption"
-                color="error"
-                sx={{ display: "block", mt: 0.8, fontWeight: 700 }}
+                sx={{
+                  display: "block",
+                  mt: 0.5,
+                  fontSize: "0.75rem",
+                  color: (theme) => (theme.palette.mode === "dark" ? "#f87171" : "#ef4444"),
+                }}
               >
-                ⚠️ {errors.screenshot}
+                {errors.screenshot}
               </Typography>
             )}
           </Grid>

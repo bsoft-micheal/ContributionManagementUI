@@ -399,7 +399,7 @@ const MfaSettings = forwardRef(function MfaSettings(
               onClick={handleVerifySetup}
               disabled={loading}
             >
-              {loading ? "Verifying..." : "Verify & Save"}
+              {loading ? "Verifying..." : "Save"}
             </AppSaveButton>
           </Box>
         </Box>

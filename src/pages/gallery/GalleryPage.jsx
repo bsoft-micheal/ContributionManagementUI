@@ -1384,7 +1384,7 @@ export default function GalleryPage() {
           <Grid size={{ xs: 12 }}>
             <AppTextArea
               label="Description"
-              placeholder="Enter photo or moment description..."
+              placeholder="Enter  description..."
               value={form.description}
               onChange={(e) => {
                 if (e.target.value.length <= 500) {
