@@ -90,11 +90,20 @@ export default function AppOverflowTooltip({
       disableHoverListener={!isOverflowed || !tooltipTitle}
       disableFocusListener={!isOverflowed || !tooltipTitle}
       disableTouchListener={!isOverflowed || !tooltipTitle}
+      disableInteractive
+      enterDelay={100}
+      leaveDelay={50}
       arrow
       placement={placement}
       slotProps={{
+        popper: {
+          sx: {
+            pointerEvents: "none",
+          },
+        },
         tooltip: {
           sx: {
+            pointerEvents: "none",
             fontSize: "0.75rem",
             fontWeight: 500,
             maxWidth: 360,
@@ -103,6 +112,11 @@ export default function AppOverflowTooltip({
             borderRadius: "6px",
             boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
             ...tooltipSx,
+          },
+        },
+        arrow: {
+          sx: {
+            pointerEvents: "none",
           },
         },
       }}

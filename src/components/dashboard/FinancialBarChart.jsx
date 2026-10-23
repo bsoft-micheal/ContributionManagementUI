@@ -462,46 +462,20 @@ export default function FinancialBarChart({
                         const isHovered = hoveredBar === item.id;
 
                         return (
-                          <Stack
+                          <Box
                             key={item.id}
-                            alignItems="center"
                             onMouseEnter={() => setHoveredBar(item.id)}
                             onMouseLeave={() => setHoveredBar(null)}
                             sx={{
                               height: "100%",
-                              justifyContent: "flex-end",
+                              display: "flex",
+                              alignItems: "flex-end",
+                              justifyContent: "center",
                               width: { xs: 55, sm: 68 },
                               cursor: "pointer",
-                              transition: "transform 0.2s ease",
-                              "&:hover": {
-                                transform: "translateY(-4px)",
-                              },
+                              position: "relative",
                             }}
                           >
-                            {/* Value badge above column */}
-                            <Box
-                              sx={{
-                                mb: 0.6,
-                                px: 0.8,
-                                py: 0.15,
-                                borderRadius: 1,
-                                bgcolor: isHovered
-                                  ? item.color
-                                  : isDark
-                                  ? "rgba(255,255,255,0.08)"
-                                  : "rgba(0,0,0,0.04)",
-                                color: isHovered ? "#ffffff" : "text.primary",
-                                fontSize: "0.75rem",
-                                fontWeight: 600,
-                                whiteSpace: "nowrap",
-                                boxShadow: isHovered ? `0 4px 12px ${alpha(item.color, 0.4)}` : "none",
-                                transition: "all 0.2s ease",
-                              }}
-                            >
-                              {item.formattedValue}
-                            </Box>
-
-                            {/* The Bar */}
                             <Tooltip
                               title={
                                 <Box sx={{ p: 0.5, minWidth: 160 }}>
@@ -557,9 +531,18 @@ export default function FinancialBarChart({
                               }
                               arrow
                               placement="top"
+                              disableInteractive
+                              enterDelay={80}
+                              leaveDelay={50}
                               slotProps={{
+                                popper: {
+                                  sx: {
+                                    pointerEvents: "none",
+                                  },
+                                },
                                 tooltip: {
                                   sx: {
+                                    pointerEvents: "none",
                                     bgcolor: isDark ? "#1e293b" : "#ffffff",
                                     color: isDark ? "#ffffff" : "#0f172a",
                                     border: isDark
@@ -577,6 +560,7 @@ export default function FinancialBarChart({
                                 },
                                 arrow: {
                                   sx: {
+                                    pointerEvents: "none",
                                     color: isDark ? "#1e293b" : "#ffffff",
                                     "&:before": {
                                       border: isDark
@@ -587,31 +571,66 @@ export default function FinancialBarChart({
                                 },
                               }}
                             >
-                              <Box
+                              <Stack
+                                alignItems="center"
                                 sx={{
-                                  width: { xs: 30, sm: 42 },
-                                  height: `${visualHeight}px`,
-                                  background: item.bgGradient,
-                                  borderRadius: "6px 6px 0 0",
-                                  boxShadow: isHovered
-                                    ? `0 0 16px ${alpha(item.color, 0.6)}`
-                                    : `0 2px 6px ${alpha(item.color, 0.25)}`,
-                                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-                                  position: "relative",
-                                  "&:after": {
-                                    content: '""',
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    height: 3,
-                                    bgcolor: "rgba(255,255,255,0.4)",
-                                    borderRadius: "6px 6px 0 0",
-                                  },
+                                  justifyContent: "flex-end",
+                                  width: "100%",
+                                  transform: isHovered ? "translateY(-4px)" : "translateY(0)",
+                                  transition: "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                                  pointerEvents: "none",
                                 }}
-                              />
+                              >
+                                {/* Value badge above column */}
+                                <Box
+                                  sx={{
+                                    mb: 0.6,
+                                    px: 0.8,
+                                    py: 0.15,
+                                    borderRadius: 1,
+                                    bgcolor: isHovered
+                                      ? item.color
+                                      : isDark
+                                      ? "rgba(255,255,255,0.08)"
+                                      : "rgba(0,0,0,0.04)",
+                                    color: isHovered ? "#ffffff" : "text.primary",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 600,
+                                    whiteSpace: "nowrap",
+                                    boxShadow: isHovered ? `0 4px 12px ${alpha(item.color, 0.4)}` : "none",
+                                    transition: "all 0.2s ease",
+                                  }}
+                                >
+                                  {item.formattedValue}
+                                </Box>
+
+                                {/* The Bar */}
+                                <Box
+                                  sx={{
+                                    width: { xs: 30, sm: 42 },
+                                    height: `${visualHeight}px`,
+                                    background: item.bgGradient,
+                                    borderRadius: "6px 6px 0 0",
+                                    boxShadow: isHovered
+                                      ? `0 0 16px ${alpha(item.color, 0.6)}`
+                                      : `0 2px 6px ${alpha(item.color, 0.25)}`,
+                                    transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                                    position: "relative",
+                                    "&:after": {
+                                      content: '""',
+                                      position: "absolute",
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      height: 3,
+                                      bgcolor: "rgba(255,255,255,0.4)",
+                                      borderRadius: "6px 6px 0 0",
+                                    },
+                                  }}
+                                />
+                              </Stack>
                             </Tooltip>
-                          </Stack>
+                          </Box>
                         );
                       })}
                     </Box>
@@ -866,9 +885,18 @@ export default function FinancialBarChart({
                           }
                           arrow
                           placement="top"
+                          disableInteractive
+                          enterDelay={80}
+                          leaveDelay={50}
                           slotProps={{
+                            popper: {
+                              sx: {
+                                pointerEvents: "none",
+                              },
+                            },
                             tooltip: {
                               sx: {
+                                pointerEvents: "none",
                                 bgcolor: isDark ? "#1e293b" : "#ffffff",
                                 color: isDark ? "#ffffff" : "#0f172a",
                                 border: isDark
@@ -886,6 +914,7 @@ export default function FinancialBarChart({
                             },
                             arrow: {
                               sx: {
+                                pointerEvents: "none",
                                 color: isDark ? "#1e293b" : "#ffffff",
                                 "&:before": {
                                   border: isDark
@@ -983,9 +1012,18 @@ export default function FinancialBarChart({
                                 }
                                 arrow
                                 placement="top"
+                                disableInteractive
+                                enterDelay={80}
+                                leaveDelay={50}
                                 slotProps={{
+                                  popper: {
+                                    sx: {
+                                      pointerEvents: "none",
+                                    },
+                                  },
                                   tooltip: {
                                     sx: {
+                                      pointerEvents: "none",
                                       bgcolor: isDark ? "#1e293b" : "#ffffff",
                                       color: isDark ? "#ffffff" : "#0f172a",
                                       border: isDark
@@ -1003,6 +1041,7 @@ export default function FinancialBarChart({
                                   },
                                   arrow: {
                                     sx: {
+                                      pointerEvents: "none",
                                       color: isDark ? "#1e293b" : "#ffffff",
                                       "&:before": {
                                         border: isDark
