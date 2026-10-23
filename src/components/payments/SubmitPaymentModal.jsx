@@ -419,31 +419,21 @@ export default function SubmitPaymentModal({
     };
   }, [open]);
 
-  // Synchronize dynamic payment modes and initial split row selection
+  // Synchronize dynamic payment modes
   useEffect(() => {
     if (dynamicPaymentModes.length > 0) {
       setFormData((prev) => {
+        if (!prev.paymentMode) return prev;
         const exists = dynamicPaymentModes.some(
-          (m) => m.value.toLowerCase() === (prev.paymentMode || "").toLowerCase()
+          (m) => m.value.toLowerCase() === prev.paymentMode.toLowerCase()
         );
-        if (!exists || !prev.paymentMode) {
-          return { ...prev, paymentMode: dynamicPaymentModes[0].value };
+        if (!exists) {
+          return { ...prev, paymentMode: "" };
         }
         return prev;
       });
     }
-    if (selectablePaymentModes.length > 0) {
-      setSplitRows((prevRows) => {
-        if (!prevRows || prevRows.length === 0) {
-          return [{ id: 1, mode: selectablePaymentModes[0].value, amount: "", utr: "" }];
-        }
-        if (!prevRows[0].mode || !selectablePaymentModes.some((m) => String(m.value).toLowerCase() === String(prevRows[0].mode).toLowerCase())) {
-          return [{ ...prevRows[0], mode: selectablePaymentModes[0].value }, ...prevRows.slice(1)];
-        }
-        return prevRows;
-      });
-    }
-  }, [dynamicPaymentModes, selectablePaymentModes]);
+  }, [dynamicPaymentModes]);
 
   // Synchronize initial prop values when modal opens
   useEffect(() => {
@@ -490,7 +480,6 @@ export default function SubmitPaymentModal({
         }
       }
 
-      const defaultFirstMode = selectablePaymentModes.length > 0 ? selectablePaymentModes[0]?.value : (dynamicPaymentModes[0]?.value || "");
       const hasDuesContext = Boolean(
         initialTotalDue !== undefined ||
         initialCurrentDue !== undefined ||
@@ -511,7 +500,7 @@ export default function SubmitPaymentModal({
         eventName: matchedEvName || prev.eventName,
         memberName: resolvedMemName || prev.memberName,
         amount: initialSplitAmt,
-        paymentMode: prev.paymentMode || defaultFirstMode,
+        paymentMode: "",
         paymentDate: dayjs(),
         utr: "",
         notes: "",
@@ -519,7 +508,7 @@ export default function SubmitPaymentModal({
         screenshots: [],
       }));
       setSplitRows([
-        { id: 1, mode: defaultFirstMode, amount: initialSplitAmt, utr: "" },
+        { id: 1, mode: "", amount: initialSplitAmt, utr: "" },
       ]);
       setPaymentScope("");
       setErrors({});
@@ -837,7 +826,7 @@ export default function SubmitPaymentModal({
             } else if (resolvedDuesAmount) {
               setSplitRows((rows) => {
                 if (rows.length <= 1) {
-                  return [{ ...(rows[0] || { id: 1, mode: selectablePaymentModes[0]?.value || "", utr: "" }), amount: resolvedDuesAmount }];
+                  return [{ ...(rows[0] || { id: 1, mode: "", utr: "" }), amount: resolvedDuesAmount }];
                 }
                 return rows;
               });
@@ -865,7 +854,7 @@ export default function SubmitPaymentModal({
             }));
             setSplitRows((rows) => {
               if (rows.length <= 1) {
-                return [{ ...(rows[0] || { id: 1, mode: selectablePaymentModes[0]?.value || "", utr: "" }), amount: resolvedFallbackAmount }];
+                return [{ ...(rows[0] || { id: 1, mode: "", utr: "" }), amount: resolvedFallbackAmount }];
               }
               return rows;
             });
@@ -922,8 +911,7 @@ export default function SubmitPaymentModal({
     setPaymentScope(scope);
     if (!duesSummary || !scope) {
       setFormData((prev) => ({ ...prev, amount: "" }));
-      const defaultMode = selectablePaymentModes[0]?.value || "";
-      setSplitRows([{ id: 1, mode: defaultMode, amount: "", utr: "" }]);
+      setSplitRows((rows) => [{ id: 1, mode: rows[0]?.mode || "", amount: "", utr: "" }]);
       return;
     }
     const isPaid = String(duesSummary.status || "").toLowerCase() === "paid";
@@ -963,9 +951,8 @@ export default function SubmitPaymentModal({
       );
     } else {
       setSplitRows((rows) => {
-        const defaultMode = selectablePaymentModes[0]?.value || "";
         if (rows.length <= 1) {
-          return [{ ...(rows[0] || { id: 1, mode: defaultMode, utr: "" }), amount: roundToWhole(amt).toString() }];
+          return [{ ...(rows[0] || { id: 1, mode: rows[0]?.mode || "", utr: "" }), amount: roundToWhole(amt).toString() }];
         }
         return rows;
       });
@@ -986,19 +973,6 @@ export default function SubmitPaymentModal({
       return;
     }
 
-    // Dynamic check: find the first mode in selectablePaymentModes not currently used in any row
-    const usedModes = new Set(
-      splitRows.map((r) => String(r.mode || "").trim().toLowerCase())
-    );
-    const nextAvailableMode = selectablePaymentModes.find(
-      (m) => !usedModes.has(String(m.value || "").trim().toLowerCase())
-    );
-
-    if (!nextAvailableMode) {
-      toast.warning("Each payment mode can only be added once. All available modes are already added.");
-      return;
-    }
-
     const newId = Date.now() + Math.random();
     const rowAmt = remaining > 0 ? String(remaining) : "";
 
@@ -1006,7 +980,7 @@ export default function SubmitPaymentModal({
       ...prev,
       {
         id: newId,
-        mode: nextAvailableMode.value,
+        mode: "",
         amount: rowAmt,
         utr: "",
       },
@@ -1034,8 +1008,11 @@ export default function SubmitPaymentModal({
     if (field === "mode") {
       const modeValStr = String(value || "").trim().toLowerCase();
       // Enforce 1 row per mode: Check if another row already uses this mode
-      const isAlreadyUsed = splitRows.some(
-        (r) => r.id !== id && String(r.mode || "").trim().toLowerCase() === modeValStr
+      const isAlreadyUsed = Boolean(
+        modeValStr &&
+        splitRows.some(
+          (r) => r.id !== id && r.mode && String(r.mode || "").trim().toLowerCase() === modeValStr
+        )
       );
       if (isAlreadyUsed) {
         toast.warning(`Payment mode '${value}' is already added in another row. Each mode can only have one row.`);
@@ -1981,11 +1958,14 @@ export default function SubmitPaymentModal({
                       <Grid size={{ xs: 12, sm: 3.5 }}>
                         <AppSelect
                           label={`Mode ${idx + 1}`}
-                          value={row.mode}
+                          value={row.mode || ""}
+                          placeholder="Select Payment Mode"
+                          allowClear
                           onChange={(e) => handleSplitRowChange(row.id, "mode", e.target.value)}
+                          onClear={() => handleSplitRowChange(row.id, "mode", "")}
                           options={selectablePaymentModes.map((m) => {
                             const isUsedInOtherRow = splitRows.some(
-                              (r) => r.id !== row.id && String(r.mode || "").trim().toLowerCase() === String(m.value || "").trim().toLowerCase()
+                              (r) => r.id !== row.id && r.mode && String(r.mode || "").trim().toLowerCase() === String(m.value || "").trim().toLowerCase()
                             );
                             return {
                               label: isUsedInOtherRow ? `${m.label} (Already added)` : m.label,
@@ -2045,7 +2025,7 @@ export default function SubmitPaymentModal({
                               }
                             />
                           </Box>
-                          {!isRowCash && (
+                          {!isRowCash && Boolean(row.mode) && (
                             <Tooltip title={`Open QR Scanner for ${row.mode} (₹${row.amount || 0})`}>
                               <Button
                                 size="small"

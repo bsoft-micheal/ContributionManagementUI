@@ -396,12 +396,12 @@ export default function ContributionsPage() {
     if (str.includes("bank") || str.includes("transfer") || str.includes("neft") || str.includes("imps")) return "Bank Transfer";
     if (str.includes("card")) return "Card";
 
-    if (str === "upi" || str === "online" || !str || str === "none") {
+    if (str === "upi" || str === "online" || !str || str === "none" || str === "2" || str === "0") {
       if (utrStr.includes("gpay") || notesStr.includes("gpay") || notesStr.includes("google pay")) return "GPay";
       if (utrStr.includes("phonepe") || notesStr.includes("phonepe") || notesStr.includes("phone pe")) return "PhonePe";
       if (utrStr.includes("paytm") || notesStr.includes("paytm")) return "Paytm";
       if (utrStr.includes("cash") || notesStr.includes("cash")) return "Cash";
-      if (str === "upi" || str === "online") return "UPI";
+      if (str === "upi" || str === "online" || str === "2") return "UPI";
     }
 
     return String(modeRaw || "Cash").trim();
@@ -456,10 +456,31 @@ export default function ContributionsPage() {
       return resolvePaymentMethodName(splits[0].mode, splits[0].utr, splits[0].notes);
     }
 
-    // 5. Check raw mode
-    const rawMode = String(c?.paymentMode || tx?.paymentMode || "").trim();
+    // 5. Check raw mode — Prioritize specific transaction mode (e.g. GPay, PhonePe)
+    // over generic Contribution enum values (like generic UPI/2).
+    const isGenericMode = (m) => {
+      if (!m || m === "-" || m === "--") return true;
+      const s = String(m).trim().toLowerCase();
+      return s === "none" || s === "upi" || s === "online" || s === "2" || s === "0";
+    };
+
+    const txMode = String(tx?.paymentMode || "").trim();
+    const cModeName = String(c?.paymentModeName || "").trim();
+    const cMode = String(c?.paymentMode || "").trim();
+
+    let rawMode = "";
+    if (txMode && !isGenericMode(txMode)) {
+      rawMode = txMode;
+    } else if (cModeName && !isGenericMode(cModeName)) {
+      rawMode = cModeName;
+    } else if (cMode && !isGenericMode(cMode)) {
+      rawMode = cMode;
+    } else {
+      rawMode = txMode || cModeName || cMode;
+    }
+
     const rawUtr = String(c?.utrNumber || c?.referenceNo || tx?.utr || tx?.transactionRef || "").trim();
-    if (rawMode && rawMode !== "-" && rawMode !== "--" && rawMode.toLowerCase() !== "none") {
+    if (rawMode && rawMode !== "-" && rawMode !== "--" && rawMode.toLowerCase() !== "none" && rawMode.toLowerCase() !== "0") {
       return resolvePaymentMethodName(rawMode, rawUtr, notes);
     }
 
@@ -1433,6 +1454,11 @@ export default function ContributionsPage() {
                     ? Number(target.paidAmount)
                     : Number(c.amount || 0))));
 
+          const origTxMode = matchedTxnForValidation?.paymentMode;
+          const currentMode = origTxMode && !["none", "0"].includes(String(origTxMode).toLowerCase())
+            ? origTxMode
+            : (c.paymentModeName || (c.paymentMode && c.paymentMode !== "None" ? c.paymentMode : (isPaid ? "Cash" : c.paymentMode)));
+
           return {
             ...c,
             paidAmount: preservedPaid,
@@ -1444,7 +1470,7 @@ export default function ContributionsPage() {
             notes: c.notes || noteText,
             rejectionReason: String(newStatus).toLowerCase() === "rejected" ? noteText : c.rejectionReason,
             paymentDate: isPaid ? (c.paymentDate || new Date().toISOString()) : c.paymentDate,
-            paymentMode: c.paymentMode && c.paymentMode !== "None" ? c.paymentMode : (isPaid ? "Cash" : c.paymentMode),
+            paymentMode: currentMode,
             totalAccumulated: isPaid ? arrears : (Number(c.amount || 0) + arrears),
           };
         }
@@ -1474,7 +1500,7 @@ export default function ContributionsPage() {
             return verifyPaymentTransactionAsync(txnId, {
               status: statusToSend,
               verifiedBy: verifier,
-              notes: noteText,
+              notes: trimmedNotes ? (txn.notes ? `${txn.notes} | ${trimmedNotes}` : trimmedNotes) : txn.notes,
             });
           })
         );
@@ -1513,11 +1539,18 @@ export default function ContributionsPage() {
         if (Array.isArray(txRes2)) {
           // Patch the verified transactions optimistically in case backend has slight delay
           const patchedTxns = txRes2.map((t) => {
-            const wasVerified = matchedTxns.some(
+            const origMatch = matchedTxns.find(
               (m) => (m.transactionId || m.id) === (t.transactionId || t.id)
             );
-            if (wasVerified) {
-              return { ...t, status: statusToSend, verifiedBy: verifier, notes: t.notes || noteText, auditRemarks: noteText };
+            if (origMatch) {
+              return {
+                ...t,
+                status: statusToSend,
+                verifiedBy: verifier,
+                notes: t.notes || origMatch.notes || noteText,
+                auditRemarks: noteText,
+                paymentMode: t.paymentMode || origMatch.paymentMode,
+              };
             }
             return t;
           });
@@ -2060,7 +2093,17 @@ export default function ContributionsPage() {
         if (isPaid || hasSubmitted) {
           resolvedMode = getResolvedPaymentMode(row, matchedTx);
           if (!resolvedMode || resolvedMode === "-" || resolvedMode === "None") {
-            const raw = row.paymentMode || matchedTx?.paymentMode;
+            const isGeneric = (m) => {
+              if (!m || m === "-" || m === "--") return true;
+              const s = String(m).trim().toLowerCase();
+              return s === "none" || s === "upi" || s === "online" || s === "2" || s === "0";
+            };
+            const txMode = matchedTx?.paymentMode;
+            const cMode = row.paymentModeName || row.paymentMode;
+            const raw = (!isGeneric(txMode) ? txMode : null) ||
+                        (!isGeneric(cMode) ? cMode : null) ||
+                        txMode ||
+                        cMode;
             const utr = row.utrNumber || row.referenceNo || matchedTx?.utr || matchedTx?.transactionRef;
             const notes = row.notes || matchedTx?.notes;
             resolvedMode = resolvePaymentMethodName(raw, utr, notes);
