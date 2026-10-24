@@ -638,7 +638,7 @@ export default function EventsPage() {
                     disabled={!canPublishEvent}
                     onClick={() => handlePublishRequest(row)}
                   >
-                    <PublishIcon sx={{ fontSize: "1.1rem", color: canPublishEvent ? "#16a34a" : "#94a3b8" }} />
+                    <PublishIcon sx={{ fontSize: "1.1rem", color: canPublishEvent ? actionIconColor : "#94a3b8" }} />
                   </IconButton>
                 </span>
               </Tooltip>
