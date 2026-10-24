@@ -38,6 +38,7 @@ import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
 import SwitchRoleDialog from "../members/SwitchRoleDialog";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
@@ -916,14 +917,13 @@ export default function AppLayout() {
 
             {/* Original Brand Logo & Name */}
             <Box
-              onClick={() => navigate("/")}
               sx={{
                 display: "flex",
                 alignItems: "center",
                 gap: 1.4,
-                cursor: "pointer",
                 mr: { xs: 1, md: 2.5 },
                 flexShrink: 0,
+                userSelect: "none",
               }}
             >
               <Box
@@ -1419,7 +1419,6 @@ export default function AppLayout() {
           p: { xs: 2, sm: 2.5, md: 3 },
           bgcolor: "background.default",
           position: "relative",
-          minHeight: "calc(100vh - 56px)",
         }}
       >
         {isLoading && <AppPageLoader fullScreen={true} text={loadingMessage || "Loading..."} />}
@@ -1431,6 +1430,78 @@ export default function AppLayout() {
         ) : (
           <Outlet />
         )}
+      </Box>
+
+      {/* ── Industry Standard Footer ───────────────────────────────────────── */}
+      <Box
+        component="footer"
+        sx={{
+          py: 1.25,
+          px: 2,
+          mt: "auto",
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#121526" : "#ffffff"),
+          borderTop: "1px solid",
+          borderColor: (theme) =>
+            theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 0.9,
+          boxShadow: (theme) =>
+            theme.palette.mode === "dark"
+              ? "0 -2px 10px rgba(0, 0, 0, 0.25)"
+              : "0 -1px 4px rgba(0, 0, 0, 0.02)",
+        }}
+      >
+        <LayersRoundedIcon
+          sx={{
+            fontSize: "1.05rem",
+            color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
+            flexShrink: 0,
+          }}
+        />
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: { xs: "0.72rem", sm: "0.78rem", md: "0.8125rem" },
+            fontWeight: 500,
+            color: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.65)" : "#64748b",
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            columnGap: 1,
+            rowGap: 0.3,
+            lineHeight: 1.4,
+          }}
+        >
+          <span>{new Date().getFullYear()} © 1ATeamSync</span>
+          <Box
+            component="span"
+            sx={{
+              color: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25)" : "#cbd5e1",
+              fontWeight: 300,
+              userSelect: "none",
+            }}
+          >
+            |
+          </Box>
+          <span>Developed by Bosco Soft Technologies</span>
+          <Box
+            component="span"
+            sx={{
+              color: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25)" : "#cbd5e1",
+              fontWeight: 300,
+              userSelect: "none",
+            }}
+          >
+            |
+          </Box>
+          <span>All Rights Reserved.</span>
+        </Typography>
       </Box>
 
       {/* ── Profile Dialog ────────────────────────────────────────────────── */}
