@@ -34,7 +34,7 @@ import {
   getPaymentTransactionsAsync,
 } from "../../services/paymentService";
 import { getMembersAsync } from "../../services/memberService";
-import { getEventsAsync } from "../../services/eventService";
+import { getEventsAsync, isEventPublished } from "../../services/eventService";
 import { getStatusesAsync } from "../../services/statusService";
 import { useAuth } from "../../contexts/AuthContext";
 import { getRightsForPage, hasActionPermission } from "../../utils/rightsHelper";
@@ -92,6 +92,7 @@ export default function PaymentsPage() {
   const [appliedMode, setAppliedMode] = useState("ALL");
   const [appliedStatus, setAppliedStatus] = useState("ALL");
   const [appliedDate, setAppliedDate] = useState(null);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
 
   // Dynamically derive payment modes from DB transactions
   const modeOptions = useMemo(() => {
@@ -159,7 +160,7 @@ export default function PaymentsPage() {
       ]);
 
       if (Array.isArray(memsRes)) setMembersList(memsRes);
-      if (Array.isArray(eventsRes)) setEventsList(eventsRes);
+      if (Array.isArray(eventsRes)) setEventsList(eventsRes.filter((e) => !e.isDeleted && isEventPublished(e)));
       if (Array.isArray(statusRes)) setDbStatuses(statusRes);
 
       if (Array.isArray(txnRes)) {
@@ -872,7 +873,8 @@ export default function PaymentsPage() {
       <AppDataTable
         title={isMemberRole ? "My Payment History" : "Payment History"}
         columns={columns}
-        data={filteredTransactions}
+        data={hasAppliedFilter ? filteredTransactions : []}
+        emptyMessage={!hasAppliedFilter ? "Please select filters and click Filter to view payment history." : undefined}
         loading={loading}
 
         filterPanel={
@@ -960,6 +962,7 @@ export default function PaymentsPage() {
                   setAppliedMode(filterMode);
                   setAppliedStatus(filterStatus);
                   setAppliedDate(filterDate);
+                  setHasAppliedFilter(true);
                 }}
                 sx={{
                   height: 34,
@@ -985,6 +988,7 @@ export default function PaymentsPage() {
                   setAppliedMode("ALL");
                   setAppliedStatus("ALL");
                   setAppliedDate(null);
+                  setHasAppliedFilter(false);
                 }}
                 sx={{
                   color: "#ef4444",

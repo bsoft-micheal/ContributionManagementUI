@@ -49,7 +49,7 @@ import {
   verifyPaymentTransactionAsync,
 } from "../../services/paymentService";
 import { getMembersAsync } from "../../services/memberService";
-import { getEventsAsync } from "../../services/eventService";
+import { getEventsAsync, isEventPublished } from "../../services/eventService";
 import { getStatusesAsync } from "../../services/statusService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getPaymentModesAsync } from "../../services/paymentModeService";
@@ -158,7 +158,7 @@ export default function SubmitPaymentPage() {
       ]);
 
       if (Array.isArray(memsRes)) setMembersList(memsRes);
-      if (Array.isArray(eventsRes)) setEventsList(eventsRes);
+      if (Array.isArray(eventsRes)) setEventsList(eventsRes.filter((e) => !e.isDeleted && isEventPublished(e)));
       if (Array.isArray(statusRes)) setDbStatuses(statusRes);
       if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
       if (Array.isArray(modesRes)) setDbPaymentModes(modesRes);

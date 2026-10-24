@@ -39,6 +39,7 @@ import AppButton from "../../components/common/AppButton";
 import { COMMON_STRINGS } from "../../constants";
 import { getDashboardSummaryAsync } from "../../services/dashboardService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getEventsAsync } from "../../services/eventService";
 import { formatWholeCurrency, formatWholeNumber } from "../../utils/roundingHelper";
 import { getMembersAsync } from "../../services/memberService";
 import { useAppToast } from "../../components/common/AppToast";
@@ -753,7 +754,9 @@ export default function DashboardPage() {
   };
 
   const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [filterEventsList, setFilterEventsList] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [quickAccessDrawerOpen, setQuickAccessDrawerOpen] = useState(false);
   const [quickAccessStatus, setQuickAccessStatus] = useState("all");
@@ -777,6 +780,30 @@ export default function DashboardPage() {
     eventType: "ALL",
     eventId: "ALL",
   });
+
+  // Automatically fetch events available in selected month and year for cascading dropdowns
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPeriodEvents() {
+      try {
+        const m = Number(pendingFilters.month);
+        const y = Number(pendingFilters.year);
+        const data = await getEventsAsync({
+          month: m > 0 ? m : undefined,
+          year: y > 0 ? y : undefined,
+        });
+        if (!cancelled && Array.isArray(data)) {
+          setFilterEventsList(data.filter((e) => !e.isDeleted));
+        }
+      } catch {
+        if (!cancelled) setFilterEventsList([]);
+      }
+    }
+    loadPeriodEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingFilters.month, pendingFilters.year]);
 
   // Fetch event types for filter dropdown
   useEffect(() => {
@@ -807,10 +834,7 @@ export default function DashboardPage() {
     }
   }, [toast]);
 
-  // Initial load
-  useEffect(() => {
-    loadDashboard(appliedFilters.month, appliedFilters.year);
-  }, []);
+  // Initial load: Do not load data automatically below filter section (waits for Filter button click)
 
   // Detect today's birthdays on login & trigger celebratory pop up message only once per login session
   useEffect(() => {
@@ -868,27 +892,37 @@ export default function DashboardPage() {
     };
   }, [hasCelebrated, summary]);
 
-  // Build Event Type options combining API categories and any upcoming events
+  // Build Event Type options strictly from events available in selected month & year
   const eventTypeOptions = useMemo(() => {
     const options = [
       { label: COMMON_STRINGS.DASHBOARD?.ALL_EVENT_TYPES || "All Event Types", value: "ALL" },
     ];
     const set = new Set();
-    eventTypes.forEach((t) => {
-      const name = t.eventTypeName || t.name;
+    filterEventsList.forEach((e) => {
+      const name = (e.eventTypeName || e.category || "").trim();
       if (name && !set.has(name.toLowerCase())) {
         set.add(name.toLowerCase());
         options.push({ label: name, value: name });
       }
     });
-    (summary?.upcomingEvents ?? []).forEach((e) => {
-      if (e.eventTypeName && !set.has(e.eventTypeName.toLowerCase())) {
-        set.add(e.eventTypeName.toLowerCase());
-        options.push({ label: e.eventTypeName, value: e.eventTypeName });
-      }
-    });
     return options;
-  }, [eventTypes, summary?.upcomingEvents]);
+  }, [filterEventsList]);
+
+  // Reset invalid dependent Event Type and Event Name when options change
+  useEffect(() => {
+    if (pendingFilters.eventType && pendingFilters.eventType !== "ALL") {
+      const isValid = eventTypeOptions.some(
+        (opt) => opt.value.toLowerCase() === pendingFilters.eventType.toLowerCase()
+      );
+      if (!isValid) {
+        setPendingFilters((prev) => ({
+          ...prev,
+          eventType: "ALL",
+          eventId: "ALL",
+        }));
+      }
+    }
+  }, [eventTypeOptions, pendingFilters.eventType]);
 
   // Dynamic Year Options calculated from current year window + any event years in the database
   const dynamicYearOptions = useMemo(() => {
@@ -897,7 +931,7 @@ export default function DashboardPage() {
     for (let i = currentYear - 5; i <= currentYear + 5; i++) {
       yearsSet.add(i);
     }
-    (summary?.upcomingEvents || []).forEach((e) => {
+    filterEventsList.forEach((e) => {
       const d = e.eventDate || e.createdOn || e.date;
       if (d) {
         const y = dayjs(d).year();
@@ -911,31 +945,30 @@ export default function DashboardPage() {
       { label: "All", value: 0 },
       ...sortedYears.map((y) => ({ label: String(y), value: y })),
     ];
-  }, [summary?.upcomingEvents]);
+  }, [filterEventsList]);
 
-  // Build Event options cascading from pendingFilters.eventType
+  // Build Event options cascading from month, year, and pendingFilters.eventType
   const eventOptions = useMemo(() => {
     const options = [
       { label: COMMON_STRINGS.DASHBOARD?.ALL_EVENTS || "All Events", value: "ALL" },
     ];
-    const allEventsList = summary?.upcomingEvents ?? [];
     const selectedType = pendingFilters.eventType;
-
     const matchingEvents =
       !selectedType || selectedType === "ALL"
-        ? allEventsList
-        : allEventsList.filter(
-          (e) => (e.eventTypeName || "").toLowerCase() === selectedType.toLowerCase()
-        );
+        ? filterEventsList
+        : filterEventsList.filter(
+            (e) => (e.eventTypeName || e.category || "").toLowerCase() === selectedType.toLowerCase()
+          );
 
     const seen = new Set();
     matchingEvents.forEach((e) => {
-      if (e.eventName) {
-        const val = e.eventId ? String(e.eventId) : e.eventName;
+      const name = e.eventName || e.name;
+      if (name) {
+        const val = e.eventId ? String(e.eventId) : name;
         if (!seen.has(val)) {
           seen.add(val);
           options.push({
-            label: e.eventName,
+            label: name,
             value: val,
           });
         }
@@ -943,7 +976,22 @@ export default function DashboardPage() {
     });
 
     return options;
-  }, [summary?.upcomingEvents, pendingFilters.eventType]);
+  }, [filterEventsList, pendingFilters.eventType]);
+
+  // Reset invalid dependent Event Name when eventOptions change
+  useEffect(() => {
+    if (pendingFilters.eventId && pendingFilters.eventId !== "ALL") {
+      const isValid = eventOptions.some(
+        (opt) => String(opt.value) === String(pendingFilters.eventId)
+      );
+      if (!isValid) {
+        setPendingFilters((prev) => ({
+          ...prev,
+          eventId: "ALL",
+        }));
+      }
+    }
+  }, [eventOptions, pendingFilters.eventId]);
 
   function handleFilterChange(key, value) {
     let normalizedVal = value;
@@ -956,9 +1004,8 @@ export default function DashboardPage() {
     if (key === "eventType") {
       let autoEventId = "ALL";
       if (normalizedVal && normalizedVal !== "ALL") {
-        const allEventsList = summary?.upcomingEvents ?? [];
-        const matchingEvents = allEventsList.filter(
-          (e) => (e.eventTypeName || "").toLowerCase() === normalizedVal.toLowerCase()
+        const matchingEvents = filterEventsList.filter(
+          (e) => (e.eventTypeName || e.category || "").toLowerCase() === normalizedVal.toLowerCase()
         );
         const uniqueEvents = [];
         const seen = new Set();
@@ -986,6 +1033,7 @@ export default function DashboardPage() {
 
   function handleFilter() {
     setAppliedFilters({ ...pendingFilters });
+    setHasAppliedFilter(true);
     loadDashboard(pendingFilters.month, pendingFilters.year);
   }
 
@@ -998,7 +1046,8 @@ export default function DashboardPage() {
     };
     setPendingFilters(defaultValues);
     setAppliedFilters(defaultValues);
-    loadDashboard(0, 0);
+    setSummary(null);
+    setHasAppliedFilter(false);
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -1569,6 +1618,30 @@ export default function DashboardPage() {
       {/* ── Tab Content ─────────────────────────────────────────────── */}
       {activeTab === "calendar" ? (
         <CalendarPage isEmbedded />
+      ) : !hasAppliedFilter ? (
+        <Box
+          sx={{
+            py: 8,
+            px: 2,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            gap: 1.5,
+            border: `1px dashed ${theme.palette.divider}`,
+            borderRadius: 2,
+            bgcolor: isDark ? "rgba(255, 255, 255, 0.02)" : "rgba(0, 0, 0, 0.01)",
+          }}
+        >
+          <FilterListIcon sx={{ fontSize: 44, color: "text.disabled" }} />
+          <Typography variant="h6" fontWeight={600} color="text.primary">
+            No Data Displayed
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 450 }}>
+            Please select your filter criteria above and click <strong>Filter</strong> to view the dashboard summary, metrics, and events.
+          </Typography>
+        </Box>
       ) : (
         <Stack spacing={3}>
 
