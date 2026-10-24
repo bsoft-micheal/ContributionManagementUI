@@ -24,6 +24,10 @@ export const deleteEventAsync = async (id) => {
   return await deleteApi(`/events/deleteEventAsyncById/${id}`);
 };
 
+export const publishEventAsync = async (id) => {
+  return await postApi(`/events/publishEventAsync/${id}`);
+};
+
 export const getEventByIdAsync = async (id) => {
   return await getApi(`/events/getEventAsyncById/${id}`);
 };
