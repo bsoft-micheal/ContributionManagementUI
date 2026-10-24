@@ -70,6 +70,7 @@ import AppMultiSelect from "../../components/common/AppMultiSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppTextArea from "../../components/common/AppTextArea";
 import AppButton, { AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
+import AppConfirmDialog from "../../components/common/AppConfirmDialog";
 import { validateForm } from "../../utils/validation";
 import { useAppToast } from "../../components/common/AppToast";
 import {
@@ -414,6 +415,7 @@ export default function EventFormPage({
   const [allocatedAmount, setAllocatedAmount] = useState(0);
   const [selectedDeductionType, setSelectedDeductionType] = useState("available");
   const [customDeductionAmount, setCustomDeductionAmount] = useState("");
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
 
   const isMemberActive = (m) => {
     const active =
@@ -2167,12 +2169,7 @@ export default function EventFormPage({
     setErrors((p) => ({ ...p, eventDate: validDate ? "" : "This field is required" }));
   };
 
-  const handleSubmit = async () => {
-    if (isEdit ? !canEditEvent : !canAddEvent) {
-      toast.error(isEdit ? "Access Denied: You do not have permission to edit events." : "Access Denied: You do not have permission to add events.");
-      return;
-    }
-
+  const validateEventForm = () => {
     const requiredMsg = "This field is required";
     const newErrors = {};
 
@@ -2300,32 +2297,56 @@ export default function EventFormPage({
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
-      return;
+      return false;
     }
 
     // Check budget calculation only after mandatory required fields are valid
     if (plannedBudget <= 0) {
       toast.error("Event cannot be saved with ₹0. Please enter a valid contribution amount or configure budget items.");
-      return;
+      return false;
     }
 
     if (useAvailableBalance) {
       if (balanceValidationError) {
         toast.error(balanceValidationError);
-        return;
+        return false;
       }
       if (effectiveDeduction > plannedBudget) {
         toast.error(`Deduction amount (${formatWholeCurrency(effectiveDeduction)}) cannot exceed the planned budget (${formatWholeCurrency(plannedBudget)}).`);
-        return;
+        return false;
       }
       if (effectiveDeduction > availableAmountInHand) {
         toast.error(`Deduction amount (${formatWholeCurrency(effectiveDeduction)}) exceeds available Amount In Hand (${formatWholeCurrency(availableAmountInHand)}).`);
-        return;
+        return false;
       }
     }
 
     if (isEdit && hasPayments) {
       toast.error("Cannot edit event because payments have already been received.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSaveDraft = async () => {
+    if (!validateEventForm()) return;
+    await executeSaveEvent("Draft");
+  };
+
+  const handlePublishClick = () => {
+    if (!validateEventForm()) return;
+    setPublishConfirmOpen(true);
+  };
+
+  const handleConfirmPublish = async () => {
+    setPublishConfirmOpen(false);
+    await executeSaveEvent("Published");
+  };
+
+  const executeSaveEvent = async (targetStatus) => {
+    if (isEdit ? !canEditEvent : !canAddEvent) {
+      toast.error(isEdit ? "Access Denied: You do not have permission to edit events." : "Access Denied: You do not have permission to add events.");
       return;
     }
 
@@ -2364,21 +2385,7 @@ export default function EventFormPage({
             amount: roundedShares[idx],
           });
         });
-      } else {
-        // For non-birthday events, let backend calculate tenure and standard shares dynamically
-        // using the exact same calculation engine that powers the preview.
       }
-
-      const celebrantsSummary = isBirthday
-        ? monthCelebrants
-          .map((c) => `${c.name} (${dayjs(c.dateOfBirth).format("D MMM")})`)
-          .join(", ")
-        : "";
-
-      const defaultDesc = isBirthday
-        ? `Birthday celebration (${office} Office, ${wfh} WFH)${celebrantsSummary ? ` for ${celebrantsSummary}` : ""
-        }${nonBirthdaySelectedTypes.length > 0 ? ` + ${nonBirthdaySelectedTypes.map(t => t.eventTypeName).join(" & ")}` : ""}. Planned Budget: ₹${formatWholeNumber(plannedBudget)}, Contribution/member: ₹${formatWholeNumber(contributionPerMember)}`
-        : `${selectedTypeNames.join(" & ") || "Event"} celebration for ${total} members. Planned Budget: ₹${formatWholeNumber(plannedBudget)}, Contribution/member: ₹${formatWholeNumber(contributionPerMember)}`;
 
       const finalTypeIds = allowMultipleEvents && form.eventTypeIds?.length > 0
         ? form.eventTypeIds
@@ -2458,7 +2465,6 @@ export default function EventFormPage({
         }
       }
 
-      // Compact celebrants metadata without duplicate keys or dates for description HTML comments
       const compactCelebrants = {};
       if (marriageCelebrantIds.length > 0) {
         compactCelebrants["marriage"] = marriageCelebrantIds;
@@ -2483,6 +2489,8 @@ export default function EventFormPage({
         compactCelebrants
       );
 
+      const resolvedStatus = targetStatus || form.status || "Planned";
+
       const payload = {
         eventName: form.eventName.trim(),
         eventTypeId: finalTypeIds[0] || form.eventTypeId,
@@ -2495,7 +2503,7 @@ export default function EventFormPage({
         eventTypeMembers: membersMap,
         eventTypeMemberDates: memberDatesMap,
         description: finalDescription,
-        status: form.status || "Planned",
+        status: resolvedStatus,
         baseAmount: plannedBudget,
         useAvailableBalance: Boolean(useAvailableBalance),
         allocatedAmount: useAvailableBalance ? Number(effectiveDeduction) : 0,
@@ -2505,7 +2513,13 @@ export default function EventFormPage({
 
       if (isEdit) {
         await updateEventAsync(id, payload);
-        toast.success(TOAST_MESSAGES.EVENTS.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
+        if (resolvedStatus === "Draft") {
+          toast.success("Event saved as draft successfully.");
+        } else if (resolvedStatus === "Published") {
+          toast.success("Event published successfully. Member notifications are being processed.");
+        } else {
+          toast.success(TOAST_MESSAGES.EVENTS.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
+        }
       } else {
         // Sync dynamic QR code with per-member contribution amount to backend settings before event creation
         try {
@@ -2532,7 +2546,13 @@ export default function EventFormPage({
         }
 
         await createEventAsync(payload);
-        toast.success("Event created successfully");
+        if (resolvedStatus === "Draft") {
+          toast.success("Event saved as draft successfully.");
+        } else if (resolvedStatus === "Published") {
+          toast.success("Event published successfully. Member notifications are being processed.");
+        } else {
+          toast.success("Event created successfully");
+        }
       }
 
       if (isDialog) {
@@ -2555,6 +2575,8 @@ export default function EventFormPage({
       setSaving(false);
     }
   };
+
+  const handleSubmit = handleSaveDraft;
 
   const handleCancel = () => {
     if (isDialog) {
@@ -4237,6 +4259,7 @@ export default function EventFormPage({
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
+            flexWrap: "wrap",
             gap: 2,
             mt: 2,
             pt: 1.75,
@@ -4252,20 +4275,83 @@ export default function EventFormPage({
           >
             {readOnly ? (isDialog ? "Close" : "Back to Events") : "Cancel"}
           </AppCancelButton>
+
           {(isEdit ? canEditEvent : canAddEvent) && canEdit && (
-            <Tooltip title={isEdit && hasPayments ? "Cannot edit event after payments have been received" : ""}>
-              <span>
-                <AppSaveButton
-                  onClick={handleSubmit}
-                  disabled={saving || (isEdit && hasPayments)}
-                >
-                  {saving ? "Saving..." : isEdit ? "Update" : "Save"}
-                </AppSaveButton>
-              </span>
-            </Tooltip>
+            <>
+              {/* Save as Draft Button (Secondary / Outlined) */}
+              {(!isEdit || form.status === "Draft") && (
+                <Tooltip title={isEdit && hasPayments ? "Cannot edit event after payments have been received" : ""}>
+                  <span>
+                    <AppButton
+                      variant="outlined"
+                      onClick={handleSaveDraft}
+                      disabled={saving || (isEdit && hasPayments)}
+                      sx={{
+                        borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.3)" : "#4a3f6b",
+                        color: (theme) => theme.palette.mode === "dark" ? "#e2e8f0" : "#4a3f6b",
+                        fontWeight: 600,
+                        "&:hover": {
+                          borderColor: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#3b3156",
+                          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.04)",
+                        },
+                      }}
+                    >
+                      {saving ? "Saving..." : "Save as Draft"}
+                    </AppButton>
+                  </span>
+                </Tooltip>
+              )}
+
+              {/* Publish Button (Primary purple button) or Update button if already published */}
+              {(!isEdit || form.status === "Draft") ? (
+                <Tooltip title={isEdit && hasPayments ? "Cannot publish event after payments have been received" : ""}>
+                  <span>
+                    <AppButton
+                      variant="contained"
+                      onClick={handlePublishClick}
+                      disabled={saving || (isEdit && hasPayments)}
+                      sx={{
+                        bgcolor: "#4a3f6b !important",
+                        color: "#ffffff !important",
+                        fontWeight: 700,
+                        boxShadow: "0 4px 12px rgba(74, 63, 107, 0.25)",
+                        "&:hover": {
+                          bgcolor: "#3b3156 !important",
+                          boxShadow: "0 6px 16px rgba(74, 63, 107, 0.35)",
+                        },
+                      }}
+                    >
+                      {saving ? "Publishing..." : "Publish"}
+                    </AppButton>
+                  </span>
+                </Tooltip>
+              ) : (
+                <Tooltip title={isEdit && hasPayments ? "Cannot edit event after payments have been received" : ""}>
+                  <span>
+                    <AppSaveButton
+                      onClick={handlePublishClick}
+                      disabled={saving || (isEdit && hasPayments)}
+                    >
+                      {saving ? "Saving..." : "Update"}
+                    </AppSaveButton>
+                  </span>
+                </Tooltip>
+              )}
+            </>
           )}
         </Box>
       </Box>
+
+      {/* Publish Confirmation Dialog */}
+      <AppConfirmDialog
+        open={publishConfirmOpen}
+        onClose={() => setPublishConfirmOpen(false)}
+        onConfirm={handleConfirmPublish}
+        title="Publish Event?"
+        content="Are you sure you want to publish this event? Once published, the event will be visible to eligible members and notifications will be sent."
+        confirmText="Confirm & Publish"
+        cancelText="Cancel"
+      />
     </Box>
   );
 

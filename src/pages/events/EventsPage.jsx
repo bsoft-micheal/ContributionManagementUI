@@ -22,6 +22,7 @@ import {
   PostAdd as AddExpenseIcon,
   NotificationsActive as NotificationsActiveIcon,
   CalculateRounded as CalculateRoundedIcon,
+  PublishRounded as PublishIcon,
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -36,7 +37,7 @@ import { MENU_FEATURE_IDS } from "../../constants";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission, getRightsForFeatureId } from "../../utils/rightsHelper";
-import { getEventsAsync, deleteEventAsync, sendRemindersForEventAsync } from "../../services/eventService";
+import { getEventsAsync, deleteEventAsync, publishEventAsync, sendRemindersForEventAsync } from "../../services/eventService";
 import { getExpensesAsync } from "../../services/expenseService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
@@ -142,11 +143,13 @@ export default function EventsPage() {
   const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
   const [filterEventType, setFilterEventType] = useState("ALL");
   const [filterEvent, setFilterEvent] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
   const [filters, setFilters] = useState({
     year: dayjs().year(),
     month: dayjs().month() + 1,
     eventType: "ALL",
     event: "ALL",
+    status: "ALL",
   });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -160,6 +163,9 @@ export default function EventsPage() {
   const [addExpenseEvent, setAddExpenseEvent] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
+  const [eventToPublish, setEventToPublish] = useState(null);
+  const [publishing, setPublishing] = useState(false);
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
@@ -427,6 +433,7 @@ export default function EventsPage() {
       month: filterMonth,
       eventType: filterEventType,
       event: filterEvent,
+      status: filterStatus,
     };
     setFilters(nextFilters);
     loadData(nextFilters);
@@ -437,11 +444,13 @@ export default function EventsPage() {
     setFilterMonth(0);
     setFilterEventType("ALL");
     setFilterEvent("ALL");
+    setFilterStatus("ALL");
     const resetFilters = {
       year: 0,
       month: 0,
       eventType: "ALL",
       event: "ALL",
+      status: "ALL",
     };
     setFilters(resetFilters);
     loadData(resetFilters);
@@ -456,6 +465,29 @@ export default function EventsPage() {
       if (filters.event && filters.event !== "ALL") {
         const name = (e.eventName || e.name || "").trim().toLowerCase();
         if (name !== filters.event.trim().toLowerCase()) return false;
+      }
+      if (filters.status && filters.status !== "ALL") {
+        const rowStatus = String(e.status || "").trim().toLowerCase();
+        const targetStatus = filters.status.trim().toLowerCase();
+        if (targetStatus === "published") {
+          if (rowStatus !== "published" && rowStatus !== "planned" && rowStatus !== "active" && rowStatus !== "2" && rowStatus !== "3" && rowStatus !== "6") {
+            return false;
+          }
+        } else if (targetStatus === "draft") {
+          if (rowStatus !== "draft" && rowStatus !== "1") {
+            return false;
+          }
+        } else if (targetStatus === "completed") {
+          if (rowStatus !== "completed" && rowStatus !== "4") {
+            return false;
+          }
+        } else if (targetStatus === "cancelled") {
+          if (rowStatus !== "cancelled" && rowStatus !== "5") {
+            return false;
+          }
+        } else if (rowStatus !== targetStatus) {
+          return false;
+        }
       }
       return true;
     });
@@ -533,6 +565,27 @@ export default function EventsPage() {
     }
   };
 
+  const handlePublishRequest = (eventItem) => {
+    setEventToPublish(eventItem);
+    setPublishConfirmOpen(true);
+  };
+
+  const handleConfirmPublish = async () => {
+    if (!eventToPublish) return;
+    setPublishing(true);
+    try {
+      await publishEventAsync(eventToPublish.eventId);
+      toast.success("Event published successfully. Member notifications are being processed.");
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to publish event.");
+    } finally {
+      setPublishing(false);
+      setPublishConfirmOpen(false);
+      setEventToPublish(null);
+    }
+  };
+
   const handleSendEventReminders = async (eventItem) => {
     try {
       await sendRemindersForEventAsync(eventItem.eventId);
@@ -555,6 +608,10 @@ export default function EventsPage() {
         );
         const isEditable = canEditEvent && !hasPaid;
         const isDeletable = canDeleteEvent && !hasPaid;
+        const statusStr = String(row.status || "").trim().toLowerCase();
+        const isDraft = statusStr === "draft" || statusStr === "1";
+        const canPublishEvent = (canEditEvent || canAddEvent) && isDraft;
+
         return (
           <Box sx={{ display: "flex", gap: 0.4, alignItems: "center" }}>
             <Tooltip title={canViewEvent ? "View Details" : "Disabled"}>
@@ -572,6 +629,20 @@ export default function EventsPage() {
                 </IconButton>
               </span>
             </Tooltip>
+            {isDraft && (
+              <Tooltip title={canPublishEvent ? "Publish Event" : "Disabled"}>
+                <span style={{ display: "inline-flex", cursor: !canPublishEvent ? "not-allowed" : "pointer" }}>
+                  <IconButton
+                    size="small"
+                    sx={{ p: 0.3 }}
+                    disabled={!canPublishEvent}
+                    onClick={() => handlePublishRequest(row)}
+                  >
+                    <PublishIcon sx={{ fontSize: "1.1rem", color: canPublishEvent ? "#16a34a" : "#94a3b8" }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
             <Tooltip
               title={
                 !canEditEvent
@@ -751,6 +822,64 @@ export default function EventsPage() {
               </span>
             </Tooltip>
           </Box>
+        );
+      },
+    },
+    {
+      label: "Status",
+      key: "status",
+      align: "center",
+      render: (row) => {
+        const raw = String(row.status || "").trim().toLowerCase();
+        let label = "Published";
+        let color = "#16a34a";
+        let bgcolor = "rgba(22, 163, 74, 0.12)";
+        let borderColor = "rgba(22, 163, 74, 0.3)";
+
+        if (raw === "draft" || raw === "1") {
+          label = "Draft";
+          color = "#64748b";
+          bgcolor = "rgba(100, 116, 139, 0.12)";
+          borderColor = "#cbd5e1";
+        } else if (raw === "completed" || raw === "4") {
+          label = "Completed";
+          color = "#2563eb";
+          bgcolor = "rgba(37, 99, 235, 0.12)";
+          borderColor = "rgba(37, 99, 235, 0.3)";
+        } else if (raw === "cancelled" || raw === "5") {
+          label = "Cancelled";
+          color = "#dc2626";
+          bgcolor = "rgba(220, 38, 38, 0.12)";
+          borderColor = "rgba(220, 38, 38, 0.3)";
+        } else if (raw === "active" || raw === "3") {
+          label = "Active";
+          color = "#059669";
+          bgcolor = "rgba(5, 150, 105, 0.12)";
+          borderColor = "rgba(5, 150, 105, 0.3)";
+        } else if (raw === "published" || raw === "planned" || raw === "2" || raw === "6") {
+          label = "Published";
+          color = "#16a34a";
+          bgcolor = "rgba(22, 163, 74, 0.12)";
+          borderColor = "rgba(22, 163, 74, 0.3)";
+        } else if (row.status) {
+          label = String(row.status);
+        }
+
+        return (
+          <Chip
+            size="small"
+            label={label}
+            sx={{
+              height: 22,
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              color: color,
+              bgcolor: bgcolor,
+              border: `1px solid ${borderColor}`,
+              borderRadius: "6px",
+              "& .MuiChip-label": { px: 1 },
+            }}
+          />
         );
       },
     },
@@ -1131,6 +1260,24 @@ export default function EventsPage() {
                   placeholder="Select Event Name"
                 />
               </Box>
+              <Box sx={{ width: { xs: "100%", sm: 150, md: 165 } }}>
+                <AppSelect
+                  label="Event Status"
+                  value={filterStatus}
+                  onChange={(event) => {
+                    setFilterStatus(event.target.value || "ALL");
+                  }}
+                  onClear={() => setFilterStatus("ALL")}
+                  options={[
+                    { label: "All Statuses", value: "ALL" },
+                    { label: "Draft", value: "Draft" },
+                    { label: "Published", value: "Published" },
+                    { label: "Completed", value: "Completed" },
+                    { label: "Cancelled", value: "Cancelled" },
+                  ]}
+                  placeholder="Select Status"
+                />
+              </Box>
               <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
                 <AppButton
                   variant="contained"
@@ -1283,6 +1430,21 @@ export default function EventsPage() {
         onConfirm={handleConfirmDelete}
         title={COMMON_STRINGS.DIALOGS.CONFIRM_TITLE}
         content={COMMON_STRINGS.DIALOGS.DELETE_CONFIRM_MSG}
+      />
+
+      <AppConfirmDialog
+        open={publishConfirmOpen}
+        onClose={() => {
+          if (!publishing) {
+            setPublishConfirmOpen(false);
+            setEventToPublish(null);
+          }
+        }}
+        onConfirm={handleConfirmPublish}
+        title="Publish Event?"
+        content="Are you sure you want to publish this event? Once published, the event will be visible to eligible members and notifications will be sent."
+        confirmText="Confirm & Publish"
+        cancelText="Cancel"
       />
     </div>
   );
