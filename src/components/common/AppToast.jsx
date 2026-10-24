@@ -144,6 +144,10 @@ export const ToastProvider = ({ children }) => {
     // Global handler: Catch any unhandled promise rejections and directly show toast message
     const handleUnhandledRejection = (event) => {
       if (event.reason) {
+        // Suppress duplicate toast: rate limit 429 is already displayed as warning by apiClient
+        if (event.reason?.response?.status === 429 || event.reason?.isRateLimit) {
+          return;
+        }
         const errorMsg = extractErrorMessage(event.reason);
         if (errorMsg) {
           showToast(errorMsg, "error");

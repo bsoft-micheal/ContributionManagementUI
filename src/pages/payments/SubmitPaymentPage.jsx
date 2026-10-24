@@ -103,6 +103,7 @@ export default function SubmitPaymentPage() {
   const [statusChangeValue, setStatusChangeValue] = useState("");
   const [auditRemarks, setAuditRemarks] = useState("");
   const [statusError, setStatusError] = useState("");
+  const [auditRemarksError, setAuditRemarksError] = useState("");
 
   const isAuthorityRole = [
     "admin",
@@ -151,7 +152,7 @@ export default function SubmitPaymentPage() {
         getPaymentTransactionsAsync().catch(() => []),
         getMembersAsync().catch(() => []),
         getEventsAsync().catch(() => []),
-        getStatusesAsync(true, "Contribution").catch(() => []),
+        getStatusesAsync(true).catch(() => []),
         getEventTypesAsync().catch(() => []),
         getPaymentModesAsync(true).catch(() => []),
       ]);
@@ -186,6 +187,29 @@ export default function SubmitPaymentPage() {
     }
   };
 
+  useEffect(() => {
+    if (!statusModalOpen) return;
+    getStatusesAsync(true)
+      .then((res) => {
+        if (Array.isArray(res) && res.length > 0) {
+          setDbStatuses(res);
+        }
+      })
+      .catch(() => {});
+  }, [statusModalOpen]);
+
+  useEffect(() => {
+    const handleStatusUpdated = () => {
+      getStatusesAsync(true)
+        .then((res) => {
+          if (Array.isArray(res)) setDbStatuses(res);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("status_updated", handleStatusUpdated);
+    return () => window.removeEventListener("status_updated", handleStatusUpdated);
+  }, []);
+
   // Dynamic statuses loaded directly from database table
   const getModalStatusOptions = (txn) => {
     const hasSubmittedProof = Boolean(
@@ -197,32 +221,70 @@ export default function SubmitPaymentPage() {
     const actualReceived = hasSubmittedProof ? Number(txn?.amount || txn?.paidAmount || 0) : 0;
     const isAmountReceived = actualReceived > 0;
 
-    const list = Array.isArray(dbStatuses) && dbStatuses.length > 0
-      ? dbStatuses
-          .filter((s) => s.statusName && s.isActive !== false)
-          .map((s) => {
-            const isVerificationStatus = ["verified", "paid", "closed", "completed"].includes(
-              String(s.statusName).toLowerCase().trim()
-            );
-            return {
-              label: !isAmountReceived && isVerificationStatus
-                ? `${s.statusName} (Payment not received)`
-                : s.statusName,
-              value: s.statusName,
-              disabled: !isAmountReceived && isVerificationStatus,
-            };
-          })
-      : [
-          { label: "Pending", value: "Pending" },
-          { label: isAmountReceived ? "Verified" : "Verified (Payment not received)", value: "Verified", disabled: !isAmountReceived },
-          { label: "Rejected", value: "Rejected" },
-          { label: isAmountReceived ? "Paid" : "Paid (Payment not received)", value: "Paid", disabled: !isAmountReceived },
-        ];
+    // The authority review workflow explicitly requires: Approved, Rejected, Pending
+    const allowedAuthorityStatuses = ["approved", "rejected", "pending"];
 
-    if (txn?.status && !list.some((o) => o.value.toLowerCase() === String(txn.status).toLowerCase())) {
-      return [{ label: String(txn.status), value: String(txn.status) }, ...list];
+    let options = [];
+
+    if (Array.isArray(dbStatuses) && dbStatuses.length > 0) {
+      options = dbStatuses
+        .filter((s) => {
+          if (!s.statusName || s.isActive === false) return false;
+          const nameLower = s.statusName.trim().toLowerCase();
+          return allowedAuthorityStatuses.includes(nameLower);
+        })
+        .map((s) => {
+          const name = s.statusName.trim();
+          const isApproval = name.toLowerCase() === "approved";
+          return {
+            label: !isAmountReceived && isApproval
+              ? `${name} (Payment not received)`
+              : name,
+            value: name,
+            disabled: !isAmountReceived && isApproval,
+          };
+        });
     }
-    return list;
+
+    const orderMap = { approved: 1, rejected: 2, pending: 3 };
+
+    // Deduplicate options by case-insensitive value
+    const uniqueOptions = [];
+    const seen = new Set();
+    for (const opt of options) {
+      const valLower = opt.value.toLowerCase();
+      if (!seen.has(valLower)) {
+        seen.add(valLower);
+        uniqueOptions.push(opt);
+      }
+    }
+
+    // Ensure all 3 authority statuses are present
+    if (!seen.has("approved")) {
+      uniqueOptions.push({
+        label: !isAmountReceived ? "Approved (Payment not received)" : "Approved",
+        value: "Approved",
+        disabled: !isAmountReceived,
+      });
+      seen.add("approved");
+    }
+    if (!seen.has("rejected")) {
+      uniqueOptions.push({ label: "Rejected", value: "Rejected", disabled: false });
+      seen.add("rejected");
+    }
+    if (!seen.has("pending")) {
+      uniqueOptions.push({ label: "Pending", value: "Pending", disabled: false });
+      seen.add("pending");
+    }
+
+    // Sort to canonical order: Approved, Rejected, Pending
+    uniqueOptions.sort((a, b) => {
+      const ordA = orderMap[a.value.toLowerCase()] || 99;
+      const ordB = orderMap[b.value.toLowerCase()] || 99;
+      return ordA - ordB;
+    });
+
+    return uniqueOptions;
   };
 
   const handleStatusUpdate = async (txn, newStatus, customNotes) => {
@@ -274,6 +336,8 @@ export default function SubmitPaymentPage() {
         setStatusModalOpen(false);
         setStatusModalTxn(null);
         setAuditRemarks("");
+        setStatusError("");
+        setAuditRemarksError("");
         await loadData();
       } catch (err) {
         toast.error(err, "Failed to update payment status");
@@ -281,6 +345,8 @@ export default function SubmitPaymentPage() {
           setStatusModalOpen(false);
           setStatusModalTxn(null);
           setAuditRemarks("");
+          setStatusError("");
+          setAuditRemarksError("");
           await loadData();
         }
       }
@@ -539,12 +605,21 @@ export default function SubmitPaymentPage() {
   }, [dynamicPaymentModes]);
 
   const statusOptions = useMemo(() => {
-    return [
-      { label: "All Statuses", value: "ALL" },
-      { label: "Pending", value: "Pending" },
-      { label: "Verified", value: "Verified" },
-    ];
-  }, []);
+    const list = [{ label: "All Statuses", value: "ALL" }];
+    const seen = new Set();
+    (dbStatuses || []).forEach((s) => {
+      if (!s.statusName || s.isActive === false) return;
+      const mod = String(s.module || "General").toLowerCase();
+      if (mod.includes("payment") || mod.includes("contribution") || mod.includes("general") || !s.module) {
+        const name = s.statusName.trim();
+        if (!seen.has(name.toLowerCase())) {
+          seen.add(name.toLowerCase());
+          list.push({ label: name, value: name });
+        }
+      }
+    });
+    return list;
+  }, [dbStatuses]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
@@ -852,6 +927,7 @@ export default function SubmitPaymentPage() {
     {
       label: "Txn / Ref ID",
       key: "id",
+      minWidth: 150,
       render: (row) => (
         <Typography
           variant="body2"
@@ -860,6 +936,8 @@ export default function SubmitPaymentPage() {
             color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
             cursor: "pointer",
             fontSize: "0.8rem",
+            fontFamily: "monospace",
+            letterSpacing: "0.02em",
             "&:hover": { textDecoration: "underline" },
           }}
           onClick={() => {
@@ -1153,8 +1231,10 @@ export default function SubmitPaymentPage() {
         onClose={() => {
           setStatusModalOpen(false);
           setStatusModalTxn(null);
+          setStatusChangeValue("");
           setAuditRemarks("");
           setStatusError("");
+          setAuditRemarksError("");
         }}
         title="Authority Status Update"
         maxWidth="sm"
@@ -1168,6 +1248,9 @@ export default function SubmitPaymentPage() {
             );
             const actualReceived = hasSubmittedProof ? Number(statusModalTxn?.amount || statusModalTxn?.paidAmount || 0) : 0;
             const isZeroAmount = actualReceived <= 0;
+            const isVerificationTarget = ["verified", "paid", "closed", "completed", "approved"].includes(
+              String(statusChangeValue).toLowerCase()
+            );
 
             return (
               <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1175,18 +1258,30 @@ export default function SubmitPaymentPage() {
                   Close
                 </AppCancelButton>
                 <AppSaveButton
-                  disabled={isZeroAmount}
-                  disabledTooltip={isZeroAmount ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first." : ""}
+                  disabled={isZeroAmount && isVerificationTarget}
+                  disabledTooltip={
+                    isZeroAmount && isVerificationTarget
+                      ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first."
+                      : ""
+                  }
                   onClick={() => {
+                    let hasError = false;
                     if (!statusChangeValue || !String(statusChangeValue).trim()) {
                       setStatusError("This field is required");
+                      hasError = true;
+                    }
+                    if (!auditRemarks || !String(auditRemarks).trim()) {
+                      setAuditRemarksError("This field is required");
+                      hasError = true;
+                    }
+                    if (hasError) {
                       toast.error("This field is required");
                       return;
                     }
                     handleStatusUpdate(
                       statusModalTxn,
                       statusChangeValue,
-                      auditRemarks
+                      auditRemarks.trim()
                     );
                   }}
                 >
@@ -1247,8 +1342,14 @@ export default function SubmitPaymentPage() {
                 label="Audit Remarks / Notes"
                 placeholder="Enter remarks or status update notes..."
                 value={auditRemarks}
-                onChange={(e) => setAuditRemarks(e.target.value)}
+                onChange={(e) => {
+                  setAuditRemarks(e.target.value);
+                  if (auditRemarksError) setAuditRemarksError("");
+                }}
                 rows={3}
+                required
+                error={Boolean(auditRemarksError)}
+                helperText={auditRemarksError || ""}
               />
             </Paper>
           </Box>

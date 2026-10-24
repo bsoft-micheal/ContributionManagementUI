@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Grid,
@@ -11,9 +11,21 @@ import {
   Chip,
   Tooltip,
   Button,
+  Avatar,
+  TextField,
+  InputAdornment,
+  IconButton,
+  CircularProgress,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
-import { Delete as DeleteIcon } from "@mui/icons-material";
+import {
+  Delete as DeleteIcon,
+  CheckCircle as CheckCircleIcon,
+  HourglassEmpty as HourglassEmptyIcon,
+  Search as SearchIcon,
+  Close as CloseIcon,
+} from "@mui/icons-material";
 import dayjs from "dayjs";
 import { formatViewDate } from "../../utils/dateHelper";
 import { formatWholeCurrency, roundToWhole } from "../../utils/roundingHelper";
@@ -33,6 +45,10 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
   const navigate = useNavigate();
   const toast = useAppToast();
   const { authState } = useAuth();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  const [memberViewTab, setMemberViewTab] = useState("split");
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [internalMembers, setInternalMembers] = useState([]);
@@ -146,10 +162,6 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     (m) => m && m.isActive !== false && !m.isExited && !m.isDeleted
   );
 
-  if (!open || !event) {
-    return null;
-  }
-
   const allocatedAmt = (activeEvent?.useAvailableBalance || event?.useAvailableBalance)
     ? Number(activeEvent?.allocatedAmount ?? event?.allocatedAmount ?? 0)
     : 0;
@@ -162,11 +174,56 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
       ? Math.max(0, (Number(activeEvent?.baseAmount ?? event?.baseAmount ?? 0) || rawBudget) - allocatedAmt)
       : (Number(activeEvent?.totalExpectedAmount ?? event?.totalExpectedAmount) || rawBudget)
   );
-  const totalPaid = (contributions || [])
-    .filter((c) => c.paymentStatus === "Paid")
-    .reduce((sum, c) => sum + roundToWhole(c.amount || 0), 0);
+
+  const isContributionPaid = (c) => {
+    const rawStatus = String(c.paymentStatus || c.statusName || c.status || "").trim().toLowerCase();
+    const hasPaidAmt = Number(c.paidAmount || c.amountPaid || 0) > 0;
+    const hasCash = Number(c.cashAmount || 0) > 0;
+    const hasUpi = Number(c.upiAmount || 0) > 0;
+    return rawStatus === "paid" || Number(c.paymentStatus) === 2 || ["verified", "closed", "completed"].includes(rawStatus) || (hasPaidAmt || hasCash || hasUpi);
+  };
+
+  const paidList = useMemo(() => {
+    return (contributions || []).filter(isContributionPaid);
+  }, [contributions]);
+
+  const unpaidList = useMemo(() => {
+    return (contributions || []).filter((c) => !isContributionPaid(c));
+  }, [contributions]);
+
+  const totalPaid = useMemo(() => {
+    return paidList.reduce((sum, c) => sum + roundToWhole(Number(c.paidAmount || c.amount || 0)), 0);
+  }, [paidList]);
+
   const totalUnpaid = Math.max(0, totalExpected - totalPaid);
-  const unpaidList = (contributions || []).filter((c) => c.paymentStatus !== "Paid");
+
+  const getMemberWorkType = (memberId, memberName) => {
+    const m = allMembers.find(
+      (mem) =>
+        (memberId && (String(mem.id) === String(memberId) || String(mem.memberId) === String(memberId))) ||
+        (memberName && (mem.name || mem.fullName || "").trim().toLowerCase() === String(memberName).trim().toLowerCase())
+    );
+    return m?.workType || "Office";
+  };
+
+  const getInitials = (name) => {
+    if (!name) return "M";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const filteredPaid = useMemo(() => {
+    if (!memberSearchQuery.trim()) return paidList;
+    const q = memberSearchQuery.toLowerCase().trim();
+    return paidList.filter((c) => (c.memberName || "").toLowerCase().includes(q));
+  }, [paidList, memberSearchQuery]);
+
+  const filteredUnpaid = useMemo(() => {
+    if (!memberSearchQuery.trim()) return unpaidList;
+    const q = memberSearchQuery.toLowerCase().trim();
+    return unpaidList.filter((c) => (c.memberName || "").toLowerCase().includes(q));
+  }, [unpaidList, memberSearchQuery]);
 
   const isBirthday = Boolean(
     event?.eventTypeName?.toLowerCase().includes("birthday") ||
@@ -617,6 +674,10 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
   const overviewText = isBirthday && tableMembers.length > 0
     ? getOverviewText()
     : stripContribMeta(activeEvent?.description || event?.description || "");
+
+  if (!open || !event) {
+    return null;
+  }
 
   return (
     <>
@@ -1152,52 +1213,544 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
             </Grid>
           </Grid>
 
-          {/* Unpaid Members List */}
-          {unpaidList.length > 0 && (
-            <Grid size={{ xs: 12 }}>
+          {/* ── Paid & Unpaid Member Status Section ── */}
+          <Grid size={{ xs: 12 }}>
+            <Box
+              sx={{
+                p: { xs: 1.5, sm: 2 },
+                borderRadius: "12px",
+                border: "1px solid",
+                borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)",
+                bgcolor: isDark ? "rgba(255, 255, 255, 0.02)" : "rgba(74, 63, 107, 0.02)",
+                mt: 0.5,
+              }}
+            >
+              {/* Section Header with Controls */}
               <Box
                 sx={{
-                  p: 1.5,
-                  bgcolor: "rgba(220, 38, 38, 0.02)",
-                  borderRadius: "6px",
-                  border: "1px solid rgba(220, 38, 38, 0.08)",
-                  mt: 1,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1.5,
+                  mb: 2,
                 }}
               >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 800,
-                    color: "#dc2626",
-                    fontSize: "0.65rem",
-                    display: "block",
-                    mb: 1,
-                  }}
-                >
-                  Unpaid List
-                </Typography>
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                  {unpaidList.map((c) => (
-                    <Typography
-                      key={c.memberId}
-                      variant="caption"
+                {/* Left: Section Title & Filter Tabs */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: "0.82rem",
+                      color: isDark ? "#ffffff" : "#2a1b4d",
+                      mr: 1,
+                    }}
+                  >
+                    Member Contribution Status
+                  </Typography>
+
+                  {/* Segmented Filter Pills */}
+                  <Box
+                    sx={{
+                      display: "inline-flex",
+                      p: "3px",
+                      borderRadius: "8px",
+                      bgcolor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)",
+                      border: "1px solid",
+                      borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      onClick={() => setMemberViewTab("split")}
                       sx={{
-                        px: 1.5,
-                        py: 0.4,
-                        bgcolor: "rgba(220, 38, 38, 0.05)",
-                        color: "#dc2626",
-                        borderRadius: "4px",
-                        fontSize: "0.68rem",
+                        textTransform: "none",
                         fontWeight: 700,
+                        fontSize: "0.72rem",
+                        py: 0.4,
+                        px: 1.2,
+                        minHeight: 26,
+                        height: 26,
+                        borderRadius: "6px",
+                        bgcolor: memberViewTab === "split"
+                          ? isDark ? "#4a3f6b" : "#ffffff"
+                          : "transparent",
+                        color: memberViewTab === "split"
+                          ? isDark ? "#ffffff" : "#4a3f6b"
+                          : "text.secondary",
+                        boxShadow: memberViewTab === "split" ? "0 1px 4px rgba(0,0,0,0.12)" : "none",
+                        "&:hover": {
+                          bgcolor: memberViewTab === "split"
+                            ? isDark ? "#5a4f7c" : "#ffffff"
+                            : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+                        },
                       }}
                     >
-                      {c.memberName}
-                    </Typography>
-                  ))}
+                      Split View
+                    </Button>
+
+                    <Button
+                      size="small"
+                      onClick={() => setMemberViewTab("paid")}
+                      sx={{
+                        textTransform: "none",
+                        fontWeight: 700,
+                        fontSize: "0.72rem",
+                        py: 0.4,
+                        px: 1.2,
+                        minHeight: 26,
+                        height: 26,
+                        borderRadius: "6px",
+                        bgcolor: memberViewTab === "paid"
+                          ? isDark ? "rgba(16, 185, 129, 0.25)" : "#dcfce7"
+                          : "transparent",
+                        color: memberViewTab === "paid"
+                          ? isDark ? "#34d399" : "#15803d"
+                          : "text.secondary",
+                        boxShadow: memberViewTab === "paid" ? "0 1px 4px rgba(0,0,0,0.12)" : "none",
+                        "&:hover": {
+                          bgcolor: memberViewTab === "paid"
+                            ? isDark ? "rgba(16, 185, 129, 0.35)" : "#bbf7d0"
+                            : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+                        },
+                      }}
+                    >
+                      Paid ({paidList.length})
+                    </Button>
+
+                    <Button
+                      size="small"
+                      onClick={() => setMemberViewTab("unpaid")}
+                      sx={{
+                        textTransform: "none",
+                        fontWeight: 700,
+                        fontSize: "0.72rem",
+                        py: 0.4,
+                        px: 1.2,
+                        minHeight: 26,
+                        height: 26,
+                        borderRadius: "6px",
+                        bgcolor: memberViewTab === "unpaid"
+                          ? isDark ? "rgba(244, 63, 94, 0.25)" : "#ffe4e6"
+                          : "transparent",
+                        color: memberViewTab === "unpaid"
+                          ? isDark ? "#fb7185" : "#be123c"
+                          : "text.secondary",
+                        boxShadow: memberViewTab === "unpaid" ? "0 1px 4px rgba(0,0,0,0.12)" : "none",
+                        "&:hover": {
+                          bgcolor: memberViewTab === "unpaid"
+                            ? isDark ? "rgba(244, 63, 94, 0.35)" : "#fecdd3"
+                            : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+                        },
+                      }}
+                    >
+                      Unpaid ({unpaidList.length})
+                    </Button>
+                  </Box>
                 </Box>
+
+                {/* Right: Quick Search Box */}
+                <TextField
+                  size="small"
+                  placeholder="Search member..."
+                  value={memberSearchQuery}
+                  onChange={(e) => setMemberSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: memberSearchQuery ? (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setMemberSearchQuery("")} sx={{ p: 0.2 }}>
+                          <CloseIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
+                    sx: {
+                      height: 30,
+                      fontSize: "0.75rem",
+                      borderRadius: "6px",
+                      width: { xs: "100%", sm: 200 },
+                      bgcolor: isDark ? "rgba(255, 255, 255, 0.05)" : "#ffffff",
+                    },
+                  }}
+                />
               </Box>
-            </Grid>
-          )}
+
+              {/* Loading State */}
+              {loading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Grid container spacing={2}>
+                  {/* Paid Members Column */}
+                  {(memberViewTab === "split" || memberViewTab === "paid") && (
+                    <Grid size={{ xs: 12, md: memberViewTab === "split" ? 6 : 12 }}>
+                      <Box
+                        sx={{
+                          borderRadius: "10px",
+                          border: "1px solid",
+                          borderColor: isDark ? "rgba(16, 185, 129, 0.25)" : "rgba(16, 185, 129, 0.3)",
+                          bgcolor: isDark ? "rgba(16, 185, 129, 0.03)" : "#ffffff",
+                          overflow: "hidden",
+                          boxShadow: isDark
+                            ? "0 2px 8px rgba(0, 0, 0, 0.3)"
+                            : "0 2px 8px rgba(16, 185, 129, 0.05)",
+                        }}
+                      >
+                        {/* Header */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            p: 1.25,
+                            px: 1.5,
+                            bgcolor: isDark ? "rgba(16, 185, 129, 0.12)" : "rgba(16, 185, 129, 0.08)",
+                            borderBottom: "1px solid",
+                            borderColor: isDark ? "rgba(16, 185, 129, 0.2)" : "rgba(16, 185, 129, 0.15)",
+                          }}
+                        >
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                            <CheckCircleIcon sx={{ fontSize: 17, color: "#10b981" }} />
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.78rem", color: isDark ? "#34d399" : "#15803d" }}>
+                              Paid Members
+                            </Typography>
+                            <Chip
+                              size="small"
+                              label={`${filteredPaid.length}${memberSearchQuery ? ` / ${paidList.length}` : ""}`}
+                              sx={{
+                                height: 20,
+                                fontSize: "0.65rem",
+                                fontWeight: 800,
+                                bgcolor: isDark ? "rgba(16, 185, 129, 0.25)" : "#dcfce7",
+                                color: isDark ? "#34d399" : "#15803d",
+                              }}
+                            />
+                          </Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.78rem", color: isDark ? "#34d399" : "#15803d" }}>
+                            {formatWholeCurrency(totalPaid)}
+                          </Typography>
+                        </Box>
+
+                        {/* List */}
+                        <Box
+                          sx={{
+                            p: 1.25,
+                            maxHeight: 280,
+                            overflowY: "auto",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 0.8,
+                          }}
+                        >
+                          {filteredPaid.length > 0 ? (
+                            <Box
+                              sx={{
+                                display: "grid",
+                                gridTemplateColumns: memberViewTab === "paid" ? { xs: "1fr", sm: "repeat(2, 1fr)" } : "1fr",
+                                gap: 0.8,
+                              }}
+                            >
+                              {filteredPaid.map((c) => {
+                                const workType = c.workType || getMemberWorkType(c.memberId, c.memberName);
+                                const initials = getInitials(c.memberName);
+                                const amountVal = Number(c.paidAmount || c.amount || 0);
+                                return (
+                                  <Box
+                                    key={c.memberId || c.contributionId}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      p: 1,
+                                      px: 1.25,
+                                      borderRadius: "8px",
+                                      bgcolor: isDark ? "rgba(16, 185, 129, 0.05)" : "rgba(16, 185, 129, 0.04)",
+                                      border: "1px solid",
+                                      borderColor: isDark ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                                      transition: "all 0.15s ease",
+                                      "&:hover": {
+                                        bgcolor: isDark ? "rgba(16, 185, 129, 0.1)" : "rgba(16, 185, 129, 0.08)",
+                                        transform: "translateY(-1px)",
+                                      },
+                                    }}
+                                  >
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, pr: 1 }}>
+                                      <Avatar
+                                        sx={{
+                                          width: 28,
+                                          height: 28,
+                                          fontSize: "0.68rem",
+                                          fontWeight: 800,
+                                          bgcolor: isDark ? "rgba(16, 185, 129, 0.25)" : "rgba(16, 185, 129, 0.15)",
+                                          color: "#10b981",
+                                          border: "1px solid rgba(16, 185, 129, 0.3)",
+                                        }}
+                                      >
+                                        {initials}
+                                      </Avatar>
+                                      <Box sx={{ minWidth: 0 }}>
+                                        <Typography
+                                          variant="body2"
+                                          noWrap
+                                          title={c.memberName}
+                                          sx={{
+                                            fontWeight: 700,
+                                            fontSize: "0.78rem",
+                                            color: isDark ? "#ffffff" : "text.primary",
+                                          }}
+                                        >
+                                          {c.memberName}
+                                        </Typography>
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.6, mt: 0.2 }}>
+                                          <Chip
+                                            size="small"
+                                            label={workType}
+                                            sx={{
+                                              height: 16,
+                                              fontSize: "0.6rem",
+                                              fontWeight: 700,
+                                              bgcolor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
+                                              color: "text.secondary",
+                                              "& .MuiChip-label": { px: 0.6 },
+                                            }}
+                                          />
+                                          {c.paymentMode && (
+                                            <Typography variant="caption" sx={{ fontSize: "0.62rem", color: "text.secondary" }}>
+                                              • {c.paymentMode}
+                                            </Typography>
+                                          )}
+                                        </Box>
+                                      </Box>
+                                    </Box>
+
+                                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          fontWeight: 800,
+                                          fontSize: "0.82rem",
+                                          color: "#10b981",
+                                        }}
+                                      >
+                                        {formatWholeCurrency(amountVal)}
+                                      </Typography>
+                                      <Chip
+                                        size="small"
+                                        label="Paid"
+                                        sx={{
+                                          height: 18,
+                                          fontSize: "0.62rem",
+                                          fontWeight: 800,
+                                          mt: 0.2,
+                                          bgcolor: isDark ? "rgba(16, 185, 129, 0.2)" : "#dcfce7",
+                                          color: isDark ? "#34d399" : "#15803d",
+                                          "& .MuiChip-label": { px: 0.8 },
+                                        }}
+                                      />
+                                    </Box>
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                          ) : (
+                            <Box sx={{ py: 4, textAlign: "center", color: "text.secondary" }}>
+                              <Typography variant="body2" sx={{ fontSize: "0.75rem", fontStyle: "italic" }}>
+                                {memberSearchQuery ? "No paid members match your search" : "No payments received yet"}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </Grid>
+                  )}
+
+                  {/* Unpaid Members Column */}
+                  {(memberViewTab === "split" || memberViewTab === "unpaid") && (
+                    <Grid size={{ xs: 12, md: memberViewTab === "split" ? 6 : 12 }}>
+                      <Box
+                        sx={{
+                          borderRadius: "10px",
+                          border: "1px solid",
+                          borderColor: isDark ? "rgba(244, 63, 94, 0.25)" : "rgba(244, 63, 94, 0.3)",
+                          bgcolor: isDark ? "rgba(244, 63, 94, 0.03)" : "#ffffff",
+                          overflow: "hidden",
+                          boxShadow: isDark
+                            ? "0 2px 8px rgba(0, 0, 0, 0.3)"
+                            : "0 2px 8px rgba(244, 63, 94, 0.05)",
+                        }}
+                      >
+                        {/* Header */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            p: 1.25,
+                            px: 1.5,
+                            bgcolor: isDark ? "rgba(244, 63, 94, 0.12)" : "rgba(244, 63, 94, 0.08)",
+                            borderBottom: "1px solid",
+                            borderColor: isDark ? "rgba(244, 63, 94, 0.2)" : "rgba(244, 63, 94, 0.15)",
+                          }}
+                        >
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                            <HourglassEmptyIcon sx={{ fontSize: 17, color: "#f43f5e" }} />
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.78rem", color: isDark ? "#fb7185" : "#be123c" }}>
+                              Unpaid Members
+                            </Typography>
+                            <Chip
+                              size="small"
+                              label={`${filteredUnpaid.length}${memberSearchQuery ? ` / ${unpaidList.length}` : ""}`}
+                              sx={{
+                                height: 20,
+                                fontSize: "0.65rem",
+                                fontWeight: 800,
+                                bgcolor: isDark ? "rgba(244, 63, 94, 0.25)" : "#ffe4e6",
+                                color: isDark ? "#fb7185" : "#be123c",
+                              }}
+                            />
+                          </Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.78rem", color: isDark ? "#fb7185" : "#be123c" }}>
+                            {formatWholeCurrency(totalUnpaid)}
+                          </Typography>
+                        </Box>
+
+                        {/* List */}
+                        <Box
+                          sx={{
+                            p: 1.25,
+                            maxHeight: 280,
+                            overflowY: "auto",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 0.8,
+                          }}
+                        >
+                          {filteredUnpaid.length > 0 ? (
+                            <Box
+                              sx={{
+                                display: "grid",
+                                gridTemplateColumns: memberViewTab === "unpaid" ? { xs: "1fr", sm: "repeat(2, 1fr)" } : "1fr",
+                                gap: 0.8,
+                              }}
+                            >
+                              {filteredUnpaid.map((c) => {
+                                const workType = c.workType || getMemberWorkType(c.memberId, c.memberName);
+                                const initials = getInitials(c.memberName);
+                                const amountVal = Number(c.amount || 0);
+                                return (
+                                  <Box
+                                    key={c.memberId || c.contributionId}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      p: 1,
+                                      px: 1.25,
+                                      borderRadius: "8px",
+                                      bgcolor: isDark ? "rgba(244, 63, 94, 0.05)" : "rgba(244, 63, 94, 0.04)",
+                                      border: "1px solid",
+                                      borderColor: isDark ? "rgba(244, 63, 94, 0.15)" : "rgba(244, 63, 94, 0.15)",
+                                      transition: "all 0.15s ease",
+                                      "&:hover": {
+                                        bgcolor: isDark ? "rgba(244, 63, 94, 0.1)" : "rgba(244, 63, 94, 0.08)",
+                                        transform: "translateY(-1px)",
+                                      },
+                                    }}
+                                  >
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, pr: 1 }}>
+                                      <Avatar
+                                        sx={{
+                                          width: 28,
+                                          height: 28,
+                                          fontSize: "0.68rem",
+                                          fontWeight: 800,
+                                          bgcolor: isDark ? "rgba(244, 63, 94, 0.25)" : "rgba(244, 63, 94, 0.15)",
+                                          color: "#f43f5e",
+                                          border: "1px solid rgba(244, 63, 94, 0.3)",
+                                        }}
+                                      >
+                                        {initials}
+                                      </Avatar>
+                                      <Box sx={{ minWidth: 0 }}>
+                                        <Typography
+                                          variant="body2"
+                                          noWrap
+                                          title={c.memberName}
+                                          sx={{
+                                            fontWeight: 700,
+                                            fontSize: "0.78rem",
+                                            color: isDark ? "#ffffff" : "text.primary",
+                                          }}
+                                        >
+                                          {c.memberName}
+                                        </Typography>
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.6, mt: 0.2 }}>
+                                          <Chip
+                                            size="small"
+                                            label={workType}
+                                            sx={{
+                                              height: 16,
+                                              fontSize: "0.6rem",
+                                              fontWeight: 700,
+                                              bgcolor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
+                                              color: "text.secondary",
+                                              "& .MuiChip-label": { px: 0.6 },
+                                            }}
+                                          />
+                                        </Box>
+                                      </Box>
+                                    </Box>
+
+                                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          fontWeight: 800,
+                                          fontSize: "0.82rem",
+                                          color: "#f43f5e",
+                                        }}
+                                      >
+                                        {formatWholeCurrency(amountVal)}
+                                      </Typography>
+                                      <Chip
+                                        size="small"
+                                        label="Pending"
+                                        sx={{
+                                          height: 18,
+                                          fontSize: "0.62rem",
+                                          fontWeight: 800,
+                                          mt: 0.2,
+                                          bgcolor: isDark ? "rgba(244, 63, 94, 0.2)" : "#ffe4e6",
+                                          color: isDark ? "#fb7185" : "#be123c",
+                                          "& .MuiChip-label": { px: 0.8 },
+                                        }}
+                                      />
+                                    </Box>
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                          ) : (
+                            <Box sx={{ py: 4, textAlign: "center", color: "text.secondary" }}>
+                              <Typography variant="body2" sx={{ fontSize: "0.75rem", fontStyle: "italic" }}>
+                                {memberSearchQuery ? "No unpaid members match your search" : "All members have cleared dues! 🎉"}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
+              )}
+            </Box>
+          </Grid>
         </Grid>
       </AppDialog>
 

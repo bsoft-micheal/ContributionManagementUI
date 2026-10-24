@@ -634,11 +634,28 @@ export default function SubmitPaymentModal({
       return;
     }
 
+    const matchingEvents = (eventsList || []).filter(
+      (ev) => matchedEventCategory(ev).toLowerCase() === newCategory.toLowerCase()
+    );
+
+    // If exactly one event exists for this category, auto-bind it
+    if (matchingEvents.length === 1) {
+      const singleEvent = matchingEvents[0];
+      const singleName = singleEvent.title || singleEvent.name || singleEvent.eventName;
+      setFormData((prev) => ({ ...prev, eventCategory: newCategory }));
+      handleEventNameChange(singleName);
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.eventCategory;
+        return next;
+      });
+      return;
+    }
+
     // Changing Event Type: check if currently selected event belongs to the newly selected category
-    const isCurrentEventInNewCategory = (eventsList || []).some(
+    const isCurrentEventInNewCategory = matchingEvents.some(
       (ev) =>
-        (ev.title || ev.name || ev.eventName) === formData.eventName &&
-        matchedEventCategory(ev).toLowerCase() === newCategory.toLowerCase()
+        (ev.title || ev.name || ev.eventName) === formData.eventName
     );
 
     setFormData((prev) => ({
