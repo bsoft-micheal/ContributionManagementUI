@@ -1087,30 +1087,6 @@ export default function CalendarPage({ isEmbedded = false }) {
                   fullWidth
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 3, lg: 3.2 }}>
-                <AppInput
-                  size="small"
-                  label="Search"
-                  placeholder="Search Events..."
-                  value={filterSearch}
-                  onChange={(e) => setFilterSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleApplyFilter();
-                  }}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchRoundedIcon
-                            sx={{ fontSize: "1.1rem", color: "text.secondary" }}
-                          />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                  fullWidth
-                />
-              </Grid>
               <Grid size={{ xs: 12, sm: "auto", md: "auto" }}>
                 <Box
                   sx={{

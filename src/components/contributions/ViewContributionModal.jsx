@@ -842,19 +842,19 @@ export default function ViewContributionModal({
 
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">
-                  Event Name
+                  Event Type
                 </Typography>
-                <Typography variant="body2" fontWeight={700} color="primary.main">
-                  {currentEventName}
+                <Typography variant="body2" fontWeight={600}>
+                  {resolvedEventType}
                 </Typography>
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">
-                  Event Type
+                  Event Name
                 </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {resolvedEventType}
+                <Typography variant="body2" fontWeight={700} color="primary.main">
+                  {currentEventName}
                 </Typography>
               </Grid>
 
