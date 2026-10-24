@@ -868,16 +868,24 @@ export default function AppLayout() {
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", bgcolor: "background.default" }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        maxHeight: "100vh",
+        overflow: "hidden",
+        bgcolor: "background.default",
+      }}
+    >
       {/* Role Switching Fullscreen Transition Loader */}
       {isSwitchingRole && <AppPageLoader fullScreen opaque text="Switching role..." />}
 
-      {/* ── Top Horizontal Navigation Bar (Preserves Signature Theme) ────── */}
+      {/* ── Top Horizontal Navigation Bar (Static at Top) ────── */}
       <Box
         component="header"
         sx={{
-          position: "sticky",
-          top: 0,
+          flexShrink: 0,
           zIndex: 1100,
           width: "100%",
           bgcolor: NAVBAR.bg,
@@ -1409,11 +1417,15 @@ export default function AppLayout() {
         </Box>
       </Drawer>
 
-      {/* ── Main Content (100% Full Width Below Top Navbar) ─────────────── */}
+      {/* ── Main Content (Scrolls between Static Header & Footer) ──────── */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
+          flexShrink: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
           width: "100%",
           minWidth: 0,
           p: { xs: 2, sm: 2.5, md: 3 },
@@ -1432,13 +1444,14 @@ export default function AppLayout() {
         )}
       </Box>
 
-      {/* ── Industry Standard Footer ───────────────────────────────────────── */}
+      {/* ── Industry Standard Footer (Static at Bottom) ─────────────────────── */}
       <Box
         component="footer"
         sx={{
-          py: 1.25,
+          flexShrink: 0,
+          zIndex: 100,
+          py: 1.1,
           px: 2,
-          mt: "auto",
           bgcolor: (theme) => (theme.palette.mode === "dark" ? "#121526" : "#ffffff"),
           borderTop: "1px solid",
           borderColor: (theme) =>
