@@ -194,6 +194,7 @@ export default function StatusPage() {
       }
       setDialogOpen(false);
       loadData();
+      window.dispatchEvent(new CustomEvent("status_updated"));
     } catch (error) {
       toast.error(error, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     }
@@ -210,6 +211,7 @@ export default function StatusPage() {
         await deleteStatusAsync(itemToDelete);
         toast.success(TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadData();
+        window.dispatchEvent(new CustomEvent("status_updated"));
       } catch (error) {
         const rawMsg = error.response?.data?.message || error.response?.data?.title || error.message || "";
         if (/in use|referenced|associated|assigned|constraint|foreign key|cannot delete/i.test(rawMsg)) {
@@ -239,6 +241,7 @@ export default function StatusPage() {
       await updateStatusAsync(itemToToggle.statusId, payload);
       toast.success(TOAST_MESSAGES.GENERAL.STATUS_UPDATED_SUCCESS);
       loadData();
+      window.dispatchEvent(new CustomEvent("status_updated"));
     } catch (err) {
       toast.error(err, TOAST_MESSAGES.GENERAL.STATUS_UPDATE_FAILED);
     } finally {

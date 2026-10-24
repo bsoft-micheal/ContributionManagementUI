@@ -605,15 +605,20 @@ export default function MemberPaymentQuickAccess({
           </Box>
 
           <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<FileDownloadIcon sx={{ fontSize: 16 }} />}
-              onClick={handleExportCsv}
-              sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem", borderRadius: 2 }}
-            >
-              Export CSV
-            </Button>
+            <Tooltip title={activeCount === 0 ? "Record not found" : "Export CSV"}>
+              <span>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={activeCount === 0}
+                  startIcon={<FileDownloadIcon sx={{ fontSize: 16 }} />}
+                  onClick={handleExportCsv}
+                  sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem", borderRadius: 2 }}
+                >
+                  Export CSV
+                </Button>
+              </span>
+            </Tooltip>
             {onClose && (
               <IconButton size="small" onClick={onClose} sx={{ ml: 0.5 }}>
                 <CloseIcon fontSize="small" />

@@ -582,8 +582,10 @@ export default function ReportsPage({ mode = "event" }) {
         const params = { month: null, year: null };
         const { data: res } = await apiClient.get("/reports/getSummaryReportAsync", { params });
         setReport(res?.data !== undefined ? res.data : res);
-      } catch {
-        toast.error("Failed to load reports. Please try again.");
+      } catch (err) {
+        if (!err?.isRateLimit && err?.response?.status !== 429) {
+          toast.error("Failed to load reports. Please try again.");
+        }
       } finally {
         setLoading(false);
       }
@@ -692,14 +694,39 @@ export default function ReportsPage({ mode = "event" }) {
 
   const handleEventTypeChange = (newType) => {
     setFilterEventType(newType);
-    if (newType !== "ALL" && filterEvent !== "ALL") {
-      const isStillValid = (eventsList || []).some((e) => {
+    if (newType !== "ALL") {
+      const combined = [];
+      const unique = new Set();
+      (eventsList || []).forEach((e) => {
         const typeName = e.eventTypeName || e.category || eventTypesList.find((t) => t.eventTypeId === e.eventTypeId)?.eventTypeName || "General";
-        return (e.name || e.eventName) === filterEvent && typeName.toLowerCase() === newType.toLowerCase();
+        if (typeName.toLowerCase() === newType.toLowerCase()) {
+          const name = e.name || e.eventName;
+          if (name && !unique.has(name.toLowerCase())) {
+            unique.add(name.toLowerCase());
+            combined.push(name);
+          }
+        }
       });
-      if (!isStillValid) {
-        setFilterEvent("ALL");
+      (report?.eventCollections || []).forEach((ec) => {
+        const typeName = (ec.eventTypeName || "General").trim();
+        if (typeName.toLowerCase() === newType.toLowerCase()) {
+          if (ec.eventName && !unique.has(ec.eventName.toLowerCase())) {
+            unique.add(ec.eventName.toLowerCase());
+            combined.push(ec.eventName);
+          }
+        }
+      });
+
+      if (combined.length === 1) {
+        setFilterEvent(combined[0]);
+      } else {
+        const isStillValid = combined.includes(filterEvent);
+        if (!isStillValid) {
+          setFilterEvent("ALL");
+        }
       }
+    } else {
+      setFilterEvent("ALL");
     }
   };
 

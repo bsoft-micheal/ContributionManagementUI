@@ -135,12 +135,14 @@ export default function PaymentsPage() {
         list.push({ label: name, value: name });
       }
     });
-    ["Pending", "Verified", "Rejected"].forEach((s) => {
-      if (!seen.has(s.toLowerCase())) {
-        seen.add(s.toLowerCase());
-        list.push({ label: s, value: s });
-      }
-    });
+    if (list.length === 1) {
+      ["Pending", "Verified", "Rejected", "Paid", "Approved"].forEach((s) => {
+        if (!seen.has(s.toLowerCase())) {
+          seen.add(s.toLowerCase());
+          list.push({ label: s, value: s });
+        }
+      });
+    }
     return list;
   }, [dbStatuses]);
 
@@ -153,7 +155,7 @@ export default function PaymentsPage() {
         getPaymentTransactionsAsync().catch(() => []),
         getMembersAsync().catch(() => []),
         getEventsAsync().catch(() => []),
-        getStatusesAsync(true, "Contribution").catch(() => []),
+        getStatusesAsync(true).catch(() => []),
       ]);
 
       if (Array.isArray(memsRes)) setMembersList(memsRes);
@@ -189,8 +191,10 @@ export default function PaymentsPage() {
         const grouped = groupSplitTransactions(mapped);
         setTransactions(grouped);
       }
-    } catch {
-      toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
+    } catch (err) {
+      if (!err?.isRateLimit && err?.response?.status !== 429) {
+        toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
+      }
     } finally {
       setLoading(false);
     }
@@ -231,8 +235,19 @@ export default function PaymentsPage() {
       // Then reload from server to get accurate persisted data
       loadBackendData();
     };
+    const handleStatusUpdated = () => {
+      getStatusesAsync(true)
+        .then((res) => {
+          if (Array.isArray(res)) setDbStatuses(res);
+        })
+        .catch(() => {});
+    };
     window.addEventListener("contribution_updated", handleUpdate);
-    return () => window.removeEventListener("contribution_updated", handleUpdate);
+    window.addEventListener("status_updated", handleStatusUpdated);
+    return () => {
+      window.removeEventListener("contribution_updated", handleUpdate);
+      window.removeEventListener("status_updated", handleStatusUpdated);
+    };
   }, []);
 
   const filteredTransactions = useMemo(() => {
@@ -301,7 +316,7 @@ export default function PaymentsPage() {
 
     const st = String(status || "").toLowerCase().trim();
 
-    if (st === "verified" || st === "closed" || st === "paid") {
+    if (st === "verified" || st === "closed" || st === "paid" || st === "approved") {
       bg = "rgba(22, 163, 74, 0.1)";
       color = "#16a34a";
       border = "rgba(22, 163, 74, 0.25)";
@@ -469,6 +484,7 @@ export default function PaymentsPage() {
     {
       label: "Transaction ID",
       key: "id",
+      minWidth: 165,
       render: (row) => {
         const isSplit = row.isSplitGroup && Array.isArray(row.splits) && row.splits.length > 0;
 
@@ -729,6 +745,8 @@ export default function PaymentsPage() {
                 sx={{
                   color: (t) => (t.palette.mode === "dark" ? "#818cf8" : "#4f46e5"),
                   fontSize: "0.8rem",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.02em",
                   textDecoration: "underline",
                   textDecorationColor: "rgba(99, 102, 241, 0.3)",
                   textUnderlineOffset: "3px",

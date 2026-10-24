@@ -31,7 +31,6 @@ import {
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   HelpOutline as HelpOutlineIcon,
-  OpenInNew as OpenInNewIcon,
   ArrowForward as ArrowForwardIcon,
   FilterList as FilterListIcon,
 } from "@mui/icons-material";
@@ -402,9 +401,17 @@ export default function AnnualMemberMatrix({
     };
   }, [matrixData]);
 
+  /* ── Check if there are actual records to export ── */
+  const hasExportableRecords = useMemo(() => {
+    if (!matrixData || matrixData.length === 0) return false;
+    const totalEventsInMatrix = matrixData.reduce((acc, r) => acc + (r.annualEventsCount || 0), 0);
+    const totalFinancialActivity = (summaryTotals.grandExpected || 0) + (summaryTotals.grandPaid || 0) + (summaryTotals.grandPending || 0);
+    return totalEventsInMatrix > 0 || totalFinancialActivity > 0;
+  }, [matrixData, summaryTotals]);
+
   /* ── Export to Excel ── */
   const handleExportMatrix = () => {
-    if (!matrixData || matrixData.length === 0) return;
+    if (!hasExportableRecords) return;
 
     // Sheet 1: Matrix Overview
     const matrixSheet = matrixData.map((r) => {
@@ -926,6 +933,8 @@ export default function AnnualMemberMatrix({
             <AppButton
               size="small"
               variant="contained"
+              disabled={!hasExportableRecords}
+              disabledTooltip="Record not found"
               startIcon={<FileDownloadIcon sx={{ fontSize: 17 }} />}
               onClick={handleExportMatrix}
               sx={{
@@ -935,7 +944,7 @@ export default function AnnualMemberMatrix({
                 fontWeight: 700,
                 px: 2,
                 borderRadius: "8px",
-                boxShadow: "0 2px 8px rgba(99, 102, 241, 0.25)",
+                boxShadow: hasExportableRecords ? "0 2px 8px rgba(99, 102, 241, 0.25)" : "none",
                 whiteSpace: "nowrap",
               }}
             >
@@ -1067,29 +1076,13 @@ export default function AnnualMemberMatrix({
               >
                 Total Pending
               </TableCell>
-
-              <TableCell
-                align="center"
-                sx={{
-                  bgcolor: isDark ? "#1f1b2e" : "#f8fafc",
-                  fontWeight: 800,
-                  fontSize: "0.74rem",
-                  textTransform: "uppercase",
-                  color: "text.secondary",
-                  minWidth: 70,
-                  borderBottom: `2px solid ${isDark ? "rgba(255,255,255,0.1)" : "#cbd5e1"}`,
-                  py: 1.5,
-                }}
-              >
-                Action
-              </TableCell>
             </TableRow>
           </TableHead>
 
           <TableBody>
             {matrixData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={16} sx={{ py: 8, textAlign: "center" }}>
+                <TableCell colSpan={15} sx={{ py: 8, textAlign: "center" }}>
                   <Typography variant="body1" fontWeight={700} color="text.secondary">
                     No members match the selected criteria for {selectedYear}
                   </Typography>
@@ -1160,28 +1153,6 @@ export default function AnnualMemberMatrix({
                           >
                             {row.memberName}
                           </Typography>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.6, mt: 0.2 }}>
-                            {row.workType && (
-                              <Chip
-                                size="small"
-                                label={row.workType}
-                                sx={{
-                                  fontSize: "0.62rem",
-                                  height: 18,
-                                  fontWeight: 600,
-                                  bgcolor: row.workType.toLowerCase() === "wfh"
-                                    ? (isDark ? "rgba(59, 130, 246, 0.18)" : "rgba(59, 130, 246, 0.1)")
-                                    : (isDark ? "rgba(16, 185, 129, 0.18)" : "rgba(16, 185, 129, 0.1)"),
-                                  color: row.workType.toLowerCase() === "wfh" ? "#3b82f6" : "#10b981",
-                                }}
-                              />
-                            )}
-                            {row.email && (
-                              <Typography variant="caption" noWrap sx={{ fontSize: "0.68rem", color: "text.disabled", maxWidth: 110 }}>
-                                {row.email}
-                              </Typography>
-                            )}
-                          </Box>
                         </Box>
                       </Box>
                     </TableCell>
@@ -1212,25 +1183,6 @@ export default function AnnualMemberMatrix({
                       >
                         {INR(row.totalAnnualPending)}
                       </Typography>
-                    </TableCell>
-
-                    {/* Action */}
-                    <TableCell align="center" sx={{ py: 1 }}>
-                      <Tooltip title="View member events breakdown">
-                        <IconButton
-                          size="small"
-                          onClick={() => onOpenMemberDetails && onOpenMemberDetails(row)}
-                          sx={{
-                            color: "primary.main",
-                            bgcolor: isDark ? "rgba(99, 102, 241, 0.1)" : "rgba(99, 102, 241, 0.06)",
-                            "&:hover": {
-                              bgcolor: isDark ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.14)",
-                            },
-                          }}
-                        >
-                          <OpenInNewIcon sx={{ fontSize: 15 }} />
-                        </IconButton>
-                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 );
@@ -1342,19 +1294,6 @@ export default function AnnualMemberMatrix({
                   <Typography variant="body2" fontWeight={900} sx={{ color: "#f43f5e", fontSize: "0.85rem" }}>
                     {INR(summaryTotals.grandPending)}
                   </Typography>
-                </TableCell>
-
-                <TableCell
-                  align="center"
-                  sx={{
-                    position: "sticky",
-                    bottom: 0,
-                    bgcolor: isDark ? "#241f36" : "#f1f5f9",
-                    borderTop: `2px solid ${isDark ? "rgba(255,255,255,0.15)" : "#cbd5e1"}`,
-                    py: 1.5,
-                  }}
-                >
-                  —
                 </TableCell>
               </TableRow>
             </TableFooter>
