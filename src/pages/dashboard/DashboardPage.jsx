@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
+  ButtonBase,
   Card,
   CardContent,
   Chip,
@@ -541,6 +542,49 @@ function CollapsibleSection({ title, count, children, defaultOpen = true }) {
         <Box sx={{ pt: 2 }}>{children}</Box>
       </Collapse>
     </Box>
+  );
+}
+
+/* ─── Modern Segmented Nav Tab (Matching Reports Model) ─── */
+function SegmentedTab({ label, icon: Icon, isActive, onClick }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <ButtonBase
+      onClick={onClick}
+      sx={{
+        px: 2,
+        height: 34,
+        borderRadius: "8px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 0.8,
+        fontSize: "0.82rem",
+        fontWeight: isActive ? 700 : 600,
+        color: isActive ? "#ffffff" : isDark ? "text.secondary" : "#334155",
+        bgcolor: isActive
+          ? "#31275d"
+          : isDark ? "transparent" : "#ffffff",
+        boxShadow: isActive
+          ? "0 2px 8px rgba(49, 39, 93, 0.3)"
+          : isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.04)",
+        border: isActive
+          ? "1px solid #31275d"
+          : `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0"}`,
+        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+        "&:hover": {
+          color: isActive ? "#ffffff" : "text.primary",
+          bgcolor: isActive
+            ? "#31275d"
+            : isDark
+              ? "rgba(255, 255, 255, 0.06)"
+              : "#f8fafc",
+        },
+      }}
+    >
+      {Icon && <Icon sx={{ fontSize: 17 }} />}
+      {label}
+    </ButtonBase>
   );
 }
 
@@ -1423,105 +1467,110 @@ export default function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="page-shell">
-      {/* ── Top Dashboard / Calendar Navigation Tabs ────────────────────── */}
-      <Box
+      {/* ── Top Header Bar Card (Matching Reports / AppDataTable Model) ── */}
+      <Card
         sx={{
-          display: "flex",
-          alignItems: "center",
-          borderBottom: (theme) =>
+          overflow: "hidden",
+          borderRadius: "12px",
+          border: (theme) =>
             theme.palette.mode === "dark"
-              ? "1px solid rgba(255, 255, 255, 0.12)"
-              : "1px solid rgba(74, 63, 107, 0.15)",
-          mb: 0.5,
+              ? "1.5px solid rgba(124, 58, 237, 0.5)"
+              : "1.5px solid rgba(74, 63, 107, 0.35)",
+          boxShadow: (theme) =>
+            theme.palette.mode === "dark"
+              ? "0 4px 20px rgba(0, 0, 0, 0.4)"
+              : "0 4px 20px rgba(74, 63, 107, 0.1)",
+          mb: 3,
         }}
       >
-        <Tabs
-          value={activeTab}
-          onChange={(_, val) => handleTabChange(val)}
+        {/* ── Top Purple Header Bar ──── */}
+        <Box
           sx={{
+            background: (theme) =>
+              theme.palette.mode === "dark"
+                ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
+                : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+            borderBottom: (theme) =>
+              theme.palette.mode === "dark"
+                ? "1px solid rgba(255, 255, 255, 0.15)"
+                : "none",
+            color: "#ffffff",
+            px: { xs: 2.5, sm: 3 },
+            py: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             minHeight: 46,
-            "& .MuiTabs-indicator": {
-              height: 3,
-              borderRadius: "3px 3px 0 0",
-              background: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "linear-gradient(90deg, #a78bfa 0%, #c4b5fd 100%)"
-                  : "linear-gradient(90deg, #4a3f6b 0%, #6f5bd3 100%)",
-            },
-            "& .MuiTab-root": {
-              minHeight: 46,
-              textTransform: "none",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              px: { xs: 2.5, sm: 3.5 },
-              py: 1,
-              borderRadius: "8px 8px 0 0",
-              color: "text.secondary",
-              transition: "all 0.2s ease",
-              "&.Mui-selected": {
-                color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                fontWeight: 700,
-              },
-              "&:hover": {
-                color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.04)"
-                    : "rgba(74, 63, 107, 0.04)",
-              },
-            },
           }}
         >
-          <Tab
-            value="dashboard"
-            icon={<DashboardRoundedIcon sx={{ fontSize: "1.15rem" }} />}
-            iconPosition="start"
-            label="Dashboard"
-          />
-          <Tab
-            value="calendar"
-            icon={<CalendarMonthRoundedIcon sx={{ fontSize: "1.15rem" }} />}
-            iconPosition="start"
-            label="Calendar"
-          />
-        </Tabs>
-      </Box>
+          <Typography
+            variant="subtitle2"
+            fontWeight={600}
+            sx={{ fontSize: "0.9375rem", letterSpacing: "-0.005em", color: "#ffffff" }}
+          >
+            {activeTab === "calendar" ? "Event Calendar" : "Dashboard"}
+          </Typography>
+        </Box>
+
+        {/* ── Filter / Navigation Panel (Matching Reports Model) ──── */}
+        <Box
+          sx={{
+            p: { xs: 2, sm: 2.25 },
+            px: { xs: 2, sm: 3 },
+            bgcolor: isDark ? "background.paper" : "#fcfcff",
+          }}
+        >
+          <Stack spacing={2} sx={{ width: "100%" }}>
+            {/* Navigation Segmented Track */}
+            <Box
+              sx={{
+                display: "inline-flex",
+                p: "4px",
+                borderRadius: "8px",
+                bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(74, 63, 107, 0.05)",
+                border: "1px solid",
+                borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(74, 63, 107, 0.12)",
+                gap: 0.6,
+                width: "fit-content",
+                flexWrap: "wrap",
+              }}
+            >
+              <SegmentedTab
+                label="Dashboard"
+                icon={DashboardRoundedIcon}
+                isActive={activeTab === "dashboard"}
+                onClick={() => handleTabChange("dashboard")}
+              />
+              <SegmentedTab
+                label="Calendar"
+                icon={CalendarMonthRoundedIcon}
+                isActive={activeTab === "calendar"}
+                onClick={() => handleTabChange("calendar")}
+              />
+            </Box>
+
+            {/* Filter Bar (Visible in Dashboard Tab) */}
+            {activeTab === "dashboard" && (
+              <FilterBar
+                pending={pendingFilters}
+                onChange={handleFilterChange}
+                onFilter={handleFilter}
+                onClear={handleClear}
+                yearOptions={dynamicYearOptions}
+                eventTypeOptions={eventTypeOptions}
+                eventOptions={eventOptions}
+                loading={loading}
+              />
+            )}
+          </Stack>
+        </Box>
+      </Card>
 
       {/* ── Tab Content ─────────────────────────────────────────────── */}
       {activeTab === "calendar" ? (
         <CalendarPage isEmbedded />
       ) : (
-        <>
-          {/* ── Top Filter Bar ────────────────────────────────────────────────── */}
-          <Card
-            sx={{
-              p: { xs: 2, sm: 2.25 },
-              px: { xs: 2, sm: 3 },
-              borderRadius: 3,
-              overflow: "visible",
-              bgcolor: isDark ? "background.paper" : "#ffffff",
-              border: `1px solid ${theme.palette.divider}`,
-              boxShadow: isDark
-                ? "0 4px 20px rgba(0,0,0,0.25)"
-                : "0 2px 12px rgba(0,0,0,0.03)",
-            }}
-          >
-            <FilterBar
-              pending={pendingFilters}
-              onChange={handleFilterChange}
-              onFilter={handleFilter}
-              onClear={handleClear}
-              yearOptions={dynamicYearOptions}
-              eventTypeOptions={eventTypeOptions}
-              eventOptions={eventOptions}
-              loading={loading}
-            />
-          </Card>
-
-          {/* ── Content ─────────────────────────────────────────────────────── */}
-          <Stack spacing={3}>
+        <Stack spacing={3}>
 
             {/* ① Top Summary Metric Cards */}
             <Box
@@ -1656,8 +1705,7 @@ export default function DashboardPage() {
               <AppDataTable columns={columns} data={events} loading={false} />
             </CollapsibleSection>
           </Stack>
-        </>
-      )}
+        )}
 
       {/* Quick Access Slide-Over Drawer */}
       <Drawer

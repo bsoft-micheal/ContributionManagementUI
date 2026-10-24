@@ -1001,36 +1001,38 @@ export default function CalendarPage({ isEmbedded = false }) {
         }}
       >
         {/* ── Top Header Bar (Matching Members Details / AppDataTable) ──── */}
-        <Box
-          sx={{
-            background: (theme) =>
-              theme.palette.mode === "dark"
-                ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
-                : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
-            borderBottom: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
-            color: "#ffffff",
-            px: { xs: 2.5, sm: 3 },
-            py: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            minHeight: 48,
-          }}
-        >
-          <Box>
-            <Typography
-              variant="subtitle2"
-              fontWeight={700}
-              sx={{
-                fontSize: "0.95rem",
-                letterSpacing: "0.02em",
-                color: "#ffffff",
-              }}
-            >
-              Event Calendar
-            </Typography>
+        {!isEmbedded && (
+          <Box
+            sx={{
+              background: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
+                  : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+              borderBottom: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
+              color: "#ffffff",
+              px: { xs: 2.5, sm: 3 },
+              py: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              minHeight: 48,
+            }}
+          >
+            <Box>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                sx={{
+                  fontSize: "0.95rem",
+                  letterSpacing: "0.02em",
+                  color: "#ffffff",
+                }}
+              >
+                Event Calendar
+              </Typography>
+            </Box>
           </Box>
-        </Box>
+        )}
 
         <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
           {/* Filter Bar & Stat Badges */}
