@@ -277,6 +277,7 @@ export default function ExpensePage() {
   const [appliedEvent, setAppliedEvent] = useState("ALL");
   const [appliedCategory, setAppliedCategory] = useState("ALL");
   const [appliedStatus, setAppliedStatus] = useState("ALL");
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
 
   const fetchExpensesFromDb = async () => {
     try {
@@ -386,10 +387,12 @@ export default function ExpensePage() {
       if (location.state.filterEvent) {
         setFilterEvent(location.state.filterEvent);
         setAppliedEvent(location.state.filterEvent);
+        setHasAppliedFilter(true);
       }
       if (location.state.filterCategory) {
         setFilterCategory(location.state.filterCategory);
         setAppliedCategory(location.state.filterCategory);
+        setHasAppliedFilter(true);
       }
       if (location.state.openAddExpense) {
         if (location.state.eventName) {
@@ -1326,7 +1329,8 @@ export default function ExpensePage() {
       <AppDataTable
         title="Expense Details"
         columns={columns}
-        data={filteredExpenses}
+        data={hasAppliedFilter ? filteredExpenses : []}
+        emptyMessage={!hasAppliedFilter ? "Please select filters and click Filter to view expenses." : undefined}
         loading={loading}
         allowExport={canExportExpense}
         searchPlaceholder="Search by Expense ID ,..."
@@ -1416,6 +1420,7 @@ export default function ExpensePage() {
                     setAppliedEvent(filterEvent);
                     setAppliedCategory(filterCategory);
                     setAppliedStatus(filterStatus);
+                    setHasAppliedFilter(true);
                   }}
                   sx={{
                     height: 34,
@@ -1441,6 +1446,7 @@ export default function ExpensePage() {
                     setAppliedEvent("ALL");
                     setAppliedCategory("ALL");
                     setAppliedStatus("ALL");
+                    setHasAppliedFilter(false);
                   }}
                   sx={{
                     color: "#ef4444",
@@ -1463,7 +1469,7 @@ export default function ExpensePage() {
             </Box>
 
             {/* 4 Summary Budget KPI Cards Under the Filter */}
-            {pageBudgetSummary && (
+            {hasAppliedFilter && pageBudgetSummary && (
               <Box
                 sx={{
                   display: "grid",

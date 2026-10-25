@@ -83,6 +83,7 @@ import {
   createEventAsync,
   updateEventAsync,
   getEventByIdAsync,
+  getEventsAsync,
   getAvailableAmountInHandAsync,
 } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
@@ -405,6 +406,7 @@ export default function EventFormPage({
   const [loading, setLoading] = useState(true);
 
   const [eventTypes, setEventTypes] = useState([]);
+  const [existingEvents, setExistingEvents] = useState([]);
   const [members, setMembers] = useState([]);
   const [budgetItemsList, setBudgetItemsList] = useState([]);
   const [allowMultipleEvents, setAllowMultipleEvents] = useState(false);
@@ -469,7 +471,7 @@ export default function EventFormPage({
     async function initData() {
       setLoading(true);
       try {
-        const [typesData, usersData, budgetData, settingsData, amountInHandData] = await Promise.all([
+        const [typesData, usersData, budgetData, settingsData, amountInHandData, allEventsData] = await Promise.all([
           (propEventTypes && propEventTypes.length > 0)
             ? Promise.resolve(propEventTypes)
             : getEventTypesAsync(isEdit),
@@ -479,9 +481,12 @@ export default function EventFormPage({
           getBudgetCalculationsAsync().catch(() => []),
           getSystemSettingsAsync().catch(() => null),
           getAvailableAmountInHandAsync().catch(() => null),
+          getEventsAsync().catch(() => []),
         ]);
 
         if (!isMounted) return;
+
+        setExistingEvents(Array.isArray(allEventsData) ? allEventsData : []);
 
         const handAmt = amountInHandData?.availableAmountInHand ?? amountInHandData?.data?.availableAmountInHand ?? 0;
         setAvailableAmountInHand(Number(handAmt) || 0);
@@ -917,20 +922,41 @@ export default function EventFormPage({
           setMarriageCelebrantIds([]);
           setSendOffMemberIds([]);
 
-          const isDefaultBday = Boolean(bdayType && defaultTypeId === bdayType.eventTypeId);
-          const defaultTypeName = (typesData || []).find((t) => t.eventTypeId === defaultTypeId)?.eventTypeName || "";
+          const targetMonthNum = defaultDate && defaultDate.isValid() ? defaultDate.month() + 1 : -1;
+          const targetYearNum = defaultDate && defaultDate.isValid() ? defaultDate.year() : -1;
+
+          // Find available event types for this month/year that do not have an existing event
+          const availableTypes = (typesData || []).filter((t) => {
+            const alreadyExists = (allEventsData || []).some((ev) => {
+              if (ev.isDeleted) return false;
+              const evDate = ev.eventDate ? dayjs(ev.eventDate) : null;
+              if (!evDate || !evDate.isValid()) return false;
+              if (evDate.month() + 1 !== targetMonthNum || evDate.year() !== targetYearNum) return false;
+
+              if (ev.eventTypeId === t.eventTypeId) return true;
+              if (Array.isArray(ev.eventTypeIds) && ev.eventTypeIds.includes(t.eventTypeId)) return true;
+              return false;
+            });
+            return !alreadyExists;
+          });
+
+          const initialSelectedType = availableTypes.find((t) => t.eventTypeName?.toLowerCase().includes("birthday")) || availableTypes[0] || null;
+          const initialTypeId = initialSelectedType ? initialSelectedType.eventTypeId : "";
+          const initialTypeName = initialSelectedType ? initialSelectedType.eventTypeName : "";
+          const isInitialBday = Boolean(initialTypeName?.toLowerCase().includes("birthday"));
+
           const monthStr = defaultDate && defaultDate.isValid() ? defaultDate.format("MMMM") : "";
           let initialEventName = "";
-          if (isDefaultBday) {
+          if (isInitialBday) {
             initialEventName = monthStr ? `${monthStr} Birthday Celebration` : "Birthday Celebration";
-          } else if (defaultTypeName) {
-            initialEventName = monthStr ? `${monthStr} ${defaultTypeName} Celebration` : `${defaultTypeName} Celebration`;
+          } else if (initialTypeName) {
+            initialEventName = monthStr ? `${monthStr} ${initialTypeName} Celebration` : `${initialTypeName} Celebration`;
           }
 
           setForm({
             eventName: sanitizeEventName(initialEventName),
-            eventTypeId: defaultTypeId,
-            eventTypeIds: defaultTypeId ? [defaultTypeId] : [],
+            eventTypeId: initialTypeId,
+            eventTypeIds: initialTypeId ? [initialTypeId] : [],
             eventDate: defaultDate,
             description: "",
             baseAmount: "",
@@ -2144,10 +2170,46 @@ export default function EventFormPage({
       setWfhBirthdays(wfhCount);
     }
 
+    // If date changed in create mode, verify if currently selected event type(s) already exist in the new month/year
+    let adjustedTypeId = form.eventTypeId;
+    let adjustedTypeIds = Array.isArray(form.eventTypeIds) ? [...form.eventTypeIds] : [];
+
+    if (!isEdit && validDate && dayjs(validDate).isValid()) {
+      const targetMonthNum = dayjs(validDate).month() + 1;
+      const targetYearNum = dayjs(validDate).year();
+
+      const isTypeTaken = (tid) => {
+        return (existingEvents || []).some((ev) => {
+          if (ev.isDeleted) return false;
+          const evDate = ev.eventDate ? dayjs(ev.eventDate) : null;
+          if (!evDate || !evDate.isValid()) return false;
+          if (evDate.month() + 1 !== targetMonthNum || evDate.year() !== targetYearNum) return false;
+          if (ev.eventTypeId === tid) return true;
+          if (Array.isArray(ev.eventTypeIds) && ev.eventTypeIds.includes(tid)) return true;
+          return false;
+        });
+      };
+
+      if (adjustedTypeId && isTypeTaken(adjustedTypeId)) {
+        // Find first available type
+        const firstAvailable = eventTypes.find((t) => !isTypeTaken(t.eventTypeId));
+        adjustedTypeId = firstAvailable ? firstAvailable.eventTypeId : "";
+      }
+
+      if (adjustedTypeIds.length > 0) {
+        adjustedTypeIds = adjustedTypeIds.filter((tid) => !isTypeTaken(tid));
+        if (adjustedTypeIds.length === 0 && adjustedTypeId) {
+          adjustedTypeIds = [adjustedTypeId];
+        }
+      }
+    }
+
     setForm((c) => ({
       ...c,
       eventDate: validDate,
       eventName: newEventName,
+      eventTypeId: adjustedTypeId,
+      eventTypeIds: adjustedTypeIds,
     }));
     if (validDate && form.eventTypeId) {
       const dateStr = dayjs(validDate).format("YYYY-MM-DD");
@@ -2586,10 +2648,77 @@ export default function EventFormPage({
     }
   };
 
-  const typeOptions = eventTypes.map((t) => ({
-    label: t.eventTypeName,
-    value: t.eventTypeId,
-  }));
+  const typeOptions = useMemo(() => {
+    const selectedDate = form.eventDate ? dayjs(form.eventDate) : dayjs();
+    const targetMonth = selectedDate.month() + 1; // 1-12
+    const targetYear = selectedDate.year();
+
+    return eventTypes
+      .filter((t) => {
+        // In edit mode, allow keeping the event's current event type(s)
+        if (id) {
+          if (form.eventTypeId === t.eventTypeId) return true;
+          if (Array.isArray(form.eventTypeIds) && form.eventTypeIds.includes(t.eventTypeId)) return true;
+        }
+
+        // Check if an active (non-deleted) event of this type already exists in this month and year
+        const alreadyExists = (existingEvents || []).some((ev) => {
+          if (id && (ev.eventId === id || ev.id === id)) return false;
+          if (ev.isDeleted) return false;
+
+          const evDate = ev.eventDate ? dayjs(ev.eventDate) : null;
+          if (!evDate || !evDate.isValid()) return false;
+
+          const evMonth = evDate.month() + 1;
+          const evYear = evDate.year();
+
+          // 1. Primary event type check
+          if (ev.eventTypeId === t.eventTypeId && evMonth === targetMonth && evYear === targetYear) {
+            return true;
+          }
+
+          // 2. Multi-type check via eventTypeIds
+          if (Array.isArray(ev.eventTypeIds) && ev.eventTypeIds.includes(t.eventTypeId) && evMonth === targetMonth && evYear === targetYear) {
+            return true;
+          }
+
+          // 3. Serialized EventDates check
+          if (ev.eventDates && typeof ev.eventDates === "string" && ev.eventDates.trim().startsWith("{")) {
+            try {
+              const parsed = JSON.parse(ev.eventDates);
+              for (const [key, val] of Object.entries(parsed)) {
+                let matchesType = key === t.eventTypeId ||
+                  String(key).toLowerCase().replace(/[\s_-]/g, "") === String(t.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
+
+                if (matchesType) {
+                  if (typeof val === "string") {
+                    const d = dayjs(val);
+                    if (d.isValid() && d.month() + 1 === targetMonth && d.year() === targetYear) {
+                      return true;
+                    }
+                  } else if (val && typeof val === "object") {
+                    for (const subVal of Object.values(val)) {
+                      const d = dayjs(subVal);
+                      if (d.isValid() && d.month() + 1 === targetMonth && d.year() === targetYear) {
+                        return true;
+                      }
+                    }
+                  }
+                }
+              }
+            } catch {}
+          }
+
+          return false;
+        });
+
+        return !alreadyExists;
+      })
+      .map((t) => ({
+        label: t.eventTypeName,
+        value: t.eventTypeId,
+      }));
+  }, [eventTypes, existingEvents, form.eventDate, form.eventTypeId, form.eventTypeIds, id]);
 
   if (loading) {
     if (isDialog) {

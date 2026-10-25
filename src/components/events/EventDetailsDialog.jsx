@@ -707,28 +707,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
         }
       >
         <Grid container spacing={3}>
-          {/* Event Identity */}
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Box>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: 800,
-                  color: "text.secondary",
-                  fontSize: "0.65rem",
-                  display: "block",
-                  mb: 0.2,
-                }}
-              >
-                Event Name
-              </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
-                {event?.eventName || ""}
-              </Typography>
-            </Box>
-          </Grid>
-
-          {/* Category */}
+          {/* Category / Event Type */}
           <Grid size={{ xs: 6, sm: 3, md: 2 }}>
             <Box>
               <Typography
@@ -800,8 +779,29 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
             </Box>
           </Grid>
 
+          {/* Event Identity / Event Name */}
+          <Grid size={{ xs: 6, sm: 3, md: 3 }}>
+            <Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 800,
+                  color: "text.secondary",
+                  fontSize: "0.65rem",
+                  display: "block",
+                  mb: 0.2,
+                }}
+              >
+                Event Name
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
+                {event?.eventName || ""}
+              </Typography>
+            </Box>
+          </Grid>
+
           {/* Date */}
-          <Grid size={{ xs: 6, sm: 3, md: parsedEventDates && Object.keys(parsedEventDates).length > 1 ? 3 : 2 }}>
+          <Grid size={{ xs: 6, sm: 3, md: parsedEventDates && Object.keys(parsedEventDates).length > 1 ? 3 : 2.5 }}>
             <Box>
               <Typography
                 variant="caption"
@@ -846,94 +846,8 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
             </Box>
           </Grid>
 
-          {/* Support Tickets Raised */}
-          <Grid size={{ xs: 6, sm: 3, md: 2 }}>
-            <Box>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: 800,
-                  color: "text.secondary",
-                  fontSize: "0.65rem",
-                  display: "block",
-                  mb: 0.2,
-                }}
-              >
-                Support Tickets Raised
-              </Typography>
-              <Box sx={{ mt: 0.5 }}>
-                {(() => {
-                  const count = Number(event?.supportTicketRaisedCount ?? event?.SupportTicketRaisedCount ?? 0);
-                  if (count > 0) {
-                    return (
-                      <Tooltip title={`View ${count} support ticket${count > 1 ? "s" : ""} for ${event?.eventName || "this event"}`}>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={() => {
-                            onClose();
-                            navigate("/support-tickets", {
-                              state: {
-                                eventId: event?.eventId || event?.id,
-                                eventName: event?.eventName,
-                                relatedEvent: event?.eventName,
-                              },
-                            });
-                          }}
-                          sx={{
-                            minWidth: 40,
-                            height: 26,
-                            px: 1.4,
-                            py: 0.2,
-                            fontWeight: 700,
-                            fontSize: "0.78rem",
-                            borderRadius: "13px",
-                            bgcolor: (theme) => theme.palette.mode === "dark" ? "#7c3aed" : "#4a3f6b",
-                            color: "#ffffff",
-                            boxShadow: "0 2px 6px rgba(74, 63, 107, 0.3)",
-                            textTransform: "none",
-                            "&:hover": {
-                              bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d28d9" : "#3b3156",
-                              boxShadow: "0 4px 10px rgba(74, 63, 107, 0.45)",
-                            },
-                          }}
-                        >
-                          {count}
-                        </Button>
-                      </Tooltip>
-                    );
-                  }
-                  return (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      disabled
-                      sx={{
-                        minWidth: 40,
-                        height: 26,
-                        px: 1.4,
-                        py: 0.2,
-                        fontWeight: 600,
-                        fontSize: "0.78rem",
-                        borderRadius: "13px",
-                        color: "text.secondary !important",
-                        borderColor: (theme) =>
-                          theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)",
-                        bgcolor: "transparent",
-                        textTransform: "none",
-                        cursor: "not-allowed",
-                      }}
-                    >
-                      0
-                    </Button>
-                  );
-                })()}
-              </Box>
-            </Box>
-          </Grid>
-
           {/* Created By */}
-          <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+          <Grid size={{ xs: 6, sm: 3, md: 2.25 }}>
             <Box>
               <Typography
                 variant="caption"
@@ -954,7 +868,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
           </Grid>
 
           {/* Created On */}
-          <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+          <Grid size={{ xs: 6, sm: 3, md: 2.25 }}>
             <Box>
               <Typography
                 variant="caption"

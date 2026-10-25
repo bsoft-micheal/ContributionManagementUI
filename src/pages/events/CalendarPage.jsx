@@ -32,7 +32,7 @@ import apiClient from "../../services/apiClient";
 import { getMembersAsync } from "../../services/memberService";
 import { getUsersAsync } from "../../services/userService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
-import { getEventByIdAsync } from "../../services/eventService";
+import { getEventByIdAsync, getEventsAsync } from "../../services/eventService";
 import {
   getContributionsAsync,
   getContributionsByEventAsync,
@@ -152,6 +152,8 @@ export default function CalendarPage({ isEmbedded = false }) {
   const [filterYear, setFilterYear] = useState(currentYear);
   const [filterCategory, setFilterCategory] = useState("ALL");
   const [filterSearch, setFilterSearch] = useState("");
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [filterLookupEvents, setFilterLookupEvents] = useState([]);
 
   // Applied filter state (drives data fetching, calendar grid & sidebar)
   const [appliedFilters, setAppliedFilters] = useState({
@@ -168,6 +170,30 @@ export default function CalendarPage({ isEmbedded = false }) {
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
   const [contributions, setContributions] = useState([]);
+
+  // Automatically fetch events available in selected month and year for cascading dropdowns
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchLookupEvents() {
+      try {
+        const m = Number(filterMonth);
+        const y = Number(filterYear);
+        const data = await getEventsAsync({
+          month: m > 0 ? m : undefined,
+          year: y > 0 ? y : undefined,
+        });
+        if (!cancelled && Array.isArray(data)) {
+          setFilterLookupEvents(data.filter((e) => !e.isDeleted));
+        }
+      } catch {
+        if (!cancelled) setFilterLookupEvents([]);
+      }
+    }
+    fetchLookupEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [filterMonth, filterYear]);
 
   // Strictly filter to active, non-exited, non-deleted member accounts
   const activeMembers = useMemo(() => {
@@ -211,6 +237,7 @@ export default function CalendarPage({ isEmbedded = false }) {
       search: filterSearch.trim(),
     };
     setAppliedFilters(next);
+    setHasAppliedFilter(true);
     loadCalendarData(next);
   };
 
@@ -226,7 +253,8 @@ export default function CalendarPage({ isEmbedded = false }) {
       search: "",
     };
     setAppliedFilters(reset);
-    loadCalendarData(reset);
+    setEvents([]);
+    setHasAppliedFilter(false);
   };
 
   const handleEventDeleted = (deletedEventId) => {
@@ -241,9 +269,7 @@ export default function CalendarPage({ isEmbedded = false }) {
     loadCalendarData(appliedFilters);
   };
 
-  useEffect(() => {
-    loadCalendarData(appliedFilters);
-  }, []);
+  // Initial load: Do not load data automatically below filter section
 
   useEffect(() => {
     async function loadEventTypesAndMembers() {
@@ -391,18 +417,8 @@ export default function CalendarPage({ isEmbedded = false }) {
     const set = new Set();
     const list = [{ label: "All Events", value: "ALL" }];
 
-    // 1. From eventTypes loaded from backend API
-    (eventTypes || []).forEach((t) => {
-      const name = t.eventTypeName || t.typeName || t.name || t.nameEn;
-      if (name && !set.has(name.toLowerCase())) {
-        set.add(name.toLowerCase());
-        list.push({ label: name, value: name });
-      }
-    });
-
-    // 2. Also ensure any category present in loaded events is included
-    (events || []).forEach((e) => {
-      const name = e.eventTypeName;
+    (filterLookupEvents || []).forEach((e) => {
+      const name = (e.eventTypeName || e.category || "").trim();
       if (name && !set.has(name.toLowerCase())) {
         set.add(name.toLowerCase());
         list.push({ label: name, value: name });
@@ -410,7 +426,7 @@ export default function CalendarPage({ isEmbedded = false }) {
     });
 
     return list;
-  }, [eventTypes, events]);
+  }, [filterLookupEvents]);
 
   // Keep filterCategory valid if options change
   useEffect(() => {
@@ -1001,36 +1017,38 @@ export default function CalendarPage({ isEmbedded = false }) {
         }}
       >
         {/* ── Top Header Bar (Matching Members Details / AppDataTable) ──── */}
-        <Box
-          sx={{
-            background: (theme) =>
-              theme.palette.mode === "dark"
-                ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
-                : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
-            borderBottom: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
-            color: "#ffffff",
-            px: { xs: 2.5, sm: 3 },
-            py: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            minHeight: 48,
-          }}
-        >
-          <Box>
-            <Typography
-              variant="subtitle2"
-              fontWeight={700}
-              sx={{
-                fontSize: "0.95rem",
-                letterSpacing: "0.02em",
-                color: "#ffffff",
-              }}
-            >
-              Event Calendar
-            </Typography>
+        {!isEmbedded && (
+          <Box
+            sx={{
+              background: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
+                  : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+              borderBottom: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
+              color: "#ffffff",
+              px: { xs: 2.5, sm: 3 },
+              py: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              minHeight: 48,
+            }}
+          >
+            <Box>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                sx={{
+                  fontSize: "0.95rem",
+                  letterSpacing: "0.02em",
+                  color: "#ffffff",
+                }}
+              >
+                Event Calendar
+              </Typography>
+            </Box>
           </Box>
-        </Box>
+        )}
 
         <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
           {/* Filter Bar & Stat Badges */}
@@ -1084,30 +1102,6 @@ export default function CalendarPage({ isEmbedded = false }) {
                   onChange={(e) => setFilterCategory(e.target.value)}
                   onClear={() => setFilterCategory("ALL")}
                   options={categoryOptions}
-                  fullWidth
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 3, lg: 3.2 }}>
-                <AppInput
-                  size="small"
-                  label="Search"
-                  placeholder="Search Events..."
-                  value={filterSearch}
-                  onChange={(e) => setFilterSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleApplyFilter();
-                  }}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchRoundedIcon
-                            sx={{ fontSize: "1.1rem", color: "text.secondary" }}
-                          />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
                   fullWidth
                 />
               </Grid>
@@ -1168,7 +1162,32 @@ export default function CalendarPage({ isEmbedded = false }) {
           </Box>
 
           {/* 75% / 25% Split: 75% Calendar + 25% Birthday Members List */}
-          <Grid container>
+          {!hasAppliedFilter ? (
+            <Box
+              sx={{
+                py: 8,
+                px: 2,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                gap: 1.5,
+                borderTop: (theme) => `1px dashed ${theme.palette.divider}`,
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "rgba(0, 0, 0, 0.01)",
+              }}
+            >
+              <FilterListIcon sx={{ fontSize: 44, color: "text.disabled" }} />
+              <Typography variant="h6" fontWeight={600} color="text.primary">
+                No Calendar Data Displayed
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 450 }}>
+                Please select your filter criteria above and click <strong>Filter</strong> to view calendar events and celebrants.
+              </Typography>
+            </Box>
+          ) : (
+            <Grid container>
             {/* 75% Calendar Area */}
             <Grid
               size={{ xs: 12, lg: 9 }}
@@ -2059,6 +2078,7 @@ export default function CalendarPage({ isEmbedded = false }) {
               </Box>
             </Grid>
           </Grid>
+        )}
         </CardContent>
       </Card>
 

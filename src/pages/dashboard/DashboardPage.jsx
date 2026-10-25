@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
+  ButtonBase,
   Card,
   CardContent,
   Chip,
@@ -38,6 +39,7 @@ import AppButton from "../../components/common/AppButton";
 import { COMMON_STRINGS } from "../../constants";
 import { getDashboardSummaryAsync } from "../../services/dashboardService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getEventsAsync } from "../../services/eventService";
 import { formatWholeCurrency, formatWholeNumber } from "../../utils/roundingHelper";
 import { getMembersAsync } from "../../services/memberService";
 import { useAppToast } from "../../components/common/AppToast";
@@ -544,6 +546,49 @@ function CollapsibleSection({ title, count, children, defaultOpen = true }) {
   );
 }
 
+/* ─── Modern Segmented Nav Tab (Matching Reports Model) ─── */
+function SegmentedTab({ label, icon: Icon, isActive, onClick }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <ButtonBase
+      onClick={onClick}
+      sx={{
+        px: 2,
+        height: 34,
+        borderRadius: "8px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 0.8,
+        fontSize: "0.82rem",
+        fontWeight: isActive ? 700 : 600,
+        color: isActive ? "#ffffff" : isDark ? "text.secondary" : "#334155",
+        bgcolor: isActive
+          ? "#31275d"
+          : isDark ? "transparent" : "#ffffff",
+        boxShadow: isActive
+          ? "0 2px 8px rgba(49, 39, 93, 0.3)"
+          : isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.04)",
+        border: isActive
+          ? "1px solid #31275d"
+          : `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0"}`,
+        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+        "&:hover": {
+          color: isActive ? "#ffffff" : "text.primary",
+          bgcolor: isActive
+            ? "#31275d"
+            : isDark
+              ? "rgba(255, 255, 255, 0.06)"
+              : "#f8fafc",
+        },
+      }}
+    >
+      {Icon && <Icon sx={{ fontSize: 17 }} />}
+      {label}
+    </ButtonBase>
+  );
+}
+
 // ─── Filter Bar ───────────────────────────────────────────────────────────────
 
 const MONTH_OPTIONS = [
@@ -709,7 +754,9 @@ export default function DashboardPage() {
   };
 
   const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [filterEventsList, setFilterEventsList] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [quickAccessDrawerOpen, setQuickAccessDrawerOpen] = useState(false);
   const [quickAccessStatus, setQuickAccessStatus] = useState("all");
@@ -733,6 +780,30 @@ export default function DashboardPage() {
     eventType: "ALL",
     eventId: "ALL",
   });
+
+  // Automatically fetch events available in selected month and year for cascading dropdowns
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPeriodEvents() {
+      try {
+        const m = Number(pendingFilters.month);
+        const y = Number(pendingFilters.year);
+        const data = await getEventsAsync({
+          month: m > 0 ? m : undefined,
+          year: y > 0 ? y : undefined,
+        });
+        if (!cancelled && Array.isArray(data)) {
+          setFilterEventsList(data.filter((e) => !e.isDeleted));
+        }
+      } catch {
+        if (!cancelled) setFilterEventsList([]);
+      }
+    }
+    loadPeriodEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingFilters.month, pendingFilters.year]);
 
   // Fetch event types for filter dropdown
   useEffect(() => {
@@ -763,10 +834,7 @@ export default function DashboardPage() {
     }
   }, [toast]);
 
-  // Initial load
-  useEffect(() => {
-    loadDashboard(appliedFilters.month, appliedFilters.year);
-  }, []);
+  // Initial load: Do not load data automatically below filter section (waits for Filter button click)
 
   // Detect today's birthdays on login & trigger celebratory pop up message only once per login session
   useEffect(() => {
@@ -824,27 +892,37 @@ export default function DashboardPage() {
     };
   }, [hasCelebrated, summary]);
 
-  // Build Event Type options combining API categories and any upcoming events
+  // Build Event Type options strictly from events available in selected month & year
   const eventTypeOptions = useMemo(() => {
     const options = [
       { label: COMMON_STRINGS.DASHBOARD?.ALL_EVENT_TYPES || "All Event Types", value: "ALL" },
     ];
     const set = new Set();
-    eventTypes.forEach((t) => {
-      const name = t.eventTypeName || t.name;
+    filterEventsList.forEach((e) => {
+      const name = (e.eventTypeName || e.category || "").trim();
       if (name && !set.has(name.toLowerCase())) {
         set.add(name.toLowerCase());
         options.push({ label: name, value: name });
       }
     });
-    (summary?.upcomingEvents ?? []).forEach((e) => {
-      if (e.eventTypeName && !set.has(e.eventTypeName.toLowerCase())) {
-        set.add(e.eventTypeName.toLowerCase());
-        options.push({ label: e.eventTypeName, value: e.eventTypeName });
-      }
-    });
     return options;
-  }, [eventTypes, summary?.upcomingEvents]);
+  }, [filterEventsList]);
+
+  // Reset invalid dependent Event Type and Event Name when options change
+  useEffect(() => {
+    if (pendingFilters.eventType && pendingFilters.eventType !== "ALL") {
+      const isValid = eventTypeOptions.some(
+        (opt) => opt.value.toLowerCase() === pendingFilters.eventType.toLowerCase()
+      );
+      if (!isValid) {
+        setPendingFilters((prev) => ({
+          ...prev,
+          eventType: "ALL",
+          eventId: "ALL",
+        }));
+      }
+    }
+  }, [eventTypeOptions, pendingFilters.eventType]);
 
   // Dynamic Year Options calculated from current year window + any event years in the database
   const dynamicYearOptions = useMemo(() => {
@@ -853,7 +931,7 @@ export default function DashboardPage() {
     for (let i = currentYear - 5; i <= currentYear + 5; i++) {
       yearsSet.add(i);
     }
-    (summary?.upcomingEvents || []).forEach((e) => {
+    filterEventsList.forEach((e) => {
       const d = e.eventDate || e.createdOn || e.date;
       if (d) {
         const y = dayjs(d).year();
@@ -867,31 +945,30 @@ export default function DashboardPage() {
       { label: "All", value: 0 },
       ...sortedYears.map((y) => ({ label: String(y), value: y })),
     ];
-  }, [summary?.upcomingEvents]);
+  }, [filterEventsList]);
 
-  // Build Event options cascading from pendingFilters.eventType
+  // Build Event options cascading from month, year, and pendingFilters.eventType
   const eventOptions = useMemo(() => {
     const options = [
       { label: COMMON_STRINGS.DASHBOARD?.ALL_EVENTS || "All Events", value: "ALL" },
     ];
-    const allEventsList = summary?.upcomingEvents ?? [];
     const selectedType = pendingFilters.eventType;
-
     const matchingEvents =
       !selectedType || selectedType === "ALL"
-        ? allEventsList
-        : allEventsList.filter(
-          (e) => (e.eventTypeName || "").toLowerCase() === selectedType.toLowerCase()
-        );
+        ? filterEventsList
+        : filterEventsList.filter(
+            (e) => (e.eventTypeName || e.category || "").toLowerCase() === selectedType.toLowerCase()
+          );
 
     const seen = new Set();
     matchingEvents.forEach((e) => {
-      if (e.eventName) {
-        const val = e.eventId ? String(e.eventId) : e.eventName;
+      const name = e.eventName || e.name;
+      if (name) {
+        const val = e.eventId ? String(e.eventId) : name;
         if (!seen.has(val)) {
           seen.add(val);
           options.push({
-            label: e.eventName,
+            label: name,
             value: val,
           });
         }
@@ -899,7 +976,22 @@ export default function DashboardPage() {
     });
 
     return options;
-  }, [summary?.upcomingEvents, pendingFilters.eventType]);
+  }, [filterEventsList, pendingFilters.eventType]);
+
+  // Reset invalid dependent Event Name when eventOptions change
+  useEffect(() => {
+    if (pendingFilters.eventId && pendingFilters.eventId !== "ALL") {
+      const isValid = eventOptions.some(
+        (opt) => String(opt.value) === String(pendingFilters.eventId)
+      );
+      if (!isValid) {
+        setPendingFilters((prev) => ({
+          ...prev,
+          eventId: "ALL",
+        }));
+      }
+    }
+  }, [eventOptions, pendingFilters.eventId]);
 
   function handleFilterChange(key, value) {
     let normalizedVal = value;
@@ -912,9 +1004,8 @@ export default function DashboardPage() {
     if (key === "eventType") {
       let autoEventId = "ALL";
       if (normalizedVal && normalizedVal !== "ALL") {
-        const allEventsList = summary?.upcomingEvents ?? [];
-        const matchingEvents = allEventsList.filter(
-          (e) => (e.eventTypeName || "").toLowerCase() === normalizedVal.toLowerCase()
+        const matchingEvents = filterEventsList.filter(
+          (e) => (e.eventTypeName || e.category || "").toLowerCase() === normalizedVal.toLowerCase()
         );
         const uniqueEvents = [];
         const seen = new Set();
@@ -942,6 +1033,7 @@ export default function DashboardPage() {
 
   function handleFilter() {
     setAppliedFilters({ ...pendingFilters });
+    setHasAppliedFilter(true);
     loadDashboard(pendingFilters.month, pendingFilters.year);
   }
 
@@ -954,7 +1046,8 @@ export default function DashboardPage() {
     };
     setPendingFilters(defaultValues);
     setAppliedFilters(defaultValues);
-    loadDashboard(0, 0);
+    setSummary(null);
+    setHasAppliedFilter(false);
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -1423,105 +1516,134 @@ export default function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="page-shell">
-      {/* ── Top Dashboard / Calendar Navigation Tabs ────────────────────── */}
-      <Box
+      {/* ── Top Header Bar Card (Matching Reports / AppDataTable Model) ── */}
+      <Card
         sx={{
-          display: "flex",
-          alignItems: "center",
-          borderBottom: (theme) =>
+          overflow: "hidden",
+          borderRadius: "12px",
+          border: (theme) =>
             theme.palette.mode === "dark"
-              ? "1px solid rgba(255, 255, 255, 0.12)"
-              : "1px solid rgba(74, 63, 107, 0.15)",
-          mb: 0.5,
+              ? "1.5px solid rgba(124, 58, 237, 0.5)"
+              : "1.5px solid rgba(74, 63, 107, 0.35)",
+          boxShadow: (theme) =>
+            theme.palette.mode === "dark"
+              ? "0 4px 20px rgba(0, 0, 0, 0.4)"
+              : "0 4px 20px rgba(74, 63, 107, 0.1)",
+          mb: 3,
         }}
       >
-        <Tabs
-          value={activeTab}
-          onChange={(_, val) => handleTabChange(val)}
+        {/* ── Top Purple Header Bar ──── */}
+        <Box
           sx={{
+            background: (theme) =>
+              theme.palette.mode === "dark"
+                ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
+                : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+            borderBottom: (theme) =>
+              theme.palette.mode === "dark"
+                ? "1px solid rgba(255, 255, 255, 0.15)"
+                : "none",
+            color: "#ffffff",
+            px: { xs: 2.5, sm: 3 },
+            py: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             minHeight: 46,
-            "& .MuiTabs-indicator": {
-              height: 3,
-              borderRadius: "3px 3px 0 0",
-              background: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "linear-gradient(90deg, #a78bfa 0%, #c4b5fd 100%)"
-                  : "linear-gradient(90deg, #4a3f6b 0%, #6f5bd3 100%)",
-            },
-            "& .MuiTab-root": {
-              minHeight: 46,
-              textTransform: "none",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              px: { xs: 2.5, sm: 3.5 },
-              py: 1,
-              borderRadius: "8px 8px 0 0",
-              color: "text.secondary",
-              transition: "all 0.2s ease",
-              "&.Mui-selected": {
-                color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                fontWeight: 700,
-              },
-              "&:hover": {
-                color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.04)"
-                    : "rgba(74, 63, 107, 0.04)",
-              },
-            },
           }}
         >
-          <Tab
-            value="dashboard"
-            icon={<DashboardRoundedIcon sx={{ fontSize: "1.15rem" }} />}
-            iconPosition="start"
-            label="Dashboard"
-          />
-          <Tab
-            value="calendar"
-            icon={<CalendarMonthRoundedIcon sx={{ fontSize: "1.15rem" }} />}
-            iconPosition="start"
-            label="Calendar"
-          />
-        </Tabs>
-      </Box>
+          <Typography
+            variant="subtitle2"
+            fontWeight={600}
+            sx={{ fontSize: "0.9375rem", letterSpacing: "-0.005em", color: "#ffffff" }}
+          >
+            {activeTab === "calendar" ? "Event Calendar" : "Dashboard"}
+          </Typography>
+        </Box>
+
+        {/* ── Filter / Navigation Panel (Matching Reports Model) ──── */}
+        <Box
+          sx={{
+            p: { xs: 2, sm: 2.25 },
+            px: { xs: 2, sm: 3 },
+            bgcolor: isDark ? "background.paper" : "#fcfcff",
+          }}
+        >
+          <Stack spacing={2} sx={{ width: "100%" }}>
+            {/* Navigation Segmented Track */}
+            <Box
+              sx={{
+                display: "inline-flex",
+                p: "4px",
+                borderRadius: "8px",
+                bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(74, 63, 107, 0.05)",
+                border: "1px solid",
+                borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(74, 63, 107, 0.12)",
+                gap: 0.6,
+                width: "fit-content",
+                flexWrap: "wrap",
+              }}
+            >
+              <SegmentedTab
+                label="Dashboard"
+                icon={DashboardRoundedIcon}
+                isActive={activeTab === "dashboard"}
+                onClick={() => handleTabChange("dashboard")}
+              />
+              <SegmentedTab
+                label="Calendar"
+                icon={CalendarMonthRoundedIcon}
+                isActive={activeTab === "calendar"}
+                onClick={() => handleTabChange("calendar")}
+              />
+            </Box>
+
+            {/* Filter Bar (Visible in Dashboard Tab) */}
+            {activeTab === "dashboard" && (
+              <FilterBar
+                pending={pendingFilters}
+                onChange={handleFilterChange}
+                onFilter={handleFilter}
+                onClear={handleClear}
+                yearOptions={dynamicYearOptions}
+                eventTypeOptions={eventTypeOptions}
+                eventOptions={eventOptions}
+                loading={loading}
+              />
+            )}
+          </Stack>
+        </Box>
+      </Card>
 
       {/* ── Tab Content ─────────────────────────────────────────────── */}
       {activeTab === "calendar" ? (
         <CalendarPage isEmbedded />
+      ) : !hasAppliedFilter ? (
+        <Box
+          sx={{
+            py: 8,
+            px: 2,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            gap: 1.5,
+            border: `1px dashed ${theme.palette.divider}`,
+            borderRadius: 2,
+            bgcolor: isDark ? "rgba(255, 255, 255, 0.02)" : "rgba(0, 0, 0, 0.01)",
+          }}
+        >
+          <FilterListIcon sx={{ fontSize: 44, color: "text.disabled" }} />
+          <Typography variant="h6" fontWeight={600} color="text.primary">
+            No Data Displayed
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 450 }}>
+            Please select your filter criteria above and click <strong>Filter</strong> to view the dashboard summary, metrics, and events.
+          </Typography>
+        </Box>
       ) : (
-        <>
-          {/* ── Top Filter Bar ────────────────────────────────────────────────── */}
-          <Card
-            sx={{
-              p: { xs: 2, sm: 2.25 },
-              px: { xs: 2, sm: 3 },
-              borderRadius: 3,
-              overflow: "visible",
-              bgcolor: isDark ? "background.paper" : "#ffffff",
-              border: `1px solid ${theme.palette.divider}`,
-              boxShadow: isDark
-                ? "0 4px 20px rgba(0,0,0,0.25)"
-                : "0 2px 12px rgba(0,0,0,0.03)",
-            }}
-          >
-            <FilterBar
-              pending={pendingFilters}
-              onChange={handleFilterChange}
-              onFilter={handleFilter}
-              onClear={handleClear}
-              yearOptions={dynamicYearOptions}
-              eventTypeOptions={eventTypeOptions}
-              eventOptions={eventOptions}
-              loading={loading}
-            />
-          </Card>
-
-          {/* ── Content ─────────────────────────────────────────────────────── */}
-          <Stack spacing={3}>
+        <Stack spacing={3}>
 
             {/* ① Top Summary Metric Cards */}
             <Box
@@ -1656,8 +1778,7 @@ export default function DashboardPage() {
               <AppDataTable columns={columns} data={events} loading={false} />
             </CollapsibleSection>
           </Stack>
-        </>
-      )}
+        )}
 
       {/* Quick Access Slide-Over Drawer */}
       <Drawer

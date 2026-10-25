@@ -46,3 +46,41 @@ export const getAvailableAmountInHandAsync = async () => {
   return await getApi("/events/getAvailableAmountInHandAsync");
 };
 
+/**
+ * Checks whether an event has been published.
+ * Draft / unpublished events return false.
+ */
+export const isEventPublished = (e) => {
+  if (!e) return false;
+  if (e.isDeleted) return false;
+
+  const statusStr = String(e.status ?? "").trim().toLowerCase();
+
+  // Explicit Draft check
+  if (statusStr === "draft" || statusStr === "1") {
+    return false;
+  }
+
+  // Explicit Published / Active / Completed / Planned status check
+  if (
+    statusStr === "published" ||
+    statusStr === "active" ||
+    statusStr === "completed" ||
+    statusStr === "planned" ||
+    statusStr === "6" ||
+    statusStr === "3" ||
+    statusStr === "4" ||
+    statusStr === "2"
+  ) {
+    return true;
+  }
+
+  // If publishedAt timestamp is set and valid
+  if (e.publishedAt && !String(e.publishedAt).includes("0001-01-01")) {
+    return true;
+  }
+
+  // Non-empty status that is not draft
+  return statusStr !== "" && statusStr !== "draft" && statusStr !== "1";
+};
+

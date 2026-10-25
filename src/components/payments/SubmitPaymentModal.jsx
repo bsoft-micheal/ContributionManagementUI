@@ -54,7 +54,7 @@ import {
   getPaymentContextAsync,
 } from "../../services/paymentService";
 import { getMembersAsync } from "../../services/memberService";
-import { getEventsAsync } from "../../services/eventService";
+import { getEventsAsync, isEventPublished } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getPaymentModesAsync } from "../../services/paymentModeService";
 
@@ -90,6 +90,9 @@ export default function SubmitPaymentModal({
   initialIsSubmitted,
   initialStatus,
   initialArrearBreakdown = [],
+  initialPaymentScope = "",
+  initialAllMemberEvents = [],
+  isAllEventsFilter = false,
 }) {
   const toast = useAppToast();
   const { authState } = useAuth();
@@ -184,6 +187,8 @@ export default function SubmitPaymentModal({
   const [previewImage, setPreviewImage] = useState(null);
   const [rowToDelete, setRowToDelete] = useState(null);
 
+  const isEventSelected = Boolean(isAllEventsFilter || (formData.eventName && String(formData.eventName).trim()));
+
   const allocatedSplitSum = useMemo(() => {
     return Math.round(splitRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0) * 100) / 100;
   }, [splitRows]);
@@ -192,6 +197,7 @@ export default function SubmitPaymentModal({
   const splitDifference = Math.round((targetAmount - allocatedSplitSum) * 100) / 100;
 
   const isAddRowDisabled = useMemo(() => {
+    if (!isEventSelected) return true;
     if (targetAmount <= 0) return true;
     if (splitDifference <= 0) return true;
     // Each payment mode can only have at most one row
@@ -199,7 +205,7 @@ export default function SubmitPaymentModal({
       return true;
     }
     return false;
-  }, [targetAmount, splitDifference, splitRows.length, selectablePaymentModes.length]);
+  }, [isEventSelected, targetAmount, splitDifference, splitRows.length, selectablePaymentModes.length]);
 
   const maxPayableDue = useMemo(() => {
     if (!duesSummary) return null;
@@ -218,8 +224,12 @@ export default function SubmitPaymentModal({
 
   const isFullySettled = useMemo(() => {
     if (duesSummary) {
+      const hasDues = (Number(duesSummary.totalDue) > 0) || (Number(duesSummary.currentEventDue) > 0) || (Number(duesSummary.previousArrears) > 0);
+      if (hasDues) return false;
       return duesSummary.totalDue === 0 || String(duesSummary.status || "").toLowerCase() === "paid";
     }
+    const hasInitialDues = (Number(initialTotalDue) > 0) || (Number(initialCurrentDue) > 0) || (Number(initialPreviousArrears) > 0);
+    if (hasInitialDues) return false;
     return (
       String(initialStatus || "").toLowerCase() === "paid" ||
       (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0)
@@ -404,7 +414,7 @@ export default function SubmitPaymentModal({
         ]);
         if (!isMounted) return;
         if (Array.isArray(memsRes)) setMembersList(memsRes);
-        if (Array.isArray(eventsRes)) setEventsList(eventsRes);
+        if (Array.isArray(eventsRes)) setEventsList(eventsRes.filter((e) => !e.isDeleted && isEventPublished(e)));
         if (Array.isArray(eventTypesRes)) setEventTypesList(eventTypesRes);
         if (Array.isArray(modesRes)) setDbPaymentModes(modesRes);
       } catch {
@@ -440,9 +450,11 @@ export default function SubmitPaymentModal({
     if (open) {
       let matchedEvName = initialEventName || "";
       let matchedCategory = initialEventCategory || "";
-      const isPaidInitial =
+      const hasInitialDues = (Number(initialTotalDue) > 0) || (Number(initialCurrentDue) > 0) || (Number(initialPreviousArrears) > 0);
+      const isPaidInitial = !hasInitialDues && (
         String(initialStatus || "").toLowerCase() === "paid" ||
-        (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0);
+        (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0)
+      );
       let resolvedAmount = isPaidInitial ? "0.00" : initialAmount;
 
       if (!isPaidInitial && initialEventId && eventsList.length > 0) {
@@ -480,17 +492,34 @@ export default function SubmitPaymentModal({
         }
       }
 
-      const hasDuesContext = Boolean(
-        initialTotalDue !== undefined ||
-        initialCurrentDue !== undefined ||
-        initialPreviousArrears !== undefined
-      );
-      // If dues context exists, user MUST choose payment scope first; do not pre-fill amount
-      const initialSplitAmt = isPaidInitial
-        ? "0.00"
-        : hasDuesContext
-        ? ""
-        : (resolvedAmount ? String(resolvedAmount) : "");
+      // Determine default payment scope:
+      let defaultScope = isAllEventsFilter ? "AllOutstanding" : initialPaymentScope;
+      if (!defaultScope) {
+        if (Number(initialPreviousArrears) > 0 && Number(initialTotalDue) > 0) {
+          defaultScope = "AllOutstanding";
+        } else if (Number(initialCurrentDue) > 0) {
+          defaultScope = "CurrentEvent";
+        }
+      }
+
+      let defaultAmount = "";
+      if (isPaidInitial) {
+        defaultAmount = "0.00";
+      } else if (defaultScope === "AllOutstanding") {
+        defaultAmount = initialTotalDue !== undefined && Number(initialTotalDue) > 0
+          ? String(initialTotalDue)
+          : (resolvedAmount ? String(resolvedAmount) : String((Number(initialCurrentDue) || 0) + (Number(initialPreviousArrears) || 0)));
+      } else if (defaultScope === "CurrentEvent") {
+        defaultAmount = initialCurrentDue !== undefined && Number(initialCurrentDue) > 0
+          ? String(initialCurrentDue)
+          : (resolvedAmount ? String(resolvedAmount) : "");
+      } else if (defaultScope === "PreviousArrears") {
+        defaultAmount = initialPreviousArrears !== undefined && Number(initialPreviousArrears) > 0
+          ? String(initialPreviousArrears)
+          : "";
+      } else {
+        defaultAmount = resolvedAmount ? String(resolvedAmount) : "";
+      }
 
       setFormData((prev) => ({
         ...prev,
@@ -499,7 +528,7 @@ export default function SubmitPaymentModal({
         eventCategory: matchedCategory || prev.eventCategory,
         eventName: matchedEvName || prev.eventName,
         memberName: resolvedMemName || prev.memberName,
-        amount: initialSplitAmt,
+        amount: defaultAmount,
         paymentMode: "",
         paymentDate: dayjs(),
         utr: "",
@@ -508,9 +537,9 @@ export default function SubmitPaymentModal({
         screenshots: [],
       }));
       setSplitRows([
-        { id: 1, mode: "", amount: initialSplitAmt, utr: "" },
+        { id: 1, mode: "", amount: defaultAmount, utr: "" },
       ]);
-      setPaymentScope("");
+      setPaymentScope(defaultScope);
       setErrors({});
     }
   }, [
@@ -521,10 +550,15 @@ export default function SubmitPaymentModal({
     initialMemberId,
     initialMemberName,
     initialAmount,
+    initialPaymentScope,
+    initialTotalDue,
+    initialCurrentDue,
+    initialPreviousArrears,
     eventsList,
     membersList,
     dynamicPaymentModes,
     authState?.fullName,
+    isAllEventsFilter,
   ]);
 
   // Category options
@@ -738,16 +772,38 @@ export default function SubmitPaymentModal({
           );
 
           if (res) {
-            const isInitialPaid =
+            // Check if this event is in initialAllMemberEvents
+            const activeMemEv = (initialAllMemberEvents || []).find(
+              (e) => (formData.eventId && String(e.eventId).toLowerCase() === String(formData.eventId).toLowerCase()) ||
+                     (formData.eventName && String(e.eventName).toLowerCase().trim() === String(formData.eventName).toLowerCase().trim())
+            );
+
+            const hasActiveUnpaidEvent = Boolean(
+              activeMemEv && !activeMemEv.isPaid && (Number(activeMemEv.amount) || 0) > (Number(activeMemEv.paidAmount) || 0)
+            );
+
+            const hasOtherUnpaidEvents = Array.isArray(initialAllMemberEvents) && initialAllMemberEvents.some(
+              (e) => !e.isPaid && (Number(e.amount) || 0) > (Number(e.paidAmount) || 0)
+            );
+
+            const hasPropsRemainingDues =
+              hasActiveUnpaidEvent ||
+              hasOtherUnpaidEvents ||
+              Number(initialTotalDue) > 0 ||
+              Number(initialCurrentDue) > 0 ||
+              Number(initialPreviousArrears) > 0;
+
+            const isInitialPaid = !hasPropsRemainingDues && (
               String(initialStatus || "").toLowerCase() === "paid" ||
               String(initialStatus || "").toLowerCase() === "verified" ||
-              (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0);
+              (initialCurrentDue === 0 && initialPreviousArrears === 0 && initialTotalDue === 0)
+            );
 
-            const isBackendPaid =
+            const isBackendPaid = !hasPropsRemainingDues && (
               String(res.status || "").toLowerCase() === "paid" ||
               String(res.status || "").toLowerCase() === "verified" ||
-              String(res.status || "").toLowerCase() === "completed" ||
-              (res.totalDue === 0 && (res.currentEventDue ?? 0) === 0);
+              String(res.status || "").toLowerCase() === "completed"
+            );
 
             const isPaidStatus = isInitialPaid || isBackendPaid;
             const isSubmittedProps = initialIsSubmitted || isPaidStatus;
@@ -763,20 +819,64 @@ export default function SubmitPaymentModal({
             };
             const resolvedFallback = fallbackEvAmt();
 
-            const currentEvDue = isPaidStatus
-              ? 0
-              : (isSubmittedProps
-                ? (initialCurrentDue ?? (resolvedFallback > 0 ? resolvedFallback : 0))
-                : Number(res.currentEventDue ?? res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? resolvedFallback ?? 0));
+            // Calculate current event due:
+            let currentEvDue = 0;
+            if (activeMemEv) {
+              currentEvDue = activeMemEv.isPaid ? 0 : Math.max(0, (Number(activeMemEv.amount) || 0) - (Number(activeMemEv.paidAmount) || 0));
+            } else if (initialCurrentDue !== undefined && Number(initialCurrentDue) > 0) {
+              currentEvDue = Number(initialCurrentDue);
+            } else if (isPaidStatus) {
+              currentEvDue = 0;
+            } else if (isSubmittedProps) {
+              currentEvDue = initialCurrentDue ?? (resolvedFallback > 0 ? resolvedFallback : 0);
+            } else {
+              currentEvDue = Number(res.currentEventDue ?? res.amount ?? matchedEvent?.amount ?? matchedEvent?.contributionAmount ?? resolvedFallback ?? 0);
+            }
 
-            // Caller (e.g. ContributionsPage grid) has verified whether arrears are cleared
-            const callerClearedArrears = initialPreviousArrears === 0 || (Array.isArray(initialArrearBreakdown) && initialArrearBreakdown.length === 0 && initialPreviousArrears !== undefined);
+            // Determine other events / arrears breakdown
+            let breakdown = [];
+            if (initialAllMemberEvents && initialAllMemberEvents.length > 0) {
+              // Get all other unpaid member events excluding the current one
+              const otherMemberUnpaid = initialAllMemberEvents.filter((e) => {
+                const isCurrentEv =
+                  (formData.eventId && String(e.eventId).toLowerCase() === String(formData.eventId).toLowerCase()) ||
+                  (formData.eventName && String(e.eventName).toLowerCase().trim() === String(formData.eventName).toLowerCase().trim());
+                return !isCurrentEv && !e.isPaid && (Number(e.amount) || 0) > (Number(e.paidAmount) || 0);
+              });
+              const otherEvBreakdown = otherMemberUnpaid.map((e) => {
+                const due = Math.max(0, (Number(e.amount) || 0) - (Number(e.paidAmount) || 0));
+                return {
+                  eventId: e.eventId,
+                  eventName: e.eventName,
+                  title: e.eventName,
+                  amount: due,
+                  dueAmount: due,
+                };
+              });
+              // Append any older month arrears from initialArrearBreakdown that are not already in initialAllMemberEvents
+              const olderItems = (initialArrearBreakdown || []).filter((item) => {
+                return !initialAllMemberEvents.some((me) =>
+                  String(me.eventId).toLowerCase() === String(item.eventId).toLowerCase()
+                );
+              });
+              breakdown = [...otherEvBreakdown, ...olderItems];
+            } else {
+              const callerClearedArrears = initialPreviousArrears === 0 || (Array.isArray(initialArrearBreakdown) && initialArrearBreakdown.length === 0 && initialPreviousArrears !== undefined);
 
-            let breakdown = callerClearedArrears
-              ? []
-              : (Array.isArray(initialArrearBreakdown) && initialArrearBreakdown.length > 0
-                ? initialArrearBreakdown
-                : (res.arrearBreakdown || []));
+              breakdown = callerClearedArrears
+                ? []
+                : (Array.isArray(initialArrearBreakdown) && initialArrearBreakdown.length > 0
+                  ? initialArrearBreakdown
+                  : (res.arrearBreakdown || []));
+
+              // Exclude current event if present in breakdown
+              breakdown = breakdown.filter((item) => {
+                const isCurrentEv =
+                  (formData.eventId && String(item.eventId).toLowerCase() === String(formData.eventId).toLowerCase()) ||
+                  (formData.eventName && String(item.eventName).toLowerCase().trim() === String(formData.eventName).toLowerCase().trim());
+                return !isCurrentEv;
+              });
+            }
 
             // Dynamically filter out deleted events from arrear breakdown
             breakdown = breakdown.filter(item => {
@@ -788,47 +888,52 @@ export default function SubmitPaymentModal({
                );
             });
 
-            const filteredPrevArrears = callerClearedArrears || (isPaidStatus && initialPreviousArrears === 0)
-              ? 0
-              : (isPaidStatus
-                ? (initialPreviousArrears !== undefined ? Number(initialPreviousArrears) : breakdown.reduce((sum, item) => sum + (Number(item.amount) || 0), 0))
-                : (initialPreviousArrears !== undefined ? Number(initialPreviousArrears) : breakdown.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)));
-
-            const safePrevArrears = filteredPrevArrears > 0 ? filteredPrevArrears : 0;
-            const total = isPaidStatus && safePrevArrears === 0 ? 0 : roundToWhole(currentEvDue + safePrevArrears);
+            const safePrevArrears = breakdown.reduce((sum, item) => sum + (Number(item.dueAmount || item.amount) || 0), 0);
+            const total = roundToWhole(currentEvDue + safePrevArrears);
+            const isZeroDue = total === 0 && currentEvDue === 0 && safePrevArrears === 0;
 
             const baseAmt = Number(
               res.amount || matchedEvent?.amount || matchedEvent?.contributionAmount || (currentEvDue > 0 ? currentEvDue : resolvedFallback)
             );
 
+            const computedStatus = isZeroDue
+              ? "Paid"
+              : (initialStatus && String(initialStatus).toLowerCase() !== "paid"
+                  ? initialStatus
+                  : (res.status && String(res.status).toLowerCase() !== "paid" ? res.status : "Pending"));
+
             setDuesSummary({
               currentEventDue: currentEvDue,
               previousArrears: safePrevArrears,
               totalDue: total,
-              status: isPaidStatus ? "Paid" : (isSubmittedProps ? (initialStatus || "Pending") : (res.status || (currentEvDue === 0 && baseAmt > 0 ? "Paid" : "Pending"))),
+              status: computedStatus,
               baseAmount: baseAmt,
               arrearBreakdown: safePrevArrears === 0 ? [] : breakdown,
             });
 
-            let resolvedDuesAmount = "";
-            let resolvedScope = paymentScope;
-
-            if ((isPaidStatus && safePrevArrears === 0) || total === 0) {
-              resolvedDuesAmount = "0.00";
-            } else if (!paymentScope && safePrevArrears === 0 && currentEvDue > 0) {
-              resolvedScope = "CurrentEvent";
-              setPaymentScope("CurrentEvent");
-              resolvedDuesAmount = String(currentEvDue);
-            } else if (paymentScope) {
-              const currentDueRounded = roundToWhole(currentEvDue);
-              const arrearsRounded = roundToWhole(safePrevArrears);
-              if (paymentScope === "CurrentEvent") {
-                resolvedDuesAmount = String(currentDueRounded);
-              } else if (paymentScope === "PreviousArrears") {
-                resolvedDuesAmount = String(arrearsRounded);
+            let resolvedScope = isAllEventsFilter ? "AllOutstanding" : (paymentScope || initialPaymentScope);
+            if (!resolvedScope) {
+              if (safePrevArrears > 0 && total > 0) {
+                resolvedScope = "AllOutstanding";
+              } else if (currentEvDue > 0) {
+                resolvedScope = "CurrentEvent";
               } else {
-                resolvedDuesAmount = String(total);
+                resolvedScope = "CurrentEvent";
               }
+            }
+            setPaymentScope(resolvedScope);
+
+            let resolvedDuesAmount = "";
+            if (total === 0) {
+              resolvedDuesAmount = "0.00";
+            } else if (resolvedScope === "AllOutstanding") {
+              resolvedDuesAmount = String(total);
+            } else if (resolvedScope === "CurrentEvent") {
+              resolvedDuesAmount = String(roundToWhole(currentEvDue));
+            } else if (resolvedScope === "PreviousArrears") {
+              resolvedDuesAmount = String(roundToWhole(safePrevArrears));
+            } else {
+              resolvedDuesAmount = String(total);
             }
 
             setFormData((prev) => ({
@@ -838,9 +943,9 @@ export default function SubmitPaymentModal({
               amount: resolvedDuesAmount,
             }));
 
-            if ((isPaidStatus && safePrevArrears === 0) || total === 0) {
+            if (total === 0) {
               setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "0.00" })));
-            } else if (resolvedDuesAmount) {
+            } else if (resolvedDuesAmount && Number(resolvedDuesAmount) > 0) {
               setSplitRows((rows) => {
                 if (rows.length <= 1) {
                   return [{ ...(rows[0] || { id: 1, mode: "", utr: "" }), amount: resolvedDuesAmount }];
@@ -890,11 +995,13 @@ export default function SubmitPaymentModal({
     formData.memberName,
     eventsList,
     initialArrearBreakdown,
+    initialAllMemberEvents,
+    initialPaymentScope,
+    isAllEventsFilter,
   ]);
 
   const paymentScopeOptions = useMemo(() => {
     if (!duesSummary) return [];
-    const opts = [];
     const isPaid = String(duesSummary.status || "").toLowerCase() === "paid";
     const currentDue = isPaid ? 0 : roundToWhole(duesSummary.currentEventDue > 0 ? duesSummary.currentEventDue : duesSummary.baseAmount || 0);
     const arrears = roundToWhole(duesSummary.previousArrears || 0);
@@ -904,6 +1011,19 @@ export default function SubmitPaymentModal({
 
     const fmt = (num) => formatWholeNumber(num);
 
+    // CRITICAL REQUIREMENT:
+    // When paying against ALL Events filter, the user MUST ONLY pay All Outstanding!
+    if (isAllEventsFilter) {
+      return [
+        {
+          label: `All Outstanding (₹${fmt(total)})`,
+          value: "AllOutstanding",
+        },
+      ];
+    }
+
+    // Particular event: User can freely choose between All Outstanding, Current Event Only, or Previous Arrears Only!
+    const opts = [];
     if (arrears > 0 && total > 0) {
       opts.push({
         label: `All Outstanding (₹${fmt(total)})`,
@@ -922,7 +1042,7 @@ export default function SubmitPaymentModal({
       });
     }
     return opts;
-  }, [duesSummary]);
+  }, [duesSummary, isAllEventsFilter]);
 
   const handlePaymentScopeChange = (scope) => {
     setPaymentScope(scope);
@@ -977,6 +1097,10 @@ export default function SubmitPaymentModal({
   };
 
   const handleAddSplitRow = () => {
+    if (!isEventSelected) {
+      toast.warning("Please select an Event Name first.");
+      return;
+    }
     const curSum = roundToWhole(splitRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0));
     const targetAmt = roundToWhole(formData.amount || 0);
     const remaining = Math.max(0, targetAmt - curSum);
@@ -1005,6 +1129,9 @@ export default function SubmitPaymentModal({
   };
 
   const handleRemoveSplitRow = (id) => {
+    if (!isEventSelected) {
+      return;
+    }
     if (splitRows.length <= 1) {
       toast.warning("At least one payment row is required.");
       return;
@@ -1021,6 +1148,10 @@ export default function SubmitPaymentModal({
   };
 
   const handleSplitRowChange = (id, field, value) => {
+    if (!isEventSelected) {
+      toast.warning("Please select an Event Name first.");
+      return;
+    }
     let sanitized = value;
     if (field === "mode") {
       const modeValStr = String(value || "").trim().toLowerCase();
@@ -1344,6 +1475,11 @@ export default function SubmitPaymentModal({
 
   const handleSubmitProof = async (e) => {
     if (e) e.preventDefault();
+    if (!isEventSelected) {
+      setErrors((prev) => ({ ...prev, eventName: "Event Name is required" }));
+      toast.error("Please select an Event Name before submitting payment.");
+      return;
+    }
     const formErrors = validateForm();
     if (Object.keys(formErrors).length > 0) {
       toast.error("Please fill required field");
@@ -1411,6 +1547,16 @@ export default function SubmitPaymentModal({
         ? formData.screenshots
         : (formData.screenshot ? [formData.screenshot] : []);
 
+      const matchedEv = (eventsList || []).find((e) =>
+        (formData.eventId && String(e.id || e.eventId).toLowerCase() === String(formData.eventId).toLowerCase()) ||
+        (formData.eventName && (e.title || e.name || e.eventName || "").trim().toLowerCase() === formData.eventName.trim().toLowerCase())
+      );
+      if (matchedEv && !isEventPublished(matchedEv)) {
+        toast.warning("This event is not published yet. You can only pay for published events.");
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         eventId: formData.eventId || undefined,
         memberId: formData.memberId || undefined,
@@ -1462,6 +1608,10 @@ export default function SubmitPaymentModal({
   };
 
   const handleScreenshotUpload = (e) => {
+    if (!isEventSelected) {
+      toast.warning("Please select an Event Name first before uploading payment screenshots.");
+      return;
+    }
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
@@ -1542,26 +1692,38 @@ export default function SubmitPaymentModal({
       actions={
         <Stack direction="row" spacing={1.5}>
           <AppCancelButton onClick={onClose} />
-          <AppSaveButton
-            onClick={handleSubmitProof}
-            disabled={submitting || isFullySettled}
-            sx={{
-              bgcolor: isFullySettled
-                ? (t) => (t.palette.mode === "dark" ? "rgba(22, 163, 74, 0.25) !important" : "rgba(22, 163, 74, 0.12) !important")
-                : "#4a3f6b !important",
-              color: isFullySettled ? "#15803d !important" : "#ffffff !important",
-              fontWeight: 800,
-              "&.Mui-disabled": {
-                bgcolor: isFullySettled
-                  ? (t) => (t.palette.mode === "dark" ? "rgba(22, 163, 74, 0.25) !important" : "rgba(22, 163, 74, 0.12) !important")
-                  : undefined,
-                color: isFullySettled ? "#15803d !important" : undefined,
-              },
-              "&:hover": { bgcolor: isFullySettled ? "rgba(22, 163, 74, 0.18) !important" : "#3b325c !important" },
-            }}
-          >
-            {submitting ? "Saving..." : isFullySettled ? "✓ All Dues Settled" : "Save"}
-          </AppSaveButton>
+          <Tooltip title={!isEventSelected ? "Please select an Event Name to proceed" : ""}>
+            <span>
+              <AppSaveButton
+                onClick={handleSubmitProof}
+                disabled={submitting || isFullySettled || !isEventSelected}
+                sx={{
+                  bgcolor: isFullySettled
+                    ? (t) => (t.palette.mode === "dark" ? "rgba(22, 163, 74, 0.25) !important" : "rgba(22, 163, 74, 0.12) !important")
+                    : !isEventSelected
+                    ? undefined
+                    : "#4a3f6b !important",
+                  color: isFullySettled ? "#15803d !important" : "#ffffff !important",
+                  fontWeight: 800,
+                  "&.Mui-disabled": {
+                    bgcolor: isFullySettled
+                      ? (t) => (t.palette.mode === "dark" ? "rgba(22, 163, 74, 0.25) !important" : "rgba(22, 163, 74, 0.12) !important")
+                      : undefined,
+                    color: isFullySettled ? "#15803d !important" : undefined,
+                  },
+                  "&:hover": {
+                    bgcolor: isFullySettled
+                      ? "rgba(22, 163, 74, 0.18) !important"
+                      : !isEventSelected
+                      ? undefined
+                      : "#3b325c !important",
+                  },
+                }}
+              >
+                {submitting ? "Saving..." : isFullySettled ? "✓ All Dues Settled" : "Save"}
+              </AppSaveButton>
+            </span>
+          </Tooltip>
         </Stack>
       }
     >
@@ -1574,7 +1736,8 @@ export default function SubmitPaymentModal({
               value={formData.eventCategory}
               onChange={(e) => handleEventTypeChange(e.target.value)}
               onClear={() => handleEventTypeChange("")}
-              allowClear
+              allowClear={!isAllEventsFilter}
+              disabled={isAllEventsFilter}
               options={categoryOptions}
               placeholder="Select Event Type"
               error={!!errors.eventCategory}
@@ -1588,7 +1751,8 @@ export default function SubmitPaymentModal({
               value={formData.eventName}
               onChange={(e) => handleEventNameChange(e.target.value)}
               onClear={() => handleEventNameChange("")}
-              allowClear
+              allowClear={!isAllEventsFilter}
+              disabled={isAllEventsFilter}
               options={filteredEventOptions}
               placeholder="Select Event Name"
               error={!!errors.eventName}
@@ -1631,7 +1795,8 @@ export default function SubmitPaymentModal({
                   setFormData((prev) => ({ ...prev, memberId: "", memberName: "" }));
                   resetEventDependentFields(false);
                 }}
-                allowClear
+                allowClear={!isAllEventsFilter}
+                disabled={isAllEventsFilter}
                 options={contributorOptions}
                 placeholder="Select Contributor"
                 error={!!errors.memberName}
@@ -1644,7 +1809,7 @@ export default function SubmitPaymentModal({
                 value={formData.memberName}
                 onChange={(e) => setFormData((prev) => ({ ...prev, memberName: e.target.value }))}
                 placeholder="Your full name"
-                disabled={!isAuthorityRole && !!authState?.fullName}
+                disabled={(!isAuthorityRole && !!authState?.fullName) || isAllEventsFilter}
                 error={!!errors.memberName}
                 helperText={errors.memberName}
                 required
@@ -1686,13 +1851,15 @@ export default function SubmitPaymentModal({
                 });
               }}
               onClear={() => handlePaymentScopeChange("")}
-              allowClear
+              allowClear={!isAllEventsFilter}
               options={paymentScopeOptions}
-              disabled={!formData.eventName || !duesSummary || paymentScopeOptions.length === 0}
+              disabled={!formData.eventName || !duesSummary || paymentScopeOptions.length === 0 || isAllEventsFilter}
               error={!!errors.paymentScope}
               helperText={
                 errors.paymentScope ||
-                (!formData.eventName
+                (isAllEventsFilter
+                  ? "Locked to All Outstanding for All Events filter"
+                  : !formData.eventName
                   ? "Choose an event above to view payment scopes"
                   : isFullySettled
                   ? "All dues settled"
@@ -1889,7 +2056,9 @@ export default function SubmitPaymentModal({
                 <Chip
                   size="small"
                   label={
-                    isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0)
+                    !isEventSelected
+                      ? "⚠️ Select Event Name First"
+                      : isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0)
                       ? "✓ Dues Cleared: ₹0"
                       : splitDifference === 0
                       ? `✓ Allocated: ${formatWholeCurrency(allocatedSplitSum)} / ${formatWholeCurrency(targetAmount)}`
@@ -1901,13 +2070,17 @@ export default function SubmitPaymentModal({
                     fontWeight: 800,
                     fontSize: "0.72rem",
                     bgcolor:
-                      isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0) || splitDifference === 0
+                      !isEventSelected
+                        ? "rgba(234, 179, 8, 0.15)"
+                        : isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0) || splitDifference === 0
                         ? "rgba(22, 163, 74, 0.15)"
                         : splitDifference > 0
                         ? "rgba(234, 179, 8, 0.15)"
                         : "rgba(220, 38, 38, 0.15)",
                     color:
-                      isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0) || splitDifference === 0
+                      !isEventSelected
+                        ? "#b45309"
+                        : isFullySettled || (targetAmount === 0 && allocatedSplitSum === 0) || splitDifference === 0
                         ? "#16a34a"
                         : splitDifference > 0
                         ? "#b45309"
@@ -1916,7 +2089,9 @@ export default function SubmitPaymentModal({
                 />
                 <Tooltip
                   title={
-                    targetAmount <= 0
+                    !isEventSelected
+                      ? "Please select an Event Name above first"
+                      : targetAmount <= 0
                       ? "Select payment target scope first"
                       : selectablePaymentModes.length > 0 && splitRows.length >= selectablePaymentModes.length
                       ? "All available payment modes have been added (1 row per mode)"
@@ -1950,6 +2125,25 @@ export default function SubmitPaymentModal({
               </Stack>
             </Box>
 
+            {!isEventSelected && (
+              <Box
+                sx={{
+                  p: 1,
+                  mb: 1.2,
+                  borderRadius: "8px",
+                  bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(234, 179, 8, 0.1)" : "rgba(234, 179, 8, 0.08)"),
+                  border: "1px dashed rgba(234, 179, 8, 0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                <Typography variant="caption" sx={{ color: "#b45309", fontWeight: 700 }}>
+                  ⚠️ Please select an Event Name above to enable payment breakdown and mode selection.
+                </Typography>
+              </Box>
+            )}
+
             {errors.split && (splitDifference !== 0 || !errors.split.includes("Allocated breakdown total")) && (
               <Typography variant="caption" color="error" sx={{ display: "block", mb: 1, fontWeight: 700 }}>
                 ⚠️ {errors.split}
@@ -1978,6 +2172,7 @@ export default function SubmitPaymentModal({
                           value={row.mode || ""}
                           placeholder="Select Payment Mode"
                           allowClear
+                          disabled={!isEventSelected || isFullySettled}
                           onChange={(e) => handleSplitRowChange(row.id, "mode", e.target.value)}
                           onClear={() => handleSplitRowChange(row.id, "mode", "")}
                           options={selectablePaymentModes.map((m) => {
@@ -1992,7 +2187,7 @@ export default function SubmitPaymentModal({
                           })}
                           size="small"
                           error={!!errors[`row_${row.id}_mode`]}
-                          helperText={errors[`row_${row.id}_mode`]}
+                          helperText={!isEventSelected ? "Select event name first" : errors[`row_${row.id}_mode`]}
                           required
                         />
                       </Grid>
@@ -2002,10 +2197,11 @@ export default function SubmitPaymentModal({
                           type="number"
                           placeholder="0.00"
                           value={row.amount}
+                          disabled={!isEventSelected || isFullySettled}
                           onChange={(e) => handleSplitRowChange(row.id, "amount", e.target.value)}
                           size="small"
                           error={!!errors[`row_${row.id}_amount`]}
-                          helperText={errors[`row_${row.id}_amount`]}
+                          helperText={!isEventSelected ? "Select event name first" : errors[`row_${row.id}_amount`]}
                           required
                         />
                       </Grid>
@@ -2016,11 +2212,12 @@ export default function SubmitPaymentModal({
                               label={isRowCash ? "Cash Note" : "UTR/Ref"}
                               placeholder={isRowCash ? "Handover note" : "12-digit UTR ref"}
                               value={row.utr}
+                              disabled={!isEventSelected || isFullySettled}
                               onChange={(e) => handleSplitRowChange(row.id, "utr", e.target.value)}
                               onBlur={() => handleSplitRowBlur(row.id, "utr")}
                               size="small"
                               error={!!errors[`row_${row.id}_utr`]}
-                              helperText={errors[`row_${row.id}_utr`]}
+                              helperText={!isEventSelected ? "Select event name first" : errors[`row_${row.id}_utr`]}
                               required={!isRowCash}
                               maxLength={isRowCash ? 50 : 12}
                               endAdornment={
@@ -2047,6 +2244,7 @@ export default function SubmitPaymentModal({
                               <Button
                                 size="small"
                                 variant="outlined"
+                                disabled={!isEventSelected || isFullySettled}
                                 onClick={() => {
                                   setActiveQrModal({
                                     open: true,
@@ -2081,14 +2279,14 @@ export default function SubmitPaymentModal({
                         </Box>
                       </Grid>
                       <Grid size={{ xs: 2, sm: 1 }} sx={{ textAlign: "center", pt: { sm: 2.8, xs: 1 } }}>
-                        <Tooltip title={splitRows.length > 1 ? "Remove this row" : "At least 1 row required"}>
+                        <Tooltip title={!isEventSelected ? "Select event first" : splitRows.length > 1 ? "Remove this row" : "At least 1 row required"}>
                           <span>
                             <IconButton
                               size="small"
                               onClick={() => setRowToDelete(row.id)}
-                              disabled={splitRows.length <= 1}
+                              disabled={!isEventSelected || splitRows.length <= 1}
                               sx={{
-                                color: splitRows.length > 1 ? "error.main" : "text.disabled",
+                                color: isEventSelected && splitRows.length > 1 ? "error.main" : "text.disabled",
                                 p: 0.6,
                               }}
                             >
@@ -2202,51 +2400,70 @@ export default function SubmitPaymentModal({
 
               {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) < 3 && (
                 <Grid size={{ xs: 12, sm: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 4 : 12 }}>
-                  <Box
-                    component="label"
-                    sx={{
-                      border: errors.screenshot ? "1.5px dashed #ef4444" : "1.5px dashed",
-                      borderColor: errors.screenshot
-                        ? "#ef4444"
-                        : ((t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)")),
-                      borderRadius: "10px",
-                      p: 1.1,
-                      minHeight: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 115 : 46,
-                      display: "flex",
-                      flexDirection: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? "column" : "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 1,
-                      cursor: "pointer",
-                      bgcolor: errors.screenshot
-                        ? "rgba(239, 68, 68, 0.05)"
-                        : ((t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)")),
-                      transition: "all 0.2s ease",
-                      "&:hover": {
-                        borderColor: errors.screenshot
-                          ? "#dc2626"
-                          : ((t) => (t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b")),
-                        bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.07)"),
-                      },
-                    }}
-                  >
-                    <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple hidden onChange={handleScreenshotUpload} />
-                    <UploadIcon
+                  <Tooltip title={!isEventSelected ? "Please select an Event Name first to attach screenshots" : ""}>
+                    <Box
+                      component="label"
                       sx={{
-                        fontSize: 20,
-                        color: errors.screenshot
+                        border: errors.screenshot ? "1.5px dashed #ef4444" : "1.5px dashed",
+                        borderColor: errors.screenshot
                           ? "#ef4444"
-                          : ((t) => (t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b")),
+                          : ((t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.2)" : "rgba(74,63,107,0.3)")),
+                        borderRadius: "10px",
+                        p: 1.1,
+                        minHeight: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? 115 : 46,
+                        display: "flex",
+                        flexDirection: (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? "column" : "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 1,
+                        cursor: !isEventSelected || isFullySettled ? "not-allowed" : "pointer",
+                        opacity: !isEventSelected || isFullySettled ? 0.6 : 1,
+                        pointerEvents: !isEventSelected || isFullySettled ? "none" : undefined,
+                        bgcolor: errors.screenshot
+                          ? "rgba(239, 68, 68, 0.05)"
+                          : ((t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(74,63,107,0.03)")),
+                        transition: "all 0.2s ease",
+                        "&:hover": {
+                          borderColor: !isEventSelected || isFullySettled
+                            ? undefined
+                            : errors.screenshot
+                            ? "#dc2626"
+                            : ((t) => (t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b")),
+                          bgcolor: !isEventSelected || isFullySettled
+                            ? undefined
+                            : (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(74,63,107,0.07)"),
+                        },
                       }}
-                    />
-                    <Typography
-                      variant="caption"
-                      fontWeight={600}
-                      sx={{ color: errors.screenshot ? "#ef4444" : "text.secondary" }}
                     >
-                      {(formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0 ? "+ Add Image (Max 6MB)" : "Click to attach image (Max 6MB)"}
-                    </Typography>
-                  </Box>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        multiple
+                        hidden
+                        disabled={!isEventSelected || isFullySettled}
+                        onChange={handleScreenshotUpload}
+                      />
+                      <UploadIcon
+                        sx={{
+                          fontSize: 20,
+                          color: errors.screenshot
+                            ? "#ef4444"
+                            : ((t) => (t.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b")),
+                        }}
+                      />
+                      <Typography
+                        variant="caption"
+                        fontWeight={600}
+                        sx={{ color: errors.screenshot ? "#ef4444" : "text.secondary" }}
+                      >
+                        {!isEventSelected
+                          ? "Select Event Name above to attach image"
+                          : (formData.screenshots?.length || (formData.screenshot ? 1 : 0)) > 0
+                          ? "+ Add Image (Max 6MB)"
+                          : "Click to attach image (Max 6MB)"}
+                      </Typography>
+                    </Box>
+                  </Tooltip>
                 </Grid>
               )}
             </Grid>
@@ -2271,11 +2488,13 @@ export default function SubmitPaymentModal({
             <AppTextArea
               label="Additional Notes"
               value={formData.notes}
+              disabled={!isEventSelected || isFullySettled}
               onChange={(e) => {
+                if (!isEventSelected) return;
                 const val = e.target.value.slice(0, 300);
                 setFormData((prev) => ({ ...prev, notes: val }));
               }}
-              placeholder="e.g. Paid via GPay account"
+              placeholder={!isEventSelected ? "Please select an Event Name above first" : "e.g. Paid via GPay account"}
               rows={4}
               maxLength={300}
             />

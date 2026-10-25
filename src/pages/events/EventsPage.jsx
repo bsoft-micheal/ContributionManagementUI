@@ -139,6 +139,8 @@ export default function EventsPage() {
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
   const [users, setUsers] = useState([]);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [filterLookupEvents, setFilterLookupEvents] = useState([]);
   const [filterYear, setFilterYear] = useState(dayjs().year());
   const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
   const [filterEventType, setFilterEventType] = useState("ALL");
@@ -151,6 +153,30 @@ export default function EventsPage() {
     event: "ALL",
     status: "ALL",
   });
+
+  // Automatically fetch events available in selected month and year for cascading dropdowns
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchLookupEvents() {
+      try {
+        const m = Number(filterMonth);
+        const y = Number(filterYear);
+        const data = await getEventsAsync({
+          month: m > 0 ? m : undefined,
+          year: y > 0 ? y : undefined,
+        });
+        if (!cancelled && Array.isArray(data)) {
+          setFilterLookupEvents(data.filter((e) => !e.isDeleted));
+        }
+      } catch {
+        if (!cancelled) setFilterLookupEvents([]);
+      }
+    }
+    fetchLookupEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [filterMonth, filterYear]);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [photoDetailsDialogOpen, setPhotoDetailsDialogOpen] = useState(false);
@@ -342,9 +368,7 @@ export default function EventsPage() {
     }
   }
 
-  useEffect(() => {
-    loadData();
-  }, [filters.year, filters.month]);
+  // Initial load: Do not load data automatically below filter section
 
   const yearOptions = useMemo(() => {
     const curYear = dayjs().year();
@@ -352,7 +376,7 @@ export default function EventsPage() {
     for (let i = curYear - 5; i <= curYear + 5; i++) {
       yearsSet.add(i);
     }
-    (events || []).forEach((e) => {
+    (filterLookupEvents || []).forEach((e) => {
       const d = e.eventDate || e.createdOn || e.date;
       if (d) {
         const y = dayjs(d).year();
@@ -366,7 +390,7 @@ export default function EventsPage() {
       { label: "All", value: 0 },
       ...sortedYears.map((y) => ({ label: String(y), value: y })),
     ];
-  }, [events]);
+  }, [filterLookupEvents]);
 
   const monthOptions = [
     { label: "All", value: 0 },
@@ -376,55 +400,69 @@ export default function EventsPage() {
     })),
   ];
 
+  // Cascading Event Types available only in selected month & year
   const eventTypeOptions = useMemo(() => {
     const list = [{ label: "All Event Types", value: "ALL" }];
     const seen = new Set();
-    (eventTypes || []).forEach((t) => {
-      const name = t.eventTypeName || t.typeName || t.name;
-      if (name && !seen.has(name.toLowerCase())) {
-        seen.add(name.toLowerCase());
-        list.push({ label: name, value: name });
-      }
-    });
-    (events || []).forEach((e) => {
-      const cat = e.eventTypeName || e.category;
+    (filterLookupEvents || []).forEach((e) => {
+      const cat = (e.eventTypeName || e.category || "").trim();
       if (cat && !seen.has(cat.toLowerCase())) {
         seen.add(cat.toLowerCase());
         list.push({ label: cat, value: cat });
       }
     });
     return list;
-  }, [eventTypes, events]);
+  }, [filterLookupEvents]);
 
+  // Reset invalid dependent Event Type and Event Name when eventTypeOptions change
+  useEffect(() => {
+    if (filterEventType && filterEventType !== "ALL") {
+      const isValid = eventTypeOptions.some(
+        (opt) => opt.value.toLowerCase() === filterEventType.toLowerCase()
+      );
+      if (!isValid) {
+        setFilterEventType("ALL");
+        setFilterEvent("ALL");
+      }
+    }
+  }, [eventTypeOptions, filterEventType]);
+
+  // Cascading Event Names available in selected month, year & event type
   const eventOptions = useMemo(() => {
     const list = [{ label: "All Events", value: "ALL" }];
     const seen = new Set();
-    (events || []).forEach((e) => {
+    const matching =
+      !filterEventType || filterEventType === "ALL"
+        ? filterLookupEvents
+        : filterLookupEvents.filter(
+            (e) => (e.eventTypeName || e.category || "").toLowerCase() === filterEventType.toLowerCase()
+          );
+
+    matching.forEach((e) => {
       const name = e.eventName || e.name;
-      if (!name || seen.has(name.toLowerCase())) return;
-      const cat = (e.eventTypeName || e.category || "").toLowerCase();
-      if (filterEventType !== "ALL" && cat !== filterEventType.toLowerCase()) {
-        return;
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push({ label: name, value: name });
       }
-      seen.add(name.toLowerCase());
-      list.push({ label: name, value: name });
     });
     return list;
-  }, [events, filterEventType]);
+  }, [filterLookupEvents, filterEventType]);
+
+  // Reset invalid dependent Event Name when eventOptions change
+  useEffect(() => {
+    if (filterEvent && filterEvent !== "ALL") {
+      const isValid = eventOptions.some(
+        (opt) => opt.value.toLowerCase() === filterEvent.toLowerCase()
+      );
+      if (!isValid) {
+        setFilterEvent("ALL");
+      }
+    }
+  }, [eventOptions, filterEvent]);
 
   const handleEventTypeChange = (newType) => {
     const normalizedType = newType || "ALL";
     setFilterEventType(normalizedType);
-    if (normalizedType !== "ALL" && filterEvent !== "ALL") {
-      const isStillValid = (events || []).some((e) => {
-        const name = e.eventName || e.name;
-        const cat = (e.eventTypeName || e.category || "").toLowerCase();
-        return name?.toLowerCase() === filterEvent.toLowerCase() && cat === normalizedType.toLowerCase();
-      });
-      if (!isStillValid) {
-        setFilterEvent("ALL");
-      }
-    }
   };
 
   const handleApplyFilter = () => {
@@ -436,6 +474,7 @@ export default function EventsPage() {
       status: filterStatus,
     };
     setFilters(nextFilters);
+    setHasAppliedFilter(true);
     loadData(nextFilters);
   };
 
@@ -453,7 +492,8 @@ export default function EventsPage() {
       status: "ALL",
     };
     setFilters(resetFilters);
-    loadData(resetFilters);
+    setEvents([]);
+    setHasAppliedFilter(false);
   };
 
   const displayedEvents = useMemo(() => {
@@ -638,7 +678,7 @@ export default function EventsPage() {
                     disabled={!canPublishEvent}
                     onClick={() => handlePublishRequest(row)}
                   >
-                    <PublishIcon sx={{ fontSize: "1.1rem", color: canPublishEvent ? "#16a34a" : "#94a3b8" }} />
+                    <PublishIcon sx={{ fontSize: "1.1rem", color: canPublishEvent ? actionIconColor : "#94a3b8" }} />
                   </IconButton>
                 </span>
               </Tooltip>
@@ -1190,7 +1230,8 @@ export default function EventsPage() {
       <AppDataTable
         title="Events Details"
         columns={columns}
-        data={displayedEvents}
+        data={hasAppliedFilter ? displayedEvents : []}
+        emptyMessage={!hasAppliedFilter ? "Please select filters and click Filter to view events." : undefined}
         allowExport={canExportEvent}
         searchPlaceholder="Search by event name..."
         actions={
@@ -1322,45 +1363,47 @@ export default function EventsPage() {
             </Box>
 
             {/* 5 Summary KPI Cards Under the Filter */}
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  sm: "repeat(2, minmax(0, 1fr))",
-                  md: "repeat(3, minmax(0, 1fr))",
-                  lg: "repeat(5, minmax(0, 1fr))",
-                },
-                gap: 1.5,
-                pt: 0.5,
-              }}
-            >
-              <MetricCard
-                label="Expected Amount"
-                value={formatWholeCurrency(summaryTotals.totalExpected)}
-                accent="#6366f1"
-              />
-              <MetricCard
-                label="Collection Amount"
-                value={formatWholeCurrency(summaryTotals.totalCollected)}
-                accent="#10b981"
-              />
-              <MetricCard
-                label="Total Pending"
-                value={formatWholeCurrency(summaryTotals.totalPending)}
-                accent="#f43f5e"
-              />
-              <MetricCard
-                label="Total Expenses"
-                value={formatWholeCurrency(summaryTotals.totalExpenses)}
-                accent="#f59e0b"
-              />
-              <MetricCard
-                label="Amount In Hand"
-                value={formatWholeCurrency(summaryTotals.totalBalance)}
-                accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}
-              />
-            </Box>
+            {hasAppliedFilter && (
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0, 1fr))",
+                    md: "repeat(3, minmax(0, 1fr))",
+                    lg: "repeat(5, minmax(0, 1fr))",
+                  },
+                  gap: 1.5,
+                  pt: 0.5,
+                }}
+              >
+                <MetricCard
+                  label="Expected Amount"
+                  value={formatWholeCurrency(summaryTotals.totalExpected)}
+                  accent="#6366f1"
+                />
+                <MetricCard
+                  label="Collection Amount"
+                  value={formatWholeCurrency(summaryTotals.totalCollected)}
+                  accent="#10b981"
+                />
+                <MetricCard
+                  label="Total Pending"
+                  value={formatWholeCurrency(summaryTotals.totalPending)}
+                  accent="#f43f5e"
+                />
+                <MetricCard
+                  label="Total Expenses"
+                  value={formatWholeCurrency(summaryTotals.totalExpenses)}
+                  accent="#f59e0b"
+                />
+                <MetricCard
+                  label="Amount In Hand"
+                  value={formatWholeCurrency(summaryTotals.totalBalance)}
+                  accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}
+                />
+              </Box>
+            )}
           </Stack>
         }
       />
