@@ -54,22 +54,60 @@ export default function ExcelImportDialog({
     setLoading(true);
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array", cellDates: true });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        // Parse rows as an array of objects
-        const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+        const buffer = e.target.result;
+        let nonEmptyRawJson = [];
 
-        // Filter out completely empty rows
-        const nonEmptyRawJson = rawJson.filter((row) =>
-          Object.values(row).some(
-            (v) => v !== "" && v !== null && v !== undefined && String(v).trim() !== ""
-          )
-        );
+        try {
+          const data = new Uint8Array(buffer);
+          const workbook = XLSX.read(data, { type: "array", cellDates: true, raw: false });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+          nonEmptyRawJson = rawJson.filter((row) =>
+            Object.values(row).some(
+              (v) => v !== "" && v !== null && v !== undefined && String(v).trim() !== ""
+            )
+          );
+        } catch (xlsxErr) {
+          console.warn("XLSX parser fallback to ExcelJS:", xlsxErr);
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(buffer);
+          const worksheet = workbook.worksheets[0];
+          const headers = [];
+          const rows = [];
+          worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) {
+              row.eachCell((cell, colNumber) => {
+                headers[colNumber] = String(cell.value || "").trim();
+              });
+            } else {
+              const rowObj = {};
+              let hasValue = false;
+              row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                const header = headers[colNumber];
+                if (header) {
+                  let val = cell.value;
+                  if (val && typeof val === "object") {
+                    if (val instanceof Date) {
+                      // Date
+                    } else if (val.text) {
+                      val = val.text;
+                    } else if (val.result !== undefined) {
+                      val = val.result;
+                    }
+                  }
+                  rowObj[header] = val ?? "";
+                  if (val !== "" && val !== null && val !== undefined) hasValue = true;
+                }
+              });
+              if (hasValue) rows.push(rowObj);
+            }
+          });
+          nonEmptyRawJson = rows;
+        }
 
         // Normalize keys (case-insensitive, trim/preserve types)
         const allNormalized = nonEmptyRawJson.map((row) => {
@@ -83,13 +121,23 @@ export default function ExcelImportDialog({
 
         // Map and validate each row with full dataset context for duplicate detection
         const processed = allNormalized.map((normalizedRow, idx) => {
-          const validationResult = validateRow(normalizedRow, idx + 1, allNormalized);
-          return {
-            rowNumber: idx + 2, // Excel rows are 1-indexed, first row is header
-            raw: nonEmptyRawJson[idx],
-            error: validationResult.error,
-            parsed: validationResult.parsed,
-          };
+          try {
+            const validationResult = validateRow(normalizedRow, idx + 1, allNormalized) || {};
+            return {
+              rowNumber: idx + 2, // Excel rows are 1-indexed, first row is header
+              raw: nonEmptyRawJson[idx] || {},
+              error: validationResult.error || null,
+              parsed: validationResult.parsed || {},
+            };
+          } catch (rowErr) {
+            console.error(`Error validating row ${idx + 2}:`, rowErr);
+            return {
+              rowNumber: idx + 2,
+              raw: nonEmptyRawJson[idx] || {},
+              error: `Row ${idx + 2}: Validation error - ${rowErr?.message || "Invalid row format"}`,
+              parsed: {},
+            };
+          }
         });
 
         setParsedRows(processed);
@@ -105,8 +153,10 @@ export default function ExcelImportDialog({
           toast.success(`Excel sheet validated successfully! ${processed.length} valid record(s) ready.`);
         }
       } catch (err) {
-        setParsedRows([{ rowNumber: 1, raw: {}, error: "Failed to read Excel file. Please ensure it is a valid format.", parsed: {} }]);
-        toast.error("Failed to read Excel file. Please ensure it is a valid .xlsx or .xls file.");
+        console.error("Excel import processing error:", err);
+        const errMsg = err?.message || "Failed to read Excel file. Please ensure it is a valid .xlsx or .xls file.";
+        setParsedRows([{ rowNumber: 1, raw: {}, error: errMsg, parsed: {} }]);
+        toast.error(errMsg);
       } finally {
         setLoading(false);
       }
@@ -191,11 +241,16 @@ export default function ExcelImportDialog({
                 errorTitle: rule.errorTitle || "Validation Error",
                 ...rule,
               };
-
-              if (rule.type === "date") {
-                cell.numFmt = "dd/mm/yyyy";
-              }
             }
+          }
+
+          // Format date columns explicitly as dd/mm/yyyy
+          if (
+            header.toLowerCase().includes("date") ||
+            header.toLowerCase().includes("birth") ||
+            header.toLowerCase().includes("dob")
+          ) {
+            cell.numFmt = "dd/mm/yyyy";
           }
 
           // Format phone as text to prevent Excel removing leading zeros
@@ -223,6 +278,66 @@ export default function ExcelImportDialog({
     }
   };
 
+  const handleDownloadErrorReport = async () => {
+    try {
+      const invalidRows = parsedRows.filter((r) => r.error);
+      if (invalidRows.length === 0) return;
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Error Report");
+
+      const errorHeaders = ["Row #", "Error Description", ...templateHeaders];
+      const headerRow = worksheet.addRow(errorHeaders);
+      headerRow.height = 26;
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFDC2626" },
+        };
+        cell.font = {
+          name: "Segoe UI",
+          color: { argb: "FFFFFFFF" },
+          bold: true,
+          size: 11,
+        };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+      });
+
+      invalidRows.forEach((item) => {
+        const rowValues = [
+          item.rowNumber,
+          item.error,
+          ...templateHeaders.map((h) => {
+            const val =
+              item.raw[h] ??
+              item.raw[h.toLowerCase()] ??
+              item.raw[h.replace(/\s+/g, "")] ??
+              "";
+            return val;
+          }),
+        ];
+        worksheet.addRow(rowValues);
+      });
+
+      worksheet.columns.forEach((col, i) => {
+        col.width = i === 1 ? 40 : 20;
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${title.replace(/\s+/g, "_")}_Error_Report.xlsx`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      console.error("Failed to generate error report:", err);
+    }
+  };
+
   const handleClear = () => {
     setFile(null);
     setParsedRows([]);
@@ -236,7 +351,7 @@ export default function ExcelImportDialog({
     const validData = parsedRows
       .filter((row) => !row.error)
       .map((row) => row.parsed);
-    
+
     if (validData.length === 0) {
       toast.error("Cannot import: All rows contain validation errors. Please check the credentials and upload a corrected file.");
       return;
@@ -267,6 +382,18 @@ export default function ExcelImportDialog({
       actions={
         file ? (
           <>
+            {invalidCount > 0 && (
+              <AppButton
+                variant="outlined"
+                color="error"
+                startIcon={<DownloadIcon />}
+                onClick={handleDownloadErrorReport}
+                disabled={loading}
+                sx={{ mr: "auto" }}
+              >
+                Download Error Report ({invalidCount})
+              </AppButton>
+            )}
             <AppButton variant="outlined" onClick={handleClear} disabled={loading}>
               Upload Different File
             </AppButton>
@@ -490,6 +617,9 @@ export default function ExcelImportDialog({
                           {header}
                         </TableCell>
                       ))}
+                      <TableCell sx={{ fontWeight: 800, fontSize: "0.75rem", bgcolor: (theme) => theme.palette.mode === "dark" ? "#1d2338" : "#f8fafc" }}>
+                        Generated Username
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -546,7 +676,7 @@ export default function ExcelImportDialog({
                             row.raw[header.toLowerCase()] ||
                             row.raw[header.replace(/\s+/g, "")] ||
                             "";
-                          
+
                           // Format display value for preview table
                           const isDateColumn = header.toLowerCase().includes("date") || header.toLowerCase().includes("birth") || header.toLowerCase().includes("dob");
                           let displayValue = String(value);
@@ -570,6 +700,9 @@ export default function ExcelImportDialog({
                             </TableCell>
                           );
                         })}
+                        <TableCell sx={{ fontSize: "0.75rem", py: 1, fontWeight: 700, color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#6d28d9" }}>
+                          {row.parsed?.username || "--"}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

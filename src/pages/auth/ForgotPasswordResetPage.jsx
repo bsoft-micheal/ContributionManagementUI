@@ -13,7 +13,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import AppInput from "../../components/common/AppInput";
 import AppButton from "../../components/common/AppButton";
 import { useAppToast } from "../../components/common/AppToast";
@@ -31,10 +31,15 @@ export default function ForgotPasswordResetPage() {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const toast = useAppToast();
 
-  const email = location.state?.email || localStorage.getItem("recovery_email") || "";
-  const otp = location.state?.otp || localStorage.getItem("recovery_otp") || "";
+  const queryEmail = searchParams.get("email");
+  const queryOtp = searchParams.get("otp");
+  const isFirstTimeSetup = Boolean(queryEmail && queryOtp);
+
+  const email = queryEmail || location.state?.email || localStorage.getItem("recovery_email") || "";
+  const otp = queryOtp || location.state?.otp || localStorage.getItem("recovery_otp") || "";
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -222,10 +227,12 @@ export default function ForgotPasswordResetPage() {
             {!success ? (
               <Box component="form" onSubmit={handleResetPassword} sx={{ width: "100%" }}>
                 <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.5rem", sm: "1.625rem" }, letterSpacing: "-0.02em", color: "text.primary", mb: 1 }}>
-                  New Password
+                  {isFirstTimeSetup ? "Set Your Password" : "New Password"}
                 </Typography>
                 <Typography sx={{ fontSize: "0.85rem", color: "text.secondary", fontWeight: 500, mb: 4.5 }}>
-                  Set a solid, secure new password for your account recovery.
+                  {isFirstTimeSetup
+                    ? "Welcome! Please choose a secure password to activate your account."
+                    : "Set a solid, secure new password for your account recovery."}
                 </Typography>
 
                 <Stack spacing={3.2}>
