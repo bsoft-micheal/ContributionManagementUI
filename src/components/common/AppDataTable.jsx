@@ -671,66 +671,68 @@ export default function AppDataTable({
       }}
     >
       {/* ── 1. Top Header Bar (Store Dispatch / Member Directory layout) ──── */}
-      <Box
-        sx={{
-          background: theme.palette.mode === "dark"
-            ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
-            : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
-          borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
-          color: "#ffffff",
-          px: 3,
-          py: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          minHeight: 46,
-        }}
-      >
-        <Typography
-          variant="subtitle2"
-          fontWeight={600}
-          sx={{ fontSize: "0.9375rem", letterSpacing: "-0.005em" }}
+      {Boolean(title || actions) && (
+        <Box
+          sx={{
+            background: theme.palette.mode === "dark"
+              ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
+              : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+            borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
+            color: "#ffffff",
+            px: 3,
+            py: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            minHeight: 46,
+          }}
         >
-          {title}
-        </Typography>
-
-        {actions && (
-          <Box
-            sx={{
-              "& .MuiButton-root": {
-                bgcolor: theme.palette.mode === "dark" ? "#5a4c82 !important" : "#2a1b4d !important",
-                border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.25) !important" : "none",
-                color: "#ffffff !important",
-                borderRadius: "4px !important",
-                fontSize: "0.75rem !important",
-                fontWeight: 700,
-                py: "5px !important",
-                px: "14px !important",
-                minWidth: "unset",
-                textTransform: "none",
-                boxShadow: "none !important",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 0.5,
-                "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6a5c96 !important" : "#1a1033 !important" },
-              },
-              "& .MuiButton-root.Mui-disabled, & .MuiButton-root:disabled": {
-                bgcolor: "rgba(255, 255, 255, 0.08) !important",
-                color: "rgba(255, 255, 255, 0.7) !important",
-                border: "1px solid rgba(255, 255, 255, 0.25) !important",
-                opacity: "0.75 !important",
-                cursor: "not-allowed !important",
-                boxShadow: "none !important",
-                "& .MuiSvgIcon-root": {
-                  color: "rgba(255, 255, 255, 0.7) !important",
-                },
-              },
-            }}
+          <Typography
+            variant="subtitle2"
+            fontWeight={600}
+            sx={{ fontSize: "0.9375rem", letterSpacing: "-0.005em" }}
           >
-            {actions}
-          </Box>
-        )}
-      </Box>
+            {title}
+          </Typography>
+
+          {actions && (
+            <Box
+              sx={{
+                "& .MuiButton-root": {
+                  bgcolor: theme.palette.mode === "dark" ? "#5a4c82 !important" : "#2a1b4d !important",
+                  border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.25) !important" : "none",
+                  color: "#ffffff !important",
+                  borderRadius: "4px !important",
+                  fontSize: "0.75rem !important",
+                  fontWeight: 700,
+                  py: "5px !important",
+                  px: "14px !important",
+                  minWidth: "unset",
+                  textTransform: "none",
+                  boxShadow: "none !important",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6a5c96 !important" : "#1a1033 !important" },
+                },
+                "& .MuiButton-root.Mui-disabled, & .MuiButton-root:disabled": {
+                  bgcolor: "rgba(255, 255, 255, 0.08) !important",
+                  color: "rgba(255, 255, 255, 0.7) !important",
+                  border: "1px solid rgba(255, 255, 255, 0.25) !important",
+                  opacity: "0.75 !important",
+                  cursor: "not-allowed !important",
+                  boxShadow: "none !important",
+                  "& .MuiSvgIcon-root": {
+                    color: "rgba(255, 255, 255, 0.7) !important",
+                  },
+                },
+              }}
+            >
+              {actions}
+            </Box>
+          )}
+        </Box>
+      )}
 
       {/* ── 2. Filter Panel ─────────────────────────────────────────────── */}
       {filterPanel && (

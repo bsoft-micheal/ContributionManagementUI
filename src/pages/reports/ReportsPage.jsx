@@ -366,7 +366,8 @@ export default function ReportsPage({ mode = "event" }) {
   const { isLoading: globalLoading } = useNavigationLoading();
 
   const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
   const [filterFromDate, setFilterFromDate] = useState(dayjs().startOf("month"));
   const [filterToDate, setFilterToDate] = useState(dayjs().endOf("month"));
   const [filterEventType, setFilterEventType] = useState("ALL");
@@ -575,23 +576,20 @@ export default function ReportsPage({ mode = "event" }) {
     return true;
   }, []);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const params = { month: null, year: null };
-        const { data: res } = await apiClient.get("/reports/getSummaryReportAsync", { params });
-        setReport(res?.data !== undefined ? res.data : res);
-      } catch (err) {
-        if (!err?.isRateLimit && err?.response?.status !== 429) {
-          toast.error("Failed to load reports. Please try again.");
-        }
-      } finally {
-        setLoading(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = { month: null, year: null };
+      const { data: res } = await apiClient.get("/reports/getSummaryReportAsync", { params });
+      setReport(res?.data !== undefined ? res.data : res);
+    } catch (err) {
+      if (!err?.isRateLimit && err?.response?.status !== 429) {
+        toast.error("Failed to load reports. Please try again.");
       }
+    } finally {
+      setLoading(false);
     }
-    load();
-  }, []);
+  }, [toast]);
 
   /* Options */
   const monthOptions = [
@@ -1970,15 +1968,17 @@ export default function ReportsPage({ mode = "event" }) {
             variant="contained"
             size="small"
             startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
-            onClick={() =>
+            onClick={() => {
               setFilters({
                 fromDate: filterFromDate,
                 toDate: filterToDate,
                 eventType: filterEventType,
                 event: filterEvent,
                 paymentStatus: filterPaymentStatus,
-              })
-            }
+              });
+              setHasAppliedFilter(true);
+              load();
+            }}
             sx={{
               height: 34,
               minHeight: 34,
@@ -2008,6 +2008,8 @@ export default function ReportsPage({ mode = "event" }) {
                 event: "ALL",
                 paymentStatus: "ALL",
               });
+              setReport(null);
+              setHasAppliedFilter(false);
             }}
             sx={{
               color: "#ef4444",
@@ -2102,23 +2104,49 @@ export default function ReportsPage({ mode = "event" }) {
 
           {/* Annual Matrix Content */}
           <Box sx={{ p: 2.5 }}>
-            <AnnualMemberMatrix
-              report={report}
-              usersList={usersList}
-              eventsList={eventsList}
-              eventTypesList={eventTypesList}
-              isMember={isMember}
-              currentUserId={currentUserId}
-              currentUserName={currentUserName}
-              onOpenMemberDetails={(m) => openBreakdownModal(m, "all")}
-            />
+            {!hasAppliedFilter ? (
+              <Box
+                sx={{
+                  py: 8,
+                  px: 2,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  gap: 1.5,
+                  border: `1px dashed ${theme.palette.divider}`,
+                  borderRadius: 2,
+                }}
+              >
+                <FilterListIcon sx={{ fontSize: 44, color: "text.disabled" }} />
+                <Typography variant="h6" fontWeight={600} color="text.primary">
+                  No Report Data Displayed
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 450 }}>
+                  Please select your filter criteria above and click <strong>Filter</strong> to generate the annual matrix.
+                </Typography>
+              </Box>
+            ) : (
+              <AnnualMemberMatrix
+                report={report}
+                usersList={usersList}
+                eventsList={eventsList}
+                eventTypesList={eventTypesList}
+                isMember={isMember}
+                currentUserId={currentUserId}
+                currentUserName={currentUserName}
+                onOpenMemberDetails={(m) => openBreakdownModal(m, "all")}
+              />
+            )}
           </Box>
         </Paper>
       ) : (
         <AppDataTable
           title={pageTitle}
           columns={activeColumns}
-          data={activeData}
+          data={hasAppliedFilter ? activeData : []}
+          emptyMessage={!hasAppliedFilter ? "Please select filters and click Filter to generate reports." : undefined}
           loading={loading}
           allowExport={canExport}
           actions={exportButton}
