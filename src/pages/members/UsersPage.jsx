@@ -56,6 +56,7 @@ import {
   validateIndianMobile,
   validatePassword,
   validateConfirmPassword,
+  validateUsername,
 } from "../../utils/validation";
 import {
   getUsersAsync,
@@ -207,8 +208,8 @@ export default function UsersPage() {
     const list = Array.isArray(workTypes)
       ? workTypes
       : Array.isArray(workTypes?.$values)
-      ? workTypes.$values
-      : [];
+        ? workTypes.$values
+        : [];
     return list
       .filter((w) => w && w.isActive !== false)
       .map((w) => {
@@ -220,6 +221,10 @@ export default function UsersPage() {
 
   const templateValidations = useMemo(() => {
     const workTypesStr = typeOptions.map((t) => t.value).join(",");
+    const rolesStr = (roles || [])
+      .map((r) => r.roleName || r.name)
+      .filter(Boolean)
+      .join(",");
     const eighteenYearsAgo = new Date();
     eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
 
@@ -237,7 +242,7 @@ export default function UsersPage() {
         operator: "equal",
         formulae: [10],
         promptTitle: "Phone Number",
-        prompt: "Enter a unique 10-digit phone number.",
+        prompt: "Enter a unique 10-digit phone number starting with 6-9.",
         errorTitle: "Invalid Phone Number",
         error: "Phone number must be exactly 10 digits.",
       },
@@ -249,22 +254,21 @@ export default function UsersPage() {
         errorTitle: "Invalid Gender",
         error: "Please select a gender from the list.",
       },
-      "Date of Birth": {
-        type: "date",
-        operator: "lessThanOrEqual",
-        formulae: [eighteenYearsAgo],
+      "Date of Birth": (r, getColLetter) => ({
+        type: "custom",
+        formulae: [`AND(ISNUMBER(${getColLetter("Date of Birth")}${r}), ${getColLetter("Date of Birth")}${r}<=EDATE(TODAY(),-216))`],
         promptTitle: "Date of Birth",
         prompt: "Format: DD/MM/YYYY. User must be at least 18 years old.",
         errorTitle: "Minimum Age Requirement",
         error: "User must be at least 18 years old (DOB <= 18 years ago).",
-      },
+      }),
       "Joining Date": (r, getColLetter) => ({
         type: "custom",
-        formulae: [`AND(${getColLetter("Joining Date")}${r}>${getColLetter("Date of Birth")}${r}, ${getColLetter("Joining Date")}${r}<=EDATE(TODAY(),3))`],
+        formulae: [`AND(ISNUMBER(${getColLetter("Joining Date")}${r}), ${getColLetter("Joining Date")}${r}>=EDATE(${getColLetter("Date of Birth")}${r},216), ${getColLetter("Joining Date")}${r}<=TODAY()+90)`],
         promptTitle: "Joining Date",
-        prompt: "Format: DD/MM/YYYY. Joining date must be after Date of Birth and up to 3 months in the future.",
+        prompt: "Format: DD/MM/YYYY. Must be at least 18 years after Date of Birth and maximum 3 months in future.",
         errorTitle: "Invalid Joining Date",
-        error: "Joining Date must be after Date of Birth and cannot exceed 3 months from today.",
+        error: "Joining Date must be at least 18 years after Date of Birth and cannot exceed 3 months in future.",
       }),
       "Work Type": {
         type: "list",
@@ -274,8 +278,16 @@ export default function UsersPage() {
         errorTitle: "Invalid Work Type",
         error: "Please select a work type from the list.",
       },
+      Role: {
+        type: "list",
+        formulae: [`"${rolesStr}"`],
+        promptTitle: "Role",
+        prompt: "Select role from active roles.",
+        errorTitle: "Invalid Role",
+        error: "Please select an active role from the list.",
+      },
     };
-  }, [typeOptions]);
+  }, [typeOptions, roles]);
 
   const filteredUsers = useMemo(() => {
     let result = users;
@@ -724,17 +736,15 @@ export default function UsersPage() {
 
   // ── Excel Validation & Import ──────────────────────────────────────────────
   const validateRow = (row, rowNum, allRows) => {
-    const fullName = row["full name"] !== undefined && row["full name"] !== null
-      ? String(row["full name"]).trim()
-      : (row["name"] !== undefined && row["name"] !== null ? String(row["name"]).trim() : "");
+    const fullName = row["name"] !== undefined && row["name"] !== null
+      ? String(row["name"]).trim()
+      : (row["full name"] !== undefined && row["full name"] !== null ? String(row["full name"]).trim() : "");
     const email = row["email"] !== undefined && row["email"] !== null ? String(row["email"]).trim() : "";
     const rawUsername = row["username"] !== undefined && row["username"] !== null
       ? String(row["username"]).trim()
       : (row["user name"] !== undefined && row["user name"] !== null
         ? String(row["user name"]).trim()
         : (row["user_name"] !== undefined && row["user_name"] !== null ? String(row["user_name"]).trim() : ""));
-    const derivedUsername = rawUsername;
-    
     const phone = row["phone number"] !== undefined && row["phone number"] !== null
       ? String(row["phone number"]).trim()
       : (row["phone"] !== undefined && row["phone"] !== null
@@ -751,9 +761,13 @@ export default function UsersPage() {
       ? row["joining date"]
       : (row["joiningdate"] || "");
 
+    const rawEnableMultiple = row["enable multiple roles"] ?? row["enablemultipleroles"] ?? row["multiple roles"] ?? "";
+    const primaryRoleStr = row["primary role"] ?? row["primaryrole"] ?? row["role"] ?? row["role name"] ?? "";
+    const additionalRolesStr = row["additional roles"] ?? row["additionalroles"] ?? row["secondary roles"] ?? "";
+
     // 1. Full Name
-    if (!fullName) return { error: `Row ${rowNum}: Full Name is required` };
-    if (!/^[a-zA-Z\s]+$/.test(fullName)) return { error: `Row ${rowNum}: Full Name must contain only letters` };
+    if (!fullName) return { error: `Row ${rowNum}: Name is required` };
+    if (!/^[a-zA-Z\s]+$/.test(fullName)) return { error: `Row ${rowNum}: Name must contain only letters` };
 
     // 2. Email Format & Email Uniqueness
     if (!email) return { error: `Row ${rowNum}: Email is required` };
@@ -777,27 +791,7 @@ export default function UsersPage() {
       }
     }
 
-    // 3. Username Uniqueness (Explicit username only)
-    if (derivedUsername) {
-      const usernameLower = derivedUsername.toLowerCase();
-      const existingUsername = users.find((u) => u.username && u.username.trim().toLowerCase() === usernameLower);
-      if (existingUsername) {
-        const owner = existingUsername.fullName || existingUsername.username || "another user";
-        return { error: `Row ${rowNum}: Username '${derivedUsername}' already exists in database (registered to '${owner}')` };
-      }
-      if (allRows && Array.isArray(allRows)) {
-        const firstUserIndex = allRows.findIndex((r) => {
-          const rRawUser = r["username"] ?? r["user name"] ?? r["user_name"] ?? "";
-          const rUser = rRawUser ? String(rRawUser).trim().toLowerCase() : "";
-          return rUser && rUser === usernameLower;
-        });
-        if (firstUserIndex !== -1 && firstUserIndex < rowNum - 2) {
-          return { error: `Row ${rowNum}: Duplicate username '${derivedUsername}' in Excel sheet (matches Row ${firstUserIndex + 2})` };
-        }
-      }
-    }
-
-    // 4. Mobile Number Validation (Strictly 10 digits starting with 6–9, duplicate mobile number is allowed)
+    // 3. Phone Number Validation (10 digits starting with 6–9)
     const rawPhone = String(phone || "").trim().replace(/\D/g, "");
     if (!rawPhone) {
       return { error: `Row ${rowNum}: Phone Number is required` };
@@ -805,33 +799,21 @@ export default function UsersPage() {
     const mobileRegex = /^[6-9]\d{9}$/;
     if (!mobileRegex.test(rawPhone)) {
       if (rawPhone.length !== 10) {
-        return { error: `Row ${rowNum}: Mobile Number '${phone}' must be exactly 10 digits` };
+        return { error: `Row ${rowNum}: Phone Number '${phone}' must be exactly 10 digits` };
       }
       if (!/^[6-9]/.test(rawPhone)) {
-        return { error: `Row ${rowNum}: Mobile Number '${phone}' must start with 6, 7, 8, or 9` };
+        return { error: `Row ${rowNum}: Phone Number '${phone}' must start with 6, 7, 8, or 9` };
       }
-      return { error: `Row ${rowNum}: Mobile Number '${phone}' is invalid. Enter a 10-digit mobile number starting with 6–9` };
+      return { error: `Row ${rowNum}: Phone Number '${phone}' is invalid. Enter a 10-digit number starting with 6–9` };
     }
     const cleanPhone = rawPhone;
 
-    // 5. Gender
-    let normalizedGender = "Male";
-    if (gender) {
-      normalizedGender = gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
-      if (!["Male", "Female", "Other"].includes(normalizedGender)) {
-        return { error: `Row ${rowNum}: Gender must be Male, Female, or Other` };
-      }
-    }
-
-    // 6. Work Type
-    let normalizedType = typeOptions[0]?.value || "";
-    if (rawType) {
-      const matchedType = typeOptions.find((t) => t.value.toLowerCase() === rawType.toLowerCase());
-      if (matchedType) {
-        normalizedType = matchedType.value;
-      } else {
-        return { error: `Row ${rowNum}: Work Type '${rawType}' must be one of: ${typeOptions.map((t) => t.value).join(", ")}` };
-      }
+    // 4. Gender
+    const rawGender = String(gender || "").trim();
+    if (!rawGender) return { error: `Row ${rowNum}: Gender is required` };
+    const normalizedGender = rawGender.charAt(0).toUpperCase() + rawGender.slice(1).toLowerCase();
+    if (!["Male", "Female", "Other"].includes(normalizedGender)) {
+      return { error: `Row ${rowNum}: Gender must be Male, Female, or Other` };
     }
 
     // Date parser
@@ -847,14 +829,17 @@ export default function UsersPage() {
         const localDate = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate());
         return dayjs(localDate);
       }
-      const parsed = dayjs(String(val).trim(), ["DD/MM/YYYY", "YYYY-MM-DD", "MM/DD/YYYY", "DD-MM-YYYY"], true);
+      const str = String(val).trim();
+      const parsed = dayjs(str, ["DD/MM/YYYY", "DD-MM-YYYY", "YYYY-MM-DD"], true);
       if (parsed.isValid()) return parsed;
-      const looseParsed = dayjs(String(val).trim());
+      const parsedWithTime = dayjs(str, ["DD/MM/YYYY HH:mm:ss", "DD-MM-YYYY HH:mm:ss", "YYYY-MM-DDTHH:mm:ssZ"], true);
+      if (parsedWithTime.isValid()) return parsedWithTime;
+      const looseParsed = dayjs(str);
       if (looseParsed.isValid()) return looseParsed;
       return null;
     };
 
-    // 7. DOB Minimum Age (18 years)
+    // 5. DOB Minimum Age (18 years)
     const dob = parseExcelDate(dobStr);
     if (!dob || !dob.isValid()) {
       return { error: `Row ${rowNum}: Date of Birth must be a valid date (DD/MM/YYYY)` };
@@ -864,7 +849,7 @@ export default function UsersPage() {
       return { error: `Row ${rowNum}: User must be at least 18 years old (Age: ${ageInYears} yrs, DOB: ${dob.format("DD/MM/YYYY")})` };
     }
 
-    // 8. Joining Date must be after DOB and up to 3 months in the future
+    // 6. Joining Date must be after DOB and up to 3 months in the future
     const joiningDate = parseExcelDate(joiningStr);
     if (!joiningDate || !joiningDate.isValid()) {
       return { error: `Row ${rowNum}: Joining Date must be a valid date (DD/MM/YYYY)` };
@@ -879,20 +864,102 @@ export default function UsersPage() {
       return { error: `Row ${rowNum}: Joining Date (${joiningDate.format("DD/MM/YYYY")}) cannot be earlier than 18 years from Date of Birth (${dob.add(18, "year").format("DD/MM/YYYY")})` };
     }
 
+    // 7. Work Type
+    if (!rawType) return { error: `Row ${rowNum}: Work Type is required` };
+    const matchedType = typeOptions.find((t) => t.value.toLowerCase() === String(rawType).trim().toLowerCase());
+    if (!matchedType) {
+      return { error: `Row ${rowNum}: Work Type '${rawType}' must be one of: ${typeOptions.map((t) => t.value).join(", ")}` };
+    }
+    const normalizedType = matchedType.value;
+
+    // 8. Role (Single Role Import)
+    const cleanRole = String(primaryRoleStr || "").trim();
+    if (!cleanRole) {
+      return { error: `Row ${rowNum}: Role is required` };
+    }
+    const matchedRole = roles.find(
+      (r) => (r.roleName || r.name || "").trim().toLowerCase() === cleanRole.toLowerCase()
+    );
+    if (!matchedRole) {
+      return { error: `Row ${rowNum}: Role '${cleanRole}' is invalid. Must match an active master role: ${roles.map((r) => r.roleName || r.name).join(", ")}` };
+    }
+    const resolvedRole = matchedRole.roleName || matchedRole.name;
+
+    // 9. Autogenerate Username from Full Name (without initials, lowercase, no whitespace)
+    // Extract parts with length > 1 to exclude single-letter initials (e.g. "Anish A" -> "anish", "John Doe" -> "johndoe")
+    const nameParts = fullName
+      .trim()
+      .split(/\s+/)
+      .filter((p) => p.length > 1);
+
+    let baseUsername = (nameParts.length > 0 ? nameParts.join("") : fullName.replace(/\s+/g, "")).toLowerCase();
+    // Keep only letters and numbers
+    baseUsername = baseUsername.replace(/[^a-z0-9]/g, "");
+    if (baseUsername.length < 3) {
+      baseUsername = fullName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    }
+    if (baseUsername.length > 25) {
+      baseUsername = baseUsername.substring(0, 25);
+    }
+
+    // Determine unique username against database and previous rows in this batch
+    let cleanUsername = baseUsername;
+    let suffix = 1;
+
+    const isUsernameTaken = (candidate, currentRowIndex) => {
+      const lower = candidate.toLowerCase();
+      // Check database
+      if (users.some((u) => u.username && u.username.trim().toLowerCase() === lower)) {
+        return true;
+      }
+      // Check prior rows in current Excel import batch
+      if (allRows && Array.isArray(allRows)) {
+        for (let i = 0; i < currentRowIndex; i++) {
+          const priorRow = allRows[i];
+          const priorFullName = priorRow["name"] || priorRow["full name"] || "";
+          const priorParts = String(priorFullName).trim().split(/\s+/).filter((p) => p.length > 1);
+          let priorBase = (priorParts.length > 0 ? priorParts.join("") : String(priorFullName).replace(/\s+/g, "")).toLowerCase().replace(/[^a-z0-9]/g, "");
+          if (priorBase.length < 3) priorBase = String(priorFullName).toLowerCase().replace(/[^a-z0-9]/g, "");
+          if (priorBase.length > 25) priorBase = priorBase.substring(0, 25);
+          if (priorRow._assignedUsername && priorRow._assignedUsername.toLowerCase() === lower) {
+            return true;
+          }
+          if (priorBase === lower && !priorRow._assignedUsername) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    while (isUsernameTaken(cleanUsername, rowNum - 2)) {
+      cleanUsername = `${baseUsername}${suffix}`;
+      suffix++;
+    }
+
+    // Store assigned username on row for following rows to check against
+    row._assignedUsername = cleanUsername;
+
     return {
       error: null,
       parsed: {
         fullName,
-        username: rawUsername ? rawUsername.trim() : null,
+        username: cleanUsername,
         email,
         phone: cleanPhone,
         gender: normalizedGender,
         workType: normalizedType,
         dateOfBirth: dob.format("YYYY-MM-DD"),
         joiningDate: joiningDate.format("YYYY-MM-DD"),
-        createMemberProfile: false,
-        enableUserAccess: false,
+        createMemberProfile: true,
+        enableUserAccess: true,
         enableMultipleRoles: false,
+        roleName: resolvedRole,
+        primaryRole: resolvedRole,
+        primaryRoles: [resolvedRole],
+        secondaryRoles: [],
+        roles: [resolvedRole],
+        isImported: true,
         isActive: true,
       },
     };
@@ -915,7 +982,7 @@ export default function UsersPage() {
         (typeof serverData === "string" ? serverData : "") ||
         err.message ||
         "";
-      
+
       const lower = rawMsg.toLowerCase();
       if (lower.includes("users_email_key") || (lower.includes("email") && lower.includes("unique"))) {
         toast.error("Duplicate Credential: Email address is already registered in the database.");
@@ -976,8 +1043,8 @@ export default function UsersPage() {
               const deleteTooltip = isInUse
                 ? "This record cannot be deleted because it is currently in use."
                 : canDeleteUser
-                ? "Delete User"
-                : "Disabled";
+                  ? "Delete User"
+                  : "Disabled";
 
               return (
                 <Tooltip title={deleteTooltip}>
@@ -995,8 +1062,8 @@ export default function UsersPage() {
                             isDeleteAllowed
                               ? actionIconColor
                               : theme.palette.mode === "dark"
-                              ? "rgba(255, 255, 255, 0.45)"
-                              : "#94a3b8",
+                                ? "rgba(255, 255, 255, 0.45)"
+                                : "#94a3b8",
                         }}
                       />
                     </IconButton>
@@ -1015,8 +1082,8 @@ export default function UsersPage() {
               const tooltipTitle = isDeactivatingSelf
                 ? "You cannot deactivate your own account"
                 : canChangeUserStatus
-                ? (row.isActive ? "Deactivate User" : "Activate User")
-                : "Disabled";
+                  ? (row.isActive ? "Deactivate User" : "Activate User")
+                  : "Disabled";
 
               return (
                 <Tooltip title={tooltipTitle}>
@@ -1275,13 +1342,14 @@ export default function UsersPage() {
         onImport={handleBulkImport}
         title="Import Users"
         templateHeaders={[
-          "Full Name",
+          "Name",
           "Email",
           "Phone Number",
           "Gender",
           "Date of Birth",
           "Joining Date",
           "Work Type",
+          "Role",
         ]}
         templateValidations={templateValidations}
         validateRow={validateRow}

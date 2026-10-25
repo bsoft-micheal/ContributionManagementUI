@@ -63,7 +63,7 @@ const initialForm = {
   workType: "",
   dateOfBirth: null,
   joiningDate: null,
-  createMemberProfile: false,
+  createMemberProfile: true,
   enableMultipleRoles: false,
   roleName: "",
   primaryRole: "",
@@ -1025,7 +1025,7 @@ export default function UserFormPage() {
                 />
               </Grid>
 
-              {/* Right Column: Checkboxes aligned horizontally */}
+              {/* Right Column: Enable Multiple Roles Checkbox */}
               <Grid size={{ xs: 12, sm: 6, md: 8 }}>
                 <Box
                   sx={{
@@ -1037,81 +1037,22 @@ export default function UserFormPage() {
                     pt: { xs: 0.5, md: 2.4 },
                   }}
                 >
-                  {/* Create Login Account */}
+                  {/* Enable Multiple Roles */}
                   <Box
                     onClick={() => {
-                      if (!hasExistingLogin) {
-                        handleToggleCreateMemberProfile(!form.createMemberProfile);
-                      }
+                      handleToggleMultipleRoles(!form.enableMultipleRoles);
                     }}
                     sx={{
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 0.8,
-                      cursor: hasExistingLogin ? "default" : "pointer",
+                      cursor: "pointer",
                       userSelect: "none",
                       width: "fit-content",
                     }}
                   >
                     <Checkbox
-                      checked={Boolean(form.createMemberProfile)}
-                      disabled={hasExistingLogin}
-                      onChange={(e) => {
-                        if (!hasExistingLogin) {
-                          handleToggleCreateMemberProfile(e.target.checked);
-                        }
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      size="small"
-                      sx={{
-                        p: 0,
-                        color: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(255, 255, 255, 0.4)"
-                            : "#4a3f6b",
-                        "&.Mui-checked": {
-                          color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
-                        },
-                        "&.Mui-disabled": {
-                          color: (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "rgba(255, 255, 255, 0.35)"
-                              : "#94a3b8",
-                        },
-                      }}
-                    />
-                    <Typography
-                      variant="body2"
-                      fontWeight={600}
-                      sx={{
-                        color: (theme) =>
-                          theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b",
-                        fontSize: "0.82rem",
-                      }}
-                    >
-                      Create Login Account
-                    </Typography>
-                  </Box>
-
-                  {/* Enable Multiple Roles (only available if Create Login Account is checked) */}
-                  <Box
-                    onClick={() => {
-                      if (form.createMemberProfile) {
-                        handleToggleMultipleRoles(!form.enableMultipleRoles);
-                      }
-                    }}
-                    sx={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 0.8,
-                      cursor: form.createMemberProfile ? "pointer" : "not-allowed",
-                      userSelect: "none",
-                      width: "fit-content",
-                    }}
-                  >
-                    <Checkbox
-                      checked={Boolean(form.enableMultipleRoles && form.createMemberProfile)}
-                      disabled={!form.createMemberProfile}
+                      checked={Boolean(form.enableMultipleRoles)}
                       onChange={(e) =>
                         handleToggleMultipleRoles(e.target.checked)
                       }
@@ -1126,12 +1067,6 @@ export default function UserFormPage() {
                         "&.Mui-checked": {
                           color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
                         },
-                        "&.Mui-disabled": {
-                          color: (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "rgba(255, 255, 255, 0.35)"
-                              : "#94a3b8",
-                        },
                       }}
                     />
                     <Typography
@@ -1139,11 +1074,7 @@ export default function UserFormPage() {
                       fontWeight={600}
                       sx={{
                         color: (theme) =>
-                          !form.createMemberProfile
-                            ? theme.palette.mode === "dark"
-                              ? "#94a3b8"
-                              : "#64748b"
-                            : theme.palette.mode === "dark"
+                          theme.palette.mode === "dark"
                             ? "#e2e8f0"
                             : "#1e293b",
                         fontSize: "0.82rem",
