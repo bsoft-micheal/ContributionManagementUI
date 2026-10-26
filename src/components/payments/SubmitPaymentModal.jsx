@@ -308,9 +308,16 @@ export default function SubmitPaymentModal({
     if (!cfg?.isConfigured && formData.eventName) {
       cfg = getPaymentQrConfig(formData.eventName);
     }
-    const upiId = cfg?.upiId || duesSummary?.qrUpiId || "danielrobertanto604@okicici";
-    const receiverName = cfg?.receiverName || duesSummary?.qrReceiverName || "Contribution Management";
-    const qrImage = cfg?.qrImage || duesSummary?.qrImage || null;
+
+    const isConfigured = Boolean(
+      (cfg?.isConfigured && (cfg?.upiId || cfg?.qrImage)) ||
+      (duesSummary?.qrUpiId && duesSummary?.qrReceiverName) ||
+      duesSummary?.qrImage
+    );
+
+    const upiId = isConfigured ? (cfg?.upiId || duesSummary?.qrUpiId || "").trim() : "";
+    const receiverName = isConfigured ? (cfg?.receiverName || duesSummary?.qrReceiverName || "Contribution Management").trim() : "";
+    const qrImage = isConfigured ? (cfg?.qrImage || duesSummary?.qrImage || null) : null;
     const qrMode = qrImage ? "uploaded" : (cfg?.qrMode || "generated");
 
     return {
@@ -321,18 +328,20 @@ export default function SubmitPaymentModal({
       qrUpiId: upiId,
       qrMode,
       qrImage,
-      isConfigured: true,
+      isConfigured,
+      message: isConfigured ? "" : "Payment QR is not configured for this event type.",
     };
   }, [resolvedCategory, formData.eventName, duesSummary]);
 
   const activeRowQrData = useMemo(() => {
     if (!activeQrModal) return null;
+    if (!qrConfig?.isConfigured) return null;
     const rowAmt = Number(activeQrModal.amount) || Number(formData.amount) || 0;
     const modeLabel = activeQrModal.mode || "UPI";
     return generateDynamicPaymentQr({
       amount: rowAmt,
       note: `${formData.eventName || "Contribution"} - ${formData.memberName || "Member"} (${modeLabel})`,
-      customConfig: qrConfig?.isConfigured ? qrConfig : undefined,
+      customConfig: qrConfig,
       eventType: resolvedCategory,
     });
   }, [activeQrModal, formData.eventName, formData.memberName, qrConfig, resolvedCategory]);
@@ -2239,7 +2248,7 @@ export default function SubmitPaymentModal({
                               }
                             />
                           </Box>
-                          {!isRowCash && Boolean(row.mode) && (
+                          {!isRowCash && Boolean(row.mode) && qrConfig?.isConfigured && (
                             <Tooltip title={`Open QR Scanner for ${row.mode} (₹${row.amount || 0})`}>
                               <Button
                                 size="small"
@@ -2540,8 +2549,22 @@ export default function SubmitPaymentModal({
               />
             </Box>
           ) : (
-            <Box sx={{ py: 3, color: "text.secondary" }}>
-              <Typography variant="body2">Generating QR Code...</Typography>
+            <Box
+              sx={{
+                py: 3,
+                px: 2,
+                mb: 2,
+                borderRadius: "12px",
+                bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(234, 179, 8, 0.1)" : "rgba(234, 179, 8, 0.08)"),
+                border: "1px dashed rgba(234, 179, 8, 0.4)",
+              }}
+            >
+              <Typography variant="body2" fontWeight={800} sx={{ color: "#b45309", mb: 0.5 }}>
+                ⚠️ Payment QR Not Configured
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Payment QR for this event type has not been configured yet. Once updated in Settings, the QR code and UPI scanner will appear here.
+              </Typography>
             </Box>
           )}
 
@@ -2552,41 +2575,43 @@ export default function SubmitPaymentModal({
             {formData.eventName || "Contribution"} • {formData.memberName || "Member"}
           </Typography>
 
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 1.5,
-              borderRadius: "10px",
-              bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc"),
-              mb: 2,
-            }}
-          >
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
-              <Typography variant="caption" color="text.secondary">
-                Payee:
-              </Typography>
-              <Typography variant="caption" fontWeight={800}>
-                {activeRowQrData?.receiverName || "Contribution Management"}
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Typography variant="caption" color="text.secondary">
-                UPI ID:
-              </Typography>
-              <Stack direction="row" spacing={0.5} alignItems="center">
-                <Typography variant="caption" fontWeight={800} sx={{ fontFamily: "monospace", color: "#7c3aed" }}>
-                  {activeRowQrData?.upiId || "danielrobertanto604@okicici"}
+          {activeRowQrData?.upiId ? (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 1.5,
+                borderRadius: "10px",
+                bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#f8fafc"),
+                mb: 2,
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Payee:
                 </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => handleCopyUpi(activeRowQrData?.upiId || "danielrobertanto604@okicici")}
-                  sx={{ p: 0.2 }}
-                >
-                  {copiedUpi ? <CheckIcon sx={{ fontSize: 14, color: "success.main" }} /> : <CopyIcon sx={{ fontSize: 14 }} />}
-                </IconButton>
-              </Stack>
-            </Box>
-          </Paper>
+                <Typography variant="caption" fontWeight={800}>
+                  {activeRowQrData.receiverName || "Contribution Management"}
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="caption" color="text.secondary">
+                  UPI ID:
+                </Typography>
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Typography variant="caption" fontWeight={800} sx={{ fontFamily: "monospace", color: "#7c3aed" }}>
+                    {activeRowQrData.upiId}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleCopyUpi(activeRowQrData.upiId)}
+                    sx={{ p: 0.2 }}
+                  >
+                    {copiedUpi ? <CheckIcon sx={{ fontSize: 14, color: "success.main" }} /> : <CopyIcon sx={{ fontSize: 14 }} />}
+                  </IconButton>
+                </Stack>
+              </Box>
+            </Paper>
+          ) : null}
 
           <Button
             fullWidth

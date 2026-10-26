@@ -364,7 +364,6 @@ export default function EventsPage() {
 
       setEvents(mappedEvents);
     } catch (error) {
-      if (error?.isRateLimit || error?.response?.status === 429) return;
       toast.error(error.response?.data?.message || "Failed to load events data");
     }
   }
@@ -616,7 +615,6 @@ export default function EventsPage() {
         toast.success(TOAST_MESSAGES.EVENTS.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
         loadData();
       } catch (error) {
-        if (error?.isRateLimit || error?.response?.status === 429) return;
         toast.error(error.response?.data?.message || TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       } finally {
         setDeleteConfirmOpen(false);
@@ -638,7 +636,6 @@ export default function EventsPage() {
       toast.success("Event published successfully. Member notifications are being processed.");
       loadData();
     } catch (error) {
-      if (error?.isRateLimit || error?.response?.status === 429) return;
       toast.error(error.response?.data?.message || "Failed to publish event.");
     } finally {
       setPublishing(false);
@@ -652,7 +649,6 @@ export default function EventsPage() {
       await sendRemindersForEventAsync(eventItem.eventId);
       toast.success(`Reminder emails enqueued for '${eventItem.eventName}' via Hangfire!`);
     } catch (error) {
-      if (error?.isRateLimit || error?.response?.status === 429) return;
       toast.error(error.response?.data?.message || "Failed to trigger reminder emails.");
     }
   };

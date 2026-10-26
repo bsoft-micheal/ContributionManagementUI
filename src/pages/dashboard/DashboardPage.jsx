@@ -825,10 +825,8 @@ export default function DashboardPage() {
     try {
       const data = await getDashboardSummaryAsync({ month, year });
       setSummary(data);
-    } catch (err) {
-      if (!err?.isRateLimit && err?.response?.status !== 429) {
-        toast.error("Failed to load dashboard data");
-      }
+    } catch {
+      toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }

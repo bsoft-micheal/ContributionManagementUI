@@ -359,8 +359,7 @@ export default function ExpensePage() {
       } else {
         setExpenses([]);
       }
-    } catch (err) {
-      if (err?.isRateLimit || err?.response?.status === 429) return;
+    } catch {
       toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
@@ -420,8 +419,7 @@ export default function ExpensePage() {
       }
 
       setStatusesList(cleanList);
-    } catch (err) {
-      if (err?.isRateLimit || err?.response?.status === 429) return;
+    } catch {
       toast.error("Failed to load lookup data.");
     }
   };
@@ -844,7 +842,6 @@ export default function ExpensePage() {
       toast.success(TOAST_MESSAGES.EXPENSES.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchExpensesFromDb();
     } catch (err) {
-      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error(err, TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       await fetchExpensesFromDb();
     } finally {
@@ -991,7 +988,6 @@ export default function ExpensePage() {
       setErrors({});
       await fetchExpensesFromDb();
     } catch (err) {
-      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
       if (err?.response?.status === 404 || err?.response?.status === 409) {
         setDialogOpen(false);
@@ -1115,7 +1111,6 @@ export default function ExpensePage() {
       setStatusRemarks("");
       await fetchExpensesFromDb();
     } catch (err) {
-      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
       if (err?.response?.status === 404 || err?.response?.status === 409) {
         setStatusDialogOpen(false);

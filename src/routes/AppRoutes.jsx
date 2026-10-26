@@ -66,10 +66,10 @@ export default function AppRoutes() {
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/my-contributions" element={<ProtectedRoute><MyContributionSummaryPage /></ProtectedRoute>} />
         <Route path="/reports" element={<Navigate to="/reports/event-collection-audit" replace />} />
-        <Route path="/reports/event-collection-audit" element={<ProtectedRoute><ReportsPage mode="event" /></ProtectedRoute>} />
-        <Route path="/reports/member-velocity" element={<ProtectedRoute><ReportsPage mode="member" /></ProtectedRoute>} />
-        <Route path="/reports/payment-history" element={<ProtectedRoute><ReportsPage mode="payment-history" /></ProtectedRoute>} />
-        <Route path="/reports/annual-member-matrix" element={<ProtectedRoute><ReportsPage mode="annual-matrix" /></ProtectedRoute>} />
+        <Route path="/reports/event-collection-audit" element={<ProtectedRoute><ReportsPage key="event" mode="event" /></ProtectedRoute>} />
+        <Route path="/reports/member-velocity" element={<ProtectedRoute><ReportsPage key="member" mode="member" /></ProtectedRoute>} />
+        <Route path="/reports/payment-history" element={<ProtectedRoute><ReportsPage key="payment" mode="payment-history" /></ProtectedRoute>} />
+        <Route path="/reports/annual-member-matrix" element={<ProtectedRoute><ReportsPage key="annual-matrix" mode="annual-matrix" /></ProtectedRoute>} />
         <Route path="/reports/annual-matrix" element={<Navigate to="/reports/annual-member-matrix" replace />} />
         <Route path="/reports/member-matrix" element={<Navigate to="/reports/annual-member-matrix" replace />} />
         <Route path="/reports/pending-dues" element={<Navigate to="/reports/member-velocity" replace />} />
