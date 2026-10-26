@@ -47,6 +47,12 @@ export const getAvailableAmountInHandAsync = async (excludeEventId = null) => {
   return await getApi(`/events/getAvailableAmountInHandAsync${query}`);
 };
 
+export const getMonthlyRestrictionsAsync = async (month, year, excludeEventId = null) => {
+  const params = { month, year };
+  if (excludeEventId) params.excludeEventId = excludeEventId;
+  return await getApi("/events/getMonthlyRestrictionsAsync", params);
+};
+
 /**
  * Checks whether an event has been published.
  * Draft / unpublished events return false.
