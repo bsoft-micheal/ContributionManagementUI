@@ -152,7 +152,7 @@ export default function CalendarPage({ isEmbedded = false }) {
   const [filterYear, setFilterYear] = useState(currentYear);
   const [filterCategory, setFilterCategory] = useState("ALL");
   const [filterSearch, setFilterSearch] = useState("");
-  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(true);
   const [filterLookupEvents, setFilterLookupEvents] = useState([]);
 
   // Applied filter state (drives data fetching, calendar grid & sidebar)
@@ -269,7 +269,10 @@ export default function CalendarPage({ isEmbedded = false }) {
     loadCalendarData(appliedFilters);
   };
 
-  // Initial load: Do not load data automatically below filter section
+  // Initial load: Load calendar data automatically on mount with default month and year
+  useEffect(() => {
+    loadCalendarData(appliedFilters);
+  }, []);
 
   useEffect(() => {
     async function loadEventTypesAndMembers() {
@@ -1065,8 +1068,16 @@ export default function CalendarPage({ isEmbedded = false }) {
             }}
           >
             {/* Filter controls row */}
-            <Grid container spacing={1.5} alignItems="flex-end">
-              <Grid size={{ xs: 6, sm: 3, md: 2, lg: 1.5 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "flex-end",
+                flexWrap: "wrap",
+                gap: 1.25,
+                width: "100%",
+              }}
+            >
+              <Box sx={{ width: { xs: "100%", sm: 125, md: 135 } }}>
                 <AppSelect
                   size="small"
                   label="Year"
@@ -1079,8 +1090,8 @@ export default function CalendarPage({ isEmbedded = false }) {
                   options={yearOptions}
                   fullWidth
                 />
-              </Grid>
-              <Grid size={{ xs: 6, sm: 3, md: 2, lg: 1.8 }}>
+              </Box>
+              <Box sx={{ width: { xs: "100%", sm: 145, md: 155 } }}>
                 <AppSelect
                   size="small"
                   label="Month"
@@ -1093,8 +1104,8 @@ export default function CalendarPage({ isEmbedded = false }) {
                   options={monthOptions}
                   fullWidth
                 />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 2.8, lg: 2.5 }}>
+              </Box>
+              <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
                 <AppSelect
                   size="small"
                   label="Event Type"
@@ -1104,61 +1115,61 @@ export default function CalendarPage({ isEmbedded = false }) {
                   options={categoryOptions}
                   fullWidth
                 />
-              </Grid>
-              <Grid size={{ xs: 12, sm: "auto", md: "auto" }}>
-                <Box
+              </Box>
+              <Box
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 1,
+                  height: 34,
+                  flexShrink: 0,
+                }}
+              >
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
+                  onClick={handleApplyFilter}
+                  disabled={!canView}
                   sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
                     height: 34,
-                    pb: "1px",
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                    border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
                   }}
                 >
-                  <AppButton
-                    variant="contained"
-                    size="small"
-                    startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
-                    onClick={handleApplyFilter}
-                    disabled={!canView}
-                    sx={{
-                      height: 34,
-                      minHeight: 34,
-                      fontWeight: 700,
-                      fontSize: "0.75rem",
-                      px: 2,
-                      whiteSpace: "nowrap",
-                      borderRadius: "8px",
-                    }}
-                  >
-                    Filter
-                  </AppButton>
-                  <AppButton
-                    variant="outlined"
-                    size="small"
-                    onClick={handleClearFilter}
-                    disabled={!canView}
-                    sx={{
-                      height: 34,
-                      minHeight: 34,
-                      fontWeight: 700,
-                      fontSize: "0.75rem",
-                      px: 2,
-                      whiteSpace: "nowrap",
-                      borderRadius: "8px",
-                      color: "#ef4444",
-                      borderColor: "rgba(239, 68, 68, 0.4)",
-                      "&:hover": {
-                        borderColor: "#ef4444",
-                        bgcolor: "rgba(239, 68, 68, 0.05)",
-                      },
-                    }}
-                  >
-                    Clear Filter
-                  </AppButton>
-                </Box>
-              </Grid>
-            </Grid>
+                  Filter
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  onClick={handleClearFilter}
+                  disabled={!canView}
+                  sx={{
+                    height: 34,
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                    borderRadius: "8px",
+                    color: "#ef4444",
+                    borderColor: "rgba(239, 68, 68, 0.4)",
+                    "&:hover": {
+                      borderColor: "#ef4444",
+                      bgcolor: "rgba(239, 68, 68, 0.05)",
+                    },
+                  }}
+                >
+                  Clear Filter
+                </AppButton>
+              </Box>
+            </Box>
           </Box>
 
           {/* 75% / 25% Split: 75% Calendar + 25% Birthday Members List */}
@@ -1188,897 +1199,897 @@ export default function CalendarPage({ isEmbedded = false }) {
             </Box>
           ) : (
             <Grid container>
-            {/* 75% Calendar Area */}
-            <Grid
-              size={{ xs: 12, lg: 9 }}
-              sx={{
-                borderRight: {
-                  lg: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "1.5px solid rgba(124, 58, 237, 0.25)"
-                      : "1.5px solid rgba(124, 58, 237, 0.2)",
-                },
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              {/* Month Stepper & Today Action */}
-              <Box
+              {/* 75% Calendar Area */}
+              <Grid
+                size={{ xs: 12, lg: 9 }}
                 sx={{
+                  borderRight: {
+                    lg: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "1.5px solid rgba(124, 58, 237, 0.25)"
+                        : "1.5px solid rgba(124, 58, 237, 0.2)",
+                  },
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  px: { xs: 2, sm: 3 },
-                  py: 1.2,
-                  borderBottom: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "1.5px solid rgba(124, 58, 237, 0.18)"
-                      : "1.5px solid rgba(124, 58, 237, 0.12)",
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.02)"
-                      : "rgba(0, 0, 0, 0.01)",
+                  flexDirection: "column",
                 }}
               >
-                <Box sx={{ width: 60 }} />
-
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                  <IconButton
-                    size="small"
-                    onClick={handlePrevMonth}
-                    sx={{
-                      border: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "1px solid rgba(255, 255, 255, 0.2)"
-                          : "1px solid rgba(124, 58, 237, 0.25)",
-                      borderRadius: "8px",
-                      p: 0.5,
-                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
-                      "&:hover": {
-                        bgcolor: "action.hover",
-                        borderColor: "primary.main",
-                      },
-                    }}
-                  >
-                    <ChevronLeftRoundedIcon fontSize="small" />
-                  </IconButton>
-
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight={800}
-                    sx={{
-                      minWidth: 160,
-                      textAlign: "center",
-                      fontSize: "1rem",
-                      letterSpacing: "-0.01em",
-                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
-                    }}
-                  >
-                    {displayedMonthName}{!appliedFilters.year || appliedFilters.year === 0 ? "" : ` ${appliedFilters.year}`}
-                  </Typography>
-
-                  <IconButton
-                    size="small"
-                    onClick={handleNextMonth}
-                    sx={{
-                      border: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "1px solid rgba(255, 255, 255, 0.2)"
-                          : "1px solid rgba(124, 58, 237, 0.25)",
-                      borderRadius: "8px",
-                      p: 0.5,
-                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
-                      "&:hover": {
-                        bgcolor: "action.hover",
-                        borderColor: "primary.main",
-                      },
-                    }}
-                  >
-                    <ChevronRightRoundedIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-
-                <AppButton
-                  variant="outlined"
-                  size="small"
-                  onClick={handleGoToToday}
-                  sx={{
-                    borderRadius: "8px",
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    px: 1.6,
-                    py: 0.35,
-                    minHeight: 28,
-                    borderColor: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255, 255, 255, 0.25)"
-                        : "rgba(124, 58, 237, 0.35)",
-                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "primary.main"),
-                  }}
-                >
-                  Today
-                </AppButton>
-              </Box>
-
-              {/* Calendar Grid View (Compact Size) */}
-              <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
-                {/* Weekdays header */}
+                {/* Month Stepper & Today Action */}
                 <Box
                   sx={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(7, 1fr)",
-                    gap: 1,
-                    mb: 1,
-                    pb: 0.8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    px: { xs: 2, sm: 3 },
+                    py: 1.2,
                     borderBottom: (theme) =>
                       theme.palette.mode === "dark"
                         ? "1.5px solid rgba(124, 58, 237, 0.18)"
                         : "1.5px solid rgba(124, 58, 237, 0.12)",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(255, 255, 255, 0.02)"
+                        : "rgba(0, 0, 0, 0.01)",
                   }}
                 >
-                  {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((d) => (
-                    <Typography
-                      key={d}
-                      variant="caption"
-                      fontWeight={800}
+                  <Box sx={{ width: 60 }} />
+
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+                    <IconButton
+                      size="small"
+                      onClick={handlePrevMonth}
                       sx={{
-                        textAlign: "center",
-                        color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.secondary"),
-                        letterSpacing: "0.06em",
-                        fontSize: "0.7rem",
+                        border: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "1px solid rgba(255, 255, 255, 0.2)"
+                            : "1px solid rgba(124, 58, 237, 0.25)",
+                        borderRadius: "8px",
+                        p: 0.5,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
+                        "&:hover": {
+                          bgcolor: "action.hover",
+                          borderColor: "primary.main",
+                        },
                       }}
                     >
-                      {d}
+                      <ChevronLeftRoundedIcon fontSize="small" />
+                    </IconButton>
+
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={800}
+                      sx={{
+                        minWidth: 160,
+                        textAlign: "center",
+                        fontSize: "1rem",
+                        letterSpacing: "-0.01em",
+                        color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
+                      }}
+                    >
+                      {displayedMonthName}{!appliedFilters.year || appliedFilters.year === 0 ? "" : ` ${appliedFilters.year}`}
                     </Typography>
-                  ))}
-                </Box>
 
-                {/* Calendar Days Cells */}
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(7, 1fr)",
-                    gap: { xs: 0.6, sm: 0.8 },
-                  }}
-                >
-                  {calendarDays.map((day) => {
-                    const dayItems = getDayItems(day);
-                    const isCurrentMonth = appliedFilters.month === 0 || day.month() + 1 === appliedFilters.month;
-                    const isDifferentMonth = !isCurrentMonth;
-                    const isToday = day.isSame(dayjs(), "day");
+                    <IconButton
+                      size="small"
+                      onClick={handleNextMonth}
+                      sx={{
+                        border: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "1px solid rgba(255, 255, 255, 0.2)"
+                            : "1px solid rgba(124, 58, 237, 0.25)",
+                        borderRadius: "8px",
+                        p: 0.5,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
+                        "&:hover": {
+                          bgcolor: "action.hover",
+                          borderColor: "primary.main",
+                        },
+                      }}
+                    >
+                      <ChevronRightRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
 
-                    return (
-                      <Paper
-                        key={day.toString()}
-                        elevation={0}
-                        onClick={() => handleDateClick(day)}
-                        sx={{
-                          p: 0.6,
-                          height: 98,
-                          maxHeight: 98,
-                          minHeight: 98,
-                          boxSizing: "border-box",
-                          overflow: "hidden",
-                          border: (theme) =>
-                            isToday
-                              ? "2px solid #7c3aed"
-                              : theme.palette.mode === "dark"
-                                ? "1px solid rgba(255, 255, 255, 0.10)"
-                                : "1px solid rgba(124, 58, 237, 0.15)",
-                          borderRadius: "10px",
-                          opacity: isDifferentMonth ? 0.35 : 1,
-                          bgcolor: isToday
-                            ? (theme) =>
-                              theme.palette.mode === "dark"
-                                ? "rgba(124, 58, 237, 0.15)"
-                                : "rgba(124, 58, 237, 0.05)"
-                            : "background.paper",
-                          cursor: hasWriteAccess ? "pointer" : "default",
-                          display: "flex",
-                          flexDirection: "column",
-                          transition: "all 0.15s ease",
-                          "&:hover": hasWriteAccess
-                            ? {
-                              bgcolor: (theme) =>
-                                theme.palette.mode === "dark"
-                                  ? "rgba(255, 255, 255, 0.04)"
-                                  : "#f8fafc",
-                              borderColor: "#7c3aed",
-                            }
-                            : {},
-                        }}
-                      >
-                        {/* Day number header */}
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            mb: 0.4,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {isToday ? (
-                            <Box
-                              sx={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                bgcolor: (theme) =>
-                                  theme.palette.mode === "dark" ? "#7c3aed" : "primary.main",
-                                color: "#ffffff",
-                                borderRadius: "6px",
-                                px: 0.6,
-                                py: 0.1,
-                                fontSize: "0.62rem",
-                                fontWeight: 800,
-                                lineHeight: 1.2,
-                                boxShadow: "0 2px 4px rgba(124, 58, 237, 0.3)",
-                              }}
-                            >
-                              {day.format("D")} Today
-                            </Box>
-                          ) : (
-                            <Typography
-                              sx={{
-                                fontSize: "0.72rem",
-                                fontWeight: 700,
-                                color: isDifferentMonth
-                                  ? "text.disabled"
-                                  : (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.secondary"),
-                                lineHeight: 1,
-                              }}
-                            >
-                              {day.format("DD")}
-                            </Typography>
-                          )}
-                        </Box>
-
-                        {/* Day event cards: scrollable within fixed height cell */}
-                        <Stack
-                          spacing={0.35}
-                          sx={{
-                            flex: 1,
-                            minHeight: 0,
-                            overflowY: "auto",
-                            overflowX: "hidden",
-                            pr: 0.2,
-                            "&::-webkit-scrollbar": {
-                              width: "3px",
-                            },
-                            "&::-webkit-scrollbar-track": {
-                              background: "transparent",
-                            },
-                            "&::-webkit-scrollbar-thumb": {
-                              background: (theme) =>
-                                theme.palette.mode === "dark"
-                                  ? "rgba(255, 255, 255, 0.22)"
-                                  : "rgba(124, 58, 237, 0.35)",
-                              borderRadius: "3px",
-                            },
-                            "&::-webkit-scrollbar-thumb:hover": {
-                              background: (theme) =>
-                                theme.palette.mode === "dark"
-                                  ? "rgba(255, 255, 255, 0.45)"
-                                  : "rgba(124, 58, 237, 0.7)",
-                            },
-                          }}
-                        >
-                          {dayItems.map((item) => {
-                            const typeInfo = getEventTypeInfo(item.colorType);
-                            const isBirthdayItem = item.colorType?.toLowerCase().includes("birthday");
-                            const isTodayDay = day.isSame(dayjs(), "day");
-                            const isPastDay = day.isBefore(dayjs().startOf("day"), "day");
-                            const isPaymentPending = isItemPaymentPending(item);
-
-                            let statusText = item.categoryLabel;
-                            if (isBirthdayItem) {
-                              if (isTodayDay) statusText = "Today 🎉";
-                              else if (isPastDay) statusText = "Completed ✓";
-                              else statusText = "Upcoming";
-                            }
-
-                            return (
-                              <Tooltip
-                                key={item.key}
-                                title={`${item.displayName} • ${statusText}`}
-                                arrow
-                                placement="top"
-                              >
-                                <Box
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (isBirthdayItem && isTodayDay) {
-                                      launchPaperBlast(e.clientX, e.clientY, 100);
-                                      setCelebrantsForCelebration([item.celebrant || { name: item.displayName }]);
-                                      setBdayCelebrationOpen(true);
-                                    } else if (item.eventItem) {
-                                      handleEventClick(item.eventItem);
-                                    }
-                                  }}
-                                  sx={{
-                                    p: "4px 6px",
-                                    borderRadius: "8px",
-                                    bgcolor: (theme) =>
-                                      isBirthdayItem && isTodayDay
-                                        ? theme.palette.mode === "dark"
-                                          ? "rgba(236, 72, 153, 0.2)"
-                                          : "rgba(236, 72, 153, 0.08)"
-                                        : theme.palette.mode === "dark"
-                                          ? typeInfo.darkBg
-                                          : typeInfo.bg,
-                                    border: (theme) =>
-                                      isBirthdayItem && isTodayDay
-                                        ? "1.5px solid #ec4899"
-                                        : `1px solid ${typeInfo.border}`,
-                                    boxShadow:
-                                      isBirthdayItem && isTodayDay
-                                        ? "0 2px 8px rgba(236, 72, 153, 0.25)"
-                                        : "none",
-                                    cursor: "pointer",
-                                    transition: "transform 0.12s ease, box-shadow 0.12s ease",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: 0.35,
-                                    "&:hover": {
-                                      transform: "translateY(-1px)",
-                                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                                      borderColor: isBirthdayItem && isTodayDay ? "#ec4899" : typeInfo.color,
-                                    },
-                                  }}
-                                >
-                                  {/* Top Row: Avatar Box + (Name & Status Pill) */}
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
-                                    {/* Avatar Box */}
-                                    <Box
-                                      sx={{
-                                        width: 24,
-                                        height: 24,
-                                        minWidth: 24,
-                                        borderRadius: "6px",
-                                        bgcolor: (theme) =>
-                                          isBirthdayItem && isTodayDay
-                                            ? "rgba(236, 72, 153, 0.22)"
-                                            : "rgba(14, 165, 233, 0.14)",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "0.8rem",
-                                        lineHeight: 1,
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      {isBirthdayItem && isTodayDay ? "🎂" : isBirthdayItem ? "🎂" : typeInfo.emoji}
-                                    </Box>
-
-                                    {/* Name & Status Pill */}
-                                    <Box sx={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 0.15 }}>
-                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
-                                        <Typography
-                                          sx={{
-                                            fontSize: "0.74rem",
-                                            fontWeight: 800,
-                                            color: (theme) =>
-                                              theme.palette.mode === "dark"
-                                                ? typeInfo.darkText
-                                                : "#312e81",
-                                            whiteSpace: "nowrap",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            lineHeight: 1.15,
-                                          }}
-                                        >
-                                          {item.displayName}
-                                        </Typography>
-                                        {isBirthdayItem && isTodayDay && (
-                                          <Typography
-                                            component="span"
-                                            sx={{
-                                              fontSize: "0.68rem",
-                                              display: "inline-block",
-                                              animation: "bouncePopper 1.5s infinite ease-in-out",
-                                            }}
-                                          >
-                                            🎉
-                                          </Typography>
-                                        )}
-                                      </Box>
-
-                                      {/* Status Pill */}
-                                      <Box sx={{ display: "inline-flex" }}>
-                                        <Box
-                                          sx={{
-                                            bgcolor: (theme) =>
-                                              isBirthdayItem && isTodayDay
-                                                ? "rgba(236, 72, 153, 0.15)"
-                                                : isBirthdayItem && isPastDay
-                                                  ? "rgba(34, 197, 94, 0.15)"
-                                                  : "rgba(124, 58, 237, 0.1)",
-                                            color: (theme) =>
-                                              isBirthdayItem && isTodayDay
-                                                ? "#db2777"
-                                                : isBirthdayItem && isPastDay
-                                                  ? "#16a34a"
-                                                  : "#7c3aed",
-                                            border: (theme) =>
-                                              isBirthdayItem && isTodayDay
-                                                ? "1px solid rgba(236, 72, 153, 0.3)"
-                                                : isBirthdayItem && isPastDay
-                                                  ? "1px solid rgba(34, 197, 94, 0.25)"
-                                                  : "1px solid rgba(124, 58, 237, 0.2)",
-                                            borderRadius: "10px",
-                                            px: 0.6,
-                                            py: "1px",
-                                            fontSize: "0.62rem",
-                                            fontWeight: 700,
-                                            lineHeight: 1.1,
-                                            whiteSpace: "nowrap",
-                                          }}
-                                        >
-                                          {isBirthdayItem
-                                            ? isTodayDay
-                                              ? "Today 🎉"
-                                              : isPastDay
-                                                ? "Completed ✓"
-                                                : "Upcoming"
-                                            : item.categoryLabel}
-                                        </Box>
-                                      </Box>
-                                    </Box>
-                                  </Box>
-
-                                </Box>
-                              </Tooltip>
-                            );
-                          })}
-                        </Stack>
-                      </Paper>
-                    );
-                  })}
-                </Box>
-              </Box>
-            </Grid>
-
-            {/* 25% Birthday Members List Area */}
-            <Grid
-              size={{ xs: 12, lg: 3 }}
-              sx={{
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(124, 58, 237, 0.04)"
-                    : "rgba(124, 58, 237, 0.015)",
-                display: "flex",
-                flexDirection: "column",
-                borderTop: {
-                  xs: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "1.5px solid rgba(124, 58, 237, 0.25)"
-                      : "1.5px solid rgba(124, 58, 237, 0.2)",
-                  lg: "none",
-                },
-              }}
-            >
-              {/* Sidebar Header: Dynamic based on Category filter */}
-              <Box
-                sx={{
-                  p: 2,
-                  px: 2.5,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  borderBottom: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "1.5px solid rgba(124, 58, 237, 0.22)"
-                      : "1.5px solid rgba(124, 58, 237, 0.15)",
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(124, 58, 237, 0.09)"
-                      : "rgba(124, 58, 237, 0.04)",
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {!appliedFilters.category || appliedFilters.category === "ALL" ? (
-                    <CalendarMonthRoundedIcon
-                      sx={{ color: "#7c3aed", fontSize: "1.25rem" }}
-                    />
-                  ) : (appliedFilters.category || "").toLowerCase().includes("birthday") ? (
-                    <CakeRoundedIcon
-                      sx={{ color: "#ec4899", fontSize: "1.25rem" }}
-                    />
-                  ) : (
-                    <Typography component="span" sx={{ fontSize: "1.2rem", lineHeight: 1 }}>
-                      {getEventTypeInfo(appliedFilters.category).emoji || "👏"}
-                    </Typography>
-                  )}
-                  <Typography
-                    variant="subtitle2"
-                    fontWeight={800}
+                  <AppButton
+                    variant="outlined"
+                    size="small"
+                    onClick={handleGoToToday}
                     sx={{
-                      color: "text.primary",
-                      fontSize: "0.92rem",
-                      letterSpacing: "-0.01em",
+                      borderRadius: "8px",
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                      px: 1.6,
+                      py: 0.35,
+                      minHeight: 28,
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(255, 255, 255, 0.25)"
+                          : "rgba(124, 58, 237, 0.35)",
+                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "primary.main"),
                     }}
                   >
-                    {!appliedFilters.category || appliedFilters.category === "ALL"
-                      ? "Event Members List"
-                      : (appliedFilters.category || "").toLowerCase().includes("birthday")
-                        ? "Birthday Members List"
-                        : `${getEventTypeInfo(appliedFilters.category).label || appliedFilters.category} Members List`}
-                  </Typography>
+                    Today
+                  </AppButton>
                 </Box>
-                <Box
-                  sx={{
-                    bgcolor: (theme) =>
-                      !appliedFilters.category || appliedFilters.category === "ALL"
-                        ? "primary.main"
-                        : (appliedFilters.category || "").toLowerCase().includes("birthday")
-                          ? theme.palette.mode === "dark"
-                            ? "rgba(255, 255, 255, 0.15)"
-                            : "primary.main"
-                          : getEventTypeInfo(appliedFilters.category).color || "primary.main",
-                    color: "#ffffff",
-                    borderRadius: "10px",
-                    px: 1,
-                    py: 0.2,
-                    fontSize: "0.72rem",
-                    fontWeight: 800,
-                  }}
-                >
-                  {unifiedSidebarItems.length}
-                </Box>
-              </Box>
 
-              {/* Sidebar Items: Chronologically Sorted All/Category Members */}
-              <Box
-                sx={{
-                  p: 2,
-                  flex: 1,
-                  overflowY: "auto",
-                  maxHeight: { lg: 580 },
-                  "&::-webkit-scrollbar": {
-                    width: "4px",
-                  },
-                  "&::-webkit-scrollbar-thumb": {
-                    backgroundColor: "rgba(124, 58, 237, 0.25)",
-                    borderRadius: "4px",
-                  },
-                }}
-              >
-                {unifiedSidebarItems.length === 0 ? (
-                  <Box sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
-                    <Typography sx={{ fontSize: "2rem", mb: 1 }}>
-                      {!categoryFilter || categoryFilter === "ALL"
-                        ? "🗓️"
-                        : (categoryFilter || "").toLowerCase().includes("birthday")
-                          ? "🎂"
-                          : getEventTypeInfo(categoryFilter).emoji || "👏"}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      fontWeight={700}
-                      sx={{ color: "text.primary", fontSize: "0.85rem" }}
-                    >
-                      {!categoryFilter || categoryFilter === "ALL"
-                        ? `No events or birthdays in ${displayedMonthName}`
-                        : (categoryFilter || "").toLowerCase().includes("birthday")
-                          ? `No birthdays in ${displayedMonthName}`
-                          : `No ${categoryFilter} members in ${displayedMonthName}`}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", mt: 0.5, fontSize: "0.75rem" }}
-                    >
-                      {!categoryFilter || categoryFilter === "ALL"
-                        ? "Events and birthdays for this month will appear here automatically"
-                        : `Members and events for ${categoryFilter} will appear here`}
-                    </Typography>
+                {/* Calendar Grid View (Compact Size) */}
+                <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+                  {/* Weekdays header */}
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, 1fr)",
+                      gap: 1,
+                      mb: 1,
+                      pb: 0.8,
+                      borderBottom: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "1.5px solid rgba(124, 58, 237, 0.18)"
+                          : "1.5px solid rgba(124, 58, 237, 0.12)",
+                    }}
+                  >
+                    {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((d) => (
+                      <Typography
+                        key={d}
+                        variant="caption"
+                        fontWeight={800}
+                        sx={{
+                          textAlign: "center",
+                          color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.secondary"),
+                          letterSpacing: "0.06em",
+                          fontSize: "0.7rem",
+                        }}
+                      >
+                        {d}
+                      </Typography>
+                    ))}
                   </Box>
-                ) : (
-                  <Stack spacing={1.2}>
-                    {unifiedSidebarItems.map((item) => {
-                      const isToday = item.status === "today";
-                      const isCompleted = item.status === "completed";
-                      const isUpcoming = item.status === "upcoming";
-                      const isBirthday = item.isBirthday;
-                      const catInfo = getEventTypeInfo(item.category);
+
+                  {/* Calendar Days Cells */}
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, 1fr)",
+                      gap: { xs: 0.6, sm: 0.8 },
+                    }}
+                  >
+                    {calendarDays.map((day) => {
+                      const dayItems = getDayItems(day);
+                      const isCurrentMonth = appliedFilters.month === 0 || day.month() + 1 === appliedFilters.month;
+                      const isDifferentMonth = !isCurrentMonth;
+                      const isToday = day.isSame(dayjs(), "day");
 
                       return (
                         <Paper
-                          key={item.id}
+                          key={day.toString()}
                           elevation={0}
-                          onClick={(e) => {
-                            if (isBirthday && isToday && item.celebrant) {
-                              launchPaperBlast(e.clientX, e.clientY, 100);
-                              setCelebrantsForCelebration([item.celebrant]);
-                              setBdayCelebrationOpen(true);
-                            } else if (item.eventItem) {
-                              handleEventClick(item.eventItem);
-                            }
-                          }}
+                          onClick={() => handleDateClick(day)}
                           sx={{
-                            p: 1.2,
-                            px: 1.4,
-                            borderRadius: "10px",
+                            p: 0.6,
+                            height: 98,
+                            maxHeight: 98,
+                            minHeight: 98,
+                            boxSizing: "border-box",
+                            overflow: "hidden",
                             border: (theme) =>
-                              isBirthday && isToday
-                                ? "2px solid #ec4899"
+                              isToday
+                                ? "2px solid #7c3aed"
                                 : theme.palette.mode === "dark"
-                                  ? "1.5px solid rgba(255, 255, 255, 0.12)"
-                                  : isBirthday
-                                    ? "1.5px solid rgba(124, 58, 237, 0.18)"
-                                    : `1.5px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
-                            bgcolor: (theme) =>
-                              isBirthday && isToday
-                                ? theme.palette.mode === "dark"
-                                  ? "rgba(236, 72, 153, 0.12)"
-                                  : "rgba(236, 72, 153, 0.05)"
-                                : "background.paper",
+                                  ? "1px solid rgba(255, 255, 255, 0.10)"
+                                  : "1px solid rgba(124, 58, 237, 0.15)",
+                            borderRadius: "10px",
+                            opacity: isDifferentMonth ? 0.35 : 1,
+                            bgcolor: isToday
+                              ? (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(124, 58, 237, 0.15)"
+                                  : "rgba(124, 58, 237, 0.05)"
+                              : "background.paper",
+                            cursor: hasWriteAccess ? "pointer" : "default",
                             display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
+                            flexDirection: "column",
                             transition: "all 0.15s ease",
-                            cursor: (isBirthday && isToday) || item.eventItem ? "pointer" : "default",
-                            animation: isBirthday && isToday ? "festiveGlow 3s infinite ease-in-out" : "none",
-                            opacity: isCompleted ? 0.88 : 1,
-                            "&:hover": {
-                              borderColor: isBirthday && isToday ? "#ec4899" : catInfo.color || "primary.main",
-                              transform: "translateY(-1px)",
-                              boxShadow:
-                                isBirthday && isToday
-                                  ? "0 4px 14px rgba(236, 72, 153, 0.3)"
-                                  : theme.palette.mode === "dark"
-                                    ? "0 3px 12px rgba(0, 0, 0, 0.3)"
-                                    : "0 3px 8px rgba(124, 58, 237, 0.12)",
-                            },
+                            "&:hover": hasWriteAccess
+                              ? {
+                                bgcolor: (theme) =>
+                                  theme.palette.mode === "dark"
+                                    ? "rgba(255, 255, 255, 0.04)"
+                                    : "#f8fafc",
+                                borderColor: "#7c3aed",
+                              }
+                              : {},
                           }}
                         >
-                          {/* Member Initial / Icon Avatar + Name + Subtitle */}
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, minWidth: 0 }}>
-                            <Box
-                              sx={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: "50%",
-                                bgcolor: (theme) =>
-                                  isBirthday
-                                    ? isToday
-                                      ? "rgba(236, 72, 153, 0.2)"
-                                      : theme.palette.mode === "dark"
-                                        ? "rgba(255, 255, 255, 0.08)"
-                                        : "rgba(236, 72, 153, 0.12)"
-                                    : theme.palette.mode === "dark"
-                                      ? "rgba(255, 255, 255, 0.08)"
-                                      : catInfo.bg || "rgba(245, 158, 11, 0.1)",
-                                color: (theme) =>
-                                  isBirthday
-                                    ? isToday
-                                      ? "#db2777"
-                                      : theme.palette.mode === "dark"
-                                        ? "#ffffff"
-                                        : "#db2777"
-                                    : theme.palette.mode === "dark"
-                                      ? "#ffffff"
-                                      : catInfo.color || "primary.main",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontWeight: 800,
-                                fontSize: "0.82rem",
-                                border: (theme) =>
-                                  isBirthday
-                                    ? isToday
-                                      ? "1.5px solid #ec4899"
-                                      : theme.palette.mode === "dark"
-                                        ? "1px solid rgba(255, 255, 255, 0.18)"
-                                        : "1px solid rgba(236, 72, 153, 0.25)"
-                                    : theme.palette.mode === "dark"
-                                      ? "1px solid rgba(255, 255, 255, 0.18)"
-                                      : `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
-                                flexShrink: 0,
-                              }}
-                            >
-                              {isBirthday
-                                ? isToday
-                                  ? "🎂"
-                                  : item.name.charAt(0).toUpperCase()
-                                : item.name
-                                  ? item.name.charAt(0).toUpperCase()
-                                  : catInfo.emoji || "💐"}
-                            </Box>
-                            <Box sx={{ minWidth: 0 }}>
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                <Typography
-                                  variant="body2"
-                                  fontWeight={700}
-                                  sx={{
-                                    color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
-                                    fontSize: "0.84rem",
-                                    lineHeight: 1.2,
-                                    whiteSpace: "nowrap",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                  }}
+                          {/* Day number header */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              mb: 0.4,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {isToday ? (
+                              <Box
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  bgcolor: (theme) =>
+                                    theme.palette.mode === "dark" ? "#7c3aed" : "primary.main",
+                                  color: "#ffffff",
+                                  borderRadius: "6px",
+                                  px: 0.6,
+                                  py: 0.1,
+                                  fontSize: "0.62rem",
+                                  fontWeight: 800,
+                                  lineHeight: 1.2,
+                                  boxShadow: "0 2px 4px rgba(124, 58, 237, 0.3)",
+                                }}
+                              >
+                                {day.format("D")} Today
+                              </Box>
+                            ) : (
+                              <Typography
+                                sx={{
+                                  fontSize: "0.72rem",
+                                  fontWeight: 700,
+                                  color: isDifferentMonth
+                                    ? "text.disabled"
+                                    : (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.secondary"),
+                                  lineHeight: 1,
+                                }}
+                              >
+                                {day.format("DD")}
+                              </Typography>
+                            )}
+                          </Box>
+
+                          {/* Day event cards: scrollable within fixed height cell */}
+                          <Stack
+                            spacing={0.35}
+                            sx={{
+                              flex: 1,
+                              minHeight: 0,
+                              overflowY: "auto",
+                              overflowX: "hidden",
+                              pr: 0.2,
+                              "&::-webkit-scrollbar": {
+                                width: "3px",
+                              },
+                              "&::-webkit-scrollbar-track": {
+                                background: "transparent",
+                              },
+                              "&::-webkit-scrollbar-thumb": {
+                                background: (theme) =>
+                                  theme.palette.mode === "dark"
+                                    ? "rgba(255, 255, 255, 0.22)"
+                                    : "rgba(124, 58, 237, 0.35)",
+                                borderRadius: "3px",
+                              },
+                              "&::-webkit-scrollbar-thumb:hover": {
+                                background: (theme) =>
+                                  theme.palette.mode === "dark"
+                                    ? "rgba(255, 255, 255, 0.45)"
+                                    : "rgba(124, 58, 237, 0.7)",
+                              },
+                            }}
+                          >
+                            {dayItems.map((item) => {
+                              const typeInfo = getEventTypeInfo(item.colorType);
+                              const isBirthdayItem = item.colorType?.toLowerCase().includes("birthday");
+                              const isTodayDay = day.isSame(dayjs(), "day");
+                              const isPastDay = day.isBefore(dayjs().startOf("day"), "day");
+                              const isPaymentPending = isItemPaymentPending(item);
+
+                              let statusText = item.categoryLabel;
+                              if (isBirthdayItem) {
+                                if (isTodayDay) statusText = "Today 🎉";
+                                else if (isPastDay) statusText = "Completed ✓";
+                                else statusText = "Upcoming";
+                              }
+
+                              return (
+                                <Tooltip
+                                  key={item.key}
+                                  title={`${item.displayName} • ${statusText}`}
+                                  arrow
+                                  placement="top"
                                 >
-                                  {item.name}
-                                </Typography>
-                                {isBirthday && isToday && (
-                                  <Typography
-                                    component="span"
+                                  <Box
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (isBirthdayItem && isTodayDay) {
+                                        launchPaperBlast(e.clientX, e.clientY, 100);
+                                        setCelebrantsForCelebration([item.celebrant || { name: item.displayName }]);
+                                        setBdayCelebrationOpen(true);
+                                      } else if (item.eventItem) {
+                                        handleEventClick(item.eventItem);
+                                      }
+                                    }}
                                     sx={{
-                                      fontSize: "0.85rem",
-                                      display: "inline-block",
-                                      animation: "bouncePopper 1.5s infinite ease-in-out",
+                                      p: "4px 6px",
+                                      borderRadius: "8px",
+                                      bgcolor: (theme) =>
+                                        isBirthdayItem && isTodayDay
+                                          ? theme.palette.mode === "dark"
+                                            ? "rgba(236, 72, 153, 0.2)"
+                                            : "rgba(236, 72, 153, 0.08)"
+                                          : theme.palette.mode === "dark"
+                                            ? typeInfo.darkBg
+                                            : typeInfo.bg,
+                                      border: (theme) =>
+                                        isBirthdayItem && isTodayDay
+                                          ? "1.5px solid #ec4899"
+                                          : `1px solid ${typeInfo.border}`,
+                                      boxShadow:
+                                        isBirthdayItem && isTodayDay
+                                          ? "0 2px 8px rgba(236, 72, 153, 0.25)"
+                                          : "none",
+                                      cursor: "pointer",
+                                      transition: "transform 0.12s ease, box-shadow 0.12s ease",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: 0.35,
+                                      "&:hover": {
+                                        transform: "translateY(-1px)",
+                                        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                                        borderColor: isBirthdayItem && isTodayDay ? "#ec4899" : typeInfo.color,
+                                      },
                                     }}
                                   >
-                                    🎉
-                                  </Typography>
-                                )}
-                              </Box>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{ fontSize: "0.7rem", display: "block", lineHeight: 1.2, mt: 0.1 }}
-                              >
-                                {!categoryFilter || categoryFilter === "ALL"
-                                  ? isBirthday
-                                    ? `${item.type || "Member"}`
-                                    : `${item.type || "Member"} • ${catInfo.emoji || ""} ${item.category}`
-                                  : item.type || item.eventName || item.category}
-                              </Typography>
-                            </Box>
-                          </Box>
+                                    {/* Top Row: Avatar Box + (Name & Status Pill) */}
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
+                                      {/* Avatar Box */}
+                                      <Box
+                                        sx={{
+                                          width: 24,
+                                          height: 24,
+                                          minWidth: 24,
+                                          borderRadius: "6px",
+                                          bgcolor: (theme) =>
+                                            isBirthdayItem && isTodayDay
+                                              ? "rgba(236, 72, 153, 0.22)"
+                                              : "rgba(14, 165, 233, 0.14)",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          fontSize: "0.8rem",
+                                          lineHeight: 1,
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        {isBirthdayItem && isTodayDay ? "🎂" : isBirthdayItem ? "🎂" : typeInfo.emoji}
+                                      </Box>
 
-                          {/* Right Side: Date Pill & Status Badge */}
-                          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.4, flexShrink: 0 }}>
-                            {/* Date Pill */}
-                            <Box
-                              sx={{
-                                bgcolor: (theme) =>
-                                  isToday
-                                    ? "rgba(236, 72, 153, 0.15)"
-                                    : theme.palette.mode === "dark"
-                                      ? "rgba(255, 255, 255, 0.12)"
-                                      : isBirthday
-                                        ? "rgba(124, 58, 237, 0.08)"
-                                        : catInfo.bg || "rgba(245, 158, 11, 0.08)",
-                                color: (theme) =>
-                                  isToday
-                                    ? "#db2777"
-                                    : theme.palette.mode === "dark"
-                                      ? "#ffffff"
-                                      : isBirthday
-                                        ? "#4a3f6b"
-                                        : catInfo.color || "text.primary",
-                                border: (theme) =>
-                                  isToday
-                                    ? "1px solid rgba(236, 72, 153, 0.35)"
-                                    : theme.palette.mode === "dark"
-                                      ? "1px solid rgba(255, 255, 255, 0.2)"
-                                      : isBirthday
-                                        ? "1px solid rgba(124, 58, 237, 0.2)"
-                                        : `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
-                                borderRadius: "6px",
-                                px: 0.9,
-                                py: 0.15,
-                                fontWeight: 800,
-                                fontSize: "0.72rem",
-                                whiteSpace: "nowrap",
-                                lineHeight: 1.2,
-                              }}
-                            >
-                              {item.formattedDate}
-                            </Box>
+                                      {/* Name & Status Pill */}
+                                      <Box sx={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 0.15 }}>
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
+                                          <Typography
+                                            sx={{
+                                              fontSize: "0.74rem",
+                                              fontWeight: 800,
+                                              color: (theme) =>
+                                                theme.palette.mode === "dark"
+                                                  ? typeInfo.darkText
+                                                  : "#312e81",
+                                              whiteSpace: "nowrap",
+                                              overflow: "hidden",
+                                              textOverflow: "ellipsis",
+                                              lineHeight: 1.15,
+                                            }}
+                                          >
+                                            {item.displayName}
+                                          </Typography>
+                                          {isBirthdayItem && isTodayDay && (
+                                            <Typography
+                                              component="span"
+                                              sx={{
+                                                fontSize: "0.68rem",
+                                                display: "inline-block",
+                                                animation: "bouncePopper 1.5s infinite ease-in-out",
+                                              }}
+                                            >
+                                              🎉
+                                            </Typography>
+                                          )}
+                                        </Box>
 
-                            {/* Status Chip: Completed / Today 🎉 / Upcoming */}
-                            {isCompleted && (
-                              <Chip
-                                size="small"
-                                icon={
-                                  <CheckCircleRoundedIcon
-                                    sx={{ fontSize: "0.75rem !important", color: "#16a34a !important" }}
-                                  />
-                                }
-                                label="Completed"
-                                sx={{
-                                  height: 20,
-                                  fontSize: "0.64rem",
-                                  fontWeight: 700,
-                                  bgcolor: (theme) =>
-                                    theme.palette.mode === "dark"
-                                      ? "rgba(22, 163, 74, 0.18)"
-                                      : "rgba(22, 163, 74, 0.08)",
-                                  color: "#16a34a",
-                                  border: "1px solid rgba(22, 163, 74, 0.28)",
-                                  "& .MuiChip-label": { px: 0.5 },
-                                  "& .MuiChip-icon": { ml: 0.4, mr: -0.3 },
-                                }}
-                              />
-                            )}
+                                        {/* Status Pill */}
+                                        <Box sx={{ display: "inline-flex" }}>
+                                          <Box
+                                            sx={{
+                                              bgcolor: (theme) =>
+                                                isBirthdayItem && isTodayDay
+                                                  ? "rgba(236, 72, 153, 0.15)"
+                                                  : isBirthdayItem && isPastDay
+                                                    ? "rgba(34, 197, 94, 0.15)"
+                                                    : "rgba(124, 58, 237, 0.1)",
+                                              color: (theme) =>
+                                                isBirthdayItem && isTodayDay
+                                                  ? "#db2777"
+                                                  : isBirthdayItem && isPastDay
+                                                    ? "#16a34a"
+                                                    : "#7c3aed",
+                                              border: (theme) =>
+                                                isBirthdayItem && isTodayDay
+                                                  ? "1px solid rgba(236, 72, 153, 0.3)"
+                                                  : isBirthdayItem && isPastDay
+                                                    ? "1px solid rgba(34, 197, 94, 0.25)"
+                                                    : "1px solid rgba(124, 58, 237, 0.2)",
+                                              borderRadius: "10px",
+                                              px: 0.6,
+                                              py: "1px",
+                                              fontSize: "0.62rem",
+                                              fontWeight: 700,
+                                              lineHeight: 1.1,
+                                              whiteSpace: "nowrap",
+                                            }}
+                                          >
+                                            {isBirthdayItem
+                                              ? isTodayDay
+                                                ? "Today 🎉"
+                                                : isPastDay
+                                                  ? "Completed ✓"
+                                                  : "Upcoming"
+                                              : item.categoryLabel}
+                                          </Box>
+                                        </Box>
+                                      </Box>
+                                    </Box>
 
-                            {isUpcoming && (
-                              <Chip
-                                size="small"
-                                icon={
-                                  <ScheduleRoundedIcon
-                                    sx={{
-                                      fontSize: "0.75rem !important",
-                                      color: (theme) =>
-                                        theme.palette.mode === "dark" ? "#c4b5fd !important" : "#7c3aed !important",
-                                    }}
-                                  />
-                                }
-                                label={!categoryFilter || categoryFilter === "ALL" || isBirthday ? "Upcoming" : item.categoryLabel}
-                                sx={{
-                                  height: 20,
-                                  fontSize: "0.64rem",
-                                  fontWeight: 700,
-                                  bgcolor: (theme) =>
-                                    theme.palette.mode === "dark"
-                                      ? "rgba(124, 58, 237, 0.22)"
-                                      : "rgba(124, 58, 237, 0.08)",
-                                  color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#7c3aed"),
-                                  border: (theme) =>
-                                    theme.palette.mode === "dark"
-                                      ? "1px solid rgba(196, 181, 253, 0.3)"
-                                      : "1px solid rgba(124, 58, 237, 0.28)",
-                                  "& .MuiChip-label": { px: 0.5 },
-                                  "& .MuiChip-icon": { ml: 0.4, mr: -0.3 },
-                                }}
-                              />
-                            )}
-
-                            {isToday && (
-                              <Tooltip title={isBirthday ? "Today's Birthday! Click to blast confetti! 🎊" : "Event is Today! 🎯"} arrow placement="left">
-                                <Chip
-                                  size="small"
-                                  icon={
-                                    <span
-                                      style={{
-                                        fontSize: "0.8rem",
-                                        display: "inline-block",
-                                        animation: "bouncePopper 1.2s infinite ease-in-out",
-                                      }}
-                                    >
-                                      🎉
-                                    </span>
-                                  }
-                                  label="Today"
-                                  onClick={(e) => {
-                                    if (isBirthday && item.celebrant) {
-                                      e.stopPropagation();
-                                      launchPaperBlast(e.clientX, e.clientY, 100);
-                                      setCelebrantsForCelebration([item.celebrant]);
-                                      setBdayCelebrationOpen(true);
-                                    }
-                                  }}
-                                  sx={{
-                                    height: 22,
-                                    fontSize: "0.68rem",
-                                    fontWeight: 800,
-                                    background: "linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)",
-                                    color: "#ffffff",
-                                    boxShadow: "0 2px 6px rgba(236, 72, 153, 0.45)",
-                                    cursor: isBirthday ? "pointer" : "default",
-                                    animation: "pulseToday 2s infinite ease-in-out",
-                                    "& .MuiChip-label": { px: 0.6 },
-                                    "& .MuiChip-icon": { ml: 0.5, mr: -0.2 },
-                                    "&:hover": {
-                                      transform: "scale(1.06)",
-                                    },
-                                  }}
-                                />
-                              </Tooltip>
-                            )}
-                          </Box>
+                                  </Box>
+                                </Tooltip>
+                              );
+                            })}
+                          </Stack>
                         </Paper>
                       );
                     })}
-                  </Stack>
-                )}
-              </Box>
+                  </Box>
+                </Box>
+              </Grid>
+
+              {/* 25% Birthday Members List Area */}
+              <Grid
+                size={{ xs: 12, lg: 3 }}
+                sx={{
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(124, 58, 237, 0.04)"
+                      : "rgba(124, 58, 237, 0.015)",
+                  display: "flex",
+                  flexDirection: "column",
+                  borderTop: {
+                    xs: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "1.5px solid rgba(124, 58, 237, 0.25)"
+                        : "1.5px solid rgba(124, 58, 237, 0.2)",
+                    lg: "none",
+                  },
+                }}
+              >
+                {/* Sidebar Header: Dynamic based on Category filter */}
+                <Box
+                  sx={{
+                    p: 2,
+                    px: 2.5,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderBottom: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "1.5px solid rgba(124, 58, 237, 0.22)"
+                        : "1.5px solid rgba(124, 58, 237, 0.15)",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(124, 58, 237, 0.09)"
+                        : "rgba(124, 58, 237, 0.04)",
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    {!appliedFilters.category || appliedFilters.category === "ALL" ? (
+                      <CalendarMonthRoundedIcon
+                        sx={{ color: "#7c3aed", fontSize: "1.25rem" }}
+                      />
+                    ) : (appliedFilters.category || "").toLowerCase().includes("birthday") ? (
+                      <CakeRoundedIcon
+                        sx={{ color: "#ec4899", fontSize: "1.25rem" }}
+                      />
+                    ) : (
+                      <Typography component="span" sx={{ fontSize: "1.2rem", lineHeight: 1 }}>
+                        {getEventTypeInfo(appliedFilters.category).emoji || "👏"}
+                      </Typography>
+                    )}
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight={800}
+                      sx={{
+                        color: "text.primary",
+                        fontSize: "0.92rem",
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {!appliedFilters.category || appliedFilters.category === "ALL"
+                        ? "Event Members List"
+                        : (appliedFilters.category || "").toLowerCase().includes("birthday")
+                          ? "Birthday Members List"
+                          : `${getEventTypeInfo(appliedFilters.category).label || appliedFilters.category} Members List`}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      bgcolor: (theme) =>
+                        !appliedFilters.category || appliedFilters.category === "ALL"
+                          ? "primary.main"
+                          : (appliedFilters.category || "").toLowerCase().includes("birthday")
+                            ? theme.palette.mode === "dark"
+                              ? "rgba(255, 255, 255, 0.15)"
+                              : "primary.main"
+                            : getEventTypeInfo(appliedFilters.category).color || "primary.main",
+                      color: "#ffffff",
+                      borderRadius: "10px",
+                      px: 1,
+                      py: 0.2,
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {unifiedSidebarItems.length}
+                  </Box>
+                </Box>
+
+                {/* Sidebar Items: Chronologically Sorted All/Category Members */}
+                <Box
+                  sx={{
+                    p: 2,
+                    flex: 1,
+                    overflowY: "auto",
+                    maxHeight: { lg: 580 },
+                    "&::-webkit-scrollbar": {
+                      width: "4px",
+                    },
+                    "&::-webkit-scrollbar-thumb": {
+                      backgroundColor: "rgba(124, 58, 237, 0.25)",
+                      borderRadius: "4px",
+                    },
+                  }}
+                >
+                  {unifiedSidebarItems.length === 0 ? (
+                    <Box sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
+                      <Typography sx={{ fontSize: "2rem", mb: 1 }}>
+                        {!categoryFilter || categoryFilter === "ALL"
+                          ? "🗓️"
+                          : (categoryFilter || "").toLowerCase().includes("birthday")
+                            ? "🎂"
+                            : getEventTypeInfo(categoryFilter).emoji || "👏"}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        fontWeight={700}
+                        sx={{ color: "text.primary", fontSize: "0.85rem" }}
+                      >
+                        {!categoryFilter || categoryFilter === "ALL"
+                          ? `No events or birthdays in ${displayedMonthName}`
+                          : (categoryFilter || "").toLowerCase().includes("birthday")
+                            ? `No birthdays in ${displayedMonthName}`
+                            : `No ${categoryFilter} members in ${displayedMonthName}`}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", mt: 0.5, fontSize: "0.75rem" }}
+                      >
+                        {!categoryFilter || categoryFilter === "ALL"
+                          ? "Events and birthdays for this month will appear here automatically"
+                          : `Members and events for ${categoryFilter} will appear here`}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Stack spacing={1.2}>
+                      {unifiedSidebarItems.map((item) => {
+                        const isToday = item.status === "today";
+                        const isCompleted = item.status === "completed";
+                        const isUpcoming = item.status === "upcoming";
+                        const isBirthday = item.isBirthday;
+                        const catInfo = getEventTypeInfo(item.category);
+
+                        return (
+                          <Paper
+                            key={item.id}
+                            elevation={0}
+                            onClick={(e) => {
+                              if (isBirthday && isToday && item.celebrant) {
+                                launchPaperBlast(e.clientX, e.clientY, 100);
+                                setCelebrantsForCelebration([item.celebrant]);
+                                setBdayCelebrationOpen(true);
+                              } else if (item.eventItem) {
+                                handleEventClick(item.eventItem);
+                              }
+                            }}
+                            sx={{
+                              p: 1.2,
+                              px: 1.4,
+                              borderRadius: "10px",
+                              border: (theme) =>
+                                isBirthday && isToday
+                                  ? "2px solid #ec4899"
+                                  : theme.palette.mode === "dark"
+                                    ? "1.5px solid rgba(255, 255, 255, 0.12)"
+                                    : isBirthday
+                                      ? "1.5px solid rgba(124, 58, 237, 0.18)"
+                                      : `1.5px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
+                              bgcolor: (theme) =>
+                                isBirthday && isToday
+                                  ? theme.palette.mode === "dark"
+                                    ? "rgba(236, 72, 153, 0.12)"
+                                    : "rgba(236, 72, 153, 0.05)"
+                                  : "background.paper",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              transition: "all 0.15s ease",
+                              cursor: (isBirthday && isToday) || item.eventItem ? "pointer" : "default",
+                              animation: isBirthday && isToday ? "festiveGlow 3s infinite ease-in-out" : "none",
+                              opacity: isCompleted ? 0.88 : 1,
+                              "&:hover": {
+                                borderColor: isBirthday && isToday ? "#ec4899" : catInfo.color || "primary.main",
+                                transform: "translateY(-1px)",
+                                boxShadow:
+                                  isBirthday && isToday
+                                    ? "0 4px 14px rgba(236, 72, 153, 0.3)"
+                                    : theme.palette.mode === "dark"
+                                      ? "0 3px 12px rgba(0, 0, 0, 0.3)"
+                                      : "0 3px 8px rgba(124, 58, 237, 0.12)",
+                              },
+                            }}
+                          >
+                            {/* Member Initial / Icon Avatar + Name + Subtitle */}
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, minWidth: 0 }}>
+                              <Box
+                                sx={{
+                                  width: 34,
+                                  height: 34,
+                                  borderRadius: "50%",
+                                  bgcolor: (theme) =>
+                                    isBirthday
+                                      ? isToday
+                                        ? "rgba(236, 72, 153, 0.2)"
+                                        : theme.palette.mode === "dark"
+                                          ? "rgba(255, 255, 255, 0.08)"
+                                          : "rgba(236, 72, 153, 0.12)"
+                                      : theme.palette.mode === "dark"
+                                        ? "rgba(255, 255, 255, 0.08)"
+                                        : catInfo.bg || "rgba(245, 158, 11, 0.1)",
+                                  color: (theme) =>
+                                    isBirthday
+                                      ? isToday
+                                        ? "#db2777"
+                                        : theme.palette.mode === "dark"
+                                          ? "#ffffff"
+                                          : "#db2777"
+                                      : theme.palette.mode === "dark"
+                                        ? "#ffffff"
+                                        : catInfo.color || "primary.main",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontWeight: 800,
+                                  fontSize: "0.82rem",
+                                  border: (theme) =>
+                                    isBirthday
+                                      ? isToday
+                                        ? "1.5px solid #ec4899"
+                                        : theme.palette.mode === "dark"
+                                          ? "1px solid rgba(255, 255, 255, 0.18)"
+                                          : "1px solid rgba(236, 72, 153, 0.25)"
+                                      : theme.palette.mode === "dark"
+                                        ? "1px solid rgba(255, 255, 255, 0.18)"
+                                        : `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {isBirthday
+                                  ? isToday
+                                    ? "🎂"
+                                    : item.name.charAt(0).toUpperCase()
+                                  : item.name
+                                    ? item.name.charAt(0).toUpperCase()
+                                    : catInfo.emoji || "💐"}
+                              </Box>
+                              <Box sx={{ minWidth: 0 }}>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight={700}
+                                    sx={{
+                                      color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "text.primary"),
+                                      fontSize: "0.84rem",
+                                      lineHeight: 1.2,
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {item.name}
+                                  </Typography>
+                                  {isBirthday && isToday && (
+                                    <Typography
+                                      component="span"
+                                      sx={{
+                                        fontSize: "0.85rem",
+                                        display: "inline-block",
+                                        animation: "bouncePopper 1.5s infinite ease-in-out",
+                                      }}
+                                    >
+                                      🎉
+                                    </Typography>
+                                  )}
+                                </Box>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ fontSize: "0.7rem", display: "block", lineHeight: 1.2, mt: 0.1 }}
+                                >
+                                  {!categoryFilter || categoryFilter === "ALL"
+                                    ? isBirthday
+                                      ? `${item.type || "Member"}`
+                                      : `${item.type || "Member"} • ${catInfo.emoji || ""} ${item.category}`
+                                    : item.type || item.eventName || item.category}
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            {/* Right Side: Date Pill & Status Badge */}
+                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.4, flexShrink: 0 }}>
+                              {/* Date Pill */}
+                              <Box
+                                sx={{
+                                  bgcolor: (theme) =>
+                                    isToday
+                                      ? "rgba(236, 72, 153, 0.15)"
+                                      : theme.palette.mode === "dark"
+                                        ? "rgba(255, 255, 255, 0.12)"
+                                        : isBirthday
+                                          ? "rgba(124, 58, 237, 0.08)"
+                                          : catInfo.bg || "rgba(245, 158, 11, 0.08)",
+                                  color: (theme) =>
+                                    isToday
+                                      ? "#db2777"
+                                      : theme.palette.mode === "dark"
+                                        ? "#ffffff"
+                                        : isBirthday
+                                          ? "#4a3f6b"
+                                          : catInfo.color || "text.primary",
+                                  border: (theme) =>
+                                    isToday
+                                      ? "1px solid rgba(236, 72, 153, 0.35)"
+                                      : theme.palette.mode === "dark"
+                                        ? "1px solid rgba(255, 255, 255, 0.2)"
+                                        : isBirthday
+                                          ? "1px solid rgba(124, 58, 237, 0.2)"
+                                          : `1px solid ${catInfo.border || "rgba(245, 158, 11, 0.3)"}`,
+                                  borderRadius: "6px",
+                                  px: 0.9,
+                                  py: 0.15,
+                                  fontWeight: 800,
+                                  fontSize: "0.72rem",
+                                  whiteSpace: "nowrap",
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                {item.formattedDate}
+                              </Box>
+
+                              {/* Status Chip: Completed / Today 🎉 / Upcoming */}
+                              {isCompleted && (
+                                <Chip
+                                  size="small"
+                                  icon={
+                                    <CheckCircleRoundedIcon
+                                      sx={{ fontSize: "0.75rem !important", color: "#16a34a !important" }}
+                                    />
+                                  }
+                                  label="Completed"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: "0.64rem",
+                                    fontWeight: 700,
+                                    bgcolor: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? "rgba(22, 163, 74, 0.18)"
+                                        : "rgba(22, 163, 74, 0.08)",
+                                    color: "#16a34a",
+                                    border: "1px solid rgba(22, 163, 74, 0.28)",
+                                    "& .MuiChip-label": { px: 0.5 },
+                                    "& .MuiChip-icon": { ml: 0.4, mr: -0.3 },
+                                  }}
+                                />
+                              )}
+
+                              {isUpcoming && (
+                                <Chip
+                                  size="small"
+                                  icon={
+                                    <ScheduleRoundedIcon
+                                      sx={{
+                                        fontSize: "0.75rem !important",
+                                        color: (theme) =>
+                                          theme.palette.mode === "dark" ? "#c4b5fd !important" : "#7c3aed !important",
+                                      }}
+                                    />
+                                  }
+                                  label={!categoryFilter || categoryFilter === "ALL" || isBirthday ? "Upcoming" : item.categoryLabel}
+                                  sx={{
+                                    height: 20,
+                                    fontSize: "0.64rem",
+                                    fontWeight: 700,
+                                    bgcolor: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? "rgba(124, 58, 237, 0.22)"
+                                        : "rgba(124, 58, 237, 0.08)",
+                                    color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#7c3aed"),
+                                    border: (theme) =>
+                                      theme.palette.mode === "dark"
+                                        ? "1px solid rgba(196, 181, 253, 0.3)"
+                                        : "1px solid rgba(124, 58, 237, 0.28)",
+                                    "& .MuiChip-label": { px: 0.5 },
+                                    "& .MuiChip-icon": { ml: 0.4, mr: -0.3 },
+                                  }}
+                                />
+                              )}
+
+                              {isToday && (
+                                <Tooltip title={isBirthday ? "Today's Birthday! Click to blast confetti! 🎊" : "Event is Today! 🎯"} arrow placement="left">
+                                  <Chip
+                                    size="small"
+                                    icon={
+                                      <span
+                                        style={{
+                                          fontSize: "0.8rem",
+                                          display: "inline-block",
+                                          animation: "bouncePopper 1.2s infinite ease-in-out",
+                                        }}
+                                      >
+                                        🎉
+                                      </span>
+                                    }
+                                    label="Today"
+                                    onClick={(e) => {
+                                      if (isBirthday && item.celebrant) {
+                                        e.stopPropagation();
+                                        launchPaperBlast(e.clientX, e.clientY, 100);
+                                        setCelebrantsForCelebration([item.celebrant]);
+                                        setBdayCelebrationOpen(true);
+                                      }
+                                    }}
+                                    sx={{
+                                      height: 22,
+                                      fontSize: "0.68rem",
+                                      fontWeight: 800,
+                                      background: "linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)",
+                                      color: "#ffffff",
+                                      boxShadow: "0 2px 6px rgba(236, 72, 153, 0.45)",
+                                      cursor: isBirthday ? "pointer" : "default",
+                                      animation: "pulseToday 2s infinite ease-in-out",
+                                      "& .MuiChip-label": { px: 0.6 },
+                                      "& .MuiChip-icon": { ml: 0.5, mr: -0.2 },
+                                      "&:hover": {
+                                        transform: "scale(1.06)",
+                                      },
+                                    }}
+                                  />
+                                </Tooltip>
+                              )}
+                            </Box>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                </Box>
+              </Grid>
             </Grid>
-          </Grid>
-        )}
+          )}
         </CardContent>
       </Card>
 

@@ -367,7 +367,7 @@ export default function ReportsPage({ mode = "event" }) {
 
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(true);
   const [filterFromDate, setFilterFromDate] = useState(dayjs().startOf("month"));
   const [filterToDate, setFilterToDate] = useState(dayjs().endOf("month"));
   const [filterEventType, setFilterEventType] = useState("ALL");
@@ -482,7 +482,7 @@ export default function ReportsPage({ mode = "event" }) {
     if (ev.category && ev.category.trim()) return ev.category.trim();
     const match = (eventsList || []).find(
       (el) => (el.eventId && ev.eventId && String(el.eventId) === String(ev.eventId)) ||
-              ((el.eventName || el.name || "").trim().toLowerCase() === (ev.eventName || "").trim().toLowerCase())
+        ((el.eventName || el.name || "").trim().toLowerCase() === (ev.eventName || "").trim().toLowerCase())
     );
     return match?.eventTypeName || match?.category || match?.categoryName || "General";
   }, [eventsList]);
@@ -590,6 +590,11 @@ export default function ReportsPage({ mode = "event" }) {
       setLoading(false);
     }
   }, [toast]);
+
+  // Initial load: Load reports automatically on mount
+  useEffect(() => {
+    load();
+  }, [load]);
 
   /* Options */
   const monthOptions = [
@@ -903,7 +908,7 @@ export default function ReportsPage({ mode = "event" }) {
   ];
 
   const memberColumns = [
-   
+
     {
       label: "Event Type",
       key: "eventType",
@@ -924,7 +929,7 @@ export default function ReportsPage({ mode = "event" }) {
         </Typography>
       ),
     },
-     {
+    {
       label: "Member Name",
       key: "memberName",
       exportValue: (r) => r.memberName,
@@ -1606,7 +1611,7 @@ export default function ReportsPage({ mode = "event" }) {
         const curYear = dayjs().year();
         const memberHist = report?.memberContributionHistory || [];
         const monthShortNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        
+
         const matrixExportRows = (usersList.length > 0 ? usersList : memberHist).map((u) => {
           const mName = u.fullName || u.memberName || u.username || "Member";
           const uId = String(u.userId || u.memberId || "").toLowerCase();
@@ -1986,8 +1991,9 @@ export default function ReportsPage({ mode = "event" }) {
               fontSize: "0.75rem",
               px: 2,
               whiteSpace: "nowrap",
-              bgcolor: "#4a3f6b !important",
-              "&:hover": { bgcolor: "#3b325c !important" },
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+              border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+              "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
             }}
           >
             Filter
@@ -2008,8 +2014,8 @@ export default function ReportsPage({ mode = "event" }) {
                 event: "ALL",
                 paymentStatus: "ALL",
               });
-              setReport(null);
-              setHasAppliedFilter(false);
+              setHasAppliedFilter(true);
+              load();
             }}
             sx={{
               color: "#ef4444",

@@ -1167,78 +1167,90 @@ export default function GalleryPage() {
           </Stack>
         }
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 8 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 180 }}>
-                <AppSelect
-                  label="Event Type"
-                  value={filterCategory}
-                  onChange={(e) => {
-                    const newCategory = e.target.value || "ALL";
-                    setFilterCategory(newCategory);
-                    if (newCategory !== "ALL") {
-                      const unique = new Set();
-                      eventsList.forEach((ev) => {
-                        const typeName = (ev.eventTypeName || ev.categoryName || "").trim().toLowerCase();
-                        if (typeName === newCategory.trim().toLowerCase()) {
-                          const name = ev.name || ev.eventName;
-                          if (name) unique.add(name);
-                        }
-                      });
-                      photos.forEach((p) => {
-                        const pCat = (p.category || "").trim().toLowerCase();
-                        if (pCat === newCategory.trim().toLowerCase()) {
-                          if (p.eventName) unique.add(p.eventName);
-                        }
-                      });
-                      const matchedNames = Array.from(unique);
-                      if (matchedNames.length === 1) {
-                        setFilterEvent(matchedNames[0]);
-                      } else {
-                        setFilterEvent("ALL");
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 1.25,
+              width: "100%",
+            }}
+          >
+            <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+              <AppSelect
+                label="Event Type"
+                value={filterCategory}
+                onChange={(e) => {
+                  const newCategory = e.target.value || "ALL";
+                  setFilterCategory(newCategory);
+                  if (newCategory !== "ALL") {
+                    const unique = new Set();
+                    eventsList.forEach((ev) => {
+                      const typeName = (ev.eventTypeName || ev.categoryName || "").trim().toLowerCase();
+                      if (typeName === newCategory.trim().toLowerCase()) {
+                        const name = ev.name || ev.eventName;
+                        if (name) unique.add(name);
                       }
+                    });
+                    photos.forEach((p) => {
+                      const pCat = (p.category || "").trim().toLowerCase();
+                      if (pCat === newCategory.trim().toLowerCase()) {
+                        if (p.eventName) unique.add(p.eventName);
+                      }
+                    });
+                    const matchedNames = Array.from(unique);
+                    if (matchedNames.length === 1) {
+                      setFilterEvent(matchedNames[0]);
                     } else {
                       setFilterEvent("ALL");
                     }
-                  }}
-                  onClear={() => {
-                    setFilterCategory("ALL");
+                  } else {
                     setFilterEvent("ALL");
-                  }}
-                  options={categoryOptions}
-                  size="small"
-                  placeholder="Select Type"
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: 220 }}>
-                <AppSelect
-                  label="Event Name"
-                  value={filterEvent}
-                  onChange={(e) => {
-                    setFilterEvent(e.target.value || "ALL");
-                  }}
-                  onClear={() => setFilterEvent("ALL")}
-                  options={eventOptions}
-                  size="small"
-                  placeholder="Select Event Name"
-                  fullWidth
-                />
-              </Box>
+                  }
+                }}
+                onClear={() => {
+                  setFilterCategory("ALL");
+                  setFilterEvent("ALL");
+                }}
+                options={categoryOptions}
+                size="small"
+                placeholder="Select Type"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 200, md: 230 } }}>
+              <AppSelect
+                label="Event Name"
+                value={filterEvent}
+                onChange={(e) => {
+                  setFilterEvent(e.target.value || "ALL");
+                }}
+                onClear={() => setFilterEvent("ALL")}
+                options={eventOptions}
+                size="small"
+                placeholder="Select Event Name"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
               <AppButton
                 variant="contained"
                 size="small"
-                startIcon={<FilterListIcon />}
+                startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
                 onClick={() => {
                   setAppliedEvent(filterEvent);
                   setAppliedCategory(filterCategory);
                 }}
                 sx={{
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                  border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
                 }}
               >
                 Filter
@@ -1256,10 +1268,11 @@ export default function GalleryPage() {
                   color: "#ef4444",
                   borderColor: "rgba(239, 68, 68, 0.4)",
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
                   "&:hover": {
                     borderColor: "#ef4444",
                     bgcolor: "rgba(239, 68, 68, 0.05)",
@@ -1268,8 +1281,8 @@ export default function GalleryPage() {
               >
                 Clear Filter
               </AppButton>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         }
       />
 

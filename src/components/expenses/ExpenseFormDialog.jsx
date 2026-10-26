@@ -667,10 +667,9 @@ export default function ExpenseFormDialog({
                       ? "rgba(124, 58, 237, 0.08)"
                       : "rgba(124, 58, 237, 0.04)",
                   border: (t) =>
-                    `1px solid ${
-                      t.palette.mode === "dark"
-                        ? "rgba(124, 58, 237, 0.25)"
-                        : "rgba(124, 58, 237, 0.18)"
+                    `1px solid ${t.palette.mode === "dark"
+                      ? "rgba(124, 58, 237, 0.25)"
+                      : "rgba(124, 58, 237, 0.18)"
                     }`,
                 }}
               >
@@ -823,8 +822,8 @@ export default function ExpenseFormDialog({
                 (isOverBudget
                   ? `Note: Exceeds budget by ${formatWholeCurrency(projectedExtraSpent)}`
                   : selectedEventBudget && selectedEventBudget.expected > 0
-                  ? `Remaining Budget: ${formatWholeCurrency(Math.max(0, selectedEventBudget.expected - projectedTotalSpent))}`
-                  : undefined)
+                    ? `Remaining Budget: ${formatWholeCurrency(Math.max(0, selectedEventBudget.expected - projectedTotalSpent))}`
+                    : undefined)
               }
               required
             />
