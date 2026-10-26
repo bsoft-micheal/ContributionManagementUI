@@ -269,12 +269,14 @@ export default function AddSupportTicketModal({
     return list;
   }, [eventsList, form.eventType, form.relatedEvent]);
 
-  // Helper: Find active/unverified ticket for a specific ticket type
-  const getUnverifiedTicketForType = (typeVal) => {
+  // Helper: Find active/unverified ticket for a specific ticket type on an event
+  const getUnverifiedTicketForType = (typeVal, targetEventId, targetEventName) => {
     if (!typeVal) return null;
     const cleanType = String(typeVal).trim().toLowerCase();
     const rawMemberName = (form.memberName || authState?.fullName || authState?.username || "").trim().toLowerCase();
     const rawMemberId = String(form.memberId || authState?.memberId || authState?.user?.userId || "").trim().toLowerCase();
+    const cleanEventId = String(targetEventId || form.eventId || "").trim().toLowerCase();
+    const cleanEventName = String(targetEventName || form.relatedEvent || "").trim().toLowerCase();
 
     return (existingTickets || []).find((t) => {
       const s = String(t.status || "").trim().toLowerCase();
@@ -283,6 +285,19 @@ export default function AddSupportTicketModal({
 
       const tType = String(t.ticketType || "").trim().toLowerCase();
       if (tType !== cleanType) return false;
+
+      // Event match: if event is specified, ticket must match that event
+      if (cleanEventId || cleanEventName) {
+        const tEventId = String(t.eventId || "").trim().toLowerCase();
+        const tEventName = String(t.relatedEvent || "").trim().toLowerCase();
+
+        const matchesEventId = Boolean(cleanEventId && tEventId && tEventId === cleanEventId);
+        const matchesEventName = Boolean(cleanEventName && tEventName && tEventName === cleanEventName);
+
+        if (!matchesEventId && !matchesEventName) {
+          return false;
+        }
+      }
 
       if (isMemberRole && userRole !== "admin" && userRole !== "organizer") return true;
 
@@ -295,13 +310,13 @@ export default function AddSupportTicketModal({
     });
   };
 
-  // Ticket Type options with active ticket status
+  // Ticket Type options with active ticket status (event-wise)
   const ticketTypeOptions = useMemo(() => {
     const fromDb = Array.isArray(dbTicketTypes)
       ? dbTicketTypes
         .filter((t) => t.typeName && t.isActive !== false)
         .map((t) => {
-          const active = getUnverifiedTicketForType(t.typeName);
+          const active = getUnverifiedTicketForType(t.typeName, form.eventId, form.relatedEvent);
           return {
             label: active ? `${t.typeName} (Active: ${active.ticketNo})` : t.typeName,
             value: t.typeName,
@@ -312,14 +327,14 @@ export default function AddSupportTicketModal({
 
     if (fromDb.length > 0) return fromDb;
     return DEFAULT_TICKET_TYPES.map((t) => {
-      const active = getUnverifiedTicketForType(t);
+      const active = getUnverifiedTicketForType(t, form.eventId, form.relatedEvent);
       return {
         label: active ? `${t} (Active: ${active.ticketNo})` : t,
         value: t,
         disabled: Boolean(active),
       };
     });
-  }, [dbTicketTypes, form.memberName, form.memberId, existingTickets, authState, isMemberRole, userRole]);
+  }, [dbTicketTypes, form.memberName, form.memberId, form.eventId, form.relatedEvent, existingTickets, authState, isMemberRole, userRole]);
 
   // Priority options
   const priorityOptions = useMemo(() => {
@@ -412,8 +427,8 @@ export default function AddSupportTicketModal({
   };
 
   const unverifiedTicketForSelectedType = useMemo(() => {
-    return getUnverifiedTicketForType(form.ticketType);
-  }, [existingTickets, form.ticketType, form.memberName, form.memberId, authState, isMemberRole, userRole]);
+    return getUnverifiedTicketForType(form.ticketType, form.eventId, form.relatedEvent);
+  }, [existingTickets, form.ticketType, form.eventId, form.relatedEvent, form.memberName, form.memberId, authState, isMemberRole, userRole]);
 
   const handleSaveTicket = async () => {
     const newErrors = {};
@@ -430,10 +445,11 @@ export default function AddSupportTicketModal({
       return;
     }
 
-    const existingUnverified = getUnverifiedTicketForType(form.ticketType);
+    const existingUnverified = getUnverifiedTicketForType(form.ticketType, form.eventId, form.relatedEvent);
     if (existingUnverified) {
+      const eventLabel = form.relatedEvent ? ` on event "${form.relatedEvent}"` : "";
       toast.warning(
-        `You already have an active support ticket (${existingUnverified.ticketNo}) for ticket type "${existingUnverified.ticketType}". A new ticket for this type can only be created after the existing ticket is verified.`
+        `You already have an active support ticket (${existingUnverified.ticketNo}) for ticket type "${existingUnverified.ticketType}"${eventLabel}. A new ticket for this type can only be created after the existing ticket is resolved.`
       );
       return;
     }
@@ -446,11 +462,7 @@ export default function AddSupportTicketModal({
         if (matched) resolvedMemberId = matched.memberId || matched.id || "";
       }
 
-      const nextCount = (existingTickets?.length || 0) + 1;
-      const newTicketNo = `TKT${String(nextCount).padStart(4, "0")}`;
-
       const created = await createSupportTicketAsync({
-        ticketNo: newTicketNo,
         memberName: form.memberName,
         memberId: resolvedMemberId || "",
         eventId: form.eventId || initialData?.eventId || null,
@@ -462,7 +474,7 @@ export default function AddSupportTicketModal({
         attachment: form.attachment || null,
       });
 
-      const actualTicketNo = created?.ticketNo || newTicketNo;
+      const actualTicketNo = created?.ticketNo || "";
       window.dispatchEvent(new CustomEvent("support_ticket_updated", { detail: created }));
 
       // Trigger notification for Authority/Admin safely
@@ -522,8 +534,8 @@ export default function AddSupportTicketModal({
             <Grid size={{ xs: 12 }}>
               <Alert severity="warning" sx={{ borderRadius: "8px", fontWeight: 600 }}>
                 {isMemberRole
-                  ? `You currently have an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}". Please wait until it is verified before submitting another ticket for this type.`
-                  : `Member already has an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}". It must be verified before creating a new ticket for this type.`}
+                  ? `You currently have an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}"${form.relatedEvent ? ` on event "${form.relatedEvent}"` : ""}. Please resolve the existing ticket before submitting another ticket for this type.`
+                  : `Member already has an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}"${form.relatedEvent ? ` on event "${form.relatedEvent}"` : ""}. It must be resolved before creating or updating a ticket for this type.`}
               </Alert>
             </Grid>
           )}

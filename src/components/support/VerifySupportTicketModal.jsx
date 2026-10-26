@@ -249,11 +249,13 @@ export default function VerifySupportTicketModal({
     }
     if (!replyText || !replyText.trim()) {
       newErrors.replyText = "This field is required";
+    } else if (replyText.trim().length > 250) {
+      newErrors.replyText = "Resolution notes cannot exceed 250 characters";
     }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("This field is required");
+      toast.error(newErrors.replyText || newErrors.updateStatus || "This field is required");
       return;
     }
 
@@ -644,8 +646,13 @@ export default function VerifySupportTicketModal({
                   label="Resolution Notes / Reply Message"
                   placeholder="Type resolution notes or reply message..."
                   value={replyText}
+                  maxLength={250}
+                  showCount={true}
                   onChange={(e) => {
-                    setReplyText(e.target.value);
+                    const val = e.target.value;
+                    if (val.length <= 250) {
+                      setReplyText(val);
+                    }
                     if (errors.replyText) setErrors((prev) => ({ ...prev, replyText: "" }));
                   }}
                   error={!!errors.replyText}
