@@ -25,7 +25,7 @@ import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppClearFilterButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import { useAppToast } from "../../components/common/AppToast";
@@ -981,9 +981,14 @@ export default function PaymentsPage() {
               >
                 Filter
               </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
+              <AppClearFilterButton
+                filters={{
+                  member: filterMember,
+                  event: filterEvent,
+                  mode: filterMode,
+                  status: filterStatus,
+                  date: filterDate,
+                }}
                 onClick={() => {
                   setFilterMember("ALL");
                   setFilterEvent("ALL");
@@ -997,23 +1002,7 @@ export default function PaymentsPage() {
                   setAppliedDate(null);
                   setHasAppliedFilter(true);
                 }}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  whiteSpace: "nowrap",
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)",
-                  },
-                }}
-              >
-                Clear Filter
-              </AppButton>
+              />
             </Box>
           </Box>
         }

@@ -35,7 +35,7 @@ import {
   FilterList as FilterListIcon,
 } from "@mui/icons-material";
 import AppSelect from "../common/AppSelect";
-import AppButton from "../common/AppButton";
+import AppButton, { AppClearFilterButton } from "../common/AppButton";
 import { exportSheets } from "../../utils/exportToExcel";
 import { formatGridDate } from "../../utils/dateHelper";
 import { formatWholeCurrency } from "../../utils/roundingHelper";
@@ -915,28 +915,19 @@ export default function AnnualMemberMatrix({
               Filter
             </AppButton>
 
-            <AppButton
-              size="small"
-              variant="outlined"
-              onClick={handleClearFilter}
-              sx={{
-                height: 34,
-                minHeight: 34,
-                fontWeight: 700,
-                fontSize: "0.75rem",
-                px: 2,
-                borderRadius: "8px",
-                color: "#ef4444",
-                borderColor: "rgba(239, 68, 68, 0.4)",
-                "&:hover": {
-                  borderColor: "#ef4444",
-                  color: "#ef4444",
-                  bgcolor: "rgba(239, 68, 68, 0.05)",
-                },
+            <AppClearFilterButton
+              filters={{
+                year: selectedYear,
+                eventType: filterEventType,
+                workType: filterWorkType,
+                paymentStatus: filterPaymentStatus,
+                search: searchTerm,
               }}
-            >
-              Clear Filter
-            </AppButton>
+              defaultValues={{
+                year: currentYear,
+              }}
+              onClick={handleClearFilter}
+            />
 
             <AppButton
               size="small"

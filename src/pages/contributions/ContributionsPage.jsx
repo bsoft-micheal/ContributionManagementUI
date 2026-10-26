@@ -45,7 +45,7 @@ import {
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
-import AppButton, { AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton, AppClearFilterButton } from "../../components/common/AppButton";
 import { getContributionsAsync, getContributionsByEventAsync, recordPaymentAsync } from "../../services/contributionService";
 import { getSupportTicketsAsync } from "../../services/supportTicketService";
 import { getEventsAsync, isEventPublished } from "../../services/eventService";
@@ -3284,27 +3284,16 @@ export default function ContributionsPage() {
               >
                 Filter
               </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
-                onClick={handleClearFilter}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  whiteSpace: "nowrap",
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)",
-                  },
+              <AppClearFilterButton
+                filters={{
+                  year: filterYear,
+                  month: filterMonth,
+                  eventType: filterEventType,
+                  event: filterEventId,
+                  status: filterStatus,
                 }}
-              >
-                Clear Filter
-              </AppButton>
+                onClick={handleClearFilter}
+              />
             </Box>
           </Box>
         }

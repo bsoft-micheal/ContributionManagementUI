@@ -44,7 +44,7 @@ import { hasActionPermission } from "../../utils/rightsHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppTextArea from "../../components/common/AppTextArea";
-import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton, AppClearFilterButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -1621,9 +1621,13 @@ export default function SupportTicketsPage() {
               >
                 Filter
               </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
+              <AppClearFilterButton
+                filters={{
+                  type: filterType,
+                  priority: filterPriority,
+                  status: filterStatus,
+                  event: filterEvent,
+                }}
                 onClick={() => {
                   setFilterType("ALL");
                   setFilterPriority("ALL");
@@ -1634,23 +1638,7 @@ export default function SupportTicketsPage() {
                   setAppliedStatus("ALL");
                   setAppliedEvent("ALL");
                 }}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  whiteSpace: "nowrap",
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)",
-                  },
-                }}
-              >
-                Clear Filter
-              </AppButton>
+              />
             </Box>
           </Box>
         }

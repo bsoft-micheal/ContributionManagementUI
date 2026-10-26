@@ -14,7 +14,7 @@ import { getMembersAsync } from "../../services/memberService";
 import { getRolesAsync } from "../../services/roleService";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppClearFilterButton } from "../../components/common/AppButton";
 import { getEventsAsync, getEventByIdAsync } from "../../services/eventService";
 import { useAppToast } from "../../components/common/AppToast";
 import { COMMON_STRINGS } from "../../constants";
@@ -358,9 +358,13 @@ export default function ContributionCalculationPage() {
                 >
                   Filter
                 </AppButton>
-                <AppButton
-                  variant="outlined"
-                  size="small"
+                <AppClearFilterButton
+                  filters={{
+                    eventId: filterEventId,
+                  }}
+                  defaultValues={{
+                    eventId: events.length > 0 ? events[0].eventId : "",
+                  }}
                   onClick={() => {
                     if (events.length > 0) {
                       const firstEventId = events[0].eventId;
@@ -368,23 +372,7 @@ export default function ContributionCalculationPage() {
                       setSelectedEventId(firstEventId);
                     }
                   }}
-                  sx={{
-                    color: "#ef4444",
-                    borderColor: "rgba(239, 68, 68, 0.4)",
-                    height: 34,
-                    minHeight: 34,
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    px: 2,
-                    whiteSpace: "nowrap",
-                    "&:hover": {
-                      borderColor: "#ef4444",
-                      bgcolor: "rgba(239, 68, 68, 0.05)"
-                    }
-                  }}
-                >
-                  Clear Filter
-                </AppButton>
+                />
               </Box>
             </Grid>
             <Grid size={{ xs: 12, lg: 8 }} sx={{ display: "flex", justifyContent: "flex-end", alignItems: "stretch" }}>

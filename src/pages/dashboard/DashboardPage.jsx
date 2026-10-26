@@ -35,7 +35,7 @@ import dayjs from "dayjs";
 import { formatGridDate, parseMemberDob } from "../../utils/dateHelper";
 import MetricCard from "../../components/MetricCard";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppClearFilterButton } from "../../components/common/AppButton";
 import { COMMON_STRINGS } from "../../constants";
 import { getDashboardSummaryAsync } from "../../services/dashboardService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
@@ -691,29 +691,12 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
           {COMMON_STRINGS.DASHBOARD?.FILTER_BUTTON || "Filter"}
         </AppButton>
 
-        <AppButton
-          variant="outlined"
-          size="small"
+        <AppClearFilterButton
+          filters={pending}
           onClick={onClear}
-          sx={{
-            height: 34,
-            minHeight: 34,
-            px: 2,
-            borderRadius: "8px",
-            color: "#ef4444",
-            borderColor: "rgba(239, 68, 68, 0.4)",
-            fontWeight: 700,
-            fontSize: "0.75rem",
-            whiteSpace: "nowrap",
-            "&:hover": {
-              borderColor: "#ef4444",
-              bgcolor: isDark ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.05)",
-              color: "#ef4444",
-            },
-          }}
         >
           {COMMON_STRINGS.DASHBOARD?.CLEAR_FILTER_BUTTON || "Clear Filter"}
-        </AppButton>
+        </AppClearFilterButton>
       </Box>
     </Box>
   );

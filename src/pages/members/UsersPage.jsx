@@ -42,7 +42,7 @@ dayjs.extend(customParseFormat);
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
-import AppButton, { AppAddButton } from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppClearFilterButton } from "../../components/common/AppButton";
 import AppSwitch from "../../components/common/AppSwitch";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppDialog from "../../components/common/AppDialog";
@@ -1241,32 +1241,18 @@ export default function UsersPage() {
               >
                 Filter
               </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
+              <AppClearFilterButton
+                filters={{
+                  role: filterRole,
+                  status: filterStatus,
+                }}
                 onClick={() => {
                   setFilterRole("");
                   setFilterStatus("");
                   setAppliedRole("");
                   setAppliedStatus("");
                 }}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  whiteSpace: "nowrap",
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)",
-                  },
-                }}
-              >
-                Clear Filter
-              </AppButton>
+              />
             </Box>
           </Box>
         }
