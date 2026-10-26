@@ -36,6 +36,11 @@ export const VALIDATION_PATTERNS = {
     message: "Only letters, numbers, and spaces are allowed",
     sanitize: (val) => val.replace(/[^A-Za-z0-9\s]/g, "")
   },
+  alphanumeric: {
+    pattern: /^[A-Za-z0-9]*$/,
+    message: "Only letters and numbers are allowed (no symbols or spaces)",
+    sanitize: (val) => String(val || "").replace(/[^A-Za-z0-9]/g, "")
+  },
   numberspecialcharacter: {
     pattern: /^[^A-Za-z]*$/,
     message: "Only numbers and special characters are allowed (no letters)",

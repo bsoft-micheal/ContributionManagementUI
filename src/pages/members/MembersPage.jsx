@@ -15,7 +15,7 @@ import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatGridDate } from "../../utils/dateHelper";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppClearFilterButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import MemberDetailsDialog from "../../components/members/MemberDetailsDialog";
 import { getMembersAsync } from "../../services/memberService";
@@ -298,30 +298,15 @@ export default function MembersPage() {
                 >
                   Filter
                 </AppButton>
-                <AppButton
-                  variant="outlined"
-                  size="small"
+                <AppClearFilterButton
+                  filters={{
+                    roleId: filterRoleId,
+                  }}
                   onClick={() => {
                     setFilterRoleId("");
                     setAppliedRoleId("");
                   }}
-                  sx={{
-                    color: "#ef4444",
-                    borderColor: "rgba(239, 68, 68, 0.4)",
-                    height: 34,
-                    minHeight: 34,
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    px: 2,
-                    whiteSpace: "nowrap",
-                    "&:hover": {
-                      borderColor: "#ef4444",
-                      bgcolor: "rgba(239, 68, 68, 0.05)",
-                    },
-                  }}
-                >
-                  Clear Filter
-                </AppButton>
+                />
               </Box>
             </Box>
           ) : null

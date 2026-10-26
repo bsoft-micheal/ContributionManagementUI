@@ -2982,15 +2982,6 @@ export default function SettingsPage() {
                   columns={qrTableColumns}
                   data={qrTableData}
                   loading={false}
-                  actions={
-                    <Chip
-                      label={`${qrTableData.filter((r) => r.isConfigured).length} of ${qrTableData.length} Configured`}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                      sx={{ fontWeight: 700, fontSize: "0.74rem" }}
-                    />
-                  }
                 />
               </Box>
             </Stack>

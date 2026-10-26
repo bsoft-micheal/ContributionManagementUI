@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box,
   Dialog,
@@ -45,7 +45,7 @@ import {
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
-import AppButton, { AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
+import AppButton, { AppCancelButton, AppSaveButton, AppClearFilterButton } from "../../components/common/AppButton";
 import { getContributionsAsync, getContributionsByEventAsync, recordPaymentAsync } from "../../services/contributionService";
 import { getSupportTicketsAsync } from "../../services/supportTicketService";
 import { getEventsAsync, isEventPublished } from "../../services/eventService";
@@ -87,10 +87,16 @@ const initialPayment = {
 export default function ContributionsPage() {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { authState } = useAuth();
   const { addNotification } = useNotifications();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
+
+  const navEventId = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+    return location.state?.eventId || searchParams.get("eventId");
+  }, [location.search, location.state]);
 
   // Granular Action Permissions (aligned with User Rights Master & menuConstants)
   const canAddContribution = hasActionPermission(
@@ -179,6 +185,68 @@ export default function ContributionsPage() {
       cancelled = true;
     };
   }, [filterMonth, filterYear]);
+
+  // Handle navigation from other pages (e.g. Exit Clearance) with a targeted eventId
+  useEffect(() => {
+    if (!navEventId) return;
+
+    let cancelled = false;
+    async function applyNavEvent() {
+      try {
+        let allPublished = events;
+        if (!allPublished || allPublished.length === 0) {
+          const fetched = await getEventsAsync();
+          allPublished = (Array.isArray(fetched) ? fetched : []).filter((e) => !e.isDeleted && isEventPublished(e));
+          if (!cancelled && allPublished.length > 0) setEvents(allPublished);
+        }
+
+        const matchedEv = allPublished.find(
+          (e) => String(e.eventId || e.id).toLowerCase() === String(navEventId).toLowerCase()
+        );
+
+        if (cancelled) return;
+
+        if (matchedEv) {
+          const evDate = matchedEv.eventDate || matchedEv.createdOn || matchedEv.date;
+          const evYear = evDate ? dayjs(evDate).year() : dayjs().year();
+          const evMonth = evDate ? dayjs(evDate).month() + 1 : dayjs().month() + 1;
+          const evIdStr = String(matchedEv.eventId || matchedEv.id);
+
+          setFilterYear(evYear);
+          setAppliedYear(evYear);
+          setFilterMonth(evMonth);
+          setAppliedMonth(evMonth);
+          setFilterEventType("ALL");
+          setAppliedEventType("ALL");
+          setFilterEventId(evIdStr);
+          setSelectedEventId(evIdStr);
+          setHasAppliedFilter(true);
+
+          setFilterLookupEvents((prev) => {
+            if (prev.some((e) => String(e.eventId || e.id).toLowerCase() === evIdStr.toLowerCase())) {
+              return prev;
+            }
+            return [matchedEv, ...prev];
+          });
+        } else {
+          setFilterEventId(String(navEventId));
+          setSelectedEventId(String(navEventId));
+          setHasAppliedFilter(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setFilterEventId(String(navEventId));
+          setSelectedEventId(String(navEventId));
+          setHasAppliedFilter(true);
+        }
+      }
+    }
+
+    applyNavEvent();
+    return () => {
+      cancelled = true;
+    };
+  }, [navEventId, events]);
 
   // --- All remaining useState declarations (must be before any useEffect/useMemo that references them) ---
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1340,6 +1408,13 @@ export default function ContributionsPage() {
           });
 
       return [...filteredGrouped].sort((a, b) => {
+        const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || "";
+        const dateB = b.createdAt || b.CreatedAt || b.createdOn || b.CreatedOn || "";
+        const dayA = dateA ? dayjs(dateA).format("YYYY-MM-DD") : "";
+        const dayB = dateB ? dayjs(dateB).format("YYYY-MM-DD") : "";
+        if (dayA !== dayB) {
+          return dayB.localeCompare(dayA);
+        }
         const nameA = String(a.memberName || a.name || "").trim();
         const nameB = String(b.memberName || b.name || "").trim();
         if (!nameA && !nameB) return 0;
@@ -1377,6 +1452,13 @@ export default function ContributionsPage() {
         });
 
     return [...filteredEnriched].sort((a, b) => {
+      const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || "";
+      const dateB = b.createdAt || b.CreatedAt || b.createdOn || b.CreatedOn || "";
+      const dayA = dateA ? dayjs(dateA).format("YYYY-MM-DD") : "";
+      const dayB = dateB ? dayjs(dateB).format("YYYY-MM-DD") : "";
+      if (dayA !== dayB) {
+        return dayB.localeCompare(dayA);
+      }
       const nameA = String(a.memberName || a.name || "").trim();
       const nameB = String(b.memberName || b.name || "").trim();
       if (!nameA && !nameB) return 0;
@@ -1934,10 +2016,9 @@ export default function ContributionsPage() {
     const filteredEvents = (filterLookupEvents || []).filter((e) => isMatchingEventType(e, filterEventType));
 
     filteredEvents.forEach((e) => {
-      const dateStr = e.eventDate ? dayjs(e.eventDate).format("DD/MM/YYYY") : "";
-      const label = dateStr ? `${e.eventName || "Unnamed Event"} (${dateStr})` : (e.eventName || "Unnamed Event");
+      const name = e.eventName || e.title || e.name || "Unnamed Event";
       list.push({
-        label,
+        label: name,
         value: String(e.eventId || e.id),
       });
     });
@@ -1947,6 +2028,7 @@ export default function ContributionsPage() {
 
   // Reset invalid dependent Event ID when eventOptions change
   useEffect(() => {
+    if (filterLookupEvents.length === 0) return;
     if (filterEventId && filterEventId !== "ALL") {
       const isValid = eventOptions.some(
         (opt) => String(opt.value).toLowerCase() === String(filterEventId).toLowerCase()
@@ -1955,7 +2037,7 @@ export default function ContributionsPage() {
         setFilterEventId("ALL");
       }
     }
-  }, [eventOptions, filterEventId]);
+  }, [eventOptions, filterEventId, filterLookupEvents.length]);
 
   const handleEventTypeChange = (newTypeId) => {
     setFilterEventType(newTypeId);
@@ -2831,6 +2913,7 @@ export default function ContributionsPage() {
                 sx={{
                   cursor: "help",
                   textDecoration: "underline dotted",
+                  textUnderlineOffset: "3px",
                   display: "inline-block",
                 }}
               >
@@ -2930,6 +3013,7 @@ export default function ContributionsPage() {
               sx={{
                 cursor: "help",
                 textDecoration: paidAmount > 0 ? "underline dotted" : "none",
+                textUnderlineOffset: "3px",
                 display: "inline-block",
               }}
             >
@@ -2978,6 +3062,7 @@ export default function ContributionsPage() {
                 sx={{
                   cursor: row.memberEvents && row.memberEvents.length > 1 ? "help" : "inherit",
                   textDecoration: row.memberEvents && row.memberEvents.length > 1 ? "underline dotted" : "none",
+                  textUnderlineOffset: "3px",
                 }}
               >
                 {formatWholeCurrency(totalAmount)}
@@ -3036,6 +3121,7 @@ export default function ContributionsPage() {
               sx={{
                 cursor: displayArrears > 0 ? "help" : "default",
                 textDecoration: displayArrears > 0 ? "underline dotted" : "none",
+                textUnderlineOffset: "3px",
                 display: "inline-block",
               }}
             >
@@ -3236,7 +3322,7 @@ export default function ContributionsPage() {
                 fullWidth
               />
             </Box>
-            <Box sx={{ width: { xs: "100%", sm: 200, md: 230 } }}>
+            <Box sx={{ width: { xs: "100%", sm: 220, md: 260 } }}>
               <AppSelect
                 label="Event"
                 placeholder="Select an event"
@@ -3284,27 +3370,16 @@ export default function ContributionsPage() {
               >
                 Filter
               </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
-                onClick={handleClearFilter}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  whiteSpace: "nowrap",
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)",
-                  },
+              <AppClearFilterButton
+                filters={{
+                  year: filterYear,
+                  month: filterMonth,
+                  eventType: filterEventType,
+                  event: filterEventId,
+                  status: filterStatus,
                 }}
-              >
-                Clear Filter
-              </AppButton>
+                onClick={handleClearFilter}
+              />
             </Box>
           </Box>
         }
@@ -3444,7 +3519,13 @@ export default function ContributionsPage() {
                     placeholder="₹ Cash"
                     value={payment.cashAmount}
                     onChange={(e) => handleCashAmountChange(e.target.value)}
-                    restrictType="decimalonly"
+                    restrictType="numberonly"
+                    inputMode="numeric"
+                    onKeyDown={(e) => {
+                      if (e.key === "e" || e.key === "E" || e.key === "+" || e.key === "-" || e.key === ".") {
+                        e.preventDefault();
+                      }
+                    }}
                     maxLength={10}
                     error={!!errors.cashAmount}
                     helperText={errors.cashAmount}
@@ -3457,7 +3538,13 @@ export default function ContributionsPage() {
                     placeholder="₹ UPI"
                     value={payment.upiAmount}
                     onChange={(e) => handleUpiAmountChange(e.target.value)}
-                    restrictType="decimalonly"
+                    restrictType="numberonly"
+                    inputMode="numeric"
+                    onKeyDown={(e) => {
+                      if (e.key === "e" || e.key === "E" || e.key === "+" || e.key === "-" || e.key === ".") {
+                        e.preventDefault();
+                      }
+                    }}
                     maxLength={10}
                     error={!!errors.upiAmount}
                     helperText={errors.upiAmount}
@@ -3726,7 +3813,8 @@ export default function ContributionsPage() {
                       setStatusError("This field is required");
                       hasError = true;
                     }
-                    if (!auditRemarks || !String(auditRemarks).trim()) {
+                    const isRemarksMandatory = String(statusChangeValue || "").trim().toLowerCase() === "rejected";
+                    if (isRemarksMandatory && (!auditRemarks || !String(auditRemarks).trim())) {
                       setAuditRemarksError("This field is required");
                       hasError = true;
                     }
@@ -4445,19 +4533,24 @@ export default function ContributionsPage() {
                 </Grid>
               </Grid>
 
-              <AppTextArea
-                label="Audit Remarks / Notes"
-                placeholder="Enter remarks or status update notes..."
-                value={auditRemarks}
-                onChange={(e) => {
-                  setAuditRemarks(e.target.value);
-                  if (auditRemarksError) setAuditRemarksError("");
-                }}
-                rows={3}
-                required
-                error={Boolean(auditRemarksError)}
-                helperText={auditRemarksError || ""}
-              />
+              {(() => {
+                const isRemarksMandatory = String(statusChangeValue || "").trim().toLowerCase() === "rejected";
+                return (
+                  <AppTextArea
+                    label={isRemarksMandatory ? "Audit Remarks / Notes *" : "Audit Remarks / Notes"}
+                    placeholder={isRemarksMandatory ? "Enter reason for rejection (required)..." : "Enter remarks or status update notes (optional)..."}
+                    value={auditRemarks}
+                    onChange={(e) => {
+                      setAuditRemarks(e.target.value);
+                      if (auditRemarksError) setAuditRemarksError("");
+                    }}
+                    rows={3}
+                    required={isRemarksMandatory}
+                    error={Boolean(auditRemarksError)}
+                    helperText={auditRemarksError || ""}
+                  />
+                );
+              })()}
             </Paper>
           </Box>
         )}

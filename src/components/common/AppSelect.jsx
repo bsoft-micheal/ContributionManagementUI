@@ -130,38 +130,34 @@ export default function AppSelect({
             const found = uniqueOptions.find(
               (o) => String(o?.value ?? "").toLowerCase() === String(selected ?? "").toLowerCase()
             );
-            if (found) return found.label;
-
-            if (selected === "" || selected === undefined || selected === null) {
-              return (
-                <span
-                  style={{
-                    color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
-                    fontWeight: 400,
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  {effectivePlaceholder}
-                </span>
-              );
-            }
 
             const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(selected));
-            if (isUuid) {
-              return (
-                <span
-                  style={{
-                    color: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569",
-                    fontWeight: 400,
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  {effectivePlaceholder}
-                </span>
-              );
-            }
+            const isPlaceholder = !found && (selected === "" || selected === undefined || selected === null || isUuid);
+            const labelText = found
+              ? found.label
+              : (isPlaceholder ? effectivePlaceholder : selected);
 
-            return selected;
+            return (
+              <Box
+                component="span"
+                title={typeof labelText === "string" ? labelText : ""}
+                sx={{
+                  display: "block",
+                  width: "100%",
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  color: isPlaceholder
+                    ? (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.75)" : "#475569")
+                    : "inherit",
+                  fontWeight: isPlaceholder ? 400 : "inherit",
+                  fontSize: isPlaceholder ? "0.875rem" : "inherit",
+                }}
+              >
+                {labelText}
+              </Box>
+            );
           },
         }}
         sx={{
@@ -182,8 +178,10 @@ export default function AppSelect({
               py: 0,
               px: 1.5,
               fontSize: "0.84375rem",
-              pr: showClearButton ? "52px !important" : "32px !important",
+              pr: showClearButton ? "58px !important" : "36px !important",
               color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "inherit",
+              overflow: "hidden !important",
+              minWidth: 0,
             },
             "& .MuiSelect-nativeInput": {
               opacity: "0 !important",

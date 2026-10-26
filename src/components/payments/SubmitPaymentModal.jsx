@@ -1181,7 +1181,7 @@ export default function SubmitPaymentModal({
       const existingUtr = existingRow?.utr || "";
       const trimmedUtr = isNewCash
         ? existingUtr.slice(0, 50)
-        : existingUtr.replace(/[^a-zA-Z0-9\-_/]/g, "").slice(0, 12);
+        : existingUtr.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12);
 
       setSplitRows((prev) =>
         prev.map((r) => (r.id === id ? { ...r, mode: value, utr: trimmedUtr } : r))
@@ -1196,6 +1196,13 @@ export default function SubmitPaymentModal({
       return;
     }
     if (field === "amount") {
+      // Strictly whole numbers: disallow decimal/point, e/E, and negative signs
+      const rawStr = String(value ?? "").split(".")[0];
+      sanitized = rawStr.replace(/[^0-9]/g, "");
+      if (sanitized.length > 1 && sanitized.startsWith("0")) {
+        sanitized = sanitized.replace(/^0+/, "") || "0";
+      }
+
       const targetAmt = roundToWhole(formData.amount || 0);
       const otherRowsSum = roundToWhole(
         splitRows
@@ -1222,8 +1229,8 @@ export default function SubmitPaymentModal({
         // Strict limit Cash Note to max 50 characters
         sanitized = String(value || "").slice(0, 50);
       } else {
-        // Limit UTR / Ref to max 12 characters (alphanumeric)
-        sanitized = String(value || "").replace(/[^a-zA-Z0-9\-_/]/g, "").slice(0, 12);
+        // Limit UTR / Ref to max 12 characters (alphanumeric only, no symbols)
+        sanitized = String(value || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 12);
       }
     }
 
@@ -1436,6 +1443,8 @@ export default function SubmitPaymentModal({
           }
           if (!r.amount || isNaN(rowAmt) || rowAmt <= 0) {
             errs[`row_${r.id}_amount`] = "Amount must be greater than ₹0";
+          } else if (String(r.amount).includes(".") || rowAmt % 1 !== 0) {
+            errs[`row_${r.id}_amount`] = "Point / decimal values are not allowed. Please enter a whole number.";
           } else if (targetAmt > 0 && rowAmt > targetAmt) {
             errs[`row_${r.id}_amount`] = `Cannot exceed ${formatWholeCurrency(targetAmt)}`;
           } else if (rowAmt > 10000000) {
@@ -2203,11 +2212,18 @@ export default function SubmitPaymentModal({
                       <Grid size={{ xs: 12, sm: 2.5 }}>
                         <AppInput
                           label="Amount (₹)"
-                          type="number"
-                          placeholder="0.00"
+                          type="text"
+                          inputMode="numeric"
+                          restrictType="numberonly"
+                          placeholder="0"
                           value={row.amount}
                           disabled={!isEventSelected || isFullySettled}
                           onChange={(e) => handleSplitRowChange(row.id, "amount", e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "e" || e.key === "E" || e.key === "+" || e.key === "-" || e.key === ".") {
+                              e.preventDefault();
+                            }
+                          }}
                           size="small"
                           error={!!errors[`row_${row.id}_amount`]}
                           helperText={!isEventSelected ? "Select event name first" : errors[`row_${row.id}_amount`]}
@@ -2222,8 +2238,30 @@ export default function SubmitPaymentModal({
                               placeholder={isRowCash ? "Handover note" : "12-digit UTR ref"}
                               value={row.utr}
                               disabled={!isEventSelected || isFullySettled}
+                              restrictType={isRowCash ? undefined : "alphanumeric"}
                               onChange={(e) => handleSplitRowChange(row.id, "utr", e.target.value)}
                               onBlur={() => handleSplitRowBlur(row.id, "utr")}
+                              onKeyDown={(e) => {
+                                if (!isRowCash) {
+                                  const isControlKey =
+                                    e.key === "Backspace" ||
+                                    e.key === "Delete" ||
+                                    e.key === "Tab" ||
+                                    e.key === "Escape" ||
+                                    e.key === "Enter" ||
+                                    e.key === "ArrowLeft" ||
+                                    e.key === "ArrowRight" ||
+                                    e.key === "ArrowUp" ||
+                                    e.key === "ArrowDown" ||
+                                    e.key === "Home" ||
+                                    e.key === "End" ||
+                                    e.ctrlKey ||
+                                    e.metaKey;
+                                  if (!isControlKey && !/^[a-zA-Z0-9]$/.test(e.key)) {
+                                    e.preventDefault();
+                                  }
+                                }
+                              }}
                               size="small"
                               error={!!errors[`row_${row.id}_utr`]}
                               helperText={!isEventSelected ? "Select event name first" : errors[`row_${row.id}_utr`]}
