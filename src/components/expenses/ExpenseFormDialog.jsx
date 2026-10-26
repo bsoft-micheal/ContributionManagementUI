@@ -397,10 +397,74 @@ export default function ExpenseFormDialog({
   }, [additionalExpenses]);
   const totalCalculatedExpense = roundToWhole(mainBudgetAmount + extraExpensesSum);
 
+  const remainingBudgetCap = useMemo(() => {
+    if (!selectedEventBudget || selectedEventBudget.expected <= 0) return null;
+    return selectedEventBudget.remaining;
+  }, [selectedEventBudget]);
+
+  const isBudgetExhausted = remainingBudgetCap !== null && remainingBudgetCap <= 0;
+
   const isMainAmountExceedingBudget = useMemo(() => {
     if (!selectedEventBudget || selectedEventBudget.expected <= 0) return false;
     return mainBudgetAmount > selectedEventBudget.remaining;
   }, [selectedEventBudget, mainBudgetAmount]);
+
+  // Auto-clamp main budget amount whenever selected event changes or updates
+  useEffect(() => {
+    if (selectedEventBudget && selectedEventBudget.expected > 0) {
+      const currentNum = Number(form.amount) || 0;
+      if (selectedEventBudget.remaining <= 0) {
+        if (form.amount !== "" && form.amount !== "0") {
+          setForm((c) => ({ ...c, amount: "0" }));
+        }
+      } else if (currentNum > selectedEventBudget.remaining) {
+        setForm((c) => ({ ...c, amount: String(selectedEventBudget.remaining) }));
+        setErrors((p) => ({
+          ...p,
+          amount: `Amount clamped to remaining budget (${formatWholeCurrency(selectedEventBudget.remaining)})`,
+        }));
+      }
+    }
+  }, [selectedEventBudget]);
+
+  const handleAmountChange = (e) => {
+    const raw = e.target.value.replace(/[^0-9]/g, "");
+    if (raw === "") {
+      setForm((c) => ({ ...c, amount: "" }));
+      setErrors((p) => ({ ...p, amount: "" }));
+      return;
+    }
+    if (raw.length > 6) return;
+
+    const num = Number(raw);
+
+    // If event has an expected budget:
+    if (remainingBudgetCap !== null) {
+      if (isBudgetExhausted) {
+        setForm((c) => ({ ...c, amount: "0" }));
+        setErrors((p) => ({
+          ...p,
+          amount: "Remaining budget is ₹0. Please enter extra expenses in '+ Add Row' below.",
+        }));
+        toast.warning("Remaining expected budget is ₹0. Any expense must be added using '+ Add Row'.");
+        return;
+      }
+
+      if (num > remainingBudgetCap) {
+        // Strictly prevent entering more than remaining expected budget!
+        setForm((c) => ({ ...c, amount: String(remainingBudgetCap) }));
+        setErrors((p) => ({
+          ...p,
+          amount: `Cannot exceed remaining budget (${formatWholeCurrency(remainingBudgetCap)}). Enter extra spending under '+ Add Row' below.`,
+        }));
+        toast.warning(`Amount restricted to remaining budget of ${formatWholeCurrency(remainingBudgetCap)}. Extra spending must be added using '+ Add Row'.`);
+        return;
+      }
+    }
+
+    setForm((c) => ({ ...c, amount: raw }));
+    if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
+  };
 
   const handleAddAdditionalExpenseRow = () => {
     setAdditionalExpenses((prev) => [
@@ -555,7 +619,12 @@ export default function ExpenseFormDialog({
       if (numAmount > maxBudgetLimit) {
         newErrors.amount = `Main Budget Amount cannot exceed remaining budget (${formatWholeCurrency(maxBudgetLimit)})`;
       } else if (numAmount === 0 && additionalExpenses.length === 0) {
-        newErrors.amount = "This field is required";
+        if (selectedEventBudget.remaining === 0) {
+          newErrors.amount = "Budget is exhausted (₹0). Please add extra expenses using '+ Add Row' below";
+          toast.warning("Budget limit reached (₹0 remaining). Please use '+ Add Row' below to enter additional expenses.");
+        } else {
+          newErrors.amount = "This field is required";
+        }
       }
     } else {
       if (!form.amount || !String(form.amount).trim() || numAmount <= 0 || isNaN(numAmount)) {
@@ -911,46 +980,32 @@ export default function ExpenseFormDialog({
             <AppInput
               label={selectedEventBudget ? "Main Budget Amount (₹)" : "Amount (₹)"}
               placeholder={
-                selectedEventBudget && selectedEventBudget.remaining === 0
-                  ? "₹ 0 (Budget exhausted)"
+                isBudgetExhausted
+                  ? "₹ 0 (Remaining budget is ₹0)"
+                  : remainingBudgetCap !== null
+                  ? `₹ Max ${formatWholeCurrency(remainingBudgetCap)}`
                   : "₹ Enter budget amount"
               }
-              value={form.amount}
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (raw === "") {
-                  setForm((c) => ({ ...c, amount: "" }));
-                  setErrors((p) => ({ ...p, amount: "" }));
-                  return;
-                }
-                if (raw.length > 6) return;
-
-                const num = Number(raw);
-                if (selectedEventBudget && num > selectedEventBudget.remaining) {
-                  setForm((c) => ({ ...c, amount: raw }));
-                  setErrors((p) => ({
-                    ...p,
-                    amount: `Cannot exceed remaining budget (${formatWholeCurrency(selectedEventBudget.remaining)}). Use "+ Add Row" below for additional expenses.`,
-                  }));
-                  return;
-                }
-
-                setForm((c) => ({ ...c, amount: raw }));
-                if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
-              }}
+              value={isBudgetExhausted ? "0" : form.amount}
+              disabled={isBudgetExhausted}
+              onChange={handleAmountChange}
               maxLength={6}
-              inputProps={{ maxLength: 6 }}
+              inputProps={{
+                maxLength: 6,
+                max: remainingBudgetCap !== null ? remainingBudgetCap : 999999,
+                readOnly: isBudgetExhausted,
+              }}
               restrictType="numberonly"
               error={!!errors.amount || isMainAmountExceedingBudget}
               helperText={
                 errors.amount ||
-                (isMainAmountExceedingBudget
-                  ? `Exceeds remaining budget (${formatWholeCurrency(selectedEventBudget.remaining)}). Please use "+ Add Row" below.`
-                  : selectedEventBudget
-                  ? `Max allowed from budget: ${formatWholeCurrency(selectedEventBudget.remaining)}`
+                (isBudgetExhausted
+                  ? "Remaining budget is ₹0. Please enter extra expenses using '+ Add Row' below."
+                  : remainingBudgetCap !== null
+                  ? `Max allowed from expected budget: ${formatWholeCurrency(remainingBudgetCap)}`
                   : undefined)
               }
-              required={additionalExpenses.length === 0}
+              required={!isBudgetExhausted && additionalExpenses.length === 0}
             />
           </Grid>
 
