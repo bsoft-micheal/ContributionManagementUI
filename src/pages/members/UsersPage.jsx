@@ -325,7 +325,11 @@ export default function UsersPage() {
         getRolesAsync().catch(() => []),
         getWorkTypesAsync(true).catch(() => []),
       ]);
-      setUsers(usersData || []);
+      const filteredUsers = (usersData || []).filter((u) => {
+        const email = (u.email || "").trim().toLowerCase();
+        return email !== "admin@gmail.com" && email !== "member@gmail.com";
+      });
+      setUsers(filteredUsers);
       setRoles(rolesData || []);
       setWorkTypes(Array.isArray(workTypesData) ? workTypesData : []);
     } catch {

@@ -499,14 +499,20 @@ export default function EventFormPage({
           setUsePreviousEventBalance(true);
         }
 
-        const normalizedMembers = (usersData || []).map((u) => ({
-          ...u,
-          memberId: u.memberId || u.userId || u.id,
-          name: u.name || u.fullName || u.username,
-          workType: u.workType || u.memberType || "Office",
-          isActive: u.isActive !== false && !u.isDeleted,
-          isExited: Boolean(u.isExited),
-        }));
+        const normalizedMembers = (usersData || [])
+          .filter((u) => {
+            const email = (u.email || "").toLowerCase().trim();
+            const name = (u.name || u.fullName || u.username || "").toLowerCase().trim();
+            return email !== "admin@gmail.com" && email !== "member@gmail.com" && name !== "default member" && name !== "system admin";
+          })
+          .map((u) => ({
+            ...u,
+            memberId: u.memberId || u.userId || u.id,
+            name: u.name || u.fullName || u.username,
+            workType: u.workType || u.memberType || "Office",
+            isActive: u.isActive !== false && !u.isDeleted,
+            isExited: Boolean(u.isExited),
+          }));
 
         const activeMems = normalizedMembers.filter((m) => m.isActive && !m.isExited);
         setEventTypes(typesData || []);
