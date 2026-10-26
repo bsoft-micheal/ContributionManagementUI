@@ -1075,9 +1075,11 @@ export default function ExpensePage() {
       errors.status = "Decision / Status is required";
     }
 
-    const isRejectedState = newStatus?.trim().toLowerCase() === "rejected";
+    const isRejectedState =
+      newStatus?.trim().toLowerCase() === "rejected" ||
+      newStatus?.trim().toLowerCase() === "reject";
     if (isRejectedState && (!statusRemarks || !statusRemarks.trim())) {
-      errors.remarks = "Resolution / Verification notes are required when status is Rejected";
+      errors.remarks = "Remarks / Verification notes are required when status is Rejected";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -1472,7 +1474,7 @@ export default function ExpensePage() {
       key: "submittedBy",
     },
     {
-      label: "Approved By",
+      label: "Verified By",
       key: "approvedBy",
       render: (row) => (
         <Typography variant="body2" color="text.secondary">
@@ -1683,6 +1685,11 @@ export default function ExpensePage() {
         onClose={handleCloseDialog}
         onSaved={fetchExpensesFromDb}
         editingExpense={editingExpense}
+        initialEvent={
+          appliedEvent && appliedEvent !== "ALL"
+            ? (eventsList || []).find((e) => (e.name || e.eventName || "") === appliedEvent)
+            : undefined
+        }
         events={eventsList}
         eventTypes={eventTypesList}
         members={membersList}
@@ -1844,7 +1851,7 @@ export default function ExpensePage() {
                       variant="caption"
                       sx={{ color: "text.secondary", fontWeight: 700, fontSize: "0.75rem", display: "block", mb: 0.5 }}
                     >
-                      Itemized Additional Expenses ({selectedExpense.additionalExpenses.length})
+                      Reason for Additional Expenses ({selectedExpense.additionalExpenses.length})
                     </Typography>
                     <Box
                       sx={{
@@ -1893,7 +1900,7 @@ export default function ExpensePage() {
                 </Grid>
                 <Grid size={{ xs: 6 }}>
                   <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, fontSize: "0.75rem", display: "block", mb: 0.3 }}>
-                    Approved By
+                    Verified By
                   </Typography>
                   <Typography variant="body2" fontWeight={600} sx={{ color: "text.primary", fontSize: "0.875rem" }}>
                     {selectedExpense.approvedBy && selectedExpense.approvedBy !== "-" ? selectedExpense.approvedBy : "--"}
@@ -2174,6 +2181,10 @@ export default function ExpensePage() {
                     const chosen = e.target.value;
                     setNewStatus(chosen);
                     if (statusErrors.status) setStatusErrors((prev) => ({ ...prev, status: "" }));
+                    const isReject = (chosen || "").toLowerCase().trim() === "rejected" || (chosen || "").toLowerCase().trim() === "reject";
+                    if (!isReject && statusErrors.remarks) {
+                      setStatusErrors((prev) => ({ ...prev, remarks: "" }));
+                    }
                     if (chosen && chosen !== "Pending" && (!reviewerName || reviewerName === "-")) {
                       const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "Admin";
                       setReviewerName(currentUserName);
@@ -2196,9 +2207,9 @@ export default function ExpensePage() {
               </Grid>
               <Grid size={{ xs: 12 }}>
                 <AppTextArea
-                  label={newStatus?.trim().toLowerCase() === "rejected" ? "Remarks / Verification Notes" : "Remarks / Verification Notes"}
+                  label="Remarks / Verification Notes"
                   placeholder={
-                    newStatus?.trim().toLowerCase() === "rejected"
+                    newStatus?.trim().toLowerCase() === "rejected" || newStatus?.trim().toLowerCase() === "reject"
                       ? "Enter reason for rejection (required)..."
                       : "Enter remarks or verification notes (optional)..."
                   }
@@ -2209,7 +2220,7 @@ export default function ExpensePage() {
                   }}
                   error={!!statusErrors.remarks}
                   helperText={statusErrors.remarks}
-                  required={newStatus?.trim().toLowerCase() === "rejected"}
+                  required={newStatus?.trim().toLowerCase() === "rejected" || newStatus?.trim().toLowerCase() === "reject"}
                   minRows={3}
                   maxLength={500}
                   showCount

@@ -242,14 +242,20 @@ export default function VerifySupportTicketModal({
     return activeList;
   }, [statuses, dbStatuses, ticketInfo?.status]);
 
+  const isRejectStatus = useMemo(() => {
+    const s = String(updateStatus || "").toLowerCase().trim();
+    return s === "rejected" || s === "reject" || s.includes("reject");
+  }, [updateStatus]);
+
   const handleSave = async () => {
     const newErrors = {};
     if (!updateStatus) {
       newErrors.updateStatus = "This field is required";
     }
-    if (!replyText || !replyText.trim()) {
+    const trimmedReply = replyText ? replyText.trim() : "";
+    if (isRejectStatus && !trimmedReply) {
       newErrors.replyText = "This field is required";
-    } else if (replyText.trim().length > 250) {
+    } else if (trimmedReply.length > 250) {
       newErrors.replyText = "Resolution notes cannot exceed 250 characters";
     }
 
@@ -273,7 +279,7 @@ export default function VerifySupportTicketModal({
             status: updateStatus,
             modifiedOn: ticketInfo?.modifiedOn || initialData?.modifiedOn || null,
           });
-        } else if (statusChanged) {
+        } else {
           await updateSupportTicketAsync(ticketId, {
             memberName: ticketInfo.memberName,
             memberId: ticketInfo.memberId || "",
@@ -631,8 +637,13 @@ export default function VerifySupportTicketModal({
                   label="Update Status"
                   value={updateStatus}
                   onChange={(e) => {
-                    setUpdateStatus(e.target.value);
+                    const nextStatus = e.target.value;
+                    setUpdateStatus(nextStatus);
                     if (errors.updateStatus) setErrors((prev) => ({ ...prev, updateStatus: "" }));
+                    const isNextReject = String(nextStatus || "").toLowerCase().trim().includes("reject");
+                    if (!isNextReject && errors.replyText) {
+                      setErrors((prev) => ({ ...prev, replyText: "" }));
+                    }
                   }}
                   options={statusOptions}
                   error={!!errors.updateStatus}
@@ -658,7 +669,7 @@ export default function VerifySupportTicketModal({
                   error={!!errors.replyText}
                   helperText={errors.replyText || ""}
                   minRows={3}
-                  required
+                  required={isRejectStatus}
                 />
               </Grid>
             </Grid>

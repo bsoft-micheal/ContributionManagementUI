@@ -155,9 +155,9 @@ export function canAddAdditionalExpenseRow({
   rows = [],
   currentRowsCount = 0,
   maxRows = MAX_ADDITIONAL_EXPENSE_ROWS,
-} = {}) {
+} = {}) { 
   if (!eventSelected) return false;
-  const count = rows && rows.length !== undefined ? rows.length : currentRowsCount;
+  const count = Array.isArray(rows) && rows.length > 0 ? rows.length : currentRowsCount;
   if (count >= maxRows) return false;
 
   // Rule: Do not allow adding subsequent row if any existing row has not had values entered
