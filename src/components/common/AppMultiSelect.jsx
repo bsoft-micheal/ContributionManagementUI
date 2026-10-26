@@ -31,6 +31,7 @@ export default function AppMultiSelect({
   maxHeight = 145, // Defaults to ~5 rows of chips
   searchable = true,
   showSelectAll = true,
+  disabled = false,
   ...props
 }) {
   const theme = useTheme();
@@ -129,7 +130,7 @@ export default function AppMultiSelect({
       {/* Clickable Select Field Box */}
       <Box
         ref={anchorRef}
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={disabled ? undefined : () => setOpen((prev) => !prev)}
         sx={{
           display: "flex",
           alignItems: "center",
@@ -139,19 +140,27 @@ export default function AppMultiSelect({
           width: "100%",
           p: size === "small" ? "4px 10px" : "6px 14px",
           boxSizing: "border-box",
-          bgcolor: "background.paper",
+          bgcolor: disabled
+            ? (theme) =>
+                theme.palette.mode === "dark"
+                  ? "rgba(255, 255, 255, 0.05)"
+                  : "rgba(0, 0, 0, 0.04)"
+            : "background.paper",
           borderRadius: "8px",
           border: (theme) =>
             error
               ? `1.5px solid ${theme.palette.mode === "dark" ? "#f87171" : "#ef4444"}`
-              : open
+              : open && !disabled
               ? `2px solid ${theme.palette.mode === "dark" ? "#9d8ce6" : "#6f5bd3"}`
               : `1.5px solid ${theme.palette.mode === "dark" ? "rgba(231, 235, 247, 0.25)" : "rgba(74, 63, 107, 0.28)"}`,
-          cursor: "pointer",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.75 : 1,
           transition: "all 0.15s ease",
           "&:hover": {
             borderColor: (theme) =>
-              error
+              disabled
+                ? undefined
+                : error
                 ? theme.palette.mode === "dark" ? "#f87171" : "#ef4444"
                 : theme.palette.mode === "dark" ? "rgba(157, 140, 230, 0.75)" : "#6f5bd3",
           },
@@ -218,52 +227,56 @@ export default function AppMultiSelect({
                       fontSize: "0.74rem",
                       fontWeight: 600,
                       lineHeight: 1.2,
-                      cursor: "pointer",
+                      cursor: disabled ? "default" : "pointer",
                       transition: "all 0.15s ease",
                       "&:hover": {
                         bgcolor: (theme) =>
-                          theme.palette.mode === "dark"
+                          disabled
+                            ? undefined
+                            : theme.palette.mode === "dark"
                             ? "rgba(124, 58, 237, 0.5)"
                             : "#3b325c",
                       },
                     }}
                   >
                     <span>{labelText}</span>
-                    <Box
-                      component="span"
-                      role="button"
-                      aria-label="Remove"
-                      onClick={(e) => handleRemoveValue(val, e)}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                      }}
-                      sx={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        ml: 0.8,
-                        width: 15,
-                        height: 15,
-                        borderRadius: "50%",
-                        border: "1.2px solid rgba(255, 255, 255, 0.8)",
-                        color: "rgba(255, 255, 255, 0.95)",
-                        fontSize: "8.5px",
-                        fontWeight: "bold",
-                        lineHeight: 1,
-                        cursor: "pointer",
-                        flexShrink: 0,
-                        transition: "all 0.12s ease",
-                        "&:hover": {
-                          bgcolor: "#ef4444",
-                          borderColor: "#ef4444",
-                          color: "#ffffff",
-                          transform: "scale(1.15)",
-                        },
-                      }}
-                    >
-                      ✕
-                    </Box>
+                    {!disabled && (
+                      <Box
+                        component="span"
+                        role="button"
+                        aria-label="Remove"
+                        onClick={(e) => handleRemoveValue(val, e)}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          ml: 0.8,
+                          width: 15,
+                          height: 15,
+                          borderRadius: "50%",
+                          border: "1.2px solid rgba(255, 255, 255, 0.8)",
+                          color: "rgba(255, 255, 255, 0.95)",
+                          fontSize: "8.5px",
+                          fontWeight: "bold",
+                          lineHeight: 1,
+                          cursor: "pointer",
+                          flexShrink: 0,
+                          transition: "all 0.12s ease",
+                          "&:hover": {
+                            bgcolor: "#ef4444",
+                            borderColor: "#ef4444",
+                            color: "#ffffff",
+                            transform: "scale(1.15)",
+                          },
+                        }}
+                      >
+                        ✕
+                      </Box>
+                    )}
                   </Box>
                 );
               })
@@ -272,9 +285,9 @@ export default function AppMultiSelect({
 
         <ArrowDropDownIcon
           sx={{
-            color: "text.secondary",
+            color: disabled ? "action.disabled" : "text.secondary",
             transition: "transform 0.2s ease",
-            transform: open ? "rotate(180deg)" : "none",
+            transform: open && !disabled ? "rotate(180deg)" : "none",
             flexShrink: 0,
           }}
         />
@@ -304,7 +317,7 @@ export default function AppMultiSelect({
 
       {/* Popper Dropdown (always strictly positioned below the box without ever covering it) */}
       <Popper
-        open={open}
+        open={open && !disabled}
         anchorEl={anchorRef.current}
         placement="bottom-start"
         modifiers={[

@@ -2096,6 +2096,7 @@ export default function EventFormPage({
 
   // Handle single event type switch
   const handleTypeChange = (newTypeId) => {
+    if (isEdit) return;
     if (!newTypeId) {
       setForm((prev) => ({
         ...prev,
@@ -2208,6 +2209,7 @@ export default function EventFormPage({
 
   // Handle multiple event types selection
   const handleMultiTypeChange = (newTypeIds) => {
+    if (isEdit) return;
     const selectedTypesList = eventTypes.filter((t) => newTypeIds.includes(t.eventTypeId));
     const hasBday = selectedTypesList.some((t) =>
       t.eventTypeName?.toLowerCase().includes("birthday")
@@ -2296,6 +2298,7 @@ export default function EventFormPage({
 
   // Handle toggle for allowing multiple events
   const handleToggleAllowMultipleEvents = async (checked) => {
+    if (isEdit) return;
     setAllowMultipleEvents(checked);
 
     if (checked) {
@@ -3093,19 +3096,21 @@ export default function EventFormPage({
                 </Typography>
 
                 <Box
-                  onClick={() => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
+                  onClick={isEdit ? undefined : () => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
                   sx={{
                     display: "flex",
                     alignItems: "center",
                     gap: 0.8,
-                    cursor: "pointer",
+                    cursor: isEdit ? "not-allowed" : "pointer",
                     userSelect: "none",
+                    opacity: isEdit ? 0.6 : 1,
                   }}
                 >
                   <Checkbox
                     checked={Boolean(allowMultipleEvents)}
-                    onChange={(e) => handleToggleAllowMultipleEvents(e.target.checked)}
+                    onChange={isEdit ? undefined : (e) => handleToggleAllowMultipleEvents(e.target.checked)}
                     onClick={(e) => e.stopPropagation()}
+                    disabled={isEdit}
                     size="small"
                     sx={{
                       p: 0.2,
@@ -3139,6 +3144,7 @@ export default function EventFormPage({
                     <AppMultiSelect
                       label="Event Types"
                       placeholder="Select EventType"
+                      disabled={isEdit}
                       value={
                         form.eventTypeIds && form.eventTypeIds.length > 0
                           ? form.eventTypeIds
@@ -3162,6 +3168,7 @@ export default function EventFormPage({
                     <AppSelect
                       label="Event Type"
                       placeholder="Select EventType"
+                      disabled={isEdit}
                       value={form.eventTypeId}
                       onChange={(e) => handleTypeChange(e.target.value)}
                       onBlur={() => {
@@ -3169,7 +3176,7 @@ export default function EventFormPage({
                           setErrors((p) => ({ ...p, eventTypeId: "This field is required" }));
                         }
                       }}
-                      clearable
+                      clearable={!isEdit}
                       options={typeOptions}
                       error={!!errors.eventTypeId}
                       helperText={errors.eventTypeId}
