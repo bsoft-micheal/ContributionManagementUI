@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { Snackbar, Alert, AlertTitle, Slide, Box, Typography } from "@mui/material";
 
 const ToastContext = createContext();
@@ -108,13 +108,13 @@ export const useAppToast = () => {
   if (!context) {
     throw new Error("useAppToast must be used within a ToastProvider");
   }
-  return {
+  return useMemo(() => ({
     success: (msg) => context.showToast(msg, "success"),
     error: (msg, fallback) => context.showToast(extractErrorMessage(msg, fallback), "error"),
     warning: (msg) => context.showToast(msg, "warning"),
     warn: (msg) => context.showToast(msg, "warning"),
     info: (msg) => context.showToast(msg, "info")
-  };
+  }), [context]);
 };
 
 function SlideTransition(props) {
@@ -144,10 +144,6 @@ export const ToastProvider = ({ children }) => {
     // Global handler: Catch any unhandled promise rejections and directly show toast message
     const handleUnhandledRejection = (event) => {
       if (event.reason) {
-        // Suppress duplicate toast: rate limit 429 is already displayed as warning by apiClient
-        if (event.reason?.response?.status === 429 || event.reason?.isRateLimit) {
-          return;
-        }
         const errorMsg = extractErrorMessage(event.reason);
         if (errorMsg) {
           showToast(errorMsg, "error");
