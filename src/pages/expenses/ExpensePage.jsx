@@ -119,11 +119,14 @@ const parseExpenseDescription = (rawDesc = "") => {
     };
   }
 
+  // Strip metadata comments if present: <!-- EXTRA_EXPENSES: {...} -->
+  const strippedDesc = rawDesc.replace(/<!--\s*EXTRA_EXPENSES:\s*[\s\S]*?-->/g, "").trim();
+
   // Regex matching status note pattern:
   // e.g. "fgsdgdfs [Status Note - Verify (20 Oct 2026, 02:19 PM) by Daniel A]: ok"
   // or "fgsdgdfs\n[Status Note - Verify (20 Oct 2026, 02:19 PM) by Daniel A]: ok"
   const regex = /^(.*?)(?:[\r\n\s]*\[Status Note\s*-\s*([^\]]+)\]\s*:\s*([\s\S]*))$/s;
-  const match = rawDesc.match(regex);
+  const match = strippedDesc.match(regex);
 
   if (match) {
     const clean = (match[1] || "").trim();
@@ -138,7 +141,7 @@ const parseExpenseDescription = (rawDesc = "") => {
 
   // Fallback for marker: "--- Verification Note ---"
   const fallback = /^(.*?)(?:[\r\n\s]*---\s*Verification (?:Note|Remarks)\s*---\s*([\s\S]*))$/s;
-  const fbMatch = rawDesc.match(fallback);
+  const fbMatch = strippedDesc.match(fallback);
   if (fbMatch) {
     const clean = (fbMatch[1] || "").trim();
     const note = (fbMatch[2] || "").trim();
@@ -150,7 +153,7 @@ const parseExpenseDescription = (rawDesc = "") => {
   }
 
   return {
-    cleanDescription: rawDesc.trim() || "No description provided.",
+    cleanDescription: strippedDesc.trim() || "No description provided.",
     verifiedNote: null,
     verifiedMeta: null,
   };
@@ -311,7 +314,8 @@ export default function ExpensePage() {
       } else {
         setExpenses([]);
       }
-    } catch {
+    } catch (err) {
+      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
@@ -371,7 +375,8 @@ export default function ExpensePage() {
       }
 
       setStatusesList(cleanList);
-    } catch {
+    } catch (err) {
+      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error("Failed to load lookup data.");
     }
   };
@@ -770,6 +775,7 @@ export default function ExpensePage() {
       toast.success(TOAST_MESSAGES.EXPENSES.DELETED_SUCCESS || TOAST_MESSAGES.GENERAL.DELETED_SUCCESS);
       await fetchExpensesFromDb();
     } catch (err) {
+      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error(err, TOAST_MESSAGES.GENERAL.DELETE_FAILED);
       await fetchExpensesFromDb();
     } finally {
@@ -916,6 +922,7 @@ export default function ExpensePage() {
       setErrors({});
       await fetchExpensesFromDb();
     } catch (err) {
+      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
       if (err?.response?.status === 404 || err?.response?.status === 409) {
         setDialogOpen(false);
@@ -1018,6 +1025,7 @@ export default function ExpensePage() {
       setStatusRemarks("");
       await fetchExpensesFromDb();
     } catch (err) {
+      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
       if (err?.response?.status === 404 || err?.response?.status === 409) {
         setStatusDialogOpen(false);
@@ -1163,11 +1171,39 @@ export default function ExpensePage() {
     {
       label: "Amount",
       key: "amount",
-      render: (row) => (
-        <Typography variant="body2" fontWeight={700}>
-          {formatWholeCurrency(row.amount)}
-        </Typography>
-      ),
+      render: (row) => {
+        const hasExtra = Number(row.extraAmount) > 0;
+        return (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 0.3 }}>
+            <Typography variant="body2" fontWeight={700}>
+              {formatWholeCurrency(row.amount)}
+            </Typography>
+            {hasExtra && (
+              <Tooltip
+                title={`Budget: ${formatWholeCurrency(row.budgetAmount || 0)} | Extra: ${formatWholeCurrency(row.extraAmount)}`}
+                arrow
+              >
+                <Chip
+                  size="small"
+                  label={`+${formatWholeCurrency(row.extraAmount)} extra`}
+                  sx={{
+                    height: 18,
+                    fontSize: "0.65rem",
+                    fontWeight: 700,
+                    bgcolor: (t) =>
+                      t.palette.mode === "dark"
+                        ? "rgba(245, 158, 11, 0.18)"
+                        : "rgba(245, 158, 11, 0.12)",
+                    color: (t) => (t.palette.mode === "dark" ? "#fbbf24" : "#b45309"),
+                    border: "1px solid rgba(245, 158, 11, 0.3)",
+                    cursor: "pointer",
+                  }}
+                />
+              </Tooltip>
+            )}
+          </Box>
+        );
+      },
     },
     {
       label: "Expense Date",
@@ -1634,7 +1670,7 @@ export default function ExpensePage() {
                 </Grid>
                 <Grid size={{ xs: 6 }}>
                   <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, fontSize: "0.75rem", display: "block", mb: 0.3 }}>
-                    Amount
+                    {Number(selectedExpense.extraAmount) > 0 ? "Total Expense Amount" : "Amount"}
                   </Typography>
                   <Typography
                     variant="subtitle1"
@@ -1643,6 +1679,11 @@ export default function ExpensePage() {
                   >
                     {formatWholeCurrency(selectedExpense.amount)}
                   </Typography>
+                  {Number(selectedExpense.extraAmount) > 0 && (
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", display: "block", mt: 0.2 }}>
+                      Budget: {formatWholeCurrency(selectedExpense.budgetAmount || 0)} + Extra: {formatWholeCurrency(selectedExpense.extraAmount)}
+                    </Typography>
+                  )}
                 </Grid>
                 <Grid size={{ xs: 6 }}>
                   <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, fontSize: "0.75rem", display: "block", mb: 0.3 }}>
@@ -1652,6 +1693,73 @@ export default function ExpensePage() {
                     {formatViewDate(selectedExpense.expenseDate)}
                   </Typography>
                 </Grid>
+
+                {Number(selectedExpense.extraAmount) > 0 && (
+                  <>
+                    <Grid size={{ xs: 6 }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, fontSize: "0.75rem", display: "block", mb: 0.3 }}>
+                        Main Budget Amount
+                      </Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: "success.main", fontSize: "0.9rem" }}>
+                        {formatWholeCurrency(selectedExpense.budgetAmount || 0)}
+                      </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6 }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, fontSize: "0.75rem", display: "block", mb: 0.3 }}>
+                        Additional Expense Total
+                      </Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: "warning.main", fontSize: "0.9rem" }}>
+                        +{formatWholeCurrency(selectedExpense.extraAmount)}
+                      </Typography>
+                    </Grid>
+                  </>
+                )}
+
+                {selectedExpense.additionalExpenses && selectedExpense.additionalExpenses.length > 0 && (
+                  <Grid size={{ xs: 12 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary", fontWeight: 700, fontSize: "0.75rem", display: "block", mb: 0.5 }}
+                    >
+                      Itemized Additional Expenses ({selectedExpense.additionalExpenses.length})
+                    </Typography>
+                    <Box
+                      sx={{
+                        borderRadius: "10px",
+                        border: (t) => `1px solid ${t.palette.divider}`,
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc",
+                        p: 1.25,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.8,
+                      }}
+                    >
+                      {selectedExpense.additionalExpenses.map((extra, idx) => (
+                        <Box
+                          key={idx}
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            pb: idx === selectedExpense.additionalExpenses.length - 1 ? 0 : 0.8,
+                            borderBottom:
+                              idx === selectedExpense.additionalExpenses.length - 1
+                                ? "none"
+                                : (t) => `1px solid ${t.palette.divider}`,
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: "text.primary", fontSize: "0.82rem" }}>
+                            {extra.reason || `Additional Item #${idx + 1}`}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: "warning.main", fontSize: "0.82rem" }}>
+                            +{formatWholeCurrency(extra.amount)}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Grid>
+                )}
                 <Grid size={{ xs: 6 }}>
                   <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, fontSize: "0.75rem", display: "block", mb: 0.3 }}>
                     Submitted By
