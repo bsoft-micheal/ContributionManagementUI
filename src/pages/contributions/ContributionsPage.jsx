@@ -141,14 +141,14 @@ export default function ContributionsPage() {
   const [supportTickets, setSupportTickets] = useState([]);
 
   const [events, setEvents] = useState([]);
-  const [selectedEventId, setSelectedEventId] = useState("");
+  const [selectedEventId, setSelectedEventId] = useState("ALL");
   const [filterEventId, setFilterEventId] = useState("ALL");
   const [eventTypes, setEventTypes] = useState([]);
   const [filterEventType, setFilterEventType] = useState("ALL");
   const [appliedEventType, setAppliedEventType] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [appliedStatus, setAppliedStatus] = useState("ALL");
-  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(true);
   const [filterYear, setFilterYear] = useState(dayjs().year());
   const [appliedYear, setAppliedYear] = useState(dayjs().year());
   const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
@@ -865,145 +865,145 @@ export default function ContributionsPage() {
         });
       })
       .map((c) => {
-      const targetEvId = String(c.eventId || (selectedEventId !== "ALL" ? selectedEventId : "")).toLowerCase();
-      const targetEvName = String(c.eventName || "").trim().toLowerCase();
-      const activeEv = publishedEvList.find((e) => {
-        const eId = String(e.eventId || e.id || "").toLowerCase();
-        const eName = String(e.eventName || e.title || e.name || "").trim().toLowerCase();
-        return (targetEvId && eId === targetEvId) || (targetEvName && eName === targetEvName);
+        const targetEvId = String(c.eventId || (selectedEventId !== "ALL" ? selectedEventId : "")).toLowerCase();
+        const targetEvName = String(c.eventName || "").trim().toLowerCase();
+        const activeEv = publishedEvList.find((e) => {
+          const eId = String(e.eventId || e.id || "").toLowerCase();
+          const eName = String(e.eventName || e.title || e.name || "").trim().toLowerCase();
+          return (targetEvId && eId === targetEvId) || (targetEvName && eName === targetEvName);
+        });
+        const resolvedAmount = getMemberEventAmount(c, activeEv);
+        const currentContribution = {
+          ...c,
+          eventName: c.eventName || activeEv?.eventName || activeEv?.title || activeEv?.name || "",
+          categoryName: c.categoryName || activeEv?.eventTypeName || activeEv?.categoryName || "",
+          amount: resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0),
+        };
+
+        // Calculate Arrears: sum of unpaid contributions for this member in other events
+        const targetMemberId = String(c.memberId || c.userId || "").toLowerCase().trim();
+        const targetMemberName = String(c.memberName || "").toLowerCase().trim();
+        const targetEventId = String(c.eventId || (selectedEventId !== "ALL" ? selectedEventId : "")).toLowerCase().trim();
+
+        const previousUnpaidItems = (allList || []).filter((prev) => {
+          const prevMemberId = String(prev.memberId || prev.userId || "").toLowerCase().trim();
+          const prevMemberName = String(prev.memberName || "").toLowerCase().trim();
+          const isSameMember = (targetMemberId && prevMemberId && targetMemberId === prevMemberId) ||
+            (targetMemberName && prevMemberName && targetMemberName === prevMemberName);
+          if (!isSameMember) return false;
+
+          const prevEventId = String(prev.eventId || "").toLowerCase().trim();
+          if (!prevEventId || prevEventId === targetEventId) return false;
+
+          if (isContributionPaid(prev)) return false;
+
+          return publishedEvList.some((e) => String(e.eventId || e.id).toLowerCase().trim() === prevEventId);
+        });
+        const matchedTx = findContributionTransaction(c, txList, c.eventId || (selectedEventId !== "ALL" ? selectedEventId : ""));
+        const scope = String(c.paymentScope || c.scope || matchedTx?.notes || "").toLowerCase();
+        const isAllOutstandingScope =
+          scope.includes("alloutstanding") ||
+          scope.includes("all outstanding") ||
+          scope.includes("scope: all") ||
+          scope.includes("scope:all") ||
+          scope.includes("arrear");
+        const isCurrentEventOnly =
+          scope.includes("currentevent") ||
+          scope.includes("current event") ||
+          scope.includes("scope: current");
+
+        const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => {
+          const prevEv = (evList || []).find((e) => String(e.eventId || e.id) === String(prev.eventId));
+          const prevAmt = getMemberEventAmount(prev, prevEv);
+          return sum + (prevAmt > 0 ? prevAmt : Number(prev.amount) || 0);
+        }, 0);
+
+        const currentOutstanding = getContributionOutstanding(currentContribution, activeEv);
+        const isVerified = isContributionVerified(currentContribution, matchedTx);
+        const isRejected =
+          String(matchedTx?.status || "").toLowerCase() === "rejected" ||
+          String(c.paymentStatus || "").toLowerCase() === "rejected" ||
+          String(c.statusName || "").toLowerCase() === "rejected";
+
+        const isApproved =
+          String(matchedTx?.status || "").toLowerCase() === "approved" ||
+          String(c.paymentStatus || "").toLowerCase() === "approved" ||
+          String(c.statusName || "").toLowerCase() === "approved" ||
+          (isContributionApproved(currentContribution, matchedTx) && !isRejected);
+
+        const isPaid =
+          isContributionPaid(currentContribution, matchedTx) ||
+          hasSubmittedPayment(currentContribution, matchedTx) ||
+          c.paymentStatus === 2 ||
+          String(c.paymentStatus || "").toLowerCase() === "paid" ||
+          String(c.statusName || "").toLowerCase() === "paid" ||
+          String(c.status || "").toLowerCase() === "paid" ||
+          isVerified ||
+          isApproved;
+
+        let resolvedStatus = "Pending";
+        if (isRejected) {
+          resolvedStatus = "Rejected";
+        } else if (isApproved) {
+          resolvedStatus = "Approved";
+        } else if (isVerified) {
+          resolvedStatus = "Verified";
+        } else if (isPaid) {
+          resolvedStatus = "Paid";
+        }
+
+        // Compute raw transacted amount for this contribution
+        let rawPaidAmount = 0;
+        const cash = Number(c.cashAmount) || 0;
+        const upi = Number(c.upiAmount) || 0;
+        const allTxns = findAllContributionTransactions(c, txList, c.eventId || (selectedEventId !== "ALL" ? selectedEventId : ""));
+        const totalTxAmt = allTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+        const txAmt = totalTxAmt > 0 ? totalTxAmt : Number(matchedTx?.amount || 0);
+        const rawPaid = Number(c.paidAmount) || Number(c.totalReceivedAmount) || 0;
+        if (cash > 0 || upi > 0) {
+          rawPaidAmount = cash + upi;
+        } else if (txAmt > 0) {
+          rawPaidAmount = txAmt;
+        } else if (rawPaid > 0) {
+          rawPaidAmount = rawPaid;
+        } else if (isPaid || isRejected) {
+          rawPaidAmount = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
+        }
+
+        // For this event's contribution, the paid amount cannot exceed the event's required amount.
+        // Any excess transacted amount was paid towards previous arrears.
+        const eventTargetAmt = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
+        const paidAmount = eventTargetAmt > 0
+          ? (isPaid ? eventTargetAmt : Math.min(rawPaidAmount, eventTargetAmt))
+          : rawPaidAmount;
+        const arrearsPaidInTx = eventTargetAmt > 0 ? Math.max(0, rawPaidAmount - eventTargetAmt) : 0;
+
+        const isArrearsCleared =
+          (isAllOutstandingScope && !isCurrentEventOnly && (hasSubmittedPayment(c, matchedTx) || isContributionPaid(c))) ||
+          (arrearsPaidInTx > 0 && arrearsPaidInTx >= rawPreviousUnpaid);
+        const previousUnpaid = isArrearsCleared ? 0 : Math.max(0, rawPreviousUnpaid - arrearsPaidInTx);
+
+        return {
+          ...currentContribution,
+          paymentStatus: resolvedStatus,
+          isVerified,
+          verifiedBy: currentContribution.verifiedBy || matchedTx?.verifiedBy,
+          verifiedOn: currentContribution.verifiedOn || matchedTx?.verifiedOn,
+          auditRemarks: currentContribution.auditRemarks || matchedTx?.auditRemarks || matchedTx?.notes || currentContribution.notes,
+          notes: matchedTx?.notes || currentContribution.notes,
+          rejectionReason: isRejected
+            ? (currentContribution.rejectionReason || matchedTx?.notes || currentContribution.notes)
+            : currentContribution.rejectionReason,
+          paidAmount,
+          rawTotalPaid: rawPaidAmount,
+          arrearsPaid: arrearsPaidInTx,
+          previousUnpaid,
+          previousUnpaidItems: isArrearsCleared || previousUnpaid === 0 ? [] : previousUnpaidItems,
+          totalAccumulated: currentOutstanding + previousUnpaid,
+          screenshot: currentContribution.screenshot || matchedTx?.screenshot || (allTxns.find((t) => t.screenshot)?.screenshot) || null,
+          screenshots: currentContribution.screenshots || matchedTx?.screenshots || (allTxns.find((t) => t.screenshots)?.screenshots) || null,
+        };
       });
-      const resolvedAmount = getMemberEventAmount(c, activeEv);
-      const currentContribution = {
-        ...c,
-        eventName: c.eventName || activeEv?.eventName || activeEv?.title || activeEv?.name || "",
-        categoryName: c.categoryName || activeEv?.eventTypeName || activeEv?.categoryName || "",
-        amount: resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0),
-      };
-
-      // Calculate Arrears: sum of unpaid contributions for this member in other events
-      const targetMemberId = String(c.memberId || c.userId || "").toLowerCase().trim();
-      const targetMemberName = String(c.memberName || "").toLowerCase().trim();
-      const targetEventId = String(c.eventId || (selectedEventId !== "ALL" ? selectedEventId : "")).toLowerCase().trim();
-
-      const previousUnpaidItems = (allList || []).filter((prev) => {
-        const prevMemberId = String(prev.memberId || prev.userId || "").toLowerCase().trim();
-        const prevMemberName = String(prev.memberName || "").toLowerCase().trim();
-        const isSameMember = (targetMemberId && prevMemberId && targetMemberId === prevMemberId) ||
-                             (targetMemberName && prevMemberName && targetMemberName === prevMemberName);
-        if (!isSameMember) return false;
-
-        const prevEventId = String(prev.eventId || "").toLowerCase().trim();
-        if (!prevEventId || prevEventId === targetEventId) return false;
-
-        if (isContributionPaid(prev)) return false;
-
-        return publishedEvList.some((e) => String(e.eventId || e.id).toLowerCase().trim() === prevEventId);
-      });
-      const matchedTx = findContributionTransaction(c, txList, c.eventId || (selectedEventId !== "ALL" ? selectedEventId : ""));
-      const scope = String(c.paymentScope || c.scope || matchedTx?.notes || "").toLowerCase();
-      const isAllOutstandingScope =
-        scope.includes("alloutstanding") ||
-        scope.includes("all outstanding") ||
-        scope.includes("scope: all") ||
-        scope.includes("scope:all") ||
-        scope.includes("arrear");
-      const isCurrentEventOnly =
-        scope.includes("currentevent") ||
-        scope.includes("current event") ||
-        scope.includes("scope: current");
-
-      const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => {
-        const prevEv = (evList || []).find((e) => String(e.eventId || e.id) === String(prev.eventId));
-        const prevAmt = getMemberEventAmount(prev, prevEv);
-        return sum + (prevAmt > 0 ? prevAmt : Number(prev.amount) || 0);
-      }, 0);
-
-      const currentOutstanding = getContributionOutstanding(currentContribution, activeEv);
-      const isVerified = isContributionVerified(currentContribution, matchedTx);
-      const isRejected =
-        String(matchedTx?.status || "").toLowerCase() === "rejected" ||
-        String(c.paymentStatus || "").toLowerCase() === "rejected" ||
-        String(c.statusName || "").toLowerCase() === "rejected";
-
-      const isApproved =
-        String(matchedTx?.status || "").toLowerCase() === "approved" ||
-        String(c.paymentStatus || "").toLowerCase() === "approved" ||
-        String(c.statusName || "").toLowerCase() === "approved" ||
-        (isContributionApproved(currentContribution, matchedTx) && !isRejected);
-
-      const isPaid =
-        isContributionPaid(currentContribution, matchedTx) ||
-        hasSubmittedPayment(currentContribution, matchedTx) ||
-        c.paymentStatus === 2 ||
-        String(c.paymentStatus || "").toLowerCase() === "paid" ||
-        String(c.statusName || "").toLowerCase() === "paid" ||
-        String(c.status || "").toLowerCase() === "paid" ||
-        isVerified ||
-        isApproved;
-
-      let resolvedStatus = "Pending";
-      if (isRejected) {
-        resolvedStatus = "Rejected";
-      } else if (isApproved) {
-        resolvedStatus = "Approved";
-      } else if (isVerified) {
-        resolvedStatus = "Verified";
-      } else if (isPaid) {
-        resolvedStatus = "Paid";
-      }
-
-      // Compute raw transacted amount for this contribution
-      let rawPaidAmount = 0;
-      const cash = Number(c.cashAmount) || 0;
-      const upi = Number(c.upiAmount) || 0;
-      const allTxns = findAllContributionTransactions(c, txList, c.eventId || (selectedEventId !== "ALL" ? selectedEventId : ""));
-      const totalTxAmt = allTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-      const txAmt = totalTxAmt > 0 ? totalTxAmt : Number(matchedTx?.amount || 0);
-      const rawPaid = Number(c.paidAmount) || Number(c.totalReceivedAmount) || 0;
-      if (cash > 0 || upi > 0) {
-        rawPaidAmount = cash + upi;
-      } else if (txAmt > 0) {
-        rawPaidAmount = txAmt;
-      } else if (rawPaid > 0) {
-        rawPaidAmount = rawPaid;
-      } else if (isPaid || isRejected) {
-        rawPaidAmount = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
-      }
-
-      // For this event's contribution, the paid amount cannot exceed the event's required amount.
-      // Any excess transacted amount was paid towards previous arrears.
-      const eventTargetAmt = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
-      const paidAmount = eventTargetAmt > 0
-        ? (isPaid ? eventTargetAmt : Math.min(rawPaidAmount, eventTargetAmt))
-        : rawPaidAmount;
-      const arrearsPaidInTx = eventTargetAmt > 0 ? Math.max(0, rawPaidAmount - eventTargetAmt) : 0;
-
-      const isArrearsCleared =
-        (isAllOutstandingScope && !isCurrentEventOnly && (hasSubmittedPayment(c, matchedTx) || isContributionPaid(c))) ||
-        (arrearsPaidInTx > 0 && arrearsPaidInTx >= rawPreviousUnpaid);
-      const previousUnpaid = isArrearsCleared ? 0 : Math.max(0, rawPreviousUnpaid - arrearsPaidInTx);
-
-      return {
-        ...currentContribution,
-        paymentStatus: resolvedStatus,
-        isVerified,
-        verifiedBy: currentContribution.verifiedBy || matchedTx?.verifiedBy,
-        verifiedOn: currentContribution.verifiedOn || matchedTx?.verifiedOn,
-        auditRemarks: currentContribution.auditRemarks || matchedTx?.auditRemarks || matchedTx?.notes || currentContribution.notes,
-        notes: matchedTx?.notes || currentContribution.notes,
-        rejectionReason: isRejected
-          ? (currentContribution.rejectionReason || matchedTx?.notes || currentContribution.notes)
-          : currentContribution.rejectionReason,
-        paidAmount,
-        rawTotalPaid: rawPaidAmount,
-        arrearsPaid: arrearsPaidInTx,
-        previousUnpaid,
-        previousUnpaidItems: isArrearsCleared || previousUnpaid === 0 ? [] : previousUnpaidItems,
-        totalAccumulated: currentOutstanding + previousUnpaid,
-        screenshot: currentContribution.screenshot || matchedTx?.screenshot || (allTxns.find((t) => t.screenshot)?.screenshot) || null,
-        screenshots: currentContribution.screenshots || matchedTx?.screenshots || (allTxns.find((t) => t.screenshots)?.screenshots) || null,
-      };
-    });
 
     if (isMemberRole) {
       const userEmail = String(authState?.email || "").toLowerCase().trim();
@@ -1131,7 +1131,7 @@ export default function ContributionsPage() {
           const tMemId = String(t.userId || t.memberId || "").toLowerCase().trim();
           const tMemName = String(t.memberName || "").toLowerCase().trim();
           const isMember = (memberIdKey && tMemId && memberIdKey === tMemId) ||
-                 (memberNameKey && tMemName && memberNameKey === tMemName);
+            (memberNameKey && tMemName && memberNameKey === tMemName);
           if (!isMember) return false;
           const tEvId = String(t.eventId || "").toLowerCase().trim();
           const tEvName = String(t.eventName || "").toLowerCase().trim();
@@ -1547,8 +1547,8 @@ export default function ContributionsPage() {
     const handleUpdate = async () => {
       try {
         const [txRes, ticketsRes] = await Promise.all([
-           getPaymentTransactionsAsync().catch(() => []),
-           getSupportTicketsAsync().catch(() => []),
+          getPaymentTransactionsAsync().catch(() => []),
+          getSupportTicketsAsync().catch(() => []),
         ]);
         if (Array.isArray(txRes)) setTransactions(txRes);
         if (Array.isArray(ticketsRes)) setSupportTickets(ticketsRes);
@@ -1571,7 +1571,7 @@ export default function ContributionsPage() {
           setDbStatuses(res);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [statusModalOpen]);
 
   useEffect(() => {
@@ -1580,7 +1580,7 @@ export default function ContributionsPage() {
         .then((res) => {
           if (Array.isArray(res)) setDbStatuses(res);
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     window.addEventListener("status_updated", handleStatusUpdated);
     return () => window.removeEventListener("status_updated", handleStatusUpdated);
@@ -1929,11 +1929,10 @@ export default function ContributionsPage() {
     setFilterEventType("ALL");
     setAppliedEventType("ALL");
     setFilterEventId("ALL");
-    setSelectedEventId("");
+    setSelectedEventId("ALL");
     setFilterStatus("ALL");
     setAppliedStatus("ALL");
-    setHasAppliedFilter(false);
-    setRawContributions([]);
+    setHasAppliedFilter(true);
   };
 
   const getActualReceivedAmount = useCallback((row, matchedTx) => {
@@ -2140,7 +2139,7 @@ export default function ContributionsPage() {
         const isMatch = target.isGrouped
           ? (isSameText(c.memberId, target.memberId) || isSameText(c.memberName, target.memberName))
           : ((target.contributionId && c.contributionId === target.contributionId) ||
-             (isSameText(c.memberId, target.memberId) && isSameText(c.eventId, target.eventId)));
+            (isSameText(c.memberId, target.memberId) && isSameText(c.eventId, target.eventId)));
         if (isMatch) {
           const isApproved = String(newStatus).toLowerCase() === "approved";
           const isVerified = String(newStatus).toLowerCase() === "verified";
@@ -2360,17 +2359,17 @@ export default function ContributionsPage() {
         const verifyTooltipTitle = isApproved
           ? "Already Approved"
           : isActuallyVerified
-          ? "Already Verified"
-          : isRejected
-          ? "Authority Status Update (Payment Rejected)"
-          : !hasMemberPaid
-          ? "Payment Not Received (Verification Disabled)"
-          : "Authority Status Update";
+            ? "Already Verified"
+            : isRejected
+              ? "Authority Status Update (Payment Rejected)"
+              : !hasMemberPaid
+                ? "Payment Not Received (Verification Disabled)"
+                : "Authority Status Update";
 
         const tooltipTitle = isPaidMember
           ? (isActuallyVerified
-              ? "Payment Verified & Settled"
-              : (hasSubmitted && statusStr === "pending")
+            ? "Payment Verified & Settled"
+            : (hasSubmitted && statusStr === "pending")
               ? "Payment Proof Submitted (Pending Verification)"
               : "Payment Fully Cleared (Settled)")
           : "Submit Payment Details";
@@ -3045,9 +3044,9 @@ export default function ContributionsPage() {
             const txMode = matchedTx?.paymentMode;
             const cMode = row.paymentModeName || row.paymentMode;
             const raw = (!isGeneric(txMode) ? txMode : null) ||
-                        (!isGeneric(cMode) ? cMode : null) ||
-                        txMode ||
-                        cMode;
+              (!isGeneric(cMode) ? cMode : null) ||
+              txMode ||
+              cMode;
             const utr = row.utrNumber || row.referenceNo || matchedTx?.utr || matchedTx?.transactionRef;
             const notes = row.notes || matchedTx?.notes;
             resolvedMode = resolvePaymentMethodName(raw, utr, notes);
@@ -3135,86 +3134,103 @@ export default function ContributionsPage() {
         data={hasAppliedFilter ? contributions : []}
         emptyMessage={!hasAppliedFilter ? "Please select filters and click Filter to view contribution collections." : undefined}
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12 }} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 125, maxWidth: 145 }}>
-                <AppSelect
-                  label="Year"
-                  placeholder="Select Year"
-                  value={filterYear}
-                  onChange={(event) => {
-                    const val = event.target.value;
-                    setFilterYear(val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
-                  }}
-                  onClear={() => setFilterYear(0)}
-                  options={yearOptions}
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: 145, maxWidth: 165 }}>
-                <AppSelect
-                  label="Month"
-                  placeholder="Select Month"
-                  value={filterMonth}
-                  onChange={(event) => {
-                    const val = event.target.value;
-                    setFilterMonth(val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
-                  }}
-                  onClear={() => setFilterMonth(0)}
-                  options={monthOptions}
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: 200, maxWidth: 260 }}>
-                <AppSelect
-                  label="Event Type"
-                  placeholder="Select event type"
-                  value={filterEventType}
-                  onChange={(event) => {
-                    handleEventTypeChange(event.target.value || "ALL");
-                  }}
-                  onClear={() => handleEventTypeChange("ALL")}
-                  options={eventTypeOptions}
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: 260, maxWidth: 360 }}>
-                <AppSelect
-                  label="Event"
-                  placeholder="Select an event"
-                  value={filterEventId}
-                  onChange={(event) => {
-                    setFilterEventId(event.target.value || "ALL");
-                  }}
-                  onClear={() => setFilterEventId("ALL")}
-                  options={eventOptions}
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: 180, maxWidth: 240 }}>
-                <AppSelect
-                  label="Status"
-                  placeholder="Select status"
-                  value={filterStatus}
-                  onChange={(event) => {
-                    setFilterStatus(event.target.value || "ALL");
-                  }}
-                  onClear={() => setFilterStatus("ALL")}
-                  options={filterStatusOptions}
-                  fullWidth
-                />
-              </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 1.25,
+              width: "100%",
+            }}
+          >
+            <Box sx={{ width: { xs: "100%", sm: 125, md: 135 } }}>
+              <AppSelect
+                label="Year"
+                placeholder="Select Year"
+                value={filterYear}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  setFilterYear(val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
+                }}
+                onClear={() => setFilterYear(0)}
+                options={yearOptions}
+                size="small"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 145, md: 155 } }}>
+              <AppSelect
+                label="Month"
+                placeholder="Select Month"
+                value={filterMonth}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  setFilterMonth(val === "" || val === null || isNaN(Number(val)) ? 0 : Number(val));
+                }}
+                onClear={() => setFilterMonth(0)}
+                options={monthOptions}
+                size="small"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+              <AppSelect
+                label="Event Type"
+                placeholder="Select event type"
+                value={filterEventType}
+                onChange={(event) => {
+                  handleEventTypeChange(event.target.value || "ALL");
+                }}
+                onClear={() => handleEventTypeChange("ALL")}
+                options={eventTypeOptions}
+                size="small"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 200, md: 230 } }}>
+              <AppSelect
+                label="Event"
+                placeholder="Select an event"
+                value={filterEventId}
+                onChange={(event) => {
+                  setFilterEventId(event.target.value || "ALL");
+                }}
+                onClear={() => setFilterEventId("ALL")}
+                options={eventOptions}
+                size="small"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+              <AppSelect
+                label="Status"
+                placeholder="Select status"
+                value={filterStatus}
+                onChange={(event) => {
+                  setFilterStatus(event.target.value || "ALL");
+                }}
+                onClear={() => setFilterStatus("ALL")}
+                options={filterStatusOptions}
+                size="small"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
               <AppButton
                 variant="contained"
                 size="small"
-                startIcon={<FilterListIcon />}
+                startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
                 onClick={handleApplyFilter}
                 sx={{
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                  border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
                 }}
               >
                 Filter
@@ -3227,10 +3243,11 @@ export default function ContributionsPage() {
                   color: "#ef4444",
                   borderColor: "rgba(239, 68, 68, 0.4)",
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
                   "&:hover": {
                     borderColor: "#ef4444",
                     bgcolor: "rgba(239, 68, 68, 0.05)",
@@ -3239,8 +3256,8 @@ export default function ContributionsPage() {
               >
                 Clear Filter
               </AppButton>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         }
       />
 
@@ -3505,8 +3522,8 @@ export default function ContributionsPage() {
                   {isUploaded
                     ? `Uploaded Custom QR (${formatWholeCurrency(targetAmount)})`
                     : isSplitMode
-                    ? `Dynamic UPI QR (Split UPI Portion: ${formatWholeCurrency(targetAmount)})`
-                    : `Dynamic UPI Payment QR (${formatWholeCurrency(targetAmount)})`}
+                      ? `Dynamic UPI QR (Split UPI Portion: ${formatWholeCurrency(targetAmount)})`
+                      : `Dynamic UPI Payment QR (${formatWholeCurrency(targetAmount)})`}
                 </Typography>
                 <Box
                   component="img"
@@ -3735,13 +3752,13 @@ export default function ContributionsPage() {
                 const resolvedEventType = statusModalRow.isGrouped
                   ? "All Event Types"
                   : (statusModalRow?.eventTypeName ||
-                     statusModalRow?.eventType ||
-                     statusModalRow?.categoryName ||
-                     statusModalRow?.eventCategory ||
-                     (events.find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId)))?.eventTypeName ||
-                     (events.find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId)))?.categoryName ||
-                     (events.find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId)))?.category ||
-                     "--");
+                    statusModalRow?.eventType ||
+                    statusModalRow?.categoryName ||
+                    statusModalRow?.eventCategory ||
+                    (events.find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId)))?.eventTypeName ||
+                    (events.find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId)))?.categoryName ||
+                    (events.find((e) => String(e.eventId || e.id) === String(statusModalRow?.eventId)))?.category ||
+                    "--");
 
                 // Parse structured splits or breakdown
                 let splitsList = [];
@@ -4196,7 +4213,7 @@ export default function ContributionsPage() {
                                   Event Payment Breakdown:
                                 </Typography>
                                 {eventBreakdownItems.map((itemStr, idx) => (
-                                   <Typography key={idx} variant="caption" sx={{ display: "block", fontSize: "0.72rem", py: 0.1 }}>
+                                  <Typography key={idx} variant="caption" sx={{ display: "block", fontSize: "0.72rem", py: 0.1 }}>
                                     • {itemStr}
                                   </Typography>
                                 ))}
@@ -4425,7 +4442,7 @@ export default function ContributionsPage() {
           try {
             const ticketsRes = await getSupportTicketsAsync();
             if (Array.isArray(ticketsRes)) setSupportTickets(ticketsRes);
-          } catch {}
+          } catch { }
           window.dispatchEvent(new CustomEvent("contribution_updated"));
         }}
       />

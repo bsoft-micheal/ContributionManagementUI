@@ -1210,68 +1210,75 @@ export default function UsersPage() {
           </Stack>
         }
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid
-              size={{ xs: 12, md: 8 }}
-              sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
-            >
-              {/* Role filter */}
-              <Box sx={{ minWidth: 180 }}>
-                <AppSelect
-                  label="User Role"
-                  placeholder="Select Role"
-                  value={filterRole}
-                  onChange={(e) => {
-                    setFilterRole(e.target.value || "");
-                  }}
-                  onClear={() => setFilterRole("")}
-                  options={[{ label: "All Roles", value: "" }, ...userRolesList]}
-                  size="small"
-                  fullWidth
-                />
-              </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 1.25,
+              width: "100%",
+            }}
+          >
+            {/* Role filter */}
+            <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+              <AppSelect
+                label="User Role"
+                placeholder="Select Role"
+                value={filterRole}
+                onChange={(e) => {
+                  setFilterRole(e.target.value || "");
+                }}
+                onClear={() => setFilterRole("")}
+                options={[{ label: "All Roles", value: "" }, ...userRolesList]}
+                size="small"
+                fullWidth
+              />
+            </Box>
 
-              {/* Status filter */}
-              <Box sx={{ minWidth: 160 }}>
-                <AppSelect
-                  label=" User Status"
-                  placeholder="Select Status"
-                  value={filterStatus}
-                  onChange={(e) => {
-                    setFilterStatus(e.target.value || "");
-                  }}
-                  onClear={() => setFilterStatus("")}
-                  options={[
-                    { label: "All Statuses", value: "" },
-                    { label: "Active", value: "true" },
-                    { label: "Inactive", value: "false" },
-                  ]}
-                  size="small"
-                  fullWidth
-                />
-              </Box>
+            {/* Status filter */}
+            <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+              <AppSelect
+                label="User Status"
+                placeholder="Select Status"
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value || "");
+                }}
+                onClear={() => setFilterStatus("")}
+                options={[
+                  { label: "All Statuses", value: "" },
+                  { label: "Active", value: "true" },
+                  { label: "Inactive", value: "false" },
+                ]}
+                size="small"
+                fullWidth
+              />
+            </Box>
 
-              {/* Filter button */}
+            {/* Action buttons */}
+            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
               <AppButton
                 variant="contained"
                 size="small"
-                startIcon={<FilterListIcon />}
+                startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
                 onClick={() => {
                   setAppliedRole(filterRole);
                   setAppliedStatus(filterStatus);
                 }}
                 sx={{
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                  border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
                 }}
               >
                 Filter
               </AppButton>
-
-              {/* Clear button */}
               <AppButton
                 variant="outlined"
                 size="small"
@@ -1283,22 +1290,23 @@ export default function UsersPage() {
                 }}
                 sx={{
                   color: "#ef4444",
-                  borderColor: "rgba(239,68,68,0.4)",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
                   "&:hover": {
                     borderColor: "#ef4444",
-                    bgcolor: "rgba(239,68,68,0.05)",
+                    bgcolor: "rgba(239, 68, 68, 0.05)",
                   },
                 }}
               >
                 Clear Filter
               </AppButton>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         }
       />
 

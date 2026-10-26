@@ -1535,115 +1535,124 @@ export default function SupportTicketsPage() {
           </Stack>
         }
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12 }} sx={{ display: "flex", alignItems: "flex-end", gap: 1.5, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
-                <AppSelect
-                  label="Ticket Type"
-                  value={filterType}
-                  onChange={(e) => {
-                    setFilterType(e.target.value);
-                  }}
-                  options={ticketTypeOptions}
-                  size="small"
-                  placeholder="Select Ticket Type"
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
-                <AppSelect
-                  label="Ticket Priority"
-                  value={filterPriority}
-                  onChange={(e) => {
-                    setFilterPriority(e.target.value);
-                  }}
-                  options={priorityOptions}
-                  size="small"
-                  placeholder="Select Priority"
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
-                <AppSelect
-                  label="Ticket Status"
-                  value={filterStatus}
-                  onChange={(e) => {
-                    setFilterStatus(e.target.value);
-                  }}
-                  options={statusOptions}
-                  size="small"
-                  placeholder="Select Status"
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ minWidth: { xs: "100%", sm: 160 } }}>
-                <AppSelect
-                  label="Event Name"
-                  value={filterEvent}
-                  onChange={(e) => {
-                    setFilterEvent(e.target.value);
-                  }}
-                  options={filterEventOptions}
-                  size="small"
-                  placeholder="Select Event"
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <AppButton
-                  variant="contained"
-                  size="small"
-                  startIcon={<FilterListIcon />}
-                  onClick={() => {
-                    setAppliedType(filterType);
-                    setAppliedPriority(filterPriority);
-                    setAppliedStatus(filterStatus);
-                    setAppliedEvent(filterEvent);
-                  }}
-                  sx={{
-                    height: 34,
-                    minHeight: 34,
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    px: 2,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Filter
-                </AppButton>
-                <AppButton
-                  variant="outlined"
-                  size="small"
-                  onClick={() => {
-                    setFilterType("ALL");
-                    setFilterPriority("ALL");
-                    setFilterStatus("ALL");
-                    setFilterEvent("ALL");
-                    setAppliedType("ALL");
-                    setAppliedPriority("ALL");
-                    setAppliedStatus("ALL");
-                    setAppliedEvent("ALL");
-                  }}
-                  sx={{
-                    color: "#ef4444",
-                    borderColor: "rgba(239, 68, 68, 0.4)",
-                    height: 34,
-                    minHeight: 34,
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    px: 2,
-                    whiteSpace: "nowrap",
-                    "&:hover": {
-                      borderColor: "#ef4444",
-                      bgcolor: "rgba(239, 68, 68, 0.05)",
-                    },
-                  }}
-                >
-                  Clear Filter
-                </AppButton>
-              </Box>
-            </Grid>
-          </Grid>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 1.25,
+              width: "100%",
+            }}
+          >
+            <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+              <AppSelect
+                label="Ticket Type"
+                value={filterType}
+                onChange={(e) => {
+                  setFilterType(e.target.value);
+                }}
+                options={ticketTypeOptions}
+                size="small"
+                placeholder="Select Ticket Type"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+              <AppSelect
+                label="Ticket Priority"
+                value={filterPriority}
+                onChange={(e) => {
+                  setFilterPriority(e.target.value);
+                }}
+                options={priorityOptions}
+                size="small"
+                placeholder="Select Priority"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
+              <AppSelect
+                label="Ticket Status"
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                }}
+                options={statusOptions}
+                size="small"
+                placeholder="Select Status"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 175, md: 195 } }}>
+              <AppSelect
+                label="Event Name"
+                value={filterEvent}
+                onChange={(e) => {
+                  setFilterEvent(e.target.value);
+                }}
+                options={filterEventOptions}
+                size="small"
+                placeholder="Select Event"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
+              <AppButton
+                variant="contained"
+                size="small"
+                startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
+                onClick={() => {
+                  setAppliedType(filterType);
+                  setAppliedPriority(filterPriority);
+                  setAppliedStatus(filterStatus);
+                  setAppliedEvent(filterEvent);
+                }}
+                sx={{
+                  height: 34,
+                  minHeight: 34,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                  whiteSpace: "nowrap",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                  border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                }}
+              >
+                Filter
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  setFilterType("ALL");
+                  setFilterPriority("ALL");
+                  setFilterStatus("ALL");
+                  setFilterEvent("ALL");
+                  setAppliedType("ALL");
+                  setAppliedPriority("ALL");
+                  setAppliedStatus("ALL");
+                  setAppliedEvent("ALL");
+                }}
+                sx={{
+                  color: "#ef4444",
+                  borderColor: "rgba(239, 68, 68, 0.4)",
+                  height: 34,
+                  minHeight: 34,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                  whiteSpace: "nowrap",
+                  "&:hover": {
+                    borderColor: "#ef4444",
+                    bgcolor: "rgba(239, 68, 68, 0.05)",
+                  },
+                }}
+              >
+                Clear Filter
+              </AppButton>
+            </Box>
+          </Box>
         }
       />
 
@@ -2280,7 +2289,43 @@ export default function SupportTicketsPage() {
                     lineHeight: 1.6,
                   }}
                 >
-                  {cleanResolutionNotes(selectedTicket.resolutionNotes) ? (
+                  {selectedTicket.resolutionNotesHistory && selectedTicket.resolutionNotesHistory.length > 0 ? (
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+                      {selectedTicket.resolutionNotesHistory.map((note, idx) => (
+                        <Box
+                          key={note.noteId || idx}
+                          sx={{
+                            p: 1.25,
+                            borderRadius: "8px",
+                            bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#ffffff"),
+                            border: (t) => `1px solid ${t.palette.divider}`,
+                          }}
+                        >
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                            <Typography variant="caption" fontWeight={700} color="primary.main">
+                              {note.senderName || "Admin"}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {note.createdAt ? dayjs(note.createdAt).format("DD/MM/YYYY hh:mm A") : ""}
+                            </Typography>
+                          </Box>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                              color: (t) => (t.palette.mode === "dark" ? "#86efac" : "#166534"),
+                              fontWeight: 500,
+                              fontSize: "0.85rem",
+                              lineHeight: 1.6,
+                            }}
+                          >
+                            {note.notes}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : cleanResolutionNotes(selectedTicket.resolutionNotes) ? (
                     <Box>
                       <Typography
                         variant="body2"

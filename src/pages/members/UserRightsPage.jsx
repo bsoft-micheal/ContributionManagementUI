@@ -747,8 +747,16 @@ export default function UserRightsPage() {
         searchPlaceholder="Search module, sub-module, action..."
         emptyMessage={hasNoPermissions ? "No permissions assigned. Contact your administrator for access." : "No records found."}
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 1.25,
+              width: "100%",
+            }}
+          >
+            <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
               <AppSelect
                 label="Role"
                 placeholder="Select Role"
@@ -757,10 +765,11 @@ export default function UserRightsPage() {
                 onClear={() => setFilterRoleName(roles[0]?.roleName || "Admin")}
                 options={roles.map(r => ({ label: r.roleName, value: r.roleName }))}
                 required
+                size="small"
                 fullWidth
               />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3.2 }}>
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 200, md: 220 } }}>
               <AppSelect
                 label="Module"
                 placeholder="Select Module"
@@ -769,16 +778,27 @@ export default function UserRightsPage() {
                 onClear={() => setFilterModule("All")}
                 options={moduleOptions}
                 required
+                size="small"
                 fullWidth
               />
-            </Grid>
-            <Grid size={{ xs: 12, md: 5.8 }} sx={{ display: "flex", gap: 1.2, flexWrap: "wrap", alignItems: "center", mt: { xs: 0, md: 2.2 } }}>
+            </Box>
+            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
               <AppButton
                 variant="contained"
                 size="small"
                 startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
                 onClick={handleApplyFilter}
-                sx={{ height: 34, minHeight: 34, fontWeight: 700, fontSize: "0.75rem", px: 2, borderRadius: "8px" }}
+                sx={{
+                  height: 34,
+                  minHeight: 34,
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                  whiteSpace: "nowrap",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                  border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                }}
               >
                 Filter
               </AppButton>
@@ -793,6 +813,7 @@ export default function UserRightsPage() {
                   fontSize: "0.75rem",
                   px: 2,
                   borderRadius: "8px",
+                  whiteSpace: "nowrap",
                   color: "#ef4444",
                   borderColor: "rgba(239, 68, 68, 0.4)",
                   "&:hover": { borderColor: "#ef4444", bgcolor: "rgba(239, 68, 68, 0.05)" },
@@ -824,8 +845,8 @@ export default function UserRightsPage() {
               >
                 Refresh
               </AppButton>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         }
       />
     </div>

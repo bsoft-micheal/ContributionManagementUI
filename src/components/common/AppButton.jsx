@@ -173,8 +173,8 @@ export default function AppButton({
                 ? "rgba(255, 255, 255, 0.7) !important"
                 : "#64748b !important"
               : theme.palette.mode === "dark"
-              ? "#ffffff"
-              : "#475569",
+                ? "#ffffff"
+                : "#475569",
           "&:hover": {
             border: (theme) =>
               isBtnDisabled ? undefined : `1.5px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.5)" : "#94a3b8"}`,

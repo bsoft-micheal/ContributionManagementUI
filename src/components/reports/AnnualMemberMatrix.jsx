@@ -902,6 +902,10 @@ export default function AnnualMemberMatrix({
                 fontSize: "0.78rem",
                 px: 2,
                 borderRadius: "8px",
+                whiteSpace: "nowrap",
+                bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
               }}
             >
               Filter
