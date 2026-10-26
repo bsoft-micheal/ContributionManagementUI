@@ -542,7 +542,7 @@ export default function SupportTicketsPage() {
 
   // Filtered tickets
   const filteredTickets = useMemo(() => {
-    return tickets.filter((item) => {
+    const list = tickets.filter((item) => {
       if (appliedType !== "ALL" && item.ticketType !== appliedType) return false;
       if (appliedPriority !== "ALL" && item.priority !== appliedPriority) return false;
       if (appliedStatus !== "ALL" && item.status !== appliedStatus) return false;
@@ -556,6 +556,22 @@ export default function SupportTicketsPage() {
         }
       }
       return true;
+    });
+
+    return [...list].sort((a, b) => {
+      const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || "";
+      const dateB = b.createdAt || b.CreatedAt || b.createdOn || b.CreatedOn || "";
+      const dayA = dateA ? dayjs(dateA).format("YYYY-MM-DD") : "";
+      const dayB = dateB ? dayjs(dateB).format("YYYY-MM-DD") : "";
+      if (dayA !== dayB) {
+        return dayB.localeCompare(dayA);
+      }
+      const nameA = String(a.memberName || a.name || a.subject || a.title || "").trim();
+      const nameB = String(b.memberName || b.name || b.subject || b.title || "").trim();
+      if (!nameA && !nameB) return 0;
+      if (!nameA) return 1;
+      if (!nameB) return -1;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
     });
   }, [tickets, appliedType, appliedPriority, appliedStatus, appliedEvent, location.state?.eventId]);
 
@@ -1583,7 +1599,7 @@ export default function SupportTicketsPage() {
                 fullWidth
               />
             </Box>
-            <Box sx={{ width: { xs: "100%", sm: 175, md: 195 } }}>
+            <Box sx={{ width: { xs: "100%", sm: 220, md: 250 } }}>
               <AppSelect
                 label="Event Name"
                 value={filterEvent}

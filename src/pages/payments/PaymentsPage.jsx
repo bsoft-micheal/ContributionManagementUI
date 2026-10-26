@@ -250,7 +250,7 @@ export default function PaymentsPage() {
   }, []);
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
+    const list = transactions.filter((t) => {
       if (isMemberRole) {
         const userFullName = String(authState?.fullName || authState?.user?.fullName || authState?.name || "").trim().toLowerCase();
         const userEmail = String(authState?.email || "").trim().toLowerCase();
@@ -271,6 +271,22 @@ export default function PaymentsPage() {
       if (appliedStatus !== "ALL" && t.status !== appliedStatus) return false;
       if (appliedDate && !dayjs(t.paymentDate).isSame(appliedDate, "day")) return false;
       return true;
+    });
+
+    return [...list].sort((a, b) => {
+      const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || a.paymentDate || "";
+      const dateB = b.createdAt || b.CreatedAt || b.createdOn || b.CreatedOn || b.paymentDate || "";
+      const dayA = dateA ? dayjs(dateA).format("YYYY-MM-DD") : "";
+      const dayB = dateB ? dayjs(dateB).format("YYYY-MM-DD") : "";
+      if (dayA !== dayB) {
+        return dayB.localeCompare(dayA);
+      }
+      const nameA = String(a.memberName || a.name || "").trim();
+      const nameB = String(b.memberName || b.name || "").trim();
+      if (!nameA && !nameB) return 0;
+      if (!nameA) return 1;
+      if (!nameB) return -1;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
     });
   }, [transactions, appliedMember, appliedEvent, appliedMode, appliedStatus, appliedDate, isMemberRole, authState]);
 
@@ -901,7 +917,7 @@ export default function PaymentsPage() {
                 />
               </Box>
             )}
-            <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+            <Box sx={{ width: { xs: "100%", sm: 220, md: 250 } }}>
               <AppSelect
                 label="Select Event Name"
                 value={filterEvent}

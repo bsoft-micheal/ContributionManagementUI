@@ -656,7 +656,7 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
           size="small"
         />
       </Box>
-      <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
+      <Box sx={{ width: { xs: "100%", sm: 220, md: 250 } }}>
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.EVENT_LABEL || "Event Name"}
           value={pending.eventId || "ALL"}

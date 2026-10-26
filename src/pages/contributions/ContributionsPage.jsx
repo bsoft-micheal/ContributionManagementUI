@@ -1340,6 +1340,13 @@ export default function ContributionsPage() {
           });
 
       return [...filteredGrouped].sort((a, b) => {
+        const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || "";
+        const dateB = b.createdAt || b.CreatedAt || b.createdOn || b.CreatedOn || "";
+        const dayA = dateA ? dayjs(dateA).format("YYYY-MM-DD") : "";
+        const dayB = dateB ? dayjs(dateB).format("YYYY-MM-DD") : "";
+        if (dayA !== dayB) {
+          return dayB.localeCompare(dayA);
+        }
         const nameA = String(a.memberName || a.name || "").trim();
         const nameB = String(b.memberName || b.name || "").trim();
         if (!nameA && !nameB) return 0;
@@ -1377,6 +1384,13 @@ export default function ContributionsPage() {
         });
 
     return [...filteredEnriched].sort((a, b) => {
+      const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || "";
+      const dateB = b.createdAt || b.CreatedAt || b.createdOn || b.CreatedOn || "";
+      const dayA = dateA ? dayjs(dateA).format("YYYY-MM-DD") : "";
+      const dayB = dateB ? dayjs(dateB).format("YYYY-MM-DD") : "";
+      if (dayA !== dayB) {
+        return dayB.localeCompare(dayA);
+      }
       const nameA = String(a.memberName || a.name || "").trim();
       const nameB = String(b.memberName || b.name || "").trim();
       if (!nameA && !nameB) return 0;
@@ -1934,10 +1948,9 @@ export default function ContributionsPage() {
     const filteredEvents = (filterLookupEvents || []).filter((e) => isMatchingEventType(e, filterEventType));
 
     filteredEvents.forEach((e) => {
-      const dateStr = e.eventDate ? dayjs(e.eventDate).format("DD/MM/YYYY") : "";
-      const label = dateStr ? `${e.eventName || "Unnamed Event"} (${dateStr})` : (e.eventName || "Unnamed Event");
+      const name = e.eventName || e.title || e.name || "Unnamed Event";
       list.push({
-        label,
+        label: name,
         value: String(e.eventId || e.id),
       });
     });
@@ -2831,6 +2844,7 @@ export default function ContributionsPage() {
                 sx={{
                   cursor: "help",
                   textDecoration: "underline dotted",
+                  textUnderlineOffset: "3px",
                   display: "inline-block",
                 }}
               >
@@ -2930,6 +2944,7 @@ export default function ContributionsPage() {
               sx={{
                 cursor: "help",
                 textDecoration: paidAmount > 0 ? "underline dotted" : "none",
+                textUnderlineOffset: "3px",
                 display: "inline-block",
               }}
             >
@@ -2978,6 +2993,7 @@ export default function ContributionsPage() {
                 sx={{
                   cursor: row.memberEvents && row.memberEvents.length > 1 ? "help" : "inherit",
                   textDecoration: row.memberEvents && row.memberEvents.length > 1 ? "underline dotted" : "none",
+                  textUnderlineOffset: "3px",
                 }}
               >
                 {formatWholeCurrency(totalAmount)}
@@ -3036,6 +3052,7 @@ export default function ContributionsPage() {
               sx={{
                 cursor: displayArrears > 0 ? "help" : "default",
                 textDecoration: displayArrears > 0 ? "underline dotted" : "none",
+                textUnderlineOffset: "3px",
                 display: "inline-block",
               }}
             >
@@ -3236,7 +3253,7 @@ export default function ContributionsPage() {
                 fullWidth
               />
             </Box>
-            <Box sx={{ width: { xs: "100%", sm: 200, md: 230 } }}>
+            <Box sx={{ width: { xs: "100%", sm: 220, md: 260 } }}>
               <AppSelect
                 label="Event"
                 placeholder="Select an event"
@@ -3433,7 +3450,13 @@ export default function ContributionsPage() {
                     placeholder="₹ Cash"
                     value={payment.cashAmount}
                     onChange={(e) => handleCashAmountChange(e.target.value)}
-                    restrictType="decimalonly"
+                    restrictType="numberonly"
+                    inputMode="numeric"
+                    onKeyDown={(e) => {
+                      if (e.key === "e" || e.key === "E" || e.key === "+" || e.key === "-" || e.key === ".") {
+                        e.preventDefault();
+                      }
+                    }}
                     maxLength={10}
                     error={!!errors.cashAmount}
                     helperText={errors.cashAmount}
@@ -3446,7 +3469,13 @@ export default function ContributionsPage() {
                     placeholder="₹ UPI"
                     value={payment.upiAmount}
                     onChange={(e) => handleUpiAmountChange(e.target.value)}
-                    restrictType="decimalonly"
+                    restrictType="numberonly"
+                    inputMode="numeric"
+                    onKeyDown={(e) => {
+                      if (e.key === "e" || e.key === "E" || e.key === "+" || e.key === "-" || e.key === ".") {
+                        e.preventDefault();
+                      }
+                    }}
                     maxLength={10}
                     error={!!errors.upiAmount}
                     helperText={errors.upiAmount}
@@ -3715,7 +3744,8 @@ export default function ContributionsPage() {
                       setStatusError("This field is required");
                       hasError = true;
                     }
-                    if (!auditRemarks || !String(auditRemarks).trim()) {
+                    const isRemarksMandatory = String(statusChangeValue || "").trim().toLowerCase() === "rejected";
+                    if (isRemarksMandatory && (!auditRemarks || !String(auditRemarks).trim())) {
                       setAuditRemarksError("This field is required");
                       hasError = true;
                     }
@@ -4434,19 +4464,24 @@ export default function ContributionsPage() {
                 </Grid>
               </Grid>
 
-              <AppTextArea
-                label="Audit Remarks / Notes"
-                placeholder="Enter remarks or status update notes..."
-                value={auditRemarks}
-                onChange={(e) => {
-                  setAuditRemarks(e.target.value);
-                  if (auditRemarksError) setAuditRemarksError("");
-                }}
-                rows={3}
-                required
-                error={Boolean(auditRemarksError)}
-                helperText={auditRemarksError || ""}
-              />
+              {(() => {
+                const isRemarksMandatory = String(statusChangeValue || "").trim().toLowerCase() === "rejected";
+                return (
+                  <AppTextArea
+                    label={isRemarksMandatory ? "Audit Remarks / Notes *" : "Audit Remarks / Notes"}
+                    placeholder={isRemarksMandatory ? "Enter reason for rejection (required)..." : "Enter remarks or status update notes (optional)..."}
+                    value={auditRemarks}
+                    onChange={(e) => {
+                      setAuditRemarks(e.target.value);
+                      if (auditRemarksError) setAuditRemarksError("");
+                    }}
+                    rows={3}
+                    required={isRemarksMandatory}
+                    error={Boolean(auditRemarksError)}
+                    helperText={auditRemarksError || ""}
+                  />
+                );
+              })()}
             </Paper>
           </Box>
         )}

@@ -1956,7 +1956,7 @@ export default function ReportsPage({ mode: propMode = "event" }) {
             options={eventTypeOptions}
           />
         </Box>
-        <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+        <Box sx={{ width: { xs: "100%", sm: 220, md: 250 } }}>
           <AppSelect
             label="Event"
             value={filterEvent}

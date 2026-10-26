@@ -91,7 +91,21 @@ export default function AppInput({
   };
 
   const handleKeyDown = (e) => {
+    // Prevent exponential scientific notation ('e', 'E') and plus/minus signs on numeric inputs
+    if (type === "number") {
+      if (e.key === "e" || e.key === "E" || e.key === "+" || e.key === "-") {
+        e.preventDefault();
+        return;
+      }
+    }
+
     if (restrictType === "numberonly") {
+      // For whole numbers: also block decimal point '.', plus/minus signs, and exponential notation
+      if (e.key === "." || e.key === "e" || e.key === "E" || e.key === "+" || e.key === "-") {
+        e.preventDefault();
+        return;
+      }
+
       const isControlKey =
         e.key === "Backspace" ||
         e.key === "Delete" ||
@@ -125,16 +139,73 @@ export default function AppInput({
       }
     }
 
+    if (restrictType === "alphanumeric") {
+      const isControlKey =
+        e.key === "Backspace" ||
+        e.key === "Delete" ||
+        e.key === "Tab" ||
+        e.key === "Escape" ||
+        e.key === "Enter" ||
+        e.key === "ArrowLeft" ||
+        e.key === "ArrowRight" ||
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown" ||
+        e.key === "Home" ||
+        e.key === "End" ||
+        e.ctrlKey ||
+        e.metaKey;
+
+      if (!isControlKey && !/^[A-Za-z0-9]$/.test(e.key)) {
+        e.preventDefault();
+        return;
+      }
+
+      if (maxLength && !isControlKey) {
+        const input = e.target;
+        const hasSelection =
+          input.selectionStart !== null &&
+          input.selectionEnd !== null &&
+          input.selectionStart !== input.selectionEnd;
+        if ((input.value || "").length >= Number(maxLength) && !hasSelection) {
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+
     if (props.onKeyDown) {
       props.onKeyDown(e);
     }
   };
 
   const handlePaste = (e) => {
+    if (restrictType === "alphanumeric") {
+      e.preventDefault();
+      const pasteText = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+      const clean = pasteText.replace(/[^A-Za-z0-9]/g, "");
+      const input = e.target;
+      const current = input.value || "";
+      const start = input.selectionStart ?? current.length;
+      const end = input.selectionEnd ?? current.length;
+      let nextVal = current.slice(0, start) + clean + current.slice(end);
+      if (maxLength !== undefined && maxLength !== null) {
+        nextVal = nextVal.slice(0, Number(maxLength));
+      }
+      input.value = nextVal;
+      if (onChange) {
+        onChange({
+          ...e,
+          target: input,
+        });
+      }
+      return;
+    }
+
     if (restrictType === "numberonly") {
       e.preventDefault();
       const pasteText = (e.clipboardData || window.clipboardData)?.getData("text") || "";
-      const digits = pasteText.replace(/\D/g, "");
+      const integerPart = pasteText.split(".")[0];
+      const digits = integerPart.replace(/\D/g, "");
       const input = e.target;
       const current = input.value || "";
       const start = input.selectionStart ?? current.length;

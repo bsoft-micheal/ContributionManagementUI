@@ -1557,7 +1557,7 @@ export default function ExpensePage() {
                   placeholder="Select Event Type"
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 220, md: 250 } }}>
                 <AppSelect
                   label="Event Name"
                   value={filterEvent}
