@@ -32,7 +32,7 @@ import { formatWholeCurrency, roundToWhole } from "../../utils/roundingHelper";
 import { useAppToast } from "../../components/common/AppToast";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton, { AppAddButton } from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppClearFilterButton } from "../../components/common/AppButton";
 import { MENU_FEATURE_IDS } from "../../constants";
 import { useAuth } from "../../contexts/AuthContext";
 import useAccessByLocation from "../../hooks/useAccessByLocation";
@@ -1390,7 +1390,7 @@ export default function EventsPage() {
                   placeholder="Select Event Type"
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 220, md: 250 } }}>
                 <AppSelect
                   label="Event Name"
                   value={filterEvent}
@@ -1440,27 +1440,16 @@ export default function EventsPage() {
                 >
                   Filter
                 </AppButton>
-                <AppButton
-                  variant="outlined"
-                  size="small"
-                  onClick={handleClearFilter}
-                  sx={{
-                    color: "#ef4444",
-                    borderColor: "rgba(239, 68, 68, 0.4)",
-                    height: 34,
-                    minHeight: 34,
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    px: 2,
-                    whiteSpace: "nowrap",
-                    "&:hover": {
-                      borderColor: "#ef4444",
-                      bgcolor: "rgba(239, 68, 68, 0.05)",
-                    },
+                <AppClearFilterButton
+                  filters={{
+                    year: filterYear,
+                    month: filterMonth,
+                    eventType: filterEventType,
+                    event: filterEvent,
+                    status: filterStatus,
                   }}
-                >
-                  Clear Filter
-                </AppButton>
+                  onClick={handleClearFilter}
+                />
               </Box>
             </Box>
 

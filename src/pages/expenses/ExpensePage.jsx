@@ -44,7 +44,7 @@ import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
 import AppTextArea from "../../components/common/AppTextArea";
-import AppButton, { AppAddButton, AppCancelButton, AppSaveButton } from "../../components/common/AppButton";
+import AppButton, { AppAddButton, AppCancelButton, AppSaveButton, AppClearFilterButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import MetricCard from "../../components/MetricCard";
 import AppDialog from "../../components/common/AppDialog";
@@ -1557,7 +1557,7 @@ export default function ExpensePage() {
                   placeholder="Select Event Type"
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
+              <Box sx={{ width: { xs: "100%", sm: 220, md: 250 } }}>
                 <AppSelect
                   label="Event Name"
                   value={filterEvent}
@@ -1608,9 +1608,12 @@ export default function ExpensePage() {
                 >
                   Filter
                 </AppButton>
-                <AppButton
-                  variant="outlined"
-                  size="small"
+                <AppClearFilterButton
+                  filters={{
+                    eventType: filterCategory,
+                    event: filterEvent,
+                    status: filterStatus,
+                  }}
                   onClick={() => {
                     setFilterEvent("ALL");
                     setFilterCategory("ALL");
@@ -1620,23 +1623,7 @@ export default function ExpensePage() {
                     setAppliedStatus("ALL");
                     setHasAppliedFilter(true);
                   }}
-                  sx={{
-                    color: "#ef4444",
-                    borderColor: "rgba(239, 68, 68, 0.4)",
-                    height: 34,
-                    minHeight: 34,
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    px: 2,
-                    whiteSpace: "nowrap",
-                    "&:hover": {
-                      borderColor: "#ef4444",
-                      bgcolor: "rgba(239, 68, 68, 0.05)",
-                    },
-                  }}
-                >
-                  Clear Filter
-                </AppButton>
+                />
               </Box>
             </Box>
 

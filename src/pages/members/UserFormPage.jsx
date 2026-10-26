@@ -72,6 +72,7 @@ const initialForm = {
   newPassword: "",
   confirmPassword: "",
   isActive: true,
+  isTwoFactorEnabled: false,
 };
 
 function FormSectionCard({ title, subtitle, children, sx = {} }) {
@@ -362,6 +363,7 @@ export default function UserFormPage() {
       newPassword: "",
       confirmPassword: "",
       isActive: row.isActive ?? row.IsActive ?? true,
+      isTwoFactorEnabled: Boolean(row.isTwoFactorEnabled ?? row.IsTwoFactorEnabled),
     };
 
     setForm(editFormData);
@@ -834,6 +836,7 @@ export default function UserFormPage() {
         roles: combinedRolesList,
         rolesCsv: combinedRolesList.length > 0 ? combinedRolesList.join(", ") : null,
         isActive: Boolean(form.isActive),
+        isTwoFactorEnabled: Boolean(form.isTwoFactorEnabled),
       };
 
       const shouldReqPassword =
@@ -1376,6 +1379,58 @@ export default function UserFormPage() {
                     )}
                   </>
                 )}
+
+                {/* Two-Factor Authentication (2FA) Toggle */}
+                <Grid size={{ xs: 12 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      mt: 1,
+                      pt: 1,
+                      borderTop: (theme) =>
+                        `1px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9"}`,
+                    }}
+                  >
+                    <Box
+                      onClick={() => fieldChange("isTwoFactorEnabled", !form.isTwoFactorEnabled)}
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 1,
+                        cursor: "pointer",
+                        userSelect: "none",
+                      }}
+                    >
+                      <Checkbox
+                        checked={Boolean(form.isTwoFactorEnabled)}
+                        onChange={(e) => fieldChange("isTwoFactorEnabled", e.target.checked)}
+                        size="small"
+                        sx={{
+                          p: 0,
+                          color: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(255, 255, 255, 0.4)"
+                              : "#94a3b8",
+                          "&.Mui-checked": {
+                            color: "#10b981",
+                          },
+                        }}
+                      />
+                      <Typography
+                        variant="body2"
+                        fontWeight={600}
+                        sx={{
+                          color: (theme) =>
+                            theme.palette.mode === "dark" ? "#f1f5f9" : "#1e1a2e",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        Enable Two-Factor Authentication (2FA)
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Grid>
               </Grid>
             </FormSectionCard>
           )}

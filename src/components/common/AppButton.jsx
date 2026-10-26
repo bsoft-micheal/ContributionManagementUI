@@ -6,8 +6,19 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import AppAddButton, { AddButton } from "./AppAddButton";
 import AppSaveButton, { SaveButton } from "./AppSaveButton";
 import AppCancelButton, { CancelButton } from "./AppCancelButton";
+import AppClearFilterButton, { ClearFilterButton } from "./AppClearFilterButton";
+import { hasActiveFilters } from "../../utils/filterHelper";
 
-export { AppAddButton, AddButton, AppSaveButton, SaveButton, AppCancelButton, CancelButton };
+export {
+  AppAddButton,
+  AddButton,
+  AppSaveButton,
+  SaveButton,
+  AppCancelButton,
+  CancelButton,
+  AppClearFilterButton,
+  ClearFilterButton,
+};
 
 export default function AppButton({
   children,
@@ -19,6 +30,8 @@ export default function AppButton({
   disabled,
   disabledTooltip = null,
   tooltip,
+  filters,
+  defaultFilterValues,
   ...props
 }) {
   let resolvedStartIcon = startIcon;
@@ -32,6 +45,13 @@ export default function AppButton({
   const isCancelBtn = /^cancel$/i.test(textStr) && variant === "outlined";
   const isFilterBtn = /^filter$/i.test(textStr) || /^apply filter/i.test(textStr);
   const isClearFilterBtn = /^(clear filter|clear filters)$/i.test(textStr);
+
+  let calculatedDisabled = disabled;
+  if (calculatedDisabled === undefined && filters !== undefined && isClearFilterBtn) {
+    calculatedDisabled = !hasActiveFilters(filters, defaultFilterValues);
+  }
+
+  const isBtnDisabled = Boolean(calculatedDisabled || props.disabled);
 
   // Automatically attach SaveIcon if button text is/contains "Save", "Saving...", "Update" and no startIcon is provided
   if (resolvedStartIcon === undefined && isSaveBtn) {
@@ -52,8 +72,6 @@ export default function AppButton({
   if (isClearFilterBtn || (isCancelBtn && startIcon === undefined)) {
     resolvedStartIcon = null;
   }
-
-  const isBtnDisabled = Boolean(disabled || props.disabled);
 
   const buttonElement = (
     <Button
@@ -98,12 +116,17 @@ export default function AppButton({
           px: 2,
           borderRadius: "8px",
           whiteSpace: "nowrap",
-          color: "#ef4444 !important",
-          border: "1.5px solid rgba(239, 68, 68, 0.4) !important",
+          color: isBtnDisabled
+            ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.3) !important" : "rgba(0, 0, 0, 0.28) !important")
+            : "#ef4444 !important",
+          border: isBtnDisabled
+            ? (theme) => (theme.palette.mode === "dark" ? "1.5px solid rgba(255, 255, 255, 0.12) !important" : "1.5px solid rgba(0, 0, 0, 0.14) !important")
+            : "1.5px solid rgba(239, 68, 68, 0.4) !important",
+          bgcolor: "transparent !important",
           "&:hover": {
-            border: "1.5px solid #ef4444 !important",
-            bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12) !important" : "rgba(239, 68, 68, 0.05) !important"),
-            color: "#ef4444 !important",
+            border: isBtnDisabled ? undefined : "1.5px solid #ef4444 !important",
+            bgcolor: isBtnDisabled ? undefined : (theme) => (theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12) !important" : "rgba(239, 68, 68, 0.05) !important"),
+            color: isBtnDisabled ? undefined : "#ef4444 !important",
           },
         }),
         ...(isCancelBtn && {
@@ -199,7 +222,7 @@ export default function AppButton({
   if (isBtnDisabled) {
     const tipTitle = (disabledTooltip === false || disabledTooltip === "")
       ? null
-      : (disabledTooltip || tooltip || null);
+      : (disabledTooltip || (isClearFilterBtn ? "No active filters to clear" : tooltip) || null);
     const wrappedBtn = (
       <span
         style={{

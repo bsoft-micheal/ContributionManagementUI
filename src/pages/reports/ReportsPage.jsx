@@ -16,7 +16,7 @@ import { exportSheets } from "../../utils/exportToExcel";
 import AppDataTable from "../../components/common/AppDataTable";
 import AppSelect from "../../components/common/AppSelect";
 import AppDateInput from "../../components/common/AppDateInput";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppClearFilterButton } from "../../components/common/AppButton";
 import AppPieChart from "../../components/common/AppPieChart";
 import ExecutiveFinancialBarChart from "../../components/dashboard/ExecutiveFinancialBarChart";
 import FinancialBarChart from "../../components/dashboard/FinancialBarChart";
@@ -1956,7 +1956,7 @@ export default function ReportsPage({ mode: propMode = "event" }) {
             options={eventTypeOptions}
           />
         </Box>
-        <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+        <Box sx={{ width: { xs: "100%", sm: 220, md: 250 } }}>
           <AppSelect
             label="Event"
             value={filterEvent}
@@ -2006,9 +2006,14 @@ export default function ReportsPage({ mode: propMode = "event" }) {
           >
             Filter
           </AppButton>
-          <AppButton
-            variant="outlined"
-            size="small"
+          <AppClearFilterButton
+            filters={{
+              fromDate: filterFromDate,
+              toDate: filterToDate,
+              eventType: filterEventType,
+              event: filterEvent,
+              paymentStatus: filterPaymentStatus,
+            }}
             onClick={() => {
               setFilterFromDate(null);
               setFilterToDate(null);
@@ -2025,23 +2030,7 @@ export default function ReportsPage({ mode: propMode = "event" }) {
               setHasAppliedFilter(true);
               load();
             }}
-            sx={{
-              color: "#ef4444",
-              borderColor: "rgba(239, 68, 68, 0.4)",
-              height: 34,
-              minHeight: 34,
-              fontWeight: 700,
-              fontSize: "0.75rem",
-              px: 2,
-              whiteSpace: "nowrap",
-              "&:hover": {
-                borderColor: "#ef4444",
-                bgcolor: "rgba(239, 68, 68, 0.05)",
-              },
-            }}
-          >
-            Clear Filter
-          </AppButton>
+          />
         </Box>
       </Box>
     </Stack>

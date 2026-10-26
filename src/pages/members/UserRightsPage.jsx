@@ -12,7 +12,7 @@ import {
 
 import { useAppToast } from "../../components/common/AppToast";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton, { AppSaveButton } from "../../components/common/AppButton";
+import AppButton, { AppSaveButton, AppClearFilterButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import {
   FilterList as FilterListIcon,
@@ -799,25 +799,17 @@ export default function UserRightsPage() {
               >
                 Filter
               </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
-                onClick={handleClearFilter}
-                sx={{
-                  height: 34,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  borderRadius: "8px",
-                  whiteSpace: "nowrap",
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  "&:hover": { borderColor: "#ef4444", bgcolor: "rgba(239, 68, 68, 0.05)" },
+              <AppClearFilterButton
+                filters={{
+                  role: filterRoleName,
+                  module: filterModule,
                 }}
-              >
-                Clear Filter
-              </AppButton>
+                defaultValues={{
+                  role: roles.length > 0 ? roles[0].roleName : "Admin",
+                  module: "All",
+                }}
+                onClick={handleClearFilter}
+              />
               <AppSaveButton
                 onClick={handleSave}
                 loading={saving}

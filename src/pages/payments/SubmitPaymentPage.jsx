@@ -1270,7 +1270,8 @@ export default function SubmitPaymentPage() {
                       setStatusError("This field is required");
                       hasError = true;
                     }
-                    if (!auditRemarks || !String(auditRemarks).trim()) {
+                    const isRemarksMandatory = String(statusChangeValue || "").trim().toLowerCase() === "rejected";
+                    if (isRemarksMandatory && (!auditRemarks || !String(auditRemarks).trim())) {
                       setAuditRemarksError("This field is required");
                       hasError = true;
                     }
@@ -1338,19 +1339,24 @@ export default function SubmitPaymentPage() {
                 </Grid>
               </Grid>
 
-              <AppTextArea
-                label="Audit Remarks / Notes"
-                placeholder="Enter remarks or status update notes..."
-                value={auditRemarks}
-                onChange={(e) => {
-                  setAuditRemarks(e.target.value);
-                  if (auditRemarksError) setAuditRemarksError("");
-                }}
-                rows={3}
-                required
-                error={Boolean(auditRemarksError)}
-                helperText={auditRemarksError || ""}
-              />
+              {(() => {
+                const isRemarksMandatory = String(statusChangeValue || "").trim().toLowerCase() === "rejected";
+                return (
+                  <AppTextArea
+                    label={isRemarksMandatory ? "Audit Remarks / Notes *" : "Audit Remarks / Notes"}
+                    placeholder={isRemarksMandatory ? "Enter reason for rejection (required)..." : "Enter remarks or status update notes (optional)..."}
+                    value={auditRemarks}
+                    onChange={(e) => {
+                      setAuditRemarks(e.target.value);
+                      if (auditRemarksError) setAuditRemarksError("");
+                    }}
+                    rows={3}
+                    required={isRemarksMandatory}
+                    error={Boolean(auditRemarksError)}
+                    helperText={auditRemarksError || ""}
+                  />
+                );
+              })()}
             </Paper>
           </Box>
         )}

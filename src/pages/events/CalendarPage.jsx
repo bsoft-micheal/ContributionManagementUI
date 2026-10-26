@@ -27,7 +27,7 @@ import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { formatViewDate } from "../../utils/dateHelper";
 import AppInput from "../../components/common/AppInput";
 import AppSelect from "../../components/common/AppSelect";
-import AppButton from "../../components/common/AppButton";
+import AppButton, { AppClearFilterButton } from "../../components/common/AppButton";
 import apiClient from "../../services/apiClient";
 import { getMembersAsync } from "../../services/memberService";
 import { getUsersAsync } from "../../services/userService";
@@ -1145,29 +1145,16 @@ export default function CalendarPage({ isEmbedded = false }) {
                 >
                   Filter
                 </AppButton>
-                <AppButton
-                  variant="outlined"
-                  size="small"
-                  onClick={handleClearFilter}
-                  disabled={!canView}
-                  sx={{
-                    height: 34,
-                    minHeight: 34,
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    px: 2,
-                    whiteSpace: "nowrap",
-                    borderRadius: "8px",
-                    color: "#ef4444",
-                    borderColor: "rgba(239, 68, 68, 0.4)",
-                    "&:hover": {
-                      borderColor: "#ef4444",
-                      bgcolor: "rgba(239, 68, 68, 0.05)",
-                    },
+                <AppClearFilterButton
+                  disabled={!canView ? true : undefined}
+                  filters={{
+                    year: filterYear,
+                    month: filterMonth,
+                    category: filterCategory,
+                    search: filterSearch,
                   }}
-                >
-                  Clear Filter
-                </AppButton>
+                  onClick={handleClearFilter}
+                />
               </Box>
             </Box>
           </Box>
