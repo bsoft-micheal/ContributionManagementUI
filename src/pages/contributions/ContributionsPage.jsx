@@ -474,7 +474,7 @@ export default function ContributionsPage() {
     }
 
     // 2. Individual contribution row: Transaction MUST strictly belong to this specific event
-    return tList.find((t) => {
+    const directMatch = tList.find((t) => {
       const tMemberId = t.userId || t.memberId;
       const tMemberName = t.memberName;
       const memberMatch = isSameText(targetMemberId, tMemberId) || isSameText(targetMemberName, tMemberName);
@@ -489,6 +489,25 @@ export default function ContributionsPage() {
         return isMatchingEventName(targetEventName, tEventName);
       }
       return false;
+    });
+
+    if (directMatch) return directMatch;
+
+    // Fallback: If no direct event match, find a covering multi-event / AllOutstanding transaction for this member
+    return tList.find((t) => {
+      const tMemberId = t.userId || t.memberId;
+      const tMemberName = t.memberName;
+      const memberMatch = isSameText(targetMemberId, tMemberId) || isSameText(targetMemberName, tMemberName);
+      if (!memberMatch) return false;
+
+      const notes = String(t.notes || "").toLowerCase();
+      return (
+        notes.includes("alloutstanding") ||
+        notes.includes("all outstanding") ||
+        notes.includes("scope: all") ||
+        notes.includes("scope:all") ||
+        notes.includes("arrear")
+      );
     }) || null;
   };
 
@@ -598,9 +617,17 @@ export default function ContributionsPage() {
     return String(modeRaw || "Cash").trim();
   };
 
+  const isGenericMode = (m) => {
+    if (!m || m === "-" || m === "--") return true;
+    const s = String(m).trim().toLowerCase();
+    return s === "none" || s === "upi" || s === "online" || s === "2" || s === "0";
+  };
+
   const getResolvedPaymentMode = (c, matchedTx) => {
-    const tx = matchedTx !== undefined ? matchedTx : findContributionTransaction(c);
-    const allTxns = findAllContributionTransactions(c);
+    if (!c && !matchedTx) return "";
+    const isTx = Boolean(c && (c.txnNumber || c.transactionId || c.utr !== undefined));
+    const tx = isTx ? c : (matchedTx !== undefined ? matchedTx : findContributionTransaction(c));
+    const allTxns = isTx ? [c] : findAllContributionTransactions(c);
 
     // 1. Multiple transactions or splits = Split
     if (allTxns.length > 1) {
@@ -649,11 +676,6 @@ export default function ContributionsPage() {
 
     // 5. Check raw mode — Prioritize specific transaction mode (e.g. GPay, PhonePe)
     // over generic Contribution enum values (like generic UPI/2).
-    const isGenericMode = (m) => {
-      if (!m || m === "-" || m === "--") return true;
-      const s = String(m).trim().toLowerCase();
-      return s === "none" || s === "upi" || s === "online" || s === "2" || s === "0";
-    };
 
     const txMode = String(tx?.paymentMode || "").trim();
     const cModeName = String(c?.paymentModeName || "").trim();
@@ -1140,14 +1162,13 @@ export default function ContributionsPage() {
 
         // Calculate excess payment strictly from events in this active group
         let excessPool = (row.memberEvents || []).reduce((sum, e) => sum + (e.arrearsPaid || 0), 0);
+        const validTxns = memberTxns.filter((t) => String(t.status || "").toLowerCase() !== "rejected");
+        const sourceTx =
+          validTxns.find((t) => Number(t.amount) > 0) ||
+          row.allMemberTransactions?.[0];
 
         // Allocate excessPool across unpaid / partially paid events of this member
         if (excessPool > 0) {
-          const validTxns = memberTxns.filter((t) => String(t.status || "").toLowerCase() !== "rejected");
-          const sourceTx =
-            validTxns.find((t) => Number(t.amount) > 0) ||
-            row.allMemberTransactions?.[0];
-
           row.memberEvents.forEach((ev) => {
             const needed = Number(ev.amount || 0) - Number(ev.paidAmount || 0);
             if (needed > 0 && excessPool > 0) {
@@ -1171,7 +1192,7 @@ export default function ContributionsPage() {
                 ev.isApproved = ev.isApproved || isTxApproved;
                 ev.isVerified = ev.isVerified || isTxVerified;
                 ev.paymentStatus = ev.isApproved ? "Approved" : (ev.isVerified ? "Verified" : (sourceTx?.status || "Paid"));
-                ev.paymentMode = ev.paymentMode && ev.paymentMode !== "None" && ev.paymentMode !== "-"
+                ev.paymentMode = (ev.paymentMode && !isGenericMode(ev.paymentMode))
                   ? ev.paymentMode
                   : (getResolvedPaymentMode(sourceTx) || sourceTx?.paymentMode || "");
                 ev.paymentDate = ev.paymentDate || sourceTx?.paymentDate || sourceTx?.createdOn || null;
@@ -1186,6 +1207,24 @@ export default function ContributionsPage() {
             ev.arrearsPaid = 0;
           }
         });
+
+        // Ensure paid events in this member group have their specific payment mode resolved
+        // (e.g. GPay, PhonePe, Cash rather than falling back to generic UPI)
+        const specificGroupMode = sourceTx
+          ? (getResolvedPaymentMode(sourceTx) || resolvePaymentMethodName(sourceTx.paymentMode, sourceTx.utr, sourceTx.notes))
+          : (row.memberEvents.find((e) => e.paymentMode && !isGenericMode(e.paymentMode))?.paymentMode || "");
+
+        if (specificGroupMode && !isGenericMode(specificGroupMode)) {
+          row.memberEvents.forEach((ev) => {
+            const hasPayment = ev.isPaid || (Number(ev.paidAmount) || 0) > 0;
+            if (hasPayment && isGenericMode(ev.paymentMode)) {
+              ev.paymentMode = specificGroupMode;
+              if (!ev.paymentDate && (sourceTx?.paymentDate || sourceTx?.createdOn)) {
+                ev.paymentDate = sourceTx.paymentDate || sourceTx.createdOn;
+              }
+            }
+          });
+        }
 
         // Recalculate member totals
         const totalAmount = (row.memberEvents || []).reduce((sum, e) => sum + Number(e.amount || 0), 0);
@@ -1274,77 +1313,89 @@ export default function ContributionsPage() {
         };
       });
 
-      if (!appliedStatus || appliedStatus === "ALL") return groupedList;
-      const filterLower = appliedStatus.toLowerCase();
-      return groupedList.filter((c) => {
-        const statusLower = String(c.paymentStatus || "").toLowerCase();
-        if (filterLower === "paid") {
-          return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
-        }
-        if (filterLower === "approved") {
-          return statusLower === "approved";
-        }
-        if (filterLower === "verified") {
-          return statusLower === "verified";
-        }
-        if (filterLower === "pending") {
-          return statusLower === "pending" || statusLower === "partial";
-        }
-        if (filterLower === "partial") {
-          return statusLower === "partial";
-        }
-        if (filterLower === "rejected") {
-          return statusLower === "rejected";
-        }
-        return statusLower === filterLower;
+      const filterLower = String(appliedStatus || "").toLowerCase();
+      const filteredGrouped = (!appliedStatus || appliedStatus === "ALL")
+        ? groupedList
+        : groupedList.filter((c) => {
+            const statusLower = String(c.paymentStatus || "").toLowerCase();
+            if (filterLower === "paid") {
+              return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
+            }
+            if (filterLower === "approved") {
+              return statusLower === "approved";
+            }
+            if (filterLower === "verified") {
+              return statusLower === "verified";
+            }
+            if (filterLower === "pending") {
+              return statusLower === "pending" || statusLower === "partial";
+            }
+            if (filterLower === "partial") {
+              return statusLower === "partial";
+            }
+            if (filterLower === "rejected") {
+              return statusLower === "rejected";
+            }
+            return statusLower === filterLower;
+          });
+
+      return [...filteredGrouped].sort((a, b) => {
+        const nameA = String(a.memberName || a.name || "").trim();
+        const nameB = String(b.memberName || b.name || "").trim();
+        if (!nameA && !nameB) return 0;
+        if (!nameA) return 1;
+        if (!nameB) return -1;
+        return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
       });
     }
 
-    if (!appliedStatus || appliedStatus === "ALL") return enriched;
-    const filterLower = appliedStatus.toLowerCase();
-    return enriched.filter((c) => {
-      const statusLower = String(c.paymentStatus || "").toLowerCase();
-      if (filterLower === "paid") {
-        return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
-      }
-      if (filterLower === "approved") {
-        return statusLower === "approved";
-      }
-      if (filterLower === "verified") {
-        return statusLower === "verified";
-      }
-      if (filterLower === "pending") {
-        return statusLower === "pending";
-      }
-      if (filterLower === "rejected") {
-        return (
-          statusLower === "rejected" ||
-          String(c.status || "").toLowerCase() === "rejected" ||
-          String(c.statusName || "").toLowerCase() === "rejected"
-        );
-      }
-      return statusLower === filterLower;
+    const filterLower = String(appliedStatus || "").toLowerCase();
+    const filteredEnriched = (!appliedStatus || appliedStatus === "ALL")
+      ? enriched
+      : enriched.filter((c) => {
+          const statusLower = String(c.paymentStatus || "").toLowerCase();
+          if (filterLower === "paid") {
+            return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
+          }
+          if (filterLower === "approved") {
+            return statusLower === "approved";
+          }
+          if (filterLower === "verified") {
+            return statusLower === "verified";
+          }
+          if (filterLower === "pending") {
+            return statusLower === "pending";
+          }
+          if (filterLower === "rejected") {
+            return (
+              statusLower === "rejected" ||
+              String(c.status || "").toLowerCase() === "rejected" ||
+              String(c.statusName || "").toLowerCase() === "rejected"
+            );
+          }
+          return statusLower === filterLower;
+        });
+
+    return [...filteredEnriched].sort((a, b) => {
+      const nameA = String(a.memberName || a.name || "").trim();
+      const nameB = String(b.memberName || b.name || "").trim();
+      if (!nameA && !nameB) return 0;
+      if (!nameA) return 1;
+      if (!nameB) return -1;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
     });
   }, [rawContributions, allContributions, events, transactions, appliedStatus, selectedEventId]);
 
   const filterStatusOptions = useMemo(() => {
     const list = [{ label: "All Statuses", value: "ALL" }];
-    const seen = new Set();
-    (dbStatuses || []).forEach((s) => {
-      const name = (s.statusName || s.name || "").trim();
-      if (name && !seen.has(name.toLowerCase())) {
-        seen.add(name.toLowerCase());
-        list.push({ label: name, value: name });
-      }
+    const allowed = ["Approved", "Rejected", "Pending", "Paid"];
+    allowed.forEach((statusName) => {
+      const found = (dbStatuses || []).find(
+        (s) => (s.statusName || s.name || "").trim().toLowerCase() === statusName.toLowerCase()
+      );
+      const name = found ? (found.statusName || found.name).trim() : statusName;
+      list.push({ label: name, value: name });
     });
-    if (list.length === 1) {
-      ["Paid", "Pending", "Verified", "Rejected", "Approved"].forEach((s) => {
-        if (!seen.has(s.toLowerCase())) {
-          seen.add(s.toLowerCase());
-          list.push({ label: s, value: s });
-        }
-      });
-    }
     return list;
   }, [dbStatuses]);
 
@@ -2889,7 +2940,7 @@ export default function ContributionsPage() {
       },
     },
     {
-      label: "Amount",
+      label: "Current Amount",
       key: "amount",
       align: "right",
       render: (row) => {
@@ -2951,7 +3002,7 @@ export default function ContributionsPage() {
       },
     },
     {
-      label: "Arrears",
+      label: "Previous Arrears",
       key: "previousUnpaid",
       align: "right",
       render: (row) => {
@@ -3343,7 +3394,7 @@ export default function ContributionsPage() {
           )}
 
           <AppInput
-            label="Amount"
+            label="Current Amount"
             placeholder="Fixed payment amount (₹)"
             value={payment.amount}
             onChange={(event) => handleAmountChange(event.target.value)}

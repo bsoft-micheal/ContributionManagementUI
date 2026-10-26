@@ -197,6 +197,7 @@ export default function EventsPage() {
   const hasWriteAccess = canEdit;
 
   const activeRole = authState?.role || authState?.roleName;
+  const isMember = String(activeRole || "").trim().toLowerCase() === "member";
 
   // Granular Action Permissions evaluated via MENU_FEATURE_IDS and role rights
   const canViewEvent = hasActionPermission("View Event", MENU_FEATURE_IDS.EVENT_VIEW, activeRole).canView;
@@ -323,7 +324,7 @@ export default function EventsPage() {
 
         const expAmount = Math.max(Number(e.expenseAmount || 0), eventExpenseTotal);
         const allocatedAmt = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
-        const rawBudget = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
+        const rawBudget = Number(e.totalExpectedAmount || 0) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
         // If event was funded from Amount in Hand, member collection expected is reduced by allocatedAmt
         const expectedAmt = allocatedAmt > 0 && Number(e.totalExpectedAmount || 0) <= (rawBudget - allocatedAmt)
           ? Number(e.totalExpectedAmount)
@@ -555,15 +556,18 @@ export default function EventsPage() {
 
     const totalExpected = (displayedEvents || []).reduce((sum, e) => {
       const allocated = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
-      const raw = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
-      const exp = allocated > 0 ? Math.max(0, (Number(e.baseAmount || 0) || raw) - allocated) : (Number(e.totalExpectedAmount) || Number(e.baseAmount) || 0);
+      const expAmt = Number(e.totalExpectedAmount || 0) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
+      const exp = allocated > 0 ? Math.max(0, expAmt - allocated) : expAmt;
       return sum + roundToWhole(exp);
     }, 0);
 
     const totalPending = (displayedEvents || []).reduce((sum, e) => {
+      if (isMember) {
+        return sum + roundToWhole(Number(e.pendingAmount ?? 0));
+      }
       const allocated = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
-      const raw = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
-      const exp = allocated > 0 ? Math.max(0, (Number(e.baseAmount || 0) || raw) - allocated) : (Number(e.totalExpectedAmount) || Number(e.baseAmount) || 0);
+      const expAmt = Number(e.totalExpectedAmount || 0) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
+      const exp = allocated > 0 ? Math.max(0, expAmt - allocated) : expAmt;
       const col = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
       const pen = Number(e.pendingAmount !== undefined ? e.pendingAmount : Math.max(0, exp - col));
       return sum + roundToWhole(pen);
@@ -590,8 +594,9 @@ export default function EventsPage() {
       totalAllocated,
       totalRecoveredDeficit,
       totalBalance,
+      totalEvents: (displayedEvents || []).length,
     };
-  }, [displayedEvents]);
+  }, [displayedEvents, isMember]);
 
   const handleDeleteRequest = (eventItem) => {
     const hasPaid = Boolean(
@@ -1127,79 +1132,118 @@ export default function EventsPage() {
         );
       },
     },
-
-    {
-      label: "Expected Amount",
-      key: "totalExpectedAmount",
-      align: "right",
-      exportValue: (row) => {
-        const allocated = row.useAvailableBalance ? Number(row.allocatedAmount || 0) : 0;
-        const raw = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
-        return roundToWhole(allocated > 0 ? Math.max(0, raw - allocated) : raw);
+    ...(isMember ? [
+      {
+        label: "Paid Amount",
+        key: "collectedAmount",
+        align: "right",
+        exportValue: (row) => roundToWhole(Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0)),
+        render: (row) => {
+          const val = Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0);
+          return formatWholeCurrency(val);
+        }
       },
-      render: (row) => {
-        const allocated = row.useAvailableBalance ? Number(row.allocatedAmount || 0) : 0;
-        const raw = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
-        const val = allocated > 0 ? Math.max(0, raw - allocated) : raw;
-        return (
-          <Box sx={{ textAlign: "right" }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+      {
+        label: "Unpaid Amount",
+        key: "pendingAmount",
+        align: "right",
+        exportValue: (row) => roundToWhole(Number(row.pendingAmount ?? 0)),
+        render: (row) => {
+          const val = Number(row.pendingAmount ?? 0);
+          return (
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: val > 0 ? 700 : 500,
+                color: val > 0 ? "#f43f5e" : "text.secondary",
+              }}
+            >
               {formatWholeCurrency(val)}
             </Typography>
-            {allocated > 0 && (
-              <Typography variant="caption" sx={{ color: "#16a34a", fontSize: "0.7rem", display: "block" }}>
-                (Budget: {formatWholeCurrency(raw)} - {formatWholeCurrency(allocated)} from Hand)
-              </Typography>
-            )}
-            {row.usePreviousEventBalance && row.previousEventAdjustmentType === "DeficitRecovery" && (
-              <Typography variant="caption" sx={{ color: "#d97706", fontSize: "0.7rem", display: "block" }}>
-                (Planned: {formatWholeCurrency(row.originalPlannedBudget || (row.baseAmount - (row.previousEventAdjustment || 0)))} + {formatWholeCurrency(row.previousEventAdjustment || 0)} Deficit)
-              </Typography>
-            )}
-          </Box>
-        );
-      }
-    },
-    {
-      label: "Collection Amount",
-      key: "collectedAmount",
-      align: "right",
-      exportValue: (row) => roundToWhole(Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0)),
-      render: (row) => {
-        const val = Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0);
-        return formatWholeCurrency(val);
-      }
-    },
-    {
-      label: "Extra Amount Spent",
-      key: "extraAmountSpent",
-      align: "right",
-      exportValue: (row) => {
-        const exp = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
-        const spent = Number(row.expenseAmount || 0);
-        const extra = row.extraAmountSpent !== undefined ? Number(row.extraAmountSpent) : Math.max(0, spent - exp);
-        return roundToWhole(extra);
+          );
+        }
       },
-      render: (row) => {
-        const exp = Math.max(Number(row.baseAmount || 0), Number(row.totalExpectedAmount || 0));
-        const spent = Number(row.expenseAmount || 0);
-        const extra = row.extraAmountSpent !== undefined ? Number(row.extraAmountSpent) : Math.max(0, spent - exp);
-        const isOver = extra > 0;
-        return (
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: isOver ? 700 : 500,
-              color: isOver ? "#ef4444" : "text.secondary",
-              display: "inline-block",
-              fontSize: "0.85rem",
-            }}
-          >
-            {extra > 0 ? formatWholeCurrency(extra) : "₹0"}
-          </Typography>
-        );
+      {
+        label: "Expense Amount",
+        key: "expenseAmount",
+        align: "right",
+        exportValue: (row) => roundToWhole(Number(row.expenseAmount || 0)),
+        render: (row) => formatWholeCurrency(row.expenseAmount || 0),
       },
-    },
+    ] : [
+      {
+        label: "Expected Amount",
+        key: "totalExpectedAmount",
+        align: "right",
+        exportValue: (row) => {
+          const allocated = row.useAvailableBalance ? Number(row.allocatedAmount || 0) : 0;
+          const raw = Number(row.totalExpectedAmount || 0) > 0 ? Number(row.totalExpectedAmount) : Number(row.baseAmount || 0);
+          return roundToWhole(allocated > 0 ? Math.max(0, raw - allocated) : raw);
+        },
+        render: (row) => {
+          const allocated = row.useAvailableBalance ? Number(row.allocatedAmount || 0) : 0;
+          const raw = Number(row.totalExpectedAmount || 0) > 0 ? Number(row.totalExpectedAmount) : Number(row.baseAmount || 0);
+          const val = allocated > 0 ? Math.max(0, raw - allocated) : raw;
+          return (
+            <Box sx={{ textAlign: "right" }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {formatWholeCurrency(val)}
+              </Typography>
+              {allocated > 0 && (
+                <Typography variant="caption" sx={{ color: "#16a34a", fontSize: "0.7rem", display: "block" }}>
+                  (Budget: {formatWholeCurrency(raw)} - {formatWholeCurrency(allocated)} from Hand)
+                </Typography>
+              )}
+              {row.usePreviousEventBalance && row.previousEventAdjustmentType === "DeficitRecovery" && (
+                <Typography variant="caption" sx={{ color: "#d97706", fontSize: "0.7rem", display: "block" }}>
+                  (Planned: {formatWholeCurrency(row.originalPlannedBudget || (row.baseAmount - (row.previousEventAdjustment || 0)))} + {formatWholeCurrency(row.previousEventAdjustment || 0)} Deficit)
+                </Typography>
+              )}
+            </Box>
+          );
+        }
+      },
+      {
+        label: "Collection Amount",
+        key: "collectedAmount",
+        align: "right",
+        exportValue: (row) => roundToWhole(Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0)),
+        render: (row) => {
+          const val = Number(row.collectedAmount ?? row.totalPaidAmount ?? row.paidAmount ?? 0);
+          return formatWholeCurrency(val);
+        }
+      },
+      {
+        label: "Extra Amount Spent",
+        key: "extraAmountSpent",
+        align: "right",
+        exportValue: (row) => {
+          const exp = Number(row.totalExpectedAmount || 0) > 0 ? Number(row.totalExpectedAmount) : Number(row.baseAmount || 0);
+          const spent = Number(row.expenseAmount || 0);
+          const extra = row.extraAmountSpent !== undefined ? Number(row.extraAmountSpent) : Math.max(0, spent - exp);
+          return roundToWhole(extra);
+        },
+        render: (row) => {
+          const exp = Number(row.totalExpectedAmount || 0) > 0 ? Number(row.totalExpectedAmount) : Number(row.baseAmount || 0);
+          const spent = Number(row.expenseAmount || 0);
+          const extra = row.extraAmountSpent !== undefined ? Number(row.extraAmountSpent) : Math.max(0, spent - exp);
+          const isOver = extra > 0;
+          return (
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: isOver ? 700 : 500,
+                color: isOver ? "#ef4444" : "text.secondary",
+                display: "inline-block",
+                fontSize: "0.85rem",
+              }}
+            >
+              {extra > 0 ? formatWholeCurrency(extra) : "₹0"}
+            </Typography>
+          );
+        }
+      },
+    ]),
     {
       label: "Support Tickets Raised",
       key: "supportTicketRaisedCount",
@@ -1420,7 +1464,7 @@ export default function EventsPage() {
               </Box>
             </Box>
 
-            {/* 5 Summary KPI Cards Under the Filter */}
+            {/* Summary KPI Cards Under the Filter */}
             {hasAppliedFilter && (
               <Box
                 sx={{
@@ -1428,38 +1472,65 @@ export default function EventsPage() {
                   gridTemplateColumns: {
                     xs: "1fr",
                     sm: "repeat(2, minmax(0, 1fr))",
-                    md: "repeat(3, minmax(0, 1fr))",
-                    lg: "repeat(5, minmax(0, 1fr))",
+                    md: isMember ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+                    lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))",
                   },
                   gap: 1.5,
                   pt: 0.5,
                 }}
               >
-                <MetricCard
-                  label="Expected Amount"
-                  value={formatWholeCurrency(summaryTotals.totalExpected)}
-                  accent="#6366f1"
-                />
-                <MetricCard
-                  label="Collection Amount"
-                  value={formatWholeCurrency(summaryTotals.totalCollected)}
-                  accent="#10b981"
-                />
-                <MetricCard
-                  label="Total Pending"
-                  value={formatWholeCurrency(summaryTotals.totalPending)}
-                  accent="#f43f5e"
-                />
-                <MetricCard
-                  label="Total Expenses"
-                  value={formatWholeCurrency(summaryTotals.totalExpenses)}
-                  accent="#f59e0b"
-                />
-                <MetricCard
-                  label="Amount In Hand"
-                  value={formatWholeCurrency(summaryTotals.totalBalance)}
-                  accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}
-                />
+                {isMember ? (
+                  <>
+                    <MetricCard
+                      label="Paid Amount"
+                      value={formatWholeCurrency(summaryTotals.totalCollected)}
+                      accent="#10b981"
+                    />
+                    <MetricCard
+                      label="Unpaid Amount"
+                      value={formatWholeCurrency(summaryTotals.totalPending)}
+                      accent="#f43f5e"
+                    />
+                    <MetricCard
+                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
+                      value={formatWholeCurrency(summaryTotals.totalExpenses)}
+                      accent="#f59e0b"
+                    />
+                    <MetricCard
+                      label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
+                      value={summaryTotals.totalEvents}
+                      accent="#8b5cf6"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <MetricCard
+                      label="Expected Amount"
+                      value={formatWholeCurrency(summaryTotals.totalExpected)}
+                      accent="#6366f1"
+                    />
+                    <MetricCard
+                      label="Collection Amount"
+                      value={formatWholeCurrency(summaryTotals.totalCollected)}
+                      accent="#10b981"
+                    />
+                    <MetricCard
+                      label="Total Pending"
+                      value={formatWholeCurrency(summaryTotals.totalPending)}
+                      accent="#f43f5e"
+                    />
+                    <MetricCard
+                      label="Total Expenses"
+                      value={formatWholeCurrency(summaryTotals.totalExpenses)}
+                      accent="#f59e0b"
+                    />
+                    <MetricCard
+                      label="Amount In Hand"
+                      value={formatWholeCurrency(summaryTotals.totalBalance)}
+                      accent={summaryTotals.totalBalance >= 0 ? "#06b6d4" : "#f43f5e"}
+                    />
+                  </>
+                )}
               </Box>
             )}
           </Stack>
