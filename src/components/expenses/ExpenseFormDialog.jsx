@@ -17,6 +17,7 @@ import {
   Delete as DeleteIcon,
   Close as CloseIcon,
   Image as ImageIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import AppDialog from "../common/AppDialog";
@@ -68,6 +69,7 @@ export default function ExpenseFormDialog({
   const fileInputRef = useRef(null);
 
   const [form, setForm] = useState(initialFormState);
+  const [additionalExpenses, setAdditionalExpenses] = useState([]);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
@@ -176,6 +178,7 @@ export default function ExpenseFormDialog({
   useEffect(() => {
     if (!open) {
       setForm(initialFormState);
+      setAdditionalExpenses([]);
       setErrors({});
       setSaving(false);
       setConfirmDiscardOpen(false);
@@ -185,12 +188,21 @@ export default function ExpenseFormDialog({
     if (editingExpense) {
       const cleanDesc = (editingExpense.description || "")
         .replace(/<!--[\s\S]*?-->/gi, "")
+        .replace(/\[Additional Expenses:.*?\]/gi, "")
         .trim();
+
+      const rawBudget =
+        editingExpense.budgetAmount !== undefined && editingExpense.budgetAmount !== null
+          ? String(editingExpense.budgetAmount)
+          : (editingExpense.extraAmount > 0
+              ? String(Math.max(0, Number(editingExpense.amount || 0) - Number(editingExpense.extraAmount || 0)))
+              : (editingExpense.amount !== undefined && editingExpense.amount !== null ? String(editingExpense.amount) : ""));
+
       const initialData = {
         eventId: editingExpense.eventId || "",
         eventName: editingExpense.eventName || "",
         category: editingExpense.category || "",
-        amount: editingExpense.amount !== undefined && editingExpense.amount !== null ? String(editingExpense.amount) : "",
+        amount: rawBudget,
         expenseDate: editingExpense.expenseDate ? dayjs(editingExpense.expenseDate) : dayjs(),
         description: cleanDesc === "No description provided." ? "" : cleanDesc,
         submittedBy: editingExpense.submittedBy || loggedInUserName,
@@ -198,8 +210,18 @@ export default function ExpenseFormDialog({
         attachment: editingExpense.fileData || editingExpense.fileName || "",
         attachmentName: editingExpense.fileName || "",
       };
+
+      const extras = Array.isArray(editingExpense.additionalExpenses)
+        ? editingExpense.additionalExpenses.map((it, idx) => ({
+            id: it.id || `extra-${idx}-${Date.now()}`,
+            reason: it.reason || "",
+            amount: it.amount !== undefined && it.amount !== null ? String(it.amount) : "",
+          }))
+        : [];
+
       setForm(initialData);
-      savedFormRef.current = initialData;
+      setAdditionalExpenses(extras);
+      savedFormRef.current = { ...initialData, additionalExpenses: extras };
       setErrors({});
       return;
     }
@@ -222,7 +244,8 @@ export default function ExpenseFormDialog({
         submittedBy: loggedInUserName,
       };
       setForm(initialData);
-      savedFormRef.current = initialData;
+      setAdditionalExpenses([]);
+      savedFormRef.current = { ...initialData, additionalExpenses: [] };
       setErrors({});
       return;
     }
@@ -233,7 +256,8 @@ export default function ExpenseFormDialog({
       expenseDate: dayjs(),
     };
     setForm(defaultData);
-    savedFormRef.current = defaultData;
+    setAdditionalExpenses([]);
+    savedFormRef.current = { ...defaultData, additionalExpenses: [] };
     setErrors({});
   }, [open, editingExpense, initialEvent, loggedInUserName]);
 
@@ -356,7 +380,7 @@ export default function ExpenseFormDialog({
           const isNotSame = !currentExpenseId || (ex.expenseId !== currentExpenseId && ex.id !== currentExpenseId);
           return exName === targetName && isNotSame && (ex.status || "").toLowerCase() !== "rejected";
         })
-        .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0)
+        .reduce((sum, ex) => sum + (Number(ex.budgetAmount ?? ex.amount) || 0), 0)
     );
 
     const remaining = Math.max(0, expected - spent);
@@ -364,28 +388,85 @@ export default function ExpenseFormDialog({
     return { expected, spent, remaining, extraSpent };
   }, [form.eventName, form.eventId, form.category, eventsList, existingExpenses, editingExpense, initialEvent]);
 
-  // Live budget projection based on amount entered
-  const enteredAmount = Number(form.amount) || 0;
-  const projectedTotalSpent = selectedEventBudget ? selectedEventBudget.spent + enteredAmount : 0;
-  const projectedExtraSpent = selectedEventBudget
-    ? Math.max(0, projectedTotalSpent - selectedEventBudget.expected)
-    : 0;
-  const isOverBudget =
-    selectedEventBudget !== null &&
-    selectedEventBudget.expected > 0 &&
-    enteredAmount > 0 &&
-    projectedTotalSpent > selectedEventBudget.expected;
+  // Live calculation of main budget, additional expenses, and total expense
+  const mainBudgetAmount = Number(form.amount) || 0;
+  const extraExpensesSum = useMemo(() => {
+    return roundToWhole(
+      additionalExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+    );
+  }, [additionalExpenses]);
+  const totalCalculatedExpense = roundToWhole(mainBudgetAmount + extraExpensesSum);
+
+  const isMainAmountExceedingBudget = useMemo(() => {
+    if (!selectedEventBudget || selectedEventBudget.expected <= 0) return false;
+    return mainBudgetAmount > selectedEventBudget.remaining;
+  }, [selectedEventBudget, mainBudgetAmount]);
+
+  const handleAddAdditionalExpenseRow = () => {
+    setAdditionalExpenses((prev) => [
+      ...prev,
+      {
+        id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        reason: "",
+        amount: "",
+      },
+    ]);
+  };
+
+  const handleRemoveAdditionalExpenseRow = (id) => {
+    setAdditionalExpenses((prev) => prev.filter((r) => r.id !== id));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[`extra_reason_${id}`];
+      delete next[`extra_amount_${id}`];
+      return next;
+    });
+  };
+
+  const handleAdditionalExpenseChange = (id, field, value) => {
+    setAdditionalExpenses((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        if (field === "amount") {
+          const sanitized = value.replace(/[^0-9]/g, "").slice(0, 6);
+          return { ...r, amount: sanitized };
+        }
+        return { ...r, [field]: value };
+      })
+    );
+    setErrors((prev) => {
+      const errorKey = `extra_${field}_${id}`;
+      if (prev[errorKey]) {
+        const next = { ...prev };
+        delete next[errorKey];
+        return next;
+      }
+      return prev;
+    });
+  };
 
   const isFormDirty = () => {
     const saved = savedFormRef.current;
     if (!saved) return false;
-    return (
+    const basicDirty =
       (form.eventName || "") !== (saved.eventName || "") ||
       (form.category || "") !== (saved.category || "") ||
       String(form.amount || "") !== String(saved.amount || "") ||
       (form.description || "") !== (saved.description || "") ||
-      (form.attachment || "") !== (saved.attachment || "")
-    );
+      (form.attachment || "") !== (saved.attachment || "");
+    if (basicDirty) return true;
+
+    const savedExtras = saved.additionalExpenses || [];
+    if (additionalExpenses.length !== savedExtras.length) return true;
+    for (let i = 0; i < additionalExpenses.length; i++) {
+      if (
+        additionalExpenses[i].reason !== savedExtras[i].reason ||
+        String(additionalExpenses[i].amount) !== String(savedExtras[i].amount)
+      ) {
+        return true;
+      }
+    }
+    return false;
   };
 
   const handleCloseAttempt = () => {
@@ -465,15 +546,44 @@ export default function ExpenseFormDialog({
     const newErrors = {};
     if (!form.eventName) newErrors.eventName = "This field is required";
     if (!form.category) newErrors.category = "This field is required";
-    if (
-      !form.amount ||
-      !String(form.amount).trim() ||
-      Number(form.amount) <= 0 ||
-      isNaN(Number(form.amount))
-    ) {
-      newErrors.amount = "This field is required";
-    } else if (String(form.amount).length > 6) {
-      newErrors.amount = "Amount cannot exceed 6 digits";
+
+    const numAmount = Number(form.amount) || 0;
+    const hasRemainingBudget = selectedEventBudget && selectedEventBudget.expected > 0;
+    const maxBudgetLimit = hasRemainingBudget ? selectedEventBudget.remaining : 1000000;
+
+    if (hasRemainingBudget) {
+      if (numAmount > maxBudgetLimit) {
+        newErrors.amount = `Main Budget Amount cannot exceed remaining budget (${formatWholeCurrency(maxBudgetLimit)})`;
+      } else if (numAmount === 0 && additionalExpenses.length === 0) {
+        newErrors.amount = "This field is required";
+      }
+    } else {
+      if (!form.amount || !String(form.amount).trim() || numAmount <= 0 || isNaN(numAmount)) {
+        if (additionalExpenses.length === 0) {
+          newErrors.amount = "This field is required";
+        }
+      } else if (String(form.amount).length > 6) {
+        newErrors.amount = "Amount cannot exceed 6 digits";
+      }
+    }
+
+    // Validate additional expenses
+    additionalExpenses.forEach((extra) => {
+      if (!extra.reason || !extra.reason.trim()) {
+        newErrors[`extra_reason_${extra.id}`] = "This field is required";
+      }
+      if (!extra.amount || Number(extra.amount) <= 0 || isNaN(Number(extra.amount))) {
+        newErrors[`extra_amount_${extra.id}`] = "Amount must be greater than ₹0";
+      } else if (String(extra.amount).length > 6) {
+        newErrors[`extra_amount_${extra.id}`] = "Amount cannot exceed 6 digits";
+      }
+    });
+
+    const totalExpense = roundToWhole(numAmount + extraExpensesSum);
+    if (totalExpense <= 0) {
+      if (!newErrors.amount) {
+        newErrors.amount = "Total expense amount must be greater than ₹0";
+      }
     }
 
     if (!form.expenseDate) {
@@ -505,7 +615,14 @@ export default function ExpenseFormDialog({
         eventId: matchedEv ? (matchedEv.eventId || matchedEv.id) : (form.eventId || undefined),
         eventName: form.eventName,
         category: form.category,
-        amount: Number(form.amount),
+        budgetAmount: numAmount,
+        amount: totalExpense,
+        additionalExpenses: additionalExpenses
+          .filter((r) => r.reason.trim() || Number(r.amount) > 0)
+          .map((r) => ({
+            reason: r.reason.trim(),
+            amount: Number(r.amount) || 0,
+          })),
         expenseDate: form.expenseDate ? form.expenseDate.toISOString() : new Date().toISOString(),
         status: editingExpense ? (editingExpense.status || "Pending") : (form.status || "Pending"),
         submittedBy: form.submittedBy || loggedInUserName,
@@ -521,18 +638,10 @@ export default function ExpenseFormDialog({
           ...payload,
           modifiedOn: editingExpense.modifiedOn || null,
         });
-        if (isOverBudget) {
-          toast.success(`Expense updated. Note: Exceeds expected budget by ${formatWholeCurrency(projectedExtraSpent)}`);
-        } else {
-          toast.success(TOAST_MESSAGES.EXPENSES.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
-        }
+        toast.success(TOAST_MESSAGES.EXPENSES.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
         await createExpenseAsync(payload);
-        if (isOverBudget) {
-          toast.success(`Expense added. Note: Exceeds expected budget by ${formatWholeCurrency(projectedExtraSpent)}`);
-        } else {
-          toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
-        }
+        toast.success(TOAST_MESSAGES.EXPENSES.CREATED_SUCCESS || TOAST_MESSAGES.GENERAL.CREATED_SUCCESS);
       }
 
       onClose();
@@ -540,6 +649,7 @@ export default function ExpenseFormDialog({
         await onSaved();
       }
     } catch (err) {
+      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     } finally {
       setSaving(false);
@@ -555,12 +665,12 @@ export default function ExpenseFormDialog({
         maxWidth="md"
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
-            {isOverBudget && (
+            {extraExpensesSum > 0 && (
               <Typography
                 variant="caption"
                 sx={{ color: "text.secondary", fontWeight: 700, fontSize: "0.75rem" }}
               >
-                Note: Expense exceeds budget by {formatWholeCurrency(projectedExtraSpent)}
+                Includes {formatWholeCurrency(extraExpensesSum)} in additional expenses
               </Typography>
             )}
             <AppCancelButton onClick={handleCloseAttempt} disabled={saving} />
@@ -737,8 +847,8 @@ export default function ExpenseFormDialog({
                   </Grid>
                 </Grid>
 
-                {/* Notice if projected to exceed budget or already exceeded */}
-                {isOverBudget ? (
+                {/* Notice if remaining budget is 0 or event exceeded budget */}
+                {selectedEventBudget.remaining === 0 ? (
                   <Box
                     sx={{
                       mt: 1.5,
@@ -746,9 +856,9 @@ export default function ExpenseFormDialog({
                       borderRadius: 1.5,
                       bgcolor: (t) =>
                         t.palette.mode === "dark"
-                          ? "rgba(99, 102, 241, 0.12)"
-                          : "rgba(99, 102, 241, 0.08)",
-                      border: "1px solid rgba(99, 102, 241, 0.3)",
+                          ? "rgba(239, 68, 68, 0.12)"
+                          : "rgba(239, 68, 68, 0.08)",
+                      border: "1px solid rgba(239, 68, 68, 0.3)",
                       display: "flex",
                       alignItems: "center",
                       gap: 1,
@@ -757,12 +867,12 @@ export default function ExpenseFormDialog({
                     <Typography
                       variant="caption"
                       sx={{
-                        color: (t) => (t.palette.mode === "dark" ? "#a5b4fc" : "#4338ca"),
+                        color: (t) => (t.palette.mode === "dark" ? "#fca5a5" : "#b91c1c"),
                         fontWeight: 700,
                         fontSize: "0.75rem",
                       }}
                     >
-                      Note: This expense exceeds the expected budget by {formatWholeCurrency(projectedExtraSpent)}. Total spending will be {formatWholeCurrency(projectedTotalSpent)}.
+                      Budget Limit Reached: The expected budget for this event is fully exhausted. Any additional expenses should be added using "+ Add Row" below.
                     </Typography>
                   </Box>
                 ) : selectedEventBudget.extraSpent > 0 ? (
@@ -789,7 +899,7 @@ export default function ExpenseFormDialog({
                         fontSize: "0.75rem",
                       }}
                     >
-                      Note: This event has exceeded its expected budget by {formatWholeCurrency(selectedEventBudget.extraSpent)}.
+                      Note: This event has previously recorded {formatWholeCurrency(selectedEventBudget.extraSpent)} in additional expenses.
                     </Typography>
                   </Box>
                 ) : null}
@@ -797,11 +907,15 @@ export default function ExpenseFormDialog({
             </Grid>
           )}
 
-          {/* Amount Input */}
+          {/* Main Budget Amount Input */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
-              label="Amount"
-              placeholder="₹ Enter amount"
+              label={selectedEventBudget ? "Main Budget Amount (₹)" : "Amount (₹)"}
+              placeholder={
+                selectedEventBudget && selectedEventBudget.remaining === 0
+                  ? "₹ 0 (Budget exhausted)"
+                  : "₹ Enter budget amount"
+              }
               value={form.amount}
               onChange={(e) => {
                 const raw = e.target.value;
@@ -811,22 +925,33 @@ export default function ExpenseFormDialog({
                   return;
                 }
                 if (raw.length > 6) return;
+
+                const num = Number(raw);
+                if (selectedEventBudget && num > selectedEventBudget.remaining) {
+                  setForm((c) => ({ ...c, amount: raw }));
+                  setErrors((p) => ({
+                    ...p,
+                    amount: `Cannot exceed remaining budget (${formatWholeCurrency(selectedEventBudget.remaining)}). Use "+ Add Row" below for additional expenses.`,
+                  }));
+                  return;
+                }
+
                 setForm((c) => ({ ...c, amount: raw }));
                 if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
               }}
               maxLength={6}
               inputProps={{ maxLength: 6 }}
               restrictType="numberonly"
-              error={!!errors.amount}
+              error={!!errors.amount || isMainAmountExceedingBudget}
               helperText={
                 errors.amount ||
-                (isOverBudget
-                  ? `Note: Exceeds budget by ${formatWholeCurrency(projectedExtraSpent)}`
-                  : selectedEventBudget && selectedEventBudget.expected > 0
-                  ? `Remaining Budget: ${formatWholeCurrency(Math.max(0, selectedEventBudget.expected - projectedTotalSpent))}`
+                (isMainAmountExceedingBudget
+                  ? `Exceeds remaining budget (${formatWholeCurrency(selectedEventBudget.remaining)}). Please use "+ Add Row" below.`
+                  : selectedEventBudget
+                  ? `Max allowed from budget: ${formatWholeCurrency(selectedEventBudget.remaining)}`
                   : undefined)
               }
-              required
+              required={additionalExpenses.length === 0}
             />
           </Grid>
 
@@ -1094,6 +1219,205 @@ export default function ExpenseFormDialog({
               showCount
               required
             />
+          </Grid>
+
+          {/* Additional Expenses Breakdown Section */}
+          <Grid size={{ xs: 12 }}>
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                border: (t) => `1px solid ${t.palette.divider}`,
+                bgcolor: (t) =>
+                  t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(248, 250, 252, 0.7)",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: additionalExpenses.length > 0 ? 1.5 : 0,
+                  flexWrap: "wrap",
+                  gap: 1,
+                }}
+              >
+                <Box>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 700,
+                      color: (t) => (t.palette.mode === "dark" ? "#e2e8f0" : "#334155"),
+                    }}
+                  >
+                    Additional Expenses Breakdown
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Record extra expenses exceeding the expected budget with itemized reasons and amounts.
+                  </Typography>
+                </Box>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon sx={{ fontSize: 18 }} />}
+                  onClick={handleAddAdditionalExpenseRow}
+                  sx={{
+                    borderRadius: 1.5,
+                    textTransform: "none",
+                    fontWeight: 700,
+                  }}
+                >
+                  Add Row
+                </AppButton>
+              </Box>
+
+              {additionalExpenses.length === 0 ? (
+                <Box
+                  sx={{
+                    mt: 1.5,
+                    p: 2,
+                    textAlign: "center",
+                    border: "1px dashed",
+                    borderColor: (t) =>
+                      t.palette.mode === "dark" ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
+                    borderRadius: 1.5,
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    No additional expenses added. Click <strong>+ Add Row</strong> if spending exceeds the budget or needs extra itemization.
+                  </Typography>
+                </Box>
+              ) : (
+                <Stack spacing={1.5} sx={{ mt: 1 }}>
+                  {additionalExpenses.map((extra, index) => (
+                    <Box
+                      key={extra.id || index}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 1.5,
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#ffffff",
+                        border: (t) => `1px solid ${t.palette.divider}`,
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                      }}
+                    >
+                      <Grid container spacing={1.5} alignItems="flex-start">
+                        <Grid size={{ xs: 12, sm: 6.5 }}>
+                          <AppInput
+                            label={`Reason #${index + 1}`}
+                            placeholder="e.g. Venue extension, extra supplies, emergency fuel"
+                            value={extra.reason}
+                            onChange={(e) =>
+                              handleAdditionalExpenseChange(extra.id, "reason", e.target.value)
+                            }
+                            error={Boolean(errors[`extra_reason_${extra.id}`])}
+                            helperText={errors[`extra_reason_${extra.id}`]}
+                            maxLength={100}
+                            required
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 9, sm: 4.5 }}>
+                          <AppInput
+                            label="Extra Amount (₹)"
+                            placeholder="₹ 0"
+                            value={extra.amount}
+                            onChange={(e) =>
+                              handleAdditionalExpenseChange(extra.id, "amount", e.target.value)
+                            }
+                            error={Boolean(errors[`extra_amount_${extra.id}`])}
+                            helperText={errors[`extra_amount_${extra.id}`]}
+                            maxLength={6}
+                            restrictType="numberonly"
+                            required
+                          />
+                        </Grid>
+                        <Grid
+                          size={{ xs: 3, sm: 1 }}
+                          sx={{ display: "flex", justifyContent: "center", pt: { sm: 3.5, xs: 1 } }}
+                        >
+                          <Tooltip title="Delete Row">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleRemoveAdditionalExpenseRow(extra.id)}
+                              sx={{
+                                color: "error.main",
+                                "&:hover": {
+                                  bgcolor: (t) =>
+                                    t.palette.mode === "dark"
+                                      ? "rgba(239, 68, 68, 0.15)"
+                                      : "rgba(239, 68, 68, 0.08)",
+                                },
+                              }}
+                            >
+                              <DeleteIcon sx={{ fontSize: 20 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+          </Grid>
+
+          {/* Dynamic Financial Summary Card */}
+          <Grid size={{ xs: 12 }}>
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                bgcolor: (t) =>
+                  t.palette.mode === "dark"
+                    ? "rgba(99, 102, 241, 0.1)"
+                    : "rgba(99, 102, 241, 0.05)",
+                border: (t) =>
+                  `1px solid ${
+                    t.palette.mode === "dark"
+                      ? "rgba(99, 102, 241, 0.3)"
+                      : "rgba(99, 102, 241, 0.2)"
+                  }`,
+              }}
+            >
+              <Grid container spacing={2} alignItems="center">
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    Main Budget Amount:
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {formatWholeCurrency(mainBudgetAmount)}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    (+) Additional Expenses:
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      color: extraExpensesSum > 0 ? "warning.main" : "text.primary",
+                    }}
+                  >
+                    {formatWholeCurrency(extraExpensesSum)}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    (=) Total Expense:
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      fontWeight: 800,
+                      color: (t) => (t.palette.mode === "dark" ? "#a5b4fc" : "#4338ca"),
+                    }}
+                  >
+                    {formatWholeCurrency(totalCalculatedExpense)}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
           </Grid>
         </Grid>
       </AppDialog>
