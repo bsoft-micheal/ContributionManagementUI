@@ -58,3 +58,8 @@ export const switchRoleAsync = async (data) => {
   return await postApi("/users/switchRoleAsync", data);
 };
 
+export const toggleUserTwoFactorAsync = async (id, enable) => {
+  return await putApi(`/users/toggleTwoFactorAsync/${id}`, { enable });
+};
+
+

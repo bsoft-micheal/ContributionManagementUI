@@ -29,6 +29,8 @@ import {
   Description as ExcelIcon,
   FilterList as FilterListIcon,
   SwapHoriz as SwapHorizIcon,
+  Security as SecurityIcon,
+  SecurityOutlined as SecurityOutlinedIcon,
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -64,6 +66,7 @@ import {
   updateUserAsync,
   deleteUserAsync,
   createUsersBulkAsync,
+  toggleUserTwoFactorAsync,
 } from "../../services/userService";
 import { getRolesAsync } from "../../services/roleService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
@@ -163,6 +166,8 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState(null);
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
   const [userToToggle, setUserToToggle] = useState(null);
+  const [mfaConfirmOpen, setMfaConfirmOpen] = useState(false);
+  const [userToMfaToggle, setUserToMfaToggle] = useState(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [roleSwitchDialogOpen, setRoleSwitchDialogOpen] = useState(false);
   const [selectedUserForRoleSwitch, setSelectedUserForRoleSwitch] = useState(null);
@@ -734,6 +739,32 @@ export default function UsersPage() {
     }
   }
 
+  function handleToggleMfaRequest(row) {
+    if (!canChangeUserStatus) return;
+    setUserToMfaToggle(row);
+    setMfaConfirmOpen(true);
+  }
+
+  async function handleConfirmMfaToggle() {
+    if (!userToMfaToggle) return;
+    const targetId = userToMfaToggle.userId || userToMfaToggle.id;
+    const nextStatus = !userToMfaToggle.isTwoFactorEnabled;
+    try {
+      await toggleUserTwoFactorAsync(targetId, nextStatus);
+      toast.success(
+        `Two-Factor Authentication (2FA) ${nextStatus ? "enabled" : "disabled"} successfully for ${
+          userToMfaToggle.fullName || userToMfaToggle.username || "this user"
+        }.`
+      );
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update Two-Factor Authentication setting.");
+    } finally {
+      setMfaConfirmOpen(false);
+      setUserToMfaToggle(null);
+    }
+  }
+
   // ── Excel Validation & Import ──────────────────────────────────────────────
   const validateRow = (row, rowNum, allRows) => {
     const fullName = row["name"] !== undefined && row["name"] !== null
@@ -1066,6 +1097,36 @@ export default function UsersPage() {
                 </Tooltip>
               );
             })()}
+
+            {(() => {
+              const isMfaActive = Boolean(row.isTwoFactorEnabled);
+              const mfaTooltip = canChangeUserStatus
+                ? isMfaActive
+                  ? "Two-Factor Authentication (2FA) Enabled - Click to Disable"
+                  : "Two-Factor Authentication (2FA) Disabled - Click to Enable"
+                : isMfaActive
+                  ? "Two-Factor Authentication (2FA) Enabled"
+                  : "Two-Factor Authentication (2FA) Disabled";
+
+              return (
+                <Tooltip title={mfaTooltip}>
+                  <span style={{ display: "inline-flex", cursor: !canChangeUserStatus ? "not-allowed" : "pointer" }}>
+                    <IconButton
+                      size="small"
+                      sx={{ p: 0.3 }}
+                      disabled={!canChangeUserStatus}
+                      onClick={() => handleToggleMfaRequest(row)}
+                    >
+                      {isMfaActive ? (
+                        <SecurityIcon sx={{ fontSize: "1.15rem", color: canChangeUserStatus ? "#10b981" : "#94a3b8" }} />
+                      ) : (
+                        <SecurityOutlinedIcon sx={{ fontSize: "1.15rem", color: canChangeUserStatus ? "#94a3b8" : "#cbd5e1" }} />
+                      )}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              );
+            })()}
           </Box>
         );
       },
@@ -1289,6 +1350,22 @@ export default function UsersPage() {
         onConfirm={handleConfirmStatusToggle}
         title="Confirm"
         content={`Are you sure you want to ${userToToggle?.isActive ? "deactivate" : "activate"} this user account?`}
+      />
+
+      {/* ── MFA Confirm ────────────────────────────────────────────────────── */}
+      <AppConfirmDialog
+        open={mfaConfirmOpen}
+        onClose={() => {
+          setMfaConfirmOpen(false);
+          setUserToMfaToggle(null);
+        }}
+        onConfirm={handleConfirmMfaToggle}
+        title="Confirm Two-Factor Authentication (2FA)"
+        content={`Are you sure you want to ${
+          userToMfaToggle?.isTwoFactorEnabled ? "disable" : "enable"
+        } Two-Factor Authentication (2FA) for ${
+          userToMfaToggle?.fullName || userToMfaToggle?.username || "this user"
+        }?`}
       />
 
       {/* ── Unified Excel Import ─────────────────────────────────────────── */}
