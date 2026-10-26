@@ -1125,13 +1125,23 @@ export default function EventFormPage({
   const participantsInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (!participantsInitializedRef.current && activeMembers.length > 0 && isEdit) {
-      if (form.participantIds && form.participantIds.length > 0) {
-        setSelectedParticipantIds(form.participantIds);
+    if (!participantsInitializedRef.current && activeMembers.length > 0) {
+      if (isEdit) {
+        if (form.participantIds && form.participantIds.length > 0) {
+          setSelectedParticipantIds(form.participantIds);
+          participantsInitializedRef.current = true;
+        }
+      } else {
+        const exemptIds = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+        const allEligible = activeMembers
+          .map((m) => m.memberId)
+          .filter((id) => !exemptIds.has(id));
+        setSelectedParticipantIds(allEligible);
+        setForm((prev) => ({ ...prev, participantIds: allEligible }));
         participantsInitializedRef.current = true;
       }
     }
-  }, [activeMembers, form.participantIds, isEdit]);
+  }, [activeMembers, form.participantIds, isEdit, marriageCelebrantIds, sendOffMemberIds]);
 
   // Dynamic Member & Date helpers for any selected event type without hardcoding
   const getMemberFieldLabel = (type) => {
@@ -2120,9 +2130,13 @@ export default function EventFormPage({
       updatedName = sanitizeEventName(updatedName);
     }
 
-    const initialParticipants = isEdit ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || [])) : [];
+    const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+    const allEligible = activeMembers.map((m) => m.memberId).filter((id) => !allExempt.has(id));
+    const initialParticipants = isEdit
+      ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || []))
+      : allEligible;
     if (!isEdit) {
-      setSelectedParticipantIds([]);
+      setSelectedParticipantIds(allEligible);
     }
 
     const offTotal = activeMembers.filter(
@@ -2153,7 +2167,7 @@ export default function EventFormPage({
       setOfficeMembers(offTotal);
       setWfhMembers(wfhTotal);
     } else {
-      const currParticipants = isEdit ? initialParticipants : [];
+      const currParticipants = initialParticipants;
       const pMembers = activeMembers.filter((m) => currParticipants.includes(m.memberId));
       setTotalMembers(pMembers.length);
       const offCount = pMembers.filter(
@@ -2186,7 +2200,7 @@ export default function EventFormPage({
       eventTypeIds: newTypeId ? [newTypeId] : [],
       eventName: updatedName,
       baseAmount: hasItems ? "" : (prev.baseAmount || ""),
-      participantIds: isEdit ? initialParticipants : [],
+      participantIds: initialParticipants,
     }));
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
     if (errors.baseAmount) setErrors((p) => ({ ...p, baseAmount: "" }));
@@ -2217,9 +2231,13 @@ export default function EventFormPage({
       updatedName = sanitizeEventName(updatedName);
     }
 
-    const initialParticipants = isEdit ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || [])) : [];
+    const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+    const allEligible = activeMembers.map((m) => m.memberId).filter((id) => !allExempt.has(id));
+    const initialParticipants = isEdit
+      ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || []))
+      : allEligible;
     if (!isEdit) {
-      setSelectedParticipantIds([]);
+      setSelectedParticipantIds(allEligible);
     }
 
     const offTotal = activeMembers.filter(
@@ -2250,7 +2268,7 @@ export default function EventFormPage({
       setOfficeMembers(offTotal);
       setWfhMembers(wfhTotal);
     } else {
-      const currParticipants = isEdit ? initialParticipants : [];
+      const currParticipants = initialParticipants;
       const pMembers = activeMembers.filter((m) => currParticipants.includes(m.memberId));
       setTotalMembers(pMembers.length);
       const offCount = pMembers.filter(
@@ -2269,7 +2287,7 @@ export default function EventFormPage({
       eventTypeIds: newTypeIds,
       eventName: updatedName,
       baseAmount: prev.baseAmount || "",
-      participantIds: isEdit ? initialParticipants : [],
+      participantIds: initialParticipants,
     }));
 
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
@@ -2510,16 +2528,16 @@ export default function EventFormPage({
       }
 
       if (hasMarriageSelected && marriageCelebrantIds.length === 0) {
-        newErrors.marriageCelebrantIds = "Please select at least one marriage celebrant";
+        newErrors.marriageCelebrantIds = "This field is required";
       }
       if (hasSendOffSelected && sendOffMemberIds.length === 0) {
-        newErrors.sendOffMemberIds = "Please select at least one send-off / relieving member";
+        newErrors.sendOffMemberIds = "This field is required";
       }
     }
 
     // 4. Participant validation for non-birthday events if an event type is chosen
     if (!isBirthday && (form.eventTypeId || form.eventTypeIds?.length > 0) && selectedParticipantIds.length === 0 && (!allowMultipleEvents || selectedTypes.length <= 1)) {
-      newErrors.participantIds = "Please select at least one participating member";
+      newErrors.participantIds = "This field is required";
     }
 
     // 5. Types without expense items amount validation
@@ -2653,6 +2671,10 @@ export default function EventFormPage({
 
   const handlePublishClick = () => {
     if (!validateEventForm()) return;
+    if (isEdit) {
+      executeSaveEvent(form.status || "Published");
+      return;
+    }
     setPublishConfirmOpen(true);
   };
 

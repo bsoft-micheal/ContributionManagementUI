@@ -1,5 +1,17 @@
-import { useState } from "react";
-import { MenuItem, TextField, Box, Typography, Checkbox, ListItemText } from "@mui/material";
+import { useState, useMemo } from "react";
+import {
+  MenuItem,
+  TextField,
+  Box,
+  Typography,
+  Checkbox,
+  ListItemText,
+  ListSubheader,
+  InputAdornment,
+  IconButton,
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
 import { useTheme } from "@mui/material/styles";
 
 export default function AppMultiSelect({
@@ -14,12 +26,22 @@ export default function AppMultiSelect({
   helperText = "",
   required = false,
   maxHeight = 145, // Defaults to ~5 rows of chips
+  searchable = true,
   ...props
 }) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const selectableOptions = options.filter((o) => !o.disabled);
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm.trim()) return options;
+    const term = searchTerm.toLowerCase().trim();
+    return options.filter((o) =>
+      String(o.label || "").toLowerCase().includes(term)
+    );
+  }, [options, searchTerm]);
+
+  const selectableOptions = filteredOptions.filter((o) => !o.disabled);
   const allSelected =
     selectableOptions.length > 0 &&
     selectableOptions.every((o) => (value || []).includes(o.value));
@@ -33,18 +55,15 @@ export default function AppMultiSelect({
 
     if (selectedValues.includes("select-all")) {
       if (allSelected) {
-        // Deselect all selectable options (keep any disabled selected values intact)
-        const disabledSelected = (value || []).filter((v) =>
-          options.some((o) => o.value === v && o.disabled)
-        );
-        onChange({ target: { value: disabledSelected } });
-        // Do not close when deselecting all
+        // Deselect current selectable filtered options
+        const selectableValsSet = new Set(selectableOptions.map((o) => o.value));
+        const remaining = (value || []).filter((v) => !selectableValsSet.has(v));
+        onChange({ target: { value: remaining } });
       } else {
-        // Select all selectable options
+        // Select all selectable filtered options
         const selectableVals = selectableOptions.map((o) => o.value);
         const merged = Array.from(new Set([...(value || []), ...selectableVals]));
         onChange({ target: { value: merged } });
-        setOpen(false); // Close when choosing Select All
       }
     } else {
       onChange(event);
@@ -96,10 +115,21 @@ export default function AppMultiSelect({
           multiple: true,
           open: open,
           onOpen: () => setOpen(true),
-          onClose: () => setOpen(false),
+          onClose: () => {
+            setOpen(false);
+            setSearchTerm("");
+          },
           MenuProps: {
             autoFocus: false,
             disableAutoFocusItem: true,
+            PaperProps: {
+              sx: {
+                maxHeight: 380,
+                "& .MuiList-root": {
+                  pt: 0,
+                },
+              },
+            },
           },
           renderValue: (selected) => {
             if (!selected || selected.length === 0) {
@@ -289,7 +319,67 @@ export default function AppMultiSelect({
         helperText={helperText}
         {...props}
       >
-        {options.length > 0 && (
+        {searchable && (
+          <ListSubheader
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              p: 1,
+              bgcolor: (theme) =>
+                theme.palette.mode === "dark" ? "#1e293b" : "#ffffff",
+              position: "sticky",
+              top: 0,
+              zIndex: 10,
+              lineHeight: "normal",
+            }}
+          >
+            <TextField
+              size="small"
+              placeholder="Search members..."
+              fullWidth
+              autoFocus
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSearchTerm("");
+                      }}
+                      sx={{ p: 0.2 }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
+              }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  fontSize: "0.82rem",
+                  borderRadius: "6px",
+                  height: 34,
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "#f8fafc",
+                },
+              }}
+            />
+          </ListSubheader>
+        )}
+
+        {selectableOptions.length > 0 && (
           <MenuItem
             key="select-all"
             value="select-all"
@@ -313,33 +403,40 @@ export default function AppMultiSelect({
             />
           </MenuItem>
         )}
-        {options.map((option) => {
-          const isChecked = (value || []).includes(option.value);
-          return (
-            <MenuItem
-              key={option.value}
-              value={option.value}
-              disabled={Boolean(option.disabled)}
-              sx={{ fontSize: "0.85rem", py: 0.5 }}
-            >
-              <Checkbox
-                checked={isChecked}
-                size="small"
-                sx={{
-                  pointerEvents: "none",
-                  color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.4)" : "rgba(74, 63, 107, 0.4)",
-                  "&.Mui-checked": {
-                    color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
-                  },
-                }}
-              />
-              <ListItemText
-                primary={option.label}
-                primaryTypographyProps={{ fontSize: "0.85rem" }}
-              />
-            </MenuItem>
-          );
-        })}
+
+        {filteredOptions.length === 0 ? (
+          <MenuItem disabled sx={{ fontSize: "0.85rem", fontStyle: "italic", justifyContent: "center", py: 1.5 }}>
+            No matching members found
+          </MenuItem>
+        ) : (
+          filteredOptions.map((option) => {
+            const isChecked = (value || []).includes(option.value);
+            return (
+              <MenuItem
+                key={option.value}
+                value={option.value}
+                disabled={Boolean(option.disabled)}
+                sx={{ fontSize: "0.85rem", py: 0.5 }}
+              >
+                <Checkbox
+                  checked={isChecked}
+                  size="small"
+                  sx={{
+                    pointerEvents: "none",
+                    color: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.4)" : "rgba(74, 63, 107, 0.4)",
+                    "&.Mui-checked": {
+                      color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                    },
+                  }}
+                />
+                <ListItemText
+                  primary={option.label}
+                  primaryTypographyProps={{ fontSize: "0.85rem" }}
+                />
+              </MenuItem>
+            );
+          })
+        )}
       </TextField>
     </Box>
   );
