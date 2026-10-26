@@ -3390,6 +3390,7 @@ export default function EventFormPage({
                               onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
                               options={getMemberCelebrantOptionsForType(type)}
                               maxHeight={145}
+                              showSelectAll={false}
                               required
                               error={!!errors[`members_${typeId}`]}
                               helperText={
@@ -3533,7 +3534,7 @@ export default function EventFormPage({
                     )}
 
                     {hasMarriageSelected && (
-                      <>
+                      <React.Fragment key="marriage-celebrants-section">
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
                             label="Marriage Celebrants"
@@ -3542,6 +3543,7 @@ export default function EventFormPage({
                             onChange={handleMarriageCelebrantsChange}
                             options={getMemberCelebrantOptionsForType(marriageTypeObj || "marriage")}
                             maxHeight={145}
+                            showSelectAll={false}
                             required
                             error={!!errors.marriageCelebrantIds}
                             helperText={
@@ -3579,11 +3581,11 @@ export default function EventFormPage({
                               </Grid>
                             );
                           })}
-                      </>
+                      </React.Fragment>
                     )}
 
                     {hasSendOffSelected && (
-                      <>
+                      <React.Fragment key="sendoff-members-section">
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
                             label="Send-off / Relieving Members"
@@ -3592,6 +3594,7 @@ export default function EventFormPage({
                             onChange={handleSendOffMembersChange}
                             options={getMemberCelebrantOptionsForType(sendOffTypeObj || "sendoff")}
                             maxHeight={145}
+                            showSelectAll={false}
                             required
                             error={!!errors.sendOffMemberIds}
                             helperText={
@@ -3629,7 +3632,7 @@ export default function EventFormPage({
                               </Grid>
                             );
                           })}
-                      </>
+                      </React.Fragment>
                     )}
 
                     {/* Any other custom non-birthday event type (dynamic, not hardcoded) */}
@@ -3651,6 +3654,7 @@ export default function EventFormPage({
                                 onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
                                 options={getMemberCelebrantOptionsForType(type)}
                                 maxHeight={145}
+                                showSelectAll={false}
                                 required
                                 error={!!errors[`members_${typeId}`]}
                                 helperText={
@@ -3703,6 +3707,7 @@ export default function EventFormPage({
                           }}
                           options={memberOptions}
                           maxHeight={145}
+                          showSelectAll={true}
                           required
                           error={!!errors.participantIds}
                           helperText={errors.participantIds}
