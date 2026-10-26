@@ -1274,77 +1274,87 @@ export default function ContributionsPage() {
         };
       });
 
-      if (!appliedStatus || appliedStatus === "ALL") return groupedList;
-      const filterLower = appliedStatus.toLowerCase();
-      return groupedList.filter((c) => {
-        const statusLower = String(c.paymentStatus || "").toLowerCase();
-        if (filterLower === "paid") {
-          return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
-        }
-        if (filterLower === "approved") {
-          return statusLower === "approved";
-        }
-        if (filterLower === "verified") {
-          return statusLower === "verified";
-        }
-        if (filterLower === "pending") {
-          return statusLower === "pending" || statusLower === "partial";
-        }
-        if (filterLower === "partial") {
-          return statusLower === "partial";
-        }
-        if (filterLower === "rejected") {
-          return statusLower === "rejected";
-        }
-        return statusLower === filterLower;
+      const filteredGrouped = (!appliedStatus || appliedStatus === "ALL")
+        ? groupedList
+        : groupedList.filter((c) => {
+            const statusLower = String(c.paymentStatus || "").toLowerCase();
+            if (filterLower === "paid") {
+              return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
+            }
+            if (filterLower === "approved") {
+              return statusLower === "approved";
+            }
+            if (filterLower === "verified") {
+              return statusLower === "verified";
+            }
+            if (filterLower === "pending") {
+              return statusLower === "pending" || statusLower === "partial";
+            }
+            if (filterLower === "partial") {
+              return statusLower === "partial";
+            }
+            if (filterLower === "rejected") {
+              return statusLower === "rejected";
+            }
+            return statusLower === filterLower;
+          });
+
+      return [...filteredGrouped].sort((a, b) => {
+        const nameA = String(a.memberName || a.name || "").trim();
+        const nameB = String(b.memberName || b.name || "").trim();
+        if (!nameA && !nameB) return 0;
+        if (!nameA) return 1;
+        if (!nameB) return -1;
+        return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
       });
     }
 
-    if (!appliedStatus || appliedStatus === "ALL") return enriched;
-    const filterLower = appliedStatus.toLowerCase();
-    return enriched.filter((c) => {
-      const statusLower = String(c.paymentStatus || "").toLowerCase();
-      if (filterLower === "paid") {
-        return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
-      }
-      if (filterLower === "approved") {
-        return statusLower === "approved";
-      }
-      if (filterLower === "verified") {
-        return statusLower === "verified";
-      }
-      if (filterLower === "pending") {
-        return statusLower === "pending";
-      }
-      if (filterLower === "rejected") {
-        return (
-          statusLower === "rejected" ||
-          String(c.status || "").toLowerCase() === "rejected" ||
-          String(c.statusName || "").toLowerCase() === "rejected"
-        );
-      }
-      return statusLower === filterLower;
+    const filteredEnriched = (!appliedStatus || appliedStatus === "ALL")
+      ? enriched
+      : enriched.filter((c) => {
+          const statusLower = String(c.paymentStatus || "").toLowerCase();
+          if (filterLower === "paid") {
+            return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
+          }
+          if (filterLower === "approved") {
+            return statusLower === "approved";
+          }
+          if (filterLower === "verified") {
+            return statusLower === "verified";
+          }
+          if (filterLower === "pending") {
+            return statusLower === "pending";
+          }
+          if (filterLower === "rejected") {
+            return (
+              statusLower === "rejected" ||
+              String(c.status || "").toLowerCase() === "rejected" ||
+              String(c.statusName || "").toLowerCase() === "rejected"
+            );
+          }
+          return statusLower === filterLower;
+        });
+
+    return [...filteredEnriched].sort((a, b) => {
+      const nameA = String(a.memberName || a.name || "").trim();
+      const nameB = String(b.memberName || b.name || "").trim();
+      if (!nameA && !nameB) return 0;
+      if (!nameA) return 1;
+      if (!nameB) return -1;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
     });
   }, [rawContributions, allContributions, events, transactions, appliedStatus, selectedEventId]);
 
   const filterStatusOptions = useMemo(() => {
     const list = [{ label: "All Statuses", value: "ALL" }];
-    const seen = new Set();
-    (dbStatuses || []).forEach((s) => {
-      const name = (s.statusName || s.name || "").trim();
-      if (name && !seen.has(name.toLowerCase())) {
-        seen.add(name.toLowerCase());
-        list.push({ label: name, value: name });
-      }
+    const allowed = ["Approved", "Rejected", "Pending", "Paid"];
+    allowed.forEach((statusName) => {
+      const found = (dbStatuses || []).find(
+        (s) => (s.statusName || s.name || "").trim().toLowerCase() === statusName.toLowerCase()
+      );
+      const name = found ? (found.statusName || found.name).trim() : statusName;
+      list.push({ label: name, value: name });
     });
-    if (list.length === 1) {
-      ["Paid", "Pending", "Verified", "Rejected", "Approved"].forEach((s) => {
-        if (!seen.has(s.toLowerCase())) {
-          seen.add(s.toLowerCase());
-          list.push({ label: s, value: s });
-        }
-      });
-    }
     return list;
   }, [dbStatuses]);
 
@@ -2891,7 +2901,7 @@ export default function ContributionsPage() {
       },
     },
     {
-      label: "Amount",
+      label: "Current Amount",
       key: "amount",
       align: "right",
       render: (row) => {
@@ -2953,7 +2963,7 @@ export default function ContributionsPage() {
       },
     },
     {
-      label: "Arrears",
+      label: "Previous Arrears",
       key: "previousUnpaid",
       align: "right",
       render: (row) => {
@@ -3345,7 +3355,7 @@ export default function ContributionsPage() {
           )}
 
           <AppInput
-            label="Amount"
+            label="Current Amount"
             placeholder="Fixed payment amount (₹)"
             value={payment.amount}
             onChange={(event) => handleAmountChange(event.target.value)}
