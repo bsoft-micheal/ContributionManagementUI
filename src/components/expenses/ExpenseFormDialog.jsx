@@ -629,7 +629,7 @@ export default function ExpenseFormDialog({
         newErrors[`extra_reason_${extra.id}`] = "This field is required";
       }
       if (!extra.amount || Number(extra.amount) <= 0 || isNaN(Number(extra.amount))) {
-        newErrors[`extra_amount_${extra.id}`] = "Amount must be greater than ₹0";
+        newErrors[`extra_amount_${extra.id}`] = "This field is required";
       } else if (String(extra.amount).length > 6) {
         newErrors[`extra_amount_${extra.id}`] = "Amount cannot exceed 6 digits";
       }
