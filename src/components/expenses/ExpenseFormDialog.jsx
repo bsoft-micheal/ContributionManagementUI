@@ -649,7 +649,6 @@ export default function ExpenseFormDialog({
         await onSaved();
       }
     } catch (err) {
-      if (err?.isRateLimit || err?.response?.status === 429) return;
       toast.error(err, TOAST_MESSAGES.GENERAL.SAVE_FAILED);
     } finally {
       setSaving(false);

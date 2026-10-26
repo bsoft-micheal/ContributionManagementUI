@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Card, CardContent, Chip, CircularProgress, Grid, Stack, Typography,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -337,10 +337,20 @@ function SegmentedTab({ label, icon: Icon, isActive, onClick }) {
 }
 
 /* ═══════════════════════ MAIN PAGE ═══════════════════════ */
-export default function ReportsPage({ mode = "event" }) {
+export default function ReportsPage({ mode: propMode = "event" }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const mode = useMemo(() => {
+    const p = (location.pathname || "").toLowerCase();
+    if (p.includes("annual-member-matrix") || p.includes("annual-matrix") || p.includes("member-matrix")) return "annual-matrix";
+    if (p.includes("payment-history")) return "payment-history";
+    if (p.includes("member-velocity")) return "member";
+    if (p.includes("event-collection-audit")) return "event";
+    return propMode;
+  }, [location.pathname, propMode]);
   const { authState } = useAuth();
   const isMember = String(authState?.role || authState?.user?.role || "").toLowerCase() === "member";
   const currentUserId = authState?.userId || authState?.user?.userId || authState?.id;
@@ -582,14 +592,12 @@ export default function ReportsPage({ mode = "event" }) {
       const params = { month: null, year: null };
       const { data: res } = await apiClient.get("/reports/getSummaryReportAsync", { params });
       setReport(res?.data !== undefined ? res.data : res);
-    } catch (err) {
-      if (!err?.isRateLimit && err?.response?.status !== 429) {
-        toast.error("Failed to load reports. Please try again.");
-      }
+    } catch {
+      toast.error("Failed to load reports. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   // Initial load: Load reports automatically on mount
   useEffect(() => {

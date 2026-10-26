@@ -192,10 +192,8 @@ export default function PaymentsPage() {
         const grouped = groupSplitTransactions(mapped);
         setTransactions(grouped);
       }
-    } catch (err) {
-      if (!err?.isRateLimit && err?.response?.status !== 429) {
-        toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
-      }
+    } catch {
+      toast.error(TOAST_MESSAGES.GENERAL.FETCH_FAILED);
     } finally {
       setLoading(false);
     }

@@ -84,7 +84,11 @@ export default function AnnualMemberMatrix({
 
   /* ── Collect Available Years Dynamically ── */
   const availableYears = useMemo(() => {
-    const yrSet = new Set([currentYear, currentYear - 1, currentYear - 2]);
+    const yrSet = new Set();
+    // Include a wide standard range (10 years back and 2 years ahead)
+    for (let y = currentYear - 10; y <= currentYear + 2; y++) {
+      yrSet.add(y);
+    }
 
     (report?.memberContributionHistory || []).forEach((m) => {
       (m.events || []).forEach((ev) => {

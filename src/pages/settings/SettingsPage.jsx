@@ -1577,7 +1577,7 @@ export default function SettingsPage() {
             const previewDueDate = dayjs().endOf("month").format("DD/MM/YYYY");
             const currentCatQrConfig = getPaymentQrConfig(currentCategoryLabel);
             const previewIsUploaded = (currentCatQrConfig.qrMode || "").toLowerCase() === "uploaded";
-            const previewUpiId = currentCatQrConfig.upiId || currentQrConfig.upiId || "danielrobertanto604@okicici";
+            const previewUpiId = currentCatQrConfig.upiId || currentQrConfig.upiId || "";
             const previewReceiverName = currentCatQrConfig.receiverName || currentQrConfig.receiverName || settings.orgName || "Unit 1A";
             const previewUpiUri = !previewIsUploaded && previewUpiId
               ? buildUpiPaymentUri({

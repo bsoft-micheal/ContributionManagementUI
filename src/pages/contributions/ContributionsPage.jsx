@@ -1533,10 +1533,8 @@ export default function ContributionsPage() {
         } catch {
           // fallback
         }
-      } catch (err) {
-        if (!err?.isRateLimit && err?.response?.status !== 429) {
-          toast.error("Failed to load events and contributions data.");
-        }
+      } catch {
+        toast.error("Failed to load events and contributions data.");
       }
     }
 
@@ -3491,6 +3489,9 @@ export default function ContributionsPage() {
 
             const activeEventObj = events.find(e => e.eventId === selectedEventId);
             const qrConfig = getPaymentQrConfig(activeEventObj);
+            if (!qrConfig?.isConfigured || (!qrConfig.upiId && !qrConfig.qrImage)) {
+              return null;
+            }
 
             const isUploaded = qrConfig.qrMode === "uploaded" && qrConfig.qrImage;
             let qrSrc = "";
