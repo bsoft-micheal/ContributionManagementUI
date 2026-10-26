@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Grid,
   Box,
@@ -1048,6 +1048,44 @@ export default function EventFormPage({
     [selectedTypes]
   );
 
+  const marriageTypeObj = useMemo(
+    () =>
+      selectedTypes.find((t) => {
+        const name = (t.eventTypeName || "").toLowerCase();
+        const cat = (t.category || "").toLowerCase();
+        return name.includes("marriage") || cat.includes("marriage") || name.includes("wedding") || cat.includes("wedding");
+      }) ||
+      eventTypes.find((t) => {
+        const name = (t.eventTypeName || "").toLowerCase();
+        return name.includes("marriage") || name.includes("wedding");
+      }),
+    [selectedTypes, eventTypes]
+  );
+
+  const sendOffTypeObj = useMemo(
+    () =>
+      selectedTypes.find((t) => {
+        const name = (t.eventTypeName || "").toLowerCase();
+        const cat = (t.category || "").toLowerCase();
+        return (
+          name.includes("send-off") ||
+          name.includes("send off") ||
+          name.includes("sendoff") ||
+          name.includes("farewell") ||
+          name.includes("relieving") ||
+          cat.includes("send-off") ||
+          cat.includes("send off") ||
+          cat.includes("farewell") ||
+          cat.includes("relieving")
+        );
+      }) ||
+      eventTypes.find((t) => {
+        const name = (t.eventTypeName || "").toLowerCase();
+        return name.includes("send") || name.includes("farewell") || name.includes("relieving");
+      }),
+    [selectedTypes, eventTypes]
+  );
+
   // Event types that do NOT have configured expense items (require manual contribution amount)
   const typesWithoutExpenseItems = useMemo(() => {
     return nonBirthdaySelectedTypes.filter((type) => {
@@ -1087,13 +1125,23 @@ export default function EventFormPage({
   const participantsInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (!participantsInitializedRef.current && activeMembers.length > 0 && isEdit) {
-      if (form.participantIds && form.participantIds.length > 0) {
-        setSelectedParticipantIds(form.participantIds);
+    if (!participantsInitializedRef.current && activeMembers.length > 0) {
+      if (isEdit) {
+        if (form.participantIds && form.participantIds.length > 0) {
+          setSelectedParticipantIds(form.participantIds);
+          participantsInitializedRef.current = true;
+        }
+      } else {
+        const exemptIds = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+        const allEligible = activeMembers
+          .map((m) => m.memberId)
+          .filter((id) => !exemptIds.has(id));
+        setSelectedParticipantIds(allEligible);
+        setForm((prev) => ({ ...prev, participantIds: allEligible }));
         participantsInitializedRef.current = true;
       }
     }
-  }, [activeMembers, form.participantIds, isEdit]);
+  }, [activeMembers, form.participantIds, isEdit, marriageCelebrantIds, sendOffMemberIds]);
 
   // Dynamic Member & Date helpers for any selected event type without hardcoding
   const getMemberFieldLabel = (type) => {
@@ -1338,7 +1386,121 @@ export default function EventFormPage({
     }
   }, [hasSendOffSelected, sendOffMemberIds]);
 
-  // All active members options for celebrant multi-selects
+  // List of celebrants from existing events in this calendar month (for Rule B duplicate celebrant check)
+  const celebratingMembersList = useMemo(() => {
+    const selectedDate = form.eventDate ? dayjs(form.eventDate) : dayjs();
+    const targetMonth = selectedDate.month() + 1;
+    const targetYear = selectedDate.year();
+
+    const list = [];
+
+    (existingEvents || []).forEach((ev) => {
+      if (ev.isDeleted) return;
+      if (id && (ev.eventId === id || ev.id === id)) return;
+
+      const evDate = ev.eventDate ? dayjs(ev.eventDate) : null;
+      if (!evDate || !evDate.isValid()) return;
+      if (evDate.month() + 1 !== targetMonth || evDate.year() !== targetYear) return;
+
+      const evTypeName = String(ev.eventTypeName || "").trim();
+
+      // Check celebrants from eventDates JSON: { [typeId]: { [memberId]: "YYYY-MM-DD" } }
+      if (ev.eventDates && typeof ev.eventDates === "string" && ev.eventDates.trim().startsWith("{")) {
+        try {
+          const parsed = JSON.parse(ev.eventDates);
+          for (const [typeKey, val] of Object.entries(parsed)) {
+            if (val && typeof val === "object") {
+              for (const mId of Object.keys(val)) {
+                const matchedMember = activeMembers.find(
+                  (m) => String(m.memberId || m.userId || m.id).toLowerCase() === String(mId).toLowerCase()
+                );
+                list.push({
+                  memberId: String(mId),
+                  memberName: matchedMember?.name || "Member",
+                  eventTypeId: ev.eventTypeId,
+                  typeKey,
+                  eventTypeName: evTypeName || "Event",
+                  eventId: ev.eventId,
+                  eventName: ev.eventName,
+                });
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // Check celebrants from description comment <!--celebrants:{...}-->
+      if (ev.description && typeof ev.description === "string") {
+        const match = ev.description.match(/<!--celebrants:(.*?)-->/);
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            for (const [typeKey, memList] of Object.entries(parsed)) {
+              if (Array.isArray(memList)) {
+                for (const mId of memList) {
+                  const matchedMember = activeMembers.find(
+                    (m) => String(m.memberId || m.userId || m.id).toLowerCase() === String(mId).toLowerCase()
+                  );
+                  list.push({
+                    memberId: String(mId),
+                    memberName: matchedMember?.name || "Member",
+                    eventTypeId: ev.eventTypeId,
+                    typeKey,
+                    eventTypeName: evTypeName || typeKey,
+                    eventId: ev.eventId,
+                    eventName: ev.eventName,
+                  });
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+    });
+
+    return list;
+  }, [form.eventDate, existingEvents, id, activeMembers]);
+
+  // Helper returning member options filtered per specific event type (Rule B)
+  const getMemberCelebrantOptionsForType = useCallback(
+    (typeObjOrKey) => {
+      const typeIdStr = typeof typeObjOrKey === "object" ? String(typeObjOrKey?.eventTypeId || "") : String(typeObjOrKey || "");
+      const typeNameStr = typeof typeObjOrKey === "object" ? String(typeObjOrKey?.eventTypeName || "") : String(typeObjOrKey || "");
+      const cleanTargetName = typeNameStr.toLowerCase().replace(/[\s_-]/g, "");
+
+      return activeMembers.map((m) => {
+        const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+        const mId = String(m.memberId || m.userId || m.id).toLowerCase();
+
+        // Check if this member ALREADY has an event of THAT SAME event type in this calendar month
+        const conflict = celebratingMembersList.find((c) => {
+          if (String(c.memberId).toLowerCase() !== mId) return false;
+          if (typeIdStr && String(c.eventTypeId).toLowerCase() === typeIdStr.toLowerCase()) return true;
+          if (typeIdStr && String(c.typeKey).toLowerCase() === typeIdStr.toLowerCase()) return true;
+          const cTypeNameClean = String(c.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
+          if (cleanTargetName && cTypeNameClean && (cTypeNameClean.includes(cleanTargetName) || cleanTargetName.includes(cTypeNameClean))) return true;
+          return false;
+        });
+
+        if (conflict) {
+          return {
+            label: `${m.name} (${isWfh ? "WFH" : "Office"}) - [Already has ${conflict.eventTypeName}]`,
+            value: m.memberId,
+            disabled: true,
+          };
+        }
+
+        return {
+          label: `${m.name} (${isWfh ? "WFH" : "Office"})`,
+          value: m.memberId,
+          disabled: false,
+        };
+      });
+    },
+    [activeMembers, celebratingMembersList]
+  );
+
+  // All active members options (unrestricted baseline)
   const allActiveMemberOptions = useMemo(
     () =>
       activeMembers.map((m) => {
@@ -1346,6 +1508,7 @@ export default function EventFormPage({
         return {
           label: `${m.name} (${isWfh ? "WFH" : "Office"})`,
           value: m.memberId,
+          disabled: false,
         };
       }),
     [activeMembers]
@@ -1933,6 +2096,7 @@ export default function EventFormPage({
 
   // Handle single event type switch
   const handleTypeChange = (newTypeId) => {
+    if (isEdit) return;
     if (!newTypeId) {
       setForm((prev) => ({
         ...prev,
@@ -1967,9 +2131,13 @@ export default function EventFormPage({
       updatedName = sanitizeEventName(updatedName);
     }
 
-    const initialParticipants = isEdit ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || [])) : [];
+    const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+    const allEligible = activeMembers.map((m) => m.memberId).filter((id) => !allExempt.has(id));
+    const initialParticipants = isEdit
+      ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || []))
+      : allEligible;
     if (!isEdit) {
-      setSelectedParticipantIds([]);
+      setSelectedParticipantIds(allEligible);
     }
 
     const offTotal = activeMembers.filter(
@@ -2000,7 +2168,7 @@ export default function EventFormPage({
       setOfficeMembers(offTotal);
       setWfhMembers(wfhTotal);
     } else {
-      const currParticipants = isEdit ? initialParticipants : [];
+      const currParticipants = initialParticipants;
       const pMembers = activeMembers.filter((m) => currParticipants.includes(m.memberId));
       setTotalMembers(pMembers.length);
       const offCount = pMembers.filter(
@@ -2033,7 +2201,7 @@ export default function EventFormPage({
       eventTypeIds: newTypeId ? [newTypeId] : [],
       eventName: updatedName,
       baseAmount: hasItems ? "" : (prev.baseAmount || ""),
-      participantIds: isEdit ? initialParticipants : [],
+      participantIds: initialParticipants,
     }));
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
     if (errors.baseAmount) setErrors((p) => ({ ...p, baseAmount: "" }));
@@ -2041,6 +2209,7 @@ export default function EventFormPage({
 
   // Handle multiple event types selection
   const handleMultiTypeChange = (newTypeIds) => {
+    if (isEdit) return;
     const selectedTypesList = eventTypes.filter((t) => newTypeIds.includes(t.eventTypeId));
     const hasBday = selectedTypesList.some((t) =>
       t.eventTypeName?.toLowerCase().includes("birthday")
@@ -2064,9 +2233,13 @@ export default function EventFormPage({
       updatedName = sanitizeEventName(updatedName);
     }
 
-    const initialParticipants = isEdit ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || [])) : [];
+    const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
+    const allEligible = activeMembers.map((m) => m.memberId).filter((id) => !allExempt.has(id));
+    const initialParticipants = isEdit
+      ? (selectedParticipantIds.length > 0 ? selectedParticipantIds : (form.participantIds || []))
+      : allEligible;
     if (!isEdit) {
-      setSelectedParticipantIds([]);
+      setSelectedParticipantIds(allEligible);
     }
 
     const offTotal = activeMembers.filter(
@@ -2097,7 +2270,7 @@ export default function EventFormPage({
       setOfficeMembers(offTotal);
       setWfhMembers(wfhTotal);
     } else {
-      const currParticipants = isEdit ? initialParticipants : [];
+      const currParticipants = initialParticipants;
       const pMembers = activeMembers.filter((m) => currParticipants.includes(m.memberId));
       setTotalMembers(pMembers.length);
       const offCount = pMembers.filter(
@@ -2116,7 +2289,7 @@ export default function EventFormPage({
       eventTypeIds: newTypeIds,
       eventName: updatedName,
       baseAmount: prev.baseAmount || "",
-      participantIds: isEdit ? initialParticipants : [],
+      participantIds: initialParticipants,
     }));
 
     if (errors.eventTypeId) setErrors((p) => ({ ...p, eventTypeId: "" }));
@@ -2125,6 +2298,7 @@ export default function EventFormPage({
 
   // Handle toggle for allowing multiple events
   const handleToggleAllowMultipleEvents = async (checked) => {
+    if (isEdit) return;
     setAllowMultipleEvents(checked);
 
     if (checked) {
@@ -2357,16 +2531,16 @@ export default function EventFormPage({
       }
 
       if (hasMarriageSelected && marriageCelebrantIds.length === 0) {
-        newErrors.marriageCelebrantIds = "Please select at least one marriage celebrant";
+        newErrors.marriageCelebrantIds = "This field is required";
       }
       if (hasSendOffSelected && sendOffMemberIds.length === 0) {
-        newErrors.sendOffMemberIds = "Please select at least one send-off / relieving member";
+        newErrors.sendOffMemberIds = "This field is required";
       }
     }
 
     // 4. Participant validation for non-birthday events if an event type is chosen
     if (!isBirthday && (form.eventTypeId || form.eventTypeIds?.length > 0) && selectedParticipantIds.length === 0 && (!allowMultipleEvents || selectedTypes.length <= 1)) {
-      newErrors.participantIds = "Please select at least one participating member";
+      newErrors.participantIds = "This field is required";
     }
 
     // 5. Types without expense items amount validation
@@ -2387,6 +2561,75 @@ export default function EventFormPage({
         }
       });
     }
+
+    // 6. Monthly Celebrant Restriction Validation (Rule A & Rule B):
+    const targetDateObj = form.eventDate ? dayjs(form.eventDate) : dayjs();
+    const monthDisplayName = targetDateObj.format("MMMM");
+    const targetYearVal = targetDateObj.year();
+    const targetMonth = targetDateObj.month() + 1;
+
+    // Rule A: Birthday check (only once per month globally)
+    const hasBirthdaySelected = selectedTypes.some(
+      (t) => String(t.eventTypeName || "").toLowerCase().includes("birthday")
+    );
+    if (hasBirthdaySelected) {
+      const bdayConflict = (existingEvents || []).find((ev) => {
+        if (id && (ev.eventId === id || ev.id === id)) return false;
+        if (ev.isDeleted) return false;
+        const evDate = ev.eventDate ? dayjs(ev.eventDate) : null;
+        if (!evDate || !evDate.isValid()) return false;
+        if (evDate.month() + 1 !== targetMonth || evDate.year() !== targetYearVal) return false;
+        const evTypeName = String(ev.eventTypeName || "").trim().toLowerCase();
+        const evName = String(ev.eventName || "").trim().toLowerCase();
+        return evTypeName.includes("birthday") || evName.includes("birthday");
+      });
+      if (bdayConflict) {
+        newErrors.eventTypeId = `A Birthday event ('${bdayConflict.eventName}') has already been created for ${monthDisplayName} ${targetYearVal}. Only one Birthday event is allowed per calendar month.`;
+      }
+    }
+
+    // Rule B: Non-Birthday event types check duplicate (memberId + eventTypeId)
+    selectedTypes.forEach((type) => {
+      const typeId = type.eventTypeId;
+      const typeName = type.eventTypeName || "";
+      if (String(typeName).toLowerCase().includes("birthday")) return; // Birthday covered by Rule A
+
+      let memberIds = [];
+      const cleanName = String(typeName).toLowerCase().replace(/[\s_-]/g, "");
+      if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
+        memberIds = marriageCelebrantIds || [];
+      } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
+        memberIds = sendOffMemberIds || [];
+      } else {
+        memberIds = eventTypeMembers[typeId] || [];
+      }
+
+      (memberIds || []).forEach((mId) => {
+        const conflict = celebratingMembersList.find((c) => {
+          if (String(c.memberId).toLowerCase() !== String(mId).toLowerCase()) return false;
+          if (String(c.eventTypeId).toLowerCase() === String(typeId).toLowerCase()) return true;
+          if (String(c.typeKey).toLowerCase() === String(typeId).toLowerCase()) return true;
+          const cTypeNameClean = String(c.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
+          if (cleanName && cTypeNameClean && (cTypeNameClean.includes(cleanName) || cleanName.includes(cTypeNameClean))) return true;
+          return false;
+        });
+
+        if (conflict) {
+          const matched = activeMembers.find(
+            (m) => String(m.memberId || m.userId || m.id).toLowerCase() === String(mId).toLowerCase()
+          );
+          const mName = matched?.name || conflict.memberName || "Member";
+          const conflictMsg = `Member '${mName}' already has an event of type '${conflict.eventTypeName}' in ${monthDisplayName} ${targetYearVal}. Duplicate event of the same type for the same member is not allowed in the same month.`;
+          if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
+            newErrors.marriageCelebrantIds = conflictMsg;
+          } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
+            newErrors.sendOffMemberIds = conflictMsg;
+          } else {
+            newErrors[`members_${typeId}`] = conflictMsg;
+          }
+        }
+      });
+    });
 
     // CRITICAL: Block submission and display inline errors on ALL mandatory fields first!
     if (Object.keys(newErrors).length > 0) {
@@ -2431,6 +2674,10 @@ export default function EventFormPage({
 
   const handlePublishClick = () => {
     if (!validateEventForm()) return;
+    if (isEdit) {
+      executeSaveEvent(form.status || "Published");
+      return;
+    }
     setPublishConfirmOpen(true);
   };
 
@@ -2699,8 +2946,16 @@ export default function EventFormPage({
           if (Array.isArray(form.eventTypeIds) && form.eventTypeIds.includes(t.eventTypeId)) return true;
         }
 
-        // Check if an active (non-deleted) event of this type already exists in this month and year
-        const alreadyExists = (existingEvents || []).some((ev) => {
+        const isBirthdayType = String(t.eventTypeName || "").toLowerCase().includes("birthday");
+
+        // Rule B: All Other Event Types — Prevent Duplicate Celebrants, Not Different Celebrants
+        // Non-birthday event types are ALWAYS available in the dropdown
+        if (!isBirthdayType) {
+          return true;
+        }
+
+        // Rule A: Birthday Event — Only Once Per Month
+        const birthdayAlreadyExists = (existingEvents || []).some((ev) => {
           if (id && (ev.eventId === id || ev.id === id)) return false;
           if (ev.isDeleted) return false;
 
@@ -2710,47 +2965,15 @@ export default function EventFormPage({
           const evMonth = evDate.month() + 1;
           const evYear = evDate.year();
 
-          // 1. Primary event type check
-          if (ev.eventTypeId === t.eventTypeId && evMonth === targetMonth && evYear === targetYear) {
-            return true;
-          }
+          if (evMonth !== targetMonth || evYear !== targetYear) return false;
 
-          // 2. Multi-type check via eventTypeIds
-          if (Array.isArray(ev.eventTypeIds) && ev.eventTypeIds.includes(t.eventTypeId) && evMonth === targetMonth && evYear === targetYear) {
-            return true;
-          }
+          const evTypeName = String(ev.eventTypeName || "").trim().toLowerCase();
+          const evName = String(ev.eventName || "").trim().toLowerCase();
 
-          // 3. Serialized EventDates check
-          if (ev.eventDates && typeof ev.eventDates === "string" && ev.eventDates.trim().startsWith("{")) {
-            try {
-              const parsed = JSON.parse(ev.eventDates);
-              for (const [key, val] of Object.entries(parsed)) {
-                let matchesType = key === t.eventTypeId ||
-                  String(key).toLowerCase().replace(/[\s_-]/g, "") === String(t.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
-
-                if (matchesType) {
-                  if (typeof val === "string") {
-                    const d = dayjs(val);
-                    if (d.isValid() && d.month() + 1 === targetMonth && d.year() === targetYear) {
-                      return true;
-                    }
-                  } else if (val && typeof val === "object") {
-                    for (const subVal of Object.values(val)) {
-                      const d = dayjs(subVal);
-                      if (d.isValid() && d.month() + 1 === targetMonth && d.year() === targetYear) {
-                        return true;
-                      }
-                    }
-                  }
-                }
-              }
-            } catch {}
-          }
-
-          return false;
+          return evTypeName.includes("birthday") || evName.includes("birthday");
         });
 
-        return !alreadyExists;
+        return !birthdayAlreadyExists;
       })
       .map((t) => ({
         label: t.eventTypeName,
@@ -2873,19 +3096,21 @@ export default function EventFormPage({
                 </Typography>
 
                 <Box
-                  onClick={() => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
+                  onClick={isEdit ? undefined : () => handleToggleAllowMultipleEvents(!allowMultipleEvents)}
                   sx={{
                     display: "flex",
                     alignItems: "center",
                     gap: 0.8,
-                    cursor: "pointer",
+                    cursor: isEdit ? "not-allowed" : "pointer",
                     userSelect: "none",
+                    opacity: isEdit ? 0.6 : 1,
                   }}
                 >
                   <Checkbox
                     checked={Boolean(allowMultipleEvents)}
-                    onChange={(e) => handleToggleAllowMultipleEvents(e.target.checked)}
+                    onChange={isEdit ? undefined : (e) => handleToggleAllowMultipleEvents(e.target.checked)}
                     onClick={(e) => e.stopPropagation()}
+                    disabled={isEdit}
                     size="small"
                     sx={{
                       p: 0.2,
@@ -2919,6 +3144,7 @@ export default function EventFormPage({
                     <AppMultiSelect
                       label="Event Types"
                       placeholder="Select EventType"
+                      disabled={isEdit}
                       value={
                         form.eventTypeIds && form.eventTypeIds.length > 0
                           ? form.eventTypeIds
@@ -2942,6 +3168,7 @@ export default function EventFormPage({
                     <AppSelect
                       label="Event Type"
                       placeholder="Select EventType"
+                      disabled={isEdit}
                       value={form.eventTypeId}
                       onChange={(e) => handleTypeChange(e.target.value)}
                       onBlur={() => {
@@ -2949,7 +3176,7 @@ export default function EventFormPage({
                           setErrors((p) => ({ ...p, eventTypeId: "This field is required" }));
                         }
                       }}
-                      clearable
+                      clearable={!isEdit}
                       options={typeOptions}
                       error={!!errors.eventTypeId}
                       helperText={errors.eventTypeId}
@@ -3073,7 +3300,7 @@ export default function EventFormPage({
                                 placeholder={getMemberFieldPlaceholder(type)}
                                 value={memsVal}
                                 onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
-                                options={allActiveMemberOptions}
+                                options={getMemberCelebrantOptionsForType(type)}
                                 maxHeight={145}
                                 required
                                 error={!!errors[`members_${typeId}`]}
@@ -3168,8 +3395,9 @@ export default function EventFormPage({
                               placeholder={getMemberFieldPlaceholder(type)}
                               value={memsVal}
                               onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
-                              options={allActiveMemberOptions}
+                              options={getMemberCelebrantOptionsForType(type)}
                               maxHeight={145}
+                              showSelectAll={false}
                               required
                               error={!!errors[`members_${typeId}`]}
                               helperText={
@@ -3313,15 +3541,16 @@ export default function EventFormPage({
                     )}
 
                     {hasMarriageSelected && (
-                      <>
+                      <React.Fragment key="marriage-celebrants-section">
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
                             label="Marriage Celebrants"
                             placeholder="Select members celebrating marriage"
                             value={marriageCelebrantIds}
                             onChange={handleMarriageCelebrantsChange}
-                            options={allActiveMemberOptions}
+                            options={getMemberCelebrantOptionsForType(marriageTypeObj || "marriage")}
                             maxHeight={145}
+                            showSelectAll={false}
                             required
                             error={!!errors.marriageCelebrantIds}
                             helperText={
@@ -3359,19 +3588,20 @@ export default function EventFormPage({
                               </Grid>
                             );
                           })}
-                      </>
+                      </React.Fragment>
                     )}
 
                     {hasSendOffSelected && (
-                      <>
+                      <React.Fragment key="sendoff-members-section">
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
                             label="Send-off / Relieving Members"
                             placeholder="Select members having send-off"
                             value={sendOffMemberIds}
                             onChange={handleSendOffMembersChange}
-                            options={allActiveMemberOptions}
+                            options={getMemberCelebrantOptionsForType(sendOffTypeObj || "sendoff")}
                             maxHeight={145}
+                            showSelectAll={false}
                             required
                             error={!!errors.sendOffMemberIds}
                             helperText={
@@ -3409,7 +3639,7 @@ export default function EventFormPage({
                               </Grid>
                             );
                           })}
-                      </>
+                      </React.Fragment>
                     )}
 
                     {/* Any other custom non-birthday event type (dynamic, not hardcoded) */}
@@ -3429,8 +3659,9 @@ export default function EventFormPage({
                                 placeholder={getMemberFieldPlaceholder(type)}
                                 value={memsVal}
                                 onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
-                                options={allActiveMemberOptions}
+                                options={getMemberCelebrantOptionsForType(type)}
                                 maxHeight={145}
+                                showSelectAll={false}
                                 required
                                 error={!!errors[`members_${typeId}`]}
                                 helperText={
@@ -3483,6 +3714,7 @@ export default function EventFormPage({
                           }}
                           options={memberOptions}
                           maxHeight={145}
+                          showSelectAll={true}
                           required
                           error={!!errors.participantIds}
                           helperText={errors.participantIds}
