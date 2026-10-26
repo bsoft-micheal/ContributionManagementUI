@@ -42,8 +42,9 @@ export const previewContributionsAsync = async (data) => {
   return await postApi("/events/previewContributionsAsync", data);
 };
 
-export const getAvailableAmountInHandAsync = async () => {
-  return await getApi("/events/getAvailableAmountInHandAsync");
+export const getAvailableAmountInHandAsync = async (excludeEventId = null) => {
+  const query = excludeEventId ? `?excludeEventId=${encodeURIComponent(excludeEventId)}` : "";
+  return await getApi(`/events/getAvailableAmountInHandAsync${query}`);
 };
 
 /**

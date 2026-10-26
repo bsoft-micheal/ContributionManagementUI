@@ -547,6 +547,13 @@ export default function EventsPage() {
       return sum + roundToWhole(allocated);
     }, 0);
 
+    const totalRecoveredDeficit = (displayedEvents || []).reduce((sum, e) => {
+      const isDeficit = Boolean(e.usePreviousEventBalance) &&
+        (e.previousEventAdjustmentType === "DeficitRecovery" || e.PreviousEventAdjustmentType === "DeficitRecovery");
+      const adj = Number(e.previousEventAdjustment ?? e.PreviousEventAdjustment ?? 0);
+      return sum + (isDeficit ? roundToWhole(adj) : 0);
+    }, 0);
+
     const totalExpected = (displayedEvents || []).reduce((sum, e) => {
       const allocated = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
       const raw = Math.max(Number(e.baseAmount || 0), Number(e.totalExpectedAmount || 0));
@@ -567,7 +574,14 @@ export default function EventsPage() {
       return sum + roundToWhole(Number(e.expenseAmount || 0));
     }, 0);
 
-    const totalBalance = totalCollected - totalExpenses - totalAllocated;
+    const rawBalance = totalCollected - totalExpenses - totalAllocated;
+    // Amount In Hand = rawBalance + recoveredDeficits (do NOT clamp to zero).
+    // A negative result is a real uncovered shortfall and must be shown to the user.
+    // Example: rawBalance = -2600, recovered = 100 → totalBalance = -2500 ✓
+    // Dynamic: when ₹100 pending is collected → rawBalance becomes -2500 → totalBalance = -2400 ✓
+    const totalBalance = (rawBalance < 0 && totalRecoveredDeficit > 0)
+      ? rawBalance + totalRecoveredDeficit
+      : rawBalance;
 
     return {
       totalExpected,
@@ -575,6 +589,7 @@ export default function EventsPage() {
       totalPending,
       totalExpenses,
       totalAllocated,
+      totalRecoveredDeficit,
       totalBalance,
     };
   }, [displayedEvents]);
@@ -955,6 +970,40 @@ export default function EventsPage() {
               />
             </Tooltip>
           )}
+          {row.usePreviousEventBalance && row.previousEventAdjustmentType === "DeficitRecovery" && (
+            <Tooltip title={`Deficit Recovery: +${formatWholeCurrency(row.previousEventAdjustment || 0)} added from previous event overspend (Planned Budget: ${formatWholeCurrency(row.originalPlannedBudget || (row.baseAmount - row.previousEventAdjustment))})`}>
+              <Chip
+                size="small"
+                label="Deficit Recovered"
+                sx={{
+                  height: 18,
+                  fontSize: "0.64rem",
+                  fontWeight: 700,
+                  bgcolor: "rgba(245, 158, 11, 0.15)",
+                  color: "#d97706",
+                  borderRadius: "4px",
+                  "& .MuiChip-label": { px: 0.6 },
+                }}
+              />
+            </Tooltip>
+          )}
+          {row.usePreviousEventBalance && row.previousEventAdjustmentType === "SurplusCredit" && (
+            <Tooltip title={`Surplus Credit: -${formatWholeCurrency(row.previousEventAdjustment || 0)} applied from previous event balance`}>
+              <Chip
+                size="small"
+                label="Surplus Credited"
+                sx={{
+                  height: 18,
+                  fontSize: "0.64rem",
+                  fontWeight: 700,
+                  bgcolor: "rgba(16, 185, 129, 0.15)",
+                  color: "#059669",
+                  borderRadius: "4px",
+                  "& .MuiChip-label": { px: 0.6 },
+                }}
+              />
+            </Tooltip>
+          )}
         </Box>
       ),
     },
@@ -1104,6 +1153,11 @@ export default function EventsPage() {
             {allocated > 0 && (
               <Typography variant="caption" sx={{ color: "#16a34a", fontSize: "0.7rem", display: "block" }}>
                 (Budget: {formatWholeCurrency(raw)} - {formatWholeCurrency(allocated)} from Hand)
+              </Typography>
+            )}
+            {row.usePreviousEventBalance && row.previousEventAdjustmentType === "DeficitRecovery" && (
+              <Typography variant="caption" sx={{ color: "#d97706", fontSize: "0.7rem", display: "block" }}>
+                (Planned: {formatWholeCurrency(row.originalPlannedBudget || (row.baseAmount - (row.previousEventAdjustment || 0)))} + {formatWholeCurrency(row.previousEventAdjustment || 0)} Deficit)
               </Typography>
             )}
           </Box>
