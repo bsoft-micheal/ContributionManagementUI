@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box,
   Dialog,
@@ -87,10 +87,16 @@ const initialPayment = {
 export default function ContributionsPage() {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { authState } = useAuth();
   const { addNotification } = useNotifications();
   const { canEdit } = useAccessByLocation();
   const hasWriteAccess = canEdit;
+
+  const navEventId = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+    return location.state?.eventId || searchParams.get("eventId");
+  }, [location.search, location.state]);
 
   // Granular Action Permissions (aligned with User Rights Master & menuConstants)
   const canAddContribution = hasActionPermission(
@@ -179,6 +185,68 @@ export default function ContributionsPage() {
       cancelled = true;
     };
   }, [filterMonth, filterYear]);
+
+  // Handle navigation from other pages (e.g. Exit Clearance) with a targeted eventId
+  useEffect(() => {
+    if (!navEventId) return;
+
+    let cancelled = false;
+    async function applyNavEvent() {
+      try {
+        let allPublished = events;
+        if (!allPublished || allPublished.length === 0) {
+          const fetched = await getEventsAsync();
+          allPublished = (Array.isArray(fetched) ? fetched : []).filter((e) => !e.isDeleted && isEventPublished(e));
+          if (!cancelled && allPublished.length > 0) setEvents(allPublished);
+        }
+
+        const matchedEv = allPublished.find(
+          (e) => String(e.eventId || e.id).toLowerCase() === String(navEventId).toLowerCase()
+        );
+
+        if (cancelled) return;
+
+        if (matchedEv) {
+          const evDate = matchedEv.eventDate || matchedEv.createdOn || matchedEv.date;
+          const evYear = evDate ? dayjs(evDate).year() : dayjs().year();
+          const evMonth = evDate ? dayjs(evDate).month() + 1 : dayjs().month() + 1;
+          const evIdStr = String(matchedEv.eventId || matchedEv.id);
+
+          setFilterYear(evYear);
+          setAppliedYear(evYear);
+          setFilterMonth(evMonth);
+          setAppliedMonth(evMonth);
+          setFilterEventType("ALL");
+          setAppliedEventType("ALL");
+          setFilterEventId(evIdStr);
+          setSelectedEventId(evIdStr);
+          setHasAppliedFilter(true);
+
+          setFilterLookupEvents((prev) => {
+            if (prev.some((e) => String(e.eventId || e.id).toLowerCase() === evIdStr.toLowerCase())) {
+              return prev;
+            }
+            return [matchedEv, ...prev];
+          });
+        } else {
+          setFilterEventId(String(navEventId));
+          setSelectedEventId(String(navEventId));
+          setHasAppliedFilter(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setFilterEventId(String(navEventId));
+          setSelectedEventId(String(navEventId));
+          setHasAppliedFilter(true);
+        }
+      }
+    }
+
+    applyNavEvent();
+    return () => {
+      cancelled = true;
+    };
+  }, [navEventId, events]);
 
   // --- All remaining useState declarations (must be before any useEffect/useMemo that references them) ---
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1960,6 +2028,7 @@ export default function ContributionsPage() {
 
   // Reset invalid dependent Event ID when eventOptions change
   useEffect(() => {
+    if (filterLookupEvents.length === 0) return;
     if (filterEventId && filterEventId !== "ALL") {
       const isValid = eventOptions.some(
         (opt) => String(opt.value).toLowerCase() === String(filterEventId).toLowerCase()
@@ -1968,7 +2037,7 @@ export default function ContributionsPage() {
         setFilterEventId("ALL");
       }
     }
-  }, [eventOptions, filterEventId]);
+  }, [eventOptions, filterEventId, filterLookupEvents.length]);
 
   const handleEventTypeChange = (newTypeId) => {
     setFilterEventType(newTypeId);

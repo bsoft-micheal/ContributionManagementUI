@@ -28,16 +28,29 @@ export const extractErrorMessage = (err, fallback = "Something went wrong. Pleas
   const str = String(rawMsg || fallback).trim();
   const lower = str.toLowerCase();
 
-  // 1. Record deleted conflict (404 or record not found / deleted)
+  // 1. Internal / EF Core / Server unhandled errors (500+)
+  if (
+    (status && status >= 500) ||
+    str.includes("Microsoft.EntityFrameworkCore") ||
+    str.includes("could not be translated") ||
+    str.includes("InvalidOperationException") ||
+    str.includes("System.Data.") ||
+    lower.includes("network error")
+  ) {
+    return rawMsg || "Something went wrong. Please try again.";
+  }
+
+  // 2. Record deleted conflict (404 or record not found / deleted)
   if (
     status === 404 ||
     lower.includes("no longer exists") ||
     lower.includes("recorddeleted") ||
-    lower.includes("not found") ||
+    lower.includes("user not found") ||
+    lower.includes("username not found") ||
     lower.includes("isdeleted") ||
     lower.includes("does not exist")
   ) {
-    return "Username not found.";
+    return rawMsg || "Record not found.";
   }
 
   // 2. Already processed / completed (409 or duplicate submission / completed)
@@ -75,18 +88,6 @@ export const extractErrorMessage = (err, fallback = "Something went wrong. Pleas
     lower.includes("cannot be deleted because it is currently in use")
   ) {
     return "This record cannot be deleted because it is currently in use.";
-  }
-
-  // 5. Internal / EF Core / Server unhandled errors
-  if (
-    (status && status >= 500) ||
-    str.includes("Microsoft.EntityFrameworkCore") ||
-    str.includes("could not be translated") ||
-    str.includes("InvalidOperationException") ||
-    str.includes("System.Data.") ||
-    lower.includes("network error")
-  ) {
-    return "Something went wrong. Please try again.";
   }
 
   return str || fallback;
