@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Grid,
@@ -29,6 +30,11 @@ import {
   TableRow,
   DialogContent,
   DialogActions,
+  Popover,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
 } from "@mui/material";
 import {
   ExitToAppRounded as ExitIcon,
@@ -66,6 +72,7 @@ import {
 } from "../../services/paymentService";
 import { getPaymentModesAsync } from "../../services/paymentModeService";
 import AppDataTable from "../../components/common/AppDataTable";
+import AppSelect from "../../components/common/AppSelect";
 import AppButton from "../../components/common/AppButton";
 import AppDialog from "../../components/common/AppDialog";
 import AppConfirmDialog from "../../components/common/AppConfirmDialog";
@@ -75,6 +82,7 @@ import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { hasActionPermission } from "../../utils/rightsHelper";
 
 export default function ExitProcessPage() {
+  const navigate = useNavigate();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const { authState } = useAuth();
@@ -103,7 +111,6 @@ export default function ExitProcessPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedEventId, setSelectedEventId] = useState("");
   const [selectedClearanceStatus, setSelectedClearanceStatus] = useState("all");
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("all");
@@ -114,6 +121,11 @@ export default function ExitProcessPage() {
   const [duesDetail, setDuesDetail] = useState(null);
   const [duesLoading, setDuesLoading] = useState(false);
   const [duesActiveSubTab, setDuesActiveSubTab] = useState(0); // 0 = Event Dues, 1 = Payment History
+  const [onlyUnpaidEventsInModal, setOnlyUnpaidEventsInModal] = useState(false);
+
+  // Unpaid Events Popover (for Pending Obligations chip)
+  const [unpaidPopoverAnchor, setUnpaidPopoverAnchor] = useState(null);
+  const [unpaidPopoverData, setUnpaidPopoverData] = useState(null);
 
   // Record Payment Dialog
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
@@ -162,7 +174,13 @@ export default function ExitProcessPage() {
         setKpis(res.kpis);
       }
     } catch (err) {
-      toast.error(err, "Failed to load exit clearance queue");
+      const msg = err?.response?.data?.message || err?.message || "";
+      if (msg.includes("42P01") || msg.toLowerCase().includes("does not exist")) {
+        // Table created on backend restart / first sync
+        setQueueData([]);
+      } else {
+        toast.error(err, "Failed to load exit clearance queue");
+      }
     } finally {
       setLoading(false);
     }
@@ -174,7 +192,12 @@ export default function ExitProcessPage() {
       const res = await getExitClearanceHistoryAsync();
       setHistoryData(res || []);
     } catch (err) {
-      toast.error(err, "Failed to load exit clearance history");
+      const msg = err?.response?.data?.message || err?.message || "";
+      if (msg.includes("42P01") || msg.toLowerCase().includes("does not exist")) {
+        setHistoryData([]);
+      } else {
+        toast.error(err, "Failed to load exit clearance history");
+      }
     } finally {
       setHistoryLoading(false);
     }
@@ -200,19 +223,9 @@ export default function ExitProcessPage() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [queueData]);
 
-  // Filtered Queue Data
+  // Filtered Queue Data (search is handled by the data table search)
   const filteredQueueData = useMemo(() => {
     return queueData.filter((item) => {
-      if (searchTerm) {
-        const q = searchTerm.toLowerCase();
-        const mName = (item.memberName || "").toLowerCase();
-        const mEmail = (item.memberEmail || "").toLowerCase();
-        const mCode = (item.memberCode || "").toLowerCase();
-        const eName = (item.eventName || "").toLowerCase();
-        if (!mName.includes(q) && !mEmail.includes(q) && !mCode.includes(q) && !eName.includes(q)) {
-          return false;
-        }
-      }
       if (selectedEventId && item.eventId !== selectedEventId) {
         return false;
       }
@@ -226,7 +239,7 @@ export default function ExitProcessPage() {
       }
       return true;
     });
-  }, [queueData, searchTerm, selectedEventId, selectedClearanceStatus, selectedPaymentStatus]);
+  }, [queueData, selectedEventId, selectedClearanceStatus, selectedPaymentStatus]);
 
   // Open Dues Details Modal
   async function handleOpenDues(clearanceId) {
@@ -372,18 +385,82 @@ export default function ExitProcessPage() {
     }
   }
 
-  // Status Chip Renderer
+  // Status Chip Renderer (Curated Application Color Palette)
   const renderStatusChip = (status) => {
     switch (status) {
       case "Approved":
-        return <Chip label="Approved" size="small" color="success" icon={<CheckCircleIcon />} sx={{ fontWeight: 700 }} />;
+        return (
+          <Chip
+            label="Approved"
+            size="small"
+            icon={<CheckCircleIcon sx={{ fontSize: "0.9rem !important", color: isDark ? "#34d399 !important" : "#16a34a !important" }} />}
+            sx={{
+              height: 24,
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              color: isDark ? "#34d399" : "#16a34a",
+              bgcolor: isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(22, 163, 74, 0.1)",
+              border: isDark ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(22, 163, 74, 0.25)",
+              borderRadius: 999,
+              "& .MuiChip-label": { px: 0.8 },
+            }}
+          />
+        );
       case "ReadyForApproval":
-        return <Chip label="Ready for Approval" size="small" color="success" variant="outlined" icon={<VerifiedIcon />} sx={{ fontWeight: 800 }} />;
+        return (
+          <Chip
+            label="Ready for Approval"
+            size="small"
+            icon={<VerifiedIcon sx={{ fontSize: "0.9rem !important", color: isDark ? "#c4b5fd !important" : "#4a3f6b !important" }} />}
+            sx={{
+              height: 24,
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              color: isDark ? "#c4b5fd" : "#4a3f6b",
+              bgcolor: isDark ? "rgba(196, 181, 253, 0.14)" : "rgba(74, 63, 107, 0.08)",
+              border: isDark ? "1px solid rgba(196, 181, 253, 0.3)" : "1px solid rgba(74, 63, 107, 0.25)",
+              borderRadius: 999,
+              "& .MuiChip-label": { px: 0.8 },
+            }}
+          />
+        );
       case "DuesOutstanding":
-        return <Chip label="Dues Outstanding" size="small" color="error" icon={<WarningIcon />} sx={{ fontWeight: 700 }} />;
+        return (
+          <Chip
+            label="Dues Outstanding"
+            size="small"
+            icon={<WarningIcon sx={{ fontSize: "0.9rem !important", color: isDark ? "#f87171 !important" : "#dc2626 !important" }} />}
+            sx={{
+              height: 24,
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              color: isDark ? "#f87171" : "#dc2626",
+              bgcolor: isDark ? "rgba(220, 38, 38, 0.14)" : "rgba(220, 38, 38, 0.08)",
+              border: isDark ? "1px solid rgba(220, 38, 38, 0.3)" : "1px solid rgba(220, 38, 38, 0.25)",
+              borderRadius: 999,
+              "& .MuiChip-label": { px: 0.8 },
+            }}
+          />
+        );
       case "PendingClearance":
       default:
-        return <Chip label="Pending Verification" size="small" color="warning" icon={<PendingIcon />} sx={{ fontWeight: 700 }} />;
+        return (
+          <Chip
+            label="Pending Verification"
+            size="small"
+            icon={<PendingIcon sx={{ fontSize: "0.9rem !important", color: isDark ? "#fbbf24 !important" : "#b45309 !important" }} />}
+            sx={{
+              height: 24,
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              color: isDark ? "#fbbf24" : "#b45309",
+              bgcolor: isDark ? "rgba(245, 158, 11, 0.14)" : "rgba(245, 158, 11, 0.08)",
+              border: isDark ? "1px solid rgba(245, 158, 11, 0.3)" : "1px solid rgba(245, 158, 11, 0.25)",
+              borderRadius: 999,
+              "& .MuiChip-label": { px: 0.8 },
+            }}
+          />
+        );
     }
   };
 
@@ -437,14 +514,36 @@ export default function ExitProcessPage() {
       key: "eventName",
       sortable: true,
       render: (row) => (
-        <Box>
-          <Typography variant="body2" fontWeight={700} sx={{ color: "text.primary" }}>
-            {row.eventName}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {formatGridDate(row.eventDate)}
-          </Typography>
-        </Box>
+        <Tooltip title={`View contributions for ${row.eventName}`}>
+          <Box
+            onClick={() => {
+              if (row.eventId) {
+                navigate(`/contributions?eventId=${row.eventId}`, { state: { eventId: row.eventId } });
+              }
+            }}
+            sx={{
+              cursor: "pointer",
+              display: "inline-block",
+              transition: "transform 0.15s ease",
+              "&:hover .event-name-link": {
+                color: "primary.main",
+                textDecoration: "underline",
+              },
+            }}
+          >
+            <Typography
+              className="event-name-link"
+              variant="body2"
+              fontWeight={700}
+              sx={{ color: "text.primary", transition: "color 0.15s ease" }}
+            >
+              {row.eventName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {formatGridDate(row.eventDate)}
+            </Typography>
+          </Box>
+        </Tooltip>
       ),
     },
     {
@@ -476,17 +575,51 @@ export default function ExitProcessPage() {
       ),
     },
     {
-      label: "Pending Obligations",
+      label: "Pending Events",
       key: "pendingObligationsCount",
       align: "center",
-      render: (row) => (
-        <Chip
-          label={`${row.pendingObligationsCount || 0} Event${row.pendingObligationsCount === 1 ? "" : "s"}`}
-          size="small"
-          color={row.pendingObligationsCount > 0 ? "warning" : "default"}
-          sx={{ fontWeight: 700, fontSize: "0.68rem" }}
-        />
-      ),
+      render: (row) => {
+        const count = row.pendingObligationsCount || 0;
+        const targetEvId = row.unpaidEventId || row.eventId;
+        const unpaidList = row.unpaidEvents || [];
+        const hasDues = count > 0;
+        return (
+          <Tooltip title={hasDues ? "Click to view unpaid events" : "No pending obligations"}>
+            <Chip
+              label={`${count} Event${count === 1 ? "" : "s"}`}
+              size="small"
+              onClick={hasDues ? (e) => {
+                if (unpaidList.length > 1) {
+                  setUnpaidPopoverAnchor(e.currentTarget);
+                  setUnpaidPopoverData({
+                    memberName: row.memberName,
+                    memberId: row.memberId,
+                    unpaidEvents: unpaidList,
+                  });
+                } else if (targetEvId) {
+                  navigate(`/contributions?eventId=${targetEvId}`, { state: { eventId: targetEvId } });
+                }
+              } : undefined}
+              sx={{
+                fontWeight: 700,
+                fontSize: "0.72rem",
+                height: 24,
+                cursor: hasDues ? "pointer" : "default",
+                color: hasDues ? (isDark ? "#fbbf24" : "#b45309") : (isDark ? "#94a3b8" : "#64748b"),
+                bgcolor: hasDues
+                  ? (isDark ? "rgba(245, 158, 11, 0.14)" : "rgba(245, 158, 11, 0.08)")
+                  : (isDark ? "rgba(100, 116, 139, 0.14)" : "rgba(100, 116, 139, 0.08)"),
+                border: hasDues
+                  ? (isDark ? "1px solid rgba(245, 158, 11, 0.3)" : "1px solid rgba(245, 158, 11, 0.25)")
+                  : (isDark ? "1px solid rgba(100, 116, 139, 0.25)" : "1px solid rgba(100, 116, 139, 0.2)"),
+                borderRadius: 999,
+                transition: "all 0.2s ease",
+                "&:hover": hasDues ? { filter: "brightness(0.95)", transform: "translateY(-1px)", boxShadow: "0 2px 6px rgba(245, 158, 11, 0.25)" } : {},
+              }}
+            />
+          </Tooltip>
+        );
+      },
     },
     {
       label: "Payment Verification",
@@ -498,9 +631,17 @@ export default function ExitProcessPage() {
             <Chip
               label="Pending Verification"
               size="small"
-              color="warning"
-              variant="outlined"
-              sx={{ fontWeight: 700, fontSize: "0.68rem" }}
+              icon={<PendingIcon sx={{ fontSize: "0.9rem !important", color: isDark ? "#fbbf24 !important" : "#b45309 !important" }} />}
+              sx={{
+                height: 24,
+                fontWeight: 700,
+                fontSize: "0.72rem",
+                color: isDark ? "#fbbf24" : "#b45309",
+                bgcolor: isDark ? "rgba(245, 158, 11, 0.14)" : "rgba(245, 158, 11, 0.08)",
+                border: isDark ? "1px solid rgba(245, 158, 11, 0.3)" : "1px solid rgba(245, 158, 11, 0.25)",
+                borderRadius: 999,
+                "& .MuiChip-label": { px: 0.8 },
+              }}
             />
           );
         }
@@ -508,8 +649,17 @@ export default function ExitProcessPage() {
           <Chip
             label={row.paymentVerificationStatus || "All Verified"}
             size="small"
-            color={row.outstandingAmount === 0 ? "success" : "default"}
-            sx={{ fontWeight: 700, fontSize: "0.68rem" }}
+            icon={<CheckCircleIcon sx={{ fontSize: "0.9rem !important", color: isDark ? "#34d399 !important" : "#16a34a !important" }} />}
+            sx={{
+              height: 24,
+              fontWeight: 700,
+              fontSize: "0.72rem",
+              color: isDark ? "#34d399" : "#16a34a",
+              bgcolor: isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(22, 163, 74, 0.08)",
+              border: isDark ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(22, 163, 74, 0.25)",
+              borderRadius: 999,
+              "& .MuiChip-label": { px: 0.8 },
+            }}
           />
         );
       },
@@ -536,7 +686,7 @@ export default function ExitProcessPage() {
                 onClick={() => handleOpenDues(row.clearanceId)}
                 sx={{
                   color: isDark ? "#c4b5fd" : "#4a3f6b",
-                  "&:hover": { bgcolor: isDark ? "rgba(196,181,253,0.12)" : "rgba(74,63,107,0.1)" },
+                  "&:hover": { bgcolor: isDark ? "rgba(196,181,253,0.12)" : "rgba(74,63,107,0.08)" },
                 }}
               >
                 <DuesIcon fontSize="small" />
@@ -549,8 +699,8 @@ export default function ExitProcessPage() {
                   size="small"
                   onClick={() => handleOpenRecordPayment(row)}
                   sx={{
-                    color: "primary.main",
-                    "&:hover": { bgcolor: "rgba(33, 150, 243, 0.1)" },
+                    color: isDark ? "#c4b5fd" : "#4a3f6b",
+                    "&:hover": { bgcolor: isDark ? "rgba(196,181,253,0.12)" : "rgba(74,63,107,0.08)" },
                   }}
                 >
                   <PaymentIcon fontSize="small" />
@@ -569,19 +719,35 @@ export default function ExitProcessPage() {
                 <span>
                   <Button
                     size="small"
-                    variant={canApprove ? "contained" : "outlined"}
-                    color={canApprove ? "success" : "inherit"}
+                    variant="contained"
                     disabled={!canApprove}
                     onClick={() => handleOpenApproveDialog(row)}
-                    startIcon={<CheckCircleIcon sx={{ fontSize: "1rem !important" }} />}
+                    startIcon={<CheckCircleIcon sx={{ fontSize: "0.95rem !important" }} />}
                     sx={{
                       fontSize: "0.72rem",
-                      py: 0.3,
-                      px: 1.2,
-                      fontWeight: 800,
+                      py: 0.35,
+                      px: 1.4,
+                      fontWeight: 700,
                       textTransform: "none",
-                      borderRadius: "6px",
-                      opacity: canApprove ? 1 : 0.45,
+                      borderRadius: "8px",
+                      background: canApprove
+                        ? (isDark
+                            ? "linear-gradient(135deg, #6d5ca0 0%, #52447d 100%) !important"
+                            : "linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%) !important")
+                        : "action.disabledBackground",
+                      color: canApprove ? "#ffffff !important" : "text.disabled",
+                      border: canApprove && isDark ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                      boxShadow: canApprove
+                        ? (isDark ? "0 2px 8px rgba(0, 0, 0, 0.3)" : "0 2px 8px rgba(74, 63, 107, 0.25)")
+                        : "none",
+                      opacity: canApprove ? 1 : 0.6,
+                      "&:hover": {
+                        background: canApprove
+                          ? (isDark
+                              ? "linear-gradient(135deg, #7d6bb3 0%, #605191 100%) !important"
+                              : "linear-gradient(135deg, #5c4f82 0%, #3a3065 100%) !important")
+                          : undefined,
+                      },
                     }}
                   >
                     Approve
@@ -594,8 +760,17 @@ export default function ExitProcessPage() {
               <Chip
                 label="Completed"
                 size="small"
-                color="default"
-                sx={{ fontSize: "0.68rem", fontWeight: 700 }}
+                icon={<CheckCircleIcon sx={{ fontSize: "0.85rem !important", color: isDark ? "#94a3b8 !important" : "#64748b !important" }} />}
+                sx={{
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  height: 24,
+                  color: isDark ? "#94a3b8" : "#64748b",
+                  bgcolor: isDark ? "rgba(148, 163, 184, 0.12)" : "rgba(100, 116, 139, 0.08)",
+                  border: isDark ? "1px solid rgba(148, 163, 184, 0.25)" : "1px solid rgba(100, 116, 139, 0.2)",
+                  borderRadius: 999,
+                  "& .MuiChip-label": { px: 0.8 },
+                }}
               />
             )}
           </Stack>
@@ -672,10 +847,17 @@ export default function ExitProcessPage() {
         <Chip
           label={row.approvedByName || "Admin"}
           size="small"
-          icon={<VerifiedIcon />}
-          color="success"
-          variant="outlined"
-          sx={{ fontWeight: 700, fontSize: "0.72rem" }}
+          icon={<VerifiedIcon sx={{ fontSize: "0.9rem !important", color: isDark ? "#34d399 !important" : "#16a34a !important" }} />}
+          sx={{
+            fontWeight: 700,
+            fontSize: "0.72rem",
+            height: 24,
+            color: isDark ? "#34d399" : "#16a34a",
+            bgcolor: isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(22, 163, 74, 0.08)",
+            border: isDark ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(22, 163, 74, 0.25)",
+            borderRadius: 999,
+            "& .MuiChip-label": { px: 0.8 },
+          }}
         />
       ),
     },
@@ -725,35 +907,10 @@ export default function ExitProcessPage() {
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2.5 } }}>
-      {/* ── Page Header ────────────────────────────────────────── */}
-      <Box sx={{ mb: 2.5, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1.5 }}>
-        <Box>
-          <Typography variant="caption" sx={{ color: isDark ? "#c4b5fd" : "#4a3f6b", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
-            Tools &bull; Member Clearance
-          </Typography>
-          <Typography variant="h5" fontWeight={900} sx={{ color: "text.primary", mt: 0.25 }}>
-            Member Exit Clearance
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-            Automated send-off clearance workflow: Send-off Beneficiaries &rarr; Live Dues Settlement &rarr; Admin Final Approval.
-          </Typography>
-        </Box>
-
-        <Stack direction="row" spacing={1}>
-          <AppButton
-            variant="outlined"
-            size="small"
-            onClick={() => (activeTab === 0 ? loadQueue() : loadHistory())}
-            startIcon={<RefreshIcon />}
-          >
-            Refresh
-          </AppButton>
-        </Stack>
-      </Box>
 
       {/* ── KPI Summary Cards ──────────────────────────────────── */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
             sx={{
               borderRadius: "12px",
@@ -782,7 +939,7 @@ export default function ExitProcessPage() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
             sx={{
               borderRadius: "12px",
@@ -811,7 +968,7 @@ export default function ExitProcessPage() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
             sx={{
               borderRadius: "12px",
@@ -840,7 +997,7 @@ export default function ExitProcessPage() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
             sx={{
               borderRadius: "12px",
@@ -918,7 +1075,7 @@ export default function ExitProcessPage() {
       {/* ── TAB 0: Clearance Queue ─────────────────────────────── */}
       {activeTab === 0 && (
         <Box>
-          {/* Filter Panel */}
+          {/* Filter Panel (Common Component Pattern) */}
           <Paper
             elevation={0}
             sx={{
@@ -929,106 +1086,111 @@ export default function ExitProcessPage() {
               border: `1px solid ${theme.palette.divider}`,
             }}
           >
-            <Grid container spacing={1.5} alignItems="center">
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Search member, email, event..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: searchTerm && (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setSearchTerm("")}>
-                          <ClearIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "flex-end",
+                flexWrap: "wrap",
+                gap: 1.5,
+                width: "100%",
+              }}
+            >
+              <Box sx={{ width: { xs: "100%", sm: 220, md: 240 } }}>
+                <AppSelect
+                  label="Send-Off Event"
+                  value={selectedEventId || "all"}
+                  onChange={(e) => setSelectedEventId(e.target.value === "all" ? "" : e.target.value)}
+                  onClear={() => setSelectedEventId("")}
+                  options={[
+                    { label: "All Send-Off Events", value: "all" },
+                    ...uniqueSendOffEvents.map((ev) => ({ label: ev.name, value: ev.id })),
+                  ]}
+                  placeholder="Select Event"
                 />
-              </Grid>
+              </Box>
 
-              <Grid item xs={12} sm={6} md={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="event-filter-label">Send-Off Event</InputLabel>
-                  <Select
-                    labelId="event-filter-label"
-                    label="Send-Off Event"
-                    value={selectedEventId}
-                    onChange={(e) => setSelectedEventId(e.target.value)}
-                  >
-                    <MenuItem value="">
-                      <em>All Send-Off Events</em>
-                    </MenuItem>
-                    {uniqueSendOffEvents.map((ev) => (
-                      <MenuItem key={ev.id} value={ev.id}>
-                        {ev.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+              <Box sx={{ width: { xs: "100%", sm: 200, md: 220 } }}>
+                <AppSelect
+                  label="Clearance Status"
+                  value={selectedClearanceStatus}
+                  onChange={(e) => setSelectedClearanceStatus(e.target.value || "all")}
+                  onClear={() => setSelectedClearanceStatus("all")}
+                  options={[
+                    { label: "All Clearance Statuses", value: "all" },
+                    { label: "Ready For Approval", value: "ReadyForApproval" },
+                    { label: "Dues Outstanding", value: "DuesOutstanding" },
+                    { label: "Pending Verification", value: "PendingClearance" },
+                    { label: "Approved", value: "Approved" },
+                  ]}
+                  placeholder="Select Status"
+                />
+              </Box>
 
-              <Grid item xs={12} sm={6} md={2.5}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="clearance-status-label">Clearance Status</InputLabel>
-                  <Select
-                    labelId="clearance-status-label"
-                    label="Clearance Status"
-                    value={selectedClearanceStatus}
-                    onChange={(e) => setSelectedClearanceStatus(e.target.value)}
-                  >
-                    <MenuItem value="all">All Clearance Statuses</MenuItem>
-                    <MenuItem value="ReadyForApproval">Ready For Approval</MenuItem>
-                    <MenuItem value="DuesOutstanding">Dues Outstanding</MenuItem>
-                    <MenuItem value="PendingClearance">Pending Verification</MenuItem>
-                    <MenuItem value="Approved">Approved</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
+              <Box sx={{ width: { xs: "100%", sm: 200, md: 220 } }}>
+                <AppSelect
+                  label="Payment Status"
+                  value={selectedPaymentStatus}
+                  onChange={(e) => setSelectedPaymentStatus(e.target.value || "all")}
+                  onClear={() => setSelectedPaymentStatus("all")}
+                  options={[
+                    { label: "All Payment Statuses", value: "all" },
+                    { label: "All Cleared (₹0 Dues)", value: "cleared" },
+                    { label: "Has Outstanding Dues", value: "dues" },
+                    { label: "Awaiting Verification", value: "unverified" },
+                  ]}
+                  placeholder="Select Status"
+                />
+              </Box>
 
-              <Grid item xs={12} sm={6} md={2.5}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="payment-status-label">Payment Status</InputLabel>
-                  <Select
-                    labelId="payment-status-label"
-                    label="Payment Status"
-                    value={selectedPaymentStatus}
-                    onChange={(e) => setSelectedPaymentStatus(e.target.value)}
-                  >
-                    <MenuItem value="all">All Payment Statuses</MenuItem>
-                    <MenuItem value="cleared">All Cleared (₹0 Dues)</MenuItem>
-                    <MenuItem value="dues">Has Outstanding Dues</MenuItem>
-                    <MenuItem value="unverified">Awaiting Verification</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} md={1} sx={{ display: "flex", justifyContent: "flex-end" }}>
-                {(searchTerm || selectedEventId || selectedClearanceStatus !== "all" || selectedPaymentStatus !== "all") && (
-                  <Button
-                    size="small"
-                    variant="text"
-                    color="inherit"
-                    onClick={() => {
-                      setSearchTerm("");
-                      setSelectedEventId("");
-                      setSelectedClearanceStatus("all");
-                      setSelectedPaymentStatus("all");
-                    }}
-                    sx={{ textTransform: "none", fontSize: "0.75rem" }}
-                  >
-                    Reset
-                  </Button>
-                )}
-              </Grid>
-            </Grid>
+              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<FilterIcon sx={{ fontSize: 17 }} />}
+                  onClick={() => loadQueue()}
+                  sx={{
+                    height: 34,
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                    bgcolor: (theme) => (theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important"),
+                    border: (theme) => (theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none"),
+                    "&:hover": {
+                      bgcolor: (theme) => (theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important"),
+                    },
+                  }}
+                >
+                  Filter
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    setSelectedEventId("");
+                    setSelectedClearanceStatus("all");
+                    setSelectedPaymentStatus("all");
+                  }}
+                  sx={{
+                    color: "#ef4444",
+                    borderColor: "rgba(239, 68, 68, 0.4)",
+                    height: 34,
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                    "&:hover": {
+                      borderColor: "#ef4444",
+                      bgcolor: "rgba(239, 68, 68, 0.05)",
+                    },
+                  }}
+                >
+                  Clear Filter
+                </AppButton>
+              </Box>
+            </Box>
           </Paper>
 
           {/* Queue Data Table */}
@@ -1036,7 +1198,7 @@ export default function ExitProcessPage() {
             data={filteredQueueData}
             columns={queueColumns}
             loading={loading}
-            emptyMessage="No members currently in the exit clearance queue. Beneficiaries will automatically appear when a Send-Off event is published."
+            emptyMessage="No record found"
             exportFileName="Member_Exit_Clearance_Queue"
           />
         </Box>
@@ -1049,7 +1211,7 @@ export default function ExitProcessPage() {
             data={historyData}
             columns={historyColumns}
             loading={historyLoading}
-            emptyMessage="No approved exit clearance history records found yet."
+            emptyMessage="No record found"
             exportFileName="Member_Exit_Clearance_History"
           />
         </Box>
@@ -1215,27 +1377,45 @@ export default function ExitProcessPage() {
             )}
 
             {/* Sub-tabs: Event Dues vs Payment History */}
-            <Tabs
-              value={duesActiveSubTab}
-              onChange={(e, v) => setDuesActiveSubTab(v)}
-              sx={{
-                mb: 1.5,
-                borderBottom: 1,
-                borderColor: "divider",
-                "& .MuiTab-root": { fontWeight: 800, fontSize: "0.82rem", textTransform: "none" },
-              }}
-            >
-              <Tab
-                label={`Event Obligations (${duesDetail.eventDues?.length || 0})`}
-                icon={<DuesIcon sx={{ fontSize: "1rem" }} />}
-                iconPosition="start"
-              />
-              <Tab
-                label={`Payment History (${duesDetail.paymentHistory?.length || 0})`}
-                icon={<HistoryIcon sx={{ fontSize: "1rem" }} />}
-                iconPosition="start"
-              />
-            </Tabs>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: 1, borderColor: "divider", mb: 1.5 }}>
+              <Tabs
+                value={duesActiveSubTab}
+                onChange={(e, v) => setDuesActiveSubTab(v)}
+                sx={{
+                  "& .MuiTab-root": { fontWeight: 800, fontSize: "0.82rem", textTransform: "none" },
+                }}
+              >
+                <Tab
+                  label={`Event Obligations (${duesDetail.eventDues?.length || 0})`}
+                  icon={<DuesIcon sx={{ fontSize: "1rem" }} />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`Payment History (${duesDetail.paymentHistory?.length || 0})`}
+                  icon={<HistoryIcon sx={{ fontSize: "1rem" }} />}
+                  iconPosition="start"
+                />
+              </Tabs>
+
+              {duesActiveSubTab === 0 && (duesDetail.eventDues?.filter(ed => ed.outstandingBalance > 0).length || 0) > 0 && (
+                <Button
+                  size="small"
+                  variant={onlyUnpaidEventsInModal ? "contained" : "outlined"}
+                  color={onlyUnpaidEventsInModal ? "warning" : "inherit"}
+                  onClick={() => setOnlyUnpaidEventsInModal((prev) => !prev)}
+                  sx={{
+                    fontSize: "0.72rem",
+                    py: 0.3,
+                    px: 1,
+                    fontWeight: 700,
+                    textTransform: "none",
+                    borderRadius: "6px",
+                  }}
+                >
+                  {onlyUnpaidEventsInModal ? "Showing Unpaid Alone" : "Show Unpaid Alone"}
+                </Button>
+              )}
+            </Box>
 
             {/* Event Dues Table */}
             {duesActiveSubTab === 0 && (
@@ -1253,16 +1433,40 @@ export default function ExitProcessPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {duesDetail.eventDues?.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} align="center" sx={{ py: 3, color: "text.secondary" }}>
-                          No contribution obligations found for this member.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      duesDetail.eventDues.map((ed) => (
+                    {(() => {
+                      const displayedDues = onlyUnpaidEventsInModal
+                        ? (duesDetail.eventDues || []).filter((ed) => ed.outstandingBalance > 0)
+                        : (duesDetail.eventDues || []);
+
+                      if (displayedDues.length === 0) {
+                        return (
+                          <TableRow>
+                            <TableCell colSpan={7} align="center" sx={{ py: 3, color: "text.secondary" }}>
+                              {onlyUnpaidEventsInModal ? "No unpaid events found for this member." : "No contribution obligations found for this member."}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      return displayedDues.map((ed) => (
                         <TableRow key={ed.eventId} hover>
-                          <TableCell sx={{ fontWeight: 700 }}>{ed.eventName}</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>
+                            <Tooltip title={`View contributions for ${ed.eventName}`}>
+                              <Typography
+                                variant="body2"
+                                fontWeight={700}
+                                onClick={() => navigate(`/contributions?eventId=${ed.eventId}`, { state: { eventId: ed.eventId } })}
+                                sx={{
+                                  cursor: "pointer",
+                                  color: "primary.main",
+                                  display: "inline-block",
+                                  "&:hover": { textDecoration: "underline" },
+                                }}
+                              >
+                                {ed.eventName}
+                              </Typography>
+                            </Tooltip>
+                          </TableCell>
                           <TableCell sx={{ fontSize: "0.82rem" }}>{formatGridDate(ed.eventDate)}</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 700 }}>
                             {formatWholeCurrency(ed.contributionAmount)}
@@ -1280,20 +1484,42 @@ export default function ExitProcessPage() {
                             {formatWholeCurrency(ed.outstandingBalance)}
                           </TableCell>
                           <TableCell align="center">
-                            <Chip
-                              label={ed.paymentStatus}
-                              size="small"
-                              color={
-                                ed.paymentStatus === "Paid"
-                                  ? "success"
-                                  : ed.paymentStatus === "Partially Paid"
-                                  ? "warning"
-                                  : "error"
-                              }
-                              sx={{ fontWeight: 700, fontSize: "0.68rem" }}
-                            />
-                            {ed.hasPendingPayment && (
-                              <Typography variant="caption" color="warning.main" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 700 }}>
+                            {(() => {
+                              const isPaid = ed.paymentStatus === "Paid";
+                              const isPartial = ed.paymentStatus === "Partially Paid";
+                              const color = isPaid
+                                ? (isDark ? "#34d399" : "#16a34a")
+                                : isPartial
+                                ? (isDark ? "#fbbf24" : "#b45309")
+                                : (isDark ? "#f87171" : "#dc2626");
+                              const bg = isPaid
+                                ? (isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(22, 163, 74, 0.08)")
+                                : isPartial
+                                ? (isDark ? "rgba(245, 158, 11, 0.14)" : "rgba(245, 158, 11, 0.08)")
+                                : (isDark ? "rgba(220, 38, 38, 0.14)" : "rgba(220, 38, 38, 0.08)");
+                              const border = isPaid
+                                ? (isDark ? "rgba(16, 185, 129, 0.3)" : "rgba(22, 163, 74, 0.25)")
+                                : isPartial
+                                ? (isDark ? "rgba(245, 158, 11, 0.3)" : "rgba(245, 158, 11, 0.25)")
+                                : (isDark ? "rgba(220, 38, 38, 0.3)" : "rgba(220, 38, 38, 0.25)");
+                              return (
+                                <Chip
+                                  label={ed.paymentStatus}
+                                  size="small"
+                                  sx={{
+                                    fontWeight: 700,
+                                    fontSize: "0.68rem",
+                                    height: 22,
+                                    color,
+                                    bgcolor: bg,
+                                    border: `1px solid ${border}`,
+                                    borderRadius: 999,
+                                  }}
+                                />
+                              );
+                            })()}
+                            {ed.hasPendingPayment && ed.outstandingBalance > 0 && ed.paymentStatus !== "Paid" && (
+                              <Typography variant="caption" sx={{ display: "block", fontSize: "0.65rem", fontWeight: 700, color: isDark ? "#fbbf24" : "#b45309", mt: 0.3 }}>
                                 +{formatWholeCurrency(ed.pendingPaymentAmount)} Pending
                               </Typography>
                             )}
@@ -1316,8 +1542,8 @@ export default function ExitProcessPage() {
                             )}
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </TableBody>
                 </Table>
               </Box>
@@ -1357,18 +1583,40 @@ export default function ExitProcessPage() {
                             {formatWholeCurrency(pt.amount)}
                           </TableCell>
                           <TableCell align="center">
-                            <Chip
-                              label={pt.status || "Pending"}
-                              size="small"
-                              color={
-                                pt.status === "Verified" || pt.status === "Approved" || pt.status === "Paid"
-                                  ? "success"
-                                  : pt.status === "Rejected"
-                                  ? "error"
-                                  : "warning"
-                              }
-                              sx={{ fontWeight: 700, fontSize: "0.68rem" }}
-                            />
+                            {(() => {
+                              const isVer = pt.status === "Verified" || pt.status === "Approved" || pt.status === "Paid";
+                              const isRej = pt.status === "Rejected";
+                              const color = isVer
+                                ? (isDark ? "#34d399" : "#16a34a")
+                                : isRej
+                                ? (isDark ? "#f87171" : "#dc2626")
+                                : (isDark ? "#fbbf24" : "#b45309");
+                              const bg = isVer
+                                ? (isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(22, 163, 74, 0.08)")
+                                : isRej
+                                ? (isDark ? "rgba(220, 38, 38, 0.14)" : "rgba(220, 38, 38, 0.08)")
+                                : (isDark ? "rgba(245, 158, 11, 0.14)" : "rgba(245, 158, 11, 0.08)");
+                              const border = isVer
+                                ? (isDark ? "rgba(16, 185, 129, 0.3)" : "rgba(22, 163, 74, 0.25)")
+                                : isRej
+                                ? (isDark ? "rgba(220, 38, 38, 0.3)" : "rgba(220, 38, 38, 0.25)")
+                                : (isDark ? "rgba(245, 158, 11, 0.3)" : "rgba(245, 158, 11, 0.25)");
+                              return (
+                                <Chip
+                                  label={pt.status || "Pending"}
+                                  size="small"
+                                  sx={{
+                                    fontWeight: 700,
+                                    fontSize: "0.68rem",
+                                    height: 22,
+                                    color,
+                                    bgcolor: bg,
+                                    border: `1px solid ${border}`,
+                                    borderRadius: 999,
+                                  }}
+                                />
+                              );
+                            })()}
                           </TableCell>
                           <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{pt.utr || "--"}</TableCell>
                           <TableCell align="center">
@@ -1429,7 +1677,7 @@ export default function ExitProcessPage() {
           </Typography>
 
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
                 label="Payment Amount (₹)"
@@ -1443,7 +1691,7 @@ export default function ExitProcessPage() {
               />
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth size="small">
                 <InputLabel id="payment-mode-select-label">Payment Mode</InputLabel>
                 <Select
@@ -1464,7 +1712,7 @@ export default function ExitProcessPage() {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 label="UTR / Reference Number (Optional for Cash)"
@@ -1475,7 +1723,7 @@ export default function ExitProcessPage() {
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 multiline
@@ -1598,7 +1846,7 @@ export default function ExitProcessPage() {
                 }}
               >
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <Typography variant="caption" color="text.secondary">
                       MEMBER NAME AT APPROVAL
                     </Typography>
@@ -1610,7 +1858,7 @@ export default function ExitProcessPage() {
                     </Typography>
                   </Grid>
 
-                  <Grid item xs={12} sm={6}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <Typography variant="caption" color="text.secondary">
                       SEND-OFF EVENT
                     </Typography>
@@ -1619,7 +1867,7 @@ export default function ExitProcessPage() {
                     </Typography>
                   </Grid>
 
-                  <Grid item xs={12} sm={4}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Typography variant="caption" color="text.secondary">
                       APPROVED BY
                     </Typography>
@@ -1628,7 +1876,7 @@ export default function ExitProcessPage() {
                     </Typography>
                   </Grid>
 
-                  <Grid item xs={12} sm={4}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Typography variant="caption" color="text.secondary">
                       APPROVAL DATE
                     </Typography>
@@ -1637,7 +1885,7 @@ export default function ExitProcessPage() {
                     </Typography>
                   </Grid>
 
-                  <Grid item xs={12} sm={4}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Typography variant="caption" color="text.secondary">
                       OUTSTANDING AT APPROVAL
                     </Typography>
@@ -1665,6 +1913,90 @@ export default function ExitProcessPage() {
           )}
         </Box>
       </AppDialog>
+
+      {/* ── UNPAID EVENTS POPOVER (Shows Unpaid Events Alone) ── */}
+      <Popover
+        open={Boolean(unpaidPopoverAnchor)}
+        anchorEl={unpaidPopoverAnchor}
+        onClose={() => {
+          setUnpaidPopoverAnchor(null);
+          setUnpaidPopoverData(null);
+        }}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "center",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "center",
+        }}
+        slotProps={{
+          paper: {
+            sx: {
+              p: 1.5,
+              width: 330,
+              maxWidth: "92vw",
+              borderRadius: "10px",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+              border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#e2e8f0"}`,
+            },
+          },
+        }}
+      >
+        <Box sx={{ mb: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography variant="subtitle2" fontWeight={800} color="error.main">
+            Unpaid Events ({unpaidPopoverData?.unpaidEvents?.length || 0})
+          </Typography>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>
+            {unpaidPopoverData?.memberName}
+          </Typography>
+        </Box>
+        <Divider sx={{ mb: 1 }} />
+        <List dense disablePadding>
+          {(unpaidPopoverData?.unpaidEvents || []).map((ev) => (
+            <ListItem
+              key={ev.eventId}
+              button
+              onClick={() => {
+                const targetId = ev.eventId;
+                setUnpaidPopoverAnchor(null);
+                setUnpaidPopoverData(null);
+                navigate(`/contributions?eventId=${targetId}`, { state: { eventId: targetId } });
+              }}
+              sx={{
+                borderRadius: "8px",
+                mb: 0.5,
+                bgcolor: isDark ? "rgba(239, 68, 68, 0.08)" : "#fef2f2",
+                "&:hover": {
+                  bgcolor: isDark ? "rgba(239, 68, 68, 0.16)" : "#fee2e2",
+                },
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                py: 0.75,
+                px: 1,
+              }}
+            >
+              <Box sx={{ pr: 1, minWidth: 0, flex: 1 }}>
+                <Typography variant="body2" fontWeight={700} noWrap sx={{ color: "primary.main" }}>
+                  {ev.eventName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {formatGridDate(ev.eventDate)}
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: "right" }}>
+                <Typography variant="body2" fontWeight={900} color="error.main">
+                  {formatWholeCurrency(ev.outstandingBalance)}
+                </Typography>
+                <Typography variant="caption" color="error.main" fontWeight={700}>
+                  {ev.paymentStatus || "Unpaid"}
+                </Typography>
+              </Box>
+            </ListItem>
+          ))}
+        </List>
+      </Popover>
     </Box>
   );
 }

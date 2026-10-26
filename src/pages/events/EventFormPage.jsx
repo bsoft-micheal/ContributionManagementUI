@@ -422,17 +422,23 @@ export default function EventFormPage({
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
 
   const isMemberActive = (m) => {
-    const active =
-      m.isActive === true ||
-      m.isActive === 1 ||
-      String(m.isActive).toLowerCase() === "true" ||
-      m.status === "Active" ||
-      m.isActive === undefined;
-    const exited =
+    if (!m) return false;
+    const isExited =
       m.isExited === true ||
       m.isExited === 1 ||
       String(m.isExited).toLowerCase() === "true";
-    return active && !exited;
+    if (isExited) return false;
+
+    if (
+      m.isActive === false ||
+      m.isActive === 0 ||
+      String(m.isActive).toLowerCase() === "false" ||
+      m.status === "Inactive"
+    ) {
+      return false;
+    }
+
+    return true;
   };
 
   // Active members count
@@ -510,11 +516,11 @@ export default function EventFormPage({
             memberId: u.memberId || u.userId || u.id,
             name: u.name || u.fullName || u.username,
             workType: u.workType || u.memberType || "Office",
-            isActive: u.isActive !== false && !u.isDeleted,
-            isExited: Boolean(u.isExited),
+            isActive: u.isActive !== false && u.isActive !== 0 && String(u.isActive).toLowerCase() !== "false" && u.status !== "Inactive" && !u.isDeleted,
+            isExited: u.isExited === true || u.isExited === 1 || String(u.isExited).toLowerCase() === "true",
           }));
 
-        const activeMems = normalizedMembers.filter((m) => m.isActive && !m.isExited);
+        const activeMems = normalizedMembers.filter(isMemberActive);
         setEventTypes(typesData || []);
         setMembers(normalizedMembers);
 
