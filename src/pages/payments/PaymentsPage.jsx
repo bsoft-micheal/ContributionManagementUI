@@ -92,7 +92,7 @@ export default function PaymentsPage() {
   const [appliedMode, setAppliedMode] = useState("ALL");
   const [appliedStatus, setAppliedStatus] = useState("ALL");
   const [appliedDate, setAppliedDate] = useState(null);
-  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(true);
 
   // Dynamically derive payment modes from DB transactions
   const modeOptions = useMemo(() => {
@@ -878,84 +878,89 @@ export default function PaymentsPage() {
         loading={loading}
 
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid
-              size={{ xs: 12, md: 10 }}
-              sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
-            >
-              {!isMemberRole && (
-                <Box sx={{ minWidth: 180 }}>
-                  <AppSelect
-                    label="Select Member"
-                    value={filterMember}
-                    onChange={(e) => {
-                      setFilterMember(e.target.value || "ALL");
-                    }}
-                    onClear={() => setFilterMember("ALL")}
-                    options={memberOptions}
-                    size="small"
-                    placeholder="Select Member"
-                    fullWidth
-                  />
-                </Box>
-              )}
-              <Box sx={{ minWidth: 180 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 1.25,
+              width: "100%",
+            }}
+          >
+            {!isMemberRole && (
+              <Box sx={{ width: { xs: "100%", sm: 175, md: 190 } }}>
                 <AppSelect
-                  label="Select Event Name"
-                  value={filterEvent}
+                  label="Select Member"
+                  value={filterMember}
                   onChange={(e) => {
-                    setFilterEvent(e.target.value || "ALL");
+                    setFilterMember(e.target.value || "ALL");
                   }}
-                  onClear={() => setFilterEvent("ALL")}
-                  options={eventOptions}
+                  onClear={() => setFilterMember("ALL")}
+                  options={memberOptions}
                   size="small"
-                  placeholder="Select Event Name"
+                  placeholder="Select Member"
                   fullWidth
                 />
               </Box>
-              <Box sx={{ minWidth: 140 }}>
-                <AppSelect
-                  label="Payment Mode"
-                  value={filterMode}
-                  onChange={(e) => {
-                    setFilterMode(e.target.value || "ALL");
-                  }}
-                  onClear={() => setFilterMode("ALL")}
-                  options={modeOptions}
-                  size="small"
-                  placeholder="Payment Mode"
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ width: 160, minWidth: 160 }}>
-                <AppSelect
-                  label="Select Status"
-                  value={filterStatus}
-                  onChange={(e) => {
-                    setFilterStatus(e.target.value || "ALL");
-                  }}
-                  onClear={() => setFilterStatus("ALL")}
-                  options={statusOptions}
-                  size="small"
-                  placeholder="Select Status"
-                  fullWidth
-                />
-              </Box>
-              <Box sx={{ width: 170, minWidth: 165 }}>
-                <AppDateInput
-                  label="Payment Date"
-                  value={filterDate}
-                  onChange={(newVal) => {
-                    setFilterDate(newVal);
-                  }}
-                  size="small"
-                  fullWidth
-                />
-              </Box>
+            )}
+            <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+              <AppSelect
+                label="Select Event Name"
+                value={filterEvent}
+                onChange={(e) => {
+                  setFilterEvent(e.target.value || "ALL");
+                }}
+                onClear={() => setFilterEvent("ALL")}
+                options={eventOptions}
+                size="small"
+                placeholder="Select Event Name"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 140, md: 155 } }}>
+              <AppSelect
+                label="Payment Mode"
+                value={filterMode}
+                onChange={(e) => {
+                  setFilterMode(e.target.value || "ALL");
+                }}
+                onClear={() => setFilterMode("ALL")}
+                options={modeOptions}
+                size="small"
+                placeholder="Payment Mode"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 155, md: 170 } }}>
+              <AppSelect
+                label="Select Status"
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value || "ALL");
+                }}
+                onClear={() => setFilterStatus("ALL")}
+                options={statusOptions}
+                size="small"
+                placeholder="Select Status"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ width: { xs: "100%", sm: 165, md: 175 } }}>
+              <AppDateInput
+                label="Payment Date"
+                value={filterDate}
+                onChange={(newVal) => {
+                  setFilterDate(newVal);
+                }}
+                size="small"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
               <AppButton
                 variant="contained"
                 size="small"
-                startIcon={<FilterListIcon />}
+                startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
                 onClick={() => {
                   setAppliedMember(filterMember);
                   setAppliedEvent(filterEvent);
@@ -966,10 +971,14 @@ export default function PaymentsPage() {
                 }}
                 sx={{
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                  border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
                 }}
               >
                 Filter
@@ -988,16 +997,17 @@ export default function PaymentsPage() {
                   setAppliedMode("ALL");
                   setAppliedStatus("ALL");
                   setAppliedDate(null);
-                  setHasAppliedFilter(false);
+                  setHasAppliedFilter(true);
                 }}
                 sx={{
                   color: "#ef4444",
                   borderColor: "rgba(239, 68, 68, 0.4)",
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
                   "&:hover": {
                     borderColor: "#ef4444",
                     bgcolor: "rgba(239, 68, 68, 0.05)",
@@ -1006,8 +1016,8 @@ export default function PaymentsPage() {
               >
                 Clear Filter
               </AppButton>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         }
       />
 

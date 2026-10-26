@@ -139,7 +139,7 @@ export default function EventsPage() {
   const [eventTypes, setEventTypes] = useState([]);
   const [members, setMembers] = useState([]);
   const [users, setUsers] = useState([]);
-  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(true);
   const [filterLookupEvents, setFilterLookupEvents] = useState([]);
   const [filterYear, setFilterYear] = useState(dayjs().year());
   const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
@@ -369,7 +369,10 @@ export default function EventsPage() {
     }
   }
 
-  // Initial load: Do not load data automatically below filter section
+  // Initial load: Load data automatically on mount with default filters
+  useEffect(() => {
+    loadData(filters);
+  }, []);
 
   const yearOptions = useMemo(() => {
     const curYear = dayjs().year();
@@ -436,8 +439,8 @@ export default function EventsPage() {
       !filterEventType || filterEventType === "ALL"
         ? filterLookupEvents
         : filterLookupEvents.filter(
-            (e) => (e.eventTypeName || e.category || "").toLowerCase() === filterEventType.toLowerCase()
-          );
+          (e) => (e.eventTypeName || e.category || "").toLowerCase() === filterEventType.toLowerCase()
+        );
 
     matching.forEach((e) => {
       const name = e.eventName || e.name;
@@ -493,8 +496,8 @@ export default function EventsPage() {
       status: "ALL",
     };
     setFilters(resetFilters);
-    setEvents([]);
-    setHasAppliedFilter(false);
+    setHasAppliedFilter(true);
+    loadData(resetFilters);
   };
 
   const displayedEvents = useMemo(() => {
@@ -692,8 +695,8 @@ export default function EventsPage() {
                 !canEditEvent
                   ? "Disabled"
                   : hasPaid
-                  ? "Cannot edit event after payments have been received"
-                  : "Edit Event"
+                    ? "Cannot edit event after payments have been received"
+                    : "Edit Event"
               }
             >
               <span style={{ display: "inline-flex", cursor: !isEditable ? "not-allowed" : "pointer" }}>
@@ -723,8 +726,8 @@ export default function EventsPage() {
                 !canDeleteEvent
                   ? "Disabled"
                   : hasPaid
-                  ? "Cannot delete event after payments have been received"
-                  : "Delete Event"
+                    ? "Cannot delete event after payments have been received"
+                    : "Delete Event"
               }
             >
               <span style={{ display: "inline-flex", cursor: !isDeletable ? "not-allowed" : "pointer" }}>
@@ -773,8 +776,8 @@ export default function EventsPage() {
                     !canViewPhotos
                       ? "Disabled"
                       : !hasPhotos
-                      ? "No photos available"
-                      : "View Photos"
+                        ? "No photos available"
+                        : "View Photos"
                   }
                 >
                   <span style={{ display: "inline-flex", cursor: !isPhotoViewable ? "not-allowed" : "pointer" }}>
@@ -823,8 +826,8 @@ export default function EventsPage() {
                     !canViewExpense
                       ? "Disabled"
                       : !hasExpenses
-                      ? "No expenses recorded"
-                      : "View Expense"
+                        ? "No expenses recorded"
+                        : "View Expense"
                   }
                 >
                   <span style={{ display: "inline-flex", cursor: !isExpenseViewable ? "not-allowed" : "pointer" }}>
@@ -978,7 +981,7 @@ export default function EventsPage() {
           if (match) {
             try {
               datesByType = JSON.parse(match[1]);
-            } catch {}
+            } catch { }
           }
         }
 
@@ -1323,7 +1326,7 @@ export default function EventsPage() {
                   placeholder="Select Status"
                 />
               </Box>
-              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
+              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
                 <AppButton
                   variant="contained"
                   size="small"
@@ -1336,8 +1339,9 @@ export default function EventsPage() {
                     fontSize: "0.75rem",
                     px: 2,
                     whiteSpace: "nowrap",
-                    bgcolor: "#4a3f6b !important",
-                    "&:hover": { bgcolor: "#3b325c !important" },
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                    border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
                   }}
                 >
                   Filter

@@ -491,34 +491,43 @@ export default function BudgetCalculationsPage() {
         data={filteredItems}
         loading={loading}
         filterPanel={
-          <Grid container spacing={2} alignItems="center">
-            <Grid
-              size={{ xs: 12, md: 8 }}
-              sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
-            >
-              <Box sx={{ minWidth: 200 }}>
-                <AppSelect
-                  label="Select Event Type"
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value || "ALL")}
-                  onClear={() => setFilterCategory("ALL")}
-                  options={categoryFilterOptions}
-                  size="small"
-                  placeholder="Select Event Type"
-                  fullWidth
-                />
-              </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 1.25,
+              width: "100%",
+            }}
+          >
+            <Box sx={{ width: { xs: "100%", sm: 200, md: 230 } }}>
+              <AppSelect
+                label="Select Event Type"
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value || "ALL")}
+                onClear={() => setFilterCategory("ALL")}
+                options={categoryFilterOptions}
+                size="small"
+                placeholder="Select Event Type"
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
               <AppButton
                 variant="contained"
                 size="small"
-                startIcon={<FilterListIcon />}
+                startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
                 onClick={() => setAppliedCategory(filterCategory)}
                 sx={{
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                  border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
                 }}
               >
                 Filter
@@ -534,10 +543,11 @@ export default function BudgetCalculationsPage() {
                   color: "#ef4444",
                   borderColor: "rgba(239, 68, 68, 0.4)",
                   height: 34,
-                  mt: 2.2,
+                  minHeight: 34,
                   fontWeight: 700,
                   fontSize: "0.75rem",
                   px: 2,
+                  whiteSpace: "nowrap",
                   "&:hover": {
                     borderColor: "#ef4444",
                     bgcolor: "rgba(239, 68, 68, 0.05)",
@@ -546,8 +556,8 @@ export default function BudgetCalculationsPage() {
               >
                 Clear Filter
               </AppButton>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         }
         actions={
           <AppAddButton

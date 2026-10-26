@@ -321,8 +321,8 @@ export default function ContributionCalculationPage() {
         loading={loading}
         filterPanel={
           <Grid container spacing={3} alignItems="stretch" justifyContent="space-between">
-            <Grid size={{ xs: 12, lg: 4 }} sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, flexWrap: "wrap", pt: 0.5 }}>
-              <Box sx={{ minWidth: 220, flexGrow: 1 }}>
+            <Grid size={{ xs: 12, lg: 4 }} sx={{ display: "flex", alignItems: "flex-end", gap: 1.25, flexWrap: "wrap" }}>
+              <Box sx={{ minWidth: 220, flexGrow: 1, width: { xs: "100%", sm: "auto" } }}>
                 <AppSelect
                   label="Event Name"
                   placeholder="Select an event"
@@ -332,52 +332,60 @@ export default function ContributionCalculationPage() {
                   }}
                   options={events.map(e => ({ label: e.eventName, value: e.eventId }))}
                   required
+                  size="small"
                   fullWidth
                 />
               </Box>
-              <AppButton
-                variant="contained"
-                size="small"
-                startIcon={<FilterListIcon />}
-                onClick={() => {
-                  setSelectedEventId(filterEventId);
-                }}
-                sx={{
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                }}
-              >
-                Filter
-              </AppButton>
-              <AppButton
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  if (events.length > 0) {
-                    const firstEventId = events[0].eventId;
-                    setFilterEventId(firstEventId);
-                    setSelectedEventId(firstEventId);
-                  }
-                }}
-                sx={{
-                  color: "#ef4444",
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  height: 34,
-                  mt: 2.2,
-                  fontWeight: 700,
-                  fontSize: "0.75rem",
-                  px: 2,
-                  "&:hover": {
-                    borderColor: "#ef4444",
-                    bgcolor: "rgba(239, 68, 68, 0.05)"
-                  }
-                }}
-              >
-                Clear Filter
-              </AppButton>
+              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
+                <AppButton
+                  variant="contained"
+                  size="small"
+                  startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
+                  onClick={() => {
+                    setSelectedEventId(filterEventId);
+                  }}
+                  sx={{
+                    height: 34,
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                    border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
+                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                  }}
+                >
+                  Filter
+                </AppButton>
+                <AppButton
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    if (events.length > 0) {
+                      const firstEventId = events[0].eventId;
+                      setFilterEventId(firstEventId);
+                      setSelectedEventId(firstEventId);
+                    }
+                  }}
+                  sx={{
+                    color: "#ef4444",
+                    borderColor: "rgba(239, 68, 68, 0.4)",
+                    height: 34,
+                    minHeight: 34,
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    px: 2,
+                    whiteSpace: "nowrap",
+                    "&:hover": {
+                      borderColor: "#ef4444",
+                      bgcolor: "rgba(239, 68, 68, 0.05)"
+                    }
+                  }}
+                >
+                  Clear Filter
+                </AppButton>
+              </Box>
             </Grid>
             <Grid size={{ xs: 12, lg: 8 }} sx={{ display: "flex", justifyContent: "flex-end", alignItems: "stretch" }}>
               <Card sx={{ border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === "dark" ? "#171b2d" : "#ffffff", p: 1.5, width: "100%", maxWidth: 840, display: "flex", flexDirection: "column", justifyContent: "center" }}>

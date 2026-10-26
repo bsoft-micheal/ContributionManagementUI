@@ -615,11 +615,12 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
       sx={{
         display: "flex",
         flexWrap: "wrap",
-        gap: 2,
+        gap: 1.25,
         alignItems: "flex-end",
+        width: "100%",
       }}
     >
-      <Box sx={{ width: { xs: "100%", sm: 120 } }}>
+      <Box sx={{ width: { xs: "100%", sm: 125, md: 135 } }}>
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.YEAR_LABEL || "Year"}
           value={pending.year}
@@ -632,7 +633,7 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
           size="small"
         />
       </Box>
-      <Box sx={{ width: { xs: "100%", sm: 150 } }}>
+      <Box sx={{ width: { xs: "100%", sm: 145, md: 155 } }}>
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.MONTH_LABEL || "Month"}
           value={pending.month}
@@ -645,7 +646,7 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
           size="small"
         />
       </Box>
-      <Box sx={{ width: { xs: "100%", sm: 180 } }}>
+      <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.EVENT_TYPE_LABEL || "Event Type"}
           value={pending.eventType || "ALL"}
@@ -655,7 +656,7 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
           size="small"
         />
       </Box>
-      <Box sx={{ width: { xs: "100%", sm: 200 } }}>
+      <Box sx={{ width: { xs: "100%", sm: 190, md: 210 } }}>
         <AppSelect
           label={COMMON_STRINGS.DASHBOARD?.EVENT_LABEL || "Event Name"}
           value={pending.eventId || "ALL"}
@@ -666,12 +667,11 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
         />
       </Box>
 
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0, height: 34 }}>
         <AppButton
           variant="contained"
           size="small"
           onClick={onFilter}
-          disabled={loading}
           startIcon={<FilterListIcon sx={{ fontSize: 17 }} />}
           sx={{
             height: 34,
@@ -681,9 +681,10 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
             fontWeight: 700,
             fontSize: "0.75rem",
             whiteSpace: "nowrap",
-            bgcolor: "#4a3f6b !important",
+            bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+            border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
             "&:hover": {
-              bgcolor: "#3b325c !important",
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important",
             },
           }}
         >
@@ -694,7 +695,6 @@ function FilterBar({ pending, onChange, onFilter, onClear, yearOptions = YEAR_OP
           variant="outlined"
           size="small"
           onClick={onClear}
-          disabled={loading}
           sx={{
             height: 34,
             minHeight: 34,
@@ -755,7 +755,7 @@ export default function DashboardPage() {
 
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(true);
   const [filterEventsList, setFilterEventsList] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [quickAccessDrawerOpen, setQuickAccessDrawerOpen] = useState(false);
@@ -834,7 +834,10 @@ export default function DashboardPage() {
     }
   }, [toast]);
 
-  // Initial load: Do not load data automatically below filter section (waits for Filter button click)
+  // Initial load: Load dashboard automatically with default month & year on mount
+  useEffect(() => {
+    loadDashboard(pendingFilters.month, pendingFilters.year);
+  }, [loadDashboard]);
 
   // Detect today's birthdays on login & trigger celebratory pop up message only once per login session
   useEffect(() => {
@@ -957,8 +960,8 @@ export default function DashboardPage() {
       !selectedType || selectedType === "ALL"
         ? filterEventsList
         : filterEventsList.filter(
-            (e) => (e.eventTypeName || e.category || "").toLowerCase() === selectedType.toLowerCase()
-          );
+          (e) => (e.eventTypeName || e.category || "").toLowerCase() === selectedType.toLowerCase()
+        );
 
     const seen = new Set();
     matchingEvents.forEach((e) => {
@@ -1046,8 +1049,8 @@ export default function DashboardPage() {
     };
     setPendingFilters(defaultValues);
     setAppliedFilters(defaultValues);
-    setSummary(null);
-    setHasAppliedFilter(false);
+    setHasAppliedFilter(true);
+    loadDashboard(0, 0);
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -1645,140 +1648,140 @@ export default function DashboardPage() {
       ) : (
         <Stack spacing={3}>
 
-            {/* ① Top Summary Metric Cards */}
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  sm: "repeat(2, minmax(0, 1fr))",
-                  md: isMember ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
-                  lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
-                },
-                gap: { xs: 1, sm: 1.25 },
-              }}
-            >
-              {isMember ? (
-                <>
-                  {/* Member Card 1: Paid Amount */}
-                  <MetricCard
-                    label="Paid Amount"
-                    value={formatWholeCurrency(totalCollected)}
-                    accent="#10b981"
-                    onClick={totalCollected > 0 && events.length > 0 ? () => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); } : undefined}
-                    actionText={totalCollected > 0 && events.length > 0 ? "My Payments →" : undefined}
-                  />
-                  {/* Member Card 2: Unpaid Amount */}
-                  <MetricCard
-                    label="Unpaid Amount"
-                    value={formatWholeCurrency(totalPending)}
-                    accent="#f43f5e"
-                    onClick={totalPending > 0 && events.length > 0 ? () => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); } : undefined}
-                    actionText={totalPending > 0 && events.length > 0 ? "View Unpaid →" : undefined}
-                  />
-                  {/* Member Card 3: Total Expenses */}
-                  <MetricCard
-                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
-                    value={formatWholeCurrency(totalExpenses)}
-                    accent="#f59e0b"
-                    onClick={totalExpenses > 0 ? () => navigate("/expense") : undefined}
-                    actionText={totalExpenses > 0 ? "Expenses →" : undefined}
-                  />
-                  {/* Member Card 4: Total Events */}
-                  <MetricCard
-                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
-                    value={events.length}
-                    accent="#8b5cf6"
-                    onClick={events.length > 0 ? () => navigate("/events") : undefined}
-                    actionText={events.length > 0 ? "View Events →" : undefined}
-                  />
-                </>
-              ) : (
-                <>
-                  {/* Other Roles: Card 1: Expected Amount */}
-                  <MetricCard
-                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Expected Amount"}
-                    value={formatWholeCurrency(totalExpected)}
-                    accent="#6366f1"
-                    onClick={totalExpected > 0 && events.length > 0 ? () => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); } : undefined}
-                    actionText={totalExpected > 0 && events.length > 0 ? "All Members →" : undefined}
-                  />
-                  {/* Other Roles: Card 2: Collection Amount */}
-                  <MetricCard
-                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Collection Amount"}
-                    value={formatWholeCurrency(totalCollected)}
-                    accent="#10b981"
-                    onClick={totalCollected > 0 && events.length > 0 ? () => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); } : undefined}
-                    actionText={totalCollected > 0 && events.length > 0 ? "View Paid →" : undefined}
-                  />
-                  {/* Other Roles: Card 3: Pending Amount */}
-                  <MetricCard
-                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Pending Amount"}
-                    value={formatWholeCurrency(totalPending)}
-                    accent="#f43f5e"
-                    onClick={totalPending > 0 && events.length > 0 ? () => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); } : undefined}
-                    actionText={totalPending > 0 && events.length > 0 ? "View Unpaid →" : undefined}
-                  />
-                  {/* Other Roles: Card 4: Total Expenses */}
-                  <MetricCard
-                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
-                    value={formatWholeCurrency(totalExpenses)}
-                    accent="#f59e0b"
-                    onClick={totalExpenses > 0 ? () => navigate("/expense") : undefined}
-                    actionText={totalExpenses > 0 ? "Expenses →" : undefined}
-                  />
-                  {/* Other Roles: Card 5: Amount in Hand */}
-                  <MetricCard
-                    label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Amount in Hand"}
-                    value={formatWholeCurrency(totalRemaining)}
-                    accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
-                    badge={usedInHandBadge}
-                    actionText={totalRemaining !== 0 ? "Amount In Hand →" : undefined}
-                  />
-                  {/* Other Roles: Card 6: Total Events */}
-                  <MetricCard
-                    label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
-                    value={events.length}
-                    accent="#8b5cf6"
-                    onClick={events.length > 0 ? () => navigate("/events") : undefined}
-                    actionText={events.length > 0 ? "View Events →" : undefined}
-                  />
-                </>
-              )}
-            </Box>
-
-            {/* ② Financial Overview Column / Bar Chart */}
-            {events.length > 0 ? (
-              <FinancialBarChart
-                totalExpected={totalExpected}
-                totalCollected={totalCollected}
-                totalPending={totalPending}
-                totalExpenses={totalExpenses}
-                totalRemaining={totalRemaining}
-                events={events}
-                isMember={isMember}
-              />
+          {/* ① Top Summary Metric Cards */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+                md: isMember ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+                lg: isMember ? "repeat(4, minmax(0, 1fr))" : "repeat(6, minmax(0, 1fr))",
+              },
+              gap: { xs: 1, sm: 1.25 },
+            }}
+          >
+            {isMember ? (
+              <>
+                {/* Member Card 1: Paid Amount */}
+                <MetricCard
+                  label="Paid Amount"
+                  value={formatWholeCurrency(totalCollected)}
+                  accent="#10b981"
+                  onClick={totalCollected > 0 && events.length > 0 ? () => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); } : undefined}
+                  actionText={totalCollected > 0 && events.length > 0 ? "My Payments →" : undefined}
+                />
+                {/* Member Card 2: Unpaid Amount */}
+                <MetricCard
+                  label="Unpaid Amount"
+                  value={formatWholeCurrency(totalPending)}
+                  accent="#f43f5e"
+                  onClick={totalPending > 0 && events.length > 0 ? () => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); } : undefined}
+                  actionText={totalPending > 0 && events.length > 0 ? "View Unpaid →" : undefined}
+                />
+                {/* Member Card 3: Total Expenses */}
+                <MetricCard
+                  label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
+                  value={formatWholeCurrency(totalExpenses)}
+                  accent="#f59e0b"
+                  onClick={totalExpenses > 0 ? () => navigate("/expense") : undefined}
+                  actionText={totalExpenses > 0 ? "Expenses →" : undefined}
+                />
+                {/* Member Card 4: Total Events */}
+                <MetricCard
+                  label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
+                  value={events.length}
+                  accent="#8b5cf6"
+                  onClick={events.length > 0 ? () => navigate("/events") : undefined}
+                  actionText={events.length > 0 ? "View Events →" : undefined}
+                />
+              </>
             ) : (
-              <Box sx={{
-                py: 10, display: "grid", placeItems: "center", color: "text.secondary",
-                border: `1px dashed ${theme.palette.divider}`, borderRadius: 2,
-              }}>
-                <Typography variant="body2">
-                  {isFilteredByType
-                    ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
-                    : "No records found."}
-                </Typography>
-              </Box>
+              <>
+                {/* Other Roles: Card 1: Expected Amount */}
+                <MetricCard
+                  label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPECTED || "Expected Amount"}
+                  value={formatWholeCurrency(totalExpected)}
+                  accent="#6366f1"
+                  onClick={totalExpected > 0 && events.length > 0 ? () => { setQuickAccessStatus("all"); setQuickAccessDrawerOpen(true); } : undefined}
+                  actionText={totalExpected > 0 && events.length > 0 ? "All Members →" : undefined}
+                />
+                {/* Other Roles: Card 2: Collection Amount */}
+                <MetricCard
+                  label={COMMON_STRINGS.DASHBOARD?.TOTAL_COLLECTIONS || "Collection Amount"}
+                  value={formatWholeCurrency(totalCollected)}
+                  accent="#10b981"
+                  onClick={totalCollected > 0 && events.length > 0 ? () => { setQuickAccessStatus("paid"); setQuickAccessDrawerOpen(true); } : undefined}
+                  actionText={totalCollected > 0 && events.length > 0 ? "View Paid →" : undefined}
+                />
+                {/* Other Roles: Card 3: Pending Amount */}
+                <MetricCard
+                  label={COMMON_STRINGS.DASHBOARD?.TOTAL_PENDING || "Pending Amount"}
+                  value={formatWholeCurrency(totalPending)}
+                  accent="#f43f5e"
+                  onClick={totalPending > 0 && events.length > 0 ? () => { setQuickAccessStatus("pending"); setQuickAccessDrawerOpen(true); } : undefined}
+                  actionText={totalPending > 0 && events.length > 0 ? "View Unpaid →" : undefined}
+                />
+                {/* Other Roles: Card 4: Total Expenses */}
+                <MetricCard
+                  label={COMMON_STRINGS.DASHBOARD?.TOTAL_EXPENSES || "Total Expenses"}
+                  value={formatWholeCurrency(totalExpenses)}
+                  accent="#f59e0b"
+                  onClick={totalExpenses > 0 ? () => navigate("/expense") : undefined}
+                  actionText={totalExpenses > 0 ? "Expenses →" : undefined}
+                />
+                {/* Other Roles: Card 5: Amount in Hand */}
+                <MetricCard
+                  label={COMMON_STRINGS.DASHBOARD?.BALANCE_AMOUNT || COMMON_STRINGS.DASHBOARD?.REMAINING_AMOUNT || "Amount in Hand"}
+                  value={formatWholeCurrency(totalRemaining)}
+                  accent={totalRemaining >= 0 ? "#06b6d4" : "#f43f5e"}
+                  badge={usedInHandBadge}
+                  actionText={totalRemaining !== 0 ? "Amount In Hand →" : undefined}
+                />
+                {/* Other Roles: Card 6: Total Events */}
+                <MetricCard
+                  label={COMMON_STRINGS.DASHBOARD?.TOTAL_EVENTS || "Total Events"}
+                  value={events.length}
+                  accent="#8b5cf6"
+                  onClick={events.length > 0 ? () => navigate("/events") : undefined}
+                  actionText={events.length > 0 ? "View Events →" : undefined}
+                />
+              </>
             )}
-            <CollapsibleSection
-              title="Events for Selected Period"
-              count={events.length}
-              defaultOpen
-            >
-              <AppDataTable columns={columns} data={events} loading={false} />
-            </CollapsibleSection>
-          </Stack>
-        )}
+          </Box>
+
+          {/* ② Financial Overview Column / Bar Chart */}
+          {events.length > 0 ? (
+            <FinancialBarChart
+              totalExpected={totalExpected}
+              totalCollected={totalCollected}
+              totalPending={totalPending}
+              totalExpenses={totalExpenses}
+              totalRemaining={totalRemaining}
+              events={events}
+              isMember={isMember}
+            />
+          ) : (
+            <Box sx={{
+              py: 10, display: "grid", placeItems: "center", color: "text.secondary",
+              border: `1px dashed ${theme.palette.divider}`, borderRadius: 2,
+            }}>
+              <Typography variant="body2">
+                {isFilteredByType
+                  ? `No events found for event type "${appliedFilters.eventType}" in the selected period.`
+                  : "No records found."}
+              </Typography>
+            </Box>
+          )}
+          <CollapsibleSection
+            title="Events for Selected Period"
+            count={events.length}
+            defaultOpen
+          >
+            <AppDataTable columns={columns} data={events} loading={false} />
+          </CollapsibleSection>
+        </Stack>
+      )}
 
       {/* Quick Access Slide-Over Drawer */}
       <Drawer

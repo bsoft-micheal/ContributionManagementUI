@@ -191,6 +191,7 @@ export default function VerifySupportTicketModal({
           attachment: resolvedMatch?.attachment || initialData?.attachment || null,
           description: resolvedMatch?.description || resolvedMatch?.Description || initialData?.description || initialData?.Description || "",
           resolutionNotes: resolvedMatch?.resolutionNotes || initialData?.resolutionNotes || initialData?.replyMessage || initialData?.resolution || "",
+          resolutionNotesHistory: resolvedMatch?.resolutionNotesHistory || initialData?.resolutionNotesHistory || [],
           modifiedOn: resolvedMatch?.modifiedOn || initialData?.modifiedOn || null,
         };
 
@@ -248,11 +249,13 @@ export default function VerifySupportTicketModal({
     }
     if (!replyText || !replyText.trim()) {
       newErrors.replyText = "This field is required";
+    } else if (replyText.trim().length > 250) {
+      newErrors.replyText = "Resolution notes cannot exceed 250 characters";
     }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("This field is required");
+      toast.error(newErrors.replyText || newErrors.updateStatus || "This field is required");
       return;
     }
 
@@ -565,9 +568,9 @@ export default function VerifySupportTicketModal({
               </Box>
             )}
 
-            {/* Update Controls */}
             <Grid container spacing={2}>
-              {ticketInfo?.resolutionNotes && (
+              {/* Previous Resolution Notes / Replies History */}
+              {((ticketInfo?.resolutionNotesHistory && ticketInfo.resolutionNotesHistory.length > 0) || ticketInfo?.resolutionNotes) && (
                 <Grid size={{ xs: 12 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: "block", mb: 0.5 }}>
                     Previous Resolution Notes / Replies
@@ -578,18 +581,48 @@ export default function VerifySupportTicketModal({
                       borderRadius: "8px",
                       bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f8fafc"),
                       border: (t) => `1px solid ${t.palette.divider}`,
-                      whiteSpace: "pre-wrap",
                       fontSize: "0.85rem",
                       lineHeight: 1.6,
-                      maxHeight: "140px",
+                      maxHeight: "160px",
                       overflowY: "auto",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1.25,
                     }}
                   >
-                    {ticketInfo.resolutionNotes
-                      .split("\n")
-                      .map((line) => line.replace(/^\[.*?\]\s*[^:\n\r]+:\s*/, ""))
-                      .join("\n")
-                      .trim()}
+                    {ticketInfo?.resolutionNotesHistory && ticketInfo.resolutionNotesHistory.length > 0 ? (
+                      ticketInfo.resolutionNotesHistory.map((note, idx) => (
+                        <Box
+                          key={note.noteId || idx}
+                          sx={{
+                            p: 1,
+                            borderRadius: "6px",
+                            bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "#ffffff"),
+                            border: (t) => `1px solid ${t.palette.divider}`,
+                          }}
+                        >
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                            <Typography variant="caption" fontWeight={700} color="primary.main">
+                              {note.senderName || "Admin"}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {note.createdAt ? dayjs(note.createdAt).format("DD/MM/YYYY hh:mm A") : ""}
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", fontSize: "0.82rem" }}>
+                            {note.notes}
+                          </Typography>
+                        </Box>
+                      ))
+                    ) : (
+                      <Box sx={{ whiteSpace: "pre-wrap" }}>
+                        {ticketInfo.resolutionNotes
+                          .split("\n")
+                          .map((line) => line.replace(/^\[.*?\]\s*[^:\n\r]+:\s*/, ""))
+                          .join("\n")
+                          .trim()}
+                      </Box>
+                    )}
                   </Box>
                 </Grid>
               )}
@@ -613,8 +646,13 @@ export default function VerifySupportTicketModal({
                   label="Resolution Notes / Reply Message"
                   placeholder="Type resolution notes or reply message..."
                   value={replyText}
+                  maxLength={250}
+                  showCount={true}
                   onChange={(e) => {
-                    setReplyText(e.target.value);
+                    const val = e.target.value;
+                    if (val.length <= 250) {
+                      setReplyText(val);
+                    }
                     if (errors.replyText) setErrors((prev) => ({ ...prev, replyText: "" }));
                   }}
                   error={!!errors.replyText}

@@ -280,7 +280,7 @@ export default function ExpensePage() {
   const [appliedEvent, setAppliedEvent] = useState("ALL");
   const [appliedCategory, setAppliedCategory] = useState("ALL");
   const [appliedStatus, setAppliedStatus] = useState("ALL");
-  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(true);
 
   const fetchExpensesFromDb = async () => {
     try {
@@ -1482,7 +1482,7 @@ export default function ExpensePage() {
                     setAppliedEvent("ALL");
                     setAppliedCategory("ALL");
                     setAppliedStatus("ALL");
-                    setHasAppliedFilter(false);
+                    setHasAppliedFilter(true);
                   }}
                   sx={{
                     color: "#ef4444",

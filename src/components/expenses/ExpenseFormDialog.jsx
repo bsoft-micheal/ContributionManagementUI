@@ -777,10 +777,9 @@ export default function ExpenseFormDialog({
                       ? "rgba(124, 58, 237, 0.08)"
                       : "rgba(124, 58, 237, 0.04)",
                   border: (t) =>
-                    `1px solid ${
-                      t.palette.mode === "dark"
-                        ? "rgba(124, 58, 237, 0.25)"
-                        : "rgba(124, 58, 237, 0.18)"
+                    `1px solid ${t.palette.mode === "dark"
+                      ? "rgba(124, 58, 237, 0.25)"
+                      : "rgba(124, 58, 237, 0.18)"
                     }`,
                 }}
               >
