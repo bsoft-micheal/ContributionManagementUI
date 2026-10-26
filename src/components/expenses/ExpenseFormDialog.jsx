@@ -447,10 +447,74 @@ export default function ExpenseFormDialog({
   }, [additionalExpenses]);
   const totalCalculatedExpense = roundToWhole(mainBudgetAmount + extraExpensesSum);
 
+  const remainingBudgetCap = useMemo(() => {
+    if (!selectedEventBudget || selectedEventBudget.expected <= 0) return null;
+    return selectedEventBudget.remaining;
+  }, [selectedEventBudget]);
+
+  const isBudgetExhausted = remainingBudgetCap !== null && remainingBudgetCap <= 0;
+
   const isMainAmountExceedingBudget = useMemo(() => {
     if (!selectedEventBudget || selectedEventBudget.expected <= 0) return false;
     return mainBudgetAmount > selectedEventBudget.remaining;
   }, [selectedEventBudget, mainBudgetAmount]);
+
+  // Auto-clamp main budget amount whenever selected event changes or updates
+  useEffect(() => {
+    if (selectedEventBudget && selectedEventBudget.expected > 0) {
+      const currentNum = Number(form.amount) || 0;
+      if (selectedEventBudget.remaining <= 0) {
+        if (form.amount !== "" && form.amount !== "0") {
+          setForm((c) => ({ ...c, amount: "0" }));
+        }
+      } else if (currentNum > selectedEventBudget.remaining) {
+        setForm((c) => ({ ...c, amount: String(selectedEventBudget.remaining) }));
+        setErrors((p) => ({
+          ...p,
+          amount: `Amount clamped to remaining budget (${formatWholeCurrency(selectedEventBudget.remaining)})`,
+        }));
+      }
+    }
+  }, [selectedEventBudget]);
+
+  const handleAmountChange = (e) => {
+    const raw = e.target.value.replace(/[^0-9]/g, "");
+    if (raw === "") {
+      setForm((c) => ({ ...c, amount: "" }));
+      setErrors((p) => ({ ...p, amount: "" }));
+      return;
+    }
+    if (raw.length > 6) return;
+
+    const num = Number(raw);
+
+    // If event has an expected budget:
+    if (remainingBudgetCap !== null) {
+      if (isBudgetExhausted) {
+        setForm((c) => ({ ...c, amount: "0" }));
+        setErrors((p) => ({
+          ...p,
+          amount: "Remaining budget is ₹0. Please enter extra expenses in '+ Add Row' below.",
+        }));
+        toast.warning("Remaining expected budget is ₹0. Any expense must be added using '+ Add Row'.");
+        return;
+      }
+
+      if (num > remainingBudgetCap) {
+        // Strictly prevent entering more than remaining expected budget!
+        setForm((c) => ({ ...c, amount: String(remainingBudgetCap) }));
+        setErrors((p) => ({
+          ...p,
+          amount: `Cannot exceed remaining budget (${formatWholeCurrency(remainingBudgetCap)}). Enter extra spending under '+ Add Row' below.`,
+        }));
+        toast.warning(`Amount restricted to remaining budget of ${formatWholeCurrency(remainingBudgetCap)}. Extra spending must be added using '+ Add Row'.`);
+        return;
+      }
+    }
+
+    setForm((c) => ({ ...c, amount: raw }));
+    if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
+  };
 
   const handleAddAdditionalExpenseRow = () => {
     setAdditionalExpenses((prev) => [
@@ -1001,8 +1065,6 @@ export default function ExpenseFormDialog({
                 setForm((c) => ({ ...c, amount: raw }));
                 if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
               }}
-              maxLength={6}
-              inputProps={{ maxLength: 6 }}
               restrictType="numberonly"
               error={!isMainBudgetDisabled && (!!errors.amount || isMainAmountExceedingBudget)}
               helperText={

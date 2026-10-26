@@ -413,6 +413,8 @@ export default function EventFormPage({
   const [hasPayments, setHasPayments] = useState(false);
   const [isCustomEventName, setIsCustomEventName] = useState(false);
   const [useAvailableBalance, setUseAvailableBalance] = useState(false);
+  const [usePreviousEventBalance, setUsePreviousEventBalance] = useState(false);
+  const [previousBalanceData, setPreviousBalanceData] = useState(null);
   const [availableAmountInHand, setAvailableAmountInHand] = useState(0);
   const [allocatedAmount, setAllocatedAmount] = useState(0);
   const [selectedDeductionType, setSelectedDeductionType] = useState("available");
@@ -480,7 +482,7 @@ export default function EventFormPage({
             : getUsersAsync().catch(() => getMembersAsync()),
           getBudgetCalculationsAsync().catch(() => []),
           getSystemSettingsAsync().catch(() => null),
-          getAvailableAmountInHandAsync().catch(() => null),
+          getAvailableAmountInHandAsync(id || null).catch(() => null),
           getEventsAsync().catch(() => []),
         ]);
 
@@ -488,8 +490,14 @@ export default function EventFormPage({
 
         setExistingEvents(Array.isArray(allEventsData) ? allEventsData : []);
 
-        const handAmt = amountInHandData?.availableAmountInHand ?? amountInHandData?.data?.availableAmountInHand ?? 0;
+        const balanceObj = amountInHandData?.data || amountInHandData || {};
+        setPreviousBalanceData(balanceObj);
+        const handAmt = balanceObj.availableAmountInHand ?? 0;
         setAvailableAmountInHand(Number(handAmt) || 0);
+
+        if (!id && Number(balanceObj?.eligibleAdjustmentAmount || 0) > 0) {
+          setUsePreviousEventBalance(true);
+        }
 
         const normalizedMembers = (usersData || []).map((u) => ({
           ...u,
@@ -664,7 +672,7 @@ export default function EventFormPage({
               (t) => eventTypeIdsList.includes(t.eventTypeId) && t.eventTypeName?.toLowerCase().includes("birthday")
             );
 
-          let savedBaseAmount = Math.round(Number(detailedEvent.baseAmount || 0));
+          let savedBaseAmount = Math.round(Number(detailedEvent.originalPlannedBudget > 0 ? detailedEvent.originalPlannedBudget : detailedEvent.baseAmount || 0));
           let initialBaseAmount = savedBaseAmount > 0 ? String(savedBaseAmount) : "";
 
           // Compile and normalize all member lists / celebrants
@@ -869,6 +877,8 @@ export default function EventFormPage({
           const savedAlloc = Number(detailedEvent.allocatedAmount) || 0;
           setUseAvailableBalance(hasBal);
           setAllocatedAmount(savedAlloc);
+          const hasPrevBal = Boolean(detailedEvent.usePreviousEventBalance);
+          setUsePreviousEventBalance(hasPrevBal);
           if (hasBal) {
             const availAmt = Number(amountInHandData?.availableAmountInHand ?? amountInHandData?.data?.availableAmountInHand ?? 0);
             if (savedAlloc > 0 && Math.abs(savedAlloc - availAmt) > 0.01) {
@@ -1834,19 +1844,42 @@ export default function EventFormPage({
 
   const plannedBudget = roundToWhole(computedBudgetItems.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0));
 
+  const eligibleAdjAmount = Number(previousBalanceData?.eligibleAdjustmentAmount || 0);
+  const prevAdjType = previousBalanceData?.adjustmentType || "None";
+  const prevEventName = previousBalanceData?.previousEventName || "Previous Event";
+  const rawHandAmt = Number(previousBalanceData?.rawAmountInHand || 0);
+  const totalPendingAmt = Number(previousBalanceData?.totalPendingAmount || 0);
+
+  const effectiveBudget = useMemo(() => {
+    if (usePreviousEventBalance && eligibleAdjAmount > 0 && prevAdjType === "DeficitRecovery") {
+      return plannedBudget + eligibleAdjAmount;
+    }
+    return plannedBudget;
+  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, plannedBudget]);
+
   const effectiveDeduction = useMemo(() => {
+    if (usePreviousEventBalance && eligibleAdjAmount > 0 && prevAdjType === "SurplusCredit") {
+      return roundToWhole(Math.min(eligibleAdjAmount, plannedBudget));
+    }
     if (!useAvailableBalance) return 0;
     if (selectedDeductionType === "custom") {
       const customVal = parseFloat(customDeductionAmount);
       return isNaN(customVal) || customVal < 0 ? 0 : roundToWhole(customVal);
     }
     return roundToWhole(availableAmountInHand);
-  }, [useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand]);
+  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, plannedBudget]);
 
   const remainingBudgetToCollect = useMemo(() => {
+    if (usePreviousEventBalance && eligibleAdjAmount > 0) {
+      if (prevAdjType === "DeficitRecovery") {
+        return effectiveBudget;
+      } else if (prevAdjType === "SurplusCredit") {
+        return Math.max(0, plannedBudget - effectiveDeduction);
+      }
+    }
     if (!useAvailableBalance) return plannedBudget;
     return Math.max(0, plannedBudget - effectiveDeduction);
-  }, [useAvailableBalance, plannedBudget, effectiveDeduction]);
+  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, effectiveBudget, effectiveDeduction, useAvailableBalance, plannedBudget]);
 
   const contributionPerMember = useMemo(() => {
     if (isBirthday && exempt && celebrantCount > 0) {
@@ -2567,8 +2600,13 @@ export default function EventFormPage({
         description: finalDescription,
         status: resolvedStatus,
         baseAmount: plannedBudget,
-        useAvailableBalance: Boolean(useAvailableBalance),
-        allocatedAmount: useAvailableBalance ? Number(effectiveDeduction) : 0,
+        useAvailableBalance: Boolean(useAvailableBalance || (usePreviousEventBalance && prevAdjType === "SurplusCredit")),
+        allocatedAmount: (usePreviousEventBalance && prevAdjType === "SurplusCredit")
+          ? Number(effectiveDeduction)
+          : (useAvailableBalance ? Number(effectiveDeduction) : 0),
+        usePreviousEventBalance: Boolean(usePreviousEventBalance),
+        previousEventAdjustment: usePreviousEventBalance ? Number(eligibleAdjAmount) : 0,
+        previousEventAdjustmentType: usePreviousEventBalance ? prevAdjType : "None",
         participantIds: finalParticipantIds,
         contributionOverrides: contributionOverrides,
       };
@@ -3736,6 +3774,199 @@ export default function EventFormPage({
                   </Box>
                 </Box>
               </Box>
+
+              {/* Previous Event Balance Adjustment Card */}
+              {eligibleAdjAmount > 0 && (
+                <Box
+                  sx={{
+                    mt: 2,
+                    p: { xs: 1.8, sm: 2 },
+                    borderRadius: "10px",
+                    border: "1px solid",
+                    borderColor: (theme) =>
+                      prevAdjType === "DeficitRecovery"
+                        ? (theme.palette.mode === "dark" ? "rgba(245, 158, 11, 0.4)" : "#fed7aa")
+                        : (theme.palette.mode === "dark" ? "rgba(16, 185, 129, 0.4)" : "#bbf7d0"),
+                    bgcolor: (theme) =>
+                      prevAdjType === "DeficitRecovery"
+                        ? (theme.palette.mode === "dark" ? "rgba(245, 158, 11, 0.06)" : "#fffbeb")
+                        : (theme.palette.mode === "dark" ? "rgba(16, 185, 129, 0.06)" : "#f0fdf4"),
+                  }}
+                >
+                  {/* Header & Checkbox */}
+                  <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                      <Checkbox
+                        checked={usePreviousEventBalance}
+                        onChange={(e) => setUsePreviousEventBalance(e.target.checked)}
+                        sx={{
+                          p: 0,
+                          mt: "2px",
+                          color: prevAdjType === "DeficitRecovery" ? "#d97706" : "#059669",
+                          "&.Mui-checked": {
+                            color: prevAdjType === "DeficitRecovery" ? "#d97706" : "#059669",
+                          },
+                        }}
+                      />
+                      <Box>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                          <Typography
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: "0.88rem",
+                              color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                              cursor: "pointer",
+                              userSelect: "none",
+                            }}
+                            onClick={() => setUsePreviousEventBalance(!usePreviousEventBalance)}
+                          >
+                            Adjust using previous event balance
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={prevAdjType === "DeficitRecovery" ? "Deficit Recovery" : "Surplus Credit"}
+                            sx={{
+                              height: 20,
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              bgcolor: prevAdjType === "DeficitRecovery" ? "#fef3c7" : "#dcfce7",
+                              color: prevAdjType === "DeficitRecovery" ? "#92400e" : "#166534",
+                              border: "1px solid",
+                              borderColor: prevAdjType === "DeficitRecovery" ? "#fde68a" : "#bbf7d0",
+                            }}
+                          />
+                        </Box>
+                        <Typography
+                          sx={{
+                            fontSize: "0.74rem",
+                            color: "#64748b",
+                            mt: 0.35,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {prevAdjType === "DeficitRecovery"
+                            ? `The net Amount In Hand is negative (-₹${formatWholeNumber(Math.abs(rawHandAmt))}) from previous spending${prevEventName ? ` (${prevEventName})` : ""}. Checking this adds the ₹${formatWholeNumber(eligibleAdjAmount)} deficit to this event's budget so it is recovered from member contributions.`
+                            : `A net surplus of ₹${formatWholeNumber(eligibleAdjAmount)} is available from collections exceeding pending dues. Checking this applies the surplus credit to reduce member contributions.`}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+
+                  {/* Dynamic Calculation Strip when selected */}
+                  {usePreviousEventBalance && (
+                    <Box
+                      sx={{
+                        mt: 1.5,
+                        p: 1.5,
+                        borderRadius: "8px",
+                        bgcolor: (theme) =>
+                          theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.25)" : "#ffffff",
+                        border: "1px solid",
+                        borderColor: (theme) =>
+                          prevAdjType === "DeficitRecovery"
+                            ? (theme.palette.mode === "dark" ? "rgba(245, 158, 11, 0.3)" : "#fde68a")
+                            : (theme.palette.mode === "dark" ? "rgba(16, 185, 129, 0.3)" : "#bbf7d0"),
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: 1,
+                        }}
+                      >
+                        {/* Planned Budget */}
+                        <Box sx={{ textAlign: "left" }}>
+                          <Typography sx={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 500, mb: 0.2 }}>
+                            Planned Event Budget
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: "0.95rem",
+                              fontWeight: 800,
+                              color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#0f172a"),
+                            }}
+                          >
+                            ₹{formatWholeNumber(plannedBudget)}
+                          </Typography>
+                        </Box>
+
+                        <Typography sx={{ fontSize: "1.1rem", fontWeight: 700, color: "#94a3b8" }}>
+                          {prevAdjType === "DeficitRecovery" ? "+" : "-"}
+                        </Typography>
+
+                        {/* Adjustment Amount */}
+                        <Box sx={{ textAlign: "center" }}>
+                          <Typography sx={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 500, mb: 0.2 }}>
+                            {prevAdjType === "DeficitRecovery" ? "Previous Deficit" : "Surplus Credit"}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: "0.95rem",
+                              fontWeight: 800,
+                              color: prevAdjType === "DeficitRecovery" ? "#d97706" : "#059669",
+                            }}
+                          >
+                            ₹{formatWholeNumber(eligibleAdjAmount)}
+                          </Typography>
+                        </Box>
+
+                        <Typography sx={{ fontSize: "1.1rem", fontWeight: 700, color: "#94a3b8" }}>
+                          =
+                        </Typography>
+
+                        {/* Effective Budget to Collect */}
+                        <Box sx={{ textAlign: "right" }}>
+                          <Typography
+                            sx={{
+                              fontSize: "0.7rem",
+                              fontWeight: 700,
+                              color: prevAdjType === "DeficitRecovery" ? "#0284c7" : "#16a34a",
+                              mb: 0.2,
+                            }}
+                          >
+                            {prevAdjType === "DeficitRecovery" ? "Effective Budget to Collect" : "Effective Collection"}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: "1rem",
+                              fontWeight: 900,
+                              color: prevAdjType === "DeficitRecovery" ? "#0284c7" : "#16a34a",
+                            }}
+                          >
+                            ₹{formatWholeNumber(remainingBudgetToCollect)}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Per-member impact */}
+                      <Box
+                        sx={{
+                          pt: 0.8,
+                          borderTop: "1px dashed",
+                          borderColor: (theme) =>
+                            theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.1)" : "#e2e8f0",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Typography sx={{ fontSize: "0.72rem", color: "#64748b" }}>
+                          Adjusted contribution split across {total} active members:
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.85rem", fontWeight: 800, color: "#16a34a" }}>
+                          ₹{formatWholeNumber(contributionPerMember)} / member
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              )}
 
               {/* Use Available Amount In Hand Section */}
               <Box
