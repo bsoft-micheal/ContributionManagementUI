@@ -1096,12 +1096,29 @@ export default function DashboardPage() {
   // Current Remaining / Balance Amount (Amount in Hand):
   // - Single Event View: Event cash balance = Total Collection - Total Expense
   // - All Events View: Kitty Balance = Total Collection - Total Expense - Total Allocated from Kitty
+  const totalRecoveredDeficit = useMemo(() => {
+    return (allEvents || []).reduce((sum, e) => {
+      const isDeficit = Boolean(e.usePreviousEventBalance ?? e.UsePreviousEventBalance) &&
+        (e.previousEventAdjustmentType === "DeficitRecovery" || e.PreviousEventAdjustmentType === "DeficitRecovery");
+      const adj = Number(e.previousEventAdjustment ?? e.PreviousEventAdjustment ?? 0);
+      return sum + (isDeficit ? adj : 0);
+    }, 0);
+  }, [allEvents]);
+
   const totalRemaining = useMemo(() => {
-    if (isFilteredByEvent) {
-      return totalCollected - totalExpenses;
+    const raw = isFilteredByEvent
+      ? totalCollected - totalExpenses
+      : totalCollected - totalExpenses - totalAllocated;
+
+    // Amount In Hand = raw + recoveredDeficits. Do NOT clamp to zero.
+    // A negative value is a real shortfall that must be visible to the user.
+    // Example: raw = -2600, recovered = 100 → totalRemaining = -2500 ✓
+    // Dynamically reduces as pending payments are collected (totalCollected increases).
+    if (raw < 0 && totalRecoveredDeficit > 0) {
+      return raw + totalRecoveredDeficit;
     }
-    return totalCollected - totalExpenses - totalAllocated;
-  }, [isFilteredByEvent, totalCollected, totalExpenses, totalAllocated]);
+    return raw;
+  }, [isFilteredByEvent, totalCollected, totalExpenses, totalAllocated, totalRecoveredDeficit]);
 
   // ── All Events that were funded from Amount In Hand (Kitty Beneficiaries) ──
   const allFundedEvents = useMemo(() => {

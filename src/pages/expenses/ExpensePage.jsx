@@ -53,6 +53,7 @@ import useUnsavedChanges from "../../hooks/useUnsavedChanges";
 import ExpenseFormDialog from "../../components/expenses/ExpenseFormDialog";
 import {
   getExpensesAsync,
+  getExpenseByIdAsync,
   createExpenseAsync,
   updateExpenseAsync,
   deleteExpenseAsync,
@@ -287,29 +288,73 @@ export default function ExpensePage() {
       setLoading(true);
       const data = await getExpensesAsync();
       if (Array.isArray(data)) {
-        const mapped = data.map((item, idx) => ({
-          id: item.expenseId
-            ? `EXP-${String(idx + 1).padStart(3, "0")}`
-            : item.id || `EXP-${String(idx + 1).padStart(3, "0")}`,
-          expenseId: item.expenseId || item.id,
-          eventName: item.eventName || "",
-          category: item.category || item.eventTypeName || item.categoryName || "",
-          eventTypeName: item.category || item.eventTypeName || item.categoryName || "",
-          amount: item.amount || 0,
-          rawExpenseDate: item.expenseDate,
-          expenseDate: item.expenseDate ? dayjs(item.expenseDate).format("YYYY-MM-DD") : "",
-          status: item.status || "Pending",
-          submittedBy: item.submittedBy || "",
-          approvedBy: item.approvedBy || "-",
-          description: item.description || "",
-          fileName: item.fileName || "",
-          fileUrl: item.fileUrl || item.fileName || "",
-          attachment: item.fileUrl || item.fileName || "",
-          createdBy: item.createdBy || item.CreatedBy || "--",
-          createdOn: item.createdOn || item.CreatedOn || item.createdAt || item.CreatedAt || null,
-          createdAt: item.createdAt || item.CreatedAt || item.createdOn || item.CreatedOn || null,
-          modifiedOn: item.modifiedOn || item.ModifiedOn || null,
-        }));
+        const mapped = data.map((item, idx) => {
+          let budgetAmt = item.budgetAmount !== undefined && item.budgetAmount !== null
+            ? Number(item.budgetAmount)
+            : (item.BudgetAmount !== undefined && item.BudgetAmount !== null ? Number(item.BudgetAmount) : 0);
+          let extraAmt = item.extraAmount !== undefined && item.extraAmount !== null
+            ? Number(item.extraAmount)
+            : (item.ExtraAmount !== undefined && item.ExtraAmount !== null ? Number(item.ExtraAmount) : 0);
+          let addItems = Array.isArray(item.additionalExpenses)
+            ? item.additionalExpenses
+            : (Array.isArray(item.AdditionalExpenses)
+                ? item.AdditionalExpenses
+                : (typeof item.additionalExpenses === "string" && item.additionalExpenses.trim()
+                    ? (() => { try { return JSON.parse(item.additionalExpenses); } catch { return []; } })()
+                    : (typeof item.AdditionalExpenses === "string" && item.AdditionalExpenses.trim()
+                        ? (() => { try { return JSON.parse(item.AdditionalExpenses); } catch { return []; } })()
+                        : [])));
+
+          // Fallback legacy unpack if budget/extra are 0 and description has metadata
+          if (budgetAmt === 0 && extraAmt === 0 && item.description && item.description.includes("EXTRA_EXPENSES")) {
+            const descMatch = item.description.match(/<!--\s*EXTRA_EXPENSES:\s*(\{[\s\S]*?\})\s*-->/i);
+            if (descMatch) {
+              try {
+                const parsedExtra = JSON.parse(descMatch[1]);
+                budgetAmt = Number(parsedExtra.b ?? parsedExtra.budget ?? 0);
+                extraAmt = Number(parsedExtra.e ?? parsedExtra.extra ?? 0);
+                if (Array.isArray(parsedExtra.items)) {
+                  addItems = parsedExtra.items.map(it => ({
+                    reason: it.r || it.reason || "",
+                    amount: it.a ?? it.amount ?? 0,
+                  }));
+                }
+              } catch {}
+            }
+          }
+
+          if (budgetAmt === 0 && extraAmt > 0 && Number(item.amount) > extraAmt) {
+            budgetAmt = Number(item.amount) - extraAmt;
+          }
+
+          return {
+            id: item.expenseId
+              ? `EXP-${String(idx + 1).padStart(3, "0")}`
+              : item.id || `EXP-${String(idx + 1).padStart(3, "0")}`,
+            expenseId: item.expenseId || item.id,
+            eventId: item.eventId || item.EventId || "",
+            eventName: item.eventName || "",
+            category: item.category || item.eventTypeName || item.categoryName || "",
+            eventTypeName: item.category || item.eventTypeName || item.categoryName || "",
+            amount: item.amount || 0,
+            budgetAmount: budgetAmt,
+            extraAmount: extraAmt,
+            additionalExpenses: addItems,
+            rawExpenseDate: item.expenseDate,
+            expenseDate: item.expenseDate ? dayjs(item.expenseDate).format("YYYY-MM-DD") : "",
+            status: item.status || "Pending",
+            submittedBy: item.submittedBy || "",
+            approvedBy: item.approvedBy || "-",
+            description: item.description || "",
+            fileName: item.fileName || "",
+            fileUrl: item.fileUrl || item.fileName || "",
+            attachment: item.fileUrl || item.fileName || "",
+            createdBy: item.createdBy || item.CreatedBy || "--",
+            createdOn: item.createdOn || item.CreatedOn || item.createdAt || item.CreatedAt || null,
+            createdAt: item.createdAt || item.CreatedAt || item.createdOn || item.CreatedOn || null,
+            modifiedOn: item.modifiedOn || item.ModifiedOn || null,
+          };
+        });
         setExpenses(mapped);
       } else {
         setExpenses([]);
@@ -710,7 +755,7 @@ export default function ExpensePage() {
     });
   };
 
-  const handleEditExpense = (row) => {
+  const handleEditExpense = async (row) => {
     if (!canEditExpense) {
       toast.error("You do not have permission to edit expenses.");
       return;
@@ -720,23 +765,47 @@ export default function ExpensePage() {
       toast.warning("Verified expense cannot be edited.");
       return;
     }
-    setEditingExpense(row);
+
+    let fullExpense = row;
+    try {
+      const id = row.expenseId || row.id;
+      if (id) {
+        const fresh = await getExpenseByIdAsync(id);
+        if (fresh) {
+          fullExpense = {
+            ...row,
+            ...fresh,
+            budgetAmount: fresh.budgetAmount ?? fresh.BudgetAmount ?? row.budgetAmount,
+            extraAmount: fresh.extraAmount ?? fresh.ExtraAmount ?? row.extraAmount,
+            additionalExpenses: fresh.additionalExpenses || fresh.AdditionalExpenses || row.additionalExpenses || [],
+          };
+        }
+      }
+    } catch {}
+
+    setEditingExpense(fullExpense);
     setFormImageError(false);
-    const rawFile = row.fileName || row.fileUrl || "";
+    const rawFile = fullExpense.fileName || fullExpense.fileUrl || "";
     const resolvedUrl = resolveAttachmentUrl(rawFile);
     const displayName = rawFile.startsWith("data:")
-      ? `${row.id || "EXP"}_attachment.png`
-      : getAttachmentDisplayName(rawFile) || `${row.id || "EXP"}_attachment.png`;
+      ? `${fullExpense.id || "EXP"}_attachment.png`
+      : getAttachmentDisplayName(rawFile) || `${fullExpense.id || "EXP"}_attachment.png`;
 
-    const { cleanDescription } = parseExpenseDescription(row.description || "");
+    const { cleanDescription } = parseExpenseDescription(fullExpense.description || "");
+    const rawBudget = fullExpense.budgetAmount !== undefined && fullExpense.budgetAmount !== null
+      ? String(fullExpense.budgetAmount)
+      : (Number(fullExpense.extraAmount) > 0
+          ? String(Math.max(0, Number(fullExpense.amount || 0) - Number(fullExpense.extraAmount || 0)))
+          : (fullExpense.amount !== undefined && fullExpense.amount !== null ? String(fullExpense.amount) : ""));
+
     const editFormData = {
-      eventName: row.eventName || "",
-      category: row.category || "",
-      amount: row.amount || "",
-      expenseDate: row.expenseDate ? dayjs(row.expenseDate) : dayjs(),
+      eventName: fullExpense.eventName || "",
+      category: fullExpense.category || "",
+      amount: rawBudget,
+      expenseDate: fullExpense.expenseDate ? dayjs(fullExpense.expenseDate) : dayjs(),
       description: cleanDescription === "No description provided." ? "" : cleanDescription,
-      submittedBy: row.submittedBy || "",
-      status: row.status || "Pending",
+      submittedBy: fullExpense.submittedBy || "",
+      status: fullExpense.status || "Pending",
       attachment: resolvedUrl || rawFile,
       attachmentName: displayName,
     };
@@ -931,7 +1000,7 @@ export default function ExpensePage() {
     }
   };
 
-  const handleOpenStatusDialog = (row) => {
+  const handleOpenStatusDialog = async (row) => {
     if (!canVerifyExpense) {
       toast.error("You do not have permission to verify expenses.");
       return;
@@ -941,13 +1010,31 @@ export default function ExpensePage() {
       toast.info("This expense has already been verified.");
       return;
     }
-    setStatusExpense(row);
+
+    let fullExpense = row;
+    try {
+      const id = row.expenseId || row.id;
+      if (id) {
+        const fresh = await getExpenseByIdAsync(id);
+        if (fresh) {
+          fullExpense = {
+            ...row,
+            ...fresh,
+            budgetAmount: fresh.budgetAmount ?? fresh.BudgetAmount ?? row.budgetAmount,
+            extraAmount: fresh.extraAmount ?? fresh.ExtraAmount ?? row.extraAmount,
+            additionalExpenses: fresh.additionalExpenses || fresh.AdditionalExpenses || row.additionalExpenses || [],
+          };
+        }
+      }
+    } catch {}
+
+    setStatusExpense(fullExpense);
     // Do not auto select status - user must select explicitly
     setNewStatus("");
     setStatusErrors({});
 
     const currentUserName = authState?.fullName || authState?.name || authState?.user?.fullName || authState?.user?.name || authState?.username || "Admin";
-    setReviewerName(row.approvedBy && row.approvedBy !== "-" ? row.approvedBy : currentUserName);
+    setReviewerName(fullExpense.approvedBy && fullExpense.approvedBy !== "-" ? fullExpense.approvedBy : currentUserName);
     setStatusRemarks("");
     setStatusDialogOpen(true);
   };
@@ -984,6 +1071,9 @@ export default function ExpensePage() {
       await updateExpenseAsync(expenseId, {
         eventName: statusExpense.eventName,
         category: statusExpense.category,
+        budgetAmount: statusExpense.budgetAmount,
+        extraAmount: statusExpense.extraAmount,
+        additionalExpenses: statusExpense.additionalExpenses || [],
         amount: Number(statusExpense.amount),
         expenseDate: safeExpenseDate,
         status: newStatus,
@@ -1046,9 +1136,25 @@ export default function ExpensePage() {
                   size="small"
                   sx={{ p: 0.3, opacity: !canViewExpense ? 0.38 : 1 }}
                   disabled={!canViewExpense}
-                  onClick={() => {
+                  onClick={async () => {
                     if (!canViewExpense) return;
-                    setSelectedExpense(row);
+                    let full = row;
+                    try {
+                      const id = row.expenseId || row.id;
+                      if (id) {
+                        const fresh = await getExpenseByIdAsync(id);
+                        if (fresh) {
+                          full = {
+                            ...row,
+                            ...fresh,
+                            budgetAmount: fresh.budgetAmount ?? fresh.BudgetAmount ?? row.budgetAmount,
+                            extraAmount: fresh.extraAmount ?? fresh.ExtraAmount ?? row.extraAmount,
+                            additionalExpenses: fresh.additionalExpenses || fresh.AdditionalExpenses || row.additionalExpenses || [],
+                          };
+                        }
+                      }
+                    } catch {}
+                    setSelectedExpense(full);
                     setViewDialogOpen(true);
                   }}
                 >
@@ -1689,7 +1795,7 @@ export default function ExpensePage() {
                   </Typography>
                 </Grid>
 
-                {Number(selectedExpense.extraAmount) > 0 && (
+                {(Number(selectedExpense.extraAmount) > 0 || (selectedExpense.additionalExpenses && selectedExpense.additionalExpenses.length > 0)) && (
                   <>
                     <Grid size={{ xs: 6 }}>
                       <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, fontSize: "0.75rem", display: "block", mb: 0.3 }}>
@@ -1704,7 +1810,7 @@ export default function ExpensePage() {
                         Additional Expense Total
                       </Typography>
                       <Typography variant="body2" fontWeight={700} sx={{ color: "warning.main", fontSize: "0.9rem" }}>
-                        +{formatWholeCurrency(selectedExpense.extraAmount)}
+                        +{formatWholeCurrency(selectedExpense.extraAmount || 0)}
                       </Typography>
                     </Grid>
                   </>
@@ -1952,7 +2058,7 @@ export default function ExpensePage() {
                 </Grid>
                 <Grid size={{ xs: 6 }}>
                   <Typography variant="caption" color="text.secondary">
-                    Amount
+                    {Number(statusExpense.extraAmount) > 0 ? "Total Expense Amount" : "Amount"}
                   </Typography>
                   <Typography variant="body2" fontWeight={700} sx={{ color: "#16a34a" }}>
                     {formatWholeCurrency(statusExpense.amount || 0)}
@@ -1966,6 +2072,73 @@ export default function ExpensePage() {
                     {statusExpense.submittedBy || "--"}
                   </Typography>
                 </Grid>
+
+                {(Number(statusExpense.extraAmount) > 0 || (statusExpense.additionalExpenses && statusExpense.additionalExpenses.length > 0)) && (
+                  <>
+                    <Grid size={{ xs: 6 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                        Main Budget Amount
+                      </Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: "success.main" }}>
+                        {formatWholeCurrency(statusExpense.budgetAmount || 0)}
+                      </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                        Additional Expense Total
+                      </Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: "warning.main" }}>
+                        +{formatWholeCurrency(statusExpense.extraAmount || 0)}
+                      </Typography>
+                    </Grid>
+                  </>
+                )}
+
+                {statusExpense.additionalExpenses && statusExpense.additionalExpenses.length > 0 && (
+                  <Grid size={{ xs: 12 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary", fontWeight: 700, fontSize: "0.75rem", display: "block", mb: 0.5 }}
+                    >
+                      Itemized Additional Expenses ({statusExpense.additionalExpenses.length})
+                    </Typography>
+                    <Box
+                      sx={{
+                        borderRadius: "10px",
+                        border: (t) => `1px solid ${t.palette.divider}`,
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#f8fafc",
+                        p: 1.25,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.8,
+                      }}
+                    >
+                      {statusExpense.additionalExpenses.map((extra, idx) => (
+                        <Box
+                          key={idx}
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            pb: idx === statusExpense.additionalExpenses.length - 1 ? 0 : 0.8,
+                            borderBottom:
+                              idx === statusExpense.additionalExpenses.length - 1
+                                ? "none"
+                                : (t) => `1px solid ${t.palette.divider}`,
+                          }}
+                        >
+                          <Typography variant="caption" fontWeight={600} sx={{ color: "text.primary" }}>
+                            {extra.reason || `Item #${idx + 1}`}
+                          </Typography>
+                          <Typography variant="caption" fontWeight={700} sx={{ color: "warning.main" }}>
+                            +{formatWholeCurrency(extra.amount || 0)}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Grid>
+                )}
               </Grid>
             </Box>
 
