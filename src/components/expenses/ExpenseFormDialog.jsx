@@ -556,11 +556,6 @@ export default function ExpenseFormDialog({
 
   const isAddRowDisabled = !canAddRow || hasIncompleteAdditionalRow || additionalExpenses.length >= MAX_ADDITIONAL_EXPENSE_ROWS;
 
-  const isMainAmountExceedingBudget = useMemo(() => {
-    if (!selectedEventBudget || selectedEventBudget.expected <= 0) return false;
-    return mainBudgetAmount > selectedEventBudget.baseRemaining;
-  }, [selectedEventBudget, mainBudgetAmount]);
-
   // Auto-clamp main budget amount whenever selected event changes or updates
   useEffect(() => {
     if (selectedEventBudget && selectedEventBudget.expected > 0) {
@@ -571,10 +566,6 @@ export default function ExpenseFormDialog({
         }
       } else if (currentNum > selectedEventBudget.baseRemaining) {
         setForm((c) => ({ ...c, amount: String(selectedEventBudget.baseRemaining) }));
-        setErrors((p) => ({
-          ...p,
-          amount: `Amount clamped to remaining budget (${formatWholeCurrency(selectedEventBudget.baseRemaining)})`,
-        }));
       }
     }
   }, [selectedEventBudget?.baseRemaining, selectedEventBudget?.expected]);
@@ -622,7 +613,13 @@ export default function ExpenseFormDialog({
     const current = (input.value || "").replace(/[^0-9]/g, "");
     const start = input.selectionStart ?? current.length;
     const end = input.selectionEnd ?? current.length;
-    const nextVal = (current.slice(0, start) + digitsOnly + current.slice(end)).slice(0, MAX_AMOUNT_DIGITS);
+    let nextVal = (current.slice(0, start) + digitsOnly + current.slice(end)).slice(0, MAX_AMOUNT_DIGITS);
+    if (selectedEventBudget && selectedEventBudget.baseRemaining != null) {
+      const num = Number(nextVal) || 0;
+      if (num > selectedEventBudget.baseRemaining) {
+        nextVal = String(selectedEventBudget.baseRemaining);
+      }
+    }
     setForm((c) => ({ ...c, amount: nextVal }));
     if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
   };
@@ -630,7 +627,14 @@ export default function ExpenseFormDialog({
   const handleMainAmountChange = (e) => {
     if (isMainBudgetDisabled) return;
     const raw = sanitizeAmountInput(e.target.value);
-    setForm((c) => ({ ...c, amount: raw }));
+    let finalVal = raw;
+    if (selectedEventBudget && selectedEventBudget.baseRemaining != null) {
+      const num = Number(raw) || 0;
+      if (num > selectedEventBudget.baseRemaining) {
+        finalVal = String(selectedEventBudget.baseRemaining);
+      }
+    }
+    setForm((c) => ({ ...c, amount: finalVal }));
     if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
   };
 
@@ -1129,7 +1133,7 @@ export default function ExpenseFormDialog({
                         fontSize: "0.75rem",
                       }}
                     >
-                      Budget Limit Reached: The expected budget for this event is fully exhausted (Remaining: ₹0). Additional expenses can now be recorded using "+ Add Row" below.
+                      Budget limit reached. Use "Add Row" below for additional expenses.
                     </Typography>
                   </Box>
                 ) : liveBudgetMetrics.extraSpent > 0 ? (
@@ -1172,7 +1176,7 @@ export default function ExpenseFormDialog({
                 selectedEventBudget && selectedEventBudget.baseRemaining === 0
                   ? "₹ 0 (Remaining: ₹0)"
                   : selectedEventBudget && selectedEventBudget.baseRemaining > 0
-                  ? `₹ Enter amount (Remaining: ${formatWholeCurrency(selectedEventBudget.baseRemaining)})`
+                  ? `Enter amount (Remaining: ${formatWholeCurrency(selectedEventBudget.baseRemaining)})`
                   : "₹ Enter budget amount (max 5 digits)"
               }
               value={isMainBudgetDisabled ? String(recordedBudgetAmount || "") : form.amount}
@@ -1182,19 +1186,8 @@ export default function ExpenseFormDialog({
               onPaste={handleMainAmountPaste}
               restrictType="numberonly"
               maxLength={MAX_AMOUNT_DIGITS}
-              error={!isMainBudgetDisabled && (!!errors.amount || isMainAmountExceedingBudget)}
-              helperText={
-                isMainBudgetDisabled
-                  ? `Expected budget (${formatWholeCurrency(selectedEventBudget?.expected || recordedBudgetAmount)}) is fully exhausted for this event. Enter additional expenses below.`
-                  : errors.amount ||
-                  (isMainAmountExceedingBudget
-                    ? (selectedEventBudget && selectedEventBudget.baseRemaining === 0
-                      ? `Expected budget is fully spent (₹0 remaining). Record extra amount using "+ Add Row" below.`
-                      : `Exceeds remaining budget (${formatWholeCurrency(selectedEventBudget.baseRemaining)}). Please use "+ Add Row" below.`)
-                    : selectedEventBudget && selectedEventBudget.expected > 0
-                      ? `Remaining budget to allocate: ${formatWholeCurrency(liveBudgetMetrics.remaining)} (Cap: ${formatWholeCurrency(selectedEventBudget.baseRemaining)})`
-                      : "Digits 0-9 only, max 5 digits (₹99,999)")
-              }
+              error={!isMainBudgetDisabled && !!errors.amount}
+              helperText={errors.amount || ""}
               required={!isMainBudgetDisabled && additionalExpenses.length === 0}
             />
           </Grid>
@@ -1495,9 +1488,6 @@ export default function ExpenseFormDialog({
                     }}
                   >
                     Additional Expenses Breakdown
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Record extra expenses exceeding the expected budget with itemized reasons and amounts.
                   </Typography>
                 </Box>
                 <Tooltip

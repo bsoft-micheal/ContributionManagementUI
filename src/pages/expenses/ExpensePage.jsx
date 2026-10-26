@@ -1472,7 +1472,7 @@ export default function ExpensePage() {
       key: "submittedBy",
     },
     {
-      label: "Approved By",
+      label: "Verified By",
       key: "approvedBy",
       render: (row) => (
         <Typography variant="body2" color="text.secondary">
@@ -1696,6 +1696,11 @@ export default function ExpensePage() {
         onClose={handleCloseDialog}
         onSaved={fetchExpensesFromDb}
         editingExpense={editingExpense}
+        initialEvent={
+          appliedEvent && appliedEvent !== "ALL"
+            ? (eventsList || []).find((e) => (e.name || e.eventName || "") === appliedEvent)
+            : undefined
+        }
         events={eventsList}
         eventTypes={eventTypesList}
         members={membersList}
@@ -1857,7 +1862,7 @@ export default function ExpensePage() {
                       variant="caption"
                       sx={{ color: "text.secondary", fontWeight: 700, fontSize: "0.75rem", display: "block", mb: 0.5 }}
                     >
-                      Itemized Additional Expenses ({selectedExpense.additionalExpenses.length})
+                      Reason for Additional Expenses ({selectedExpense.additionalExpenses.length})
                     </Typography>
                     <Box
                       sx={{
@@ -1906,7 +1911,7 @@ export default function ExpensePage() {
                 </Grid>
                 <Grid size={{ xs: 6 }}>
                   <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, fontSize: "0.75rem", display: "block", mb: 0.3 }}>
-                    Approved By
+                    Verified By
                   </Typography>
                   <Typography variant="body2" fontWeight={600} sx={{ color: "text.primary", fontSize: "0.875rem" }}>
                     {selectedExpense.approvedBy && selectedExpense.approvedBy !== "-" ? selectedExpense.approvedBy : "--"}
