@@ -31,6 +31,7 @@ import {
 } from "../../services/budgetCalculationService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getExpensesAsync } from "../../services/expenseService";
+import { getEventsAsync } from "../../services/eventService";
 import { validateForm } from "../../utils/validation";
 import { formatGridDate } from "../../utils/dateHelper";
 import { formatWholeCurrency, formatWholeNumber } from "../../utils/roundingHelper";
@@ -79,16 +80,23 @@ export default function BudgetCalculationsPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [budgetData, typesData, expensesData] = await Promise.all([
+      const [budgetData, typesData, expensesData, eventsData] = await Promise.all([
         getBudgetCalculationsAsync(),
         getEventTypesAsync().catch(() => []),
         getExpensesAsync().catch(() => []),
+        getEventsAsync().catch(() => []),
       ]);
 
       const expenseList = Array.isArray(expensesData) ? expensesData : [];
+      const eventList = Array.isArray(eventsData) ? eventsData : [];
+      const eventTypeList = Array.isArray(typesData) ? typesData : [];
+
       const processedItems = (Array.isArray(budgetData) ? budgetData : []).map((item) => {
         const itemClean = (item.expenseItem || "").trim().toLowerCase();
         const catClean = (item.category || "").trim().toLowerCase();
+        const typeIdClean = (item.eventTypeId || "").trim().toLowerCase();
+
+        // 1. Check if used in Expenses
         const inExpenses = expenseList.some((ex) => {
           const desc = (ex.description || "").toLowerCase();
           const cat = (ex.category || "").toLowerCase();
@@ -98,10 +106,34 @@ export default function BudgetCalculationsPage() {
             (catClean && cat === catClean && eventName.includes(itemClean))
           );
         });
+
+        // 2. Check if used in Events (by matching EventType or event description/name)
+        const inEvents = eventList.some((ev) => {
+          if (!ev || ev.isDeleted) return false;
+          // Match by eventTypeId
+          if (typeIdClean && (
+            (ev.eventTypeId && String(ev.eventTypeId).toLowerCase() === typeIdClean) ||
+            (Array.isArray(ev.eventTypeIds) && ev.eventTypeIds.some((id) => String(id).toLowerCase() === typeIdClean))
+          )) {
+            return true;
+          }
+          // Match by EventType name
+          const evTypeName = (ev.eventTypeName || ev.eventType?.eventTypeName || "").toLowerCase();
+          if (catClean && evTypeName && (evTypeName === catClean || evTypeName.includes(catClean) || catClean.includes(evTypeName))) {
+            return true;
+          }
+          // Match by item in event description or name
+          const evDesc = (ev.description || "").toLowerCase();
+          const evName = (ev.eventName || "").toLowerCase();
+          return (itemClean && (evDesc.includes(itemClean) || evName.includes(itemClean)));
+        });
+
+        const isReferred = Boolean(item.isReferred || item.IsReferred || inExpenses || inEvents);
+
         return {
           ...item,
-          isReferred: inExpenses,
-          IsReferred: inExpenses,
+          isReferred,
+          IsReferred: isReferred,
         };
       });
 
@@ -338,30 +370,40 @@ export default function BudgetCalculationsPage() {
             </span>
           </Tooltip>
 
-          <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Expense Item" : "")}>
-            <span>
-              <IconButton
-                size="small"
-                sx={{ p: 0.3 }}
-                disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
-                onClick={() => handleDeleteRequest(row.budgetCalculationId)}
-              >
-                <DeleteIcon
-                  sx={{
-                    fontSize: "1.1rem",
-                    color: (theme) =>
-                      hasWriteAccess && !(row.isReferred || row.IsReferred)
-                        ? theme.palette.mode === "dark"
-                          ? "#ffffff"
-                          : "#4a3f6b"
-                        : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.45)"
-                        : "#94a3b8",
-                  }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
+          {(() => {
+            const isReferred = Boolean(row.isReferred || row.IsReferred);
+            const isDeleteDisabled = !hasWriteAccess || isReferred;
+            const tooltipTitle = isReferred
+              ? (TOAST_MESSAGES.GENERAL.RECORD_IN_USE || "Refered")
+              : (hasWriteAccess ? "Delete Expense Item" : "Disabled");
+
+            return (
+              <Tooltip title={tooltipTitle}>
+                <span style={{ display: "inline-flex", cursor: isDeleteDisabled ? "not-allowed" : "pointer" }}>
+                  <IconButton
+                    size="small"
+                    sx={{ p: 0.3 }}
+                    disabled={isDeleteDisabled}
+                    onClick={() => handleDeleteRequest(row.budgetCalculationId)}
+                  >
+                    <DeleteIcon
+                      sx={{
+                        fontSize: "1.1rem",
+                        color: (theme) =>
+                          !isDeleteDisabled
+                            ? theme.palette.mode === "dark"
+                              ? "#ffffff"
+                              : "#4a3f6b"
+                            : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.45)"
+                            : "#94a3b8",
+                      }}
+                    />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            );
+          })()}
           <Tooltip
             title={
               hasWriteAccess
@@ -627,7 +669,7 @@ export default function BudgetCalculationsPage() {
           />
           <AppInput
             label="Expense Item"
-            placeholder="Enter expense item name (e.g. ½ kg Cake)"
+            placeholder="Enter Expense Item"
             fullWidth
             value={form.expenseItem}
             onChange={(e) => {
@@ -643,7 +685,7 @@ export default function BudgetCalculationsPage() {
           />
           <AppInput
             label="Rate"
-            placeholder="Enter rate (₹)"
+            placeholder="Enter Rate"
             fullWidth
             value={formatRateAmount(form.rate)}
             onChange={(e) => {

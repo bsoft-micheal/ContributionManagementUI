@@ -2503,7 +2503,7 @@ export default function ContributionsPage() {
         );
       },
     },
-    { label: "Member Name", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
+    { label: "Username", key: "memberName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.memberName}</Typography> },
     ...(selectedEventId === "ALL"
       ? [
         {

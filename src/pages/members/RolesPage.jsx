@@ -202,8 +202,8 @@ export default function RolesPage() {
         <Grid container spacing={3}>
           <Grid size={{ xs: 12 }}>
             <AppInput
-              label="Role"
-              placeholder="Enter role name"
+              label="Role Name"
+              placeholder="Enter Role Name"
               fullWidth
               value={form.roleName}
               onChange={(e) => {

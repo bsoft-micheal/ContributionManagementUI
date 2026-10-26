@@ -1032,45 +1032,7 @@ export default function UsersPage() {
                 </IconButton>
               </span>
             </Tooltip>
-            {(() => {
-              const isInUse = Boolean(
-                row.isReferred ||
-                row.IsReferred ||
-                (row.username && String(row.username).trim() !== "") ||
-                row.createMemberProfile === true
-              );
-              const isDeleteAllowed = canDeleteUser && !isInUse;
-              const deleteTooltip = isInUse
-                ? "This record cannot be deleted because it is currently in use."
-                : canDeleteUser
-                  ? "Delete User"
-                  : "Disabled";
 
-              return (
-                <Tooltip title={deleteTooltip}>
-                  <span style={{ display: "inline-flex", cursor: !isDeleteAllowed ? "not-allowed" : "pointer" }}>
-                    <IconButton
-                      size="small"
-                      sx={{ p: 0.3 }}
-                      disabled={!isDeleteAllowed}
-                      onClick={() => handleDeleteRequest(row)}
-                    >
-                      <DeleteIcon
-                        sx={{
-                          fontSize: "1.05rem",
-                          color: (theme) =>
-                            isDeleteAllowed
-                              ? actionIconColor
-                              : theme.palette.mode === "dark"
-                                ? "rgba(255, 255, 255, 0.45)"
-                                : "#94a3b8",
-                        }}
-                      />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              );
-            })()}
             {(() => {
               const isSelf = Boolean(
                 (authState?.userId && String(row.userId).toLowerCase() === String(authState.userId).toLowerCase()) ||
