@@ -327,10 +327,13 @@ export default function ExpensePage() {
             budgetAmt = Number(item.amount) - extraAmt;
           }
 
+          const expenseNumber = item.expenseNo || item.expenseNumber || item.ExpenseNo || item.ExpenseNumber || "";
+          const displayId = expenseNumber || (item.expenseId ? `EXP-${String(idx + 1).padStart(3, "0")}` : item.id || `EXP-${String(idx + 1).padStart(3, "0")}`);
+
           return {
-            id: item.expenseId
-              ? `EXP-${String(idx + 1).padStart(3, "0")}`
-              : item.id || `EXP-${String(idx + 1).padStart(3, "0")}`,
+            id: displayId,
+            expenseNo: expenseNumber || displayId,
+            expenseNumber: expenseNumber || displayId,
             expenseId: item.expenseId || item.id,
             eventId: item.eventId || item.EventId || "",
             eventName: item.eventName || "",
@@ -572,16 +575,17 @@ export default function ExpensePage() {
 
     const expected = roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.expectedCollection ?? ev.baseAmount ?? 0));
     const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
-    const spent = roundToWhole(expenses
+    const relevantExpenses = expenses
       .filter((ex) =>
         (ex.eventName || "").trim().toLowerCase() === (form.eventName || "").trim().toLowerCase() &&
         (!currentExpenseId || (ex.expenseId !== currentExpenseId && ex.id !== currentExpenseId)) &&
         (ex.status || "").toLowerCase() !== "rejected"
-      )
-      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
+      );
+    const spent = roundToWhole(relevantExpenses.reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
+    const extraFromExpenses = roundToWhole(relevantExpenses.reduce((sum, ex) => sum + (Number(ex.extraAmount) || 0), 0));
 
     const remaining = Math.max(0, expected - spent);
-    const extraSpent = Math.max(0, spent - expected);
+    const extraSpent = Math.max(extraFromExpenses, Math.max(0, spent - expected));
     return { expected, spent, remaining, extraSpent };
   }, [form.eventName, form.eventId, form.category, eventsList, expenses, editingExpense]);
 
@@ -610,15 +614,34 @@ export default function ExpensePage() {
         (sum, e) => sum + Number(e.totalExpectedAmount ?? e.expectedAmount ?? e.baseAmount ?? 0),
         0
       ));
-      const spent = roundToWhole(expenses
-        .filter((ex) => {
-          if ((ex.status || "").toLowerCase() === "rejected") return false;
-          if (appliedCategory !== "ALL" && (ex.category || "").trim().toLowerCase() !== appliedCategory.trim().toLowerCase()) return false;
-          return true;
-        })
-        .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
+      // Only count Approved expenses in Total Spent, Remaining Budget, and Extra Amount Spent
+      const isExpenseApproved = (status) => {
+        const s = (status || "").toLowerCase().trim();
+        return s === "approved" || s === "verified" || s.includes("approv") || s.includes("verif");
+      };
+
+      const relevantExpenses = expenses.filter((ex) => {
+        if (!isExpenseApproved(ex.status)) return false;
+        if (appliedCategory !== "ALL" && (ex.category || "").trim().toLowerCase() !== appliedCategory.trim().toLowerCase()) return false;
+        return true;
+      });
+      const spent = roundToWhole(relevantExpenses.reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
       const remaining = Math.max(0, expected - spent);
-      const extraSpent = Math.max(0, spent - expected);
+
+      // Sum of itemized extraAmount across approved expenses
+      const extraFromExpenses = roundToWhole(relevantExpenses.reduce((sum, ex) => sum + (Number(ex.extraAmount) || 0), 0));
+
+      // Extra spent calculated per individual event that exceeded its expected budget
+      const perEventExtra = validEvents.reduce((sum, ev) => {
+        const evName = (ev.name || ev.eventName || "").trim().toLowerCase();
+        const evExpected = roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0));
+        const evSpent = roundToWhole(relevantExpenses
+          .filter((ex) => (ex.eventName || "").trim().toLowerCase() === evName)
+          .reduce((s, ex) => s + (Number(ex.amount) || 0), 0));
+        return sum + Math.max(0, evSpent - evExpected);
+      }, 0);
+
+      const extraSpent = Math.max(extraFromExpenses, perEventExtra, Math.max(0, spent - expected));
       return {
         title: appliedCategory !== "ALL" ? `${appliedCategory}` : "All Events",
         expected,
@@ -631,16 +654,19 @@ export default function ExpensePage() {
 
     const ev = eventsList.find((e) => (e.name || e.eventName || "").trim().toLowerCase() === targetEventName.trim().toLowerCase());
     const expected = ev ? roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0)) : 0;
-    const spent = roundToWhole(expenses
-      .filter(
-        (ex) =>
-          (ex.eventName || "").trim().toLowerCase() === targetEventName.trim().toLowerCase() &&
-          (ex.status || "").toLowerCase() !== "rejected"
-      )
-      .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
-
+    const isApprovedStatus = (status) => {
+      const s = (status || "").toLowerCase().trim();
+      return s === "approved" || s === "verified" || s.includes("approv") || s.includes("verif");
+    };
+    const relevantExpenses = expenses.filter(
+      (ex) =>
+        (ex.eventName || "").trim().toLowerCase() === targetEventName.trim().toLowerCase() &&
+        isApprovedStatus(ex.status)
+    );
+    const spent = roundToWhole(relevantExpenses.reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0));
+    const extraFromExpenses = roundToWhole(relevantExpenses.reduce((sum, ex) => sum + (Number(ex.extraAmount) || 0), 0));
     const remaining = Math.max(0, expected - spent);
-    const extraSpent = Math.max(0, spent - expected);
+    const extraSpent = Math.max(extraFromExpenses, Math.max(0, spent - expected));
     return {
       title: targetEventName,
       expected,
@@ -1044,9 +1070,18 @@ export default function ExpensePage() {
       toast.error("You do not have permission to verify expenses.");
       return;
     }
-    if (!statusExpense) return;
+    const errors = {};
     if (!newStatus || !newStatus.trim()) {
-      setStatusErrors({ status: "Decision / Status is required" });
+      errors.status = "Decision / Status is required";
+    }
+
+    const isRejectedState = newStatus?.trim().toLowerCase() === "rejected";
+    if (isRejectedState && (!statusRemarks || !statusRemarks.trim())) {
+      errors.remarks = "Resolution / Verification notes are required when status is Rejected";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setStatusErrors(errors);
       toast.error(TOAST_MESSAGES.GENERAL.REQUIRED_FIELDS);
       return;
     }
@@ -1470,7 +1505,7 @@ export default function ExpensePage() {
         emptyMessage={!hasAppliedFilter ? "Please select filters and click Filter to view expenses." : undefined}
         loading={loading}
         allowExport={canExportExpense}
-        searchPlaceholder="Search by Expense ID ,..."
+        searchPlaceholder="Search by Expense ID"
         actions={
           <Stack direction="row" spacing={1.5} alignItems="center">
             <AppAddButton
@@ -1677,7 +1712,7 @@ export default function ExpensePage() {
         title="Delete Expense"
         content={
           expenseToDelete
-            ? `Are you sure you want to delete this expense record (${expenseToDelete.id || expenseToDelete.expenseId})?`
+            ? `Are you sure you want to delete ?`
             : "Are you sure you want to delete this expense record?"
         }
         confirmText="Delete"
@@ -2174,10 +2209,20 @@ export default function ExpensePage() {
               </Grid>
               <Grid size={{ xs: 12 }}>
                 <AppTextArea
-                  label="Remarks / Verification Notes"
-                  placeholder="Enter remarks or verification notes (optional)..."
+                  label={newStatus?.trim().toLowerCase() === "rejected" ? "Remarks / Verification Notes" : "Remarks / Verification Notes"}
+                  placeholder={
+                    newStatus?.trim().toLowerCase() === "rejected"
+                      ? "Enter reason for rejection (required)..."
+                      : "Enter remarks or verification notes (optional)..."
+                  }
                   value={statusRemarks}
-                  onChange={(e) => setStatusRemarks(e.target.value)}
+                  onChange={(e) => {
+                    setStatusRemarks(e.target.value);
+                    if (statusErrors.remarks) setStatusErrors((prev) => ({ ...prev, remarks: "" }));
+                  }}
+                  error={!!statusErrors.remarks}
+                  helperText={statusErrors.remarks}
+                  required={newStatus?.trim().toLowerCase() === "rejected"}
                   minRows={3}
                   maxLength={500}
                   showCount

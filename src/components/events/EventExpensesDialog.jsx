@@ -254,7 +254,7 @@ export default function EventExpensesDialog({ open, onClose, event, onAddExpense
                     return (
                       <TableRow key={row.expenseId || row.id || idx} hover sx={{ "&:last-child td": { borderBottom: 0 } }}>
                         <TableCell sx={{ fontSize: "0.78rem", fontWeight: 700, color: "#7c3aed" }}>
-                          {row.id || (row.expenseId ? `EXP-${String(idx + 1).padStart(3, "0")}` : `EXP-${idx + 1}`)}
+                          {row.expenseNo || row.expenseNumber || row.id || (row.expenseId ? `EXP-${String(idx + 1).padStart(3, "0")}` : `EXP-${idx + 1}`)}
                         </TableCell>
                         <TableCell sx={{ fontSize: "0.78rem", fontWeight: 600, maxWidth: 180 }}>
                           {row.description || "--"}

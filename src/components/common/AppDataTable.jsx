@@ -382,7 +382,7 @@ export default function AppDataTable({
     if (title) {
       const cleanTitle = title.replace(/details|history|summary|list|manage|page/gi, "").trim();
       const lower = cleanTitle.toLowerCase();
-      if (lower.includes("event type")) return "Search by event type...";
+    if (lower.includes("event type")) return "Search by Event Type";
       if (lower.includes("event")) return "Search by event name...";
       if (lower.includes("member") || lower.includes("user")) return "Search by username / member...";
       if (lower.includes("payment") || lower.includes("contribution")) return "Search by member, event, status...";

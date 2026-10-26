@@ -495,7 +495,7 @@ export default function EventTypesPage() {
         </Box>
       )
     },
-    { label: "Category Name", key: "eventTypeName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.eventTypeName}</Typography> },
+    { label: "Event Type", key: "eventTypeName", render: (row) => <Typography variant="body2" fontWeight={700}>{row.eventTypeName}</Typography> },
     {
       label: "Calculation Rule",
       key: "hasTenureRule",
@@ -604,7 +604,7 @@ export default function EventTypesPage() {
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
           <AppInput
             label="Event Type"
-            placeholder="Enter event type name"
+            placeholder="Enter Event Type"
             fullWidth
             value={form.eventTypeName}
             onChange={(e) => {

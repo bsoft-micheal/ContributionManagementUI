@@ -1317,7 +1317,7 @@ export default function GalleryPage() {
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
               label="Photo Title"
-              placeholder="Enter the Title"
+              placeholder="Enter Photo Title"
               value={form.title}
               maxLength={250}
               onKeyDown={(e) => {
@@ -1437,7 +1437,7 @@ export default function GalleryPage() {
           <Grid size={{ xs: 12 }}>
             <AppTextArea
               label="Description"
-              placeholder="Enter  description..."
+              placeholder="Enter  Description"
               value={form.description}
               onChange={(e) => {
                 if (e.target.value.length <= 500) {

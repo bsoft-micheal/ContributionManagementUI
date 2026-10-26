@@ -778,7 +778,7 @@ export default function PaymentsPage() {
       },
     },
     {
-      label: "Member Name",
+      label: "Username",
       key: "memberName",
       render: (row) => (
         <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.82rem" }}>

@@ -144,7 +144,7 @@ export default function FinancialBarChart({
           ? "linear-gradient(180deg, #818cf8 0%, #6366f1 100%)"
           : "linear-gradient(180deg, #818cf8 0%, #6366f1 100%)",
         icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,
-        helper: "Target goal for selected period",
+        
         statusText: "Baseline Goal",
       },
       {
@@ -377,9 +377,7 @@ export default function FinancialBarChart({
               <Typography variant="h6" fontWeight={600} sx={{ fontSize: "1.1875rem", letterSpacing: "-0.015em", lineHeight: 1.35 }}>
                 Financial Overview
               </Typography>
-              <Typography variant="body2" sx={{ fontSize: "0.8125rem", fontWeight: 500, lineHeight: 1.4, color: isDark ? "rgba(255, 255, 255, 0.7)" : "#475569" }}>
-                Financial metrics comparison & contribution distribution
-              </Typography>
+              
             </Box>
           </Stack>
         </Stack>

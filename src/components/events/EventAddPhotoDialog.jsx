@@ -453,7 +453,7 @@ export default function EventAddPhotoDialog({
           <Grid size={{ xs: 12, sm: 6 }}>
             <AppInput
               label="Photo Title"
-              placeholder="Enter the Title"
+              placeholder="Enter Photo Title"
               value={form.title}
               maxLength={250}
               onKeyDown={(e) => {

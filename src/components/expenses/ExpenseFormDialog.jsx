@@ -21,13 +21,25 @@ import {
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import AppDialog from "../common/AppDialog";
+import AppConfirmDialog from "../common/AppConfirmDialog";
 import AppInput from "../common/AppInput";
 import AppSelect from "../common/AppSelect";
 import AppDateInput from "../common/AppDateInput";
 import AppTextArea from "../common/AppTextArea";
 import AppButton, { AppCancelButton, AppSaveButton } from "../common/AppButton";
-import AppConfirmDialog from "../common/AppConfirmDialog";
 import { roundToWhole, formatWholeCurrency } from "../../utils/roundingHelper";
+import {
+  sanitizeAmountInput,
+  validateAmountInput,
+  calculateLiveRemainingBudget,
+  calculateLiveTotalSpent,
+  calculateLiveExtraAmountSpent,
+  calculateTotalExpense,
+  canAddAdditionalExpenseRow,
+  MAX_ADDITIONAL_EXPENSE_ROWS,
+  MAX_AMOUNT_DIGITS,
+  MAX_AMOUNT_VALUE,
+} from "../../utils/expenseBudgetCalculations";
 import { useAppToast } from "../common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -83,7 +95,7 @@ export default function ExpenseFormDialog({
     url: "",
     title: "",
   });
-  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+  const [deleteRowId, setDeleteRowId] = useState(null);
   const savedFormRef = useRef(initialFormState);
 
   // Resolved lists
@@ -181,7 +193,6 @@ export default function ExpenseFormDialog({
       setAdditionalExpenses([]);
       setErrors({});
       setSaving(false);
-      setConfirmDiscardOpen(false);
       return;
     }
 
@@ -206,16 +217,16 @@ export default function ExpenseFormDialog({
           try {
             const extraObj = JSON.parse(descMatch[1]);
             parsedExtras = extraObj.items || [];
-          } catch {}
+          } catch { }
         }
       }
 
       const extras = Array.isArray(parsedExtras)
         ? parsedExtras.map((it, idx) => ({
-            id: it.id || `extra-${idx}-${Date.now()}`,
-            reason: it.reason || it.r || "",
-            amount: it.amount !== undefined && it.amount !== null ? String(it.amount) : (it.a !== undefined && it.a !== null ? String(it.a) : ""),
-          }))
+          id: it.id || `extra-${idx}-${Date.now()}`,
+          reason: it.reason || it.r || "",
+          amount: it.amount !== undefined && it.amount !== null ? String(it.amount) : (it.a !== undefined && it.a !== null ? String(it.a) : ""),
+        }))
         : [];
 
       let rawBudget = "";
@@ -230,7 +241,7 @@ export default function ExpenseFormDialog({
             const extraObj = JSON.parse(descMatch[1]);
             const b = extraObj.b ?? extraObj.budget;
             if (b !== undefined && b !== null) rawBudget = String(b);
-          } catch {}
+          } catch { }
         }
       }
       if (!rawBudget && editingExpense.amount !== undefined && editingExpense.amount !== null) {
@@ -372,7 +383,7 @@ export default function ExpenseFormDialog({
     return list;
   }, [membersList, loggedInUserName, authState?.role]);
 
-  // Dynamically compute selected event budget and remaining limit
+  // Dynamically compute selected event budget baseline from DB
   const selectedEventBudget = useMemo(() => {
     if (!form.eventName && !form.eventId) return null;
     const ev = (eventsList || []).find((e) => {
@@ -404,19 +415,26 @@ export default function ExpenseFormDialog({
     const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
     const targetName = (form.eventName || targetEv.eventName || targetEv.name || "").trim().toLowerCase();
 
-    const spent = roundToWhole(
+    // Sum of amounts spent by other historical expenses for this event
+    const basePriorSpent = roundToWhole(
       (existingExpenses || [])
         .filter((ex) => {
           const exName = (ex.eventName || "").trim().toLowerCase();
           const isNotSame = !currentExpenseId || (ex.expenseId !== currentExpenseId && ex.id !== currentExpenseId);
           return exName === targetName && isNotSame && (ex.status || "").toLowerCase() !== "rejected";
         })
-        .reduce((sum, ex) => sum + (Number(ex.budgetAmount ?? ex.amount) || 0), 0)
+        .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0)
     );
 
-    const remaining = Math.max(0, expected - spent);
-    const extraSpent = Math.max(0, spent - expected);
-    return { expected, spent, remaining, extraSpent };
+    const baseRemaining = Math.max(0, expected - basePriorSpent);
+    const baseExtraSpent = Math.max(0, basePriorSpent - expected);
+
+    return {
+      expected,
+      basePriorSpent,
+      baseRemaining,
+      baseExtraSpent,
+    };
   }, [form.eventName, form.eventId, form.category, eventsList, existingExpenses, editingExpense, initialEvent]);
 
   // Determine if a main budget has already been recorded for this event
@@ -434,100 +452,219 @@ export default function ExpenseFormDialog({
     });
   }, [form.eventName, form.eventId, existingExpenses, editingExpense]);
 
-  const isMainBudgetDisabled = Boolean(
-    !editingExpense && hasExistingBudget
+  // A main budget is only considered exhausted/disabled when:
+  // 1) An expected budget exists and baseRemaining <= 0 (all budget spent across prior entries)
+  // When baseRemaining > 0 (e.g. ₹3,300 remaining out of ₹7,800), the user is allowed to make multiple entries!
+  const isBudgetExhausted = Boolean(
+    selectedEventBudget &&
+    selectedEventBudget.expected > 0 &&
+    selectedEventBudget.baseRemaining <= 0
   );
 
+  const isMainBudgetDisabled = Boolean(
+    !editingExpense && isBudgetExhausted
+  );
+
+  // Existing recorded main budget amount for this event
+  const recordedBudgetAmount = useMemo(() => {
+    // When budget is exhausted, display the event's total Expected Budget amount (e.g. ₹7,800) instead of the last individual entry amount
+    if (selectedEventBudget && selectedEventBudget.expected > 0) {
+      return selectedEventBudget.expected;
+    }
+
+    if (!form.eventName && !form.eventId) return 0;
+    const targetName = (form.eventName || "").trim().toLowerCase();
+    const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
+
+    const existingMatch = (existingExpenses || []).find((ex) => {
+      const exName = (ex.eventName || "").trim().toLowerCase();
+      const isNotSame = !currentExpenseId || (ex.expenseId !== currentExpenseId && ex.id !== currentExpenseId);
+      const isNotRejected = (ex.status || "").toLowerCase() !== "rejected";
+      const budgetVal = Number(ex.budgetAmount !== undefined && ex.budgetAmount !== null ? ex.budgetAmount : ex.amount) || 0;
+      return isNotSame && exName === targetName && isNotRejected && budgetVal > 0;
+    });
+
+    if (existingMatch) {
+      return Number(existingMatch.budgetAmount !== undefined && existingMatch.budgetAmount !== null ? existingMatch.budgetAmount : existingMatch.amount) || 0;
+    }
+    return selectedEventBudget?.basePriorSpent || selectedEventBudget?.expected || 0;
+  }, [form.eventName, form.eventId, existingExpenses, editingExpense, selectedEventBudget]);
+
   // Live calculation of main budget, additional expenses, and total expense
-  const mainBudgetAmount = Number(form.amount) || 0;
+  const mainBudgetAmount = Number(sanitizeAmountInput(form.amount)) || 0;
+
   const extraExpensesSum = useMemo(() => {
     return roundToWhole(
-      additionalExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+      additionalExpenses.reduce((sum, item) => sum + (Number(sanitizeAmountInput(item.amount)) || 0), 0)
     );
   }, [additionalExpenses]);
-  const totalCalculatedExpense = roundToWhole(mainBudgetAmount + extraExpensesSum);
 
-  const remainingBudgetCap = useMemo(() => {
-    if (!selectedEventBudget || selectedEventBudget.expected <= 0) return null;
-    return selectedEventBudget.remaining;
-  }, [selectedEventBudget]);
+  // Total Expense = Main Budget Amount + sum of additional expense amounts
+  const totalCalculatedExpense = calculateTotalExpense(mainBudgetAmount, extraExpensesSum);
 
-  const isBudgetExhausted = remainingBudgetCap !== null && remainingBudgetCap <= 0;
+  // Live budget metrics updating immediately without waiting for Save:
+  const liveBudgetMetrics = useMemo(() => {
+    const expected = selectedEventBudget?.expected || 0;
+    const priorSpent = selectedEventBudget?.basePriorSpent || 0;
+
+    // Remaining Budget = max(Expected Budget - Main Budget Amount, 0)
+    const remaining = calculateLiveRemainingBudget(expected, priorSpent, mainBudgetAmount);
+
+    // Total Spent consistent with dashboard business logic
+    const totalSpent = calculateLiveTotalSpent(priorSpent, mainBudgetAmount, extraExpensesSum);
+
+    // Extra Amount Spent
+    const extraSpent = calculateLiveExtraAmountSpent(expected, priorSpent, mainBudgetAmount, extraExpensesSum);
+
+    return {
+      expected,
+      totalSpent,
+      remaining,
+      extraSpent,
+    };
+  }, [selectedEventBudget, mainBudgetAmount, extraExpensesSum]);
+
+  // Disallow adding next row without entering value (reason and amount > 0) in current row(s)
+  const hasIncompleteAdditionalRow = useMemo(() => {
+    if (additionalExpenses.length === 0) return false;
+    return additionalExpenses.some((r) => {
+      const reasonEmpty = !r.reason || !r.reason.trim();
+      const amountNum = Number(r.amount);
+      const amountEmpty = !r.amount || !String(r.amount).trim() || isNaN(amountNum) || amountNum <= 0;
+      return reasonEmpty || amountEmpty;
+    });
+  }, [additionalExpenses]);
+
+  // Add Row gating rule:
+  // 1) Disabled until Main Budget Amount reaches Expected Budget and Remaining Budget is zero.
+  // 2) Without entering values (reason and amount > 0) in current row(s), do not allow adding another row.
+  // 3) After valid row is entered, allow subsequent rows up to 10 rows.
+  const canAddRow = useMemo(() => {
+    if (hasIncompleteAdditionalRow) {
+      return false;
+    }
+    return canAddAdditionalExpenseRow({
+      eventSelected: Boolean(form.eventName),
+      expectedBudget: selectedEventBudget?.expected || 0,
+      priorSpent: selectedEventBudget?.basePriorSpent || 0,
+      mainBudgetAmount,
+      rows: additionalExpenses,
+      currentRowsCount: additionalExpenses.length,
+      maxRows: MAX_ADDITIONAL_EXPENSE_ROWS,
+    });
+  }, [form.eventName, selectedEventBudget, mainBudgetAmount, additionalExpenses, hasIncompleteAdditionalRow]);
+
+  const isAddRowDisabled = !canAddRow || hasIncompleteAdditionalRow || additionalExpenses.length >= MAX_ADDITIONAL_EXPENSE_ROWS;
 
   const isMainAmountExceedingBudget = useMemo(() => {
     if (!selectedEventBudget || selectedEventBudget.expected <= 0) return false;
-    return mainBudgetAmount > selectedEventBudget.remaining;
+    return mainBudgetAmount > selectedEventBudget.baseRemaining;
   }, [selectedEventBudget, mainBudgetAmount]);
 
   // Auto-clamp main budget amount whenever selected event changes or updates
   useEffect(() => {
     if (selectedEventBudget && selectedEventBudget.expected > 0) {
-      const currentNum = Number(form.amount) || 0;
-      if (selectedEventBudget.remaining <= 0) {
+      const currentNum = Number(sanitizeAmountInput(form.amount)) || 0;
+      if (selectedEventBudget.baseRemaining <= 0) {
         if (form.amount !== "" && form.amount !== "0") {
           setForm((c) => ({ ...c, amount: "0" }));
         }
-      } else if (currentNum > selectedEventBudget.remaining) {
-        setForm((c) => ({ ...c, amount: String(selectedEventBudget.remaining) }));
+      } else if (currentNum > selectedEventBudget.baseRemaining) {
+        setForm((c) => ({ ...c, amount: String(selectedEventBudget.baseRemaining) }));
         setErrors((p) => ({
           ...p,
-          amount: `Amount clamped to remaining budget (${formatWholeCurrency(selectedEventBudget.remaining)})`,
+          amount: `Amount clamped to remaining budget (${formatWholeCurrency(selectedEventBudget.baseRemaining)})`,
         }));
       }
     }
-  }, [selectedEventBudget]);
+  }, [selectedEventBudget?.baseRemaining, selectedEventBudget?.expected]);
 
-  const handleAmountChange = (e) => {
-    const raw = e.target.value.replace(/[^0-9]/g, "");
-    if (raw === "") {
-      setForm((c) => ({ ...c, amount: "" }));
-      setErrors((p) => ({ ...p, amount: "" }));
+  // Amount keydown filter: strictly digits 0-9 only, maximum 5 digits
+  const handleAmountKeyDown = (e) => {
+    const isControlKey =
+      e.key === "Backspace" ||
+      e.key === "Delete" ||
+      e.key === "Tab" ||
+      e.key === "Escape" ||
+      e.key === "Enter" ||
+      e.key === "ArrowLeft" ||
+      e.key === "ArrowRight" ||
+      e.key === "ArrowUp" ||
+      e.key === "ArrowDown" ||
+      e.key === "Home" ||
+      e.key === "End" ||
+      e.ctrlKey ||
+      e.metaKey;
+
+    if (!isControlKey && !/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
       return;
     }
-    if (raw.length > 6) return;
 
-    const num = Number(raw);
-
-    // If event has an expected budget:
-    if (remainingBudgetCap !== null) {
-      if (isBudgetExhausted) {
-        setForm((c) => ({ ...c, amount: "0" }));
-        setErrors((p) => ({
-          ...p,
-          amount: "Remaining budget is ₹0. Please enter extra expenses in '+ Add Row' below.",
-        }));
-        toast.warning("Remaining expected budget is ₹0. Any expense must be added using '+ Add Row'.");
-        return;
-      }
-
-      if (num > remainingBudgetCap) {
-        // Strictly prevent entering more than remaining expected budget!
-        setForm((c) => ({ ...c, amount: String(remainingBudgetCap) }));
-        setErrors((p) => ({
-          ...p,
-          amount: `Cannot exceed remaining budget (${formatWholeCurrency(remainingBudgetCap)}). Enter extra spending under '+ Add Row' below.`,
-        }));
-        toast.warning(`Amount restricted to remaining budget of ${formatWholeCurrency(remainingBudgetCap)}. Extra spending must be added using '+ Add Row'.`);
-        return;
+    if (!isControlKey) {
+      const input = e.target;
+      const hasSelection =
+        input.selectionStart !== null &&
+        input.selectionEnd !== null &&
+        input.selectionStart !== input.selectionEnd;
+      const currentVal = (input.value || "").replace(/[^0-9]/g, "");
+      if (currentVal.length >= MAX_AMOUNT_DIGITS && !hasSelection) {
+        e.preventDefault();
       }
     }
+  };
 
+  const handleMainAmountPaste = (e) => {
+    e.preventDefault();
+    const pasteText = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+    const digitsOnly = pasteText.replace(/[^0-9]/g, "");
+    const input = e.target;
+    const current = (input.value || "").replace(/[^0-9]/g, "");
+    const start = input.selectionStart ?? current.length;
+    const end = input.selectionEnd ?? current.length;
+    const nextVal = (current.slice(0, start) + digitsOnly + current.slice(end)).slice(0, MAX_AMOUNT_DIGITS);
+    setForm((c) => ({ ...c, amount: nextVal }));
+    if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
+  };
+
+  const handleMainAmountChange = (e) => {
+    if (isMainBudgetDisabled) return;
+    const raw = sanitizeAmountInput(e.target.value);
     setForm((c) => ({ ...c, amount: raw }));
     if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
   };
 
   const handleAddAdditionalExpenseRow = () => {
-    setAdditionalExpenses((prev) => [
-      ...prev,
-      {
-        id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        reason: "",
-        amount: "",
-      },
-    ]);
+    if (isAddRowDisabled || hasIncompleteAdditionalRow) {
+      if (hasIncompleteAdditionalRow) {
+        toast.warning("Please enter Reason and Extra Amount for the current row before adding another row.");
+      }
+      return;
+    }
+    setAdditionalExpenses((prev) => {
+      if (prev.length >= MAX_ADDITIONAL_EXPENSE_ROWS) return prev;
+      return [
+        ...prev,
+        {
+          id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          reason: "",
+          amount: "",
+        },
+      ];
+    });
   };
 
   const handleRemoveAdditionalExpenseRow = (id) => {
+    const row = additionalExpenses.find((r) => r.id === id);
+    const hasValues = row && ((row.reason && row.reason.trim()) || (row.amount && Number(row.amount) > 0));
+    if (hasValues) {
+      setDeleteRowId(id);
+    } else {
+      executeRemoveAdditionalExpenseRow(id);
+    }
+  };
+
+  const executeRemoveAdditionalExpenseRow = (id) => {
     setAdditionalExpenses((prev) => prev.filter((r) => r.id !== id));
     setErrors((prev) => {
       const next = { ...prev };
@@ -535,6 +672,7 @@ export default function ExpenseFormDialog({
       delete next[`extra_amount_${id}`];
       return next;
     });
+    setDeleteRowId(null);
   };
 
   const handleAdditionalExpenseChange = (id, field, value) => {
@@ -542,7 +680,7 @@ export default function ExpenseFormDialog({
       prev.map((r) => {
         if (r.id !== id) return r;
         if (field === "amount") {
-          const sanitized = value.replace(/[^0-9]/g, "").slice(0, 6);
+          const sanitized = sanitizeAmountInput(value);
           return { ...r, amount: sanitized };
         }
         return { ...r, [field]: value };
@@ -559,36 +697,20 @@ export default function ExpenseFormDialog({
     });
   };
 
-  const isFormDirty = () => {
-    const saved = savedFormRef.current;
-    if (!saved) return false;
-    const basicDirty =
-      (form.eventName || "") !== (saved.eventName || "") ||
-      (form.category || "") !== (saved.category || "") ||
-      String(form.amount || "") !== String(saved.amount || "") ||
-      (form.description || "") !== (saved.description || "") ||
-      (form.attachment || "") !== (saved.attachment || "");
-    if (basicDirty) return true;
-
-    const savedExtras = saved.additionalExpenses || [];
-    if (additionalExpenses.length !== savedExtras.length) return true;
-    for (let i = 0; i < additionalExpenses.length; i++) {
-      if (
-        additionalExpenses[i].reason !== savedExtras[i].reason ||
-        String(additionalExpenses[i].amount) !== String(savedExtras[i].amount)
-      ) {
-        return true;
-      }
-    }
-    return false;
+  const handleAdditionalExpensePaste = (id) => (e) => {
+    e.preventDefault();
+    const pasteText = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+    const digitsOnly = pasteText.replace(/[^0-9]/g, "");
+    const input = e.target;
+    const current = (input.value || "").replace(/[^0-9]/g, "");
+    const start = input.selectionStart ?? current.length;
+    const end = input.selectionEnd ?? current.length;
+    const nextVal = (current.slice(0, start) + digitsOnly + current.slice(end)).slice(0, MAX_AMOUNT_DIGITS);
+    handleAdditionalExpenseChange(id, "amount", nextVal);
   };
 
   const handleCloseAttempt = () => {
-    if (isFormDirty()) {
-      setConfirmDiscardOpen(true);
-    } else {
-      onClose();
-    }
+    onClose();
   };
 
   const handleImageChange = (e) => {
@@ -661,24 +783,24 @@ export default function ExpenseFormDialog({
     if (!form.eventName) newErrors.eventName = "This field is required";
     if (!form.category) newErrors.category = "This field is required";
 
-    const numAmount = isMainBudgetDisabled ? 0 : (Number(form.amount) || 0);
+    const rawAmount = String(form.amount || "").trim();
+    const numAmount = isMainBudgetDisabled ? 0 : (Number(rawAmount) || 0);
     const hasRemainingBudget = selectedEventBudget && selectedEventBudget.expected > 0;
-    const maxBudgetLimit = hasRemainingBudget ? selectedEventBudget.remaining : 1000000;
+    const maxBudgetLimit = hasRemainingBudget ? selectedEventBudget.baseRemaining : MAX_AMOUNT_VALUE;
 
     if (!isMainBudgetDisabled) {
-      if (hasRemainingBudget) {
-        if (numAmount > maxBudgetLimit) {
-          newErrors.amount = `Main Budget Amount cannot exceed remaining budget (${formatWholeCurrency(maxBudgetLimit)})`;
-        } else if (numAmount === 0 && additionalExpenses.length === 0) {
-          newErrors.amount = "This field is required";
-        }
-      } else {
-        if (!form.amount || !String(form.amount).trim() || numAmount <= 0 || isNaN(numAmount)) {
-          if (additionalExpenses.length === 0) {
-            newErrors.amount = "This field is required";
-          }
-        } else if (String(form.amount).length > 6) {
-          newErrors.amount = "Amount cannot exceed 6 digits";
+      if (!rawAmount && additionalExpenses.length === 0) {
+        newErrors.amount = "This field is required";
+      } else if (rawAmount) {
+        const validated = validateAmountInput(rawAmount, {
+          required: additionalExpenses.length === 0,
+          minAmount: 0,
+          fieldName: "Main Budget Amount",
+        });
+        if (!validated.isValid) {
+          newErrors.amount = validated.error;
+        } else if (hasRemainingBudget && numAmount > maxBudgetLimit) {
+          newErrors.amount = `Main Budget Amount cannot exceed remaining budget (${formatWholeCurrency(maxBudgetLimit)}). Use "+ Add Row" below for additional expenses.`;
         }
       }
     } else {
@@ -687,19 +809,35 @@ export default function ExpenseFormDialog({
       }
     }
 
+    // Gating rule enforcement before saving:
+    // If additional rows are present and expected budget exists, enforce that Main Budget Amount has reached the expected budget
+    if (additionalExpenses.length > 0 && hasRemainingBudget && !isMainBudgetDisabled) {
+      if (numAmount < maxBudgetLimit) {
+        newErrors.amount = `Main Budget Amount must reach Expected Budget (${formatWholeCurrency(maxBudgetLimit)}) before adding additional expenses.`;
+      }
+    }
+
     // Validate additional expenses
     additionalExpenses.forEach((extra) => {
       if (!extra.reason || !extra.reason.trim()) {
         newErrors[`extra_reason_${extra.id}`] = "This field is required";
       }
-      if (!extra.amount || Number(extra.amount) <= 0 || isNaN(Number(extra.amount))) {
+      const rawExtra = String(extra.amount || "").trim();
+      if (!rawExtra) {
         newErrors[`extra_amount_${extra.id}`] = "This field is required";
-      } else if (String(extra.amount).length > 6) {
-        newErrors[`extra_amount_${extra.id}`] = "Amount cannot exceed 6 digits";
+      } else {
+        const validated = validateAmountInput(rawExtra, {
+          required: true,
+          minAmount: 1,
+          fieldName: "Extra Amount",
+        });
+        if (!validated.isValid) {
+          newErrors[`extra_amount_${extra.id}`] = validated.error;
+        }
       }
     });
 
-    const totalExpense = roundToWhole(numAmount + extraExpensesSum);
+    const totalExpense = calculateTotalExpense(numAmount, extraExpensesSum);
     if (totalExpense <= 0) {
       if (!newErrors.amount) {
         newErrors.amount = "Total expense amount must be greater than ₹0";
@@ -913,7 +1051,7 @@ export default function ExpenseFormDialog({
                       {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
-                      {formatWholeCurrency(selectedEventBudget.expected)}
+                      {formatWholeCurrency(liveBudgetMetrics.expected)}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
@@ -925,7 +1063,7 @@ export default function ExpenseFormDialog({
                       {COMMON_STRINGS.EXPENSES?.TOTAL_SPENT || "Total Spent"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: "info.main" }}>
-                      {formatWholeCurrency(selectedEventBudget.spent)}
+                      {formatWholeCurrency(liveBudgetMetrics.totalSpent)}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
@@ -940,10 +1078,10 @@ export default function ExpenseFormDialog({
                       variant="body2"
                       sx={{
                         fontWeight: 800,
-                        color: selectedEventBudget.remaining > 0 ? "success.main" : "text.secondary",
+                        color: liveBudgetMetrics.remaining > 0 ? "success.main" : "text.secondary",
                       }}
                     >
-                      {formatWholeCurrency(selectedEventBudget.remaining)}
+                      {formatWholeCurrency(liveBudgetMetrics.remaining)}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
@@ -958,16 +1096,16 @@ export default function ExpenseFormDialog({
                       variant="body2"
                       sx={{
                         fontWeight: 800,
-                        color: selectedEventBudget.extraSpent > 0 ? "error.main" : "text.secondary",
+                        color: liveBudgetMetrics.extraSpent > 0 ? "error.main" : "text.secondary",
                       }}
                     >
-                      {formatWholeCurrency(selectedEventBudget.extraSpent)}
+                      {formatWholeCurrency(liveBudgetMetrics.extraSpent)}
                     </Typography>
                   </Grid>
                 </Grid>
 
                 {/* Notice if remaining budget is 0 or event exceeded budget */}
-                {selectedEventBudget.remaining === 0 ? (
+                {liveBudgetMetrics.remaining === 0 ? (
                   <Box
                     sx={{
                       mt: 1.5,
@@ -991,10 +1129,10 @@ export default function ExpenseFormDialog({
                         fontSize: "0.75rem",
                       }}
                     >
-                      Budget Limit Reached: The expected budget for this event is fully exhausted. Any additional expenses should be added using "+ Add Row" below.
+                      Budget Limit Reached: The expected budget for this event is fully exhausted (Remaining: ₹0). Additional expenses can now be recorded using "+ Add Row" below.
                     </Typography>
                   </Box>
-                ) : selectedEventBudget.extraSpent > 0 ? (
+                ) : liveBudgetMetrics.extraSpent > 0 ? (
                   <Box
                     sx={{
                       mt: 1.5,
@@ -1018,7 +1156,7 @@ export default function ExpenseFormDialog({
                         fontSize: "0.75rem",
                       }}
                     >
-                      Note: This event has previously recorded {formatWholeCurrency(selectedEventBudget.extraSpent)} in additional expenses.
+                      Note: Extra spending of {formatWholeCurrency(liveBudgetMetrics.extraSpent)} recorded beyond the expected budget.
                     </Typography>
                   </Box>
                 ) : null}
@@ -1031,52 +1169,31 @@ export default function ExpenseFormDialog({
             <AppInput
               label={selectedEventBudget ? "Main Budget Amount (₹)" : "Amount (₹)"}
               placeholder={
-                isMainBudgetDisabled
-                  ? "Main budget already recorded"
-                  : selectedEventBudget && selectedEventBudget.remaining === 0
+                selectedEventBudget && selectedEventBudget.baseRemaining === 0
                   ? "₹ 0 (Remaining: ₹0)"
-                  : "₹ Enter budget amount"
+                  : selectedEventBudget && selectedEventBudget.baseRemaining > 0
+                  ? `₹ Enter amount (Remaining: ${formatWholeCurrency(selectedEventBudget.baseRemaining)})`
+                  : "₹ Enter budget amount (max 5 digits)"
               }
-              value={isMainBudgetDisabled ? "" : form.amount}
+              value={isMainBudgetDisabled ? String(recordedBudgetAmount || "") : form.amount}
               disabled={isMainBudgetDisabled}
-              onChange={(e) => {
-                if (isMainBudgetDisabled) return;
-                const raw = e.target.value;
-                if (raw === "") {
-                  setForm((c) => ({ ...c, amount: "" }));
-                  setErrors((p) => ({ ...p, amount: "" }));
-                  return;
-                }
-                if (raw.length > 6) return;
-
-                const num = Number(raw);
-                if (selectedEventBudget && num > selectedEventBudget.remaining) {
-                  setForm((c) => ({ ...c, amount: raw }));
-                  setErrors((p) => ({
-                    ...p,
-                    amount: selectedEventBudget.remaining > 0
-                      ? `Cannot exceed remaining budget (${formatWholeCurrency(selectedEventBudget.remaining)}). Use "+ Add Row" below for additional expenses.`
-                      : `Expected budget is fully spent (₹0 remaining). Record extra amount using "+ Add Row" below.`,
-                  }));
-                  return;
-                }
-
-                setForm((c) => ({ ...c, amount: raw }));
-                if (errors.amount) setErrors((p) => ({ ...p, amount: "" }));
-              }}
+              onChange={handleMainAmountChange}
+              onKeyDown={handleAmountKeyDown}
+              onPaste={handleMainAmountPaste}
               restrictType="numberonly"
+              maxLength={MAX_AMOUNT_DIGITS}
               error={!isMainBudgetDisabled && (!!errors.amount || isMainAmountExceedingBudget)}
               helperText={
                 isMainBudgetDisabled
-                  ? "Main budget already recorded for this event. Enter additional expenses below."
+                  ? `Expected budget (${formatWholeCurrency(selectedEventBudget?.expected || recordedBudgetAmount)}) is fully exhausted for this event. Enter additional expenses below.`
                   : errors.amount ||
                   (isMainAmountExceedingBudget
-                    ? (selectedEventBudget && selectedEventBudget.remaining === 0
-                        ? `Expected budget is fully spent (₹0 remaining). Record extra amount using "+ Add Row" below.`
-                        : `Exceeds remaining budget (${formatWholeCurrency(selectedEventBudget.remaining)}). Please use "+ Add Row" below.`)
-                    : selectedEventBudget
-                    ? `Max allowed from budget: ${formatWholeCurrency(selectedEventBudget.remaining)}`
-                    : undefined)
+                    ? (selectedEventBudget && selectedEventBudget.baseRemaining === 0
+                      ? `Expected budget is fully spent (₹0 remaining). Record extra amount using "+ Add Row" below.`
+                      : `Exceeds remaining budget (${formatWholeCurrency(selectedEventBudget.baseRemaining)}). Please use "+ Add Row" below.`)
+                    : selectedEventBudget && selectedEventBudget.expected > 0
+                      ? `Remaining budget to allocate: ${formatWholeCurrency(liveBudgetMetrics.remaining)} (Cap: ${formatWholeCurrency(selectedEventBudget.baseRemaining)})`
+                      : "Digits 0-9 only, max 5 digits (₹99,999)")
               }
               required={!isMainBudgetDisabled && additionalExpenses.length === 0}
             />
@@ -1383,19 +1500,36 @@ export default function ExpenseFormDialog({
                     Record extra expenses exceeding the expected budget with itemized reasons and amounts.
                   </Typography>
                 </Box>
-                <AppButton
-                  variant="outlined"
-                  size="small"
-                  startIcon={<AddIcon sx={{ fontSize: 18 }} />}
-                  onClick={handleAddAdditionalExpenseRow}
-                  sx={{
-                    borderRadius: 1.5,
-                    textTransform: "none",
-                    fontWeight: 700,
-                  }}
+                <Tooltip
+                  title={
+                    !form.eventName
+                      ? "Please select an event first"
+                      : additionalExpenses.length >= MAX_ADDITIONAL_EXPENSE_ROWS
+                      ? `Maximum ${MAX_ADDITIONAL_EXPENSE_ROWS} additional expense rows allowed`
+                      : hasIncompleteAdditionalRow
+                      ? "Please enter Reason and Extra Amount for the current row before adding another row"
+                      : !canAddRow
+                      ? `Main Budget Amount must reach Expected Budget (${formatWholeCurrency(selectedEventBudget?.baseRemaining || 0)}) and Remaining Budget must be ₹0 before adding additional rows`
+                      : `Add an additional expense row (up to ${MAX_ADDITIONAL_EXPENSE_ROWS} rows)`
+                  }
                 >
-                  Add Row
-                </AppButton>
+                  <span>
+                    <AppButton
+                      variant="outlined"
+                      size="small"
+                      disabled={isAddRowDisabled}
+                      startIcon={<AddIcon sx={{ fontSize: 18 }} />}
+                      onClick={handleAddAdditionalExpenseRow}
+                      sx={{
+                        borderRadius: 1.5,
+                        textTransform: "none",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Add Row {additionalExpenses.length > 0 ? `(${additionalExpenses.length}/${MAX_ADDITIONAL_EXPENSE_ROWS})` : ""}
+                    </AppButton>
+                  </span>
+                </Tooltip>
               </Box>
 
               {additionalExpenses.length === 0 ? (
@@ -1451,9 +1585,11 @@ export default function ExpenseFormDialog({
                             onChange={(e) =>
                               handleAdditionalExpenseChange(extra.id, "amount", e.target.value)
                             }
+                            onKeyDown={handleAmountKeyDown}
+                            onPaste={handleAdditionalExpensePaste(extra.id)}
                             error={Boolean(errors[`extra_amount_${extra.id}`])}
                             helperText={errors[`extra_amount_${extra.id}`]}
-                            maxLength={6}
+                            maxLength={MAX_AMOUNT_DIGITS}
                             restrictType="numberonly"
                             required
                           />
@@ -1499,20 +1635,19 @@ export default function ExpenseFormDialog({
                     ? "rgba(99, 102, 241, 0.1)"
                     : "rgba(99, 102, 241, 0.05)",
                 border: (t) =>
-                  `1px solid ${
-                    t.palette.mode === "dark"
-                      ? "rgba(99, 102, 241, 0.3)"
-                      : "rgba(99, 102, 241, 0.2)"
+                  `1px solid ${t.palette.mode === "dark"
+                    ? "rgba(99, 102, 241, 0.3)"
+                    : "rgba(99, 102, 241, 0.2)"
                   }`,
               }}
             >
               <Grid container spacing={2} alignItems="center">
                 <Grid size={{ xs: 12, sm: 4 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    Main Budget Amount:
+                    {isMainBudgetDisabled ? "Main Budget (Recorded):" : "Main Budget Amount:"}
                   </Typography>
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    {formatWholeCurrency(mainBudgetAmount)}
+                    {formatWholeCurrency(isMainBudgetDisabled ? recordedBudgetAmount : mainBudgetAmount)}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 12, sm: 4 }}>
@@ -1549,19 +1684,7 @@ export default function ExpenseFormDialog({
         </Grid>
       </AppDialog>
 
-      {/* Discard Changes Confirmation */}
-      <AppConfirmDialog
-        open={confirmDiscardOpen}
-        onClose={() => setConfirmDiscardOpen(false)}
-        onConfirm={() => {
-          setConfirmDiscardOpen(false);
-          onClose();
-        }}
-        title="Discard Changes"
-        content="You have unsaved changes. Are you sure you want to discard them and close?"
-        confirmText="Discard"
-        confirmColor="warning"
-      />
+
 
       {/* Lightbox / Full Receipt Preview Dialog */}
       <Dialog
@@ -1627,6 +1750,21 @@ export default function ExpenseFormDialog({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog before deleting an additional expense row */}
+      <AppConfirmDialog
+        open={Boolean(deleteRowId)}
+        onClose={() => setDeleteRowId(null)}
+        onConfirm={() => {
+          if (deleteRowId) {
+            executeRemoveAdditionalExpenseRow(deleteRowId);
+          }
+        }}
+        title="Delete Additional Expense Row"
+        content="Are you sure want to Delete ?"
+        confirmText="Delete"
+        confirmColor="error"
+      />
     </>
   );
 }

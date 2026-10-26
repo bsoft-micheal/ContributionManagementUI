@@ -16,7 +16,6 @@ import AppButton, { AppSaveButton } from "../../components/common/AppButton";
 import AppDataTable from "../../components/common/AppDataTable";
 import {
   FilterList as FilterListIcon,
-  Refresh as RefreshIcon,
   Save as SaveIcon,
   LockOutlined as LockOutlinedIcon,
   AddModerator as AddModeratorIcon,
@@ -571,9 +570,7 @@ export default function UserRightsPage() {
     }
   };
 
-  const handleRefresh = () => {
-    fetchRightsForRole(selectedRoleName, true);
-  };
+
 
   // ── Filtered rows ─────────────────────────────────────────────────────────
   const filteredRows = useMemo(() => {
@@ -744,7 +741,7 @@ export default function UserRightsPage() {
         data={filteredRows}
         loading={loading}
         allowPagination={false}
-        searchPlaceholder="Search module, sub-module, action..."
+        searchPlaceholder="Search by Module"
         emptyMessage={hasNoPermissions ? "No permissions assigned. Contact your administrator for access." : "No records found."}
         filterPanel={
           <Box
@@ -826,25 +823,6 @@ export default function UserRightsPage() {
                 loading={saving}
                 disabled={saving || loading}
               />
-              <AppButton
-                variant="outlined"
-                size="small"
-                startIcon={<RefreshIcon sx={{ fontSize: 17 }} />}
-                onClick={handleRefresh}
-                sx={{
-                  height: 34,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: "0.78rem",
-                  px: 2,
-                  borderRadius: "8px",
-                  color: "#6366f1",
-                  borderColor: "rgba(99, 102, 241, 0.4)",
-                  "&:hover": { borderColor: "#6366f1", bgcolor: "rgba(99, 102, 241, 0.05)" },
-                }}
-              >
-                Refresh
-              </AppButton>
             </Box>
           </Box>
         }
