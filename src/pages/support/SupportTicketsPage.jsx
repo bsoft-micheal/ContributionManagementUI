@@ -655,19 +655,47 @@ export default function SupportTicketsPage() {
     return ["verified", "resolved", "closed"].some((v) => s.includes(v));
   };
 
-  // Helper: Find active/unverified ticket for a specific ticket type
-  const getUnverifiedTicketForType = (typeVal, targetMemberName, targetMemberId) => {
+  // Helper: Find active/unverified ticket for a specific ticket type on an event
+  const getUnverifiedTicketForType = (
+    typeVal,
+    targetMemberName,
+    targetMemberId,
+    targetEventId,
+    targetEventName,
+    excludeTicketId
+  ) => {
     if (!typeVal) return null;
     const cleanType = String(typeVal).trim().toLowerCase();
     const loggedIn = getLoggedInMember();
     const mName = String(targetMemberName || loggedIn.name || authState?.fullName || authState?.username || "").trim().toLowerCase();
     const mId = String(targetMemberId || loggedIn.id || authState?.memberId || authState?.user?.userId || "").trim().toLowerCase();
+    const cleanEventId = String(targetEventId || "").trim().toLowerCase();
+    const cleanEventName = String(targetEventName || "").trim().toLowerCase();
+    const cleanExcludeId = String(excludeTicketId || "").trim().toLowerCase();
 
     return (tickets || []).find((t) => {
+      if (cleanExcludeId) {
+        const tId = String(t.ticketId || t.id || "").trim().toLowerCase();
+        if (tId && tId === cleanExcludeId) return false;
+      }
+
       if (isTicketVerified(t.status)) return false;
 
       const tType = String(t.ticketType || "").trim().toLowerCase();
       if (tType !== cleanType) return false;
+
+      // Event match: if event is specified, ticket must match that event
+      if (cleanEventId || cleanEventName) {
+        const tEventId = String(t.eventId || "").trim().toLowerCase();
+        const tEventName = String(t.relatedEvent || "").trim().toLowerCase();
+
+        const matchesEventId = Boolean(cleanEventId && tEventId && tEventId === cleanEventId);
+        const matchesEventName = Boolean(cleanEventName && tEventName && tEventName === cleanEventName);
+
+        if (!matchesEventId && !matchesEventName) {
+          return false;
+        }
+      }
 
       if (isMemberRole && !isAdminOrOrg) return true;
 
@@ -675,10 +703,13 @@ export default function SupportTicketsPage() {
       const tId = String(t.memberId || "").trim().toLowerCase();
       const tCreatedBy = (t.createdBy || "").trim().toLowerCase();
 
-      const matchesName = mName && (tName === mName || tCreatedBy === mName);
-      const matchesId = mId && (tId === mId || tCreatedBy === mId);
+      if (mName || mId) {
+        const matchesName = mName && (tName === mName || tCreatedBy === mName);
+        const matchesId = mId && (tId === mId || tCreatedBy === mId);
+        return matchesName || matchesId;
+      }
 
-      return matchesName || matchesId;
+      return true;
     });
   };
 
@@ -703,11 +734,30 @@ export default function SupportTicketsPage() {
     });
   }, [tickets, authState, isMemberRole, isAdminOrOrg, membersList]);
 
-  // Check if unverified ticket exists for currently selected form.ticketType
+  // Check if unverified ticket exists for currently selected form.ticketType on selected event
   const unverifiedTicketForSelectedType = useMemo(() => {
-    if (editingTicket) return null;
-    return getUnverifiedTicketForType(form.ticketType, form.memberName, form.memberId);
-  }, [form.ticketType, form.memberName, form.memberId, editingTicket, tickets, authState, isMemberRole, isAdminOrOrg, membersList]);
+    const currentTicketId = editingTicket ? (editingTicket.ticketId || editingTicket.id) : null;
+    return getUnverifiedTicketForType(
+      form.ticketType,
+      form.memberName,
+      form.memberId,
+      form.eventId,
+      form.relatedEvent,
+      currentTicketId
+    );
+  }, [
+    form.ticketType,
+    form.memberName,
+    form.memberId,
+    form.eventId,
+    form.relatedEvent,
+    editingTicket,
+    tickets,
+    authState,
+    isMemberRole,
+    isAdminOrOrg,
+    membersList,
+  ]);
 
   // List of active ticket types from master data
   const masterTicketTypeNames = useMemo(() => {
@@ -716,30 +766,112 @@ export default function SupportTicketsPage() {
       .map((t) => t.typeName);
   }, [dbTicketTypes]);
 
-  // Whether all available ticket types already have active tickets
+  // Whether all available ticket types already have active tickets across all available events for the member
   const allTicketTypesOccupied = useMemo(() => {
+    if (!isMemberRole || !masterTicketTypeNames.length || !eventsList?.length) return false;
+    const loggedIn = getLoggedInMember();
+    const currentTicketId = editingTicket ? (editingTicket.ticketId || editingTicket.id) : null;
+
+    // A member is only globally blocked from adding if EVERY available event has all ticket types occupied
+    return eventsList.every((ev) => {
+      const evId = ev.eventId || ev.id;
+      const evName = ev.eventName || ev.name || ev.title;
+      return masterTicketTypeNames.every((typeName) =>
+        Boolean(
+          getUnverifiedTicketForType(
+            typeName,
+            loggedIn.name,
+            loggedIn.id,
+            evId,
+            evName,
+            currentTicketId
+          )
+        )
+      );
+    });
+  }, [
+    isMemberRole,
+    masterTicketTypeNames,
+    eventsList,
+    editingTicket,
+    tickets,
+    authState,
+    isAdminOrOrg,
+    membersList,
+  ]);
+
+  // Whether all ticket types for currently selected form.eventId / form.relatedEvent in the dialog are occupied
+  const isCurrentEventAllTypesOccupied = useMemo(() => {
+    if (!form.eventId && !form.relatedEvent) return false;
     if (!masterTicketTypeNames.length) return false;
     const loggedIn = getLoggedInMember();
-    return masterTicketTypeNames.every((typeName) => Boolean(getUnverifiedTicketForType(typeName, loggedIn.name, loggedIn.id)));
-  }, [masterTicketTypeNames, tickets, authState, isMemberRole, isAdminOrOrg, membersList]);
+    const targetName = form.memberName || loggedIn.name;
+    const targetId = form.memberId || loggedIn.id;
+    const currentTicketId = editingTicket ? (editingTicket.ticketId || editingTicket.id) : null;
 
-  // Ticket type options with status for Add/Edit dialog
+    return masterTicketTypeNames.every((typeName) =>
+      Boolean(
+        getUnverifiedTicketForType(
+          typeName,
+          targetName,
+          targetId,
+          form.eventId,
+          form.relatedEvent,
+          currentTicketId
+        )
+      )
+    );
+  }, [
+    masterTicketTypeNames,
+    form.eventId,
+    form.relatedEvent,
+    form.memberName,
+    form.memberId,
+    editingTicket,
+    tickets,
+    authState,
+    isMemberRole,
+    isAdminOrOrg,
+    membersList,
+  ]);
+
+  // Ticket type options with status for Add/Edit dialog (event-wise)
   const dialogTicketTypeOptions = useMemo(() => {
     const loggedIn = getLoggedInMember();
     const targetName = form.memberName || loggedIn.name;
     const targetId = form.memberId || loggedIn.id;
+    const currentTicketId = editingTicket ? (editingTicket.ticketId || editingTicket.id) : null;
 
     return (dbTicketTypes || [])
       .filter((t) => t.typeName && t.isActive !== false)
       .map((t) => {
-        const activeTicket = getUnverifiedTicketForType(t.typeName, targetName, targetId);
+        const activeTicket = getUnverifiedTicketForType(
+          t.typeName,
+          targetName,
+          targetId,
+          form.eventId,
+          form.relatedEvent,
+          currentTicketId
+        );
         return {
-          label: activeTicket && !editingTicket ? `${t.typeName} (Active: ${activeTicket.ticketNo})` : t.typeName,
+          label: activeTicket ? `${t.typeName} (Active: ${activeTicket.ticketNo})` : t.typeName,
           value: t.typeName,
-          disabled: Boolean(activeTicket) && !editingTicket,
+          disabled: Boolean(activeTicket),
         };
       });
-  }, [dbTicketTypes, form.memberName, form.memberId, editingTicket, tickets, authState, isMemberRole, isAdminOrOrg, membersList]);
+  }, [
+    dbTicketTypes,
+    form.memberName,
+    form.memberId,
+    form.eventId,
+    form.relatedEvent,
+    editingTicket,
+    tickets,
+    authState,
+    isMemberRole,
+    isAdminOrOrg,
+    membersList,
+  ]);
 
   const handleEditTicket = (row) => {
     const isVerified = isTicketVerified(row?.status);
@@ -825,21 +957,24 @@ export default function SupportTicketsPage() {
         if (matched) resolvedMemberId = matched.memberId || matched.id || "";
       }
 
-      // Check if user already has an active unverified ticket for this ticket type before creating
-      if (!editingTicket) {
-        const existingUnverified = getUnverifiedTicketForType(
-          form.ticketType,
-          form.memberName,
-          resolvedMemberId || form.memberId
-        );
+      // Check if user already has an active unverified ticket for this ticket type on this event
+      const currentTicketId = editingTicket ? (editingTicket.ticketId || editingTicket.id) : null;
+      const existingUnverified = getUnverifiedTicketForType(
+        form.ticketType,
+        form.memberName,
+        resolvedMemberId || form.memberId,
+        form.eventId,
+        form.relatedEvent,
+        currentTicketId
+      );
 
-        if (existingUnverified) {
-          toast.warning(
-            `You already have an active support ticket (${existingUnverified.ticketNo}) for ticket type "${existingUnverified.ticketType}". A new ticket for this type can only be created after the existing ticket is verified.`
-          );
-          setIsSaving(false);
-          return;
-        }
+      if (existingUnverified) {
+        const eventLabel = form.relatedEvent ? ` on event "${form.relatedEvent}"` : "";
+        toast.warning(
+          `You already have an active support ticket (${existingUnverified.ticketNo}) for ticket type "${existingUnverified.ticketType}"${eventLabel}. A new ticket for this type can only be created after the existing ticket is resolved.`
+        );
+        setIsSaving(false);
+        return;
       }
 
       if (editingTicket) {
@@ -858,11 +993,7 @@ export default function SupportTicketsPage() {
         });
         toast.success(TOAST_MESSAGES.SUPPORT.UPDATED_SUCCESS || TOAST_MESSAGES.GENERAL.UPDATED_SUCCESS);
       } else {
-        const nextIdx = (tickets?.length || 0) + 1;
-        const newTicketNo = `TKT${String(nextIdx).padStart(4, "0")}`;
-
         const created = await createSupportTicketAsync({
-          ticketNo: newTicketNo,
           memberName: form.memberName,
           memberId: resolvedMemberId || "",
           eventId: form.eventId || null,
@@ -874,7 +1005,7 @@ export default function SupportTicketsPage() {
           attachment: form.attachment || null,
         });
 
-        const actualTicketNo = created?.ticketNo || newTicketNo;
+        const actualTicketNo = created?.ticketNo || "";
 
         // Trigger notification for Authority/Admin safely
         try {
@@ -1530,7 +1661,7 @@ export default function SupportTicketsPage() {
             />
             <AppSaveButton
               loading={isSaving}
-              disabled={isSaving || (!editingTicket && Boolean(unverifiedTicketForSelectedType))}
+              disabled={isSaving || Boolean(unverifiedTicketForSelectedType) || isCurrentEventAllTypesOccupied}
               onClick={handleSaveTicket}
             >
               {editingTicket ? "Update" : "Save"}
@@ -1539,12 +1670,14 @@ export default function SupportTicketsPage() {
         }
       >
         <Grid container spacing={2}>
-          {!editingTicket && unverifiedTicketForSelectedType && (
+          {(unverifiedTicketForSelectedType || isCurrentEventAllTypesOccupied) && (
             <Grid size={{ xs: 12 }}>
               <Alert severity="warning" sx={{ borderRadius: "8px", fontWeight: 600 }}>
-                {isMemberRole
-                  ? `You currently have an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}". Please wait until it is verified before submitting another ticket for this type.`
-                  : `Member already has an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}". It must be verified before creating a new ticket for this type.`}
+                {unverifiedTicketForSelectedType
+                  ? (isMemberRole
+                      ? `You currently have an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}"${form.relatedEvent ? ` on event "${form.relatedEvent}"` : ""}. Please resolve the existing ticket before submitting another ticket for this type.`
+                      : `Member already has an active support ticket (${unverifiedTicketForSelectedType.ticketNo}) for ticket type "${unverifiedTicketForSelectedType.ticketType}"${form.relatedEvent ? ` on event "${form.relatedEvent}"` : ""}. It must be resolved before creating or updating a ticket for this type.`)
+                  : `You have active support tickets for all available ticket types on event "${form.relatedEvent}". You can only create a new ticket after an existing ticket is verified.`}
               </Alert>
             </Grid>
           )}
