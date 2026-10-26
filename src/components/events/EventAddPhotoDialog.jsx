@@ -328,7 +328,7 @@ export default function EventAddPhotoDialog({
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill required field");
+      toast.error("Please fill all required field");
       return;
     }
 

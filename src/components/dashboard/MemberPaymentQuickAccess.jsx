@@ -41,6 +41,7 @@ import { getMembersAsync } from "../../services/memberService";
 import { getExpensesAsync } from "../../services/expenseService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getDashboardSummaryAsync } from "../../services/dashboardService";
+import { getPaymentTransactionsAsync } from "../../services/paymentService";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppToast } from "../common/AppToast";
 import { formatWholeNumber, roundToWhole } from "../../utils/roundingHelper";
@@ -64,6 +65,7 @@ export default function MemberPaymentQuickAccess({
 
   const [loading, setLoading] = useState(true);
   const [contributions, setContributions] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [fallbackEvents, setFallbackEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState(propEventTypes || []);
@@ -129,6 +131,7 @@ export default function MemberPaymentQuickAccess({
           getMembersAsync().catch(() => []),
           getExpensesAsync().catch(() => []),
           getEventTypesAsync().catch(() => []),
+          getPaymentTransactionsAsync().catch(() => []),
         ];
 
         // If events prop is empty and we have a target month/year, fetch dashboard summary to get the month events
@@ -141,7 +144,7 @@ export default function MemberPaymentQuickAccess({
           );
         }
 
-        const [contribRes, membersRes, expensesRes, typesRes, dashRes] = await Promise.all(promises);
+        const [contribRes, membersRes, expensesRes, typesRes, txRes, dashRes] = await Promise.all(promises);
 
         if (cancelled) return;
 
@@ -149,8 +152,10 @@ export default function MemberPaymentQuickAccess({
         const rawMembers = Array.isArray(membersRes) ? membersRes : (membersRes?.data ?? []);
         const rawExpenses = Array.isArray(expensesRes) ? expensesRes : (expensesRes?.data ?? []);
         const rawTypes = Array.isArray(typesRes) ? typesRes : (typesRes?.data ?? []);
+        const rawTxns = Array.isArray(txRes) ? txRes : (txRes?.data ?? []);
 
         setContributions(rawContribs);
+        setTransactions(rawTxns);
         setExpenses(rawExpenses);
         if (rawTypes.length > 0) {
           setEventTypes(rawTypes);
@@ -264,6 +269,8 @@ export default function MemberPaymentQuickAccess({
 
       const mId = String(c.memberId || c.MemberId || "").toLowerCase();
       const memberInfo = membersMap.get(mId);
+      const memberName = c.memberName || c.MemberName || memberInfo?.name || "Unknown Member";
+      const eventName = c.eventName || c.EventName || eventInfo?.eventName || "--";
 
       // If Member role, only show own contributions
       if (isMemberRole) {
@@ -272,40 +279,84 @@ export default function MemberPaymentQuickAccess({
           String(memberInfo?.email || c.email || "").toLowerCase().trim() === userEmail
         );
         const matchesName = authState?.user?.fullName && (
-          String(c.memberName || memberInfo?.name || "").toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim()
+          String(memberName).toLowerCase().trim() === String(authState.user.fullName).toLowerCase().trim()
         );
         if (!matchesMemberId && !matchesEmail && !matchesName) {
           return;
         }
       }
 
+      // Match payment transaction for this member and event
+      const matchedTx = (transactions || []).find((t) => {
+        const tMemberId = String(t.userId || t.memberId || "").toLowerCase();
+        const tMemberName = String(t.memberName || "").toLowerCase().trim();
+        const memberMatches = (mId && tMemberId === mId) ||
+          (memberName && tMemberName && memberName.toLowerCase().trim() === tMemberName);
+        if (!memberMatches) return false;
+
+        const tEvId = String(t.eventId || "").toLowerCase();
+        const tEvName = String(t.eventName || "").toLowerCase().trim();
+        return (cEventId && tEvId === cEventId) ||
+          (eventName && tEvName && eventName.toLowerCase().trim() === tEvName);
+      });
+
       const rawStatusStr = String(c.paymentStatus || c.status || c.statusName || "").toLowerCase();
-      const isRejected = rawStatusStr === "rejected" || c.isRejected === true;
-      const isPaid = !isRejected && (c.paymentStatus === 2 || rawStatusStr === "paid" || rawStatusStr === "completed" || rawStatusStr === "verified");
+      const txStatus = String(matchedTx?.status || "").toLowerCase();
+      const isRejected = rawStatusStr === "rejected" || c.isRejected === true || txStatus === "rejected";
+
+      const hasPaymentDate = Boolean(c.paymentDate && !String(c.paymentDate).includes("0001-01-01"));
+      const cashAmt = Number(c.cashAmount) || 0;
+      const upiAmt = Number(c.upiAmount) || 0;
+      const hasCashOrUpi = cashAmt > 0 || upiAmt > 0;
+      const txAmt = Number(matchedTx?.amount) || 0;
+      const hasTxPaid = Boolean(matchedTx && !isRejected && (txAmt > 0 || txStatus === "paid" || txStatus === "verified" || txStatus === "approved"));
+
+      const isApproved = rawStatusStr === "approved" || txStatus === "approved" || c.isApproved === true;
+      const isVerified = rawStatusStr === "verified" || txStatus === "verified" || c.isVerified === true;
+      const isPaidStatus = c.paymentStatus === 2 || c.paymentStatus === "2" || rawStatusStr === "paid" || rawStatusStr === "completed" || txStatus === "paid" || txStatus === "completed";
+
+      const isPaid = !isRejected && (
+        isPaidStatus ||
+        isVerified ||
+        isApproved ||
+        hasTxPaid ||
+        (hasPaymentDate && (Boolean(c.paymentMode) || hasCashOrUpi)) ||
+        hasCashOrUpi
+      );
+
       const amount = Number(c.amount || c.Amount) || 0;
+      const resolvedPaymentMode = (c.paymentMode ?? c.PaymentMode) || matchedTx?.paymentMode || (cashAmt > 0 && upiAmt > 0 ? "Split" : (cashAmt > 0 ? "Cash" : (upiAmt > 0 ? "UPI" : "--")));
 
       list.push({
         id: cId || `${mId}-${cEventId}`,
         contributionId: c.contributionId || c.ContributionId,
         eventId: c.eventId || c.EventId || eventInfo?.eventId,
         memberId: c.memberId || c.MemberId,
-        memberName: c.memberName || c.MemberName || memberInfo?.name || "Unknown Member",
+        memberName,
         memberPhone: memberInfo?.phone || memberInfo?.phoneNumber || c.phone || "--",
         memberEmail: memberInfo?.email || c.email || "--",
-        eventName: c.eventName || c.EventName || eventInfo?.eventName || "--",
+        eventName,
         categoryName,
         amount,
         isPaid,
         isRejected,
-        paymentDate: c.paymentDate || c.PaymentDate,
-        paymentMode: c.paymentMode ?? c.PaymentMode,
-        rejectionReason: c.rejectionReason || c.auditRemarks || c.notes || "",
+        paymentDate: c.paymentDate || c.PaymentDate || matchedTx?.paymentDate,
+        paymentMode: resolvedPaymentMode,
+        rejectionReason: c.rejectionReason || c.auditRemarks || c.notes || matchedTx?.notes || "",
       });
     });
 
-    return list;
+    return list.sort((a, b) => {
+      const nameA = String(a.memberName || "").trim();
+      const nameB = String(b.memberName || "").trim();
+      if (!nameA && !nameB) return 0;
+      if (!nameA) return 1;
+      if (!nameB) return -1;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+    });
   }, [
     contributions,
+    transactions,
     monthEventIdSet,
     eventInfoMap,
     membersMap,
@@ -466,7 +517,7 @@ export default function MemberPaymentQuickAccess({
 
   // Filtered by Status and Search within the selected event
   const filteredItems = useMemo(() => {
-    return eventScopedItems.filter((item) => {
+    const list = eventScopedItems.filter((item) => {
       // Status filter
       if (statusFilter === "paid" && !item.isPaid) return false;
       if (statusFilter === "pending" && (item.isPaid || item.isRejected)) return false;
@@ -485,6 +536,15 @@ export default function MemberPaymentQuickAccess({
       }
 
       return true;
+    });
+
+    return list.sort((a, b) => {
+      const nameA = String(a.memberName || "").trim();
+      const nameB = String(b.memberName || "").trim();
+      if (!nameA && !nameB) return 0;
+      if (!nameA) return 1;
+      if (!nameB) return -1;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
     });
   }, [eventScopedItems, statusFilter, search]);
 
