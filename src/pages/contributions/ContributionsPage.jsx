@@ -913,15 +913,28 @@ export default function ContributionsPage() {
     const paymentStatusNum = Number(c.paymentStatus);
     const paymentStatusStr = String(c.paymentStatus || "").trim().toLowerCase();
 
-    // If explicit status is Pending (1) or Rejected, it is strictly NOT paid!
-    if (paymentStatusNum === 1 || rawStatus === "pending" || rawStatus === "rejected" || paymentStatusStr === "pending" || paymentStatusStr === "rejected") {
+    // If explicit status is Rejected, it is strictly NOT paid!
+    if (rawStatus === "rejected" || paymentStatusStr === "rejected") {
       return false;
     }
 
     const matchedTx = tx !== null ? tx : findContributionTransaction(c);
     const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
-    if (txStatus === "rejected" || txStatus === "pending") {
+    if (txStatus === "rejected") {
       return false;
+    }
+
+    // Dynamic financial balance check:
+    // If member has paid the required target amount (or more), it is Paid!
+    const cash = Number(c.cashAmount) || 0;
+    const upi = Number(c.upiAmount) || 0;
+    const allTxns = typeof findAllContributionTransactions === "function" ? findAllContributionTransactions(c) : [];
+    const totalTxAmt = allTxns.length > 0 ? allTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0) : (Number(matchedTx?.amount) || 0);
+    const rawPaid = (cash + upi) > 0 ? (cash + upi) : (totalTxAmt > 0 ? totalTxAmt : (Number(c.paidAmount) || Number(c.totalReceivedAmount) || 0));
+    const targetAmt = Number(c.amount) || 0;
+
+    if (targetAmt > 0 && rawPaid >= targetAmt) {
+      return true;
     }
 
     if (
@@ -1037,28 +1050,6 @@ export default function ContributionsPage() {
           String(c.statusName || "").toLowerCase() === "approved" ||
           (isContributionApproved(currentContribution, matchedTx) && !isRejected);
 
-        const isPaid =
-          isContributionPaid(currentContribution, matchedTx) ||
-          (!isRejected && (
-            c.paymentStatus === 2 ||
-            String(c.paymentStatus || "").toLowerCase() === "paid" ||
-            String(c.statusName || "").toLowerCase() === "paid" ||
-            String(c.status || "").toLowerCase() === "paid" ||
-            isVerified ||
-            isApproved
-          ));
-
-        let resolvedStatus = "Pending";
-        if (isRejected) {
-          resolvedStatus = "Rejected";
-        } else if (isApproved) {
-          resolvedStatus = "Approved";
-        } else if (isVerified) {
-          resolvedStatus = "Verified";
-        } else if (isPaid) {
-          resolvedStatus = "Paid";
-        }
-
         // Compute raw transacted amount for this contribution
         let rawPaidAmount = 0;
         const cash = Number(c.cashAmount) || 0;
@@ -1073,13 +1064,44 @@ export default function ContributionsPage() {
           rawPaidAmount = txAmt;
         } else if (rawPaid > 0) {
           rawPaidAmount = rawPaid;
+        }
+
+        const eventTargetAmt = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
+
+        const isAmountFullyPaid = !isRejected && eventTargetAmt > 0 && rawPaidAmount >= eventTargetAmt;
+        const isAmountPartiallyPaid = !isRejected && rawPaidAmount > 0 && rawPaidAmount < eventTargetAmt;
+
+        const isPaid =
+          isAmountFullyPaid ||
+          isContributionPaid(currentContribution, matchedTx) ||
+          (!isRejected && (
+            c.paymentStatus === 2 ||
+            String(c.paymentStatus || "").toLowerCase() === "paid" ||
+            String(c.statusName || "").toLowerCase() === "paid" ||
+            String(c.status || "").toLowerCase() === "paid" ||
+            isVerified ||
+            isApproved
+          ));
+
+        if (!rawPaidAmount && isPaid) {
+          rawPaidAmount = eventTargetAmt > 0 ? eventTargetAmt : Number(c.amount || 0);
+        }
+
+        let resolvedStatus = "Pending";
+        if (isRejected) {
+          resolvedStatus = "Rejected";
+        } else if (isApproved) {
+          resolvedStatus = "Approved";
+        } else if (isVerified) {
+          resolvedStatus = "Verified";
         } else if (isPaid) {
-          rawPaidAmount = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
+          resolvedStatus = "Paid";
+        } else if (isAmountPartiallyPaid) {
+          resolvedStatus = "Partial";
         }
 
         // For this event's contribution, the paid amount cannot exceed the event's required amount.
         // Any excess transacted amount was paid towards previous arrears.
-        const eventTargetAmt = resolvedAmount > 0 ? resolvedAmount : Number(c.amount || 0);
         const paidAmount = eventTargetAmt > 0
           ? (isPaid ? eventTargetAmt : Math.min(rawPaidAmount, eventTargetAmt))
           : rawPaidAmount;
@@ -2786,7 +2808,21 @@ export default function ContributionsPage() {
           (isContributionApproved(row, matchedTx) && !isRejected);
 
         const isVerified = isContributionVerified(row, matchedTx);
+
+        // Dynamic financial balance check for single-event row
+        const targetAmount = Number(row?.amount) || 0;
+        const allTxns = typeof findAllContributionTransactions === "function" ? findAllContributionTransactions(row) : [];
+        const totalTxAmt = allTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+        const txAmt = totalTxAmt > 0 ? totalTxAmt : (Number(matchedTx?.amount) || 0);
+        const cash = Number(row?.cashAmount) || 0;
+        const upi = Number(row?.upiAmount) || 0;
+        const rawPaid = (cash + upi) > 0 ? (cash + upi) : (txAmt > 0 ? txAmt : (Number(row?.paidAmount) || 0));
+
+        const isFullyPaidByAmount = !isRejected && targetAmount > 0 && rawPaid >= targetAmount;
+        const isPartialByAmount = !isRejected && rawPaid > 0 && rawPaid < targetAmount;
+
         const isPaid =
+          isFullyPaidByAmount ||
           isContributionPaid(row, matchedTx) ||
           (!isRejected && (
             isApproved ||
@@ -2805,14 +2841,16 @@ export default function ContributionsPage() {
           displayStatus = "Verified";
         } else if (isPaid) {
           displayStatus = "Paid";
+        } else if (isPartialByAmount || statusStr === "partial") {
+          displayStatus = "Partial";
         }
 
         const color = isRejected
           ? "#dc2626"
-          : (isApproved ? "#059669" : (isVerified ? "#16a34a" : (isPaid ? "#059669" : "#b45309")));
+          : (isApproved ? "#059669" : (isVerified ? "#16a34a" : (isPaid ? "#059669" : (displayStatus === "Partial" ? "#d97706" : "#b45309"))));
         const bg = isRejected
           ? "rgba(220,38,38,0.08)"
-          : (isApproved ? "rgba(5,150,105,0.14)" : (isVerified ? "rgba(22,163,74,0.12)" : (isPaid ? "rgba(5,150,105,0.08)" : "rgba(234,179,8,0.12)")));
+          : (isApproved ? "rgba(5,150,105,0.14)" : (isVerified ? "rgba(22,163,74,0.12)" : (isPaid ? "rgba(5,150,105,0.08)" : (displayStatus === "Partial" ? "rgba(217,119,6,0.12)" : "rgba(234,179,8,0.12)"))));
 
         return (
           <Typography
