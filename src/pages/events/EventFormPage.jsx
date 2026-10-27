@@ -85,6 +85,7 @@ import {
   getEventByIdAsync,
   getEventsAsync,
   getAvailableAmountInHandAsync,
+  getEligibleSponsorsAsync,
 } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
@@ -402,6 +403,11 @@ export default function EventFormPage({
   const [eventTypeMembers, setEventTypeMembers] = useState({});
   const [eventTypeMemberDates, setEventTypeMemberDates] = useState({});
   const [enableCelebrantSelection, setEnableCelebrantSelection] = useState(false);
+  const [requireSponsorContribution, setRequireSponsorContribution] = useState(false);
+  const [sponsorUserId, setSponsorUserId] = useState("");
+  const [sponsorContributionAmount, setSponsorContributionAmount] = useState("");
+  const [eligibleSponsors, setEligibleSponsors] = useState([]);
+  const [detailedEventSponsorName, setDetailedEventSponsorName] = useState("");
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -480,7 +486,7 @@ export default function EventFormPage({
     async function initData() {
       setLoading(true);
       try {
-        const [typesData, usersData, budgetData, settingsData, amountInHandData, allEventsData] = await Promise.all([
+        const [typesData, usersData, budgetData, settingsData, amountInHandData, allEventsData, sponsorsData] = await Promise.all([
           (propEventTypes && propEventTypes.length > 0)
             ? Promise.resolve(propEventTypes)
             : getEventTypesAsync(isEdit),
@@ -491,11 +497,13 @@ export default function EventFormPage({
           getSystemSettingsAsync().catch(() => null),
           getAvailableAmountInHandAsync(id || null).catch(() => null),
           getEventsAsync().catch(() => []),
+          getEligibleSponsorsAsync().catch(() => []),
         ]);
 
         if (!isMounted) return;
 
         setExistingEvents(Array.isArray(allEventsData) ? allEventsData : []);
+        setEligibleSponsors(Array.isArray(sponsorsData) ? sponsorsData : []);
 
         const balanceObj = amountInHandData?.data || amountInHandData || {};
         setPreviousBalanceData(balanceObj);
@@ -821,6 +829,12 @@ export default function EventFormPage({
 
           setEnableCelebrantSelection(isCelebrantsEnabled);
 
+          const isSponsorReq = Boolean(detailedEvent.requireSponsorContribution);
+          setRequireSponsorContribution(isSponsorReq);
+          setSponsorUserId(detailedEvent.sponsorUserId || "");
+          setSponsorContributionAmount(detailedEvent.sponsorContributionAmount ? String(detailedEvent.sponsorContributionAmount) : "");
+          setDetailedEventSponsorName(detailedEvent.sponsorName || "");
+
           const editNonBdays = (typesData || []).filter(
             (t) => eventTypeIdsList.includes(t.eventTypeId) && !t.eventTypeName?.toLowerCase().includes("birthday")
           );
@@ -957,6 +971,10 @@ export default function EventFormPage({
           setMarriageCelebrantIds([]);
           setSendOffMemberIds([]);
           setEnableCelebrantSelection(false);
+          setRequireSponsorContribution(false);
+          setSponsorUserId("");
+          setSponsorContributionAmount("");
+          setDetailedEventSponsorName("");
 
           const targetMonthNum = defaultDate && defaultDate.isValid() ? defaultDate.month() + 1 : -1;
           const targetYearNum = defaultDate && defaultDate.isValid() ? defaultDate.year() : -1;
@@ -1405,6 +1423,42 @@ export default function EventFormPage({
       }
     }
   };
+
+  // Handle toggling Require Sponsor Contribution flag
+  const handleToggleRequireSponsorContribution = (checked) => {
+    setRequireSponsorContribution(checked);
+    if (!checked) {
+      setSponsorUserId("");
+      setSponsorContributionAmount("");
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.sponsorUserId;
+        delete next.sponsorContributionAmount;
+        return next;
+      });
+    }
+  };
+
+  const sponsorOptions = useMemo(() => {
+    const opts = (eligibleSponsors || []).map((s) => ({
+      value: s.userId,
+      label: s.fullName || s.username || "User",
+    }));
+    if (sponsorUserId && !opts.some((o) => o.value === sponsorUserId)) {
+      opts.unshift({
+        value: sponsorUserId,
+        label: detailedEventSponsorName || "Assigned Sponsor",
+      });
+    }
+    return opts;
+  }, [eligibleSponsors, sponsorUserId, detailedEventSponsorName]);
+
+  const selectedSponsorName = useMemo(() => {
+    if (!sponsorUserId) return detailedEventSponsorName || "";
+    const found = (eligibleSponsors || []).find((s) => s.userId === sponsorUserId);
+    return found?.fullName || detailedEventSponsorName || "";
+  }, [sponsorUserId, eligibleSponsors, detailedEventSponsorName]);
+
 
   // Auto-clean celebrants and restore participants when their corresponding event type is deselected
   useEffect(() => {
@@ -2686,6 +2740,17 @@ export default function EventFormPage({
       });
     }
 
+    // 7. Sponsor Contribution Validation (when flag is enabled)
+    if (requireSponsorContribution) {
+      if (!sponsorUserId) {
+        newErrors.sponsorUserId = "Please select an eligible sponsor";
+      }
+      const sponsorAmt = parseFloat(String(sponsorContributionAmount)) || 0;
+      if (!sponsorContributionAmount || String(sponsorContributionAmount).trim() === "" || sponsorAmt <= 0) {
+        newErrors.sponsorContributionAmount = "Please enter a valid contribution amount greater than ₹0";
+      }
+    }
+
     // CRITICAL: Block submission and display inline errors on ALL mandatory fields first!
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -2914,6 +2979,9 @@ export default function EventFormPage({
         previousEventAdjustmentType: usePreviousEventBalance ? prevAdjType : "None",
         participantIds: finalParticipantIds,
         contributionOverrides: contributionOverrides,
+        requireSponsorContribution: Boolean(requireSponsorContribution),
+        sponsorUserId: requireSponsorContribution && sponsorUserId ? sponsorUserId : null,
+        sponsorContributionAmount: requireSponsorContribution && sponsorContributionAmount ? Number(sponsorContributionAmount) : null,
       };
 
       if (isEdit) {
@@ -3339,24 +3407,69 @@ export default function EventFormPage({
                       </Grid>
                     )}
 
-                    {/* Enable Celebrant Selection Checkbox (Multiple Events Mode) */}
-                    {nonBirthdaySelectedTypes.length > 0 && (
-                      <Grid size={{ xs: 12 }}>
+                    {/* Flags Row: Enable Celebrant Selection & Require Sponsor Contribution (Multiple Events Mode - Side by Side) */}
+                    <Grid size={{ xs: 12 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 3,
+                          flexWrap: "wrap",
+                          mt: 0.5,
+                          mb: 0.5,
+                        }}
+                      >
+                        {nonBirthdaySelectedTypes.length > 0 && (
+                          <Box
+                            onClick={() => handleToggleEnableCelebrants(!enableCelebrantSelection)}
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.8,
+                              cursor: "pointer",
+                              userSelect: "none",
+                            }}
+                          >
+                            <Checkbox
+                              checked={Boolean(enableCelebrantSelection)}
+                              onChange={(e) => handleToggleEnableCelebrants(e.target.checked)}
+                              onClick={(e) => e.stopPropagation()}
+                              size="small"
+                              sx={{
+                                p: 0.2,
+                                transform: "scale(0.85)",
+                                color: "#4a3f6b",
+                                "&.Mui-checked": {
+                                  color: "#4a3f6b",
+                                },
+                              }}
+                            />
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color: "text.primary",
+                                fontSize: "0.875rem",
+                              }}
+                            >
+                              Enable Celebrant Selection
+                            </Typography>
+                          </Box>
+                        )}
+
                         <Box
-                          onClick={() => handleToggleEnableCelebrants(!enableCelebrantSelection)}
+                          onClick={() => handleToggleRequireSponsorContribution(!requireSponsorContribution)}
                           sx={{
                             display: "inline-flex",
                             alignItems: "center",
                             gap: 0.8,
                             cursor: "pointer",
                             userSelect: "none",
-                            mt: 0.5,
-                            mb: 0.5,
                           }}
                         >
                           <Checkbox
-                            checked={Boolean(enableCelebrantSelection)}
-                            onChange={(e) => handleToggleEnableCelebrants(e.target.checked)}
+                            checked={Boolean(requireSponsorContribution)}
+                            onChange={(e) => handleToggleRequireSponsorContribution(e.target.checked)}
                             onClick={(e) => e.stopPropagation()}
                             size="small"
                             sx={{
@@ -3376,11 +3489,11 @@ export default function EventFormPage({
                               fontSize: "0.875rem",
                             }}
                           >
-                            Enable Celebrant Selection
+                            Require Sponsor Contribution
                           </Typography>
                         </Box>
-                      </Grid>
-                    )}
+                      </Box>
+                    </Grid>
 
                     {/* Dedicated Date & Member selector per non-birthday event type (dynamic, not hardcoded) */}
                     {nonBirthdaySelectedTypes.map((type) => {
@@ -3395,25 +3508,24 @@ export default function EventFormPage({
                       if (memsVal.length > 1) {
                         return (
                           <React.Fragment key={typeId}>
-                            <Grid size={{ xs: 12 }}>
-                              <AppMultiSelect
-                                label={getMemberFieldLabel(type)}
-                                placeholder={enableCelebrantSelection ? getMemberFieldPlaceholder(type) : "Celebrant selection is disabled"}
-                                value={memsVal}
-                                onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
-                                options={getMemberCelebrantOptionsForType(type)}
-                                maxHeight={145}
-                                required={enableCelebrantSelection}
-                                disabled={!enableCelebrantSelection}
-                                error={enableCelebrantSelection && !!errors[`members_${typeId}`]}
-                                helperText={
-                                  !enableCelebrantSelection
-                                    ? "Enable celebrant selection above to select celebrants"
-                                    : (errors[`members_${typeId}`] ||
-                                      `${memsVal.length} members (exempt from contributing)`)
-                                }
-                              />
-                            </Grid>
+                            {enableCelebrantSelection && (
+                              <Grid size={{ xs: 12 }}>
+                                <AppMultiSelect
+                                  label={getMemberFieldLabel(type)}
+                                  placeholder={getMemberFieldPlaceholder(type)}
+                                  value={memsVal}
+                                  onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
+                                  options={getMemberCelebrantOptionsForType(type)}
+                                  maxHeight={145}
+                                  required
+                                  error={!!errors[`members_${typeId}`]}
+                                  helperText={
+                                    errors[`members_${typeId}`] ||
+                                    `${memsVal.length} members (exempt from contributing)`
+                                  }
+                                />
+                              </Grid>
+                            )}
 
                             {/* Render distinct Date field for each selected member */}
                             {memsVal.map((mId) => {
@@ -3475,7 +3587,7 @@ export default function EventFormPage({
 
                       return (
                         <React.Fragment key={typeId}>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: enableCelebrantSelection ? 6 : hasAmountField ? 6 : 12 }}>
                             <AppDateInput
                               label={dateLabel}
                               required
@@ -3493,28 +3605,27 @@ export default function EventFormPage({
                               helperText={errors[`eventDate_${typeId}`] || (singleMId && errors[`eventDate_${typeId}_${singleMId}`])}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
-                            <AppMultiSelect
-                              label={getMemberFieldLabel(type)}
-                              placeholder={enableCelebrantSelection ? getMemberFieldPlaceholder(type) : "Celebrant selection is disabled"}
-                              value={memsVal}
-                              onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
-                              options={getMemberCelebrantOptionsForType(type)}
-                              maxHeight={145}
-                              showSelectAll={false}
-                              required={enableCelebrantSelection}
-                              disabled={!enableCelebrantSelection}
-                              error={enableCelebrantSelection && !!errors[`members_${typeId}`]}
-                              helperText={
-                                !enableCelebrantSelection
-                                  ? "Enable celebrant selection above to select celebrants"
-                                  : (errors[`members_${typeId}`] ||
-                                    (memsVal.length > 0
-                                      ? `${memsVal.length} member (exempt from contributing)`
-                                      : ""))
-                              }
-                            />
-                          </Grid>
+                          {enableCelebrantSelection && (
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                              <AppMultiSelect
+                                label={getMemberFieldLabel(type)}
+                                placeholder={getMemberFieldPlaceholder(type)}
+                                value={memsVal}
+                                onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
+                                options={getMemberCelebrantOptionsForType(type)}
+                                maxHeight={145}
+                                showSelectAll={false}
+                                required
+                                error={!!errors[`members_${typeId}`]}
+                                helperText={
+                                  errors[`members_${typeId}`] ||
+                                  (memsVal.length > 0
+                                    ? `${memsVal.length} member (exempt from contributing)`
+                                    : "")
+                                }
+                              />
+                            </Grid>
+                          )}
                           {hasAmountField && (
                             <Grid size={{ xs: 12, sm: 6 }}>
                               <AppInput
@@ -3538,6 +3649,66 @@ export default function EventFormPage({
                         </React.Fragment>
                       );
                     })}
+
+                    {/* Sponsor Contribution Fields (Multiple Events Mode) */}
+                    {requireSponsorContribution && (
+                      <Grid size={{ xs: 12 }}>
+                        <Grid container spacing={1.5}>
+                          <Grid size={{ xs: 12, sm: 7 }}>
+                            <AppSelect
+                              label="Event Sponsor"
+                              placeholder="Select eligible sponsor..."
+                              value={sponsorUserId}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSponsorUserId(val);
+                                if (errors.sponsorUserId) {
+                                  setErrors((prev) => ({ ...prev, sponsorUserId: "" }));
+                                }
+                              }}
+                              options={sponsorOptions}
+                              required
+                              error={!!errors.sponsorUserId}
+                              helperText={errors.sponsorUserId || ""}
+                              allowClear
+                              clearable
+                              onClear={() => setSponsorUserId("")}
+                            />
+                          </Grid>
+
+                          <Grid size={{ xs: 12, sm: 5 }}>
+                            <AppInput
+                              label="Sponsor Contribution Amount"
+                              placeholder="0.00"
+                              value={sponsorContributionAmount}
+                              onChange={(e) => {
+                                const sanitized = sanitizeDecimalAmount(e.target.value);
+                                setSponsorContributionAmount(sanitized);
+                                if (errors.sponsorContributionAmount) {
+                                  setErrors((prev) => ({ ...prev, sponsorContributionAmount: "" }));
+                                }
+                              }}
+                              startAdornment={
+                                <InputAdornment position="start">
+                                  <Typography
+                                    sx={{
+                                      color: "text.secondary",
+                                      fontSize: "0.85rem",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    ₹
+                                  </Typography>
+                                </InputAdornment>
+                              }
+                              required
+                              error={!!errors.sponsorContributionAmount}
+                              helperText={errors.sponsorContributionAmount || ""}
+                            />
+                          </Grid>
+                        </Grid>
+                      </Grid>
+                    )}
                   </>
                 ) : (
                   <>
@@ -3647,24 +3818,69 @@ export default function EventFormPage({
                       </>
                     )}
 
-                    {/* Enable Celebrant Selection Checkbox (Single Event Mode) */}
-                    {nonBirthdaySelectedTypes.length > 0 && (
-                      <Grid size={{ xs: 12 }}>
+                    {/* Flags Row: Enable Celebrant Selection & Require Sponsor Contribution (Single Event Mode - Side by Side) */}
+                    <Grid size={{ xs: 12 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 3,
+                          flexWrap: "wrap",
+                          mt: 0.5,
+                          mb: 0.5,
+                        }}
+                      >
+                        {nonBirthdaySelectedTypes.length > 0 && (
+                          <Box
+                            onClick={() => handleToggleEnableCelebrants(!enableCelebrantSelection)}
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.8,
+                              cursor: "pointer",
+                              userSelect: "none",
+                            }}
+                          >
+                            <Checkbox
+                              checked={Boolean(enableCelebrantSelection)}
+                              onChange={(e) => handleToggleEnableCelebrants(e.target.checked)}
+                              onClick={(e) => e.stopPropagation()}
+                              size="small"
+                              sx={{
+                                p: 0.2,
+                                transform: "scale(0.85)",
+                                color: "#4a3f6b",
+                                "&.Mui-checked": {
+                                  color: "#4a3f6b",
+                                },
+                              }}
+                            />
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color: "text.primary",
+                                fontSize: "0.875rem",
+                              }}
+                            >
+                              Enable Celebrant Selection
+                            </Typography>
+                          </Box>
+                        )}
+
                         <Box
-                          onClick={() => handleToggleEnableCelebrants(!enableCelebrantSelection)}
+                          onClick={() => handleToggleRequireSponsorContribution(!requireSponsorContribution)}
                           sx={{
                             display: "inline-flex",
                             alignItems: "center",
                             gap: 0.8,
                             cursor: "pointer",
                             userSelect: "none",
-                            mt: 0.5,
-                            mb: 0.5,
                           }}
                         >
                           <Checkbox
-                            checked={Boolean(enableCelebrantSelection)}
-                            onChange={(e) => handleToggleEnableCelebrants(e.target.checked)}
+                            checked={Boolean(requireSponsorContribution)}
+                            onChange={(e) => handleToggleRequireSponsorContribution(e.target.checked)}
                             onClick={(e) => e.stopPropagation()}
                             size="small"
                             sx={{
@@ -3684,33 +3900,30 @@ export default function EventFormPage({
                               fontSize: "0.875rem",
                             }}
                           >
-                            Enable Celebrant Selection
+                            Require Sponsor Contribution
                           </Typography>
                         </Box>
-                      </Grid>
-                    )}
+                      </Box>
+                    </Grid>
 
-                    {hasMarriageSelected && (
+                    {enableCelebrantSelection && hasMarriageSelected && (
                       <React.Fragment key="marriage-celebrants-section">
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
                             label="Marriage Celebrants"
-                            placeholder={enableCelebrantSelection ? "Select members celebrating marriage" : "Celebrant selection is disabled"}
+                            placeholder="Select members celebrating marriage"
                             value={marriageCelebrantIds}
                             onChange={handleMarriageCelebrantsChange}
                             options={getMemberCelebrantOptionsForType(marriageTypeObj || "marriage")}
                             maxHeight={145}
                             showSelectAll={false}
-                            required={enableCelebrantSelection}
-                            disabled={!enableCelebrantSelection}
-                            error={enableCelebrantSelection && !!errors.marriageCelebrantIds}
+                            required
+                            error={!!errors.marriageCelebrantIds}
                             helperText={
-                              !enableCelebrantSelection
-                                ? "Enable celebrant selection above to select celebrants"
-                                : (errors.marriageCelebrantIds ||
-                                  (marriageCelebrantIds.length > 0
-                                    ? `${marriageCelebrantIds.length} celebrant${marriageCelebrantIds.length > 1 ? "s" : ""} (exempt from contributing)`
-                                    : ""))
+                              errors.marriageCelebrantIds ||
+                              (marriageCelebrantIds.length > 0
+                                ? `${marriageCelebrantIds.length} celebrant${marriageCelebrantIds.length > 1 ? "s" : ""} (exempt from contributing)`
+                                : "")
                             }
                           />
                         </Grid>
@@ -3744,27 +3957,24 @@ export default function EventFormPage({
                       </React.Fragment>
                     )}
 
-                    {hasSendOffSelected && (
+                    {enableCelebrantSelection && hasSendOffSelected && (
                       <React.Fragment key="sendoff-members-section">
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
                             label="Send-off / Relieving Members"
-                            placeholder={enableCelebrantSelection ? "Select members having send-off" : "Celebrant selection is disabled"}
+                            placeholder="Select members having send-off"
                             value={sendOffMemberIds}
                             onChange={handleSendOffMembersChange}
                             options={getMemberCelebrantOptionsForType(sendOffTypeObj || "sendoff")}
                             maxHeight={145}
                             showSelectAll={false}
-                            required={enableCelebrantSelection}
-                            disabled={!enableCelebrantSelection}
-                            error={enableCelebrantSelection && !!errors.sendOffMemberIds}
+                            required
+                            error={!!errors.sendOffMemberIds}
                             helperText={
-                              !enableCelebrantSelection
-                                ? "Enable celebrant selection above to select celebrants"
-                                : (errors.sendOffMemberIds ||
-                                  (sendOffMemberIds.length > 0
-                                    ? `${sendOffMemberIds.length} member${sendOffMemberIds.length > 1 ? "s" : ""} (exempt from contributing)`
-                                    : ""))
+                              errors.sendOffMemberIds ||
+                              (sendOffMemberIds.length > 0
+                                ? `${sendOffMemberIds.length} member${sendOffMemberIds.length > 1 ? "s" : ""} (exempt from contributing)`
+                                : "")
                             }
                           />
                         </Grid>
@@ -3799,62 +4009,120 @@ export default function EventFormPage({
                     )}
 
                     {/* Any other custom non-birthday event type (dynamic, not hardcoded) */}
-                    {nonBirthdaySelectedTypes
-                      .filter((t) => {
-                        const n = (t.eventTypeName || "").toLowerCase();
-                        return !n.includes("marriage") && !n.includes("wedding") && !n.includes("send") && !n.includes("farewell") && !n.includes("relieving");
-                      })
-                      .map((type) => {
-                        const typeId = type.eventTypeId;
-                        const memsVal = getSelectedTypeMembers(type);
-                        return (
-                          <React.Fragment key={typeId}>
-                            <Grid size={{ xs: 12 }}>
-                              <AppMultiSelect
-                                label={getMemberFieldLabel(type)}
-                                placeholder={enableCelebrantSelection ? getMemberFieldPlaceholder(type) : "Celebrant selection is disabled"}
-                                value={memsVal}
-                                onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
-                                options={getMemberCelebrantOptionsForType(type)}
-                                maxHeight={145}
-                                showSelectAll={false}
-                                required={enableCelebrantSelection}
-                                disabled={!enableCelebrantSelection}
-                                error={enableCelebrantSelection && !!errors[`members_${typeId}`]}
-                                helperText={
-                                  !enableCelebrantSelection
-                                    ? "Enable celebrant selection above to select celebrants"
-                                    : (errors[`members_${typeId}`] ||
-                                      (memsVal.length > 0 ? `${memsVal.length} members (exempt from contributing)` : ""))
-                                }
-                              />
-                            </Grid>
-                            {memsVal.length > 1 &&
-                              memsVal.map((mId) => {
-                                const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
-                                const memberName = matchedMember?.name || "Member";
-                                const mDateVal = eventTypeMemberDates[typeId]?.[mId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
-                                const mDateErr = errors[`eventDate_${typeId}_${mId}`];
+                    {enableCelebrantSelection &&
+                      nonBirthdaySelectedTypes
+                        .filter((t) => {
+                          const n = (t.eventTypeName || "").toLowerCase();
+                          return !n.includes("marriage") && !n.includes("wedding") && !n.includes("send") && !n.includes("farewell") && !n.includes("relieving");
+                        })
+                        .map((type) => {
+                          const typeId = type.eventTypeId;
+                          const memsVal = getSelectedTypeMembers(type);
+                          return (
+                            <React.Fragment key={typeId}>
+                              <Grid size={{ xs: 12 }}>
+                                <AppMultiSelect
+                                  label={getMemberFieldLabel(type)}
+                                  placeholder={getMemberFieldPlaceholder(type)}
+                                  value={memsVal}
+                                  onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
+                                  options={getMemberCelebrantOptionsForType(type)}
+                                  maxHeight={145}
+                                  showSelectAll={false}
+                                  required
+                                  error={!!errors[`members_${typeId}`]}
+                                  helperText={
+                                    errors[`members_${typeId}`] ||
+                                    (memsVal.length > 0 ? `${memsVal.length} members (exempt from contributing)` : "")
+                                  }
+                                />
+                              </Grid>
+                              {memsVal.length > 1 &&
+                                memsVal.map((mId) => {
+                                  const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+                                  const memberName = matchedMember?.name || "Member";
+                                  const mDateVal = eventTypeMemberDates[typeId]?.[mId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+                                  const mDateErr = errors[`eventDate_${typeId}_${mId}`];
 
-                                return (
-                                  <Grid size={{ xs: 12, sm: 6 }} key={mId}>
-                                    <AppDateInput
-                                      label={`${memberName} - ${type.eventTypeName} Date`}
-                                      required
-                                      clearable
-                                      value={mDateVal}
-                                      disablePast={!isEdit}
-                                      minDate={!isEdit ? dayjs().startOf("day") : undefined}
-                                      onChange={(d) => handleMemberDateChange(typeId, mId, d)}
-                                      error={!!mDateErr}
-                                      helperText={mDateErr || `${type.eventTypeName} date for ${memberName}`}
-                                    />
-                                  </Grid>
-                                );
-                              })}
-                          </React.Fragment>
-                        );
-                      })}
+                                  return (
+                                    <Grid size={{ xs: 12, sm: 6 }} key={mId}>
+                                      <AppDateInput
+                                        label={`${memberName} - ${type.eventTypeName} Date`}
+                                        required
+                                        clearable
+                                        value={mDateVal}
+                                        disablePast={!isEdit}
+                                        minDate={!isEdit ? dayjs().startOf("day") : undefined}
+                                        onChange={(d) => handleMemberDateChange(typeId, mId, d)}
+                                        error={!!mDateErr}
+                                        helperText={mDateErr || `${type.eventTypeName} date for ${memberName}`}
+                                      />
+                                    </Grid>
+                                  );
+                                })}
+                            </React.Fragment>
+                          );
+                        })}
+
+                    {/* Sponsor Contribution Fields (Single Event Mode) */}
+                    {requireSponsorContribution && (
+                      <Grid size={{ xs: 12 }}>
+                        <Grid container spacing={1.5}>
+                          <Grid size={{ xs: 12, sm: 7 }}>
+                            <AppSelect
+                              label="Event Sponsor"
+                              placeholder="Select eligible sponsor..."
+                              value={sponsorUserId}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSponsorUserId(val);
+                                if (errors.sponsorUserId) {
+                                  setErrors((prev) => ({ ...prev, sponsorUserId: "" }));
+                                }
+                              }}
+                              options={sponsorOptions}
+                              required
+                              error={!!errors.sponsorUserId}
+                              helperText={errors.sponsorUserId || ""}
+                              allowClear
+                              clearable
+                              onClear={() => setSponsorUserId("")}
+                            />
+                          </Grid>
+
+                          <Grid size={{ xs: 12, sm: 5 }}>
+                            <AppInput
+                              label="Sponsor Contribution Amount"
+                              placeholder="0.00"
+                              value={sponsorContributionAmount}
+                              onChange={(e) => {
+                                const sanitized = sanitizeDecimalAmount(e.target.value);
+                                setSponsorContributionAmount(sanitized);
+                                if (errors.sponsorContributionAmount) {
+                                  setErrors((prev) => ({ ...prev, sponsorContributionAmount: "" }));
+                                }
+                              }}
+                              startAdornment={
+                                <InputAdornment position="start">
+                                  <Typography
+                                    sx={{
+                                      color: "text.secondary",
+                                      fontSize: "0.85rem",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    ₹
+                                  </Typography>
+                                </InputAdornment>
+                              }
+                              required
+                              error={!!errors.sponsorContributionAmount}
+                              helperText={errors.sponsorContributionAmount || ""}
+                            />
+                          </Grid>
+                        </Grid>
+                      </Grid>
+                    )}
 
                     {hasSelectedType && !isBirthday && (
                       <Grid size={{ xs: 12 }}>
@@ -3943,6 +4211,8 @@ export default function EventFormPage({
                   </Box>
                 </Box>
               )}
+
+
 
               {/* Description */}
               <Box sx={{ mt: 1.8 }}>
@@ -4163,6 +4433,41 @@ export default function EventFormPage({
                       ₹{formatWholeNumber(expectedCollection)}
                     </Typography>
                   </Box>
+
+                  {/* Row 7: Sponsor Contribution */}
+                  {requireSponsorContribution && Number(sponsorContributionAmount) > 0 && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        minHeight: 36,
+                        py: 0.6,
+                        borderTop: "1px solid",
+                        borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                      }}
+                    >
+                      <Box>
+                        <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                          Sponsor Contribution
+                        </Typography>
+                        {selectedSponsorName && (
+                          <Typography sx={{ fontSize: "0.72rem", color: "#8b5cf6", fontWeight: 600 }}>
+                            {selectedSponsorName}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontSize: "0.92rem",
+                          fontWeight: 700,
+                          color: "#8b5cf6",
+                        }}
+                      >
+                        ₹{formatWholeNumber(sponsorContributionAmount)}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Box>
 

@@ -152,6 +152,19 @@ export default function EventDetailsPage() {
                 }}
               />
             )}
+            {eventDetails.requireSponsorContribution && eventDetails.sponsorName && (
+              <Chip
+                label={`Sponsor: ${eventDetails.sponsorName} (₹${formatWholeCurrency(eventDetails.sponsorContributionAmount || 0)})`}
+                size="small"
+                sx={{
+                  bgcolor: "rgba(139, 92, 246, 0.12)",
+                  color: "#8b5cf6",
+                  fontWeight: 700,
+                  fontSize: "0.72rem",
+                  height: 22,
+                }}
+              />
+            )}
           </Box>
         }
         title={eventDetails.eventName}
