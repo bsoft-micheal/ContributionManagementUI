@@ -28,30 +28,6 @@ export const DEFAULT_CATEGORY_TEMPLATES = {
     reminderDescription:
       "Dear {memberName},\n\nThis is a friendly reminder that your contribution of {amount} for {categoryName} is still pending.\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
   },
-  birthday: {
-    initialSubject: "Birthday Celebration Contribution - {categoryName}",
-    initialDescription:
-      "Dear {memberName},\n\nWe have upcoming birthdays this month in our team! Your planned contribution for {categoryName} is {amount}, due by {dueDate}.\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nWarm regards,\n{orgName}",
-    reminderSubject: "Gentle Reminder: Birthday Contribution Pending ({categoryName})",
-    reminderDescription:
-      "Dear {memberName},\n\nJust a quick follow-up regarding your pending birthday contribution of {amount} for {categoryName}.\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you for celebrating our colleagues with us!\n{orgName}",
-  },
-  "team dinner": {
-    initialSubject: "Team Dinner Contribution - {categoryName}",
-    initialDescription:
-      "Dear {memberName},\n\nWe are looking forward to our upcoming Team Dinner! Your contribution amount is {amount}, due on or before {dueDate}.\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nBest regards,\n{orgName}",
-    reminderSubject: "Reminder: Team Dinner Contribution ({categoryName})",
-    reminderDescription:
-      "Dear {memberName},\n\nThis is a reminder that your Team Dinner contribution of {amount} is currently pending.\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
-  },
-  farewell: {
-    initialSubject: "Farewell Gathering Contribution - {categoryName}",
-    initialDescription:
-      "Dear {memberName},\n\nWe are organizing a farewell gathering for our colleagues. Your contribution for {categoryName} is {amount}, due by {dueDate}.\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nWarm regards,\n{orgName}",
-    reminderSubject: "Reminder: Farewell Contribution Pending ({categoryName})",
-    reminderDescription:
-      "Dear {memberName},\n\nThis is a quick reminder regarding your pending farewell contribution of {amount}.\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
-  },
 };
 
 /**
@@ -84,15 +60,8 @@ export function resolveCategoryTemplate(categoryId, categoryName, templateType =
   const key = String(categoryId || "").toLowerCase().trim();
   const nameKey = String(categoryName || "").toLowerCase().trim();
 
-  // Try finding by ID
+  // Try finding by ID or exact category name
   let match = templates[key] || templates[nameKey];
-
-  // Try loose match by category name (e.g. "birthday", "dinner", "farewell")
-  if (!match) {
-    if (nameKey.includes("birthday")) match = templates["birthday"];
-    else if (nameKey.includes("dinner")) match = templates["team dinner"];
-    else if (nameKey.includes("farewell")) match = templates["farewell"];
-  }
 
   // Fallback to "all" default
   const effective = match || templates.all || DEFAULT_CATEGORY_TEMPLATES.all;
