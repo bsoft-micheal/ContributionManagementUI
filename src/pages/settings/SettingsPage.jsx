@@ -1606,7 +1606,7 @@ export default function SettingsPage() {
             const liveSubject = interpolatePlaceholders(rawSubject, livePreviewData);
 
             const defaultDesc =
-              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank You,\n{orgName}";
+              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\nThank You,\n{orgName}";
             const rawDesc = templateDescription || defaultDesc;
 
             return (
@@ -1807,7 +1807,6 @@ export default function SettingsPage() {
                             "{amount}",
                             "{dueDate}",
                             "{orgName}",
-                            "{paymentLink}",
                             "{qrCode}",
                           ].map((token) => (
                             <Chip
@@ -1817,7 +1816,7 @@ export default function SettingsPage() {
                               onClick={() => {
                                 setTemplateDescription((prev) => {
                                   if (!prev) return token;
-                                  if (token === "{qrCode}" || token === "{paymentLink}") {
+                                  if (token === "{qrCode}") {
                                     const thankIdx = prev.search(/thank\s*you/i);
                                     if (thankIdx !== -1) {
                                       return `${prev.slice(0, thankIdx).trimEnd()}\n\n${token}\n\n${prev.slice(thankIdx).trimStart()}`;
@@ -1831,33 +1830,26 @@ export default function SettingsPage() {
                                 fontWeight: 700,
                                 height: 22,
                                 cursor: "pointer",
-                                bgcolor: token === "{qrCode}" || token === "{paymentLink}" ? "rgba(124, 58, 237, 0.1)" : "rgba(74, 63, 107, 0.08)",
-                                color: token === "{qrCode}" || token === "{paymentLink}" ? "#7c3aed" : "#4a3f6b",
-                                border: token === "{qrCode}" || token === "{paymentLink}" ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(74, 63, 107, 0.2)",
+                                bgcolor: token === "{qrCode}" ? "rgba(124, 58, 237, 0.1)" : "rgba(74, 63, 107, 0.08)",
+                                color: token === "{qrCode}" ? "#7c3aed" : "#4a3f6b",
+                                border: token === "{qrCode}" ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(74, 63, 107, 0.2)",
                                 "&:hover": { bgcolor: "rgba(74, 63, 107, 0.16)" },
                               }}
                             />
                           ))}
                           <Chip
-                            label="+ Insert QR & Payment Link"
+                            label="+ Insert QR Code"
                             size="small"
                             onClick={() => {
                               setTemplateDescription((prev) => {
                                 const current = prev || "";
-                                let updated = current;
-                                const needsQr = !updated.includes("{qrCode}");
-                                const needsPay = !updated.includes("{paymentLink}");
-                                if (!needsQr && !needsPay) return current;
+                                if (current.includes("{qrCode}")) return current;
 
-                                const insertBlock = [needsQr ? "{qrCode}" : null, needsPay ? "{paymentLink}" : null]
-                                  .filter(Boolean)
-                                  .join("\n\n");
-
-                                const thankIdx = updated.search(/thank\s*you/i);
+                                const thankIdx = current.search(/thank\s*you/i);
                                 if (thankIdx !== -1) {
-                                  return `${updated.slice(0, thankIdx).trimEnd()}\n\n${insertBlock}\n\n${updated.slice(thankIdx).trimStart()}`;
+                                  return `${current.slice(0, thankIdx).trimEnd()}\n\n{qrCode}\n\n${current.slice(thankIdx).trimStart()}`;
                                 }
-                                return `${updated.trimEnd()}\n\n${insertBlock}`;
+                                return `${current.trimEnd()}\n\n{qrCode}`;
                               });
                             }}
                             sx={{

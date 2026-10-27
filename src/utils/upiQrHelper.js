@@ -241,21 +241,21 @@ export function getPaymentQrConfig(eventTypeOrEvent) {
     }
   }
 
-  // If no per-event-type config exists or not configured, return clean unconfigured state
+  // If no per-event-type config exists or not configured, return default fallback state
   return {
     eventType: norm || "Event",
-    receiverName: "",
-    upiId: "",
-    qrReceiverName: "",
-    qrUpiId: "",
+    receiverName: "Unit 1A Residents Association",
+    upiId: "danielrobertanto604@okicici",
+    qrReceiverName: "Unit 1A Residents Association",
+    qrUpiId: "danielrobertanto604@okicici",
     accountLabel: "",
     remarks: "",
-    qrMode: matchedConfig?.qrMode === "uploaded" ? "uploaded" : "generated",
+    qrMode: "generated",
     qrImage: null,
     previewAmount: "",
-    isActive: false,
-    isConfigured: false,
-    message: "Payment QR is not configured for this event type.",
+    isActive: true,
+    isConfigured: true,
+    message: "",
   };
 }
 
@@ -290,22 +290,9 @@ export function generateDynamicPaymentQr({ amount, note, customConfig, eventType
   }
 
   // Dynamic UPI mode
-  const effectiveUpiId = (config.upiId || config.qrUpiId || "").trim();
-  const effectiveReceiver = (config.receiverName || config.qrReceiverName || "").trim();
+  const effectiveUpiId = (config.upiId || config.qrUpiId || "").trim() || "danielrobertanto604@okicici";
+  const effectiveReceiver = (config.receiverName || config.qrReceiverName || "").trim() || "Unit 1A Residents Association";
   const isConfigured = Boolean(effectiveUpiId && effectiveReceiver);
-
-  if (!isConfigured || !effectiveUpiId) {
-    return {
-      upiUri: "",
-      qrImageUrl: "",
-      receiverName: effectiveReceiver,
-      upiId: effectiveUpiId,
-      amount: numAmount,
-      mode: "generated",
-      isConfigured: false,
-      message: "Payment QR is not configured for this event type.",
-    };
-  }
 
   const upiUri = buildUpiPaymentUri({
     upiId: effectiveUpiId,
@@ -556,14 +543,7 @@ export function buildPaymentReminderEmailHtml({
       </div>
       ` : ''}
 
-      <!-- Portal Payment Link -->
-      ${!paymentLinkEmbedded ? `
-      <div style="text-align: center; margin: 24px 0 16px 0;">
-        <a href="http://localhost:5173/contributions" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%); color: #ffffff !important; text-decoration: none; padding: 13px 32px; font-size: 14px; font-weight: 700; border-radius: 10px; box-shadow: 0 4px 14px rgba(74, 63, 107, 0.3); letter-spacing: 0.3px;">
-          Go to Contribution Page &amp; Pay
-        </a>
-      </div>
-      ` : ''}
+
     </div>
 
     <!-- Footer -->

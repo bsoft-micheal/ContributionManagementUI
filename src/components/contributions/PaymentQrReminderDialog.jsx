@@ -289,7 +289,6 @@ export default function PaymentQrReminderDialog({
           <Box key={`pl-${idx}`} sx={{ textAlign: "center", my: 2 }}>
             <AppButton
               variant="contained"
-              href={upiUri || "http://localhost:5173/contributions"}
               target="_blank"
               sx={{
                 background: "linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%) !important",
@@ -740,7 +739,6 @@ export default function PaymentQrReminderDialog({
               <Box sx={{ textAlign: "center", mt: 2, mb: 1 }}>
                 <AppButton
                   variant="contained"
-                  href={upiUri || "http://localhost:5173/contributions"}
                   target="_blank"
                   sx={{
                     background: "linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%) !important",
