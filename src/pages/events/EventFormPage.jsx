@@ -60,6 +60,7 @@ import {
   RestartAltRounded as ResetIcon,
   LayersRounded as MultiIcon,
   AutoAwesomeRounded as SparklesIcon,
+  DeleteOutline as DeleteOutlineIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import dayjs from "dayjs";
@@ -85,6 +86,7 @@ import {
   getEventByIdAsync,
   getEventsAsync,
   getAvailableAmountInHandAsync,
+  getEligibleSponsorsAsync,
 } from "../../services/eventService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getMembersAsync } from "../../services/memberService";
@@ -401,6 +403,13 @@ export default function EventFormPage({
   const [eventTypeDates, setEventTypeDates] = useState({});
   const [eventTypeMembers, setEventTypeMembers] = useState({});
   const [eventTypeMemberDates, setEventTypeMemberDates] = useState({});
+  const [enableCelebrantSelection, setEnableCelebrantSelection] = useState(false);
+  const [requireSponsorContribution, setRequireSponsorContribution] = useState(false);
+  const [sponsors, setSponsors] = useState([]); // [{ id, userId, amount }]
+  const [sponsorUserId, setSponsorUserId] = useState("");
+  const [sponsorContributionAmount, setSponsorContributionAmount] = useState("");
+  const [eligibleSponsors, setEligibleSponsors] = useState([]);
+  const [detailedEventSponsorName, setDetailedEventSponsorName] = useState("");
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -479,7 +488,7 @@ export default function EventFormPage({
     async function initData() {
       setLoading(true);
       try {
-        const [typesData, usersData, budgetData, settingsData, amountInHandData, allEventsData] = await Promise.all([
+        const [typesData, usersData, budgetData, settingsData, amountInHandData, allEventsData, sponsorsData] = await Promise.all([
           (propEventTypes && propEventTypes.length > 0)
             ? Promise.resolve(propEventTypes)
             : getEventTypesAsync(isEdit),
@@ -490,11 +499,13 @@ export default function EventFormPage({
           getSystemSettingsAsync().catch(() => null),
           getAvailableAmountInHandAsync(id || null).catch(() => null),
           getEventsAsync().catch(() => []),
+          getEligibleSponsorsAsync().catch(() => []),
         ]);
 
         if (!isMounted) return;
 
         setExistingEvents(Array.isArray(allEventsData) ? allEventsData : []);
+        setEligibleSponsors(Array.isArray(sponsorsData) ? sponsorsData : []);
 
         const balanceObj = amountInHandData?.data || amountInHandData || {};
         setPreviousBalanceData(balanceObj);
@@ -808,6 +819,43 @@ export default function EventFormPage({
             setEventTypeDates(normalizedDates);
           }
 
+          const hasCelebrantsLoaded =
+            (Array.isArray(marriageList) && marriageList.length > 0) ||
+            (Array.isArray(sendOffList) && sendOffList.length > 0) ||
+            Object.values(normalizedMembers).some((arr) => Array.isArray(arr) && arr.length > 0);
+
+          const isCelebrantsEnabled =
+            detailedEvent.enableCelebrantSelection !== undefined && detailedEvent.enableCelebrantSelection !== null
+              ? Boolean(detailedEvent.enableCelebrantSelection)
+              : hasCelebrantsLoaded;
+
+          setEnableCelebrantSelection(isCelebrantsEnabled);
+
+          const isSponsorReq = Boolean(detailedEvent.requireSponsorContribution);
+          setRequireSponsorContribution(isSponsorReq);
+          setSponsorUserId(detailedEvent.sponsorUserId || "");
+          setSponsorContributionAmount(detailedEvent.sponsorContributionAmount ? String(detailedEvent.sponsorContributionAmount) : "");
+          setDetailedEventSponsorName(detailedEvent.sponsorName || "");
+          if (detailedEvent.sponsors && Array.isArray(detailedEvent.sponsors) && detailedEvent.sponsors.length > 0) {
+            setSponsors(
+              detailedEvent.sponsors.map((s, idx) => ({
+                id: s.sponsorId || `sp-edit-${idx}-${Date.now()}`,
+                userId: s.sponsorUserId || s.userId || "",
+                amount: s.contributionAmount ? String(s.contributionAmount) : "",
+              }))
+            );
+          } else if (detailedEvent.sponsorUserId) {
+            setSponsors([
+              {
+                id: "sp-edit-1",
+                userId: detailedEvent.sponsorUserId,
+                amount: detailedEvent.sponsorContributionAmount ? String(detailedEvent.sponsorContributionAmount) : "",
+              },
+            ]);
+          } else {
+            setSponsors([]);
+          }
+
           const editNonBdays = (typesData || []).filter(
             (t) => eventTypeIdsList.includes(t.eventTypeId) && !t.eventTypeName?.toLowerCase().includes("birthday")
           );
@@ -943,6 +991,11 @@ export default function EventFormPage({
           setCustomDeductionAmount("");
           setMarriageCelebrantIds([]);
           setSendOffMemberIds([]);
+          setEnableCelebrantSelection(false);
+          setRequireSponsorContribution(false);
+          setSponsorUserId("");
+          setSponsorContributionAmount("");
+          setDetailedEventSponsorName("");
 
           const targetMonthNum = defaultDate && defaultDate.isValid() ? defaultDate.month() + 1 : -1;
           const targetYearNum = defaultDate && defaultDate.isValid() ? defaultDate.year() : -1;
@@ -1364,6 +1417,119 @@ export default function EventFormPage({
       return updated;
     });
   };
+
+  // Handle toggling Enable Celebrant Selection flag
+  const handleToggleEnableCelebrants = (checked) => {
+    setEnableCelebrantSelection(checked);
+    if (!checked) {
+      setMarriageCelebrantIds([]);
+      setSendOffMemberIds([]);
+      setEventTypeMembers({});
+      setEventTypeMemberDates({});
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.marriageCelebrantIds;
+        delete next.sendOffMemberIds;
+        Object.keys(next).forEach((key) => {
+          if (key.startsWith("members_") || key.startsWith("eventDate_")) {
+            delete next[key];
+          }
+        });
+        return next;
+      });
+      if (!isEdit) {
+        const allEligible = activeMembers.map((m) => m.memberId);
+        setSelectedParticipantIds(allEligible);
+        setForm((formPrev) => ({ ...formPrev, participantIds: allEligible }));
+      }
+    }
+  };
+
+  // Handle toggling Require Sponsor Contribution flag
+  const handleToggleRequireSponsorContribution = (checked) => {
+    setRequireSponsorContribution(checked);
+    if (!checked) {
+      setSponsors([]);
+      setSponsorUserId("");
+      setSponsorContributionAmount("");
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.sponsorUserId;
+        delete next.sponsorContributionAmount;
+        delete next.sponsors;
+        return next;
+      });
+    }
+  };
+
+  const totalSponsorContributionAmount = useMemo(() => {
+    if (!requireSponsorContribution || !sponsors || sponsors.length === 0) return 0;
+    return sponsors.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+  }, [requireSponsorContribution, sponsors]);
+
+  // Gating rule: Add Row disabled if any existing row is incomplete
+  const isAddSponsorRowDisabled = useMemo(() => {
+    if (!requireSponsorContribution) return true;
+    if (!sponsors || sponsors.length === 0) return false;
+    const hasIncomplete = sponsors.some(
+      (s) => !s.userId || !s.amount || String(s.amount).trim() === "" || parseFloat(s.amount) <= 0 || isNaN(parseFloat(s.amount))
+    );
+    if (hasIncomplete) return true;
+    if (eligibleSponsors && sponsors.length >= eligibleSponsors.length) return true;
+    return false;
+  }, [requireSponsorContribution, sponsors, eligibleSponsors]);
+
+  const handleAddSponsorRow = () => {
+    if (isAddSponsorRowDisabled) return;
+    const newRow = {
+      id: "sp-" + (Date.now() + Math.random().toString(36).substring(2, 7)),
+      userId: "",
+      amount: "",
+    };
+    setSponsors((prev) => [...prev, newRow]);
+    if (errors.sponsors) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.sponsors;
+        return next;
+      });
+    }
+  };
+
+  const handleRemoveSponsorRow = (rowId) => {
+    setSponsors((prev) => prev.filter((r) => r.id !== rowId));
+  };
+
+  const handleSponsorRowChange = (rowId, field, value) => {
+    setSponsors((prev) =>
+      prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r))
+    );
+    if (errors.sponsors) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.sponsors;
+        return next;
+      });
+    }
+  };
+
+  const sponsorOptions = useMemo(() => {
+    return (eligibleSponsors || []).map((s) => ({
+      value: s.userId,
+      label: s.fullName || s.username || "User",
+    }));
+  }, [eligibleSponsors]);
+
+  const selectedSponsorNames = useMemo(() => {
+    if (!sponsors || sponsors.length === 0) return [];
+    return sponsors
+      .map((s) => {
+        const found = (eligibleSponsors || []).find((e) => e.userId === s.userId);
+        return found?.fullName || found?.username || detailedEventSponsorName || "";
+      })
+      .filter(Boolean);
+  }, [sponsors, eligibleSponsors, detailedEventSponsorName]);
+
 
   // Auto-clean celebrants and restore participants when their corresponding event type is deselected
   useEffect(() => {
@@ -2024,9 +2190,14 @@ export default function EventFormPage({
     return plannedBudget;
   }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, plannedBudget]);
 
+  const remainingFundingRequirement = useMemo(() => {
+    const sponsorDeduction = requireSponsorContribution ? totalSponsorContributionAmount : 0;
+    return Math.max(0, plannedBudget - sponsorDeduction);
+  }, [plannedBudget, requireSponsorContribution, totalSponsorContributionAmount]);
+
   const effectiveDeduction = useMemo(() => {
     if (usePreviousEventBalance && eligibleAdjAmount > 0 && prevAdjType === "SurplusCredit") {
-      return roundToWhole(Math.min(eligibleAdjAmount, plannedBudget));
+      return roundToWhole(Math.min(eligibleAdjAmount, remainingFundingRequirement));
     }
     if (!useAvailableBalance) return 0;
     if (selectedDeductionType === "custom") {
@@ -2034,19 +2205,19 @@ export default function EventFormPage({
       return isNaN(customVal) || customVal < 0 ? 0 : roundToWhole(customVal);
     }
     return roundToWhole(availableAmountInHand);
-  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, plannedBudget]);
+  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, remainingFundingRequirement]);
 
   const remainingBudgetToCollect = useMemo(() => {
     if (usePreviousEventBalance && eligibleAdjAmount > 0) {
       if (prevAdjType === "DeficitRecovery") {
-        return effectiveBudget;
+        return remainingFundingRequirement + eligibleAdjAmount;
       } else if (prevAdjType === "SurplusCredit") {
-        return Math.max(0, plannedBudget - effectiveDeduction);
+        return Math.max(0, remainingFundingRequirement - effectiveDeduction);
       }
     }
-    if (!useAvailableBalance) return plannedBudget;
-    return Math.max(0, plannedBudget - effectiveDeduction);
-  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, effectiveBudget, effectiveDeduction, useAvailableBalance, plannedBudget]);
+    if (!useAvailableBalance) return remainingFundingRequirement;
+    return Math.max(0, remainingFundingRequirement - effectiveDeduction);
+  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, remainingFundingRequirement, effectiveDeduction, useAvailableBalance]);
 
   const contributionPerMember = useMemo(() => {
     if (isBirthday && exempt && celebrantCount > 0) {
@@ -2079,19 +2250,19 @@ export default function EventFormPage({
       if (customNum > availableAmountInHand) {
         return `Deduction amount (${formatWholeCurrency(customNum)}) exceeds available Amount In Hand (${formatWholeCurrency(availableAmountInHand)}).`;
       }
-      if (customNum > plannedBudget) {
-        return `Deduction amount (${formatWholeCurrency(customNum)}) cannot exceed the planned budget (${formatWholeCurrency(plannedBudget)}).`;
+      if (customNum > remainingFundingRequirement) {
+        return `Deduction amount (${formatWholeCurrency(customNum)}) cannot exceed the remaining funding requirement (${formatWholeCurrency(remainingFundingRequirement)}).`;
       }
     } else {
       if (availableAmountInHand <= 0) {
         return "No available Amount In Hand to deduct.";
       }
-      if (availableAmountInHand > plannedBudget) {
-        return `Available balance (${formatWholeCurrency(availableAmountInHand)}) exceeds the planned budget (${formatWholeCurrency(plannedBudget)}). Please select Custom Amount to deduct up to ${formatWholeCurrency(plannedBudget)}.`;
+      if (availableAmountInHand > remainingFundingRequirement) {
+        return `Available balance (${formatWholeCurrency(availableAmountInHand)}) exceeds the remaining funding requirement (${formatWholeCurrency(remainingFundingRequirement)}). Please select Custom Amount to deduct up to ${formatWholeCurrency(remainingFundingRequirement)}.`;
       }
     }
     return null;
-  }, [useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, plannedBudget]);
+  }, [useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, remainingFundingRequirement]);
 
   const dynamicFormulaText = computedBudgetItems
     .map((i) => i.formulaPart)
@@ -2117,6 +2288,23 @@ export default function EventFormPage({
     const newType = eventTypes.find((t) => t.eventTypeId === newTypeId);
     const newTypeName = newType?.eventTypeName || "";
     const isNewBday = newTypeName.toLowerCase().includes("birthday");
+
+    setEnableCelebrantSelection(false);
+    setMarriageCelebrantIds([]);
+    setSendOffMemberIds([]);
+    setEventTypeMembers({});
+    setEventTypeMemberDates({});
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.marriageCelebrantIds;
+      delete next.sendOffMemberIds;
+      Object.keys(next).forEach((k) => {
+        if (k.startsWith("members_") || k.startsWith("eventDate_")) {
+          delete next[k];
+        }
+      });
+      return next;
+    });
 
     let updatedName = form.eventName;
 
@@ -2203,6 +2391,24 @@ export default function EventFormPage({
     const hasBday = selectedTypesList.some((t) =>
       t.eventTypeName?.toLowerCase().includes("birthday")
     );
+
+    // Filter out celebrants for any event types that are no longer selected
+    setEventTypeMembers((prev) => {
+      const next = {};
+      selectedTypesList.forEach((t) => {
+        if (prev[t.eventTypeId]) next[t.eventTypeId] = prev[t.eventTypeId];
+        if (prev[t.eventTypeName]) next[t.eventTypeName] = prev[t.eventTypeName];
+      });
+      return next;
+    });
+    setEventTypeMemberDates((prev) => {
+      const next = {};
+      selectedTypesList.forEach((t) => {
+        if (prev[t.eventTypeId]) next[t.eventTypeId] = prev[t.eventTypeId];
+        if (prev[t.eventTypeName]) next[t.eventTypeName] = prev[t.eventTypeName];
+      });
+      return next;
+    });
 
     let updatedName = form.eventName;
 
@@ -2436,33 +2642,35 @@ export default function EventFormPage({
           newErrors.eventDate = "Cannot create an event for a past date";
         }
       }
-      nonBirthdaySelectedTypes.forEach((t) => {
-        const mems = getSelectedTypeMembers(t);
-        if (!mems || mems.length === 0) {
-          newErrors[`members_${t.eventTypeId}`] = `Please select at least one member for ${t.eventTypeName}`;
-        } else if (mems.length > 1) {
-          mems.forEach((mId) => {
-            const mDate = eventTypeMemberDates[t.eventTypeId]?.[mId] || eventTypeDates[t.eventTypeId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
-            const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
-            const mName = matchedMember?.name || "Member";
-            if (!mDate || !dayjs(mDate).isValid()) {
-              newErrors[`eventDate_${t.eventTypeId}_${mId}`] = `Please select ${t.eventTypeName} date for ${mName}`;
-            } else if (!isEdit && dayjs(mDate).isBefore(dayjs().startOf("day"))) {
-              newErrors[`eventDate_${t.eventTypeId}_${mId}`] = "Cannot create an event for a past date";
+      if (enableCelebrantSelection) {
+        nonBirthdaySelectedTypes.forEach((t) => {
+          const mems = getSelectedTypeMembers(t);
+          if (!mems || mems.length === 0) {
+            newErrors[`members_${t.eventTypeId}`] = `Please select at least one member for ${t.eventTypeName}`;
+          } else if (mems.length > 1) {
+            mems.forEach((mId) => {
+              const mDate = eventTypeMemberDates[t.eventTypeId]?.[mId] || eventTypeDates[t.eventTypeId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+              const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+              const mName = matchedMember?.name || "Member";
+              if (!mDate || !dayjs(mDate).isValid()) {
+                newErrors[`eventDate_${t.eventTypeId}_${mId}`] = `Please select ${t.eventTypeName} date for ${mName}`;
+              } else if (!isEdit && dayjs(mDate).isBefore(dayjs().startOf("day"))) {
+                newErrors[`eventDate_${t.eventTypeId}_${mId}`] = "Cannot create an event for a past date";
+              }
+            });
+          } else {
+            const singleMId = mems[0];
+            const d = eventTypeMemberDates[t.eventTypeId]?.[singleMId] || eventTypeDates[t.eventTypeId];
+            if (!d || !dayjs(d).isValid()) {
+              newErrors[`eventDate_${t.eventTypeId}`] = `${t.eventTypeName} date is required`;
+            } else if (!isEdit && dayjs(d).isBefore(dayjs().startOf("day"))) {
+              newErrors[`eventDate_${t.eventTypeId}`] = "Cannot create an event for a past date";
             }
-          });
-        } else {
-          const singleMId = mems[0];
-          const d = eventTypeMemberDates[t.eventTypeId]?.[singleMId] || eventTypeDates[t.eventTypeId];
-          if (!d || !dayjs(d).isValid()) {
-            newErrors[`eventDate_${t.eventTypeId}`] = `${t.eventTypeName} date is required`;
-          } else if (!isEdit && dayjs(d).isBefore(dayjs().startOf("day"))) {
-            newErrors[`eventDate_${t.eventTypeId}`] = "Cannot create an event for a past date";
           }
-        }
-      });
+        });
+      }
     } else {
-      if (hasMultipleCelebrantDates) {
+      if (enableCelebrantSelection && hasMultipleCelebrantDates) {
         nonBirthdaySelectedTypes.forEach((t) => {
           const mems = getSelectedTypeMembers(t);
           if (mems.length > 1) {
@@ -2492,11 +2700,24 @@ export default function EventFormPage({
         }
       }
 
-      if (hasMarriageSelected && marriageCelebrantIds.length === 0) {
-        newErrors.marriageCelebrantIds = "This field is required";
-      }
-      if (hasSendOffSelected && sendOffMemberIds.length === 0) {
-        newErrors.sendOffMemberIds = "This field is required";
+      if (enableCelebrantSelection) {
+        if (hasMarriageSelected && marriageCelebrantIds.length === 0) {
+          newErrors.marriageCelebrantIds = "This field is required";
+        }
+        if (hasSendOffSelected && sendOffMemberIds.length === 0) {
+          newErrors.sendOffMemberIds = "This field is required";
+        }
+        nonBirthdaySelectedTypes
+          .filter((t) => {
+            const n = (t.eventTypeName || "").toLowerCase();
+            return !n.includes("marriage") && !n.includes("wedding") && !n.includes("send") && !n.includes("farewell") && !n.includes("relieving");
+          })
+          .forEach((type) => {
+            const mems = getSelectedTypeMembers(type);
+            if (!mems || mems.length === 0) {
+              newErrors[`members_${type.eventTypeId}`] = "This field is required";
+            }
+          });
       }
     }
 
@@ -2551,47 +2772,65 @@ export default function EventFormPage({
     }
 
     // Rule B: Non-Birthday event types check duplicate (memberId + eventTypeId)
-    selectedTypes.forEach((type) => {
-      const typeId = type.eventTypeId;
-      const typeName = type.eventTypeName || "";
-      if (String(typeName).toLowerCase().includes("birthday")) return; // Birthday covered by Rule A
+    if (enableCelebrantSelection) {
+      selectedTypes.forEach((type) => {
+        const typeId = type.eventTypeId;
+        const typeName = type.eventTypeName || "";
+        if (String(typeName).toLowerCase().includes("birthday")) return; // Birthday covered by Rule A
 
-      let memberIds = [];
-      const cleanName = String(typeName).toLowerCase().replace(/[\s_-]/g, "");
-      if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
-        memberIds = marriageCelebrantIds || [];
-      } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
-        memberIds = sendOffMemberIds || [];
-      } else {
-        memberIds = eventTypeMembers[typeId] || [];
-      }
-
-      (memberIds || []).forEach((mId) => {
-        const conflict = celebratingMembersList.find((c) => {
-          if (String(c.memberId).toLowerCase() !== String(mId).toLowerCase()) return false;
-          if (String(c.eventTypeId).toLowerCase() === String(typeId).toLowerCase()) return true;
-          if (String(c.typeKey).toLowerCase() === String(typeId).toLowerCase()) return true;
-          const cTypeNameClean = String(c.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
-          if (cleanName && cTypeNameClean && (cTypeNameClean.includes(cleanName) || cleanName.includes(cTypeNameClean))) return true;
-          return false;
-        });
-
-        if (conflict) {
-          const matched = activeMembers.find(
-            (m) => String(m.memberId || m.userId || m.id).toLowerCase() === String(mId).toLowerCase()
-          );
-          const mName = matched?.name || conflict.memberName || "Member";
-          const conflictMsg = `Member '${mName}' already has an event of type '${conflict.eventTypeName}' in ${monthDisplayName} ${targetYearVal}. Duplicate event of the same type for the same member is not allowed in the same month.`;
-          if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
-            newErrors.marriageCelebrantIds = conflictMsg;
-          } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
-            newErrors.sendOffMemberIds = conflictMsg;
-          } else {
-            newErrors[`members_${typeId}`] = conflictMsg;
-          }
+        let memberIds = [];
+        const cleanName = String(typeName).toLowerCase().replace(/[\s_-]/g, "");
+        if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
+          memberIds = marriageCelebrantIds || [];
+        } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
+          memberIds = sendOffMemberIds || [];
+        } else {
+          memberIds = eventTypeMembers[typeId] || [];
         }
+
+        (memberIds || []).forEach((mId) => {
+          const conflict = celebratingMembersList.find((c) => {
+            if (String(c.memberId).toLowerCase() !== String(mId).toLowerCase()) return false;
+            if (String(c.eventTypeId).toLowerCase() === String(typeId).toLowerCase()) return true;
+            if (String(c.typeKey).toLowerCase() === String(typeId).toLowerCase()) return true;
+            const cTypeNameClean = String(c.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
+            if (cleanName && cTypeNameClean && (cTypeNameClean.includes(cleanName) || cleanName.includes(cTypeNameClean))) return true;
+            return false;
+          });
+
+          if (conflict) {
+            const matched = activeMembers.find(
+              (m) => String(m.memberId || m.userId || m.id).toLowerCase() === String(mId).toLowerCase()
+            );
+            const mName = matched?.name || conflict.memberName || "Member";
+            const conflictMsg = `Member '${mName}' already has an event of type '${conflict.eventTypeName}' in ${monthDisplayName} ${targetYearVal}. Duplicate event of the same type for the same member is not allowed in the same month.`;
+            if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
+              newErrors.marriageCelebrantIds = conflictMsg;
+            } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
+              newErrors.sendOffMemberIds = conflictMsg;
+            } else {
+              newErrors[`members_${typeId}`] = conflictMsg;
+            }
+          }
+        });
       });
-    });
+    }
+
+    // 7. Sponsor Contribution Validation (when flag is enabled)
+    if (requireSponsorContribution) {
+      if (!sponsors || sponsors.length === 0) {
+        newErrors.sponsors = "Please add at least one sponsor using '+ Add Row'.";
+      } else {
+        const incomplete = sponsors.some(
+          (s) => !s.userId || !s.amount || String(s.amount).trim() === "" || parseFloat(s.amount) <= 0
+        );
+        if (incomplete) {
+          newErrors.sponsors = "Please select a sponsor and enter a valid contribution amount for all rows.";
+        } else if (totalSponsorContributionAmount > plannedBudget) {
+          newErrors.sponsors = `Total sponsor contribution (${formatWholeCurrency(totalSponsorContributionAmount)}) cannot exceed the total planned budget (${formatWholeCurrency(plannedBudget)}).`;
+        }
+      }
+    }
 
     // CRITICAL: Block submission and display inline errors on ALL mandatory fields first!
     if (Object.keys(newErrors).length > 0) {
@@ -2611,8 +2850,8 @@ export default function EventFormPage({
         toast.error(balanceValidationError);
         return false;
       }
-      if (effectiveDeduction > plannedBudget) {
-        toast.error(`Deduction amount (${formatWholeCurrency(effectiveDeduction)}) cannot exceed the planned budget (${formatWholeCurrency(plannedBudget)}).`);
+      if (effectiveDeduction > remainingFundingRequirement) {
+        toast.error(`Deduction amount (${formatWholeCurrency(effectiveDeduction)}) cannot exceed the remaining funding requirement (${formatWholeCurrency(remainingFundingRequirement)}).`);
         return false;
       }
       if (effectiveDeduction > availableAmountInHand) {
@@ -2757,7 +2996,7 @@ export default function EventFormPage({
       if (!isBirthday && nonBirthdaySelectedTypes.length > 0) {
         const firstValidDate = nonBirthdaySelectedTypes
           .map((t) => {
-            const mems = getSelectedTypeMembers(t);
+            const mems = enableCelebrantSelection ? getSelectedTypeMembers(t) : [];
             if (mems.length > 0) {
               return eventTypeMemberDates[t.eventTypeId]?.[mems[0]] || eventTypeMemberDates[t.eventTypeName]?.[mems[0]] || eventTypeDates[t.eventTypeId] || eventTypeDates[t.eventTypeName];
             }
@@ -2770,27 +3009,29 @@ export default function EventFormPage({
       }
 
       const compactCelebrants = {};
-      if (marriageCelebrantIds.length > 0) {
-        compactCelebrants["marriage"] = marriageCelebrantIds;
-      }
-      if (sendOffMemberIds.length > 0) {
-        compactCelebrants["sendOff"] = sendOffMemberIds;
-      }
-      nonBirthdaySelectedTypes.forEach((t) => {
-        const cleanName = (t.eventTypeName || "").trim();
-        const low = cleanName.toLowerCase().replace(/[\s_-]/g, "");
-        if (low !== "marriage" && low !== "sendoff") {
-          const mems = getSelectedTypeMembers(t);
-          if (mems.length > 0) {
-            compactCelebrants[cleanName] = mems;
-          }
+      if (enableCelebrantSelection) {
+        if (marriageCelebrantIds.length > 0) {
+          compactCelebrants["marriage"] = marriageCelebrantIds;
         }
-      });
+        if (sendOffMemberIds.length > 0) {
+          compactCelebrants["sendOff"] = sendOffMemberIds;
+        }
+        nonBirthdaySelectedTypes.forEach((t) => {
+          const cleanName = (t.eventTypeName || "").trim();
+          const low = cleanName.toLowerCase().replace(/[\s_-]/g, "");
+          if (low !== "marriage" && low !== "sendoff") {
+            const mems = getSelectedTypeMembers(t);
+            if (mems.length > 0) {
+              compactCelebrants[cleanName] = mems;
+            }
+          }
+        });
+      }
 
       const finalDescription = formatDescriptionWithContrib(
         form.description?.trim(),
         otherEventAmounts,
-        compactCelebrants
+        enableCelebrantSelection ? compactCelebrants : null
       );
 
       const resolvedStatus = targetStatus || form.status || "Planned";
@@ -2799,13 +3040,14 @@ export default function EventFormPage({
         eventName: form.eventName.trim(),
         eventTypeId: finalTypeIds[0] || form.eventTypeId,
         eventTypeIds: finalTypeIds,
+        enableCelebrantSelection: Boolean(enableCelebrantSelection),
         eventDate: dayjs(primaryEventDate).hour(12).toISOString(),
         eventDates: Object.keys(combinedDatesObj).length > 0
           ? JSON.stringify(combinedDatesObj)
           : (isBirthday ? (celebrantDatesCsv || null) : null),
         eventTypeDates: datesMap,
-        eventTypeMembers: membersMap,
-        eventTypeMemberDates: memberDatesMap,
+        eventTypeMembers: enableCelebrantSelection ? membersMap : {},
+        eventTypeMemberDates: enableCelebrantSelection ? memberDatesMap : {},
         description: finalDescription,
         status: resolvedStatus,
         baseAmount: plannedBudget,
@@ -2818,6 +3060,15 @@ export default function EventFormPage({
         previousEventAdjustmentType: usePreviousEventBalance ? prevAdjType : "None",
         participantIds: finalParticipantIds,
         contributionOverrides: contributionOverrides,
+        requireSponsorContribution: Boolean(requireSponsorContribution),
+        sponsorUserId: requireSponsorContribution && sponsors.length > 0 ? sponsors[0].userId : null,
+        sponsorContributionAmount: requireSponsorContribution && totalSponsorContributionAmount > 0 ? totalSponsorContributionAmount : null,
+        sponsors: requireSponsorContribution
+          ? sponsors.map((s) => ({
+              userId: s.userId,
+              contributionAmount: Number(s.amount),
+            }))
+          : [],
       };
 
       if (isEdit) {
@@ -2955,6 +3206,267 @@ export default function EventFormPage({
     }
     return <div className="page-shell" />;
   }
+
+  const renderSponsorSection = () => {
+    if (!requireSponsorContribution) return null;
+
+    return (
+      <Grid size={{ xs: 12 }}>
+        <Box
+          sx={{
+            p: 2,
+            borderRadius: 2.5,
+            backgroundColor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.04)" : "#faf7ff",
+            border: "1px solid",
+            borderColor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.25)" : "#ddd6fe",
+            transition: "all 0.2s ease-in-out",
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
+              mb: sponsors.length > 0 ? 2 : 1.5,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: "0.95rem",
+                  color: (theme) =>
+                    theme.palette.mode === "dark" ? "#e9d5ff" : "#5b21b6",
+                }}
+              >
+                Event Sponsors
+              </Typography>
+              {sponsors.length > 0 && (
+                <Chip
+                  label={`${sponsors.length} ${sponsors.length === 1 ? "Sponsor" : "Sponsors"}`}
+                  size="small"
+                  sx={{
+                    height: 22,
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    backgroundColor: (theme) =>
+                      theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.25)" : "#ede9fe",
+                    color: "#7c3aed",
+                  }}
+                />
+              )}
+            </Box>
+
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon fontSize="small" />}
+              disabled={isAddSponsorRowDisabled}
+              onClick={handleAddSponsorRow}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "0.82rem",
+                borderRadius: 1.5,
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.5)" : "#a78bfa",
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#c4b5fd" : "#7c3aed",
+                "&:hover": {
+                  borderColor: "#8b5cf6",
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.15)" : "#f5f3ff",
+                },
+                "&.Mui-disabled": {
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "#e2e8f0",
+                },
+              }}
+            >
+              Add Row {sponsors.length > 0 ? `(${sponsors.length})` : ""}
+            </Button>
+          </Box>
+
+          {/* Disabled Hint when incomplete row exists */}
+          {isAddSponsorRowDisabled && sponsors.length > 0 && (
+            <Typography
+              sx={{
+                fontSize: "0.75rem",
+                color: "text.secondary",
+                mb: 1.5,
+                fontStyle: "italic",
+              }}
+            >
+              * Fill sponsor name and amount to enable &quot;Add Row&quot;.
+            </Typography>
+          )}
+
+          {/* Error text if any */}
+          {errors.sponsors && (
+            <Alert severity="error" sx={{ mb: 1.5, py: 0.5, fontSize: "0.82rem" }}>
+              {errors.sponsors}
+            </Alert>
+          )}
+
+          {/* Empty State */}
+          {sponsors.length === 0 ? (
+            <Box
+              sx={{
+                p: 2.5,
+                textAlign: "center",
+                borderRadius: 2,
+                backgroundColor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(0,0,0,0.15)" : "#ffffff",
+                border: "1px dashed",
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.2)" : "#cbd5e1",
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: "0.85rem",
+                  color: "text.secondary",
+                  fontWeight: 500,
+                }}
+              >
+                No sponsors added yet. Click <strong>Add Row</strong> to add a sponsor.
+              </Typography>
+            </Box>
+          ) : (
+            /* Sponsor Rows */
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              {sponsors.map((row, index) => {
+                const otherPickedIds = sponsors
+                  .filter((r) => r.id !== row.id && r.userId)
+                  .map((r) => r.userId);
+                const filteredOptions = (eligibleSponsors || [])
+                  .filter((s) => !otherPickedIds.includes(s.userId))
+                  .map((s) => ({
+                    value: s.userId,
+                    label: s.fullName || s.username || "User",
+                  }));
+
+                return (
+                  <Box
+                    key={row.id}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      backgroundColor: (theme) =>
+                        theme.palette.mode === "dark" ? "rgba(0,0,0,0.2)" : "#ffffff",
+                      border: "1px solid",
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "#e2e8f0",
+                    }}
+                  >
+                    <Grid container spacing={1.5} alignItems="center">
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <AppSelect
+                          label={`Event Sponsor #${index + 1}`}
+                          placeholder="Select eligible sponsor..."
+                          value={row.userId}
+                          onChange={(e) => handleSponsorRowChange(row.id, "userId", e.target.value)}
+                          options={filteredOptions}
+                          required
+                        />
+                      </Grid>
+
+                      <Grid size={{ xs: 10, sm: 5 }}>
+                        <AppInput
+                          label="Contribution Amount"
+                          placeholder="0.00"
+                          value={row.amount}
+                          onChange={(e) => {
+                            const sanitized = sanitizeDecimalAmount(e.target.value);
+                            handleSponsorRowChange(row.id, "amount", sanitized);
+                          }}
+                          startAdornment={
+                            <InputAdornment position="start">
+                              <Typography
+                                sx={{
+                                  color: "text.secondary",
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ₹
+                              </Typography>
+                            </InputAdornment>
+                          }
+                          required
+                        />
+                      </Grid>
+
+                      <Grid
+                        size={{ xs: 2, sm: 1 }}
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          pt: { xs: 0, sm: 3 },
+                        }}
+                      >
+                        <IconButton
+                          color="error"
+                          size="small"
+                          onClick={() => handleRemoveSponsorRow(row.id)}
+                          title="Remove Sponsor"
+                          sx={{
+                            backgroundColor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(239, 68, 68, 0.1)"
+                                : "#fef2f2",
+                            "&:hover": {
+                              backgroundColor: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(239, 68, 68, 0.2)"
+                                  : "#fee2e2",
+                            },
+                          }}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                );
+              })}
+
+              {/* Footer Total */}
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  pt: 1,
+                  px: 0.5,
+                }}
+              >
+                <Typography sx={{ fontSize: "0.82rem", color: "text.secondary", fontWeight: 500 }}>
+                  Total Sponsor Contribution:
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    color: (theme) =>
+                      theme.palette.mode === "dark" ? "#c4b5fd" : "#7c3aed",
+                  }}
+                >
+                  ₹{formatWholeNumber(totalSponsorContributionAmount)}
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      </Grid>
+    );
+  };
 
   const formContent = (
     <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
@@ -3243,6 +3755,94 @@ export default function EventFormPage({
                       </Grid>
                     )}
 
+                    {/* Flags Row: Enable Celebrant Selection & Require Sponsor Contribution (Multiple Events Mode - Side by Side) */}
+                    <Grid size={{ xs: 12 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 3,
+                          flexWrap: "wrap",
+                          mt: 0.5,
+                          mb: 0.5,
+                        }}
+                      >
+                        {nonBirthdaySelectedTypes.length > 0 && (
+                          <Box
+                            onClick={() => handleToggleEnableCelebrants(!enableCelebrantSelection)}
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.8,
+                              cursor: "pointer",
+                              userSelect: "none",
+                            }}
+                          >
+                            <Checkbox
+                              checked={Boolean(enableCelebrantSelection)}
+                              onChange={(e) => handleToggleEnableCelebrants(e.target.checked)}
+                              onClick={(e) => e.stopPropagation()}
+                              size="small"
+                              sx={{
+                                p: 0.2,
+                                transform: "scale(0.85)",
+                                color: "#4a3f6b",
+                                "&.Mui-checked": {
+                                  color: "#4a3f6b",
+                                },
+                              }}
+                            />
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color: "text.primary",
+                                fontSize: "0.875rem",
+                              }}
+                            >
+                              Enable Celebrant Selection
+                            </Typography>
+                          </Box>
+                        )}
+
+                        <Box
+                          onClick={() => handleToggleRequireSponsorContribution(!requireSponsorContribution)}
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.8,
+                            cursor: "pointer",
+                            userSelect: "none",
+                          }}
+                        >
+                          <Checkbox
+                            checked={Boolean(requireSponsorContribution)}
+                            onChange={(e) => handleToggleRequireSponsorContribution(e.target.checked)}
+                            onClick={(e) => e.stopPropagation()}
+                            size="small"
+                            sx={{
+                              p: 0.2,
+                              transform: "scale(0.85)",
+                              color: "#4a3f6b",
+                              "&.Mui-checked": {
+                                color: "#4a3f6b",
+                              },
+                            }}
+                          />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 600,
+                              color: "text.primary",
+                              fontSize: "0.875rem",
+                            }}
+                          >
+                            Require Sponsor Contribution
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+
                     {/* Dedicated Date & Member selector per non-birthday event type (dynamic, not hardcoded) */}
                     {nonBirthdaySelectedTypes.map((type) => {
                       const typeId = type.eventTypeId;
@@ -3256,22 +3856,24 @@ export default function EventFormPage({
                       if (memsVal.length > 1) {
                         return (
                           <React.Fragment key={typeId}>
-                            <Grid size={{ xs: 12 }}>
-                              <AppMultiSelect
-                                label={getMemberFieldLabel(type)}
-                                placeholder={getMemberFieldPlaceholder(type)}
-                                value={memsVal}
-                                onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
-                                options={getMemberCelebrantOptionsForType(type)}
-                                maxHeight={145}
-                                required
-                                error={!!errors[`members_${typeId}`]}
-                                helperText={
-                                  errors[`members_${typeId}`] ||
-                                  `${memsVal.length} members (exempt from contributing)`
-                                }
-                              />
-                            </Grid>
+                            {enableCelebrantSelection && (
+                              <Grid size={{ xs: 12 }}>
+                                <AppMultiSelect
+                                  label={getMemberFieldLabel(type)}
+                                  placeholder={getMemberFieldPlaceholder(type)}
+                                  value={memsVal}
+                                  onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
+                                  options={getMemberCelebrantOptionsForType(type)}
+                                  maxHeight={145}
+                                  required
+                                  error={!!errors[`members_${typeId}`]}
+                                  helperText={
+                                    errors[`members_${typeId}`] ||
+                                    `${memsVal.length} members (exempt from contributing)`
+                                  }
+                                />
+                              </Grid>
+                            )}
 
                             {/* Render distinct Date field for each selected member */}
                             {memsVal.map((mId) => {
@@ -3333,7 +3935,7 @@ export default function EventFormPage({
 
                       return (
                         <React.Fragment key={typeId}>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: enableCelebrantSelection ? 6 : hasAmountField ? 6 : 12 }}>
                             <AppDateInput
                               label={dateLabel}
                               required
@@ -3351,25 +3953,27 @@ export default function EventFormPage({
                               helperText={errors[`eventDate_${typeId}`] || (singleMId && errors[`eventDate_${typeId}_${singleMId}`])}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
-                            <AppMultiSelect
-                              label={getMemberFieldLabel(type)}
-                              placeholder={getMemberFieldPlaceholder(type)}
-                              value={memsVal}
-                              onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
-                              options={getMemberCelebrantOptionsForType(type)}
-                              maxHeight={145}
-                              showSelectAll={false}
-                              required
-                              error={!!errors[`members_${typeId}`]}
-                              helperText={
-                                errors[`members_${typeId}`] ||
-                                (memsVal.length > 0
-                                  ? `${memsVal.length} member (exempt from contributing)`
-                                  : "")
-                              }
-                            />
-                          </Grid>
+                          {enableCelebrantSelection && (
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                              <AppMultiSelect
+                                label={getMemberFieldLabel(type)}
+                                placeholder={getMemberFieldPlaceholder(type)}
+                                value={memsVal}
+                                onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
+                                options={getMemberCelebrantOptionsForType(type)}
+                                maxHeight={145}
+                                showSelectAll={false}
+                                required
+                                error={!!errors[`members_${typeId}`]}
+                                helperText={
+                                  errors[`members_${typeId}`] ||
+                                  (memsVal.length > 0
+                                    ? `${memsVal.length} member (exempt from contributing)`
+                                    : "")
+                                }
+                              />
+                            </Grid>
+                          )}
                           {hasAmountField && (
                             <Grid size={{ xs: 12, sm: 6 }}>
                               <AppInput
@@ -3393,6 +3997,9 @@ export default function EventFormPage({
                         </React.Fragment>
                       );
                     })}
+
+                    {/* Event Sponsors Breakdown (Multiple Events Mode) */}
+                    {renderSponsorSection()}
                   </>
                 ) : (
                   <>
@@ -3502,7 +4109,95 @@ export default function EventFormPage({
                       </>
                     )}
 
-                    {hasMarriageSelected && (
+                    {/* Flags Row: Enable Celebrant Selection & Require Sponsor Contribution (Single Event Mode - Side by Side) */}
+                    <Grid size={{ xs: 12 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 3,
+                          flexWrap: "wrap",
+                          mt: 0.5,
+                          mb: 0.5,
+                        }}
+                      >
+                        {nonBirthdaySelectedTypes.length > 0 && (
+                          <Box
+                            onClick={() => handleToggleEnableCelebrants(!enableCelebrantSelection)}
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.8,
+                              cursor: "pointer",
+                              userSelect: "none",
+                            }}
+                          >
+                            <Checkbox
+                              checked={Boolean(enableCelebrantSelection)}
+                              onChange={(e) => handleToggleEnableCelebrants(e.target.checked)}
+                              onClick={(e) => e.stopPropagation()}
+                              size="small"
+                              sx={{
+                                p: 0.2,
+                                transform: "scale(0.85)",
+                                color: "#4a3f6b",
+                                "&.Mui-checked": {
+                                  color: "#4a3f6b",
+                                },
+                              }}
+                            />
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color: "text.primary",
+                                fontSize: "0.875rem",
+                              }}
+                            >
+                              Enable Celebrant Selection
+                            </Typography>
+                          </Box>
+                        )}
+
+                        <Box
+                          onClick={() => handleToggleRequireSponsorContribution(!requireSponsorContribution)}
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.8,
+                            cursor: "pointer",
+                            userSelect: "none",
+                          }}
+                        >
+                          <Checkbox
+                            checked={Boolean(requireSponsorContribution)}
+                            onChange={(e) => handleToggleRequireSponsorContribution(e.target.checked)}
+                            onClick={(e) => e.stopPropagation()}
+                            size="small"
+                            sx={{
+                              p: 0.2,
+                              transform: "scale(0.85)",
+                              color: "#4a3f6b",
+                              "&.Mui-checked": {
+                                color: "#4a3f6b",
+                              },
+                            }}
+                          />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 600,
+                              color: "text.primary",
+                              fontSize: "0.875rem",
+                            }}
+                          >
+                            Require Sponsor Contribution
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+
+                    {enableCelebrantSelection && hasMarriageSelected && (
                       <React.Fragment key="marriage-celebrants-section">
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
@@ -3553,7 +4248,7 @@ export default function EventFormPage({
                       </React.Fragment>
                     )}
 
-                    {hasSendOffSelected && (
+                    {enableCelebrantSelection && hasSendOffSelected && (
                       <React.Fragment key="sendoff-members-section">
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
@@ -3605,59 +4300,63 @@ export default function EventFormPage({
                     )}
 
                     {/* Any other custom non-birthday event type (dynamic, not hardcoded) */}
-                    {nonBirthdaySelectedTypes
-                      .filter((t) => {
-                        const n = (t.eventTypeName || "").toLowerCase();
-                        return !n.includes("marriage") && !n.includes("wedding") && !n.includes("send") && !n.includes("farewell") && !n.includes("relieving");
-                      })
-                      .map((type) => {
-                        const typeId = type.eventTypeId;
-                        const memsVal = getSelectedTypeMembers(type);
-                        return (
-                          <React.Fragment key={typeId}>
-                            <Grid size={{ xs: 12 }}>
-                              <AppMultiSelect
-                                label={getMemberFieldLabel(type)}
-                                placeholder={getMemberFieldPlaceholder(type)}
-                                value={memsVal}
-                                onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
-                                options={getMemberCelebrantOptionsForType(type)}
-                                maxHeight={145}
-                                showSelectAll={false}
-                                required
-                                error={!!errors[`members_${typeId}`]}
-                                helperText={
-                                  errors[`members_${typeId}`] ||
-                                  (memsVal.length > 0 ? `${memsVal.length} members (exempt from contributing)` : "")
-                                }
-                              />
-                            </Grid>
-                            {memsVal.length > 1 &&
-                              memsVal.map((mId) => {
-                                const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
-                                const memberName = matchedMember?.name || "Member";
-                                const mDateVal = eventTypeMemberDates[typeId]?.[mId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
-                                const mDateErr = errors[`eventDate_${typeId}_${mId}`];
+                    {enableCelebrantSelection &&
+                      nonBirthdaySelectedTypes
+                        .filter((t) => {
+                          const n = (t.eventTypeName || "").toLowerCase();
+                          return !n.includes("marriage") && !n.includes("wedding") && !n.includes("send") && !n.includes("farewell") && !n.includes("relieving");
+                        })
+                        .map((type) => {
+                          const typeId = type.eventTypeId;
+                          const memsVal = getSelectedTypeMembers(type);
+                          return (
+                            <React.Fragment key={typeId}>
+                              <Grid size={{ xs: 12 }}>
+                                <AppMultiSelect
+                                  label={getMemberFieldLabel(type)}
+                                  placeholder={getMemberFieldPlaceholder(type)}
+                                  value={memsVal}
+                                  onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
+                                  options={getMemberCelebrantOptionsForType(type)}
+                                  maxHeight={145}
+                                  showSelectAll={false}
+                                  required
+                                  error={!!errors[`members_${typeId}`]}
+                                  helperText={
+                                    errors[`members_${typeId}`] ||
+                                    (memsVal.length > 0 ? `${memsVal.length} members (exempt from contributing)` : "")
+                                  }
+                                />
+                              </Grid>
+                              {memsVal.length > 1 &&
+                                memsVal.map((mId) => {
+                                  const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+                                  const memberName = matchedMember?.name || "Member";
+                                  const mDateVal = eventTypeMemberDates[typeId]?.[mId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+                                  const mDateErr = errors[`eventDate_${typeId}_${mId}`];
 
-                                return (
-                                  <Grid size={{ xs: 12, sm: 6 }} key={mId}>
-                                    <AppDateInput
-                                      label={`${memberName} - ${type.eventTypeName} Date`}
-                                      required
-                                      clearable
-                                      value={mDateVal}
-                                      disablePast={!isEdit}
-                                      minDate={!isEdit ? dayjs().startOf("day") : undefined}
-                                      onChange={(d) => handleMemberDateChange(typeId, mId, d)}
-                                      error={!!mDateErr}
-                                      helperText={mDateErr || `${type.eventTypeName} date for ${memberName}`}
-                                    />
-                                  </Grid>
-                                );
-                              })}
-                          </React.Fragment>
-                        );
-                      })}
+                                  return (
+                                    <Grid size={{ xs: 12, sm: 6 }} key={mId}>
+                                      <AppDateInput
+                                        label={`${memberName} - ${type.eventTypeName} Date`}
+                                        required
+                                        clearable
+                                        value={mDateVal}
+                                        disablePast={!isEdit}
+                                        minDate={!isEdit ? dayjs().startOf("day") : undefined}
+                                        onChange={(d) => handleMemberDateChange(typeId, mId, d)}
+                                        error={!!mDateErr}
+                                        helperText={mDateErr || `${type.eventTypeName} date for ${memberName}`}
+                                      />
+                                    </Grid>
+                                  );
+                                })}
+                            </React.Fragment>
+                          );
+                        })}
+
+                    {/* Event Sponsors Breakdown (Single Event Mode) */}
+                    {renderSponsorSection()}
 
                     {hasSelectedType && !isBirthday && (
                       <Grid size={{ xs: 12 }}>
@@ -3746,6 +4445,8 @@ export default function EventFormPage({
                   </Box>
                 </Box>
               )}
+
+
 
               {/* Description */}
               <Box sx={{ mt: 1.8 }}>
@@ -3890,7 +4591,7 @@ export default function EventFormPage({
                     </Typography>
                   </Box>
 
-                  {/* Row 4 */}
+                  {/* Row 4: Planned Budget */}
                   <Box
                     sx={{
                       display: "flex",
@@ -3916,7 +4617,72 @@ export default function EventFormPage({
                     </Typography>
                   </Box>
 
-                  {/* Row 5 */}
+                  {/* Sponsor Contribution Row */}
+                  {requireSponsorContribution && totalSponsorContributionAmount > 0 && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        minHeight: 36,
+                        py: 0.6,
+                        borderBottom: "1px solid",
+                        borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                      }}
+                    >
+                      <Box>
+                        <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                          Sponsor Contribution
+                        </Typography>
+                        {selectedSponsorNames.length > 0 && (
+                          <Typography sx={{ fontSize: "0.72rem", color: "#8b5cf6", fontWeight: 600 }}>
+                            {selectedSponsorNames.length === 1
+                              ? selectedSponsorNames[0]
+                              : `${selectedSponsorNames.length} Sponsors (${selectedSponsorNames.join(", ")})`}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontSize: "0.92rem",
+                          fontWeight: 700,
+                          color: "#8b5cf6",
+                        }}
+                      >
+                        ₹{formatWholeNumber(totalSponsorContributionAmount)}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Remaining Funding Requirement Row */}
+                  {requireSponsorContribution && totalSponsorContributionAmount > 0 && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        minHeight: 36,
+                        py: 0.6,
+                        borderBottom: "1px solid",
+                        borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                      }}
+                    >
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                        Remaining Funding Requirement
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.92rem",
+                          fontWeight: 700,
+                          color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7"),
+                        }}
+                      >
+                        ₹{formatWholeNumber(remainingFundingRequirement)}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Row 5: Contribution Per Member */}
                   <Box
                     sx={{
                       display: "flex",
@@ -3943,7 +4709,7 @@ export default function EventFormPage({
                     </Typography>
                   </Box>
 
-                  {/* Row 6 */}
+                  {/* Row 6: Expected Collection */}
                   <Box
                     sx={{
                       display: "flex",
