@@ -2605,22 +2605,6 @@ export default function SettingsPage() {
                                 <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", fontSize: "0.72rem" }}>
                                   Upload Custom QR Code for {selectedQrEventType} *
                                 </Typography>
-                                {currentQrConfig.qrImage && (
-                                  <Tooltip title="Remove Uploaded Image">
-                                    <IconButton
-                                      size="small"
-                                      color="error"
-                                      onClick={() => {
-                                        handleQrFieldChange("qrImage", null);
-                                        toast.info(`Uploaded QR image for ${selectedQrEventType} removed.`);
-                                        if (fileInputRef.current) fileInputRef.current.value = "";
-                                      }}
-                                      sx={{ p: 0.3 }}
-                                    >
-                                      <DeleteOutlineOutlinedIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                  </Tooltip>
-                                )}
                               </Box>
 
                               <Box sx={{ width: "100%", maxWidth: { xs: "100%", sm: 520 }, mt: 0.3 }}>
