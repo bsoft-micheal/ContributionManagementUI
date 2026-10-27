@@ -427,12 +427,41 @@ export function buildPaymentReminderEmailHtml({
       </div>`;
   }
 
+  let formattedEventDates = eventDates;
+  if (typeof formattedEventDates === "string" && formattedEventDates.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(formattedEventDates);
+      const extractedDates = [];
+      const extract = (obj) => {
+        if (!obj) return;
+        if (typeof obj === "object") {
+          Object.values(obj).forEach(extract);
+        } else if (typeof obj === "string" && obj.trim()) {
+          const s = obj.trim();
+          const d = new Date(s);
+          if (!isNaN(d.getTime()) && s.length >= 8) {
+            extractedDates.push(
+              d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+            );
+          } else {
+            extractedDates.push(s);
+          }
+        }
+      };
+      extract(parsed);
+      const uniqueDates = Array.from(new Set(extractedDates));
+      if (uniqueDates.length > 0) {
+        formattedEventDates = uniqueDates.join(", ");
+      }
+    } catch {}
+  }
+
   const eventDateLabel =
-    isBirthday && eventDates && eventDates.includes(",")
+    isBirthday && formattedEventDates && formattedEventDates.includes(",")
       ? "Event Dates:"
       : "Event Date:";
   const eventDatesDisplay =
-    eventDates || (isBirthday ? "5 Oct, 10 Oct (2), 19 Oct" : (dueDate || "End of Month"));
+    formattedEventDates || (isBirthday ? "5 Oct, 10 Oct (2), 19 Oct" : (dueDate || "End of Month"));
 
   const totalAmountDisplay =
     totalAmount ||

@@ -967,16 +967,8 @@ export default function EventFormPage({
           const initialTypeName = initialSelectedType ? initialSelectedType.eventTypeName : "";
           const isInitialBday = Boolean(initialTypeName?.toLowerCase().includes("birthday"));
 
-          const monthStr = defaultDate && defaultDate.isValid() ? defaultDate.format("MMMM") : "";
-          let initialEventName = "";
-          if (isInitialBday) {
-            initialEventName = monthStr ? `${monthStr} Birthday Celebration` : "Birthday Celebration";
-          } else if (initialTypeName) {
-            initialEventName = monthStr ? `${monthStr} ${initialTypeName} Celebration` : `${initialTypeName} Celebration`;
-          }
-
           setForm({
-            eventName: sanitizeEventName(initialEventName),
+            eventName: "",
             eventTypeId: initialTypeId,
             eventTypeIds: initialTypeId ? [initialTypeId] : [],
             eventDate: defaultDate,
@@ -2127,21 +2119,6 @@ export default function EventFormPage({
     const isNewBday = newTypeName.toLowerCase().includes("birthday");
 
     let updatedName = form.eventName;
-    if (!isEdit && !isCustomEventName) {
-      const monthStr = form.eventDate && dayjs(form.eventDate).isValid()
-        ? dayjs(form.eventDate).format("MMMM")
-        : "";
-      if (monthStr) {
-        updatedName = isNewBday
-          ? `${monthStr} Birthday Celebration`
-          : `${monthStr} ${newTypeName} Celebration`;
-      } else {
-        updatedName = isNewBday
-          ? `Birthday Celebration`
-          : (newTypeName ? `${newTypeName} Celebration` : "");
-      }
-      updatedName = sanitizeEventName(updatedName);
-    }
 
     const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
     const allEligible = activeMembers.map((m) => m.memberId).filter((id) => !allExempt.has(id));
@@ -2228,22 +2205,6 @@ export default function EventFormPage({
     );
 
     let updatedName = form.eventName;
-    if (!isEdit && !isCustomEventName) {
-      const monthStr = form.eventDate && dayjs(form.eventDate).isValid()
-        ? dayjs(form.eventDate).format("MMMM")
-        : "";
-      if (selectedTypesList.length === 0) {
-        updatedName = monthStr ? `${monthStr} Celebration` : "Celebration";
-      } else if (selectedTypesList.length === 1) {
-        updatedName = hasBday
-          ? (monthStr ? `${monthStr} Birthday Celebration` : "Birthday Celebration")
-          : (monthStr ? `${monthStr} ${selectedTypesList[0].eventTypeName} Celebration` : `${selectedTypesList[0].eventTypeName} Celebration`);
-      } else {
-        const names = selectedTypesList.map((t) => t.eventTypeName);
-        updatedName = monthStr ? `${monthStr} ${names.join(" and ")} Celebration` : `${names.join(" and ")} Celebration`;
-      }
-      updatedName = sanitizeEventName(updatedName);
-    }
 
     const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
     const allEligible = activeMembers.map((m) => m.memberId).filter((id) => !allExempt.has(id));
@@ -2363,17 +2324,6 @@ export default function EventFormPage({
     const newMonth = validDate ? dayjs(validDate).month() : -1;
 
     let newEventName = form.eventName;
-    if (!isEdit && !isCustomEventName && validDate) {
-      const monthStr = dayjs(validDate).format("MMMM");
-      if (selectedTypes.length <= 1) {
-        newEventName = isBirthday
-          ? `${monthStr} Birthday Celebration`
-          : `${monthStr} ${selectedTypeNames[0] || "Event"} Celebration`;
-      } else {
-        newEventName = `${monthStr} ${selectedTypeNames.join(" and ")} Celebration`;
-      }
-      newEventName = sanitizeEventName(newEventName);
-    }
 
     if (validDate && oldMonth !== newMonth) {
       const celebrantsInNewMonth = activeMembers.filter(
