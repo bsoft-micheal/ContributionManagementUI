@@ -60,6 +60,7 @@ import {
   RestartAltRounded as ResetIcon,
   LayersRounded as MultiIcon,
   AutoAwesomeRounded as SparklesIcon,
+  DeleteOutline as DeleteOutlineIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import dayjs from "dayjs";
@@ -404,6 +405,7 @@ export default function EventFormPage({
   const [eventTypeMemberDates, setEventTypeMemberDates] = useState({});
   const [enableCelebrantSelection, setEnableCelebrantSelection] = useState(false);
   const [requireSponsorContribution, setRequireSponsorContribution] = useState(false);
+  const [sponsors, setSponsors] = useState([]); // [{ id, userId, amount }]
   const [sponsorUserId, setSponsorUserId] = useState("");
   const [sponsorContributionAmount, setSponsorContributionAmount] = useState("");
   const [eligibleSponsors, setEligibleSponsors] = useState([]);
@@ -834,6 +836,25 @@ export default function EventFormPage({
           setSponsorUserId(detailedEvent.sponsorUserId || "");
           setSponsorContributionAmount(detailedEvent.sponsorContributionAmount ? String(detailedEvent.sponsorContributionAmount) : "");
           setDetailedEventSponsorName(detailedEvent.sponsorName || "");
+          if (detailedEvent.sponsors && Array.isArray(detailedEvent.sponsors) && detailedEvent.sponsors.length > 0) {
+            setSponsors(
+              detailedEvent.sponsors.map((s, idx) => ({
+                id: s.sponsorId || `sp-edit-${idx}-${Date.now()}`,
+                userId: s.sponsorUserId || s.userId || "",
+                amount: s.contributionAmount ? String(s.contributionAmount) : "",
+              }))
+            );
+          } else if (detailedEvent.sponsorUserId) {
+            setSponsors([
+              {
+                id: "sp-edit-1",
+                userId: detailedEvent.sponsorUserId,
+                amount: detailedEvent.sponsorContributionAmount ? String(detailedEvent.sponsorContributionAmount) : "",
+              },
+            ]);
+          } else {
+            setSponsors([]);
+          }
 
           const editNonBdays = (typesData || []).filter(
             (t) => eventTypeIdsList.includes(t.eventTypeId) && !t.eventTypeName?.toLowerCase().includes("birthday")
@@ -1428,36 +1449,86 @@ export default function EventFormPage({
   const handleToggleRequireSponsorContribution = (checked) => {
     setRequireSponsorContribution(checked);
     if (!checked) {
+      setSponsors([]);
       setSponsorUserId("");
       setSponsorContributionAmount("");
       setErrors((prev) => {
         const next = { ...prev };
         delete next.sponsorUserId;
         delete next.sponsorContributionAmount;
+        delete next.sponsors;
+        return next;
+      });
+    }
+  };
+
+  const totalSponsorContributionAmount = useMemo(() => {
+    if (!requireSponsorContribution || !sponsors || sponsors.length === 0) return 0;
+    return sponsors.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+  }, [requireSponsorContribution, sponsors]);
+
+  // Gating rule: Add Row disabled if any existing row is incomplete
+  const isAddSponsorRowDisabled = useMemo(() => {
+    if (!requireSponsorContribution) return true;
+    if (!sponsors || sponsors.length === 0) return false;
+    const hasIncomplete = sponsors.some(
+      (s) => !s.userId || !s.amount || String(s.amount).trim() === "" || parseFloat(s.amount) <= 0 || isNaN(parseFloat(s.amount))
+    );
+    if (hasIncomplete) return true;
+    if (eligibleSponsors && sponsors.length >= eligibleSponsors.length) return true;
+    return false;
+  }, [requireSponsorContribution, sponsors, eligibleSponsors]);
+
+  const handleAddSponsorRow = () => {
+    if (isAddSponsorRowDisabled) return;
+    const newRow = {
+      id: "sp-" + (Date.now() + Math.random().toString(36).substring(2, 7)),
+      userId: "",
+      amount: "",
+    };
+    setSponsors((prev) => [...prev, newRow]);
+    if (errors.sponsors) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.sponsors;
+        return next;
+      });
+    }
+  };
+
+  const handleRemoveSponsorRow = (rowId) => {
+    setSponsors((prev) => prev.filter((r) => r.id !== rowId));
+  };
+
+  const handleSponsorRowChange = (rowId, field, value) => {
+    setSponsors((prev) =>
+      prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r))
+    );
+    if (errors.sponsors) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.sponsors;
         return next;
       });
     }
   };
 
   const sponsorOptions = useMemo(() => {
-    const opts = (eligibleSponsors || []).map((s) => ({
+    return (eligibleSponsors || []).map((s) => ({
       value: s.userId,
       label: s.fullName || s.username || "User",
     }));
-    if (sponsorUserId && !opts.some((o) => o.value === sponsorUserId)) {
-      opts.unshift({
-        value: sponsorUserId,
-        label: detailedEventSponsorName || "Assigned Sponsor",
-      });
-    }
-    return opts;
-  }, [eligibleSponsors, sponsorUserId, detailedEventSponsorName]);
+  }, [eligibleSponsors]);
 
-  const selectedSponsorName = useMemo(() => {
-    if (!sponsorUserId) return detailedEventSponsorName || "";
-    const found = (eligibleSponsors || []).find((s) => s.userId === sponsorUserId);
-    return found?.fullName || detailedEventSponsorName || "";
-  }, [sponsorUserId, eligibleSponsors, detailedEventSponsorName]);
+  const selectedSponsorNames = useMemo(() => {
+    if (!sponsors || sponsors.length === 0) return [];
+    return sponsors
+      .map((s) => {
+        const found = (eligibleSponsors || []).find((e) => e.userId === s.userId);
+        return found?.fullName || found?.username || detailedEventSponsorName || "";
+      })
+      .filter(Boolean);
+  }, [sponsors, eligibleSponsors, detailedEventSponsorName]);
 
 
   // Auto-clean celebrants and restore participants when their corresponding event type is deselected
@@ -2742,12 +2813,15 @@ export default function EventFormPage({
 
     // 7. Sponsor Contribution Validation (when flag is enabled)
     if (requireSponsorContribution) {
-      if (!sponsorUserId) {
-        newErrors.sponsorUserId = "Please select an eligible sponsor";
-      }
-      const sponsorAmt = parseFloat(String(sponsorContributionAmount)) || 0;
-      if (!sponsorContributionAmount || String(sponsorContributionAmount).trim() === "" || sponsorAmt <= 0) {
-        newErrors.sponsorContributionAmount = "Please enter a valid contribution amount greater than ₹0";
+      if (!sponsors || sponsors.length === 0) {
+        newErrors.sponsors = "Please add at least one sponsor using '+ Add Row'.";
+      } else {
+        const incomplete = sponsors.some(
+          (s) => !s.userId || !s.amount || String(s.amount).trim() === "" || parseFloat(s.amount) <= 0
+        );
+        if (incomplete) {
+          newErrors.sponsors = "Please select a sponsor and enter a valid contribution amount for all rows.";
+        }
       }
     }
 
@@ -2980,8 +3054,14 @@ export default function EventFormPage({
         participantIds: finalParticipantIds,
         contributionOverrides: contributionOverrides,
         requireSponsorContribution: Boolean(requireSponsorContribution),
-        sponsorUserId: requireSponsorContribution && sponsorUserId ? sponsorUserId : null,
-        sponsorContributionAmount: requireSponsorContribution && sponsorContributionAmount ? Number(sponsorContributionAmount) : null,
+        sponsorUserId: requireSponsorContribution && sponsors.length > 0 ? sponsors[0].userId : null,
+        sponsorContributionAmount: requireSponsorContribution && totalSponsorContributionAmount > 0 ? totalSponsorContributionAmount : null,
+        sponsors: requireSponsorContribution
+          ? sponsors.map((s) => ({
+              userId: s.userId,
+              contributionAmount: Number(s.amount),
+            }))
+          : [],
       };
 
       if (isEdit) {
@@ -3119,6 +3199,267 @@ export default function EventFormPage({
     }
     return <div className="page-shell" />;
   }
+
+  const renderSponsorSection = () => {
+    if (!requireSponsorContribution) return null;
+
+    return (
+      <Grid size={{ xs: 12 }}>
+        <Box
+          sx={{
+            p: 2,
+            borderRadius: 2.5,
+            backgroundColor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.04)" : "#faf7ff",
+            border: "1px solid",
+            borderColor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.25)" : "#ddd6fe",
+            transition: "all 0.2s ease-in-out",
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
+              mb: sponsors.length > 0 ? 2 : 1.5,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: "0.95rem",
+                  color: (theme) =>
+                    theme.palette.mode === "dark" ? "#e9d5ff" : "#5b21b6",
+                }}
+              >
+                Event Sponsors
+              </Typography>
+              {sponsors.length > 0 && (
+                <Chip
+                  label={`${sponsors.length} ${sponsors.length === 1 ? "Sponsor" : "Sponsors"}`}
+                  size="small"
+                  sx={{
+                    height: 22,
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    backgroundColor: (theme) =>
+                      theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.25)" : "#ede9fe",
+                    color: "#7c3aed",
+                  }}
+                />
+              )}
+            </Box>
+
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon fontSize="small" />}
+              disabled={isAddSponsorRowDisabled}
+              onClick={handleAddSponsorRow}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "0.82rem",
+                borderRadius: 1.5,
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.5)" : "#a78bfa",
+                color: (theme) =>
+                  theme.palette.mode === "dark" ? "#c4b5fd" : "#7c3aed",
+                "&:hover": {
+                  borderColor: "#8b5cf6",
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.15)" : "#f5f3ff",
+                },
+                "&.Mui-disabled": {
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "#e2e8f0",
+                },
+              }}
+            >
+              Add Row {sponsors.length > 0 ? `(${sponsors.length})` : ""}
+            </Button>
+          </Box>
+
+          {/* Disabled Hint when incomplete row exists */}
+          {isAddSponsorRowDisabled && sponsors.length > 0 && (
+            <Typography
+              sx={{
+                fontSize: "0.75rem",
+                color: "text.secondary",
+                mb: 1.5,
+                fontStyle: "italic",
+              }}
+            >
+              * Fill sponsor name and amount to enable &quot;Add Row&quot;.
+            </Typography>
+          )}
+
+          {/* Error text if any */}
+          {errors.sponsors && (
+            <Alert severity="error" sx={{ mb: 1.5, py: 0.5, fontSize: "0.82rem" }}>
+              {errors.sponsors}
+            </Alert>
+          )}
+
+          {/* Empty State */}
+          {sponsors.length === 0 ? (
+            <Box
+              sx={{
+                p: 2.5,
+                textAlign: "center",
+                borderRadius: 2,
+                backgroundColor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(0,0,0,0.15)" : "#ffffff",
+                border: "1px dashed",
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.2)" : "#cbd5e1",
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: "0.85rem",
+                  color: "text.secondary",
+                  fontWeight: 500,
+                }}
+              >
+                No sponsors added yet. Click <strong>Add Row</strong> to add a sponsor.
+              </Typography>
+            </Box>
+          ) : (
+            /* Sponsor Rows */
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              {sponsors.map((row, index) => {
+                const otherPickedIds = sponsors
+                  .filter((r) => r.id !== row.id && r.userId)
+                  .map((r) => r.userId);
+                const filteredOptions = (eligibleSponsors || [])
+                  .filter((s) => !otherPickedIds.includes(s.userId))
+                  .map((s) => ({
+                    value: s.userId,
+                    label: s.fullName || s.username || "User",
+                  }));
+
+                return (
+                  <Box
+                    key={row.id}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      backgroundColor: (theme) =>
+                        theme.palette.mode === "dark" ? "rgba(0,0,0,0.2)" : "#ffffff",
+                      border: "1px solid",
+                      borderColor: (theme) =>
+                        theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "#e2e8f0",
+                    }}
+                  >
+                    <Grid container spacing={1.5} alignItems="center">
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <AppSelect
+                          label={`Event Sponsor #${index + 1}`}
+                          placeholder="Select eligible sponsor..."
+                          value={row.userId}
+                          onChange={(e) => handleSponsorRowChange(row.id, "userId", e.target.value)}
+                          options={filteredOptions}
+                          required
+                        />
+                      </Grid>
+
+                      <Grid size={{ xs: 10, sm: 5 }}>
+                        <AppInput
+                          label="Contribution Amount"
+                          placeholder="0.00"
+                          value={row.amount}
+                          onChange={(e) => {
+                            const sanitized = sanitizeDecimalAmount(e.target.value);
+                            handleSponsorRowChange(row.id, "amount", sanitized);
+                          }}
+                          startAdornment={
+                            <InputAdornment position="start">
+                              <Typography
+                                sx={{
+                                  color: "text.secondary",
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ₹
+                              </Typography>
+                            </InputAdornment>
+                          }
+                          required
+                        />
+                      </Grid>
+
+                      <Grid
+                        size={{ xs: 2, sm: 1 }}
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          pt: { xs: 0, sm: 3 },
+                        }}
+                      >
+                        <IconButton
+                          color="error"
+                          size="small"
+                          onClick={() => handleRemoveSponsorRow(row.id)}
+                          title="Remove Sponsor"
+                          sx={{
+                            backgroundColor: (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(239, 68, 68, 0.1)"
+                                : "#fef2f2",
+                            "&:hover": {
+                              backgroundColor: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(239, 68, 68, 0.2)"
+                                  : "#fee2e2",
+                            },
+                          }}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                );
+              })}
+
+              {/* Footer Total */}
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  pt: 1,
+                  px: 0.5,
+                }}
+              >
+                <Typography sx={{ fontSize: "0.82rem", color: "text.secondary", fontWeight: 500 }}>
+                  Total Sponsor Contribution:
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    color: (theme) =>
+                      theme.palette.mode === "dark" ? "#c4b5fd" : "#7c3aed",
+                  }}
+                >
+                  ₹{formatWholeNumber(totalSponsorContributionAmount)}
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      </Grid>
+    );
+  };
 
   const formContent = (
     <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
@@ -3650,65 +3991,8 @@ export default function EventFormPage({
                       );
                     })}
 
-                    {/* Sponsor Contribution Fields (Multiple Events Mode) */}
-                    {requireSponsorContribution && (
-                      <Grid size={{ xs: 12 }}>
-                        <Grid container spacing={1.5}>
-                          <Grid size={{ xs: 12, sm: 7 }}>
-                            <AppSelect
-                              label="Event Sponsor"
-                              placeholder="Select eligible sponsor..."
-                              value={sponsorUserId}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setSponsorUserId(val);
-                                if (errors.sponsorUserId) {
-                                  setErrors((prev) => ({ ...prev, sponsorUserId: "" }));
-                                }
-                              }}
-                              options={sponsorOptions}
-                              required
-                              error={!!errors.sponsorUserId}
-                              helperText={errors.sponsorUserId || ""}
-                              allowClear
-                              clearable
-                              onClear={() => setSponsorUserId("")}
-                            />
-                          </Grid>
-
-                          <Grid size={{ xs: 12, sm: 5 }}>
-                            <AppInput
-                              label="Sponsor Contribution Amount"
-                              placeholder="0.00"
-                              value={sponsorContributionAmount}
-                              onChange={(e) => {
-                                const sanitized = sanitizeDecimalAmount(e.target.value);
-                                setSponsorContributionAmount(sanitized);
-                                if (errors.sponsorContributionAmount) {
-                                  setErrors((prev) => ({ ...prev, sponsorContributionAmount: "" }));
-                                }
-                              }}
-                              startAdornment={
-                                <InputAdornment position="start">
-                                  <Typography
-                                    sx={{
-                                      color: "text.secondary",
-                                      fontSize: "0.85rem",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    ₹
-                                  </Typography>
-                                </InputAdornment>
-                              }
-                              required
-                              error={!!errors.sponsorContributionAmount}
-                              helperText={errors.sponsorContributionAmount || ""}
-                            />
-                          </Grid>
-                        </Grid>
-                      </Grid>
-                    )}
+                    {/* Event Sponsors Breakdown (Multiple Events Mode) */}
+                    {renderSponsorSection()}
                   </>
                 ) : (
                   <>
@@ -4064,65 +4348,8 @@ export default function EventFormPage({
                           );
                         })}
 
-                    {/* Sponsor Contribution Fields (Single Event Mode) */}
-                    {requireSponsorContribution && (
-                      <Grid size={{ xs: 12 }}>
-                        <Grid container spacing={1.5}>
-                          <Grid size={{ xs: 12, sm: 7 }}>
-                            <AppSelect
-                              label="Event Sponsor"
-                              placeholder="Select eligible sponsor..."
-                              value={sponsorUserId}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setSponsorUserId(val);
-                                if (errors.sponsorUserId) {
-                                  setErrors((prev) => ({ ...prev, sponsorUserId: "" }));
-                                }
-                              }}
-                              options={sponsorOptions}
-                              required
-                              error={!!errors.sponsorUserId}
-                              helperText={errors.sponsorUserId || ""}
-                              allowClear
-                              clearable
-                              onClear={() => setSponsorUserId("")}
-                            />
-                          </Grid>
-
-                          <Grid size={{ xs: 12, sm: 5 }}>
-                            <AppInput
-                              label="Sponsor Contribution Amount"
-                              placeholder="0.00"
-                              value={sponsorContributionAmount}
-                              onChange={(e) => {
-                                const sanitized = sanitizeDecimalAmount(e.target.value);
-                                setSponsorContributionAmount(sanitized);
-                                if (errors.sponsorContributionAmount) {
-                                  setErrors((prev) => ({ ...prev, sponsorContributionAmount: "" }));
-                                }
-                              }}
-                              startAdornment={
-                                <InputAdornment position="start">
-                                  <Typography
-                                    sx={{
-                                      color: "text.secondary",
-                                      fontSize: "0.85rem",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    ₹
-                                  </Typography>
-                                </InputAdornment>
-                              }
-                              required
-                              error={!!errors.sponsorContributionAmount}
-                              helperText={errors.sponsorContributionAmount || ""}
-                            />
-                          </Grid>
-                        </Grid>
-                      </Grid>
-                    )}
+                    {/* Event Sponsors Breakdown (Single Event Mode) */}
+                    {renderSponsorSection()}
 
                     {hasSelectedType && !isBirthday && (
                       <Grid size={{ xs: 12 }}>
@@ -4435,7 +4662,7 @@ export default function EventFormPage({
                   </Box>
 
                   {/* Row 7: Sponsor Contribution */}
-                  {requireSponsorContribution && Number(sponsorContributionAmount) > 0 && (
+                  {requireSponsorContribution && totalSponsorContributionAmount > 0 && (
                     <Box
                       sx={{
                         display: "flex",
@@ -4451,9 +4678,11 @@ export default function EventFormPage({
                         <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
                           Sponsor Contribution
                         </Typography>
-                        {selectedSponsorName && (
+                        {selectedSponsorNames.length > 0 && (
                           <Typography sx={{ fontSize: "0.72rem", color: "#8b5cf6", fontWeight: 600 }}>
-                            {selectedSponsorName}
+                            {selectedSponsorNames.length === 1
+                              ? selectedSponsorNames[0]
+                              : `${selectedSponsorNames.length} Sponsors (${selectedSponsorNames.join(", ")})`}
                           </Typography>
                         )}
                       </Box>
@@ -4464,7 +4693,7 @@ export default function EventFormPage({
                           color: "#8b5cf6",
                         }}
                       >
-                        ₹{formatWholeNumber(sponsorContributionAmount)}
+                        ₹{formatWholeNumber(totalSponsorContributionAmount)}
                       </Typography>
                     </Box>
                   )}
