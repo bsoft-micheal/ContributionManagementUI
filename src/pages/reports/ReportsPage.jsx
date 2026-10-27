@@ -429,7 +429,8 @@ export default function ReportsPage({ mode: propMode = "event" }) {
           return cMemberId === member.memberId || (cMemberName && cMemberName.trim().toLowerCase() === member.memberName?.trim().toLowerCase());
         })
         .map((c) => {
-          const isPaid = c.paymentStatus === 1 || c.paymentStatus === "Paid" || Boolean(c.paymentDate);
+          const rawStatus = String(c.statusName || c.StatusName || "").trim().toLowerCase();
+          const isPaid = (c.paymentStatus === 2 || String(c.paymentStatus).toLowerCase() === "paid" || rawStatus === "paid" || rawStatus === "verified" || rawStatus === "approved") && rawStatus !== "pending" && rawStatus !== "rejected";
           return {
             contributionId: c.contributionId || c.ContributionId,
             eventId: c.eventId || c.EventId,
