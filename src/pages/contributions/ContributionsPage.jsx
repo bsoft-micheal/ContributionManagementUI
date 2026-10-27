@@ -854,6 +854,9 @@ export default function ContributionsPage() {
     const upi = Number(c.upiAmount) || 0;
     if (cash > 0 || upi > 0) return true;
 
+    const rawPaid = Number(c.paidAmount) || 0;
+    if (rawPaid > 0) return true;
+
     // Transaction strictly for THIS event with positive amount & verified/approved status
     if (matchedTx) {
       const txStatus = String(matchedTx.status || "").trim().toLowerCase();
@@ -870,11 +873,21 @@ export default function ContributionsPage() {
     const paymentStatusNum = Number(c.paymentStatus);
     const paymentStatusStr = String(c.paymentStatus || "").trim().toLowerCase();
 
-    if (rawStatus === "pending" || rawStatus === "rejected" || paymentStatusNum === 1 || paymentStatusStr === "pending" || paymentStatusStr === "rejected") {
+    if (rawStatus === "rejected" || paymentStatusStr === "rejected") {
       return false;
     }
 
-    if (paymentStatusNum === 2 || rawStatus === "paid" || rawStatus === "verified" || rawStatus === "approved" || rawStatus === "closed" || rawStatus === "completed" || paymentStatusStr === "paid") {
+    if (
+      paymentStatusNum === 2 ||
+      rawStatus === "paid" ||
+      rawStatus === "verified" ||
+      rawStatus === "approved" ||
+      rawStatus === "closed" ||
+      rawStatus === "completed" ||
+      paymentStatusStr === "paid" ||
+      paymentStatusStr === "verified" ||
+      paymentStatusStr === "approved"
+    ) {
       return true;
     }
 
@@ -886,14 +899,9 @@ export default function ContributionsPage() {
     const matchedTx = tx !== null ? tx : findContributionTransaction(c);
 
     const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
-    const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
+    const rawStatus = String(c.statusName || c.status || "").trim().toLowerCase();
 
-    // If status is rejected or pending, it can NEVER be approved!
-    if (rawStatus === "rejected" || txStatus === "rejected" || rawStatus === "pending" || txStatus === "pending") {
-      return false;
-    }
-
-    if (!hasContributionPayment(c, matchedTx)) {
+    if (rawStatus === "rejected" || txStatus === "rejected") {
       return false;
     }
 
@@ -912,15 +920,9 @@ export default function ContributionsPage() {
     const matchedTx = tx !== null ? tx : findContributionTransaction(c);
 
     const txStatus = String(matchedTx?.status || "").trim().toLowerCase();
-    const rawStatus = String(c.statusName || c.paymentStatus || c.status || "").trim().toLowerCase();
+    const rawStatus = String(c.statusName || c.status || "").trim().toLowerCase();
 
-    // If status is rejected or pending, it can NEVER be verified!
-    if (rawStatus === "rejected" || txStatus === "rejected" || rawStatus === "pending" || txStatus === "pending") {
-      return false;
-    }
-
-    // CRITICAL: A member who has NOT paid can NEVER be shown as Verified!
-    if (!hasContributionPayment(c, matchedTx)) {
+    if (rawStatus === "rejected" || txStatus === "rejected") {
       return false;
     }
 
@@ -981,8 +983,20 @@ export default function ContributionsPage() {
       paymentStatusStr === "approved" ||
       txStatus === "paid" ||
       txStatus === "verified" ||
-      txStatus === "approved"
+      txStatus === "approved" ||
+      txStatus === "completed"
     ) {
+      return true;
+    }
+
+    // Check if full amount is paid
+    const cash = Number(c.cashAmount) || 0;
+    const upi = Number(c.upiAmount) || 0;
+    const totalPaid = cash + upi;
+    const amt = Number(c.amount) || 0;
+    const paidAmt = Number(c.paidAmount) || 0;
+
+    if (amt > 0 && (totalPaid >= amt || paidAmt >= amt)) {
       return true;
     }
 
@@ -2921,6 +2935,7 @@ export default function ContributionsPage() {
         const isPaid =
           isFullyPaidByAmount ||
           isContributionPaid(row, matchedTx) ||
+          hasFullyPaid ||
           (!isRejected && (
             isApproved ||
             isVerified ||

@@ -53,6 +53,11 @@ export const getMonthlyRestrictionsAsync = async (month, year, excludeEventId = 
   return await getApi("/events/getMonthlyRestrictionsAsync", params);
 };
 
+export const getEligibleSponsorsAsync = async () => {
+  const result = await getApi("/events/eligible-sponsors");
+  return result || [];
+};
+
 /**
  * Checks whether an event has been published.
  * Draft / unpublished events return false.
