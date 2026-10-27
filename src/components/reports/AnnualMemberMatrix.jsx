@@ -33,6 +33,8 @@ import {
   HelpOutline as HelpOutlineIcon,
   ArrowForward as ArrowForwardIcon,
   FilterList as FilterListIcon,
+  GridOn as ExcelIcon,
+  PictureAsPdf as PdfIcon,
 } from "@mui/icons-material";
 import AppSelect from "../common/AppSelect";
 import AppButton, { AppClearFilterButton } from "../common/AppButton";
@@ -462,6 +464,142 @@ export default function AnnualMemberMatrix({
       { name: `Matrix ${appliedYear}`, data: matrixSheet },
     ]);
   };
+
+  /* ── Export to PDF / Printout ── */
+  const handleExportPdf = () => {
+    if (!hasExportableRecords) return;
+
+    const printWindow = window.open("", "_blank", "width=1200,height=800");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const generatedDate = new Date().toLocaleString();
+    const monthHeaders = MONTH_SHORT.map((m) => `<th style="text-align:right;">${m}</th>`).join("");
+    
+    const rowsHtml = matrixData.map((r, idx) => {
+      const monthCells = r.months.map((m) => {
+        const val = viewMetric === "pending" ? m.totalPending : viewMetric === "expected" ? m.totalExpected : m.totalPaid;
+        return `<td style="text-align:right;">${val > 0 ? INR(val) : "—"}</td>`;
+      }).join("");
+
+      return `
+        <tr class="${idx % 2 === 0 ? "even" : "odd"}">
+          <td><strong>${r.memberName}</strong></td>
+          ${monthCells}
+          <td style="text-align:right;font-weight:700;color:#059669;">${INR(r.totalAnnualPaid)}</td>
+          <td style="text-align:right;font-weight:700;color:#e11d48;">${INR(r.totalAnnualPending)}</td>
+        </tr>
+      `;
+    }).join("");
+
+    const totalMonthCells = summaryTotals.monthly.map((m, idx) => {
+      const val = viewMetric === "pending" ? m.pending : viewMetric === "expected" ? m.expected : m.paid;
+      return `<td style="text-align:right;">${val > 0 ? INR(val) : "—"}</td>`;
+    }).join("");
+
+    const totalsHtml = `
+      <tr style="background:#f1f5f9;font-weight:800;border-top:2px solid #4a3f6b;">
+        <td><strong>TOTALS</strong></td>
+        ${totalMonthCells}
+        <td style="text-align:right;color:#059669;font-weight:800;">${INR(summaryTotals.grandPaid)}</td>
+        <td style="text-align:right;color:#e11d48;font-weight:800;">${INR(summaryTotals.grandPending)}</td>
+      </tr>
+    `;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Annual Contribution Matrix ${appliedYear} - Team Contribution Management</title>
+          <meta charset="utf-8" />
+          <style>
+            @page { size: landscape; margin: 10mm; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              color: #1e1a2e; margin: 0; padding: 20px; background: #ffffff;
+              -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            }
+            .header {
+              display: flex; justify-content: space-between; align-items: flex-end;
+              border-bottom: 2px solid #4a3f6b; padding-bottom: 12px; margin-bottom: 16px;
+            }
+            .header-left h1 { margin: 0; font-size: 20px; color: #4a3f6b; font-weight: 800; }
+            .header-left p { margin: 4px 0 0 0; font-size: 12px; color: #6b7280; font-weight: 500; }
+            .header-right { text-align: right; font-size: 11px; color: #4b5563; line-height: 1.5; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 12px; margin-bottom: 16px; }
+            th {
+              background-color: #4a3f6b !important; color: #ffffff !important;
+              font-weight: 700; text-align: left; padding: 7px 8px; border: 1px solid #4a3f6b;
+              font-size: 10px;
+            }
+            td { padding: 6px 8px; border: 1px solid #e5e7eb; color: #374151; font-size: 10px; }
+            tr.even { background-color: #ffffff; }
+            tr.odd { background-color: #f8fafc; }
+            .footer {
+              margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 10px;
+              font-size: 10px; color: #9ca3af; display: flex; justify-content: space-between;
+            }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="header-left">
+              <h1>Annual Contribution Matrix (${appliedYear})</h1>
+              <p>Metric: ${viewMetric.toUpperCase()} • Total Members: ${matrixData.length}</p>
+            </div>
+            <div class="header-right">
+              <div>Printed On: <strong>${generatedDate}</strong></div>
+              <div>Grand Paid: <strong>${INR(summaryTotals.grandPaid)}</strong> | Grand Pending: <strong>${INR(summaryTotals.grandPending)}</strong></div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Member Name</th>
+                ${monthHeaders}
+                <th style="text-align:right;">Total Paid</th>
+                <th style="text-align:right;">Total Pending</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              ${totalsHtml}
+            </tbody>
+          </table>
+          <div class="footer">
+            <span>Confidential — Internal Company Record</span>
+            <span>Printed from Contribution Management System</span>
+          </div>
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const exportIconBtnSx = {
+    p: 0.4,
+    color: hasExportableRecords
+      ? (theme.palette.mode === "dark" ? "#94a3b8" : "#64748b")
+      : (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1"),
+    "&:hover": {
+      color: hasExportableRecords
+        ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")
+        : (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1"),
+    },
+  };
+
 
   /* ── Filter & Clear Handlers ── */
   const handleApplyFilter = () => {
@@ -954,16 +1092,81 @@ export default function AnnualMemberMatrix({
       </Paper>
 
       {/* ── Annual Matrix Table (Fully Scrollable Format) ── */}
-      <TableContainer
-        component={Paper}
+      <Paper
         elevation={0}
         sx={{
           borderRadius: "8px",
           border: "1px solid",
           borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(224, 224, 224, 1)",
+          overflow: "hidden",
           bgcolor: isDark ? "#171422" : "#ffffff",
-          maxHeight: "72vh",
-          overflow: "auto",
+          boxShadow: isDark
+            ? "0 4px 20px rgba(0, 0, 0, 0.4)"
+            : "0 2px 12px rgba(0, 0, 0, 0.03)",
+        }}
+      >
+        {/* Export Toolbar matching AppDataTable */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            p: 1.25,
+            px: 2,
+            borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.01)" : "#ffffff",
+            flexWrap: "wrap",
+            gap: 1.5,
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 700,
+                color: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.6)"
+                    : "rgba(74, 63, 107, 0.75)",
+                fontSize: "0.75rem",
+                mr: 0.5,
+              }}
+            >
+              Export :
+            </Typography>
+            <Tooltip title={hasExportableRecords ? "Export Excel (.xlsx)" : "Record not found"}>
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={!hasExportableRecords}
+                  onClick={handleExportMatrix}
+                  sx={exportIconBtnSx}
+                >
+                  <ExcelIcon sx={{ fontSize: "1.1rem" }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={hasExportableRecords ? "Save PDF / Printout" : "Record not found"}>
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={!hasExportableRecords}
+                  onClick={handleExportPdf}
+                  sx={exportIconBtnSx}
+                >
+                  <PdfIcon sx={{ fontSize: "1.1rem" }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
+        </Box>
+
+        <TableContainer
+          elevation={0}
+          sx={{
+            maxHeight: "72vh",
+            overflow: "auto",
           boxShadow: isDark
             ? "0 4px 20px rgba(0, 0, 0, 0.4)"
             : "0 2px 12px rgba(0, 0, 0, 0.03)",
@@ -1299,6 +1502,7 @@ export default function AnnualMemberMatrix({
           )}
         </Table>
       </TableContainer>
+      </Paper>
 
       {/* ── Bottom Status Bar (Scrollable indicator) ── */}
       <Box
