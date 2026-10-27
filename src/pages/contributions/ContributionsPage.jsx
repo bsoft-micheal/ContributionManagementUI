@@ -962,12 +962,14 @@ export default function ContributionsPage() {
     // If member has paid the required target amount (or more), it is Paid!
     const cash = Number(c.cashAmount) || 0;
     const upi = Number(c.upiAmount) || 0;
+    const totalPaid = cash + upi;
+    const paidAmt = Number(c.paidAmount) || Number(c.totalReceivedAmount) || 0;
     const allTxns = typeof findAllContributionTransactions === "function" ? findAllContributionTransactions(c) : [];
     const totalTxAmt = allTxns.length > 0 ? allTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0) : (Number(matchedTx?.amount) || 0);
-    const rawPaid = (cash + upi) > 0 ? (cash + upi) : (totalTxAmt > 0 ? totalTxAmt : (Number(c.paidAmount) || Number(c.totalReceivedAmount) || 0));
+    const rawPaid = totalPaid > 0 ? totalPaid : (totalTxAmt > 0 ? totalTxAmt : paidAmt);
     const targetAmt = Number(c.amount) || 0;
 
-    if (targetAmt > 0 && rawPaid >= targetAmt) {
+    if (targetAmt > 0 && (rawPaid >= targetAmt || totalPaid >= targetAmt || paidAmt >= targetAmt)) {
       return true;
     }
 
@@ -986,17 +988,6 @@ export default function ContributionsPage() {
       txStatus === "approved" ||
       txStatus === "completed"
     ) {
-      return true;
-    }
-
-    // Check if full amount is paid
-    const cash = Number(c.cashAmount) || 0;
-    const upi = Number(c.upiAmount) || 0;
-    const totalPaid = cash + upi;
-    const amt = Number(c.amount) || 0;
-    const paidAmt = Number(c.paidAmount) || 0;
-
-    if (amt > 0 && (totalPaid >= amt || paidAmt >= amt)) {
       return true;
     }
 
@@ -2930,6 +2921,7 @@ export default function ContributionsPage() {
         const rawPaid = (cash + upi) > 0 ? (cash + upi) : (txAmt > 0 ? txAmt : (Number(row?.paidAmount) || 0));
 
         const isFullyPaidByAmount = !isRejected && targetAmount > 0 && rawPaid >= targetAmount;
+        const hasFullyPaid = isFullyPaidByAmount || (!isRejected && targetAmount > 0 && (((cash + upi) >= targetAmount) || ((Number(row?.paidAmount) || 0) >= targetAmount)));
         const isPartialByAmount = !isRejected && rawPaid > 0 && rawPaid < targetAmount;
 
         const isPaid =
