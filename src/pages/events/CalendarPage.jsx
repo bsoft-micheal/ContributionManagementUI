@@ -1073,11 +1073,11 @@ export default function CalendarPage({ isEmbedded = false }) {
                 display: "flex",
                 alignItems: "flex-end",
                 flexWrap: "wrap",
-                gap: 1.25,
+                gap: 1.5,
                 width: "100%",
               }}
             >
-              <Box sx={{ width: { xs: "100%", sm: 125, md: 135 } }}>
+              <Box sx={{ flex: { xs: "1 1 100%", sm: "1 1 110px", md: "1 1 125px" }, minWidth: { sm: 110 } }}>
                 <AppSelect
                   size="small"
                   label="Year"
@@ -1091,7 +1091,7 @@ export default function CalendarPage({ isEmbedded = false }) {
                   fullWidth
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 145, md: 155 } }}>
+              <Box sx={{ flex: { xs: "1 1 100%", sm: "1 1 130px", md: "1 1 145px" }, minWidth: { sm: 130 } }}>
                 <AppSelect
                   size="small"
                   label="Month"
@@ -1105,7 +1105,7 @@ export default function CalendarPage({ isEmbedded = false }) {
                   fullWidth
                 />
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 180, md: 200 } }}>
+              <Box sx={{ flex: { xs: "1 1 100%", sm: "1.2 1 170px", md: "1.2 1 190px" }, minWidth: { sm: 170 } }}>
                 <AppSelect
                   size="small"
                   label="Event Type"
