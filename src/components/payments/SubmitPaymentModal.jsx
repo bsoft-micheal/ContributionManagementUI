@@ -1575,11 +1575,23 @@ export default function SubmitPaymentModal({
         return;
       }
 
+      let submitEventId = formData.eventId;
+      let submitEventName = formData.eventName;
+
+      // When paying Previous Arrears Only, route the payment to the previous event that actually holds the arrear
+      if (paymentScope === "PreviousArrears" && duesSummary?.arrearBreakdown && duesSummary.arrearBreakdown.length > 0) {
+        const targetArrear = duesSummary.arrearBreakdown[0];
+        if (targetArrear.eventId) submitEventId = targetArrear.eventId;
+        if (targetArrear.eventName || targetArrear.title) {
+          submitEventName = targetArrear.eventName || targetArrear.title;
+        }
+      }
+
       const payload = {
-        eventId: formData.eventId || undefined,
+        eventId: submitEventId || undefined,
         memberId: formData.memberId || undefined,
         memberName: formData.memberName.trim(),
-        eventName: formData.eventName.trim(),
+        eventName: submitEventName.trim(),
         amount: Number(formData.amount),
         paymentMode: finalMode,
         cashAmount: cashTotal > 0 ? cashTotal : undefined,

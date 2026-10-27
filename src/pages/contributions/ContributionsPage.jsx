@@ -550,6 +550,16 @@ export default function ContributionsPage() {
 
       const tEventId = t.eventId;
       const tEventName = t.eventName;
+      const tNotes = String(t.notes || "").toLowerCase();
+      const isTxPreviousArrearsOnly = tNotes.includes("scope: previousarrears") || tNotes.includes("scope:previousarrears") || tNotes.includes("previous arrears only");
+
+      // If a transaction was specifically paid for "Previous Arrears Only",
+      // it should NOT match the current event where the modal was opened from!
+      // It was paid to settle previous events, NOT this event.
+      if (isTxPreviousArrearsOnly && targetEventId && tEventId && isSameText(targetEventId, tEventId)) {
+        return false;
+      }
+
       if (targetEventId && tEventId) {
         return isSameText(targetEventId, tEventId);
       }
@@ -590,6 +600,15 @@ export default function ContributionsPage() {
 
       const tEventId = t.eventId;
       const tEventName = t.eventName;
+      const tNotes = String(t.notes || "").toLowerCase();
+      const isTxPreviousArrearsOnly = tNotes.includes("scope: previousarrears") || tNotes.includes("scope:previousarrears") || tNotes.includes("previous arrears only");
+
+      // If a transaction was specifically paid for "Previous Arrears Only",
+      // it should NOT be counted as paid against the current event where the modal was opened.
+      if (isTxPreviousArrearsOnly && targetEventId && tEventId && isSameText(targetEventId, tEventId)) {
+        return false;
+      }
+
       if (targetEventId && tEventId) {
         return isSameText(targetEventId, tEventId);
       }
@@ -1107,10 +1126,23 @@ export default function ContributionsPage() {
           : rawPaidAmount;
         const arrearsPaidInTx = eventTargetAmt > 0 ? Math.max(0, rawPaidAmount - eventTargetAmt) : 0;
 
+        const memberTxns = (txList || []).filter((t) => {
+          const tMemberId = t.userId || t.memberId;
+          const tMemberName = t.memberName;
+          return isSameText(targetMemberId, tMemberId) || isSameText(targetMemberName, tMemberName);
+        });
+        const arrearsTxAmount = memberTxns
+          .filter((t) => {
+            const notes = String(t.notes || "").toLowerCase();
+            return notes.includes("scope: previousarrears") || notes.includes("scope:previousarrears") || notes.includes("previous arrears only");
+          })
+          .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+        const totalArrearsPaid = arrearsPaidInTx + arrearsTxAmount;
         const isArrearsCleared =
           (isAllOutstandingScope && !isCurrentEventOnly && (hasSubmittedPayment(c, matchedTx) || isContributionPaid(c))) ||
-          (arrearsPaidInTx > 0 && arrearsPaidInTx >= rawPreviousUnpaid);
-        const previousUnpaid = isArrearsCleared ? 0 : Math.max(0, rawPreviousUnpaid - arrearsPaidInTx);
+          (totalArrearsPaid > 0 && totalArrearsPaid >= rawPreviousUnpaid);
+        const previousUnpaid = isArrearsCleared ? 0 : Math.max(0, rawPreviousUnpaid - totalArrearsPaid);
 
         return {
           ...currentContribution,
@@ -1275,7 +1307,7 @@ export default function ContributionsPage() {
           validTxns.find((t) => Number(t.amount) > 0) ||
           row.allMemberTransactions?.[0];
 
-        // Allocate excessPool across unpaid / partially paid events of this member
+        // Allocate excessPool across unpaid events of this member ONLY if it can fully cover the event amount
         if (excessPool > 0) {
           row.memberEvents.forEach((ev) => {
             const needed = Number(ev.amount || 0) - Number(ev.paidAmount || 0);
@@ -1289,7 +1321,13 @@ export default function ContributionsPage() {
                 }
               }
 
-              const alloc = Math.min(needed, excessPool);
+              // STRICT RULE: No partial payments on events!
+              // An event can ONLY be settled if the remaining excessPool fully covers the event's required amount.
+              if (excessPool < needed) {
+                return; // Cannot partially pay an event!
+              }
+
+              const alloc = needed;
               ev.paidAmount = (Number(ev.paidAmount) || 0) + alloc;
               excessPool -= alloc;
 
@@ -1533,11 +1571,13 @@ export default function ContributionsPage() {
       String(row?.paymentStatus || row?.status || row?.statusName || matchedTx?.status || "").trim().toLowerCase() === "approved" ||
       isContributionApproved(row, matchedTx);
     const isPaidStatus = statusStr === "paid" || statusStr === "verified" || statusStr === "approved" || statusStr === "completed" || statusStr === "closed" || row?.paymentStatus === 2;
-    const isSettledByAmount = Number(row?.paidAmount || 0) > 0 && (row?.totalAccumulated === undefined || Number(row?.totalAccumulated) <= 0);
+    const rowAmount = Number(row?.amount) || 0;
+    const rowPaid = Number(row?.paidAmount) || 0;
+    const hasUnpaidCurrent = !isGrouped && rowAmount > 0 && rowPaid < rowAmount;
 
     const hasRemainingDues = isGrouped
       ? (Number(row?.totalDue ?? 0) > 0 || (Array.isArray(row.memberEvents) && row.memberEvents.some((e) => !e.isPaid && (Number(e.amount) || 0) > (Number(e.paidAmount) || 0))))
-      : (Number(row?.totalDue ?? row?.totalAccumulated ?? 0) > 0 || statusStr === "partial");
+      : (hasUnpaidCurrent || Number(row?.totalDue ?? row?.totalAccumulated ?? 0) > 0 || statusStr === "partial");
 
     const isPaidMember = !hasRemainingDues && (isGrouped
       ? (statusStr === "paid" || statusStr === "approved" || statusStr === "verified" || (row?.totalDue !== undefined && row?.totalDue <= 0))
@@ -2518,9 +2558,13 @@ export default function ContributionsPage() {
         );
 
         const isGrouped = selectedEventId === "ALL" && Boolean(row.isGrouped);
+        const rowAmount = Number(row?.amount) || 0;
+        const rowPaid = Number(row?.paidAmount) || 0;
+        const hasUnpaidCurrentEvent = !isGrouped && rowAmount > 0 && rowPaid < rowAmount;
+
         const isPaidMember = isGrouped
           ? (statusStr === "paid" || statusStr === "approved" || statusStr === "verified" || (row?.totalDue !== undefined && row?.totalDue <= 0))
-          : Boolean(isApproved || isActuallyVerified || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount || hasPositiveReceivedAmt);
+          : (!hasUnpaidCurrentEvent && Boolean(isApproved || isActuallyVerified || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount));
 
         // Verify icon is disabled when already approved, already verified, or if the member has not paid yet (unless rejected, which can be re-evaluated/updated)
         const isVerifyDisabled = isGrouped
@@ -3942,8 +3986,13 @@ export default function ContributionsPage() {
                 const rawImgs = statusModalRow?.screenshots || matchedTx?.screenshots || statusModalRow?.screenshot || matchedTx?.screenshot;
                 const proofImgs = Array.isArray(rawImgs) ? rawImgs : (rawImgs ? [rawImgs] : []);
 
+                const paidGroupedEvents = statusModalRow.isGrouped && Array.isArray(statusModalRow.memberEvents)
+                  ? statusModalRow.memberEvents.filter((e) => e.isPaid || (Number(e.paidAmount) > 0 && Number(e.paidAmount) >= Number(e.amount)))
+                  : [];
                 const primaryEvName = statusModalRow.isGrouped
-                  ? (statusModalRow.memberEvents?.map((e) => e.eventName).join(", ") || "All Events")
+                  ? (paidGroupedEvents.length > 0
+                      ? paidGroupedEvents.map((e) => e.eventName).join(", ")
+                      : (statusModalRow.memberEvents?.map((e) => e.eventName).join(", ") || "All Events"))
                   : (statusModalRow?.eventName || (events.find((e) => e.eventId === statusModalRow?.eventId)?.eventName) || "Current Event");
                 const currentEvAmt = Number(statusModalRow?.amount || statusModalRow?.currentEventDue || 0);
 
@@ -4231,15 +4280,25 @@ export default function ContributionsPage() {
                 const cashHandoverNote = getCleanCashNote();
 
                 const eventBreakdownItems = [];
+                let totalBreakdownAmt = 0;
                 if (statusModalRow.isGrouped && Array.isArray(statusModalRow.memberEvents) && statusModalRow.memberEvents.length > 0) {
                   statusModalRow.memberEvents.forEach((ev) => {
-                    const evAmt = Number(ev.paidAmount || ev.amount || 0);
-                    eventBreakdownItems.push(`${ev.eventName}: ${formatWholeCurrency(evAmt)}`);
+                    const evAmt = Number(ev.paidAmount || 0);
+                    const evTarget = Number(ev.amount || 0);
+                    // STRICT RULE: Only include events that are fully covered/paid for this payment.
+                    // Never partially allocate or include unpaid events in the received payment breakdown.
+                    if (evAmt > 0 && (ev.isPaid || evAmt >= evTarget)) {
+                      eventBreakdownItems.push(`${ev.eventName}: ${formatWholeCurrency(evAmt)}`);
+                      totalBreakdownAmt += evAmt;
+                    }
                   });
-                } else if (currentEvAmt > 0) {
-                  eventBreakdownItems.push(`${primaryEvName}: ${formatWholeCurrency(currentEvAmt)}`);
-                } else {
+                } else if (currentEvAmt > 0 && (isPaidOrVerified || actualReceivedAmt > 0)) {
+                  const displayAmt = isPaidOrVerified ? currentEvAmt : (actualReceivedAmt > 0 ? actualReceivedAmt : currentEvAmt);
+                  eventBreakdownItems.push(`${primaryEvName}: ${formatWholeCurrency(displayAmt)}`);
+                  totalBreakdownAmt += displayAmt;
+                } else if (actualReceivedAmt > 0) {
                   eventBreakdownItems.push(`${primaryEvName}: ${formatWholeCurrency(actualReceivedAmt)}`);
+                  totalBreakdownAmt += actualReceivedAmt;
                 }
 
                 const prevArrears = Number(statusModalRow?.previousArrears || matchedTx?.previousArrears || (actualReceivedAmt > currentEvAmt && currentEvAmt > 0 ? actualReceivedAmt - currentEvAmt : 0));
@@ -4251,10 +4310,18 @@ export default function ContributionsPage() {
                     const amt = Number(item.dueAmount || item.amount || item.due || 0);
                     if (amt > 0) {
                       eventBreakdownItems.push(`${name}: ${formatWholeCurrency(amt)}`);
+                      totalBreakdownAmt += amt;
                     }
                   });
                 } else if (!statusModalRow.isGrouped && prevArrears > 0 && actualReceivedAmt > currentEvAmt) {
                   eventBreakdownItems.push(`Previous Arrears: ${formatWholeCurrency(prevArrears)}`);
+                  totalBreakdownAmt += prevArrears;
+                }
+
+                // If actual received money exceeds the sum of paid events, show the difference as Excess / Advance rather than attributing to unpaid events
+                if (actualReceivedAmt > totalBreakdownAmt && totalBreakdownAmt > 0) {
+                  const excessDiff = actualReceivedAmt - totalBreakdownAmt;
+                  eventBreakdownItems.push(`Excess / Advance: ${formatWholeCurrency(excessDiff)}`);
                 }
 
                 return (
