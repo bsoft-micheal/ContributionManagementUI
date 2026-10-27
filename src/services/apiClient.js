@@ -31,9 +31,13 @@ apiClient.interceptors.request.use((config) => {
   const authState = sessionStorage.getItem("teamContributionAuth") || localStorage.getItem("teamContributionAuth");
   if (authState) {
     try {
-      const { token } = JSON.parse(authState);
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      const parsed = JSON.parse(authState);
+      if (parsed.token) {
+        config.headers.Authorization = `Bearer ${parsed.token}`;
+      }
+      const activeRole = parsed.role || parsed.activeRole;
+      if (activeRole) {
+        config.headers["X-Active-Role"] = activeRole;
       }
     } catch {
       // ignore parse error
