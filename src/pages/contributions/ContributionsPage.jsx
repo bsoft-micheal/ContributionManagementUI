@@ -488,12 +488,25 @@ export default function ContributionsPage() {
     const directAmt = Number(c?.amount || 0);
     if (directAmt > 0) return directAmt;
     if (!activeEv) return 0;
-    const base = Number(activeEv.baseAmount || activeEv.totalExpectedAmount || 0);
-    const count = Number(activeEv.participantCount || (activeEv.participants && activeEv.participants.length) || 0);
+    const base = Number(activeEv.baseAmount || activeEv.totalExpectedAmount || activeEv.plannedBudget || 0);
+    let count = Number(
+      activeEv.participantCount ||
+      (Array.isArray(activeEv.participants) ? activeEv.participants.length : 0) ||
+      (activeEv.eventTypeMembers ? Object.values(activeEv.eventTypeMembers).flat().length : 0) ||
+      activeEv.eligibleContributors ||
+      activeEv.totalActiveMembers ||
+      0
+    );
+    if (count <= 0 && Array.isArray(allContributions)) {
+      const matchingContribs = allContributions.filter(item => 
+        String(item.eventId || "").toLowerCase() === String(activeEv.eventId || activeEv.id || "").toLowerCase()
+      );
+      if (matchingContribs.length > 0) count = matchingContribs.length;
+    }
     if (count > 0 && base > 0) {
       return roundToWhole(base / count);
     }
-    return base > 0 ? base : 0;
+    return 0;
   };
 
   const isSameText = (a, b) => {
@@ -1093,7 +1106,7 @@ export default function ContributionsPage() {
         const isPaid =
           isAmountFullyPaid ||
           isContributionPaid(currentContribution, matchedTx) ||
-          (!isRejected && (
+          (!isRejected && rawPaidAmount > 0 && (
             c.paymentStatus === 2 ||
             String(c.paymentStatus || "").toLowerCase() === "paid" ||
             String(c.statusName || "").toLowerCase() === "paid" ||
@@ -1102,8 +1115,10 @@ export default function ContributionsPage() {
             isApproved
           ));
 
-        if (!rawPaidAmount && isPaid) {
-          rawPaidAmount = eventTargetAmt > 0 ? eventTargetAmt : Number(c.amount || 0);
+        if (!rawPaidAmount && isPaid && eventTargetAmt > 0) {
+          if (c.paymentStatus === 2 || String(c.paymentStatus || "").toLowerCase() === "paid") {
+            rawPaidAmount = eventTargetAmt;
+          }
         }
 
         let resolvedStatus = "Pending";
@@ -1644,7 +1659,7 @@ export default function ContributionsPage() {
       activeEvName = unpaidEv?.eventName || activeEv?.eventName || activeEv?.title || activeEv?.name || "";
       activeCategory = activeEv?.eventTypeName || activeEv?.categoryName || unpaidEv?.categoryName || row?.categoryName || "";
     } else {
-      const resolvedEvAmt = row ? getMemberEventAmount(row, activeEv) : Number(activeEv?.baseAmount || 0);
+      const resolvedEvAmt = getMemberEventAmount(row, activeEv);
       activeDue = isPaidRow ? 0 : resolvedEvAmt;
       prevArrears = isPaidRow ? 0 : Number(row?.previousUnpaid || 0);
       totalDue = isPaidRow ? 0 : (activeDue + prevArrears);
@@ -2202,6 +2217,12 @@ export default function ContributionsPage() {
 
     let options = [];
 
+    const hasUnpaidEventsInGroup = row?.isGrouped && (
+      (Array.isArray(row.memberEvents) && row.memberEvents.some((e) => !e.isPaid && (Number(e.amount) || 0) > (Number(e.paidAmount) || 0))) ||
+      Number(row?.totalDue || 0) > 0
+    );
+    const cannotApprove = !isAmountReceived || hasUnpaidEventsInGroup;
+
     if (Array.isArray(dbStatuses) && dbStatuses.length > 0) {
       options = dbStatuses
         .filter((s) => {
@@ -2212,12 +2233,14 @@ export default function ContributionsPage() {
         .map((s) => {
           const name = s.statusName.trim();
           const isApproval = name.toLowerCase() === "approved";
+          const isBlocked = isApproval && cannotApprove;
+          const blockedLabel = hasUnpaidEventsInGroup && isApproval
+            ? `${name} (All events must be fully paid first)`
+            : (!isAmountReceived && isApproval ? `${name} (Payment not received)` : name);
           return {
-            label: !isAmountReceived && isApproval
-              ? `${name} (Payment not received)`
-              : name,
+            label: isBlocked ? blockedLabel : name,
             value: name,
-            disabled: !isAmountReceived && isApproval,
+            disabled: isBlocked,
           };
         });
     }
@@ -2238,9 +2261,11 @@ export default function ContributionsPage() {
     // Ensure all 3 authority statuses are present
     if (!seen.has("approved")) {
       uniqueOptions.push({
-        label: !isAmountReceived ? "Approved (Payment not received)" : "Approved",
+        label: cannotApprove
+          ? (hasUnpaidEventsInGroup ? "Approved (All events must be fully paid first)" : "Approved (Payment not received)")
+          : "Approved",
         value: "Approved",
-        disabled: !isAmountReceived,
+        disabled: cannotApprove,
       });
       seen.add("approved");
     }
@@ -2344,6 +2369,15 @@ export default function ContributionsPage() {
       return;
     }
 
+    const hasUnpaidEventsInTarget = target.isGrouped && (
+      (Array.isArray(target.memberEvents) && target.memberEvents.some((e) => !e.isPaid && (Number(e.amount) || 0) > (Number(e.paidAmount) || 0))) ||
+      Number(target.totalDue || 0) > 0
+    );
+    if (hasUnpaidEventsInTarget && isMarkingPaid) {
+      toast.error("Cannot approve: All events must be fully paid before organizer or admin can approve.");
+      return;
+    }
+
     // Optimistically update the current table row immediately
     setRawContributions((prev) =>
       prev.map((c) => {
@@ -2354,10 +2388,20 @@ export default function ContributionsPage() {
         if (isMatch) {
           const isApproved = String(newStatus).toLowerCase() === "approved";
           const isVerified = String(newStatus).toLowerCase() === "verified";
-          const updatedStatus = isApproved ? "Approved" : (isVerified ? "Verified" : (isMarkingPaid ? "Paid" : newStatus));
           const isPaid = isMarkingPaid;
           const arrears = c.previousUnpaid || 0;
           const splitAmount = (Number(c.cashAmount || 0) + Number(c.upiAmount || 0));
+          const eventDue = Number(c.amount || 0);
+          const currentPaid = splitAmount > 0 ? splitAmount : (Number(c.paidAmount || 0));
+          const isThisEventPaid = (eventDue > 0 && currentPaid >= eventDue) || c.isPaid;
+
+          // STRICT RULE: If an event has not been paid (like summa testing),
+          // approving a grouped row MUST NEVER mark the unpaid event as Approved or Paid!
+          if (!isThisEventPaid && target.isGrouped && isMarkingPaid) {
+            return c; // Unpaid event remains completely unchanged in pending state!
+          }
+
+          const updatedStatus = isApproved ? "Approved" : (isVerified ? "Verified" : (isMarkingPaid ? "Paid" : newStatus));
           const preservedPaid =
             splitAmount > 0
               ? splitAmount
@@ -2566,9 +2610,16 @@ export default function ContributionsPage() {
           ? (statusStr === "paid" || statusStr === "approved" || statusStr === "verified" || (row?.totalDue !== undefined && row?.totalDue <= 0))
           : (!hasUnpaidCurrentEvent && Boolean(isApproved || isActuallyVerified || isPaidStatus || hasDirectPaid || hasSubmitted || isSettledByAmount));
 
+        const hasUnpaidEventsInGroup = isGrouped && Array.isArray(row.memberEvents) && row.memberEvents.some(
+          (e) => !e.isPaid && (Number(e.amount) || 0) > (Number(e.paidAmount) || 0)
+        );
+        const hasRemainingTotalDue = Number(row?.totalDue ?? 0) > 0 || Number(row?.totalAccumulated ?? 0) > 0;
+        const isGroupedFullyPaid = isGrouped && !hasUnpaidEventsInGroup && !hasRemainingTotalDue;
+
         // Verify icon is disabled when already approved, already verified, or if the member has not paid yet (unless rejected, which can be re-evaluated/updated)
+        // SENIOR DEVELOPER RULE: On grouped row ("All Events"), Admin/Organizer can ONLY approve if ALL events are fully paid!
         const isVerifyDisabled = isGrouped
-          ? (!row.memberEvents?.some((e) => e.isPaid || e.paidAmount > 0) && !isRejected) || isApproved || isActuallyVerified
+          ? (hasUnpaidEventsInGroup || !isGroupedFullyPaid || isApproved || isActuallyVerified) && !isRejected
           : (isApproved || isActuallyVerified || (!hasMemberPaid && !isRejected));
 
         const verifyTooltipTitle = isApproved
@@ -2577,9 +2628,11 @@ export default function ContributionsPage() {
             ? "Already Verified"
             : isRejected
               ? "Authority Status Update (Payment Rejected)"
-              : !hasMemberPaid
-                ? "Payment Not Received (Verification Disabled)"
-                : "Authority Status Update";
+              : (isGrouped && (hasUnpaidEventsInGroup || hasRemainingTotalDue))
+                ? `Cannot Approve: All events must be fully paid first (${formatWholeCurrency(row?.totalDue || 0)} pending).`
+                : !hasMemberPaid
+                  ? "Payment Not Received (Verification Disabled)"
+                  : "Authority Status Update";
 
         const tooltipTitle = isPaidMember
           ? (isActuallyVerified
@@ -2942,7 +2995,7 @@ export default function ContributionsPage() {
               </Typography>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 0.6 }}>
                 {row.memberEvents.map((ev, idx) => {
-                  const evPaid = Number(ev.paidAmount) || (ev.isPaid ? Number(ev.amount) : 0);
+                  const evPaid = Number(ev.paidAmount) || 0;
                   const isFullyPaid = evPaid >= Number(ev.amount) && Number(ev.amount) > 0;
                   const isPartial = evPaid > 0 && !isFullyPaid;
                   const evStatus = isFullyPaid ? "Fully Paid" : isPartial ? "Partially Paid" : "Pending";
@@ -3895,6 +3948,11 @@ export default function ContributionsPage() {
             const isVerificationTarget = ["verified", "paid", "closed", "completed", "approved"].includes(
               String(statusChangeValue).toLowerCase()
             );
+            const hasUnpaidInGroup = statusModalRow?.isGrouped && (
+              (Array.isArray(statusModalRow.memberEvents) && statusModalRow.memberEvents.some((e) => !e.isPaid && (Number(e.amount) || 0) > (Number(e.paidAmount) || 0))) ||
+              Number(statusModalRow?.totalDue || 0) > 0
+            );
+            const isBlockedByUnpaidEvents = hasUnpaidInGroup && isVerificationTarget;
 
             return (
               <Stack direction="row" spacing={1.5} alignItems="center">
@@ -3903,11 +3961,13 @@ export default function ContributionsPage() {
                 </AppCancelButton>
                 <AppSaveButton
                   loading={statusSaving}
-                  disabled={isZeroAmount && isVerificationTarget}
+                  disabled={(isZeroAmount && isVerificationTarget) || isBlockedByUnpaidEvents}
                   disabledTooltip={
-                    isZeroAmount && isVerificationTarget
-                      ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first."
-                      : ""
+                    isBlockedByUnpaidEvents
+                      ? `Cannot approve: Member has unpaid event dues (${formatWholeCurrency(statusModalRow?.totalDue || 0)} pending). All events must be fully paid before organizer or admin can approve.`
+                      : (isZeroAmount && isVerificationTarget
+                        ? "Cannot save or verify: Payment amount has not been received (₹0.00). Member must submit payment first."
+                        : "")
                   }
                   onClick={() => {
                     let hasError = false;
