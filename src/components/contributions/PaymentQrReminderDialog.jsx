@@ -197,8 +197,37 @@ export default function PaymentQrReminderDialog({
       ]
     : [];
 
+  let cleanEventDates = event?.eventDates;
+  if (typeof cleanEventDates === "string" && cleanEventDates.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(cleanEventDates);
+      const extractedDates = [];
+      const extract = (obj) => {
+        if (!obj) return;
+        if (typeof obj === "object") {
+          Object.values(obj).forEach(extract);
+        } else if (typeof obj === "string" && obj.trim()) {
+          const s = obj.trim();
+          const d = new Date(s);
+          if (!isNaN(d.getTime()) && s.length >= 8) {
+            extractedDates.push(
+              d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+            );
+          } else {
+            extractedDates.push(s);
+          }
+        }
+      };
+      extract(parsed);
+      const unique = Array.from(new Set(extractedDates));
+      if (unique.length > 0) {
+        cleanEventDates = unique.join(", ");
+      }
+    } catch {}
+  }
+
   const displayEventDates =
-    event?.eventDates || (isBirthday ? "5 Oct, 10 Oct (2), 19 Oct" : (formattedDueDate || "End of Month"));
+    cleanEventDates || (isBirthday ? "5 Oct, 10 Oct (2), 19 Oct" : (formattedDueDate || "End of Month"));
 
   const displayTotalAmount = isBirthday
     ? "Rs.6250.00 (4 celebrants combined)"
