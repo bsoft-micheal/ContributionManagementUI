@@ -176,11 +176,24 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
   );
 
   const isContributionPaid = (c) => {
-    const rawStatus = String(c.paymentStatus || c.statusName || c.status || "").trim().toLowerCase();
-    const hasPaidAmt = Number(c.paidAmount || c.amountPaid || 0) > 0;
-    const hasCash = Number(c.cashAmount || 0) > 0;
-    const hasUpi = Number(c.upiAmount || 0) > 0;
-    return rawStatus === "paid" || Number(c.paymentStatus) === 2 || ["verified", "closed", "completed"].includes(rawStatus) || (hasPaidAmt || hasCash || hasUpi);
+    if (!c) return false;
+    const rawStatus = String(c.statusName || c.status || "").trim().toLowerCase();
+    const paymentStatusNum = Number(c.paymentStatus);
+    const paymentStatusStr = String(c.paymentStatus || "").trim().toLowerCase();
+
+    if (paymentStatusNum === 1 || rawStatus === "pending" || rawStatus === "rejected" || paymentStatusStr === "pending" || paymentStatusStr === "rejected") {
+      return false;
+    }
+
+    return (
+      paymentStatusNum === 2 ||
+      rawStatus === "paid" ||
+      rawStatus === "verified" ||
+      rawStatus === "approved" ||
+      rawStatus === "closed" ||
+      rawStatus === "completed" ||
+      paymentStatusStr === "paid"
+    );
   };
 
   const paidList = useMemo(() => {
