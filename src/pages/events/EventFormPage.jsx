@@ -401,6 +401,7 @@ export default function EventFormPage({
   const [eventTypeDates, setEventTypeDates] = useState({});
   const [eventTypeMembers, setEventTypeMembers] = useState({});
   const [eventTypeMemberDates, setEventTypeMemberDates] = useState({});
+  const [enableCelebrantSelection, setEnableCelebrantSelection] = useState(false);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -808,6 +809,18 @@ export default function EventFormPage({
             setEventTypeDates(normalizedDates);
           }
 
+          const hasCelebrantsLoaded =
+            (Array.isArray(marriageList) && marriageList.length > 0) ||
+            (Array.isArray(sendOffList) && sendOffList.length > 0) ||
+            Object.values(normalizedMembers).some((arr) => Array.isArray(arr) && arr.length > 0);
+
+          const isCelebrantsEnabled =
+            detailedEvent.enableCelebrantSelection !== undefined && detailedEvent.enableCelebrantSelection !== null
+              ? Boolean(detailedEvent.enableCelebrantSelection)
+              : hasCelebrantsLoaded;
+
+          setEnableCelebrantSelection(isCelebrantsEnabled);
+
           const editNonBdays = (typesData || []).filter(
             (t) => eventTypeIdsList.includes(t.eventTypeId) && !t.eventTypeName?.toLowerCase().includes("birthday")
           );
@@ -943,6 +956,7 @@ export default function EventFormPage({
           setCustomDeductionAmount("");
           setMarriageCelebrantIds([]);
           setSendOffMemberIds([]);
+          setEnableCelebrantSelection(false);
 
           const targetMonthNum = defaultDate && defaultDate.isValid() ? defaultDate.month() + 1 : -1;
           const targetYearNum = defaultDate && defaultDate.isValid() ? defaultDate.year() : -1;
@@ -1363,6 +1377,33 @@ export default function EventFormPage({
       setForm((formPrev) => ({ ...formPrev, participantIds: updated }));
       return updated;
     });
+  };
+
+  // Handle toggling Enable Celebrant Selection flag
+  const handleToggleEnableCelebrants = (checked) => {
+    setEnableCelebrantSelection(checked);
+    if (!checked) {
+      setMarriageCelebrantIds([]);
+      setSendOffMemberIds([]);
+      setEventTypeMembers({});
+      setEventTypeMemberDates({});
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.marriageCelebrantIds;
+        delete next.sendOffMemberIds;
+        Object.keys(next).forEach((key) => {
+          if (key.startsWith("members_") || key.startsWith("eventDate_")) {
+            delete next[key];
+          }
+        });
+        return next;
+      });
+      if (!isEdit) {
+        const allEligible = activeMembers.map((m) => m.memberId);
+        setSelectedParticipantIds(allEligible);
+        setForm((formPrev) => ({ ...formPrev, participantIds: allEligible }));
+      }
+    }
   };
 
   // Auto-clean celebrants and restore participants when their corresponding event type is deselected
@@ -2118,6 +2159,23 @@ export default function EventFormPage({
     const newTypeName = newType?.eventTypeName || "";
     const isNewBday = newTypeName.toLowerCase().includes("birthday");
 
+    setEnableCelebrantSelection(false);
+    setMarriageCelebrantIds([]);
+    setSendOffMemberIds([]);
+    setEventTypeMembers({});
+    setEventTypeMemberDates({});
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.marriageCelebrantIds;
+      delete next.sendOffMemberIds;
+      Object.keys(next).forEach((k) => {
+        if (k.startsWith("members_") || k.startsWith("eventDate_")) {
+          delete next[k];
+        }
+      });
+      return next;
+    });
+
     let updatedName = form.eventName;
 
     const allExempt = new Set([...marriageCelebrantIds, ...sendOffMemberIds]);
@@ -2203,6 +2261,24 @@ export default function EventFormPage({
     const hasBday = selectedTypesList.some((t) =>
       t.eventTypeName?.toLowerCase().includes("birthday")
     );
+
+    // Filter out celebrants for any event types that are no longer selected
+    setEventTypeMembers((prev) => {
+      const next = {};
+      selectedTypesList.forEach((t) => {
+        if (prev[t.eventTypeId]) next[t.eventTypeId] = prev[t.eventTypeId];
+        if (prev[t.eventTypeName]) next[t.eventTypeName] = prev[t.eventTypeName];
+      });
+      return next;
+    });
+    setEventTypeMemberDates((prev) => {
+      const next = {};
+      selectedTypesList.forEach((t) => {
+        if (prev[t.eventTypeId]) next[t.eventTypeId] = prev[t.eventTypeId];
+        if (prev[t.eventTypeName]) next[t.eventTypeName] = prev[t.eventTypeName];
+      });
+      return next;
+    });
 
     let updatedName = form.eventName;
 
@@ -2436,33 +2512,35 @@ export default function EventFormPage({
           newErrors.eventDate = "Cannot create an event for a past date";
         }
       }
-      nonBirthdaySelectedTypes.forEach((t) => {
-        const mems = getSelectedTypeMembers(t);
-        if (!mems || mems.length === 0) {
-          newErrors[`members_${t.eventTypeId}`] = `Please select at least one member for ${t.eventTypeName}`;
-        } else if (mems.length > 1) {
-          mems.forEach((mId) => {
-            const mDate = eventTypeMemberDates[t.eventTypeId]?.[mId] || eventTypeDates[t.eventTypeId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
-            const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
-            const mName = matchedMember?.name || "Member";
-            if (!mDate || !dayjs(mDate).isValid()) {
-              newErrors[`eventDate_${t.eventTypeId}_${mId}`] = `Please select ${t.eventTypeName} date for ${mName}`;
-            } else if (!isEdit && dayjs(mDate).isBefore(dayjs().startOf("day"))) {
-              newErrors[`eventDate_${t.eventTypeId}_${mId}`] = "Cannot create an event for a past date";
+      if (enableCelebrantSelection) {
+        nonBirthdaySelectedTypes.forEach((t) => {
+          const mems = getSelectedTypeMembers(t);
+          if (!mems || mems.length === 0) {
+            newErrors[`members_${t.eventTypeId}`] = `Please select at least one member for ${t.eventTypeName}`;
+          } else if (mems.length > 1) {
+            mems.forEach((mId) => {
+              const mDate = eventTypeMemberDates[t.eventTypeId]?.[mId] || eventTypeDates[t.eventTypeId] || (form.eventDate && dayjs(form.eventDate).isValid() ? dayjs(form.eventDate).format("YYYY-MM-DD") : "");
+              const matchedMember = activeMembers.find((m) => m.memberId === mId) || members.find((m) => m.memberId === mId);
+              const mName = matchedMember?.name || "Member";
+              if (!mDate || !dayjs(mDate).isValid()) {
+                newErrors[`eventDate_${t.eventTypeId}_${mId}`] = `Please select ${t.eventTypeName} date for ${mName}`;
+              } else if (!isEdit && dayjs(mDate).isBefore(dayjs().startOf("day"))) {
+                newErrors[`eventDate_${t.eventTypeId}_${mId}`] = "Cannot create an event for a past date";
+              }
+            });
+          } else {
+            const singleMId = mems[0];
+            const d = eventTypeMemberDates[t.eventTypeId]?.[singleMId] || eventTypeDates[t.eventTypeId];
+            if (!d || !dayjs(d).isValid()) {
+              newErrors[`eventDate_${t.eventTypeId}`] = `${t.eventTypeName} date is required`;
+            } else if (!isEdit && dayjs(d).isBefore(dayjs().startOf("day"))) {
+              newErrors[`eventDate_${t.eventTypeId}`] = "Cannot create an event for a past date";
             }
-          });
-        } else {
-          const singleMId = mems[0];
-          const d = eventTypeMemberDates[t.eventTypeId]?.[singleMId] || eventTypeDates[t.eventTypeId];
-          if (!d || !dayjs(d).isValid()) {
-            newErrors[`eventDate_${t.eventTypeId}`] = `${t.eventTypeName} date is required`;
-          } else if (!isEdit && dayjs(d).isBefore(dayjs().startOf("day"))) {
-            newErrors[`eventDate_${t.eventTypeId}`] = "Cannot create an event for a past date";
           }
-        }
-      });
+        });
+      }
     } else {
-      if (hasMultipleCelebrantDates) {
+      if (enableCelebrantSelection && hasMultipleCelebrantDates) {
         nonBirthdaySelectedTypes.forEach((t) => {
           const mems = getSelectedTypeMembers(t);
           if (mems.length > 1) {
@@ -2492,11 +2570,24 @@ export default function EventFormPage({
         }
       }
 
-      if (hasMarriageSelected && marriageCelebrantIds.length === 0) {
-        newErrors.marriageCelebrantIds = "This field is required";
-      }
-      if (hasSendOffSelected && sendOffMemberIds.length === 0) {
-        newErrors.sendOffMemberIds = "This field is required";
+      if (enableCelebrantSelection) {
+        if (hasMarriageSelected && marriageCelebrantIds.length === 0) {
+          newErrors.marriageCelebrantIds = "This field is required";
+        }
+        if (hasSendOffSelected && sendOffMemberIds.length === 0) {
+          newErrors.sendOffMemberIds = "This field is required";
+        }
+        nonBirthdaySelectedTypes
+          .filter((t) => {
+            const n = (t.eventTypeName || "").toLowerCase();
+            return !n.includes("marriage") && !n.includes("wedding") && !n.includes("send") && !n.includes("farewell") && !n.includes("relieving");
+          })
+          .forEach((type) => {
+            const mems = getSelectedTypeMembers(type);
+            if (!mems || mems.length === 0) {
+              newErrors[`members_${type.eventTypeId}`] = "This field is required";
+            }
+          });
       }
     }
 
@@ -2551,47 +2642,49 @@ export default function EventFormPage({
     }
 
     // Rule B: Non-Birthday event types check duplicate (memberId + eventTypeId)
-    selectedTypes.forEach((type) => {
-      const typeId = type.eventTypeId;
-      const typeName = type.eventTypeName || "";
-      if (String(typeName).toLowerCase().includes("birthday")) return; // Birthday covered by Rule A
+    if (enableCelebrantSelection) {
+      selectedTypes.forEach((type) => {
+        const typeId = type.eventTypeId;
+        const typeName = type.eventTypeName || "";
+        if (String(typeName).toLowerCase().includes("birthday")) return; // Birthday covered by Rule A
 
-      let memberIds = [];
-      const cleanName = String(typeName).toLowerCase().replace(/[\s_-]/g, "");
-      if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
-        memberIds = marriageCelebrantIds || [];
-      } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
-        memberIds = sendOffMemberIds || [];
-      } else {
-        memberIds = eventTypeMembers[typeId] || [];
-      }
-
-      (memberIds || []).forEach((mId) => {
-        const conflict = celebratingMembersList.find((c) => {
-          if (String(c.memberId).toLowerCase() !== String(mId).toLowerCase()) return false;
-          if (String(c.eventTypeId).toLowerCase() === String(typeId).toLowerCase()) return true;
-          if (String(c.typeKey).toLowerCase() === String(typeId).toLowerCase()) return true;
-          const cTypeNameClean = String(c.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
-          if (cleanName && cTypeNameClean && (cTypeNameClean.includes(cleanName) || cleanName.includes(cTypeNameClean))) return true;
-          return false;
-        });
-
-        if (conflict) {
-          const matched = activeMembers.find(
-            (m) => String(m.memberId || m.userId || m.id).toLowerCase() === String(mId).toLowerCase()
-          );
-          const mName = matched?.name || conflict.memberName || "Member";
-          const conflictMsg = `Member '${mName}' already has an event of type '${conflict.eventTypeName}' in ${monthDisplayName} ${targetYearVal}. Duplicate event of the same type for the same member is not allowed in the same month.`;
-          if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
-            newErrors.marriageCelebrantIds = conflictMsg;
-          } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
-            newErrors.sendOffMemberIds = conflictMsg;
-          } else {
-            newErrors[`members_${typeId}`] = conflictMsg;
-          }
+        let memberIds = [];
+        const cleanName = String(typeName).toLowerCase().replace(/[\s_-]/g, "");
+        if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
+          memberIds = marriageCelebrantIds || [];
+        } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
+          memberIds = sendOffMemberIds || [];
+        } else {
+          memberIds = eventTypeMembers[typeId] || [];
         }
+
+        (memberIds || []).forEach((mId) => {
+          const conflict = celebratingMembersList.find((c) => {
+            if (String(c.memberId).toLowerCase() !== String(mId).toLowerCase()) return false;
+            if (String(c.eventTypeId).toLowerCase() === String(typeId).toLowerCase()) return true;
+            if (String(c.typeKey).toLowerCase() === String(typeId).toLowerCase()) return true;
+            const cTypeNameClean = String(c.eventTypeName || "").toLowerCase().replace(/[\s_-]/g, "");
+            if (cleanName && cTypeNameClean && (cTypeNameClean.includes(cleanName) || cleanName.includes(cTypeNameClean))) return true;
+            return false;
+          });
+
+          if (conflict) {
+            const matched = activeMembers.find(
+              (m) => String(m.memberId || m.userId || m.id).toLowerCase() === String(mId).toLowerCase()
+            );
+            const mName = matched?.name || conflict.memberName || "Member";
+            const conflictMsg = `Member '${mName}' already has an event of type '${conflict.eventTypeName}' in ${monthDisplayName} ${targetYearVal}. Duplicate event of the same type for the same member is not allowed in the same month.`;
+            if (cleanName.includes("marriage") || cleanName.includes("wedding")) {
+              newErrors.marriageCelebrantIds = conflictMsg;
+            } else if (cleanName.includes("send") || cleanName.includes("farewell") || cleanName.includes("relieving")) {
+              newErrors.sendOffMemberIds = conflictMsg;
+            } else {
+              newErrors[`members_${typeId}`] = conflictMsg;
+            }
+          }
+        });
       });
-    });
+    }
 
     // CRITICAL: Block submission and display inline errors on ALL mandatory fields first!
     if (Object.keys(newErrors).length > 0) {
@@ -2757,7 +2850,7 @@ export default function EventFormPage({
       if (!isBirthday && nonBirthdaySelectedTypes.length > 0) {
         const firstValidDate = nonBirthdaySelectedTypes
           .map((t) => {
-            const mems = getSelectedTypeMembers(t);
+            const mems = enableCelebrantSelection ? getSelectedTypeMembers(t) : [];
             if (mems.length > 0) {
               return eventTypeMemberDates[t.eventTypeId]?.[mems[0]] || eventTypeMemberDates[t.eventTypeName]?.[mems[0]] || eventTypeDates[t.eventTypeId] || eventTypeDates[t.eventTypeName];
             }
@@ -2770,27 +2863,29 @@ export default function EventFormPage({
       }
 
       const compactCelebrants = {};
-      if (marriageCelebrantIds.length > 0) {
-        compactCelebrants["marriage"] = marriageCelebrantIds;
-      }
-      if (sendOffMemberIds.length > 0) {
-        compactCelebrants["sendOff"] = sendOffMemberIds;
-      }
-      nonBirthdaySelectedTypes.forEach((t) => {
-        const cleanName = (t.eventTypeName || "").trim();
-        const low = cleanName.toLowerCase().replace(/[\s_-]/g, "");
-        if (low !== "marriage" && low !== "sendoff") {
-          const mems = getSelectedTypeMembers(t);
-          if (mems.length > 0) {
-            compactCelebrants[cleanName] = mems;
-          }
+      if (enableCelebrantSelection) {
+        if (marriageCelebrantIds.length > 0) {
+          compactCelebrants["marriage"] = marriageCelebrantIds;
         }
-      });
+        if (sendOffMemberIds.length > 0) {
+          compactCelebrants["sendOff"] = sendOffMemberIds;
+        }
+        nonBirthdaySelectedTypes.forEach((t) => {
+          const cleanName = (t.eventTypeName || "").trim();
+          const low = cleanName.toLowerCase().replace(/[\s_-]/g, "");
+          if (low !== "marriage" && low !== "sendoff") {
+            const mems = getSelectedTypeMembers(t);
+            if (mems.length > 0) {
+              compactCelebrants[cleanName] = mems;
+            }
+          }
+        });
+      }
 
       const finalDescription = formatDescriptionWithContrib(
         form.description?.trim(),
         otherEventAmounts,
-        compactCelebrants
+        enableCelebrantSelection ? compactCelebrants : null
       );
 
       const resolvedStatus = targetStatus || form.status || "Planned";
@@ -2799,13 +2894,14 @@ export default function EventFormPage({
         eventName: form.eventName.trim(),
         eventTypeId: finalTypeIds[0] || form.eventTypeId,
         eventTypeIds: finalTypeIds,
+        enableCelebrantSelection: Boolean(enableCelebrantSelection),
         eventDate: dayjs(primaryEventDate).hour(12).toISOString(),
         eventDates: Object.keys(combinedDatesObj).length > 0
           ? JSON.stringify(combinedDatesObj)
           : (isBirthday ? (celebrantDatesCsv || null) : null),
         eventTypeDates: datesMap,
-        eventTypeMembers: membersMap,
-        eventTypeMemberDates: memberDatesMap,
+        eventTypeMembers: enableCelebrantSelection ? membersMap : {},
+        eventTypeMemberDates: enableCelebrantSelection ? memberDatesMap : {},
         description: finalDescription,
         status: resolvedStatus,
         baseAmount: plannedBudget,
@@ -3243,6 +3339,49 @@ export default function EventFormPage({
                       </Grid>
                     )}
 
+                    {/* Enable Celebrant Selection Checkbox (Multiple Events Mode) */}
+                    {nonBirthdaySelectedTypes.length > 0 && (
+                      <Grid size={{ xs: 12 }}>
+                        <Box
+                          onClick={() => handleToggleEnableCelebrants(!enableCelebrantSelection)}
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.8,
+                            cursor: "pointer",
+                            userSelect: "none",
+                            mt: 0.5,
+                            mb: 0.5,
+                          }}
+                        >
+                          <Checkbox
+                            checked={Boolean(enableCelebrantSelection)}
+                            onChange={(e) => handleToggleEnableCelebrants(e.target.checked)}
+                            onClick={(e) => e.stopPropagation()}
+                            size="small"
+                            sx={{
+                              p: 0.2,
+                              transform: "scale(0.85)",
+                              color: "#4a3f6b",
+                              "&.Mui-checked": {
+                                color: "#4a3f6b",
+                              },
+                            }}
+                          />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 600,
+                              color: "text.primary",
+                              fontSize: "0.875rem",
+                            }}
+                          >
+                            Enable Celebrant Selection
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
+
                     {/* Dedicated Date & Member selector per non-birthday event type (dynamic, not hardcoded) */}
                     {nonBirthdaySelectedTypes.map((type) => {
                       const typeId = type.eventTypeId;
@@ -3259,16 +3398,19 @@ export default function EventFormPage({
                             <Grid size={{ xs: 12 }}>
                               <AppMultiSelect
                                 label={getMemberFieldLabel(type)}
-                                placeholder={getMemberFieldPlaceholder(type)}
+                                placeholder={enableCelebrantSelection ? getMemberFieldPlaceholder(type) : "Celebrant selection is disabled"}
                                 value={memsVal}
                                 onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
                                 options={getMemberCelebrantOptionsForType(type)}
                                 maxHeight={145}
-                                required
-                                error={!!errors[`members_${typeId}`]}
+                                required={enableCelebrantSelection}
+                                disabled={!enableCelebrantSelection}
+                                error={enableCelebrantSelection && !!errors[`members_${typeId}`]}
                                 helperText={
-                                  errors[`members_${typeId}`] ||
-                                  `${memsVal.length} members (exempt from contributing)`
+                                  !enableCelebrantSelection
+                                    ? "Enable celebrant selection above to select celebrants"
+                                    : (errors[`members_${typeId}`] ||
+                                      `${memsVal.length} members (exempt from contributing)`)
                                 }
                               />
                             </Grid>
@@ -3354,19 +3496,22 @@ export default function EventFormPage({
                           <Grid size={{ xs: 12, sm: 6 }}>
                             <AppMultiSelect
                               label={getMemberFieldLabel(type)}
-                              placeholder={getMemberFieldPlaceholder(type)}
+                              placeholder={enableCelebrantSelection ? getMemberFieldPlaceholder(type) : "Celebrant selection is disabled"}
                               value={memsVal}
                               onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
                               options={getMemberCelebrantOptionsForType(type)}
                               maxHeight={145}
                               showSelectAll={false}
-                              required
-                              error={!!errors[`members_${typeId}`]}
+                              required={enableCelebrantSelection}
+                              disabled={!enableCelebrantSelection}
+                              error={enableCelebrantSelection && !!errors[`members_${typeId}`]}
                               helperText={
-                                errors[`members_${typeId}`] ||
-                                (memsVal.length > 0
-                                  ? `${memsVal.length} member (exempt from contributing)`
-                                  : "")
+                                !enableCelebrantSelection
+                                  ? "Enable celebrant selection above to select celebrants"
+                                  : (errors[`members_${typeId}`] ||
+                                    (memsVal.length > 0
+                                      ? `${memsVal.length} member (exempt from contributing)`
+                                      : ""))
                               }
                             />
                           </Grid>
@@ -3502,24 +3647,70 @@ export default function EventFormPage({
                       </>
                     )}
 
+                    {/* Enable Celebrant Selection Checkbox (Single Event Mode) */}
+                    {nonBirthdaySelectedTypes.length > 0 && (
+                      <Grid size={{ xs: 12 }}>
+                        <Box
+                          onClick={() => handleToggleEnableCelebrants(!enableCelebrantSelection)}
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.8,
+                            cursor: "pointer",
+                            userSelect: "none",
+                            mt: 0.5,
+                            mb: 0.5,
+                          }}
+                        >
+                          <Checkbox
+                            checked={Boolean(enableCelebrantSelection)}
+                            onChange={(e) => handleToggleEnableCelebrants(e.target.checked)}
+                            onClick={(e) => e.stopPropagation()}
+                            size="small"
+                            sx={{
+                              p: 0.2,
+                              transform: "scale(0.85)",
+                              color: "#4a3f6b",
+                              "&.Mui-checked": {
+                                color: "#4a3f6b",
+                              },
+                            }}
+                          />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 600,
+                              color: "text.primary",
+                              fontSize: "0.875rem",
+                            }}
+                          >
+                            Enable Celebrant Selection
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
+
                     {hasMarriageSelected && (
                       <React.Fragment key="marriage-celebrants-section">
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
                             label="Marriage Celebrants"
-                            placeholder="Select members celebrating marriage"
+                            placeholder={enableCelebrantSelection ? "Select members celebrating marriage" : "Celebrant selection is disabled"}
                             value={marriageCelebrantIds}
                             onChange={handleMarriageCelebrantsChange}
                             options={getMemberCelebrantOptionsForType(marriageTypeObj || "marriage")}
                             maxHeight={145}
                             showSelectAll={false}
-                            required
-                            error={!!errors.marriageCelebrantIds}
+                            required={enableCelebrantSelection}
+                            disabled={!enableCelebrantSelection}
+                            error={enableCelebrantSelection && !!errors.marriageCelebrantIds}
                             helperText={
-                              errors.marriageCelebrantIds ||
-                              (marriageCelebrantIds.length > 0
-                                ? `${marriageCelebrantIds.length} celebrant${marriageCelebrantIds.length > 1 ? "s" : ""} (exempt from contributing)`
-                                : "")
+                              !enableCelebrantSelection
+                                ? "Enable celebrant selection above to select celebrants"
+                                : (errors.marriageCelebrantIds ||
+                                  (marriageCelebrantIds.length > 0
+                                    ? `${marriageCelebrantIds.length} celebrant${marriageCelebrantIds.length > 1 ? "s" : ""} (exempt from contributing)`
+                                    : ""))
                             }
                           />
                         </Grid>
@@ -3558,19 +3749,22 @@ export default function EventFormPage({
                         <Grid size={{ xs: 12 }}>
                           <AppMultiSelect
                             label="Send-off / Relieving Members"
-                            placeholder="Select members having send-off"
+                            placeholder={enableCelebrantSelection ? "Select members having send-off" : "Celebrant selection is disabled"}
                             value={sendOffMemberIds}
                             onChange={handleSendOffMembersChange}
                             options={getMemberCelebrantOptionsForType(sendOffTypeObj || "sendoff")}
                             maxHeight={145}
                             showSelectAll={false}
-                            required
-                            error={!!errors.sendOffMemberIds}
+                            required={enableCelebrantSelection}
+                            disabled={!enableCelebrantSelection}
+                            error={enableCelebrantSelection && !!errors.sendOffMemberIds}
                             helperText={
-                              errors.sendOffMemberIds ||
-                              (sendOffMemberIds.length > 0
-                                ? `${sendOffMemberIds.length} member${sendOffMemberIds.length > 1 ? "s" : ""} (exempt from contributing)`
-                                : "")
+                              !enableCelebrantSelection
+                                ? "Enable celebrant selection above to select celebrants"
+                                : (errors.sendOffMemberIds ||
+                                  (sendOffMemberIds.length > 0
+                                    ? `${sendOffMemberIds.length} member${sendOffMemberIds.length > 1 ? "s" : ""} (exempt from contributing)`
+                                    : ""))
                             }
                           />
                         </Grid>
@@ -3618,17 +3812,20 @@ export default function EventFormPage({
                             <Grid size={{ xs: 12 }}>
                               <AppMultiSelect
                                 label={getMemberFieldLabel(type)}
-                                placeholder={getMemberFieldPlaceholder(type)}
+                                placeholder={enableCelebrantSelection ? getMemberFieldPlaceholder(type) : "Celebrant selection is disabled"}
                                 value={memsVal}
                                 onChange={(e) => handleEventTypeMembersChange(type, e.target.value)}
                                 options={getMemberCelebrantOptionsForType(type)}
                                 maxHeight={145}
                                 showSelectAll={false}
-                                required
-                                error={!!errors[`members_${typeId}`]}
+                                required={enableCelebrantSelection}
+                                disabled={!enableCelebrantSelection}
+                                error={enableCelebrantSelection && !!errors[`members_${typeId}`]}
                                 helperText={
-                                  errors[`members_${typeId}`] ||
-                                  (memsVal.length > 0 ? `${memsVal.length} members (exempt from contributing)` : "")
+                                  !enableCelebrantSelection
+                                    ? "Enable celebrant selection above to select celebrants"
+                                    : (errors[`members_${typeId}`] ||
+                                      (memsVal.length > 0 ? `${memsVal.length} members (exempt from contributing)` : ""))
                                 }
                               />
                             </Grid>
