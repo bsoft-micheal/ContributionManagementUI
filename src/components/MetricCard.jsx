@@ -58,7 +58,7 @@ export default function MetricCard({
       onKeyDown={isInteractive ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick?.(); } } : undefined}
       sx={{
         height: "100%",
-        minHeight: { xs: 104, sm: 112 },
+        minHeight: { xs: 110, sm: 118 },
         display: "flex",
         flexDirection: "column",
         borderRadius: "12px",
@@ -67,13 +67,13 @@ export default function MetricCard({
         overflow: "hidden",
         cursor: isInteractive ? "pointer" : "default",
         userSelect: isInteractive ? "none" : "auto",
-        border: `1px solid ${isDark ? alpha(resolvedAccent, 0.28) : alpha(resolvedAccent, 0.2)}`,
+        border: `1px solid ${isDark ? alpha(resolvedAccent, 0.3) : alpha(resolvedAccent, 0.25)}`,
         background: isDark
           ? `linear-gradient(145deg, ${alpha(resolvedAccent, 0.12)} 0%, rgba(20, 24, 40, 0.95) 100%)`
-          : `linear-gradient(180deg, ${alpha(resolvedAccent, 0.05)} 0%, #ffffff 100%)`,
+          : `linear-gradient(180deg, ${alpha(resolvedAccent, 0.08)} 0%, #ffffff 100%)`,
         boxShadow: isDark
           ? "0 4px 16px rgba(0, 0, 0, 0.25)"
-          : `0 2px 8px ${alpha(resolvedAccent, 0.05)}`,
+          : `0 2px 10px ${alpha(resolvedAccent, 0.06)}`,
         "&:hover": {
           transform: isInteractive ? "translateY(-2px)" : "none",
           boxShadow: isDark
@@ -93,8 +93,8 @@ export default function MetricCard({
     >
       <CardContent
         sx={{
-          p: { xs: 1.2, sm: 1.35 },
-          "&:last-child": { pb: { xs: 1.2, sm: 1.35 } },
+          p: { xs: 1.35, sm: 1.6 },
+          "&:last-child": { pb: { xs: 1.35, sm: 1.6 } },
           flex: 1,
           display: "flex",
           flexDirection: "column",
@@ -123,7 +123,7 @@ export default function MetricCard({
             sx={{
               fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               fontWeight: 600,
-              fontSize: { xs: "0.72rem", sm: "0.76rem" },
+              fontSize: { xs: "0.74rem", sm: "0.78rem" },
               lineHeight: 1.2,
               color: isDark ? "rgba(255, 255, 255, 0.76)" : "#475569",
               wordBreak: "break-word",
@@ -151,7 +151,7 @@ export default function MetricCard({
               color: valueColor || (isDark ? "#ffffff" : "#0f172a"),
               fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               fontWeight: 800,
-              fontSize: { xs: "1.32rem", sm: "1.44rem" },
+              fontSize: { xs: "1.42rem", sm: "1.58rem" },
               letterSpacing: "-0.02em",
               lineHeight: 1.15,
             }}
@@ -178,7 +178,7 @@ export default function MetricCard({
               sx={{
                 color: resolvedAccent,
                 fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                fontSize: { xs: "0.68rem", sm: "0.72rem" },
+                fontSize: { xs: "0.70rem", sm: "0.74rem" },
                 fontWeight: 600,
                 opacity: isInteractive ? { xs: 0.95, sm: 0.9 } : 0.85,
                 transition: "all 0.2s ease",

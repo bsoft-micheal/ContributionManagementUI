@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
@@ -74,6 +74,8 @@ const matchedEventCategory = (ev) => {
   return ev.eventTypeName || ev.categoryName || ev.eventType || ev.category || "";
 };
 
+const EMPTY_ARRAY = Object.freeze([]);
+
 export default function SubmitPaymentModal({
   open,
   onClose,
@@ -89,9 +91,9 @@ export default function SubmitPaymentModal({
   initialTotalDue,
   initialIsSubmitted,
   initialStatus,
-  initialArrearBreakdown = [],
+  initialArrearBreakdown = EMPTY_ARRAY,
   initialPaymentScope = "",
-  initialAllMemberEvents = [],
+  initialAllMemberEvents = EMPTY_ARRAY,
   isAllEventsFilter = false,
 }) {
   const toast = useAppToast();
@@ -757,28 +759,48 @@ export default function SubmitPaymentModal({
     });
   };
 
+  const lastLoadedContextRef = useRef("");
+
+  useEffect(() => {
+    if (!open) {
+      lastLoadedContextRef.current = "";
+    }
+  }, [open]);
+
   // Dynamic Dues Context Loader
   useEffect(() => {
     if (!open) return;
-    if (!formData.eventId && !formData.eventName) {
+    const evId = String(formData.eventId || initialEventId || "").trim();
+    const evName = String(formData.eventName || initialEventName || "").trim();
+    const memId = String(formData.memberId || initialMemberId || "").trim();
+    const memName = String(formData.memberName || initialMemberName || "").trim();
+
+    if (!evId && !evName) {
       setDuesSummary(null);
       return;
     }
-    if (formData.memberId || formData.memberName) {
-      const loadContext = async () => {
-        try {
-          const res = await getPaymentContextAsync({
-            eventId: formData.eventId || undefined,
-            memberId: formData.memberId || undefined,
-            eventName: formData.eventName || undefined,
-            memberName: formData.memberName || undefined,
-          });
+    if (!memId && !memName) return;
 
-          const matchedEvent = (eventsList || []).find(
-            (ev) =>
-              (ev.title || ev.name || ev.eventName) === formData.eventName ||
-              (ev.id || ev.eventId) === formData.eventId
-          );
+    const contextKey = `${evId}|${evName}|${memId}|${memName}`;
+    if (lastLoadedContextRef.current === contextKey) {
+      return;
+    }
+    lastLoadedContextRef.current = contextKey;
+
+    const loadContext = async () => {
+      try {
+        const res = await getPaymentContextAsync({
+          eventId: evId || undefined,
+          memberId: memId || undefined,
+          eventName: evName || undefined,
+          memberName: memName || undefined,
+        });
+
+        const matchedEvent = (eventsList || []).find(
+          (ev) =>
+            (ev.title || ev.name || ev.eventName) === evName ||
+            (ev.id || ev.eventId) === evId
+        );
 
           if (res) {
             // Check if this event is in initialAllMemberEvents
@@ -945,12 +967,23 @@ export default function SubmitPaymentModal({
               resolvedDuesAmount = String(total);
             }
 
-            setFormData((prev) => ({
-              ...prev,
-              eventName: res.eventName || prev.eventName,
-              memberName: res.memberName || prev.memberName || authState?.fullName || "",
-              amount: resolvedDuesAmount,
-            }));
+            setFormData((prev) => {
+              const updatedEvName = prev.eventName || res.eventName || "";
+              const updatedMemName = prev.memberName || res.memberName || authState?.fullName || "";
+              if (
+                prev.amount === resolvedDuesAmount &&
+                prev.eventName === updatedEvName &&
+                prev.memberName === updatedMemName
+              ) {
+                return prev;
+              }
+              return {
+                ...prev,
+                eventName: updatedEvName,
+                memberName: updatedMemName,
+                amount: resolvedDuesAmount,
+              };
+            });
 
             if (total === 0) {
               setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "0.00" })));
@@ -995,16 +1028,16 @@ export default function SubmitPaymentModal({
         }
       };
       loadContext();
-    }
   }, [
     open,
     formData.eventId,
     formData.memberId,
     formData.eventName,
     formData.memberName,
-    eventsList,
-    initialArrearBreakdown,
-    initialAllMemberEvents,
+    initialEventId,
+    initialMemberId,
+    initialEventName,
+    initialMemberName,
     initialPaymentScope,
     isAllEventsFilter,
   ]);
