@@ -361,6 +361,8 @@ export default function AppDataTable({
   searchWidth,
   initialRowsPerPage = 15,
   emptyMessage,
+  onExportExcel,
+  onExportPdf,
 }) {
   const theme = useTheme();
   const { isLoading: globalLoading } = useNavigationLoading();
@@ -804,7 +806,11 @@ export default function AppDataTable({
                     disabled={!isExportAllowed}
                     onClick={() => {
                       if (!isExportAllowed) return;
-                      exportToExcel(orderedColumns, processedData, `${title || 'export'}.xlsx`, title);
+                      if (typeof onExportExcel === "function") {
+                        onExportExcel();
+                      } else {
+                        exportToExcel(orderedColumns, processedData, `${title || 'export'}.xlsx`, title);
+                      }
                     }}
                     sx={exportIconBtnSx}
                   >
@@ -819,7 +825,11 @@ export default function AppDataTable({
                     disabled={!isExportAllowed}
                     onClick={() => {
                       if (!isExportAllowed) return;
-                      printTable(title, orderedColumns, processedData);
+                      if (typeof onExportPdf === "function") {
+                        onExportPdf();
+                      } else {
+                        printTable(title, orderedColumns, processedData);
+                      }
                     }}
                     sx={exportIconBtnSx}
                   >

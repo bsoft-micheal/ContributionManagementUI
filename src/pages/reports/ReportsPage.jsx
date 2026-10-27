@@ -49,6 +49,7 @@ import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getPaymentTransactionsAsync } from "../../services/paymentService";
 import { getUsersAsync } from "../../services/userService";
 import AnnualMemberMatrix from "../../components/reports/AnnualMemberMatrix";
+import PendingDuesReport from "../../components/reports/PendingDuesReport";
 import { groupSplitTransactions } from "../../utils/paymentGroupHelper";
 
 /* ─── Horizontal Bar Chart ─── */
@@ -293,48 +294,6 @@ function StatCard({ label, value, icon: Icon, color = "primary", subLabel, helpe
   );
 }
 
-/* ─── Modern Segmented Nav Tab ─── */
-function SegmentedTab({ label, icon: Icon, isActive, onClick }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-  return (
-    <ButtonBase
-      onClick={onClick}
-      sx={{
-        px: 2,
-        height: 34,
-        borderRadius: "8px",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 0.8,
-        fontSize: "0.82rem",
-        fontWeight: isActive ? 700 : 600,
-        color: isActive ? "#ffffff" : isDark ? "text.secondary" : "#334155",
-        bgcolor: isActive
-          ? "#31275d"
-          : isDark ? "transparent" : "#ffffff",
-        boxShadow: isActive
-          ? "0 2px 8px rgba(49, 39, 93, 0.3)"
-          : isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.04)",
-        border: isActive
-          ? "1px solid #31275d"
-          : `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0"}`,
-        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-        "&:hover": {
-          color: isActive ? "#ffffff" : "text.primary",
-          bgcolor: isActive
-            ? "#31275d"
-            : isDark
-              ? "rgba(255, 255, 255, 0.06)"
-              : "#f8fafc",
-        },
-      }}
-    >
-      {Icon && <Icon sx={{ fontSize: 17 }} />}
-      {label}
-    </ButtonBase>
-  );
-}
 
 /* ═══════════════════════ MAIN PAGE ═══════════════════════ */
 export default function ReportsPage({ mode: propMode = "event" }) {
@@ -1560,12 +1519,14 @@ export default function ReportsPage({ mode: propMode = "event" }) {
   }, [mode, filteredEventCollections, filteredMemberContributions, filteredPaymentHistory, report, isMember]);
 
   const pageTitle = mode === "payment-history"
-    ? (isMember ? "My Payment History" : "Event Payment Audit")
+    ? (isMember ? "My Payment History" : "Payment History")
     : mode === "annual-matrix"
-      ? (isMember ? "My Annual Contribution Matrix" : "Annual Member Contribution Matrix")
-      : (isMember
-        ? "My Contributions"
-        : ({ event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections"));
+      ? (isMember ? "My Annual Contribution Matrix" : "Annual Member Matrix")
+      : mode === "pending-dues"
+        ? (isMember ? "My Pending Dues" : "Monthly Pending Dues")
+        : (isMember
+          ? "My Contributions"
+          : ({ event: "Event Collections", member: "Member Contributions", pending: "Pending Dues" }[mode] || "Event Collections"));
 
   const metricOptions = mode === "pending"
     ? [{ label: "By Event", key: "event" }, { label: "By Member", key: "member" }]
@@ -1577,20 +1538,11 @@ export default function ReportsPage({ mode: propMode = "event" }) {
       { label: "Amount In Hand", key: "remaining" },
     ];
 
-  const navTabs = isMember
-    ? [
-      { label: "My Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
-      { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
-      { label: "Annual Matrix", path: "/reports/annual-member-matrix", modeKey: "annual-matrix", icon: CalendarMonthIcon },
-    ]
-    : [
-      { label: "Event Collections", path: "/reports/event-collection-audit", modeKey: "event", icon: EventIcon },
-      { label: "Member Contributions", path: "/reports/member-velocity", modeKey: "member", icon: People },
-      { label: "Payment History", path: "/reports/payment-history", modeKey: "payment-history", icon: ReceiptLongIcon },
-      { label: "Annual Member Matrix", path: "/reports/annual-member-matrix", modeKey: "annual-matrix", icon: CalendarMonthIcon },
-    ];
 
   const hasData = useMemo(() => {
+    if (mode === "pending-dues") {
+      return true;
+    }
     if (mode === "annual-matrix") {
       return (usersList || []).length > 0 || (report?.memberContributionHistory || []).length > 0;
     }
@@ -1894,42 +1846,15 @@ export default function ReportsPage({ mode: propMode = "event" }) {
   );
 
   const filterPanel = (
-    <Stack spacing={2} sx={{ width: "100%" }}>
-      {/* Navigation Segmented Track */}
-      <Box
-        sx={{
-          display: "inline-flex",
-          p: "4px",
-          borderRadius: "8px",
-          bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(74, 63, 107, 0.05)",
-          border: "1px solid",
-          borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(74, 63, 107, 0.12)",
-          gap: 0.6,
-          width: "fit-content",
-          flexWrap: "wrap",
-        }}
-      >
-        {navTabs.map((tab) => (
-          <SegmentedTab
-            key={tab.path}
-            label={tab.label}
-            icon={tab.icon}
-            isActive={mode === tab.modeKey || (!mode && tab.modeKey === "event")}
-            onClick={() => navigate(tab.path)}
-          />
-        ))}
-      </Box>
-
-      {/* Inline Filter Controls */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "flex-end",
-          flexWrap: "wrap",
-          gap: 1.2,
-          width: "100%",
-        }}
-      >
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "flex-end",
+        flexWrap: "wrap",
+        gap: 1.2,
+        width: "100%",
+      }}
+    >
         <Box sx={{ width: { xs: "100%", sm: 160, md: 175 } }}>
           <AppDateInput
             label="From Date"
@@ -2034,12 +1959,11 @@ export default function ReportsPage({ mode: propMode = "event" }) {
           />
         </Box>
       </Box>
-    </Stack>
   );
 
   return (
     <div className="page-shell">
-      {mode === "annual-matrix" ? (
+      {mode === "annual-matrix" || mode === "pending-dues" ? (
         <Paper
           elevation={0}
           sx={{
@@ -2072,43 +1996,18 @@ export default function ReportsPage({ mode: propMode = "event" }) {
             </Typography>
           </Box>
 
-          {/* Filter Panel with Navigation Tabs */}
-          <Box
-            sx={{
-              bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#fcfcff",
-              px: 3,
-              py: 2,
-              borderBottom: `1px solid ${theme.palette.divider}`,
-            }}
-          >
-            <Box
-              sx={{
-                display: "inline-flex",
-                p: "4px",
-                borderRadius: "8px",
-                bgcolor: isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(74, 63, 107, 0.05)",
-                border: "1px solid",
-                borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(74, 63, 107, 0.12)",
-                gap: 0.6,
-                width: "fit-content",
-                flexWrap: "wrap",
-              }}
-            >
-              {navTabs.map((tab) => (
-                <SegmentedTab
-                  key={tab.path}
-                  label={tab.label}
-                  icon={tab.icon}
-                  isActive={mode === tab.modeKey}
-                  onClick={() => navigate(tab.path)}
-                />
-              ))}
-            </Box>
-          </Box>
-
-          {/* Annual Matrix Content */}
+          {/* Content */}
           <Box sx={{ p: 2.5 }}>
-            {!hasAppliedFilter ? (
+            {mode === "pending-dues" ? (
+              <PendingDuesReport
+                eventTypesList={eventTypesList}
+                eventsList={eventsList}
+                isMember={isMember}
+                currentUserId={currentUserId}
+                currentUserName={currentUserName}
+                canExport={canExport}
+              />
+            ) : !hasAppliedFilter ? (
               <Box
                 sx={{
                   py: 8,
@@ -2155,6 +2054,7 @@ export default function ReportsPage({ mode: propMode = "event" }) {
           allowExport={canExport}
           actions={exportButton}
           filterPanel={filterPanel}
+          onExportExcel={handleExport}
         />
       )}
 

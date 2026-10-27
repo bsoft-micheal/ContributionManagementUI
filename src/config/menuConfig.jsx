@@ -18,6 +18,8 @@ import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import RuleRoundedIcon from "@mui/icons-material/RuleRounded";
+import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
+import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
 
 import { COMMON_STRINGS, MENU_FEATURE_IDS } from "../constants";
 
@@ -81,8 +83,15 @@ export const navigationItems = [
   {
     featureId: MENU_FEATURE_IDS.REPORTS,
     label: "Reports",
-    path: "/reports",
-    icon: <AssessmentRoundedIcon fontSize="small" />
+    id: "reports",
+    icon: <AssessmentRoundedIcon fontSize="small" />,
+    children: [
+      { featureId: MENU_FEATURE_IDS.REPORTS, label: "Event Collections", path: "/reports/event-collection-audit", icon: <EventRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.REPORTS, label: "Member Contributions", path: "/reports/member-velocity", icon: <PeopleRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.REPORTS, label: "Payment History", path: "/reports/payment-history", icon: <ReceiptLongRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.REPORTS, label: "Annual Member Matrix", path: "/reports/annual-member-matrix", icon: <CalendarMonthRoundedIcon sx={{ fontSize: "1rem" }} /> },
+      { featureId: MENU_FEATURE_IDS.REPORTS, label: "Monthly Pending Dues", path: "/reports/monthly-pending-dues", icon: <HourglassEmptyRoundedIcon sx={{ fontSize: "1rem" }} /> },
+    ]
   },
 ];
 
