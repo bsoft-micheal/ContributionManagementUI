@@ -1184,11 +1184,21 @@ export default function EventsPage() {
           const allocated = row.useAvailableBalance ? Number(row.allocatedAmount || 0) : 0;
           const raw = Number(row.totalExpectedAmount || 0) > 0 ? Number(row.totalExpectedAmount) : Number(row.baseAmount || 0);
           const val = allocated > 0 ? Math.max(0, raw - allocated) : raw;
+          const sponsorAmt = Number(row.sponsorContributionAmount || 0) ||
+            (Array.isArray(row.sponsors) ? row.sponsors.reduce((sum, s) => sum + (Number(s.contributionAmount || s.amount) || 0), 0) : 0);
+          const hasSponsor = Boolean(row.requireSponsorContribution) && sponsorAmt > 0;
+          const totalBudget = Number(row.originalPlannedBudget || row.baseAmount || raw);
+
           return (
             <Box sx={{ textAlign: "right" }}>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 {formatWholeCurrency(val)}
               </Typography>
+              {hasSponsor && (
+                <Typography variant="caption" sx={{ color: "#8b5cf6", fontSize: "0.7rem", display: "block", fontWeight: 600 }}>
+                  (Total: {formatWholeCurrency(totalBudget)} • Sponsor: {formatWholeCurrency(sponsorAmt)})
+                </Typography>
+              )}
               {allocated > 0 && (
                 <Typography variant="caption" sx={{ color: "#16a34a", fontSize: "0.7rem", display: "block" }}>
                   (Budget: {formatWholeCurrency(raw)} - {formatWholeCurrency(allocated)} from Hand)

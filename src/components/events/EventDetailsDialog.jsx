@@ -243,6 +243,62 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     event?.eventName?.toLowerCase().includes("birthday")
   );
 
+  const isChristmas = Boolean(
+    String(activeEvent?.eventTypeName || activeEvent?.category || activeEvent?.eventName || event?.eventTypeName || event?.category || event?.eventName || "")
+      .toLowerCase()
+      .includes("christma")
+  );
+
+  const eventSponsorsList = useMemo(() => {
+    const current = detailedEvent || event;
+    if (!current) return [];
+    if (Array.isArray(current.sponsors) && current.sponsors.length > 0) {
+      return current.sponsors
+        .filter((s) => s && s.isActive !== false)
+        .map((s, idx) => {
+          const uId = s.sponsorUserId || s.userId;
+          const matchedMem = allMembers.find(
+            (m) =>
+              (uId && (String(m.id) === String(uId) || String(m.memberId) === String(uId))) ||
+              (s.sponsorName && (m.name || m.fullName || "").trim().toLowerCase() === String(s.sponsorName).trim().toLowerCase())
+          );
+          return {
+            id: s.sponsorId || uId || `sp-${idx}`,
+            memberId: uId,
+            name: s.sponsorName || matchedMem?.name || s.name || "Sponsor",
+            amount: Number(s.contributionAmount ?? s.amount ?? 0),
+            workType: matchedMem?.workType || matchedMem?.memberType || s.workType || "Office",
+            roleType: "Sponsor",
+            isSponsor: true,
+          };
+        });
+    }
+    if (current.sponsorName || Number(current.sponsorContributionAmount || 0) > 0) {
+      const uId = current.sponsorUserId;
+      const matchedMem = allMembers.find(
+        (m) =>
+          (uId && (String(m.id) === String(uId) || String(m.memberId) === String(uId))) ||
+          (current.sponsorName && (m.name || m.fullName || "").trim().toLowerCase() === String(current.sponsorName).trim().toLowerCase())
+      );
+      return [
+        {
+          id: current.sponsorUserId || "sp-0",
+          memberId: current.sponsorUserId,
+          name: current.sponsorName || matchedMem?.name || "Sponsor",
+          amount: Number(current.sponsorContributionAmount || 0),
+          workType: matchedMem?.workType || matchedMem?.memberType || "Office",
+          roleType: "Sponsor",
+          isSponsor: true,
+        },
+      ];
+    }
+    return [];
+  }, [detailedEvent, event, allMembers]);
+
+  const totalSponsorAmount = useMemo(() => {
+    return eventSponsorsList.reduce((sum, sp) => sum + (Number(sp.amount) || 0), 0);
+  }, [eventSponsorsList]);
+
   // Strip internal metadata comments (<!--contrib:...-->, <!--celebrants:...-->, etc.) from a description string
   const stripContribMeta = (desc) =>
     (desc || "").replace(/<!--[\s\S]*?-->/gi, "").trim();
@@ -577,6 +633,18 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
       return result;
     }
 
+    // If Christmas event type, strictly show sponsor person names and amounts (do not dump participants as celebrants)
+    if (isChristmas) {
+      if (eventSponsorsList.length > 0) {
+        return eventSponsorsList.map((sp) => ({
+          ...sp,
+          dateValue: formatWholeCurrency(sp.amount),
+          amountFormatted: formatWholeCurrency(sp.amount),
+        }));
+      }
+      return [];
+    }
+
     // 2. Fallback to participating members if no specific send-off or marriage members are designated
     const map = new Map();
 
@@ -654,19 +722,27 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
   const hasMarriageInTable = uniqueRoles.some((r) => r.toLowerCase().includes("marriage"));
   const hasSendOffInTable = uniqueRoles.some((r) => r.toLowerCase().includes("send"));
 
-  const tableMembersLabel = uniqueRoles.length > 1
+  const isSponsorTable = tableMembers.some((m) => m.isSponsor || m.roleType === "Sponsor");
+
+  const tableMembersLabel = isSponsorTable
+    ? `${tableMembers.length} Sponsor${tableMembers.length !== 1 ? "s" : ""} (${formatWholeCurrency(totalSponsorAmount)})`
+    : uniqueRoles.length > 1
     ? `${tableMembers.length} Celebrants (${uniqueRoles.join(", ")})`
     : uniqueRoles.length === 1
     ? `${tableMembers.length} ${uniqueRoles[0]} Celebrant${tableMembers.length !== 1 ? "s" : ""}`
     : `${tableMembers.length} Participating Member${tableMembers.length !== 1 ? "s" : ""}`;
 
-  const tableMemberColumnTitle = isSingleBirthday
+  const tableMemberColumnTitle = isSponsorTable
+    ? "Sponsor Name"
+    : isSingleBirthday
     ? "Birthday Member"
     : uniqueRoles.length === 1
     ? `${uniqueRoles[0]} Celebrant`
     : "Celebrant / Member Name";
 
-  const dateColumnTitle = isSingleBirthday
+  const dateColumnTitle = isSponsorTable
+    ? "Contribution Amount"
+    : isSingleBirthday
     ? "Date of Birth"
     : hasMultipleRoles
     ? "Event Date / DOB"
@@ -788,6 +864,22 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                     );
                   });
                 })()}
+                {eventSponsorsList.map((sp, idx) => (
+                  <Chip
+                    key={sp.id || idx}
+                    size="small"
+                    label={`Sponsor: ${sp.name} (${formatWholeCurrency(sp.amount)})`}
+                    sx={{
+                      height: 22,
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      color: (theme) => theme.palette.mode === "dark" ? "#c4b5fd" : "#6d28d9",
+                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(139, 92, 246, 0.2)" : "rgba(139, 92, 246, 0.1)",
+                      border: "1px solid rgba(139, 92, 246, 0.3)",
+                      "& .MuiChip-label": { px: 0.8 },
+                    }}
+                  />
+                ))}
               </Box>
             </Box>
           </Grid>
@@ -934,12 +1026,12 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                       fontWeight: 700,
                       bgcolor: (theme) =>
                         theme.palette.mode === "dark"
-                          ? (isBirthday ? "rgba(192, 38, 211, 0.2)" : (hasSendOffInTable || hasMarriageInTable) ? "rgba(124, 58, 237, 0.2)" : "rgba(14, 165, 233, 0.2)")
-                          : (isBirthday ? "rgba(192, 38, 211, 0.1)" : (hasSendOffInTable || hasMarriageInTable) ? "rgba(124, 58, 237, 0.1)" : "rgba(14, 165, 233, 0.1)"),
+                          ? (isSponsorTable ? "rgba(139, 92, 246, 0.2)" : isBirthday ? "rgba(192, 38, 211, 0.2)" : (hasSendOffInTable || hasMarriageInTable) ? "rgba(124, 58, 237, 0.2)" : "rgba(14, 165, 233, 0.2)")
+                          : (isSponsorTable ? "rgba(139, 92, 246, 0.12)" : isBirthday ? "rgba(192, 38, 211, 0.1)" : (hasSendOffInTable || hasMarriageInTable) ? "rgba(124, 58, 237, 0.1)" : "rgba(14, 165, 233, 0.1)"),
                       color: (theme) =>
                         theme.palette.mode === "dark"
-                          ? (isBirthday ? "#f0abfc" : (hasSendOffInTable || hasMarriageInTable) ? "#c4b5fd" : "#38bdf8")
-                          : (isBirthday ? "#86198f" : (hasSendOffInTable || hasMarriageInTable) ? "#6d28d9" : "#0284c7"),
+                          ? (isSponsorTable ? "#c4b5fd" : isBirthday ? "#f0abfc" : (hasSendOffInTable || hasMarriageInTable) ? "#c4b5fd" : "#38bdf8")
+                          : (isSponsorTable ? "#7c3aed" : isBirthday ? "#86198f" : (hasSendOffInTable || hasMarriageInTable) ? "#6d28d9" : "#0284c7"),
                       borderRadius: "6px",
                     }}
                   />
@@ -1023,11 +1115,15 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                                     fontWeight: 700,
                                     bgcolor: (theme) =>
                                       theme.palette.mode === "dark"
-                                        ? celebrant.roleType === "Birthday"
+                                        ? celebrant.roleType === "Sponsor"
+                                          ? "rgba(139, 92, 246, 0.2)"
+                                          : celebrant.roleType === "Birthday"
                                           ? "rgba(168, 85, 247, 0.2)"
                                           : celebrant.roleType.toLowerCase().includes("marriage")
                                           ? "rgba(236, 72, 153, 0.2)"
                                           : "rgba(14, 165, 233, 0.2)"
+                                        : celebrant.roleType === "Sponsor"
+                                        ? "rgba(139, 92, 246, 0.12)"
                                         : celebrant.roleType === "Birthday"
                                         ? "rgba(168, 85, 247, 0.12)"
                                         : celebrant.roleType.toLowerCase().includes("marriage")
@@ -1035,11 +1131,15 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                                         : "rgba(14, 165, 233, 0.12)",
                                     color: (theme) =>
                                       theme.palette.mode === "dark"
-                                        ? celebrant.roleType === "Birthday"
+                                        ? celebrant.roleType === "Sponsor"
+                                          ? "#c4b5fd"
+                                          : celebrant.roleType === "Birthday"
                                           ? "#d8b4fe"
                                           : celebrant.roleType.toLowerCase().includes("marriage")
                                           ? "#f472b6"
                                           : "#38bdf8"
+                                        : celebrant.roleType === "Sponsor"
+                                        ? "#7c3aed"
                                         : celebrant.roleType === "Birthday"
                                         ? "#7e22ce"
                                         : celebrant.roleType.toLowerCase().includes("marriage")
@@ -1052,8 +1152,8 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                               )}
                             </Box>
                           </TableCell>
-                          <TableCell sx={{ fontSize: "0.78rem", py: 0.8, fontWeight: 600, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : "text.primary" }}>
-                            {celebrant.dateValue || (isSingleBirthday ? celebrant.dobFormatted : "--")}
+                          <TableCell sx={{ fontSize: "0.78rem", py: 0.8, fontWeight: isSponsorTable ? 700 : 600, color: (theme) => theme.palette.mode === "dark" ? "#ffffff" : isSponsorTable ? "primary.main" : "text.primary" }}>
+                            {isSponsorTable ? (celebrant.amountFormatted || formatWholeCurrency(celebrant.amount)) : (celebrant.dateValue || (isSingleBirthday ? celebrant.dobFormatted : "--"))}
                           </TableCell>
                           <TableCell sx={{ fontSize: "0.75rem", py: 0.8 }}>
                             <Chip
@@ -1096,6 +1196,11 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                   <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "primary.main" }}>
                     {formatWholeCurrency(totalExpected)}
                   </Typography>
+                  {totalSponsorAmount > 0 && (
+                    <Typography variant="caption" sx={{ color: "#8b5cf6", fontSize: "0.72rem", display: "block", fontWeight: 600 }}>
+                      (Total: {formatWholeCurrency(Number(activeEvent?.originalPlannedBudget || activeEvent?.baseAmount || rawBudget))} • Sponsor: {formatWholeCurrency(totalSponsorAmount)})
+                    </Typography>
+                  )}
                   {allocatedAmt > 0 && (
                     <Typography variant="caption" sx={{ color: "#16a34a", fontSize: "0.72rem", display: "block" }}>
                       (Budget: {formatWholeCurrency(rawBudget)} - {formatWholeCurrency(allocatedAmt)} from Hand)
