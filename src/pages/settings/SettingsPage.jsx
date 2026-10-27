@@ -1037,9 +1037,14 @@ export default function SettingsPage() {
 
       let defaultSub = settings.emailSubject;
       let defaultDesc = settings.emailDescription;
-      if (selectedCategoryId === "all" && templateType === "initial") {
-        defaultSub = templateSubject;
-        defaultDesc = templateDescription;
+      if (selectedCategoryId === "all") {
+        if (templateType === "initial") {
+          defaultSub = templateSubject;
+          defaultDesc = templateDescription;
+        }
+        delete updatedCategoryTemplates["birthday"];
+        delete updatedCategoryTemplates["team dinner"];
+        delete updatedCategoryTemplates["farewell"];
       }
 
       const updated = {
@@ -1606,7 +1611,7 @@ export default function SettingsPage() {
             const liveSubject = interpolatePlaceholders(rawSubject, livePreviewData);
 
             const defaultDesc =
-              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank You,\n{orgName}";
+              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\nThank You,\n{orgName}";
             const rawDesc = templateDescription || defaultDesc;
 
             return (
@@ -1807,7 +1812,6 @@ export default function SettingsPage() {
                             "{amount}",
                             "{dueDate}",
                             "{orgName}",
-                            "{paymentLink}",
                             "{qrCode}",
                           ].map((token) => (
                             <Chip
@@ -1817,7 +1821,7 @@ export default function SettingsPage() {
                               onClick={() => {
                                 setTemplateDescription((prev) => {
                                   if (!prev) return token;
-                                  if (token === "{qrCode}" || token === "{paymentLink}") {
+                                  if (token === "{qrCode}") {
                                     const thankIdx = prev.search(/thank\s*you/i);
                                     if (thankIdx !== -1) {
                                       return `${prev.slice(0, thankIdx).trimEnd()}\n\n${token}\n\n${prev.slice(thankIdx).trimStart()}`;
@@ -1831,33 +1835,26 @@ export default function SettingsPage() {
                                 fontWeight: 700,
                                 height: 22,
                                 cursor: "pointer",
-                                bgcolor: token === "{qrCode}" || token === "{paymentLink}" ? "rgba(124, 58, 237, 0.1)" : "rgba(74, 63, 107, 0.08)",
-                                color: token === "{qrCode}" || token === "{paymentLink}" ? "#7c3aed" : "#4a3f6b",
-                                border: token === "{qrCode}" || token === "{paymentLink}" ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(74, 63, 107, 0.2)",
+                                bgcolor: token === "{qrCode}" ? "rgba(124, 58, 237, 0.1)" : "rgba(74, 63, 107, 0.08)",
+                                color: token === "{qrCode}" ? "#7c3aed" : "#4a3f6b",
+                                border: token === "{qrCode}" ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(74, 63, 107, 0.2)",
                                 "&:hover": { bgcolor: "rgba(74, 63, 107, 0.16)" },
                               }}
                             />
                           ))}
                           <Chip
-                            label="+ Insert QR & Payment Link"
+                            label="+ Insert QR Code"
                             size="small"
                             onClick={() => {
                               setTemplateDescription((prev) => {
                                 const current = prev || "";
-                                let updated = current;
-                                const needsQr = !updated.includes("{qrCode}");
-                                const needsPay = !updated.includes("{paymentLink}");
-                                if (!needsQr && !needsPay) return current;
+                                if (current.includes("{qrCode}")) return current;
 
-                                const insertBlock = [needsQr ? "{qrCode}" : null, needsPay ? "{paymentLink}" : null]
-                                  .filter(Boolean)
-                                  .join("\n\n");
-
-                                const thankIdx = updated.search(/thank\s*you/i);
+                                const thankIdx = current.search(/thank\s*you/i);
                                 if (thankIdx !== -1) {
-                                  return `${updated.slice(0, thankIdx).trimEnd()}\n\n${insertBlock}\n\n${updated.slice(thankIdx).trimStart()}`;
+                                  return `${current.slice(0, thankIdx).trimEnd()}\n\n{qrCode}\n\n${current.slice(thankIdx).trimStart()}`;
                                 }
-                                return `${updated.trimEnd()}\n\n${insertBlock}`;
+                                return `${current.trimEnd()}\n\n{qrCode}`;
                               });
                             }}
                             sx={{
@@ -2272,52 +2269,21 @@ export default function SettingsPage() {
                                           Event Name:
                                         </Typography>
                                         <Typography variant="caption" sx={{ fontWeight: 700, color: "#1e1a2e" }}>
-                                          {selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")
-                                            ? "Birthday Celebration"
+                                          {selectedCategoryId === "all"
+                                            ? "{eventName}"
                                             : `${currentCategoryLabel} Celebration`}
                                         </Typography>
                                       </Box>
 
-                                      {/* Birthday Celebrants & Dates */}
-                                      {(selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")) && (
+                                      {/* Celebrants row (only if Birthday category specifically selected) */}
+                                      {currentCategoryLabel.toLowerCase().includes("birthday") && selectedCategoryId !== "all" && (
                                         <Box sx={{ pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
-                                          <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", display: "block", mb: 0.8 }}>
-                                            Birthday Celebrants &amp; Dates:
+                                          <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", display: "block", mb: 0.4 }}>
+                                            Celebrants &amp; Dates:
                                           </Typography>
-                                          <Box
-                                            sx={{
-                                              bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#fbfaff",
-                                              border: "1.5px solid #ece8f8",
-                                              borderRadius: "8px",
-                                              overflow: "hidden",
-                                            }}
-                                          >
-                                            {[
-                                              { name: "Leo Albert L", date: "October 05, 2026" },
-                                              { name: "Kaviarasan K", date: "October 08, 2026" },
-                                              { name: "Christy Chandran R", date: "October 09, 2026" },
-                                              { name: "testerr", date: "October 18, 2026" },
-                                            ].map((c, i, arr) => (
-                                              <Box
-                                                key={c.name}
-                                                sx={{
-                                                  display: "flex",
-                                                  justifyContent: "space-between",
-                                                  alignItems: "center",
-                                                  px: 1.5,
-                                                  py: 0.8,
-                                                  borderBottom: i < arr.length - 1 ? "1px dashed rgba(74, 63, 107, 0.12)" : "none",
-                                                }}
-                                              >
-                                                <Typography variant="caption" sx={{ color: "#4a3f6b", fontWeight: 700, fontSize: "0.75rem", display: "flex", alignItems: "center", gap: 0.5 }}>
-                                                  🎂 {c.name}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: "#c026d3", fontWeight: 700, fontSize: "0.75rem" }}>
-                                                  {c.date}
-                                                </Typography>
-                                              </Box>
-                                            ))}
-                                          </Box>
+                                          <Typography variant="caption" sx={{ color: "#7c3aed", fontWeight: 700 }}>
+                                            {"{celebrantNames & dates}"}
+                                          </Typography>
                                         </Box>
                                       )}
 
@@ -2327,9 +2293,7 @@ export default function SettingsPage() {
                                           Event Date:
                                         </Typography>
                                         <Typography variant="caption" sx={{ fontWeight: 600, color: "#1e1a2e" }}>
-                                          {selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")
-                                            ? "5 Oct, 10 Oct (2), 19 Oct"
-                                            : previewDueDate || "End of Month"}
+                                          {previewDueDate || dayjs().format("DD/MM/YYYY")}
                                         </Typography>
                                       </Box>
 
@@ -2339,21 +2303,21 @@ export default function SettingsPage() {
                                           Total Amount:
                                         </Typography>
                                         <Typography variant="caption" sx={{ fontWeight: 700, color: "#1e1a2e" }}>
-                                          {selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")
-                                            ? "Rs.6250.00 (4 celebrants combined)"
-                                            : "Rs.5000.00"}
+                                          {typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || "₹500")}
                                         </Typography>
                                       </Box>
 
-                                      {/* Description */}
-                                      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
-                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
-                                          Description:
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: "#1e1a2e" }}>
-                                          {livePreviewData.eventDescription || ""}
-                                        </Typography>
-                                      </Box>
+                                      {/* Description (only shown when entered) */}
+                                      {Boolean(livePreviewData.eventDescription) && (
+                                        <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                          <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                            Description:
+                                          </Typography>
+                                          <Typography variant="caption" sx={{ color: "#1e1a2e" }}>
+                                            {livePreviewData.eventDescription}
+                                          </Typography>
+                                        </Box>
+                                      )}
 
                                       {/* Contribution Amount */}
                                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2372,9 +2336,7 @@ export default function SettingsPage() {
                                             letterSpacing: "0.02em",
                                           }}
                                         >
-                                          {selectedCategoryId === "all" || currentCategoryLabel.toLowerCase().includes("birthday")
-                                            ? "₹135.87"
-                                            : typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || "₹500")}
+                                          {typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || "₹500")}
                                         </Box>
                                       </Box>
                                     </Box>
