@@ -185,6 +185,9 @@ export function AuthProvider({ children }) {
         localStorage.removeItem("teamContributionAuth");
         localStorage.removeItem("teamContributionRememberMe");
       }
+      if (data.role) {
+        apiClient.defaults.headers.common["X-Active-Role"] = data.role;
+      }
     }
 
     setAuthState(data);
@@ -252,6 +255,9 @@ export function AuthProvider({ children }) {
           localStorage.setItem("teamContributionAuth", JSON.stringify(data));
         }
         apiClient.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+        if (targetRoleName) {
+          apiClient.defaults.headers.common["X-Active-Role"] = targetRoleName;
+        }
       }
 
       setAuthState(data);
@@ -277,6 +283,7 @@ export function AuthProvider({ children }) {
       sessionStorage.removeItem("birthdayModalShownSession");
       localStorage.removeItem("teamContributionAuth");
       localStorage.removeItem("teamContributionRememberMe");
+      delete apiClient.defaults.headers.common["X-Active-Role"];
       setAuthState(null);
     }
   };
