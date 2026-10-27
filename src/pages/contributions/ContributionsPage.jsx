@@ -1403,27 +1403,27 @@ export default function ContributionsPage() {
       const filteredGrouped = (!appliedStatus || appliedStatus === "ALL")
         ? groupedList
         : groupedList.filter((c) => {
-            const statusLower = String(c.paymentStatus || "").toLowerCase();
-            if (filterLower === "paid") {
-              return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
-            }
-            if (filterLower === "approved") {
-              return statusLower === "approved";
-            }
-            if (filterLower === "verified") {
-              return statusLower === "verified";
-            }
-            if (filterLower === "pending") {
-              return statusLower === "pending" || statusLower === "partial";
-            }
-            if (filterLower === "partial") {
-              return statusLower === "partial";
-            }
-            if (filterLower === "rejected") {
-              return statusLower === "rejected";
-            }
-            return statusLower === filterLower;
-          });
+          const statusLower = String(c.paymentStatus || "").toLowerCase();
+          if (filterLower === "paid") {
+            return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
+          }
+          if (filterLower === "approved") {
+            return statusLower === "approved";
+          }
+          if (filterLower === "verified") {
+            return statusLower === "verified";
+          }
+          if (filterLower === "pending") {
+            return statusLower === "pending" || statusLower === "partial";
+          }
+          if (filterLower === "partial") {
+            return statusLower === "partial";
+          }
+          if (filterLower === "rejected") {
+            return statusLower === "rejected";
+          }
+          return statusLower === filterLower;
+        });
 
       return [...filteredGrouped].sort((a, b) => {
         const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || "";
@@ -1446,28 +1446,28 @@ export default function ContributionsPage() {
     const filteredEnriched = (!appliedStatus || appliedStatus === "ALL")
       ? enriched
       : enriched.filter((c) => {
-          const statusLower = String(c.paymentStatus || "").toLowerCase();
-          if (filterLower === "paid") {
-            return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
-          }
-          if (filterLower === "approved") {
-            return statusLower === "approved";
-          }
-          if (filterLower === "verified") {
-            return statusLower === "verified";
-          }
-          if (filterLower === "pending") {
-            return statusLower === "pending";
-          }
-          if (filterLower === "rejected") {
-            return (
-              statusLower === "rejected" ||
-              String(c.status || "").toLowerCase() === "rejected" ||
-              String(c.statusName || "").toLowerCase() === "rejected"
-            );
-          }
-          return statusLower === filterLower;
-        });
+        const statusLower = String(c.paymentStatus || "").toLowerCase();
+        if (filterLower === "paid") {
+          return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
+        }
+        if (filterLower === "approved") {
+          return statusLower === "approved";
+        }
+        if (filterLower === "verified") {
+          return statusLower === "verified";
+        }
+        if (filterLower === "pending") {
+          return statusLower === "pending";
+        }
+        if (filterLower === "rejected") {
+          return (
+            statusLower === "rejected" ||
+            String(c.status || "").toLowerCase() === "rejected" ||
+            String(c.statusName || "").toLowerCase() === "rejected"
+          );
+        }
+        return statusLower === filterLower;
+      });
 
     return [...filteredEnriched].sort((a, b) => {
       const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || "";

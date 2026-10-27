@@ -38,6 +38,8 @@ import {
   People as PeopleIcon,
   ReceiptLong as ReceiptLongIcon,
   CheckCircle as CheckCircleIcon,
+  CheckCircleOutline as CheckCircleOutlineIcon,
+  SearchOff as SearchOffIcon,
   InfoOutlined as InfoIcon,
   GridOn as ExcelIcon,
   PictureAsPdf as PdfIcon,
@@ -114,19 +116,19 @@ export default function PendingDuesReport({
   }, [currentYear]);
 
   const monthOptions = useMemo(() => [
-    { label: "All Months (Overall Dues)", value: 0 },
-    { label: "January", value: 1 },
-    { label: "February", value: 2 },
-    { label: "March", value: 3 },
-    { label: "April", value: 4 },
+    { label: "All Months", value: 0 },
+    { label: "Jan", value: 1 },
+    { label: "Feb", value: 2 },
+    { label: "Mar", value: 3 },
+    { label: "Apr", value: 4 },
     { label: "May", value: 5 },
-    { label: "June", value: 6 },
-    { label: "July", value: 7 },
-    { label: "August", value: 8 },
-    { label: "September", value: 9 },
-    { label: "October", value: 10 },
-    { label: "November", value: 11 },
-    { label: "December", value: 12 },
+    { label: "Jun", value: 6 },
+    { label: "Jul", value: 7 },
+    { label: "Aug", value: 8 },
+    { label: "Sep", value: 9 },
+    { label: "Oct", value: 10 },
+    { label: "Nov", value: 11 },
+    { label: "Dec", value: 12 },
   ], []);
 
   const eventTypeOptions = useMemo(() => [
@@ -224,10 +226,32 @@ export default function PendingDuesReport({
     return "Pending Contribution Dues";
   }, [appliedFilters.eventId, appliedFilters.eventType, internalEvents, eventTypesList]);
 
-  // Labels
-  const priorLabel = reportData?.priorMonthsLabel || "Earlier Months";
-  const prevLabel = reportData?.previousMonthLabel || "Previous Month";
-  const currentLabel = reportData?.currentMonthLabel || "Current Month";
+  // Short month helper
+  const toShortMonth = (name) => {
+    if (!name) return "";
+    const map = {
+      january: "Jan",
+      february: "Feb",
+      march: "Mar",
+      april: "Apr",
+      may: "May",
+      june: "Jun",
+      july: "Jul",
+      august: "Aug",
+      september: "Sep",
+      october: "Oct",
+      november: "Nov",
+      december: "Dec",
+    };
+    const key = name.trim().toLowerCase();
+    return map[key] || name;
+  };
+
+  // Labels (Short form for extra space)
+  const priorLabel = reportData?.priorMonthsLabel || "Previous Arrear";
+  const prevLabel = toShortMonth(reportData?.previousMonthLabel);
+  const currentLabel = toShortMonth(reportData?.currentMonthLabel) || "Current Month";
+  const hasPrevColumn = Boolean(prevLabel && prevLabel.trim().length > 0);
 
   // Filtered members list
   const filteredMembers = useMemo(() => {
@@ -284,22 +308,30 @@ export default function PendingDuesReport({
     }
 
     try {
-      const excelRows = filteredMembers.map((m) => ({
-        "Member Name": m.memberName,
-        [priorLabel]: m.priorMonthsPendingAmount > 0 ? Number(m.priorMonthsPendingAmount) : "",
-        [prevLabel]: m.previousMonthPendingAmount > 0 ? Number(m.previousMonthPendingAmount) : "",
-        [currentLabel]: m.currentMonthPendingAmount > 0 ? Number(m.currentMonthPendingAmount) : "",
-        "TOTAL": Number(m.totalPendingAmount || 0),
-      }));
+      const excelRows = filteredMembers.map((m) => {
+        const row = {
+          "Member Name": m.memberName,
+          [priorLabel]: m.priorMonthsPendingAmount > 0 ? Number(m.priorMonthsPendingAmount) : "",
+        };
+        if (hasPrevColumn) {
+          row[prevLabel] = m.previousMonthPendingAmount > 0 ? Number(m.previousMonthPendingAmount) : "";
+        }
+        row[currentLabel] = m.currentMonthPendingAmount > 0 ? Number(m.currentMonthPendingAmount) : "";
+        row["TOTAL"] = Number(m.totalPendingAmount || 0);
+        return row;
+      });
 
       // Append Total row at bottom
-      excelRows.push({
+      const totalRow = {
         "Member Name": "TOTAL",
         [priorLabel]: displayedTotals.prior > 0 ? displayedTotals.prior : "",
-        [prevLabel]: displayedTotals.previous > 0 ? displayedTotals.previous : "",
-        [currentLabel]: displayedTotals.current > 0 ? displayedTotals.current : "",
-        "TOTAL": displayedTotals.total,
-      });
+      };
+      if (hasPrevColumn) {
+        totalRow[prevLabel] = displayedTotals.previous > 0 ? displayedTotals.previous : "";
+      }
+      totalRow[currentLabel] = displayedTotals.current > 0 ? displayedTotals.current : "";
+      totalRow["TOTAL"] = displayedTotals.total;
+      excelRows.push(totalRow);
 
       const sanitizedTitle = reportTitle.toLowerCase().replace(/[^a-z0-9]/g, "-");
       const fileName = `${sanitizedTitle}-${appliedFilters.year}-${String(appliedFilters.month).padStart(2, "0")}.xlsx`;
@@ -333,7 +365,7 @@ export default function PendingDuesReport({
       <tr class="${idx % 2 === 0 ? "even" : "odd"}">
         <td><strong>${m.memberName}</strong>${m.department ? `<br/><span style="color:#64748b;font-size:10px;">${m.department}</span>` : ""}</td>
         <td style="text-align:right;">${m.priorMonthsPendingAmount > 0 ? "₹" + Number(m.priorMonthsPendingAmount).toLocaleString("en-IN") : "—"}</td>
-        <td style="text-align:right;">${m.previousMonthPendingAmount > 0 ? "₹" + Number(m.previousMonthPendingAmount).toLocaleString("en-IN") : "—"}</td>
+        ${hasPrevColumn ? `<td style="text-align:right;">${m.previousMonthPendingAmount > 0 ? "₹" + Number(m.previousMonthPendingAmount).toLocaleString("en-IN") : "—"}</td>` : ""}
         <td style="text-align:right;">${m.currentMonthPendingAmount > 0 ? "₹" + Number(m.currentMonthPendingAmount).toLocaleString("en-IN") : "—"}</td>
         <td style="text-align:right;font-weight:700;color:#e11d48;">₹${Number(m.totalPendingAmount || 0).toLocaleString("en-IN")}</td>
       </tr>`
@@ -344,7 +376,7 @@ export default function PendingDuesReport({
       <tr style="background:#f1f5f9;font-weight:800;border-top:2px solid #4a3f6b;">
         <td><strong>TOTAL</strong></td>
         <td style="text-align:right;">${displayedTotals.prior > 0 ? "₹" + Number(displayedTotals.prior).toLocaleString("en-IN") : "—"}</td>
-        <td style="text-align:right;">${displayedTotals.previous > 0 ? "₹" + Number(displayedTotals.previous).toLocaleString("en-IN") : "—"}</td>
+        ${hasPrevColumn ? `<td style="text-align:right;">${displayedTotals.previous > 0 ? "₹" + Number(displayedTotals.previous).toLocaleString("en-IN") : "—"}</td>` : ""}
         <td style="text-align:right;">${displayedTotals.current > 0 ? "₹" + Number(displayedTotals.current).toLocaleString("en-IN") : "—"}</td>
         <td style="text-align:right;color:#e11d48;font-size:12px;">₹${Number(displayedTotals.total).toLocaleString("en-IN")}</td>
       </tr>`;
@@ -402,7 +434,7 @@ export default function PendingDuesReport({
               <tr>
                 <th>Member Name</th>
                 <th style="text-align:right;">${priorLabel}</th>
-                <th style="text-align:right;">${prevLabel}</th>
+                ${hasPrevColumn ? `<th style="text-align:right;">${prevLabel}</th>` : ""}
                 <th style="text-align:right;">${currentLabel}</th>
                 <th style="text-align:right;">TOTAL</th>
               </tr>
@@ -559,7 +591,7 @@ export default function PendingDuesReport({
         </Box>
 
         {/* 2. Month Selector (SECOND) */}
-        <Box sx={{ width: { xs: "100%", sm: 145, md: 155 } }}>
+        <Box sx={{ width: { xs: "100%", sm: 115, md: 125 } }}>
           <AppSelect
             label="Current Month"
             value={selectedMonth}
@@ -814,10 +846,45 @@ export default function PendingDuesReport({
             </Typography>
           </Box>
         ) : filteredMembers.length === 0 ? (
-          <Box sx={{ py: 8, textAlign: "center" }}>
-            <Typography sx={{ fontSize: "2.5rem", mb: 1 }}>🎉</Typography>
-            <Typography variant="h6" fontWeight={700} color="text.primary">
-              No Pending Dues Found
+          <Box sx={{ py: 6, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <Box
+              sx={{
+                width: 54,
+                height: 54,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 1.5,
+                bgcolor: (t) =>
+                  searchTerm.trim()
+                    ? t.palette.mode === "dark"
+                      ? "rgba(148, 163, 184, 0.12)"
+                      : "rgba(100, 116, 139, 0.08)"
+                    : t.palette.mode === "dark"
+                    ? "rgba(16, 185, 129, 0.14)"
+                    : "rgba(16, 185, 129, 0.08)",
+                border: (t) =>
+                  `1.5px solid ${
+                    searchTerm.trim()
+                      ? t.palette.mode === "dark"
+                        ? "rgba(148, 163, 184, 0.25)"
+                        : "rgba(100, 116, 139, 0.2)"
+                      : t.palette.mode === "dark"
+                      ? "rgba(16, 185, 129, 0.3)"
+                      : "rgba(16, 185, 129, 0.22)"
+                  }`,
+                color: searchTerm.trim() ? "text.secondary" : "#10b981",
+              }}
+            >
+              {searchTerm.trim() ? (
+                <SearchOffIcon sx={{ fontSize: 26 }} />
+              ) : (
+                <CheckCircleOutlineIcon sx={{ fontSize: 28 }} />
+              )}
+            </Box>
+            <Typography variant="h6" fontWeight={800} color="text.primary" sx={{ fontSize: "1.05rem" }}>
+              {searchTerm.trim() ? "No Matching Members" : "No Pending Dues Found"}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 450, mx: "auto", mt: 0.5 }}>
               {onlyWithDues ? (
@@ -880,25 +947,27 @@ export default function PendingDuesReport({
                         bgcolor: (t) => (t.palette.mode === "dark" ? "#1e1e2d" : "#f1f5f9"),
                         color: "text.primary",
                         borderRight: (t) => `1px solid ${t.palette.divider}`,
-                        minWidth: 160,
+                        minWidth: 135,
                       }}
                     >
                       {priorLabel}
                     </TableCell>
 
-                    <TableCell
-                      align="right"
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: "0.85rem",
-                        bgcolor: (t) => (t.palette.mode === "dark" ? "#1e1e2d" : "#f1f5f9"),
-                        color: "text.primary",
-                        borderRight: (t) => `1px solid ${t.palette.divider}`,
-                        minWidth: 130,
-                      }}
-                    >
-                      {prevLabel}
-                    </TableCell>
+                    {hasPrevColumn && (
+                      <TableCell
+                        align="right"
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: "0.85rem",
+                          bgcolor: (t) => (t.palette.mode === "dark" ? "#1e1e2d" : "#f1f5f9"),
+                          color: "text.primary",
+                          borderRight: (t) => `1px solid ${t.palette.divider}`,
+                          minWidth: 100,
+                        }}
+                      >
+                        {prevLabel}
+                      </TableCell>
+                    )}
 
                     <TableCell
                       align="right"
@@ -908,7 +977,7 @@ export default function PendingDuesReport({
                         bgcolor: (t) => (t.palette.mode === "dark" ? "#1e1e2d" : "#f1f5f9"),
                         color: "text.primary",
                         borderRight: (t) => `1px solid ${t.palette.divider}`,
-                        minWidth: 130,
+                        minWidth: 100,
                       }}
                     >
                       {currentLabel}
@@ -921,7 +990,7 @@ export default function PendingDuesReport({
                         fontSize: "0.88rem",
                         bgcolor: (t) => (t.palette.mode === "dark" ? "#26263b" : "#e2e8f0"),
                         color: "error.main",
-                        minWidth: 130,
+                        minWidth: 110,
                       }}
                     >
                       TOTAL
@@ -996,18 +1065,20 @@ export default function PendingDuesReport({
                         </TableCell>
 
                         {/* Previous Month Dues (Blank if 0, matching Image 2) */}
-                        <TableCell
-                          align="right"
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: "0.85rem",
-                            borderRight: (t) => `1px solid ${t.palette.divider}`,
-                            py: 1.2,
-                            color: m.previousMonthPendingAmount > 0 ? "text.primary" : "text.disabled",
-                          }}
-                        >
-                          {m.previousMonthPendingAmount > 0 ? formatWholeCurrency(m.previousMonthPendingAmount) : ""}
-                        </TableCell>
+                        {hasPrevColumn && (
+                          <TableCell
+                            align="right"
+                            sx={{
+                              fontWeight: 600,
+                              fontSize: "0.85rem",
+                              borderRight: (t) => `1px solid ${t.palette.divider}`,
+                              py: 1.2,
+                              color: m.previousMonthPendingAmount > 0 ? "text.primary" : "text.disabled",
+                            }}
+                          >
+                            {m.previousMonthPendingAmount > 0 ? formatWholeCurrency(m.previousMonthPendingAmount) : ""}
+                          </TableCell>
+                        )}
 
                         {/* Current Month Dues (Blank if 0, matching Image 2) */}
                         <TableCell
@@ -1074,18 +1145,20 @@ export default function PendingDuesReport({
                       {displayedTotals.prior > 0 ? formatWholeCurrency(displayedTotals.prior) : "—"}
                     </TableCell>
 
-                    <TableCell
-                      align="right"
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: "0.88rem",
-                        color: "text.primary",
-                        borderRight: (t) => `1px solid ${t.palette.divider}`,
-                        py: 1.5,
-                      }}
-                    >
-                      {displayedTotals.previous > 0 ? formatWholeCurrency(displayedTotals.previous) : "—"}
-                    </TableCell>
+                    {hasPrevColumn && (
+                      <TableCell
+                        align="right"
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: "0.88rem",
+                          color: "text.primary",
+                          borderRight: (t) => `1px solid ${t.palette.divider}`,
+                          py: 1.5,
+                        }}
+                      >
+                        {displayedTotals.previous > 0 ? formatWholeCurrency(displayedTotals.previous) : "—"}
+                      </TableCell>
+                    )}
 
                     <TableCell
                       align="right"
@@ -1186,7 +1259,7 @@ export default function PendingDuesReport({
                 {/* Prior Months */}
                 <Box sx={{ display: "flex", justifyContent: "space-between", p: 1.2, borderRadius: "8px", bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#f9fafb" }}>
                   <Typography variant="body2" fontWeight={600}>
-                    {selectedMemberModal.priorMonthsLabel || "Earlier Months"}
+                    {selectedMemberModal.priorMonthsLabel || "Previous Arrear"}
                   </Typography>
                   <Typography variant="body2" fontWeight={800} color={selectedMemberModal.priorMonthsPendingAmount > 0 ? "error.main" : "text.secondary"}>
                     {formatWholeCurrency(selectedMemberModal.priorMonthsPendingAmount)}
@@ -1194,14 +1267,16 @@ export default function PendingDuesReport({
                 </Box>
 
                 {/* Previous Month */}
-                <Box sx={{ display: "flex", justifyContent: "space-between", p: 1.2, borderRadius: "8px", bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#f9fafb" }}>
-                  <Typography variant="body2" fontWeight={600}>
-                    {selectedMemberModal.previousMonthLabel || "Previous Month"}
-                  </Typography>
-                  <Typography variant="body2" fontWeight={800} color={selectedMemberModal.previousMonthPendingAmount > 0 ? "error.main" : "text.secondary"}>
-                    {formatWholeCurrency(selectedMemberModal.previousMonthPendingAmount)}
-                  </Typography>
-                </Box>
+                {selectedMemberModal.previousMonthLabel && (
+                  <Box sx={{ display: "flex", justifyContent: "space-between", p: 1.2, borderRadius: "8px", bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#f9fafb" }}>
+                    <Typography variant="body2" fontWeight={600}>
+                      {selectedMemberModal.previousMonthLabel}
+                    </Typography>
+                    <Typography variant="body2" fontWeight={800} color={selectedMemberModal.previousMonthPendingAmount > 0 ? "error.main" : "text.secondary"}>
+                      {formatWholeCurrency(selectedMemberModal.previousMonthPendingAmount)}
+                    </Typography>
+                  </Box>
+                )}
 
                 {/* Current Month */}
                 <Box sx={{ display: "flex", justifyContent: "space-between", p: 1.2, borderRadius: "8px", bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#f9fafb" }}>
