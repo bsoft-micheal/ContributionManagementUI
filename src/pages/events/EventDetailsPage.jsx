@@ -152,18 +152,35 @@ export default function EventDetailsPage() {
                 }}
               />
             )}
-            {eventDetails.requireSponsorContribution && eventDetails.sponsorName && (
-              <Chip
-                label={`Sponsor: ${eventDetails.sponsorName} (₹${formatWholeCurrency(eventDetails.sponsorContributionAmount || 0)})`}
-                size="small"
-                sx={{
-                  bgcolor: "rgba(139, 92, 246, 0.12)",
-                  color: "#8b5cf6",
-                  fontWeight: 700,
-                  fontSize: "0.72rem",
-                  height: 22,
-                }}
-              />
+            {eventDetails.requireSponsorContribution && (
+              eventDetails.sponsors && eventDetails.sponsors.length > 0 ? (
+                eventDetails.sponsors.map((sp, idx) => (
+                  <Chip
+                    key={sp.sponsorId || idx}
+                    label={`Sponsor: ${sp.sponsorName} (₹${formatWholeCurrency(sp.contributionAmount || 0)})`}
+                    size="small"
+                    sx={{
+                      bgcolor: "rgba(139, 92, 246, 0.12)",
+                      color: "#8b5cf6",
+                      fontWeight: 700,
+                      fontSize: "0.72rem",
+                      height: 22,
+                    }}
+                  />
+                ))
+              ) : eventDetails.sponsorName ? (
+                <Chip
+                  label={`Sponsor: ${eventDetails.sponsorName} (₹${formatWholeCurrency(eventDetails.sponsorContributionAmount || 0)})`}
+                  size="small"
+                  sx={{
+                    bgcolor: "rgba(139, 92, 246, 0.12)",
+                    color: "#8b5cf6",
+                    fontWeight: 700,
+                    fontSize: "0.72rem",
+                    height: 22,
+                  }}
+                />
+              ) : null
             )}
           </Box>
         }

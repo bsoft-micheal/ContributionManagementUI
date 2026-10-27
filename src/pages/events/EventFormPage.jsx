@@ -2190,9 +2190,14 @@ export default function EventFormPage({
     return plannedBudget;
   }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, plannedBudget]);
 
+  const remainingFundingRequirement = useMemo(() => {
+    const sponsorDeduction = requireSponsorContribution ? totalSponsorContributionAmount : 0;
+    return Math.max(0, plannedBudget - sponsorDeduction);
+  }, [plannedBudget, requireSponsorContribution, totalSponsorContributionAmount]);
+
   const effectiveDeduction = useMemo(() => {
     if (usePreviousEventBalance && eligibleAdjAmount > 0 && prevAdjType === "SurplusCredit") {
-      return roundToWhole(Math.min(eligibleAdjAmount, plannedBudget));
+      return roundToWhole(Math.min(eligibleAdjAmount, remainingFundingRequirement));
     }
     if (!useAvailableBalance) return 0;
     if (selectedDeductionType === "custom") {
@@ -2200,19 +2205,19 @@ export default function EventFormPage({
       return isNaN(customVal) || customVal < 0 ? 0 : roundToWhole(customVal);
     }
     return roundToWhole(availableAmountInHand);
-  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, plannedBudget]);
+  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, remainingFundingRequirement]);
 
   const remainingBudgetToCollect = useMemo(() => {
     if (usePreviousEventBalance && eligibleAdjAmount > 0) {
       if (prevAdjType === "DeficitRecovery") {
-        return effectiveBudget;
+        return remainingFundingRequirement + eligibleAdjAmount;
       } else if (prevAdjType === "SurplusCredit") {
-        return Math.max(0, plannedBudget - effectiveDeduction);
+        return Math.max(0, remainingFundingRequirement - effectiveDeduction);
       }
     }
-    if (!useAvailableBalance) return plannedBudget;
-    return Math.max(0, plannedBudget - effectiveDeduction);
-  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, effectiveBudget, effectiveDeduction, useAvailableBalance, plannedBudget]);
+    if (!useAvailableBalance) return remainingFundingRequirement;
+    return Math.max(0, remainingFundingRequirement - effectiveDeduction);
+  }, [usePreviousEventBalance, eligibleAdjAmount, prevAdjType, remainingFundingRequirement, effectiveDeduction, useAvailableBalance]);
 
   const contributionPerMember = useMemo(() => {
     if (isBirthday && exempt && celebrantCount > 0) {
@@ -2245,19 +2250,19 @@ export default function EventFormPage({
       if (customNum > availableAmountInHand) {
         return `Deduction amount (${formatWholeCurrency(customNum)}) exceeds available Amount In Hand (${formatWholeCurrency(availableAmountInHand)}).`;
       }
-      if (customNum > plannedBudget) {
-        return `Deduction amount (${formatWholeCurrency(customNum)}) cannot exceed the planned budget (${formatWholeCurrency(plannedBudget)}).`;
+      if (customNum > remainingFundingRequirement) {
+        return `Deduction amount (${formatWholeCurrency(customNum)}) cannot exceed the remaining funding requirement (${formatWholeCurrency(remainingFundingRequirement)}).`;
       }
     } else {
       if (availableAmountInHand <= 0) {
         return "No available Amount In Hand to deduct.";
       }
-      if (availableAmountInHand > plannedBudget) {
-        return `Available balance (${formatWholeCurrency(availableAmountInHand)}) exceeds the planned budget (${formatWholeCurrency(plannedBudget)}). Please select Custom Amount to deduct up to ${formatWholeCurrency(plannedBudget)}.`;
+      if (availableAmountInHand > remainingFundingRequirement) {
+        return `Available balance (${formatWholeCurrency(availableAmountInHand)}) exceeds the remaining funding requirement (${formatWholeCurrency(remainingFundingRequirement)}). Please select Custom Amount to deduct up to ${formatWholeCurrency(remainingFundingRequirement)}.`;
       }
     }
     return null;
-  }, [useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, plannedBudget]);
+  }, [useAvailableBalance, selectedDeductionType, customDeductionAmount, availableAmountInHand, remainingFundingRequirement]);
 
   const dynamicFormulaText = computedBudgetItems
     .map((i) => i.formulaPart)
@@ -2821,6 +2826,8 @@ export default function EventFormPage({
         );
         if (incomplete) {
           newErrors.sponsors = "Please select a sponsor and enter a valid contribution amount for all rows.";
+        } else if (totalSponsorContributionAmount > plannedBudget) {
+          newErrors.sponsors = `Total sponsor contribution (${formatWholeCurrency(totalSponsorContributionAmount)}) cannot exceed the total planned budget (${formatWholeCurrency(plannedBudget)}).`;
         }
       }
     }
@@ -2843,8 +2850,8 @@ export default function EventFormPage({
         toast.error(balanceValidationError);
         return false;
       }
-      if (effectiveDeduction > plannedBudget) {
-        toast.error(`Deduction amount (${formatWholeCurrency(effectiveDeduction)}) cannot exceed the planned budget (${formatWholeCurrency(plannedBudget)}).`);
+      if (effectiveDeduction > remainingFundingRequirement) {
+        toast.error(`Deduction amount (${formatWholeCurrency(effectiveDeduction)}) cannot exceed the remaining funding requirement (${formatWholeCurrency(remainingFundingRequirement)}).`);
         return false;
       }
       if (effectiveDeduction > availableAmountInHand) {
@@ -4584,7 +4591,7 @@ export default function EventFormPage({
                     </Typography>
                   </Box>
 
-                  {/* Row 4 */}
+                  {/* Row 4: Planned Budget */}
                   <Box
                     sx={{
                       display: "flex",
@@ -4610,58 +4617,7 @@ export default function EventFormPage({
                     </Typography>
                   </Box>
 
-                  {/* Row 5 */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      minHeight: 38,
-                      py: 0.6,
-                      borderBottom: "1px solid",
-                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
-                    }}
-                  >
-                    <Box>
-                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
-                        Contribution Per Member
-                      </Typography>
-                      {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0 && (
-                        <Typography sx={{ fontSize: "0.72rem", color: "#6366f1", fontWeight: 600 }}>
-                          Celebrants: ₹{formatWholeNumber(otherEventsSharePerPerson)}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Typography sx={{ fontSize: "0.98rem", fontWeight: 800, color: "#0284c7" }}>
-                      ₹{formatWholeNumber(contributionPerMember)}
-                    </Typography>
-                  </Box>
-
-                  {/* Row 6 */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      minHeight: 36,
-                      py: 0.6,
-                    }}
-                  >
-                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
-                      Expected Collection
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: "0.9rem",
-                        fontWeight: 700,
-                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
-                      }}
-                    >
-                      ₹{formatWholeNumber(expectedCollection)}
-                    </Typography>
-                  </Box>
-
-                  {/* Row 7: Sponsor Contribution */}
+                  {/* Sponsor Contribution Row */}
                   {requireSponsorContribution && totalSponsorContributionAmount > 0 && (
                     <Box
                       sx={{
@@ -4670,7 +4626,7 @@ export default function EventFormPage({
                         alignItems: "center",
                         minHeight: 36,
                         py: 0.6,
-                        borderTop: "1px solid",
+                        borderBottom: "1px solid",
                         borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
                       }}
                     >
@@ -4697,6 +4653,85 @@ export default function EventFormPage({
                       </Typography>
                     </Box>
                   )}
+
+                  {/* Remaining Funding Requirement Row */}
+                  {requireSponsorContribution && totalSponsorContributionAmount > 0 && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        minHeight: 36,
+                        py: 0.6,
+                        borderBottom: "1px solid",
+                        borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                      }}
+                    >
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                        Remaining Funding Requirement
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.92rem",
+                          fontWeight: 700,
+                          color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7"),
+                        }}
+                      >
+                        ₹{formatWholeNumber(remainingFundingRequirement)}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Row 5: Contribution Per Member */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 38,
+                      py: 0.6,
+                      borderBottom: "1px solid",
+                      borderColor: (theme) => (theme.palette.mode === "dark" ? "divider" : "#f1f5f9"),
+                    }}
+                  >
+                    <Box>
+                      <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                        Contribution Per Member
+                      </Typography>
+                      {isBirthday && exempt && celebrantCount > 0 && nonBirthdaySelectedTypes.length > 0 && (
+                        <Typography sx={{ fontSize: "0.72rem", color: "#6366f1", fontWeight: 600 }}>
+                          Celebrants: ₹{formatWholeNumber(otherEventsSharePerPerson)}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Typography sx={{ fontSize: "0.98rem", fontWeight: 800, color: "#0284c7" }}>
+                      ₹{formatWholeNumber(contributionPerMember)}
+                    </Typography>
+                  </Box>
+
+                  {/* Row 6: Expected Collection */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      minHeight: 36,
+                      py: 0.6,
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.84rem", color: "#64748b", fontWeight: 500 }}>
+                      Expected Collection
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b"),
+                      }}
+                    >
+                      ₹{formatWholeNumber(expectedCollection)}
+                    </Typography>
+                  </Box>
                 </Box>
               </Box>
 
