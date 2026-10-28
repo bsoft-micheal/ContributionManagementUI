@@ -361,6 +361,7 @@ export default function AppDataTable({
   searchWidth,
   initialRowsPerPage = 15,
   emptyMessage,
+  rowKey,
 }) {
   const theme = useTheme();
   const { isLoading: globalLoading } = useNavigationLoading();
@@ -450,7 +451,31 @@ export default function AppDataTable({
     // Deduplicate data by unique identifier if present
     const seenIds = new Set();
     result = result.filter((row, idx) => {
-      const id = row?.roleRightId ?? row?.featureID ?? row?.featureId ?? row?._uid ?? row?.userId ?? row?.id ?? row?.key ?? row?._id ?? row?.memberId ?? row?.photoId ?? row?.eventId ?? row?.expenseId ?? (row?.roleName && !row?.roleRightId ? row?.roleId : undefined) ?? idx;
+      let id;
+      if (rowKey) {
+        id = typeof rowKey === "function" ? rowKey(row, idx) : row?.[rowKey];
+      } else {
+        id =
+          row?.contributionId ??
+          row?.paymentId ??
+          row?.transactionId ??
+          row?.id ??
+          row?.key ??
+          row?._id ??
+          row?._uid ??
+          row?.roleRightId ??
+          row?.featureID ??
+          row?.featureId ??
+          row?.expenseId ??
+          row?.photoId ??
+          (row?.eventId && row?.memberId ? `${row.memberId}_${row.eventId}` : undefined) ??
+          row?.eventId ??
+          row?.userId ??
+          (row?.memberName && !row?.eventId ? row?.memberId : undefined) ??
+          (row?.roleName && !row?.roleRightId ? row?.roleId : undefined);
+      }
+
+      if (id === undefined || id === null) return true;
       if (seenIds.has(id)) return false;
       seenIds.add(id);
       return true;

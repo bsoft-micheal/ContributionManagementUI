@@ -432,11 +432,6 @@ export default function EventFormPage({
 
   const isMemberActive = (m) => {
     if (!m) return false;
-    const isExited =
-      m.isExited === true ||
-      m.isExited === 1 ||
-      String(m.isExited).toLowerCase() === "true";
-    if (isExited) return false;
 
     if (
       m.isActive === false ||

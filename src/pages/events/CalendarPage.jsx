@@ -198,7 +198,7 @@ export default function CalendarPage({ isEmbedded = false }) {
   // Strictly filter to active, non-exited, non-deleted member accounts
   const activeMembers = useMemo(() => {
     return (members || []).filter(
-      (m) => m.isActive !== false && !m.isExited && !m.isDeleted
+      (m) => m.isActive !== false && !m.isDeleted
     );
   }, [members]);
 
@@ -779,11 +779,11 @@ export default function CalendarPage({ isEmbedded = false }) {
       );
 
       if (matchedMaster) {
-        if (matchedMaster.isActive === false || matchedMaster.isExited || matchedMaster.isDeleted) {
+        if (matchedMaster.isActive === false || matchedMaster.isDeleted) {
           return;
         }
       } else {
-        if (memberObj.isActive === false || memberObj.isExited || memberObj.isDeleted) {
+        if (memberObj.isActive === false || memberObj.isDeleted) {
           return;
         }
       }
