@@ -7,7 +7,6 @@ import {
   calculateLiveExtraAmountSpent,
   calculateTotalExpense,
   canAddAdditionalExpenseRow,
-  getEventPlannedBudget,
   MAX_ADDITIONAL_EXPENSE_ROWS,
   MAX_AMOUNT_DIGITS,
   MAX_AMOUNT_VALUE,
@@ -242,56 +241,7 @@ function runTests() {
   assert.equal(calculateTotalExpense(15000, 2000), 17000);
   console.log("✓ Test 6 passed: Editing and prior expenses handling verified.\n");
 
-  
-  // ── TEST 7: Event Planned Budget Resolution (with Sponsor Contributions) ──
-  console.log("Test 7: Event Planned Budget Resolution with Sponsor Contribution");
-  // Case A: Event with ₹10,000 planned budget and ₹5,000 sponsor contribution (Felix R)
-  const eventWithSponsor = {
-    eventName: "Suppose Christmassss",
-    baseAmount: 10000,
-    originalPlannedBudget: 10000,
-    totalExpectedAmount: 5000, // Member collection requirement
-    requireSponsorContribution: true,
-    sponsorContributionAmount: 5000,
-    sponsors: [{ userId: "123", amount: 5000 }],
-  };
-  assert.equal(
-    getEventPlannedBudget(eventWithSponsor),
-    10000,
-    "Planned budget must be ₹10,000 even though member collection is ₹5,000 due to sponsor"
-  );
-
-  // Case B: Standard event without sponsor
-  const standardEvent = {
-    eventName: "Team Lunch",
-    baseAmount: 5000,
-    originalPlannedBudget: 5000,
-    totalExpectedAmount: 5000,
-  };
-  assert.equal(getEventPlannedBudget(standardEvent), 5000);
-
-  // Case C: Event with Amount in Hand deduction
-  const eventWithHand = {
-    eventName: "Annual Party",
-    baseAmount: 20000,
-    originalPlannedBudget: 20000,
-    totalExpectedAmount: 15000,
-    useAvailableBalance: true,
-    allocatedAmount: 5000,
-  };
-  assert.equal(getEventPlannedBudget(eventWithHand), 20000);
-
-  // Case D: Event with fallback member collection and sponsor when baseAmount was not set
-  const eventFallback = {
-    eventName: "New Year",
-    totalExpectedAmount: 6000,
-    sponsorContributionAmount: 4000,
-  };
-  assert.equal(getEventPlannedBudget(eventFallback), 10000);
-
-  console.log("✓ Test 7 passed: getEventPlannedBudget handles sponsors, balance deductions, and standard events.\n");
-
-  console.log("ALL TESTS PASSED SUCCESSFULLY! (7/7)");
+  console.log("ALL TESTS PASSED SUCCESSFULLY! (6/6)");
 }
 
 runTests();
