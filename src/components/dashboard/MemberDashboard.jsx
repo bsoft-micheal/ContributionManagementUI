@@ -412,9 +412,9 @@ export default function MemberDashboard({
   const displayedContributions = useMemo(() => {
     let list = Array.isArray(contributions)
       ? contributions.map((c, idx) => ({
-          ...c,
-          id: c.contributionId || (c.eventId && c.memberId ? `${c.memberId}_${c.eventId}` : c.eventId) || `contrib_${idx}`,
-        }))
+        ...c,
+        id: c.contributionId || (c.eventId && c.memberId ? `${c.memberId}_${c.eventId}` : c.eventId) || `contrib_${idx}`,
+      }))
       : [];
 
     // Filter by Event Type if specified (case-insensitive)
@@ -1222,7 +1222,7 @@ export default function MemberDashboard({
                         <Typography variant="body2" sx={{ fontWeight: 700, color: isDark ? "#ffffff" : "#1e293b" }}>
                           No Verified Payments Yet
                         </Typography>
-                        
+
                       </Box>
                     </TableCell>
                   </TableRow>

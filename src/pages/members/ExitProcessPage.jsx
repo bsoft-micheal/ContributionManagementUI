@@ -18,6 +18,8 @@ import {
   MenuItem,
   Select,
   FormControl,
+  FormControlLabel,
+  Checkbox,
   InputLabel,
   InputAdornment,
   Divider,
@@ -146,6 +148,7 @@ export default function ExitProcessPage() {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [approvalTarget, setApprovalTarget] = useState(null);
   const [approvalRemarks, setApprovalRemarks] = useState("");
+  const [markAsInactive, setMarkAsInactive] = useState(true);
   const [approving, setApproving] = useState(false);
 
   // Historical Snapshot View Dialog
@@ -348,6 +351,7 @@ export default function ExitProcessPage() {
     }
     setApprovalTarget(row);
     setApprovalRemarks("");
+    setMarkAsInactive(true);
     setApprovalDialogOpen(true);
   }
 
@@ -359,8 +363,12 @@ export default function ExitProcessPage() {
     try {
       await approveExitClearanceAsync(approvalTarget.clearanceId, {
         approvalRemarks: approvalRemarks.trim(),
+        markAsInactive: Boolean(markAsInactive),
       });
-      toast.success(`Exit clearance approved successfully for ${approvalTarget.memberName}.`);
+      const successMessage = markAsInactive
+        ? `Exit clearance approved successfully. ${approvalTarget.memberName}'s account has been marked as Inactive.`
+        : `Exit clearance approved successfully for ${approvalTarget.memberName}.`;
+      toast.success(successMessage);
       setApprovalDialogOpen(false);
       setApprovalTarget(null);
       if (duesModalOpen) setDuesModalOpen(false);
@@ -906,126 +914,34 @@ export default function ExitProcessPage() {
   ];
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2.5 } }}>
-
-      {/* ── KPI Summary Cards ──────────────────────────────────── */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            sx={{
-              borderRadius: "12px",
-              boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.4)" : "0 4px 16px rgba(74,63,107,0.08)",
-              bgcolor: isDark ? "rgba(124, 58, 237, 0.08)" : "#faf8ff",
-              border: `1px solid ${isDark ? "rgba(124, 58, 237, 0.25)" : "rgba(74,63,107,0.15)"}`,
-              transition: "transform 0.2s ease",
-              "&:hover": { transform: "translateY(-2px)" },
-            }}
-          >
-            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: isDark ? "#c4b5fd" : "#4a3f6b", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Pending Exit Requests
-                  </Typography>
-                  <Typography variant="h4" fontWeight={900} sx={{ mt: 0.5, color: "text.primary" }}>
-                    {kpis.pendingExitRequests}
-                  </Typography>
-                </Box>
-                <Avatar sx={{ bgcolor: isDark ? "rgba(124,58,237,0.25)" : "rgba(74,63,107,0.12)", color: isDark ? "#c4b5fd" : "#4a3f6b", width: 44, height: 44 }}>
-                  <ExitIcon />
-                </Avatar>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            sx={{
-              borderRadius: "12px",
-              boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.4)" : "0 4px 16px rgba(245,158,11,0.08)",
-              bgcolor: isDark ? "rgba(245, 158, 11, 0.08)" : "#fffcf2",
-              border: `1px solid ${isDark ? "rgba(245, 158, 11, 0.25)" : "rgba(245, 158, 11, 0.2)"}`,
-              transition: "transform 0.2s ease",
-              "&:hover": { transform: "translateY(-2px)" },
-            }}
-          >
-            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Members with Dues
-                  </Typography>
-                  <Typography variant="h4" fontWeight={900} sx={{ mt: 0.5, color: "text.primary" }}>
-                    {kpis.membersWithOutstandingDues}
-                  </Typography>
-                </Box>
-                <Avatar sx={{ bgcolor: "rgba(245, 158, 11, 0.15)", color: "warning.main", width: 44, height: 44 }}>
-                  <WalletIcon />
-                </Avatar>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            sx={{
-              borderRadius: "12px",
-              boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.4)" : "0 4px 16px rgba(239,68,68,0.08)",
-              bgcolor: isDark ? "rgba(239, 68, 68, 0.08)" : "#fff5f5",
-              border: `1px solid ${isDark ? "rgba(239, 68, 68, 0.25)" : "rgba(239, 68, 68, 0.2)"}`,
-              transition: "transform 0.2s ease",
-              "&:hover": { transform: "translateY(-2px)" },
-            }}
-          >
-            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: "error.main", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Total Outstanding
-                  </Typography>
-                  <Typography variant="h4" fontWeight={900} sx={{ mt: 0.5, color: "error.main" }}>
-                    {formatWholeCurrency(kpis.totalOutstandingAmount || 0)}
-                  </Typography>
-                </Box>
-                <Avatar sx={{ bgcolor: "rgba(239, 68, 68, 0.15)", color: "error.main", width: 44, height: 44 }}>
-                  <RupeeIcon />
-                </Avatar>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            sx={{
-              borderRadius: "12px",
-              boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.4)" : "0 4px 16px rgba(16,185,129,0.08)",
-              bgcolor: isDark ? "rgba(16, 185, 129, 0.08)" : "#f0fdf4",
-              border: `1px solid ${isDark ? "rgba(16, 185, 129, 0.25)" : "rgba(16, 185, 129, 0.2)"}`,
-              transition: "transform 0.2s ease",
-              "&:hover": { transform: "translateY(-2px)" },
-            }}
-          >
-            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: "success.main", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Ready for Approval
-                  </Typography>
-                  <Typography variant="h4" fontWeight={900} sx={{ mt: 0.5, color: "success.main" }}>
-                    {kpis.readyForFinalApproval}
-                  </Typography>
-                </Box>
-                <Avatar sx={{ bgcolor: "rgba(16, 185, 129, 0.15)", color: "success.main", width: 44, height: 44 }}>
-                  <VerifiedIcon />
-                </Avatar>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+    <div className="page-shell">
+      {/* ── Top Header Bar (Matching Support Tickets) ──── */}
+      <Box
+        sx={{
+          background: (theme) =>
+            theme.palette.mode === "dark"
+              ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
+              : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+          borderBottom: (theme) =>
+            theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
+          borderRadius: "8px",
+          color: "#ffffff",
+          px: 3,
+          py: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          minHeight: 46,
+        }}
+      >
+        <Typography
+          variant="subtitle2"
+          fontWeight={600}
+          sx={{ fontSize: "0.9375rem", letterSpacing: "-0.005em", color: "#ffffff" }}
+        >
+          Member Exit Clearance
+        </Typography>
+      </Box>
 
       {/* ── Tabs Navigation ────────────────────────────────────── */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
@@ -1775,6 +1691,16 @@ export default function ExitProcessPage() {
             All contribution dues have been cleared. Are you sure you want to approve the final exit for this member?
           </Alert>
 
+          {Boolean(
+            (authState?.userId && String(approvalTarget?.memberId).toLowerCase() === String(authState.userId).toLowerCase()) ||
+            (authState?.user?.userId && String(approvalTarget?.memberId).toLowerCase() === String(authState.user.userId).toLowerCase()) ||
+            (authState?.email && approvalTarget?.memberEmail && String(approvalTarget.memberEmail).toLowerCase() === String(authState.email).toLowerCase())
+          ) && (
+            <Alert severity="warning" sx={{ mb: 2, borderRadius: "8px", fontWeight: 600 }}>
+              Notice: You are approving your own exit clearance. Marking your account as inactive will deactivate your current administrator access.
+            </Alert>
+          )}
+
           <Paper
             elevation={0}
             sx={{
@@ -1794,10 +1720,49 @@ export default function ExitProcessPage() {
             <Typography variant="body2" sx={{ mb: 0.5 }}>
               <strong>Total Obligations Settled:</strong> {formatWholeCurrency(approvalTarget?.totalObligations || 0)}
             </Typography>
-            <Typography variant="body2" color="success.main" fontWeight={800}>
+            <Typography variant="body2" color="success.main" fontWeight={800} sx={{ mb: 0.5 }}>
               <strong>Outstanding Dues:</strong> ₹0 (Fully Cleared)
             </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1, pt: 1, borderTop: `1px dashed ${theme.palette.divider}` }}>
+              <Typography variant="body2" fontWeight={700}>
+                Account Status on Approval:
+              </Typography>
+              <Chip
+                label={markAsInactive ? "Inactive (Deactivated)" : "Active"}
+                size="small"
+                sx={{
+                  fontWeight: 800,
+                  fontSize: "0.72rem",
+                  bgcolor: markAsInactive
+                    ? (isDark ? "rgba(239, 68, 68, 0.2)" : "#fee2e2")
+                    : (isDark ? "rgba(16, 185, 129, 0.2)" : "#dcfce7"),
+                  color: markAsInactive ? "error.main" : "success.main",
+                  border: `1px solid ${markAsInactive ? "rgba(239, 68, 68, 0.3)" : "rgba(16, 185, 129, 0.3)"}`,
+                }}
+              />
+            </Box>
           </Paper>
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={markAsInactive}
+                onChange={(e) => setMarkAsInactive(e.target.checked)}
+                color="primary"
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2" fontWeight={700}>
+                  Mark member account as Inactive
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Deactivates login credentials and flags offboarding complete for {approvalTarget?.memberName || "this member"}
+                </Typography>
+              </Box>
+            }
+            sx={{ mb: 2, alignItems: "flex-start" }}
+          />
 
           <TextField
             fullWidth
@@ -1997,6 +1962,6 @@ export default function ExitProcessPage() {
           ))}
         </List>
       </Popover>
-    </Box>
+    </div>
   );
 }

@@ -102,6 +102,11 @@ import {
   getQrCodeApiUrl,
 } from "../../utils/upiQrHelper";
 import { TOAST_MESSAGES, MENU_FEATURE_IDS } from "../../constants";
+import {
+  isWfhMember,
+  isOfficeMember,
+  getWorkTypeBadgeLabel,
+} from "../../utils/workTypeHelper";
 
 import useAccessByLocation from "../../hooks/useAccessByLocation";
 import { useAuth } from "../../contexts/AuthContext";
@@ -456,14 +461,14 @@ export default function EventFormPage({
   const totalOfficeCount = useMemo(
     () =>
       activeMembers.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        isOfficeMember
       ).length,
     [activeMembers]
   );
   const totalWfhCount = useMemo(
     () =>
       activeMembers.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        isWfhMember
       ).length,
     [activeMembers]
   );
@@ -541,10 +546,10 @@ export default function EventFormPage({
         const defaultTypeId = bdayType ? bdayType.eventTypeId : typesData?.[0]?.eventTypeId || "";
 
         const offTotal = activeMems.filter(
-          (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+          isOfficeMember
         ).length;
         const wfhTotal = activeMems.filter(
-          (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+          isWfhMember
         ).length;
 
         setOfficeMembers(offTotal);
@@ -568,10 +573,10 @@ export default function EventFormPage({
             (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
           );
           const offCount = celebrantsInMonth.filter(
-            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+            isOfficeMember
           ).length;
           const wfhCount = celebrantsInMonth.filter(
-            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+            isWfhMember
           ).length;
 
           setOfficeBirthdays(offCount);
@@ -969,10 +974,10 @@ export default function EventFormPage({
               )
             : [];
           const offCount = celebrantsInMonth.filter(
-            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+            isOfficeMember
           ).length;
           const wfhCount = celebrantsInMonth.filter(
-            (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+            isWfhMember
           ).length;
 
           setOfficeBirthdays(offCount);
@@ -1634,7 +1639,7 @@ export default function EventFormPage({
       const cleanTargetName = typeNameStr.toLowerCase().replace(/[\s_-]/g, "");
 
       return activeMembers.map((m) => {
-        const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+        const isWfh = isWfhMember(m);
         const mId = String(m.memberId || m.userId || m.id).toLowerCase();
 
         // Check if this member ALREADY has an event of THAT SAME event type in this calendar month
@@ -1669,7 +1674,7 @@ export default function EventFormPage({
   const allActiveMemberOptions = useMemo(
     () =>
       activeMembers.map((m) => {
-        const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+        const isWfh = isWfhMember(m);
         return {
           label: `${m.name} (${isWfh ? "WFH" : "Office"})`,
           value: m.memberId,
@@ -1691,14 +1696,14 @@ export default function EventFormPage({
   const nonBdayOffice = useMemo(
     () =>
       participatingMembers.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        isOfficeMember
       ).length,
     [participatingMembers]
   );
   const nonBdayWfh = useMemo(
     () =>
       participatingMembers.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        isWfhMember
       ).length,
     [participatingMembers]
   );
@@ -1710,7 +1715,7 @@ export default function EventFormPage({
     sendOffMemberIds.forEach((id) => exemptLookup.set(id, "Send-off - Exempt"));
 
     return activeMembers.map((m) => {
-      const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+      const isWfh = isWfhMember(m);
       const exemptReason = exemptLookup.get(m.memberId);
       return {
         label: exemptReason
@@ -1728,10 +1733,10 @@ export default function EventFormPage({
       if (isBirthday) {
         setTotalMembers(activeMembers.length);
         const offTotal = activeMembers.filter(
-          (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+          isOfficeMember
         ).length;
         const wfhTotal = activeMembers.filter(
-          (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+          isWfhMember
         ).length;
         setOfficeMembers(offTotal);
         setWfhMembers(wfhTotal);
@@ -1750,10 +1755,10 @@ export default function EventFormPage({
         (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === targetMonth
       );
       const offCount = celebrantsInMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        isOfficeMember
       ).length;
       const wfhCount = celebrantsInMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        isWfhMember
       ).length;
       setOfficeBirthdays(offCount);
       setWfhBirthdays(wfhCount);
@@ -1885,7 +1890,7 @@ export default function EventFormPage({
   // Office birthday celebrants
   const officeCelebrants = useMemo(() => {
     return monthCelebrants.filter(
-      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      isOfficeMember
     );
   }, [monthCelebrants]);
 
@@ -2313,10 +2318,10 @@ export default function EventFormPage({
     }
 
     const offTotal = activeMembers.filter(
-      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      isOfficeMember
     ).length;
     const wfhTotal = activeMembers.filter(
-      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      isWfhMember
     ).length;
 
     if (isNewBday) {
@@ -2329,10 +2334,10 @@ export default function EventFormPage({
           )
         : [];
       const offCount = celebrantsInMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        isOfficeMember
       ).length;
       const wfhCount = celebrantsInMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        isWfhMember
       ).length;
       setOfficeBirthdays(offCount);
       setWfhBirthdays(wfhCount);
@@ -2344,10 +2349,10 @@ export default function EventFormPage({
       const pMembers = activeMembers.filter((m) => currParticipants.includes(m.memberId));
       setTotalMembers(pMembers.length);
       const offCount = pMembers.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        isOfficeMember
       ).length;
       const wfhCount = pMembers.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        isWfhMember
       ).length;
       setOfficeMembers(offCount);
       setWfhMembers(wfhCount);
@@ -2417,10 +2422,10 @@ export default function EventFormPage({
     }
 
     const offTotal = activeMembers.filter(
-      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+      isOfficeMember
     ).length;
     const wfhTotal = activeMembers.filter(
-      (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+      isWfhMember
     ).length;
 
     if (hasBday) {
@@ -2433,10 +2438,10 @@ export default function EventFormPage({
           )
         : [];
       const offCount = celebrantsInMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        isOfficeMember
       ).length;
       const wfhCount = celebrantsInMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        isWfhMember
       ).length;
       setOfficeBirthdays(offCount);
       setWfhBirthdays(wfhCount);
@@ -2448,10 +2453,10 @@ export default function EventFormPage({
       const pMembers = activeMembers.filter((m) => currParticipants.includes(m.memberId));
       setTotalMembers(pMembers.length);
       const offCount = pMembers.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        isOfficeMember
       ).length;
       const wfhCount = pMembers.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        isWfhMember
       ).length;
       setOfficeMembers(offCount);
       setWfhMembers(wfhCount);
@@ -2531,10 +2536,10 @@ export default function EventFormPage({
         (m) => m.dateOfBirth && dayjs(m.dateOfBirth).month() === newMonth
       );
       const offCount = celebrantsInNewMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "office"
+        isOfficeMember
       ).length;
       const wfhCount = celebrantsInNewMonth.filter(
-        (m) => (m.workType || m.memberType || "Office").toLowerCase() === "wfh"
+        isWfhMember
       ).length;
       setOfficeBirthdays(offCount > 0 ? offCount : 1);
       setWfhBirthdays(wfhCount);
@@ -3739,15 +3744,35 @@ export default function EventFormPage({
                     )}
 
                     {!isBirthday && (
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <AppInput
-                          label="Total Active Members"
-                          placeholder="Auto calculated"
-                          type="text"
-                          value={totalMembers}
-                          disabled
-                        />
-                      </Grid>
+                      <>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <AppInput
+                            label="Total Active Members"
+                            placeholder="Auto calculated"
+                            type="text"
+                            value={totalMembers}
+                            disabled
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <AppInput
+                            label="Office Members"
+                            placeholder="Auto calculated"
+                            type="text"
+                            value={officeMembers}
+                            disabled
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <AppInput
+                            label="WFH Members"
+                            placeholder="Auto calculated"
+                            type="text"
+                            value={wfhMembers}
+                            disabled
+                          />
+                        </Grid>
+                      </>
                     )}
 
                     {/* Flags Row: Enable Celebrant Selection & Require Sponsor Contribution (Multiple Events Mode - Side by Side) */}
@@ -4414,7 +4439,7 @@ export default function EventFormPage({
                   </Typography>
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px 8px" }}>
                     {monthCelebrants.map((m) => {
-                      const isWfh = (m.workType || m.memberType || "Office").toLowerCase() === "wfh";
+                      const isWfh = isWfhMember(m);
                       return (
                         <Chip
                           key={m.memberId}
