@@ -66,11 +66,14 @@ import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getPaymentContextAsync } from "../../services/paymentService";
 import SubmitPaymentModal from "../payments/SubmitPaymentModal";
 import AddSupportTicketModal from "../support/AddSupportTicketModal";
+import ViewContributionModal from "../contributions/ViewContributionModal";
 import BirthdayCelebrationModal from "../common/BirthdayCelebrationModal";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import MetricCard from "../common/MetricCard";
 import AppDataTable from "../common/AppDataTable";
 import AppOverflowTooltip from "../common/AppOverflowTooltip";
+import AppDialog from "../common/AppDialog";
+import AppButton, { AppCancelButton } from "../common/AppButton";
 
 // Helper to resolve thematic colors and icons for event categories
 function getCategoryVisuals(categoryName = "") {
@@ -293,21 +296,73 @@ export default function MemberDashboard({
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [activePaymentRow, setActivePaymentRow] = useState(null);
 
-  // Status modal state for viewing Pending Verification details
+  // Status modal state for viewing Contribution & Payment details
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [activeStatusRow, setActiveStatusRow] = useState(null);
-
-  // Support ticket modal state for raising issues on rejected or disputed payments
-  const [supportTicketModalOpen, setSupportTicketModalOpen] = useState(false);
-  const [selectedTicketRow, setSelectedTicketRow] = useState(null);
+  const [activeStatusTx, setActiveStatusTx] = useState(null);
 
   const handleOpenStatusModal = (row) => {
-    setActiveStatusRow(row);
+    if (!row) return;
+
+    const memberFullName =
+      row.memberName ||
+      summary?.memberName ||
+      authState?.fullName ||
+      authState?.username ||
+      "Contributor";
+
+    const matchingRecent = (recentPayments || []).filter(
+      (p) =>
+        (row.eventId && p.eventId && String(row.eventId).toLowerCase() === String(p.eventId).toLowerCase()) ||
+        (row.eventName && p.eventName && String(row.eventName).trim().toLowerCase() === String(p.eventName).trim().toLowerCase())
+    );
+
+    const isSplitPayment =
+      matchingRecent.length > 1 ||
+      matchingRecent.some((p) => String(p.paymentMode || "").toLowerCase().includes("split")) ||
+      String(row.paymentMode || "").toLowerCase().includes("split") ||
+      row.paymentMode === 5 ||
+      row.paymentMode === "5" ||
+      (Number(row.verifiedPaidAmount || 0) > 0 && Number(row.submittedAmount || 0) > 0 && Number(row.verifiedPaidAmount) > Number(row.submittedAmount));
+
+    const totalVerifiedPaid = Number(row.verifiedPaidAmount || row.submittedAmount || row.contributionAmount || 0);
+    const resolvedMode = isSplitPayment ? "Split" : (row.paymentMode || "Gpay");
+
+    const matchedTx = {
+      txnNumber: row.txnNumber,
+      paymentMode: resolvedMode,
+      amount: totalVerifiedPaid,
+      status: row.paymentVerificationStatus || row.paymentStatus,
+      notes: row.notes || row.rejectionReason,
+      rejectionReason: row.rejectionReason,
+      auditRemarks: row.auditRemarks || row.rejectionReason,
+      verifiedBy: row.verifiedBy,
+      verifiedOn: row.verifiedOn,
+      paymentDate: row.paymentDate || row.verifiedOn || row.createdAt || row.eventDate,
+      utr: row.txnNumber,
+      screenshot: row.screenshot,
+      createdBy: row.createdBy || memberFullName,
+      isSplitGroup: isSplitPayment,
+    };
+
+    setActiveStatusRow({
+      ...row,
+      memberName: memberFullName,
+      amount: Number(row.contributionAmount || row.amount || totalVerifiedPaid),
+      paidAmount: totalVerifiedPaid,
+      paymentMode: resolvedMode,
+    });
+    setActiveStatusTx(matchedTx);
     setStatusModalOpen(true);
   };
 
+  // Support ticket modal state for raising issues on rejected payments
+  const [supportTicketModalOpen, setSupportTicketModalOpen] = useState(false);
+  const [selectedTicketRow, setSelectedTicketRow] = useState(null);
+
   const handleOpenSupportTicket = (row) => {
     if (!row) return;
+    const reason = row.rejectionReason || row.auditRemarks || row.notes || "";
     setSelectedTicketRow({
       memberName: row.memberName || authState?.fullName || authState?.name || "",
       memberId: row.memberId || authState?.userId || "",
@@ -318,7 +373,9 @@ export default function MemberDashboard({
       status: row.paymentStatus || "Payment Rejected",
       ticketType: "Payment Issue",
       priority: "High",
-      description: `Payment rejected for event: ${row.eventName || "Event"}.`,
+      description: reason
+        ? `Payment rejected for event: ${row.eventName || "Event"}. Rejection Reason: ${reason}`
+        : `Payment rejected for event: ${row.eventName || "Event"}.`,
     });
     setSupportTicketModalOpen(true);
   };
@@ -596,8 +653,6 @@ export default function MemberDashboard({
   }, [contributions, statusFilter, selectedEventType, selectedEventId]);
 
 
-  console.log(displayedContributions);
-
 
   // Period label string (e.g. "October 2026" or "All Periods")
   const periodLabel = useMemo(() => {
@@ -644,34 +699,84 @@ export default function MemberDashboard({
 
   // Only records with Completed, Verified, or Approved status should appear in Recent Payments
   const completedRecentPayments = useMemo(() => {
-    const list = [];
-    const seenEvents = new Set();
+    const groupMap = new Map();
 
     (recentPayments || []).forEach((item) => {
       const rawSt = String(item.verificationStatus || item.status || "").trim().toLowerCase();
       if (rawSt === "completed" || rawSt === "verified" || rawSt === "approved") {
-        const evKey = String(item.eventId || item.eventName || "").trim().toLowerCase();
-        if (!evKey || !seenEvents.has(evKey)) {
-          if (evKey) seenEvents.add(evKey);
-          list.push({
+        const evKey = String(item.eventId || item.eventName || item.paymentId || "").trim().toLowerCase();
+        if (!groupMap.has(evKey)) {
+          groupMap.set(evKey, {
             paymentId: item.paymentId,
             eventId: item.eventId,
             eventName: item.eventName || "Event Payment",
             eventTypeName: item.eventTypeName || item.category || "Event",
             paymentDate: item.paymentDate,
-            paymentAmount: item.paymentAmount,
-            paymentMode: (() => {
-              const m = String(item.paymentMode || "").trim().toLowerCase();
-              if (m.includes("phonepe") || m.includes("phone")) return "Phonepe";
-              if (m.includes("cash")) return "Cash";
-              if (m.includes("split")) return "Split";
-              return "Gpay";
-            })(),
+            paymentAmount: Number(item.paymentAmount || 0),
+            modes: [String(item.paymentMode || "").trim()].filter(Boolean),
             verificationStatus: "Approved",
           });
+        } else {
+          const existing = groupMap.get(evKey);
+          existing.paymentAmount += Number(item.paymentAmount || 0);
+          if (item.paymentMode) {
+            existing.modes.push(String(item.paymentMode).trim());
+          }
+          if (dayjs(item.paymentDate).isAfter(dayjs(existing.paymentDate))) {
+            existing.paymentDate = item.paymentDate;
+          }
         }
       }
     });
+
+    const list = Array.from(groupMap.values()).map((entry) => {
+      // Cross-reference with contributions list to get complete event-level payment metrics
+      const matchedContrib = (contributions || []).find((c) =>
+        (entry.eventId && c.eventId && String(entry.eventId).toLowerCase() === String(c.eventId).toLowerCase()) ||
+        (entry.eventName && c.eventName && String(entry.eventName).trim().toLowerCase() === String(c.eventName).trim().toLowerCase())
+      );
+
+      const uniqueModes = Array.from(new Set(entry.modes.map((m) => m.toLowerCase())));
+      const contribMode = String(matchedContrib?.paymentMode || "").toLowerCase();
+
+      const eventFullPaid = Number(matchedContrib?.verifiedPaidAmount || matchedContrib?.submittedAmount || 0);
+      const isAmountMultiPart = eventFullPaid > entry.paymentAmount;
+
+      const isSplit =
+        uniqueModes.length > 1 ||
+        uniqueModes.some((m) => m.includes("split")) ||
+        contribMode.includes("split") ||
+        matchedContrib?.paymentMode === 5 ||
+        matchedContrib?.paymentMode === "5" ||
+        isAmountMultiPart;
+
+      let resolvedAmount = entry.paymentAmount;
+      if (isAmountMultiPart && eventFullPaid > 0) {
+        resolvedAmount = eventFullPaid;
+      }
+
+      let resolvedMode = "Gpay";
+      if (isSplit) {
+        resolvedMode = "Split";
+      } else if (uniqueModes.length === 1) {
+        const m = uniqueModes[0];
+        if (m.includes("phonepe") || m.includes("phone")) resolvedMode = "Phonepe";
+        else if (m.includes("cash")) resolvedMode = "Cash";
+        else resolvedMode = "Gpay";
+      } else if (contribMode) {
+        if (contribMode.includes("phonepe") || contribMode.includes("phone")) resolvedMode = "Phonepe";
+        else if (contribMode.includes("cash")) resolvedMode = "Cash";
+        else resolvedMode = "Gpay";
+      }
+
+      return {
+        ...entry,
+        paymentAmount: resolvedAmount,
+        paymentMode: resolvedMode,
+      };
+    });
+
+    const seenEvents = new Set(list.map((x) => String(x.eventId || x.eventName || "").trim().toLowerCase()).filter(Boolean));
 
     // Also incorporate any approved items from contributions list if not already present
     (contributions || []).forEach((c) => {
@@ -680,20 +785,21 @@ export default function MemberDashboard({
         const evKey = String(c.eventId || c.eventName || "").trim().toLowerCase();
         if (evKey && !seenEvents.has(evKey)) {
           seenEvents.add(evKey);
+          const rawM = String(c.paymentMode || "").toLowerCase();
+          const isSplit = rawM.includes("split") || c.paymentMode === 5 || c.paymentMode === "5";
+          let resolvedMode = "Gpay";
+          if (isSplit) resolvedMode = "Split";
+          else if (rawM.includes("phonepe") || rawM.includes("phone")) resolvedMode = "Phonepe";
+          else if (rawM.includes("cash")) resolvedMode = "Cash";
+
           list.push({
             paymentId: c.contributionId || c.eventId,
             eventId: c.eventId,
             eventName: c.eventName || "Event Payment",
             eventTypeName: c.eventTypeName || c.category || "Event",
             paymentDate: c.paymentDate || c.eventDate,
-            paymentAmount: c.verifiedPaidAmount || c.contributionAmount,
-            paymentMode: (() => {
-              const m = String(c.paymentMode || "").trim().toLowerCase();
-              if (m.includes("phonepe") || m.includes("phone")) return "Phonepe";
-              if (m.includes("cash")) return "Cash";
-              if (m.includes("split")) return "Split";
-              return "Gpay";
-            })(),
+            paymentAmount: Number(c.verifiedPaidAmount || c.submittedAmount || c.contributionAmount || 0),
+            paymentMode: resolvedMode,
             verificationStatus: "Approved",
           });
         }
@@ -952,7 +1058,7 @@ export default function MemberDashboard({
             );
           }
 
-          if (info.isPaid || info.isApproved || info.isPendingVerif) {
+          if (info.isPaid || info.isApproved || info.isPendingVerif || info.isRejected) {
             return (
               <Button
                 variant="outlined"
@@ -960,8 +1066,15 @@ export default function MemberDashboard({
                 onClick={() => handleOpenStatusModal(row)}
                 startIcon={<VisibilityRoundedIcon sx={{ fontSize: 18 }} />}
                 sx={{
-                  borderColor: isDark ? "rgba(255,255,255,0.2)" : "#cbd5e1",
-                  color: isDark ? "#c4b5fd" : "#4a3f6b",
+                  borderColor: info.isRejected
+                    ? (isDark ? "rgba(239, 68, 68, 0.5)" : "#fca5a5")
+                    : (isDark ? "rgba(255,255,255,0.2)" : "#cbd5e1"),
+                  color: info.isRejected
+                    ? (isDark ? "#f87171" : "#dc2626")
+                    : (isDark ? "#c4b5fd" : "#4a3f6b"),
+                  bgcolor: info.isRejected
+                    ? (isDark ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.04)")
+                    : "transparent",
                   fontWeight: 700,
                   textTransform: "none",
                   borderRadius: "8px",
@@ -969,41 +1082,14 @@ export default function MemberDashboard({
                   py: 0.65,
                   fontSize: "0.825rem",
                   "&:hover": {
-                    borderColor: "#7c3aed",
-                    bgcolor: "rgba(124, 58, 237, 0.04)",
+                    borderColor: info.isRejected ? "#dc2626" : "#7c3aed",
+                    bgcolor: info.isRejected
+                      ? (isDark ? "rgba(239, 68, 68, 0.18)" : "rgba(239, 68, 68, 0.1)")
+                      : "rgba(124, 58, 237, 0.04)",
                   },
                 }}
               >
                 View Status
-              </Button>
-            );
-          }
-
-          if (info.isRejected) {
-            return (
-              <Button
-                variant="outlined"
-                size="small"
-                color="error"
-                onClick={() => handleOpenSupportTicket(row)}
-                startIcon={<ConfirmationNumberOutlinedIcon sx={{ fontSize: 18 }} />}
-                sx={{
-                  fontWeight: 700,
-                  textTransform: "none",
-                  borderRadius: "8px",
-                  px: 1.85,
-                  py: 0.65,
-                  fontSize: "0.825rem",
-                  borderColor: isDark ? "rgba(239, 68, 68, 0.4)" : "#fca5a5",
-                  bgcolor: isDark ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.04)",
-                  color: isDark ? "#f87171" : "#dc2626",
-                  "&:hover": {
-                    borderColor: "#dc2626",
-                    bgcolor: isDark ? "rgba(239, 68, 68, 0.18)" : "rgba(239, 68, 68, 0.1)",
-                  },
-                }}
-              >
-                Support Ticket
               </Button>
             );
           }
@@ -1333,12 +1419,34 @@ export default function MemberDashboard({
                                     component="span"
                                     sx={{
                                       fontSize: "0.68rem",
-                                      fontWeight: 600,
-                                      px: 0.7,
-                                      py: 0.15,
+                                      fontWeight: 700,
+                                      px: 0.75,
+                                      py: 0.2,
                                       borderRadius: "4px",
-                                      bgcolor: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
-                                      color: isDark ? "#cbd5e1" : "#475569",
+                                      bgcolor: (() => {
+                                        const m = String(item.paymentMode).toLowerCase();
+                                        if (m.includes("split")) return isDark ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.12)";
+                                        if (m.includes("phonepe") || m.includes("phone")) return isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)";
+                                        if (m.includes("gpay") || m.includes("google")) return isDark ? "rgba(37, 99, 235, 0.2)" : "rgba(37, 99, 235, 0.1)";
+                                        if (m.includes("cash")) return isDark ? "rgba(22, 163, 74, 0.2)" : "rgba(22, 163, 74, 0.1)";
+                                        return isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9";
+                                      })(),
+                                      color: (() => {
+                                        const m = String(item.paymentMode).toLowerCase();
+                                        if (m.includes("split")) return isDark ? "#a5b4fc" : "#6366f1";
+                                        if (m.includes("phonepe") || m.includes("phone")) return isDark ? "#c4b5fd" : "#7c3aed";
+                                        if (m.includes("gpay") || m.includes("google")) return isDark ? "#93c5fd" : "#2563eb";
+                                        if (m.includes("cash")) return isDark ? "#86efac" : "#16a34a";
+                                        return isDark ? "#cbd5e1" : "#475569";
+                                      })(),
+                                      border: (() => {
+                                        const m = String(item.paymentMode).toLowerCase();
+                                        if (m.includes("split")) return "1px solid rgba(99, 102, 241, 0.35)";
+                                        if (m.includes("phonepe") || m.includes("phone")) return "1px solid rgba(124, 58, 237, 0.3)";
+                                        if (m.includes("gpay") || m.includes("google")) return "1px solid rgba(37, 99, 235, 0.3)";
+                                        if (m.includes("cash")) return "1px solid rgba(22, 163, 74, 0.3)";
+                                        return "none";
+                                      })(),
                                     }}
                                   >
                                     {item.paymentMode}
@@ -1544,113 +1652,19 @@ export default function MemberDashboard({
         />
       )}
 
-      {/* ── View Status Dialog for Pending Verification ── */}
-      <Dialog
+      {/* ── Contribution & Payment Details Dynamic Modal (Reuses ViewContributionModal) ── */}
+      <ViewContributionModal
         open={statusModalOpen}
         onClose={() => {
           setStatusModalOpen(false);
           setActiveStatusRow(null);
+          setActiveStatusTx(null);
         }}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: "16px",
-            p: 1,
-            boxShadow: "0 10px 40px rgba(0, 0, 0, 0.15)",
-          },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-          <HourglassEmptyRoundedIcon sx={{ color: "#d97706", fontSize: 24 }} />
-          Payment Status
-        </DialogTitle>
-        <DialogContent dividers sx={{ py: 2 }}>
-          {activeStatusRow && (
-            <Stack spacing={2}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Typography variant="body2" color="text.secondary">
-                  Event
-                </Typography>
-                <Typography variant="subtitle2" fontWeight={700}>
-                  {activeStatusRow.eventName || "--"}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Typography variant="body2" color="text.secondary">
-                  Event Date
-                </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {activeStatusRow.eventDate ? dayjs(activeStatusRow.eventDate).format("DD MMM YYYY") : "--"}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Typography variant="body2" color="text.secondary">
-                  Amount
-                </Typography>
-                <Typography variant="subtitle2" fontWeight={800} color="primary.main">
-                  {formatWholeCurrency(activeStatusRow.contributionAmount || 0)}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Typography variant="body2" color="text.secondary">
-                  Status
-                </Typography>
-                <Chip
-                  icon={<Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#d97706", mr: "4px !important" }} />}
-                  label="Pending Verification"
-                  size="small"
-                  sx={{
-                    bgcolor: "#fffbeb",
-                    color: "#d97706",
-                    fontWeight: 700,
-                    borderRadius: "16px",
-                    fontSize: "0.785rem",
-                    border: "1px solid #fde68a",
-                  }}
-                />
-              </Box>
-              <Box
-                sx={{
-                  bgcolor: "#fffbeb",
-                  borderRadius: "10px",
-                  p: 1.5,
-                  border: "1px solid #fde68a",
-                  display: "flex",
-                  gap: 1.25,
-                  alignItems: "flex-start",
-                }}
-              >
-                <InfoRoundedIcon sx={{ color: "#d97706", fontSize: 20, mt: 0.2 }} />
-                <Typography variant="caption" sx={{ color: "#92400e", lineHeight: 1.45, fontWeight: 500 }}>
-                  Your payment details and proof have been submitted and are currently awaiting review by an administrator. Once approved, this event will be settled and moved to Recent Payments.
-                </Typography>
-              </Box>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 2, py: 1.5 }}>
-          <Button
-            onClick={() => {
-              setStatusModalOpen(false);
-              setActiveStatusRow(null);
-            }}
-            variant="contained"
-            sx={{
-              background: isDark
-                ? "linear-gradient(90deg, #5a4c82 0%, #6f5ea0 100%)"
-                : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
-              color: "#ffffff",
-              fontWeight: 700,
-              textTransform: "none",
-              borderRadius: "8px",
-              px: 3,
-            }}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        row={activeStatusRow}
+        matchedTx={activeStatusTx}
+        allTransactions={recentPayments || []}
+        events={eventTypes || []}
+      />
 
       {/* Birthday Celebration Modal */}
       <BirthdayCelebrationModal
