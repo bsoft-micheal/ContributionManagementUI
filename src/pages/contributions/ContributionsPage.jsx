@@ -498,7 +498,7 @@ export default function ContributionsPage() {
       0
     );
     if (count <= 0 && Array.isArray(allContributions)) {
-      const matchingContribs = allContributions.filter(item => 
+      const matchingContribs = allContributions.filter(item =>
         String(item.eventId || "").toLowerCase() === String(activeEv.eventId || activeEv.id || "").toLowerCase()
       );
       if (matchingContribs.length > 0) count = matchingContribs.length;
@@ -4058,8 +4058,8 @@ export default function ContributionsPage() {
                   : [];
                 const primaryEvName = statusModalRow.isGrouped
                   ? (paidGroupedEvents.length > 0
-                      ? paidGroupedEvents.map((e) => e.eventName).join(", ")
-                      : (statusModalRow.memberEvents?.map((e) => e.eventName).join(", ") || "All Events"))
+                    ? paidGroupedEvents.map((e) => e.eventName).join(", ")
+                    : (statusModalRow.memberEvents?.map((e) => e.eventName).join(", ") || "All Events"))
                   : (statusModalRow?.eventName || (events.find((e) => e.eventId === statusModalRow?.eventId)?.eventName) || "Current Event");
                 const currentEvAmt = Number(statusModalRow?.amount || statusModalRow?.currentEventDue || 0);
 

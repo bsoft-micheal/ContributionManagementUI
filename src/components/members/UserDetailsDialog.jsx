@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Grid, Typography, Chip } from "@mui/material";
 import dayjs from "dayjs";
 import { formatViewDate, formatViewDateTime } from "../../utils/dateHelper";
+import { isWfhWorkType } from "../../utils/workTypeHelper";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 
@@ -19,7 +20,7 @@ export default function UserDetailsDialog({ open, onClose, user }) {
 
   const roleStyle = getRoleStyle(user.roleName);
   const wt = user.workType || "Office";
-  const isWfh = wt.toUpperCase() === "WFH";
+  const isWfh = isWfhWorkType(wt);
 
   return (
     <AppDialog
