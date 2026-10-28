@@ -36,7 +36,6 @@ import {
   calculateLiveExtraAmountSpent,
   calculateTotalExpense,
   canAddAdditionalExpenseRow,
-  getEventPlannedBudget,
   MAX_ADDITIONAL_EXPENSE_ROWS,
   MAX_AMOUNT_DIGITS,
   MAX_AMOUNT_VALUE,
@@ -403,7 +402,15 @@ export default function ExpenseFormDialog({
     if (!ev && !initialEvent) return null;
     const targetEv = ev || initialEvent;
 
-    const expected = roundToWhole(getEventPlannedBudget(targetEv));
+    const expected = roundToWhole(
+      Number(
+        targetEv.totalExpectedAmount ??
+        targetEv.expectedAmount ??
+        targetEv.expectedCollection ??
+        targetEv.baseAmount ??
+        0
+      )
+    );
 
     const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
     const targetName = (form.eventName || targetEv.eventName || targetEv.name || "").trim().toLowerCase();
