@@ -22,6 +22,7 @@ import { getMembersAsync } from "../../services/memberService";
 import { getRolesAsync } from "../../services/roleService";
 import { getWorkTypesAsync } from "../../services/workTypeService";
 import { hasActionPermission } from "../../utils/rightsHelper";
+import { isWfhWorkType } from "../../utils/workTypeHelper";
 
 export default function MembersPage() {
   const { authState } = useAuth();
@@ -163,7 +164,7 @@ export default function MembersPage() {
       key: "workType",
       render: (row) => {
         const wt = row.workType || row.memberType || row.type || "Office";
-        const isWfh = wt.toUpperCase() === "WFH";
+        const isWfh = isWfhWorkType(wt);
         return (
           <Typography
             variant="caption"

@@ -41,6 +41,7 @@ import AppButton, { AppClearFilterButton } from "../common/AppButton";
 import { exportSheets } from "../../utils/exportToExcel";
 import { formatGridDate } from "../../utils/dateHelper";
 import { formatWholeCurrency } from "../../utils/roundingHelper";
+import { isWfhWorkType, isOfficeWorkType } from "../../utils/workTypeHelper";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -347,7 +348,15 @@ export default function AnnualMemberMatrix({
 
       // Work type
       if (appliedWorkType !== "ALL") {
-        if ((r.workType || "").toLowerCase() !== appliedWorkType.toLowerCase()) return false;
+        const isTargetWfh = appliedWorkType.toLowerCase() === "wfh";
+        const isTargetOffice = appliedWorkType.toLowerCase() === "office";
+        if (isTargetWfh) {
+          if (!isWfhWorkType(r.workType)) return false;
+        } else if (isTargetOffice) {
+          if (!isOfficeWorkType(r.workType)) return false;
+        } else if ((r.workType || "").toLowerCase() !== appliedWorkType.toLowerCase()) {
+          return false;
+        }
       }
 
       // Payment status

@@ -29,6 +29,7 @@ import {
 import dayjs from "dayjs";
 import { formatViewDate } from "../../utils/dateHelper";
 import { formatWholeCurrency, roundToWhole } from "../../utils/roundingHelper";
+import { isWfhWorkType } from "../../utils/workTypeHelper";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 import AppConfirmDialog from "../common/AppConfirmDialog";
@@ -838,6 +839,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                   if (cats.length === 0) cats.push("Custom Event");
 
                   return cats.map((cat, idx) => {
+
                     const norm = cat.toLowerCase();
                     const isBday = norm.includes("birthday");
                     const isFarewell = norm.includes("farewell") || norm.includes("send off") || norm.includes("send-off");
@@ -1163,8 +1165,8 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
                                 height: 18,
                                 fontSize: "0.64rem",
                                 fontWeight: 700,
-                                bgcolor: (celebrant.workType || celebrant.memberType) === "WFH" ? "rgba(234, 88, 12, 0.1)" : "rgba(2, 132, 199, 0.1)",
-                                color: (celebrant.workType || celebrant.memberType) === "WFH" ? "#ea580c" : "#0284c7",
+                                bgcolor: isWfhWorkType(celebrant.workType || celebrant.memberType) ? "rgba(234, 88, 12, 0.1)" : "rgba(2, 132, 199, 0.1)",
+                                color: isWfhWorkType(celebrant.workType || celebrant.memberType) ? "#ea580c" : "#0284c7",
                                 borderRadius: "4px",
                               }}
                             />

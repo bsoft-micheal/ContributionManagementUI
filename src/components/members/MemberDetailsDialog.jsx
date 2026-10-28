@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Grid, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import { formatViewDate } from "../../utils/dateHelper";
+import { isWfhWorkType } from "../../utils/workTypeHelper";
 import AppDialog from "../common/AppDialog";
 import AppButton from "../common/AppButton";
 
@@ -163,7 +164,7 @@ export default function MemberDetailsDialog({ open, onClose, member }) {
             <Box sx={{ mt: 0.5 }}>
               {(() => {
                 const wt = member.workType || member.type || member.memberType || "Office";
-                const isWfh = wt.toUpperCase() === "WFH";
+                const isWfh = isWfhWorkType(wt);
                 return (
                   <Typography
                     variant="caption"
