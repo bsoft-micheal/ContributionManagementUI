@@ -64,14 +64,15 @@ export const COMMON_STRINGS = {
     REMAINING_AMOUNT: "Amount In Hand",
   },
   EXPENSES: {
-    EXPECTED_BUDGET: "Expected Budget",
+    EXPECTED_BUDGET: "Planned Budget",
+    PLANNED_BUDGET: "Planned Budget",
     TOTAL_SPENT: "Total Spent",
     ALREADY_SPENT: "Already Spent",
     REMAINING_BUDGET: "Remaining Budget",
     EXTRA_AMOUNT_SPENT: "Extra Amount Spent",
     BALANCE_LIMIT: "Balance Limit",
     REMAINING_LIMIT: "Remaining Budget",
-    NO_BUDGET_ALLOCATED: "No expected budget allocated for this event",
+    NO_BUDGET_ALLOCATED: "No planned budget allocated for this event",
     AMOUNT_EXCEEDS_BUDGET: (extra) => `Expense exceeds budget by ${formatWholeCurrency(extra)}`,
   },
   VALIDATION: {
