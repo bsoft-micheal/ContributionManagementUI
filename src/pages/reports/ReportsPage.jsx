@@ -401,7 +401,7 @@ export default function ReportsPage({ mode: propMode = "event" }) {
             pendingAmount: isPaid ? 0 : (c.amount || c.Amount || 0),
             paymentStatus: isPaid ? "Paid" : "Pending",
             paymentDate: c.paymentDate || c.PaymentDate,
-            paymentMode: c.paymentMode === 1 ? "Cash" : (c.paymentMode === 2 ? "UPI" : (c.paymentMode === 3 ? "Split" : (c.paymentMode || "—"))),
+            paymentMode: c.paymentMode === 1 ? "Cash" : (c.paymentMode === 2 ? "Gpay" : (c.paymentMode === 3 || c.paymentMode === 5 ? "Split" : (c.paymentMode || "—"))),
           };
         });
       setMemberContributions(memberEventsList);

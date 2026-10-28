@@ -63,8 +63,11 @@ import {
   getMemberRecentPaymentsAsync,
 } from "../../services/dashboardService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
+import { getPaymentContextAsync } from "../../services/paymentService";
 import SubmitPaymentModal from "../payments/SubmitPaymentModal";
+import AddSupportTicketModal from "../support/AddSupportTicketModal";
 import BirthdayCelebrationModal from "../common/BirthdayCelebrationModal";
+import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import MetricCard from "../common/MetricCard";
 import AppDataTable from "../common/AppDataTable";
 import AppOverflowTooltip from "../common/AppOverflowTooltip";
@@ -141,6 +144,7 @@ export const getContributionStatusInfo = (row) => {
     return {
       statusKey: "unpaid",
       isPaid: false,
+      isApproved: false,
       isPartial: false,
       isPendingVerif: false,
       isRejected: false,
@@ -161,21 +165,34 @@ export const getContributionStatusInfo = (row) => {
     payStatus.includes("reject") ||
     verifStatus.includes("reject");
 
-  // 2. Pending Verification (submitted by member, awaiting admin approval)
-  const isPendingVerif =
+  // 2. Approved / Verified by authority
+  const isApproved =
     !isRejected &&
-    (row.isPendingVerification === true ||
+    (verifStatus === "verified" ||
+      verifStatus === "approved" ||
+      verifStatus === "completed" ||
+      payStatus === "approved" ||
+      payStatus === "verified" ||
+      payStatus === "completed" ||
+      payStatus === "closed");
+
+  // 3. Paid by member (whether awaiting approval or approved)
+  const isPaid =
+    !isRejected &&
+    (isApproved ||
+      row.isPaid === true ||
+      payStatus === "paid" ||
       payStatus === "pending verification" ||
       payStatus === "pending" ||
       verifStatus === "pending" ||
-      verifStatus === "pending verification" ||
-      payStatus.includes("pending") ||
-      verifStatus.includes("pending"));
+      row.paymentEligibility === false ||
+      (row.outstandingAmount !== undefined && Number(row.outstandingAmount) === 0 && Number(row.verifiedPaidAmount) > 0));
 
-  // 3. Partially Paid
+  // 4. Partially Paid
   const isPartial =
     !isRejected &&
-    !isPendingVerif &&
+    !isApproved &&
+    !isPaid &&
     (row.isPartial === true ||
       payStatus === "partially paid" ||
       payStatus === "partiallypaid" ||
@@ -184,49 +201,32 @@ export const getContributionStatusInfo = (row) => {
       payStatus.includes("partial") ||
       (Number(row.verifiedPaidAmount) > 0 && Number(row.outstandingAmount) > 0));
 
-  // 4. Approved / Fully Paid
-  const isApprovedOrVerified =
-    verifStatus === "verified" ||
-    verifStatus === "approved" ||
-    verifStatus === "completed" ||
-    payStatus === "approved" ||
-    payStatus === "verified" ||
-    payStatus === "completed" ||
-    payStatus === "closed";
-
-  const isExplicitlyPaid =
-    row.isPaid === true ||
-    payStatus === "paid" ||
-    isApprovedOrVerified ||
-    (row.outstandingAmount !== undefined && Number(row.outstandingAmount) === 0 && Number(row.verifiedPaidAmount) > 0);
-
-  const isPaid = !isRejected && !isPendingVerif && !isPartial && isExplicitlyPaid;
-
   // 5. Unpaid
-  const isUnpaid = !isPaid && !isPartial && !isPendingVerif && !isRejected;
+  const isUnpaid = !isPaid && !isApproved && !isPartial && !isRejected;
 
   let statusKey = "unpaid";
   let displayStatus = "Unpaid";
 
-  if (isPendingVerif) {
-    statusKey = "pending";
-    displayStatus = "Pending Verification";
+  if (isRejected) {
+    statusKey = "rejected";
+    displayStatus = "Payment Rejected";
+  } else if (isApproved) {
+    statusKey = "approved";
+    displayStatus = "Approved";
+  } else if (isPaid) {
+    statusKey = "paid";
+    displayStatus = "Paid";
   } else if (isPartial) {
     statusKey = "partial";
     displayStatus = "Partially Paid";
-  } else if (isRejected) {
-    statusKey = "rejected";
-    displayStatus = "Payment Rejected";
-  } else if (isPaid) {
-    statusKey = "paid";
-    displayStatus = isApprovedOrVerified ? "Approved" : "Paid";
   }
 
   return {
     statusKey,
-    isPaid,
+    isPaid: isPaid || isApproved,
+    isApproved,
     isPartial,
-    isPendingVerif,
+    isPendingVerif: isPaid && !isApproved,
     isRejected,
     isUnpaid,
     displayStatus,
@@ -297,9 +297,30 @@ export default function MemberDashboard({
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [activeStatusRow, setActiveStatusRow] = useState(null);
 
+  // Support ticket modal state for raising issues on rejected or disputed payments
+  const [supportTicketModalOpen, setSupportTicketModalOpen] = useState(false);
+  const [selectedTicketRow, setSelectedTicketRow] = useState(null);
+
   const handleOpenStatusModal = (row) => {
     setActiveStatusRow(row);
     setStatusModalOpen(true);
+  };
+
+  const handleOpenSupportTicket = (row) => {
+    if (!row) return;
+    setSelectedTicketRow({
+      memberName: row.memberName || authState?.fullName || authState?.name || "",
+      memberId: row.memberId || authState?.userId || "",
+      eventId: row.eventId || "",
+      relatedEvent: row.eventName || "",
+      eventType: row.eventTypeName || row.categoryName || "",
+      amount: row.contributionAmount || row.amount || 0,
+      status: row.paymentStatus || "Payment Rejected",
+      ticketType: "Payment Issue",
+      priority: "High",
+      description: `Payment rejected for event: ${row.eventName || "Event"}.`,
+    });
+    setSupportTicketModalOpen(true);
   };
 
   // Birthday Celebration Modal States
@@ -372,7 +393,7 @@ export default function MemberDashboard({
   }, [loadDashboardData]);
 
   // Handle Pay Now / Pay Remaining Click
-  const handleOpenPayment = (row) => {
+  const handleOpenPayment = async (row) => {
     if (!row) return;
 
     const info = getContributionStatusInfo(row);
@@ -387,7 +408,78 @@ export default function MemberDashboard({
       }
     }
 
-    setActivePaymentRow(row);
+    const currentDue = Number(row.outstandingAmount !== undefined ? row.outstandingAmount : (row.contributionAmount || 0));
+    const targetEvId = String(row.eventId || "").toLowerCase();
+
+    // 1. Dynamically gather other unpaid events for this member
+    const otherUnpaidEvents = (contributions || []).filter((c) => {
+      const cEvId = String(c.eventId || "").toLowerCase();
+      if (!cEvId || cEvId === targetEvId) return false;
+      const cInfo = getContributionStatusInfo(c);
+      return !cInfo.isPaid && ((Number(c.outstandingAmount) || Number(c.contributionAmount) || 0) > 0);
+    });
+
+    let breakdown = otherUnpaidEvents.map((c) => {
+      const due = Number(c.outstandingAmount !== undefined ? c.outstandingAmount : (c.contributionAmount || 0));
+      return {
+        eventId: c.eventId,
+        eventName: c.eventName,
+        title: c.eventName,
+        amount: due,
+        dueAmount: due,
+      };
+    });
+
+    const otherSum = breakdown.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+    let resolvedArrears = Math.max(Number(row.previousArrears || 0), otherSum);
+
+    // If breakdown from currently visible contributions is empty but previous arrears exist from older months, fetch context
+    if (breakdown.length === 0 && resolvedArrears > 0) {
+      try {
+        const ctx = await getPaymentContextAsync({
+          eventId: row.eventId,
+          memberId: row.memberId,
+          eventName: row.eventName,
+          memberName: row.memberName || displayName,
+        });
+        if (ctx) {
+          if (Array.isArray(ctx.arrearBreakdown) && ctx.arrearBreakdown.length > 0) {
+            breakdown = ctx.arrearBreakdown;
+          }
+          if (Number(ctx.previousArrears) > 0) {
+            resolvedArrears = Number(ctx.previousArrears);
+          }
+        }
+      } catch { }
+    }
+
+    // Dynamic fallback so breakdown array is never empty when previous arrears exist
+    if (breakdown.length === 0 && resolvedArrears > 0) {
+      breakdown = [
+        {
+          eventId: "previous_arrears",
+          eventName: "Previous Unpaid Arrears",
+          title: "Previous Unpaid Arrears",
+          amount: resolvedArrears,
+          dueAmount: resolvedArrears,
+        },
+      ];
+    }
+
+    const totalDue = currentDue + resolvedArrears;
+    const defaultScope = resolvedArrears > 0 ? "AllOutstanding" : "CurrentEvent";
+    const initialAmount = defaultScope === "AllOutstanding" ? totalDue : currentDue;
+
+    setActivePaymentRow({
+      ...row,
+      currentDue,
+      previousArrears: resolvedArrears,
+      totalDue,
+      arrearBreakdown: breakdown,
+      paymentScope: defaultScope,
+      amount: initialAmount,
+      allMemberEvents: contributions || [],
+    });
     setPaymentModalOpen(true);
   };
 
@@ -395,6 +487,7 @@ export default function MemberDashboard({
     setPaymentModalOpen(false);
     setActivePaymentRow(null);
     toast.success("Payment details submitted successfully!");
+    window.dispatchEvent(new CustomEvent("contribution_updated"));
     loadDashboardData();
   };
 
@@ -440,16 +533,10 @@ export default function MemberDashboard({
     // Status card click filters (handles UNPAID, PAID, and specific statuses in all cases)
     const filterKey = String(statusFilter || "").trim().toUpperCase();
 
-    if (filterKey === "UNPAID" || filterKey === "PENDING") {
+    if (filterKey === "PAID" || filterKey === "APPROVED" || filterKey === "VERIFIED") {
       list = list.filter((c) => {
         const info = getContributionStatusInfo(c);
-        // Includes unpaid, partially paid, pending verification, and rejected (all non-paid items contributing to Total Pending)
-        return info.isUnpaid || info.isPartial || info.isPendingVerif || info.isRejected || !info.isPaid;
-      });
-    } else if (filterKey === "PAID" || filterKey === "APPROVED" || filterKey === "VERIFIED") {
-      list = list.filter((c) => {
-        const info = getContributionStatusInfo(c);
-        return info.isPaid;
+        return info.isApproved || info.isPaid;
       });
     } else if (filterKey === "PARTIAL" || filterKey === "PARTIALLY_PAID") {
       list = list.filter((c) => {
@@ -471,9 +558,14 @@ export default function MemberDashboard({
         const info = getContributionStatusInfo(c);
         return info.isUnpaid;
       });
-    }
-    else {
-      return list
+    } else {
+      // Default (ALL, UNPAID, PENDING dues):
+      // The grid displays unpaid, partially paid, rejected, and member-paid events awaiting verification.
+      // Once approved, the event leaves the grid and is displayed in the "Recent Payments" card.
+      list = list.filter((c) => {
+        const info = getContributionStatusInfo(c);
+        return !info.isApproved;
+      });
     }
 
     // Sort by status rank (unpaid & partially paid first so user can act), then by Event Date descending
@@ -557,28 +649,34 @@ export default function MemberDashboard({
 
     (recentPayments || []).forEach((item) => {
       const rawSt = String(item.verificationStatus || item.status || "").trim().toLowerCase();
-      if (rawSt === "completed" || rawSt === "verified" || rawSt === "approved" || rawSt === "paid") {
+      if (rawSt === "completed" || rawSt === "verified" || rawSt === "approved") {
         const evKey = String(item.eventId || item.eventName || "").trim().toLowerCase();
-        if (evKey && !seenEvents.has(evKey)) {
-          seenEvents.add(evKey);
+        if (!evKey || !seenEvents.has(evKey)) {
+          if (evKey) seenEvents.add(evKey);
+          list.push({
+            paymentId: item.paymentId,
+            eventId: item.eventId,
+            eventName: item.eventName || "Event Payment",
+            eventTypeName: item.eventTypeName || item.category || "Event",
+            paymentDate: item.paymentDate,
+            paymentAmount: item.paymentAmount,
+            paymentMode: (() => {
+              const m = String(item.paymentMode || "").trim().toLowerCase();
+              if (m.includes("phonepe") || m.includes("phone")) return "Phonepe";
+              if (m.includes("cash")) return "Cash";
+              if (m.includes("split")) return "Split";
+              return "Gpay";
+            })(),
+            verificationStatus: "Approved",
+          });
         }
-        list.push({
-          paymentId: item.paymentId,
-          eventId: item.eventId,
-          eventName: item.eventName || "Event Payment",
-          eventTypeName: item.eventTypeName || item.category || "Event",
-          paymentDate: item.paymentDate,
-          paymentAmount: item.paymentAmount,
-          paymentMode: item.paymentMode || "Online",
-          verificationStatus: "Approved",
-        });
       }
     });
 
-    // Also incorporate any approved/paid items from contributions list if not already present
+    // Also incorporate any approved items from contributions list if not already present
     (contributions || []).forEach((c) => {
       const info = getContributionStatusInfo(c);
-      if (info.isPaid) {
+      if (info.isApproved) {
         const evKey = String(c.eventId || c.eventName || "").trim().toLowerCase();
         if (evKey && !seenEvents.has(evKey)) {
           seenEvents.add(evKey);
@@ -589,7 +687,13 @@ export default function MemberDashboard({
             eventTypeName: c.eventTypeName || c.category || "Event",
             paymentDate: c.paymentDate || c.eventDate,
             paymentAmount: c.verifiedPaidAmount || c.contributionAmount,
-            paymentMode: c.paymentMode || "Online",
+            paymentMode: (() => {
+              const m = String(c.paymentMode || "").trim().toLowerCase();
+              if (m.includes("phonepe") || m.includes("phone")) return "Phonepe";
+              if (m.includes("cash")) return "Cash";
+              if (m.includes("split")) return "Split";
+              return "Gpay";
+            })(),
             verificationStatus: "Approved",
           });
         }
@@ -691,49 +795,7 @@ export default function MemberDashboard({
         render: (row) => {
           const info = getContributionStatusInfo(row);
 
-          // 1. Pending Verification (Paid by member, waiting for admin approval)
-          if (info.isPendingVerif) {
-            return (
-              <Chip
-                icon={<Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#d97706", mr: "4px !important" }} />}
-                label="Pending Verification"
-                size="small"
-                sx={{
-                  bgcolor: "#fffbeb",
-                  color: "#d97706",
-                  fontWeight: 700,
-                  borderRadius: "16px",
-                  fontSize: "0.785rem",
-                  px: 0.75,
-                  py: 0.25,
-                  border: "1px solid #fde68a",
-                }}
-              />
-            );
-          }
-
-          // 2. Partially Paid
-          if (info.isPartial) {
-            return (
-              <Chip
-                icon={<Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#2563eb", mr: "4px !important" }} />}
-                label="Partially Paid"
-                size="small"
-                sx={{
-                  bgcolor: "#eff6ff",
-                  color: "#2563eb",
-                  fontWeight: 700,
-                  borderRadius: "16px",
-                  fontSize: "0.785rem",
-                  px: 0.75,
-                  py: 0.25,
-                  border: "1px solid #bfdbfe",
-                }}
-              />
-            );
-          }
-
-          // 3. Rejected
+          // 1. Rejected
           if (info.isRejected) {
             return (
               <Chip
@@ -749,6 +811,48 @@ export default function MemberDashboard({
                   px: 0.75,
                   py: 0.25,
                   border: "1px solid #fecaca",
+                }}
+              />
+            );
+          }
+
+          // 2. Paid or Approved
+          if (info.isPaid || info.isApproved) {
+            return (
+              <Chip
+                icon={<CheckCircleRoundedIcon sx={{ fontSize: "15px !important", color: "#16a34a !important" }} />}
+                label={info.isApproved ? "Approved" : "Paid"}
+                size="small"
+                sx={{
+                  bgcolor: "#ecfdf5",
+                  color: "#059669",
+                  fontWeight: 700,
+                  borderRadius: "16px",
+                  fontSize: "0.8rem",
+                  px: 0.75,
+                  py: 0.25,
+                  border: "1px solid #a7f3d0",
+                }}
+              />
+            );
+          }
+
+          // 3. Partially Paid
+          if (info.isPartial) {
+            return (
+              <Chip
+                icon={<Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#2563eb", mr: "4px !important" }} />}
+                label="Partially Paid"
+                size="small"
+                sx={{
+                  bgcolor: "#eff6ff",
+                  color: "#2563eb",
+                  fontWeight: 700,
+                  borderRadius: "16px",
+                  fontSize: "0.785rem",
+                  px: 0.75,
+                  py: 0.25,
+                  border: "1px solid #bfdbfe",
                 }}
               />
             );
@@ -770,27 +874,6 @@ export default function MemberDashboard({
                   px: 0.75,
                   py: 0.25,
                   border: "1px solid #fee2e2",
-                }}
-              />
-            );
-          }
-
-          // Fallback Approved/Paid
-          if (info.isPaid) {
-            return (
-              <Chip
-                icon={<CheckCircleRoundedIcon sx={{ fontSize: "15px !important", color: "#16a34a !important" }} />}
-                label="Approved"
-                size="small"
-                sx={{
-                  bgcolor: "#ecfdf5",
-                  color: "#059669",
-                  fontWeight: 700,
-                  borderRadius: "16px",
-                  fontSize: "0.8rem",
-                  px: 0.75,
-                  py: 0.25,
-                  border: "1px solid #a7f3d0",
                 }}
               />
             );
@@ -869,7 +952,7 @@ export default function MemberDashboard({
             );
           }
 
-          if (info.isPendingVerif) {
+          if (info.isPaid || info.isApproved || info.isPendingVerif) {
             return (
               <Button
                 variant="outlined"
@@ -896,44 +979,31 @@ export default function MemberDashboard({
             );
           }
 
-          if (info.isPaid) {
-            return (
-              <Button
-                variant="contained"
-                disabled
-                size="small"
-                sx={{
-                  bgcolor: isDark ? "rgba(255,255,255,0.06) !important" : "#f1f5f9 !important",
-                  color: isDark ? "rgba(255,255,255,0.4) !important" : "#94a3b8 !important",
-                  fontWeight: 600,
-                  textTransform: "none",
-                  borderRadius: "8px",
-                  px: 2.5,
-                  py: 0.65,
-                  fontSize: "0.85rem",
-                }}
-              >
-                Paid
-              </Button>
-            );
-          }
-
           if (info.isRejected) {
             return (
               <Button
-                variant="contained"
+                variant="outlined"
                 size="small"
                 color="error"
-                onClick={() => handleOpenPayment(row)}
+                onClick={() => handleOpenSupportTicket(row)}
+                startIcon={<ConfirmationNumberOutlinedIcon sx={{ fontSize: 18 }} />}
                 sx={{
                   fontWeight: 700,
                   textTransform: "none",
                   borderRadius: "8px",
                   px: 1.85,
                   py: 0.65,
+                  fontSize: "0.825rem",
+                  borderColor: isDark ? "rgba(239, 68, 68, 0.4)" : "#fca5a5",
+                  bgcolor: isDark ? "rgba(239, 68, 68, 0.08)" : "rgba(239, 68, 68, 0.04)",
+                  color: isDark ? "#f87171" : "#dc2626",
+                  "&:hover": {
+                    borderColor: "#dc2626",
+                    bgcolor: isDark ? "rgba(239, 68, 68, 0.18)" : "rgba(239, 68, 68, 0.1)",
+                  },
                 }}
               >
-                Retry Pay
+                Support Ticket
               </Button>
             );
           }
@@ -1110,31 +1180,6 @@ export default function MemberDashboard({
                 </Typography>
               </Box>
             </Box>
-
-            <ButtonBase
-              onClick={() => navigate("/payments")}
-              sx={{
-                display: { xs: "none", sm: "inline-flex" },
-                alignItems: "center",
-                gap: 0.5,
-                px: 1.5,
-                py: 0.7,
-                borderRadius: "8px",
-                fontSize: "0.8rem",
-                fontWeight: 700,
-                color: isDark ? "#c4b5fd" : "#6d28d9",
-                bgcolor: isDark ? "rgba(196, 181, 253, 0.08)" : "rgba(109, 40, 217, 0.05)",
-                border: `1px solid ${isDark ? "rgba(196, 181, 253, 0.2)" : "rgba(109, 40, 217, 0.15)"}`,
-                transition: "all 0.2s ease",
-                "&:hover": {
-                  bgcolor: isDark ? "rgba(196, 181, 253, 0.16)" : "rgba(109, 40, 217, 0.12)",
-                  transform: "translateX(2px)",
-                },
-              }}
-            >
-              View All
-              <ArrowForwardRoundedIcon sx={{ fontSize: 15 }} />
-            </ButtonBase>
           </Box>
 
           {/* Table View of 5 transactions */}
@@ -1157,7 +1202,7 @@ export default function MemberDashboard({
                       color: isDark ? "#c4b5fd" : "#4a3f6b",
                       py: 1.25,
                       pl: 2,
-                      width: "48%",
+                      width: "46%",
                       borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0"}`,
                     }}
                   >
@@ -1172,7 +1217,7 @@ export default function MemberDashboard({
                       letterSpacing: "0.05em",
                       color: isDark ? "#c4b5fd" : "#4a3f6b",
                       py: 1.25,
-                      width: "26%",
+                      width: "22%",
                       borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0"}`,
                     }}
                   >
@@ -1187,8 +1232,9 @@ export default function MemberDashboard({
                       letterSpacing: "0.05em",
                       color: isDark ? "#c4b5fd" : "#4a3f6b",
                       py: 1.25,
-                      pr: 2,
-                      width: "26%",
+                      px: 1,
+                      width: "32%",
+                      minWidth: 105,
                       borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0"}`,
                     }}
                   >
@@ -1319,7 +1365,7 @@ export default function MemberDashboard({
                         </TableCell>
 
                         {/* Status Chip */}
-                        <TableCell align="center" sx={{ py: 1.4, pr: 2, whiteSpace: "nowrap" }}>
+                        <TableCell align="center" sx={{ py: 1.4, px: 1, minWidth: 105, whiteSpace: "nowrap" }}>
                           <Chip
                             icon={<CheckCircleRoundedIcon sx={{ fontSize: "14px !important", color: "#16a34a !important" }} />}
                             label="Approved"
@@ -1328,11 +1374,17 @@ export default function MemberDashboard({
                               fontWeight: 700,
                               fontSize: "0.75rem",
                               height: 24,
-                              px: 0.75,
+                              px: 0.5,
                               borderRadius: "16px",
                               bgcolor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ecfdf5",
                               color: isDark ? "#34d399" : "#059669",
                               border: `1px solid ${isDark ? "rgba(16, 185, 129, 0.3)" : "#a7f3d0"}`,
+                              "& .MuiChip-label": {
+                                px: 0.75,
+                                overflow: "visible",
+                                textOverflow: "clip",
+                                whiteSpace: "nowrap",
+                              },
                             }}
                           />
                         </TableCell>
@@ -1368,26 +1420,6 @@ export default function MemberDashboard({
                 {formatWholeCurrency(totalRecentAmount)}
               </Box>
             </Typography>
-
-            <ButtonBase
-              onClick={() => navigate("/payments")}
-              sx={{
-                color: isDark ? "#c4b5fd" : "#6d28d9",
-                fontWeight: 700,
-                fontSize: "0.825rem",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 0.6,
-                transition: "all 0.2s ease",
-                "&:hover": {
-                  color: isDark ? "#ddd6fe" : "#4c1d95",
-                  transform: "translateX(2px)",
-                },
-              }}
-            >
-              Full Payment History
-              <ArrowForwardRoundedIcon sx={{ fontSize: 14 }} />
-            </ButtonBase>
           </Box>
         </Paper>
       </Box>
@@ -1501,11 +1533,14 @@ export default function MemberDashboard({
           initialEventCategory={activePaymentRow.eventTypeName}
           initialMemberId={activePaymentRow.memberId}
           initialMemberName={activePaymentRow.memberName || displayName}
-          initialAmount={activePaymentRow.outstandingAmount || activePaymentRow.contributionAmount}
-          initialCurrentDue={activePaymentRow.outstandingAmount || activePaymentRow.contributionAmount}
+          initialAmount={activePaymentRow.amount || (activePaymentRow.outstandingAmount || activePaymentRow.contributionAmount)}
+          initialCurrentDue={activePaymentRow.currentDue !== undefined ? activePaymentRow.currentDue : (activePaymentRow.outstandingAmount || activePaymentRow.contributionAmount)}
           initialPreviousArrears={activePaymentRow.previousArrears || 0}
-          initialTotalDue={activePaymentRow.totalDue || (activePaymentRow.outstandingAmount + (activePaymentRow.previousArrears || 0))}
+          initialTotalDue={activePaymentRow.totalDue || ((activePaymentRow.outstandingAmount || activePaymentRow.contributionAmount) + (activePaymentRow.previousArrears || 0))}
           initialStatus={activePaymentRow.paymentStatus}
+          initialArrearBreakdown={activePaymentRow.arrearBreakdown || []}
+          initialPaymentScope={activePaymentRow.paymentScope || (activePaymentRow.previousArrears > 0 ? "AllOutstanding" : "CurrentEvent")}
+          initialAllMemberEvents={activePaymentRow.allMemberEvents || contributions || []}
         />
       )}
 
@@ -1626,6 +1661,19 @@ export default function MemberDashboard({
         }}
         celebrants={todayCelebrants}
         autoCloseSeconds={0}
+      />
+
+      {/* ── Add Support Ticket Dialog ── */}
+      <AddSupportTicketModal
+        open={supportTicketModalOpen}
+        onClose={() => {
+          setSupportTicketModalOpen(false);
+          setSelectedTicketRow(null);
+        }}
+        initialData={selectedTicketRow}
+        onSuccess={async () => {
+          loadDashboardData();
+        }}
       />
     </Box>
   );

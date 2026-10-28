@@ -140,27 +140,39 @@ export default function SubmitPaymentModal({
   const dynamicPaymentModes = useMemo(() => {
     const list = [];
     const set = new Set();
+
+    // Directly use modes fetched from the database table public.payment_modes
     (dbPaymentModes || [])
       .filter((m) => m.isActive !== false)
       .forEach((m) => {
         const name = m.paymentModeName || m.name || m.modeName;
-        if (name && !set.has(name.toLowerCase())) {
-          set.add(name.toLowerCase());
+        const lower = String(name || "").trim().toLowerCase();
+        if (name && !set.has(lower) && !["upi", "online", "none"].includes(lower)) {
+          set.add(lower);
           list.push({
             label: name,
             value: name,
+            paymentModeId: m.paymentModeId,
             color: getModeColor(name),
           });
         }
       });
-    if (formData.paymentMode && !set.has(formData.paymentMode.toLowerCase())) {
-      set.add(formData.paymentMode.toLowerCase());
-      list.push({
-        label: formData.paymentMode,
-        value: formData.paymentMode,
-        color: getModeColor(formData.paymentMode),
+
+    // Fallback only if database list is empty
+    if (list.length === 0) {
+      const defaultModes = [
+        { label: "Gpay", value: "Gpay", color: "#2563eb" },
+        { label: "Cash", value: "Cash", color: "#16a34a" },
+        { label: "Phonepe", value: "Phonepe", color: "#7c3aed" },
+      ];
+      defaultModes.forEach((d) => {
+        if (!set.has(d.value.toLowerCase())) {
+          set.add(d.value.toLowerCase());
+          list.push(d);
+        }
       });
     }
+
     if (!set.has("split")) {
       set.add("split");
       list.push({
@@ -171,12 +183,12 @@ export default function SubmitPaymentModal({
     }
 
     return list;
-  }, [dbPaymentModes, formData.paymentMode]);
+  }, [dbPaymentModes]);
 
-  // Selectable individual payment modes excluding "Split" (purely dynamic, no hardcoding)
+  // Selectable individual payment modes excluding "Split" (strictly GPay, PhonePe, Cash)
   const selectablePaymentModes = useMemo(() => {
     return dynamicPaymentModes.filter(
-      (m) => String(m.value || "").trim().toLowerCase() !== "split"
+      (m) => String(m.value || "").trim().toLowerCase() !== "split" && !["upi", "online", "none"].includes(String(m.value || "").trim().toLowerCase())
     );
   }, [dynamicPaymentModes]);
 
@@ -504,7 +516,7 @@ export default function SubmitPaymentModal({
       }
 
       // Determine default payment scope:
-      let defaultScope = isAllEventsFilter ? "AllOutstanding" : initialPaymentScope;
+      let defaultScope = initialPaymentScope;
       if (!defaultScope) {
         if (Number(initialPreviousArrears) > 0 && Number(initialTotalDue) > 0) {
           defaultScope = "AllOutstanding";
@@ -898,13 +910,11 @@ export default function SubmitPaymentModal({
               });
               breakdown = [...otherEvBreakdown, ...olderItems];
             } else {
-              const callerClearedArrears = initialPreviousArrears === 0 || (Array.isArray(initialArrearBreakdown) && initialArrearBreakdown.length === 0 && initialPreviousArrears !== undefined);
+              const callerHasArrearBreakdown = Array.isArray(initialArrearBreakdown) && initialArrearBreakdown.length > 0;
 
-              breakdown = callerClearedArrears
-                ? []
-                : (Array.isArray(initialArrearBreakdown) && initialArrearBreakdown.length > 0
-                  ? initialArrearBreakdown
-                  : (res.arrearBreakdown || []));
+              breakdown = callerHasArrearBreakdown
+                ? initialArrearBreakdown
+                : (res.arrearBreakdown || []);
 
               // Exclude current event if present in breakdown
               breakdown = breakdown.filter((item) => {
@@ -915,17 +925,23 @@ export default function SubmitPaymentModal({
               });
             }
 
-            // Dynamically filter out deleted events from arrear breakdown
-            breakdown = breakdown.filter(item => {
-               const evName = String(item.eventName || "").toLowerCase().trim();
-               const evId = String(item.eventId || "").trim();
-               return (eventsList || []).some(e => 
-                 (evId && String(e.eventId || e.id) === evId) || 
-                 (evName && String(e.eventName || e.title || e.name || "").toLowerCase().trim() === evName)
-               );
-            });
+            // Dynamically filter out deleted events from arrear breakdown only when eventsList is populated
+            if (eventsList && eventsList.length > 0) {
+              const activeBreakdown = breakdown.filter(item => {
+                 const evName = String(item.eventName || "").toLowerCase().trim();
+                 const evId = String(item.eventId || "").trim();
+                 return (eventsList || []).some(e => 
+                   (evId && String(e.eventId || e.id) === evId) || 
+                   (evName && String(e.eventName || e.title || e.name || "").toLowerCase().trim() === evName)
+                 );
+              });
+              if (activeBreakdown.length > 0) {
+                breakdown = activeBreakdown;
+              }
+            }
 
-            const safePrevArrears = breakdown.reduce((sum, item) => sum + (Number(item.dueAmount || item.amount) || 0), 0);
+            const rawCalculatedArrears = breakdown.reduce((sum, item) => sum + (Number(item.dueAmount || item.amount) || 0), 0);
+            const safePrevArrears = rawCalculatedArrears > 0 ? rawCalculatedArrears : (Number(initialPreviousArrears) || 0);
             const total = roundToWhole(currentEvDue + safePrevArrears);
             const isZeroDue = total === 0 && currentEvDue === 0 && safePrevArrears === 0;
 
@@ -939,16 +955,22 @@ export default function SubmitPaymentModal({
                   ? initialStatus
                   : (res.status && String(res.status).toLowerCase() !== "paid" ? res.status : "Pending"));
 
+            const finalArrearBreakdown = safePrevArrears === 0
+              ? []
+              : (breakdown.length > 0
+                  ? breakdown
+                  : [{ eventId: "previous_arrears", eventName: "Previous Unpaid Arrears", title: "Previous Unpaid Arrears", amount: safePrevArrears, dueAmount: safePrevArrears }]);
+
             setDuesSummary({
               currentEventDue: currentEvDue,
               previousArrears: safePrevArrears,
               totalDue: total,
               status: computedStatus,
               baseAmount: baseAmt,
-              arrearBreakdown: safePrevArrears === 0 ? [] : breakdown,
+              arrearBreakdown: finalArrearBreakdown,
             });
 
-            let resolvedScope = isAllEventsFilter ? "AllOutstanding" : (paymentScope || initialPaymentScope);
+            let resolvedScope = paymentScope || initialPaymentScope;
             if (!resolvedScope) {
               if (safePrevArrears > 0 && total > 0) {
                 resolvedScope = "AllOutstanding";
@@ -1066,18 +1088,6 @@ export default function SubmitPaymentModal({
 
     const fmt = (num) => formatWholeNumber(num);
 
-    // CRITICAL REQUIREMENT:
-    // When paying against ALL Events filter, the user MUST ONLY pay All Outstanding!
-    if (isAllEventsFilter) {
-      return [
-        {
-          label: `All Outstanding (₹${fmt(total)})`,
-          value: "AllOutstanding",
-        },
-      ];
-    }
-
-    // Particular event: User can freely choose between All Outstanding, Current Event Only, or Previous Arrears Only!
     const opts = [];
     if (arrears > 0 && total > 0) {
       opts.push({
@@ -1097,7 +1107,7 @@ export default function SubmitPaymentModal({
       });
     }
     return opts;
-  }, [duesSummary, isAllEventsFilter]);
+  }, [duesSummary]);
 
   const handlePaymentScopeChange = (scope) => {
     setPaymentScope(scope);
@@ -1927,15 +1937,13 @@ export default function SubmitPaymentModal({
                 });
               }}
               onClear={() => handlePaymentScopeChange("")}
-              allowClear={!isAllEventsFilter}
+              allowClear
               options={paymentScopeOptions}
-              disabled={!formData.eventName || !duesSummary || paymentScopeOptions.length === 0 || isAllEventsFilter}
+              disabled={!formData.eventName || !duesSummary || paymentScopeOptions.length === 0}
               error={!!errors.paymentScope}
               helperText={
                 errors.paymentScope ||
-                (isAllEventsFilter
-                  ? "Locked to All Outstanding for All Events filter"
-                  : !formData.eventName
+                (!formData.eventName
                   ? "Choose an event above to view payment scopes"
                   : isFullySettled
                   ? "All dues settled"
