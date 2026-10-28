@@ -71,8 +71,8 @@ export default function AppRoutes() {
         <Route path="/reports/payment-history" element={<ProtectedRoute><ReportsPage key="payment" mode="payment-history" /></ProtectedRoute>} />
         <Route path="/reports/annual-member-matrix" element={<ProtectedRoute><ReportsPage key="annual-matrix" mode="annual-matrix" /></ProtectedRoute>} />
         <Route path="/reports/annual-matrix" element={<Navigate to="/reports/annual-member-matrix" replace />} />
-        <Route path="/reports/member-matrix" element={<Navigate to="/reports/annual-member-matrix" replace />} />
-        <Route path="/reports/pending-dues" element={<Navigate to="/reports/member-velocity" replace />} />
+        <Route path="/reports/monthly-pending-dues" element={<ProtectedRoute><ReportsPage key="pending-dues" mode="pending-dues" /></ProtectedRoute>} />
+        <Route path="/reports/pending-dues" element={<Navigate to="/reports/monthly-pending-dues" replace />} />
         <Route path="/reports/event-financials" element={<Navigate to="/reports/event-collection-audit" replace />} />
         <Route path="/reports/payment-modes" element={<Navigate to="/reports/event-collection-audit" replace />} />
         <Route path="/reports/member-category-paid" element={<Navigate to="/reports/member-velocity" replace />} />

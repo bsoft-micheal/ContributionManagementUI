@@ -841,10 +841,16 @@ export default function SubmitPaymentModal({
 
             const fallbackEvAmt = () => {
               if (matchedEvent) {
-                const base = Number(matchedEvent.baseAmount || matchedEvent.totalExpectedAmount || 0);
-                const count = Number(matchedEvent.participantCount || matchedEvent.participants?.length || 0);
+                const base = Number(matchedEvent.baseAmount || matchedEvent.totalExpectedAmount || matchedEvent.plannedBudget || 0);
+                const count = Number(
+                  matchedEvent.participantCount ||
+                  (Array.isArray(matchedEvent.participants) ? matchedEvent.participants.length : 0) ||
+                  (matchedEvent.eventTypeMembers ? Object.values(matchedEvent.eventTypeMembers).flat().length : 0) ||
+                  matchedEvent.eligibleContributors ||
+                  matchedEvent.totalActiveMembers ||
+                  0
+                );
                 if (count > 0 && base > 0) return Math.round(base / count);
-                if (base > 0) return base;
               }
               return 0;
             };
@@ -998,9 +1004,16 @@ export default function SubmitPaymentModal({
               setSplitRows((rows) => rows.map((r) => ({ ...r, amount: "" })));
             }
           } else if (matchedEvent) {
-            const base = Number(matchedEvent.baseAmount || matchedEvent.totalExpectedAmount || 0);
-            const count = Number(matchedEvent.participantCount || matchedEvent.participants?.length || 0);
-            const fallbackAmt = (count > 0 && base > 0) ? Math.round(base / count) : (base > 0 ? base : 0);
+            const base = Number(matchedEvent.baseAmount || matchedEvent.totalExpectedAmount || matchedEvent.plannedBudget || 0);
+            const count = Number(
+              matchedEvent.participantCount ||
+              (Array.isArray(matchedEvent.participants) ? matchedEvent.participants.length : 0) ||
+              (matchedEvent.eventTypeMembers ? Object.values(matchedEvent.eventTypeMembers).flat().length : 0) ||
+              matchedEvent.eligibleContributors ||
+              matchedEvent.totalActiveMembers ||
+              0
+            );
+            const fallbackAmt = (count > 0 && base > 0) ? Math.round(base / count) : 0;
             const currentEvDue = Number(matchedEvent.amount || matchedEvent.contributionAmount || 0) || fallbackAmt;
             setDuesSummary({
               currentEventDue: currentEvDue,
@@ -1608,11 +1621,23 @@ export default function SubmitPaymentModal({
         return;
       }
 
+      let submitEventId = formData.eventId;
+      let submitEventName = formData.eventName;
+
+      // When paying Previous Arrears Only, route the payment to the previous event that actually holds the arrear
+      if (paymentScope === "PreviousArrears" && duesSummary?.arrearBreakdown && duesSummary.arrearBreakdown.length > 0) {
+        const targetArrear = duesSummary.arrearBreakdown[0];
+        if (targetArrear.eventId) submitEventId = targetArrear.eventId;
+        if (targetArrear.eventName || targetArrear.title) {
+          submitEventName = targetArrear.eventName || targetArrear.title;
+        }
+      }
+
       const payload = {
-        eventId: formData.eventId || undefined,
+        eventId: submitEventId || undefined,
         memberId: formData.memberId || undefined,
         memberName: formData.memberName.trim(),
-        eventName: formData.eventName.trim(),
+        eventName: submitEventName.trim(),
         amount: Number(formData.amount),
         paymentMode: finalMode,
         cashAmount: cashTotal > 0 ? cashTotal : undefined,
