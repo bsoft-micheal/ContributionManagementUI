@@ -7,6 +7,10 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Grid,
   IconButton,
@@ -44,7 +48,10 @@ import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import CardGiftcardRoundedIcon from "@mui/icons-material/CardGiftcardRounded";
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import EventRoundedIcon from "@mui/icons-material/EventRounded";
+import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -99,9 +106,9 @@ function getCategoryVisuals(categoryName = "") {
   }
   if (lower.includes("farewell") || lower.includes("sendoff")) {
     return {
-      icon: FavoriteRoundedIcon,
-      bg: "#ffe4e6",
-      color: "#e11d48",
+      icon: PersonRoundedIcon,
+      bg: "#f3f0f9",
+      color: "#4a3f6b",
       label: "Farewell",
     };
   }
@@ -121,11 +128,118 @@ function getCategoryVisuals(categoryName = "") {
   };
 }
 
+/**
+ * Utility to reliably classify contribution status across all edge cases:
+ * - Fully Paid / Approved / Verified / Completed
+ * - Partially Paid
+ * - Pending Verification
+ * - Payment Rejected
+ * - Unpaid
+ */
+export const getContributionStatusInfo = (row) => {
+  if (!row) {
+    return {
+      statusKey: "unpaid",
+      isPaid: false,
+      isPartial: false,
+      isPendingVerif: false,
+      isRejected: false,
+      isUnpaid: true,
+      displayStatus: "Unpaid",
+    };
+  }
+
+  const payStatus = String(row.paymentStatus || row.statusName || row.status || "").trim().toLowerCase();
+  const verifStatus = String(row.paymentVerificationStatus || row.verificationStatus || "").trim().toLowerCase();
+
+  // 1. Rejected
+  const isRejected =
+    row.isRejected === true ||
+    payStatus === "payment rejected" ||
+    payStatus === "rejected" ||
+    verifStatus === "rejected" ||
+    payStatus.includes("reject") ||
+    verifStatus.includes("reject");
+
+  // 2. Pending Verification (submitted by member, awaiting admin approval)
+  const isPendingVerif =
+    !isRejected &&
+    (row.isPendingVerification === true ||
+      payStatus === "pending verification" ||
+      payStatus === "pending" ||
+      verifStatus === "pending" ||
+      verifStatus === "pending verification" ||
+      payStatus.includes("pending") ||
+      verifStatus.includes("pending"));
+
+  // 3. Partially Paid
+  const isPartial =
+    !isRejected &&
+    !isPendingVerif &&
+    (row.isPartial === true ||
+      payStatus === "partially paid" ||
+      payStatus === "partiallypaid" ||
+      payStatus === "partially_paid" ||
+      payStatus === "partial" ||
+      payStatus.includes("partial") ||
+      (Number(row.verifiedPaidAmount) > 0 && Number(row.outstandingAmount) > 0));
+
+  // 4. Approved / Fully Paid
+  const isApprovedOrVerified =
+    verifStatus === "verified" ||
+    verifStatus === "approved" ||
+    verifStatus === "completed" ||
+    payStatus === "approved" ||
+    payStatus === "verified" ||
+    payStatus === "completed" ||
+    payStatus === "closed";
+
+  const isExplicitlyPaid =
+    row.isPaid === true ||
+    payStatus === "paid" ||
+    isApprovedOrVerified ||
+    (row.outstandingAmount !== undefined && Number(row.outstandingAmount) === 0 && Number(row.verifiedPaidAmount) > 0);
+
+  const isPaid = !isRejected && !isPendingVerif && !isPartial && isExplicitlyPaid;
+
+  // 5. Unpaid
+  const isUnpaid = !isPaid && !isPartial && !isPendingVerif && !isRejected;
+
+  let statusKey = "unpaid";
+  let displayStatus = "Unpaid";
+
+  if (isPendingVerif) {
+    statusKey = "pending";
+    displayStatus = "Pending Verification";
+  } else if (isPartial) {
+    statusKey = "partial";
+    displayStatus = "Partially Paid";
+  } else if (isRejected) {
+    statusKey = "rejected";
+    displayStatus = "Payment Rejected";
+  } else if (isPaid) {
+    statusKey = "paid";
+    displayStatus = isApprovedOrVerified ? "Approved" : "Paid";
+  }
+
+  return {
+    statusKey,
+    isPaid,
+    isPartial,
+    isPendingVerif,
+    isRejected,
+    isUnpaid,
+    displayStatus,
+  };
+};
+
 export default function MemberDashboard({
   propMonth,
   propYear,
   propEventType,
   propEventId,
+  propStatusFilter,
+  propStatus,
   onFilterChange,
   hideTopHeader = false,
 }) {
@@ -178,6 +292,15 @@ export default function MemberDashboard({
   // Payment modal state
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [activePaymentRow, setActivePaymentRow] = useState(null);
+
+  // Status modal state for viewing Pending Verification details
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [activeStatusRow, setActiveStatusRow] = useState(null);
+
+  const handleOpenStatusModal = (row) => {
+    setActiveStatusRow(row);
+    setStatusModalOpen(true);
+  };
 
   // Birthday Celebration Modal States
   const [todayCelebrants, setTodayCelebrants] = useState([]);
@@ -242,7 +365,7 @@ export default function MemberDashboard({
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, selectedYear, selectedEventType]);
+  }, [selectedMonth, selectedYear, selectedEventType, eventTypes]);
 
   useEffect(() => {
     loadDashboardData();
@@ -252,13 +375,14 @@ export default function MemberDashboard({
   const handleOpenPayment = (row) => {
     if (!row) return;
 
+    const info = getContributionStatusInfo(row);
     if (!row.paymentEligibility) {
-      if (row.paymentStatus === "Paid") {
+      if (info.isPaid) {
         toast.info("This contribution has already been fully paid and verified.");
         return;
       }
-      if (row.paymentStatus === "Pending Verification") {
-        toast.info("Your payment has been submitted and is awaiting administrator verification.");
+      if (info.isPendingVerif) {
+        handleOpenStatusModal(row);
         return;
       }
     }
@@ -274,11 +398,24 @@ export default function MemberDashboard({
     loadDashboardData();
   };
 
-  // Status filter state triggered by clicking on MetricCards (e.g. View Paid -> / View Unpaid ->)
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  // Status filter state triggered by clicking on MetricCards (e.g. View Paid -> / View Unpaid ->) or props
+  const [statusFilter, setStatusFilter] = useState(propStatusFilter || propStatus || "ALL");
+
+  useEffect(() => {
+    if (propStatusFilter !== undefined) {
+      setStatusFilter(propStatusFilter || "ALL");
+    } else if (propStatus !== undefined) {
+      setStatusFilter(propStatus || "ALL");
+    }
+  }, [propStatusFilter, propStatus]);
 
   const displayedContributions = useMemo(() => {
-    let list = Array.isArray(contributions) ? [...contributions] : [];
+    let list = Array.isArray(contributions)
+      ? contributions.map((c, idx) => ({
+          ...c,
+          id: c.contributionId || (c.eventId && c.memberId ? `${c.memberId}_${c.eventId}` : c.eventId) || `contrib_${idx}`,
+        }))
+      : [];
 
     // Filter by Event Type if specified (case-insensitive)
     if (selectedEventType && selectedEventType !== "ALL") {
@@ -300,54 +437,75 @@ export default function MemberDashboard({
       );
     }
 
-    // Status card click filters
-    if (statusFilter === "PAID") {
+    // Status card click filters (handles UNPAID, PAID, and specific statuses in all cases)
+    const filterKey = String(statusFilter || "").trim().toUpperCase();
+
+    if (filterKey === "UNPAID" || filterKey === "PENDING") {
       list = list.filter((c) => {
-        const st = String(c.paymentStatus || c.paymentVerificationStatus || "").toLowerCase();
-        return st === "paid" || st === "approved" || st === "verified";
+        const info = getContributionStatusInfo(c);
+        // Includes unpaid, partially paid, pending verification, and rejected (all non-paid items contributing to Total Pending)
+        return info.isUnpaid || info.isPartial || info.isPendingVerif || info.isRejected || !info.isPaid;
       });
-    } else if (statusFilter === "UNPAID") {
+    } else if (filterKey === "PAID" || filterKey === "APPROVED" || filterKey === "VERIFIED") {
       list = list.filter((c) => {
-        const st = String(c.paymentStatus || c.paymentVerificationStatus || "").toLowerCase();
-        return st !== "paid" && st !== "approved" && st !== "verified";
+        const info = getContributionStatusInfo(c);
+        return info.isPaid;
+      });
+    } else if (filterKey === "PARTIAL" || filterKey === "PARTIALLY_PAID") {
+      list = list.filter((c) => {
+        const info = getContributionStatusInfo(c);
+        return info.isPartial;
+      });
+    } else if (filterKey === "PENDING_VERIFICATION") {
+      list = list.filter((c) => {
+        const info = getContributionStatusInfo(c);
+        return info.isPendingVerif;
+      });
+    } else if (filterKey === "REJECTED") {
+      list = list.filter((c) => {
+        const info = getContributionStatusInfo(c);
+        return info.isRejected;
+      });
+    } else if (filterKey === "UNPAID_ONLY" || filterKey === "STRICT_UNPAID") {
+      list = list.filter((c) => {
+        const info = getContributionStatusInfo(c);
+        return info.isUnpaid;
       });
     }
+    else {
+      return list
+    }
 
-    // Dynamic Record Priority Sorting (Section 2 Specifications):
-    // 1. Unpaid
-    // 2. Partially Paid
-    // 3. Pending Verification
-    // 4. Paid (including Approved)
-    // Within each status group: sort by Event Date descending, with Event ID as deterministic tie-breaker.
-    const getStatusPriority = (item) => {
-      const st = String(item.paymentStatus || item.paymentVerificationStatus || "").toLowerCase();
-      if (st === "unpaid") return 1;
-      if (st === "partially paid" || st === "partial") return 2;
-      if (st === "pending verification" || st === "pending") return 3;
-      if (st === "payment rejected" || st === "rejected") return 4;
-      if (st === "paid" || st === "approved" || st === "verified") return 5;
-      return 6;
-    };
-
+    // Sort by status rank (unpaid & partially paid first so user can act), then by Event Date descending
     return list.sort((a, b) => {
-      const pA = getStatusPriority(a);
-      const pB = getStatusPriority(b);
-      if (pA !== pB) {
-        return pA - pB;
-      }
-      // Before approval (and within each status group): display in descending order with latest record first
-      const createdA = dayjs(a.createdAt || a.createdOn || a.eventDate).valueOf();
-      const createdB = dayjs(b.createdAt || b.createdOn || b.eventDate).valueOf();
-      if (createdB !== createdA) {
-        return createdB - createdA;
+      const getStatusRank = (item) => {
+        const info = getContributionStatusInfo(item);
+        if (info.isUnpaid) return 1;
+        if (info.isPartial) return 2;
+        if (info.isPendingVerif) return 3;
+        if (info.isRejected) return 4;
+        return 5; // paid, approved, verified
+      };
+      const rankDiff = getStatusRank(a) - getStatusRank(b);
+      if (rankDiff !== 0) {
+        return rankDiff;
       }
       const dateDiff = dayjs(b.eventDate).valueOf() - dayjs(a.eventDate).valueOf();
       if (dateDiff !== 0) {
         return dateDiff;
       }
+      const createdA = dayjs(a.createdAt || a.createdOn || a.eventDate).valueOf();
+      const createdB = dayjs(b.createdAt || b.createdOn || b.eventDate).valueOf();
+      if (createdB !== createdA) {
+        return createdB - createdA;
+      }
       return String(b.eventId || "").localeCompare(String(a.eventId || ""));
     });
   }, [contributions, statusFilter, selectedEventType, selectedEventId]);
+
+
+  console.log(displayedContributions);
+
 
   // Period label string (e.g. "October 2026" or "All Periods")
   const periodLabel = useMemo(() => {
@@ -394,11 +552,57 @@ export default function MemberDashboard({
 
   // Only records with Completed, Verified, or Approved status should appear in Recent Payments
   const completedRecentPayments = useMemo(() => {
-    return (recentPayments || []).filter((item) => {
+    const list = [];
+    const seenEvents = new Set();
+
+    (recentPayments || []).forEach((item) => {
       const rawSt = String(item.verificationStatus || item.status || "").trim().toLowerCase();
-      return rawSt === "completed" || rawSt === "verified" || rawSt === "approved";
+      if (rawSt === "completed" || rawSt === "verified" || rawSt === "approved" || rawSt === "paid") {
+        const evKey = String(item.eventId || item.eventName || "").trim().toLowerCase();
+        if (evKey && !seenEvents.has(evKey)) {
+          seenEvents.add(evKey);
+        }
+        list.push({
+          paymentId: item.paymentId,
+          eventId: item.eventId,
+          eventName: item.eventName || "Event Payment",
+          eventTypeName: item.eventTypeName || item.category || "Event",
+          paymentDate: item.paymentDate,
+          paymentAmount: item.paymentAmount,
+          paymentMode: item.paymentMode || "Online",
+          verificationStatus: "Approved",
+        });
+      }
     });
-  }, [recentPayments]);
+
+    // Also incorporate any approved/paid items from contributions list if not already present
+    (contributions || []).forEach((c) => {
+      const info = getContributionStatusInfo(c);
+      if (info.isPaid) {
+        const evKey = String(c.eventId || c.eventName || "").trim().toLowerCase();
+        if (evKey && !seenEvents.has(evKey)) {
+          seenEvents.add(evKey);
+          list.push({
+            paymentId: c.contributionId || c.eventId,
+            eventId: c.eventId,
+            eventName: c.eventName || "Event Payment",
+            eventTypeName: c.eventTypeName || c.category || "Event",
+            paymentDate: c.paymentDate || c.eventDate,
+            paymentAmount: c.verifiedPaidAmount || c.contributionAmount,
+            paymentMode: c.paymentMode || "Online",
+            verificationStatus: "Approved",
+          });
+        }
+      }
+    });
+
+    list.sort((a, b) => dayjs(b.paymentDate).valueOf() - dayjs(a.paymentDate).valueOf());
+    return list.slice(0, 5);
+  }, [recentPayments, contributions]);
+
+  const totalRecentAmount = useMemo(() => {
+    return (completedRecentPayments || []).reduce((acc, curr) => acc + (Number(curr.paymentAmount) || 0), 0);
+  }, [completedRecentPayments]);
 
   // Columns definition for AppDataTable standard grid
   const contributionColumns = useMemo(
@@ -461,34 +665,118 @@ export default function MemberDashboard({
         label: "Contribution Amount",
         key: "contributionAmount",
         align: "right",
-        render: (row) => (
-          <Typography
-            component="span"
-            sx={{
-              fontWeight: 800,
-              fontSize: "0.975rem",
-              color: isDark ? "#ffffff" : "#0f172a",
-            }}
-          >
-            {formatWholeCurrency(row.contributionAmount || 0)}
-          </Typography>
-        ),
+        render: (row) => {
+          const info = getContributionStatusInfo(row);
+          const displayAmount = info.isPartial && row.outstandingAmount !== undefined
+            ? row.outstandingAmount
+            : (row.contributionAmount || 0);
+          return (
+            <Typography
+              component="span"
+              sx={{
+                fontWeight: 800,
+                fontSize: "0.975rem",
+                color: isDark ? "#ffffff" : "#0f172a",
+              }}
+            >
+              {formatWholeCurrency(displayAmount)}
+            </Typography>
+          );
+        },
       },
       {
         label: "Status",
         key: "paymentStatus",
         align: "center",
         render: (row) => {
-          const st = String(row.paymentStatus || row.paymentVerificationStatus || "").toLowerCase();
-          const isApproved = st === "approved" || st === "verified";
-          const isPaid = st === "paid" || st === "pending verification" || st === "pending";
-          const isPendingVerif = (st === "pending verification" || st === "pending") && !isApproved;
-          const isUnpaid = st === "unpaid";
-          const isPartial = st === "partially paid" || st === "partial";
-          const isRejected = st === "payment rejected" || st === "rejected";
+          const info = getContributionStatusInfo(row);
 
-          // 1. Approved / Verified
-          if (isApproved) {
+          // 1. Pending Verification (Paid by member, waiting for admin approval)
+          if (info.isPendingVerif) {
+            return (
+              <Chip
+                icon={<Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#d97706", mr: "4px !important" }} />}
+                label="Pending Verification"
+                size="small"
+                sx={{
+                  bgcolor: "#fffbeb",
+                  color: "#d97706",
+                  fontWeight: 700,
+                  borderRadius: "16px",
+                  fontSize: "0.785rem",
+                  px: 0.75,
+                  py: 0.25,
+                  border: "1px solid #fde68a",
+                }}
+              />
+            );
+          }
+
+          // 2. Partially Paid
+          if (info.isPartial) {
+            return (
+              <Chip
+                icon={<Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#2563eb", mr: "4px !important" }} />}
+                label="Partially Paid"
+                size="small"
+                sx={{
+                  bgcolor: "#eff6ff",
+                  color: "#2563eb",
+                  fontWeight: 700,
+                  borderRadius: "16px",
+                  fontSize: "0.785rem",
+                  px: 0.75,
+                  py: 0.25,
+                  border: "1px solid #bfdbfe",
+                }}
+              />
+            );
+          }
+
+          // 3. Rejected
+          if (info.isRejected) {
+            return (
+              <Chip
+                icon={<CancelRoundedIcon sx={{ fontSize: "15px !important", color: "#dc2626 !important" }} />}
+                label="Payment Rejected"
+                size="small"
+                sx={{
+                  bgcolor: "#fef2f2",
+                  color: "#dc2626",
+                  fontWeight: 700,
+                  borderRadius: "16px",
+                  fontSize: "0.785rem",
+                  px: 0.75,
+                  py: 0.25,
+                  border: "1px solid #fecaca",
+                }}
+              />
+            );
+          }
+
+          // 4. Unpaid
+          if (info.isUnpaid) {
+            return (
+              <Chip
+                icon={<Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#dc2626", mr: "4px !important" }} />}
+                label="Unpaid"
+                size="small"
+                sx={{
+                  bgcolor: "#fef2f2",
+                  color: "#dc2626",
+                  fontWeight: 700,
+                  borderRadius: "16px",
+                  fontSize: "0.785rem",
+                  px: 0.75,
+                  py: 0.25,
+                  border: "1px solid #fee2e2",
+                }}
+              />
+            );
+          }
+
+          // Fallback Approved/Paid
+          if (info.isPaid) {
             return (
               <Chip
                 icon={<CheckCircleRoundedIcon sx={{ fontSize: "15px !important", color: "#16a34a !important" }} />}
@@ -508,104 +796,6 @@ export default function MemberDashboard({
             );
           }
 
-          // 2. Pending Verification (Paid by member, waiting for admin approval)
-          if (isPendingVerif) {
-            return (
-              <Chip
-                icon={<HourglassEmptyRoundedIcon sx={{ fontSize: "15px !important", color: "#7c3aed !important" }} />}
-                label="Pending Verification"
-                size="small"
-                sx={{
-                  bgcolor: "#f5f3ff",
-                  color: "#7c3aed",
-                  fontWeight: 700,
-                  borderRadius: "16px",
-                  fontSize: "0.785rem",
-                  px: 0.75,
-                  py: 0.25,
-                  border: "1px solid #ddd6fe",
-                }}
-              />
-            );
-          }
-
-          // 3. Paid (Fully settled / confirmed)
-          if (isPaid) {
-            return (
-              <Chip
-                icon={<CheckCircleRoundedIcon sx={{ fontSize: "15px !important", color: "#16a34a !important" }} />}
-                label="Paid"
-                size="small"
-                sx={{
-                  bgcolor: "#ecfdf5",
-                  color: "#059669",
-                  fontWeight: 700,
-                  borderRadius: "16px",
-                  fontSize: "0.8rem",
-                  px: 0.75,
-                  py: 0.25,
-                  border: "1px solid #a7f3d0",
-                }}
-              />
-            );
-          }
-          if (isPartial) {
-            return (
-              <Chip
-                icon={<ErrorRoundedIcon sx={{ fontSize: "15px !important", color: "#d97706 !important" }} />}
-                label="Partially Paid"
-                size="small"
-                sx={{
-                  bgcolor: "#fffbeb",
-                  color: "#d97706",
-                  fontWeight: 700,
-                  borderRadius: "16px",
-                  fontSize: "0.8rem",
-                  px: 0.75,
-                  py: 0.25,
-                  border: "1px solid #fde68a",
-                }}
-              />
-            );
-          }
-          if (isRejected) {
-            return (
-              <Chip
-                icon={<CancelRoundedIcon sx={{ fontSize: "15px !important", color: "#dc2626 !important" }} />}
-                label="Payment Rejected"
-                size="small"
-                sx={{
-                  bgcolor: "#fef2f2",
-                  color: "#dc2626",
-                  fontWeight: 700,
-                  borderRadius: "16px",
-                  fontSize: "0.785rem",
-                  px: 0.75,
-                  py: 0.25,
-                  border: "1px solid #fecaca",
-                }}
-              />
-            );
-          }
-          if (isUnpaid) {
-            return (
-              <Chip
-                icon={<ErrorRoundedIcon sx={{ fontSize: "15px !important", color: "#ef4444 !important" }} />}
-                label="Unpaid"
-                size="small"
-                sx={{
-                  bgcolor: "#fef2f2",
-                  color: "#dc2626",
-                  fontWeight: 700,
-                  borderRadius: "16px",
-                  fontSize: "0.8rem",
-                  px: 0.75,
-                  py: 0.25,
-                  border: "1px solid #fee2e2",
-                }}
-              />
-            );
-          }
           return <Chip label={row.paymentStatus || "--"} size="small" />;
         },
       },
@@ -614,15 +804,9 @@ export default function MemberDashboard({
         key: "action",
         align: "center",
         render: (row) => {
-          const st = String(row.paymentStatus || row.paymentVerificationStatus || "").toLowerCase();
-          const isApproved = st === "approved" || st === "verified";
-          const isPaid = st === "paid" || isApproved;
-          const isUnpaid = st === "unpaid";
-          const isPartial = st === "partially paid" || st === "partial";
-          const isPendingVerif = st === "pending verification" || st === "pending";
-          const isRejected = st === "payment rejected" || st === "rejected";
+          const info = getContributionStatusInfo(row);
 
-          if (isUnpaid) {
+          if (info.isUnpaid) {
             return (
               <Button
                 variant="contained"
@@ -658,31 +842,25 @@ export default function MemberDashboard({
             );
           }
 
-          if (isPartial) {
+          if (info.isPartial) {
             return (
               <Button
-                variant="contained"
+                variant="outlined"
                 size="small"
                 onClick={() => handleOpenPayment(row)}
                 startIcon={<PaymentRoundedIcon sx={{ fontSize: 18 }} />}
                 sx={{
-                  background: isDark
-                    ? "linear-gradient(90deg, #5a4c82 0%, #6f5ea0 100%)"
-                    : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
-                  color: "#ffffff",
+                  borderColor: isDark ? "#7c3aed" : "#4a3f6b",
+                  color: isDark ? "#c4b5fd" : "#4a3f6b",
                   fontWeight: 700,
                   textTransform: "none",
                   borderRadius: "8px",
-                  px: 1.85,
+                  px: 2,
                   py: 0.65,
-                  fontSize: "0.85rem",
-                  boxShadow: isDark
-                    ? "0 4px 12px rgba(0, 0, 0, 0.35)"
-                    : "0 4px 12px rgba(74, 63, 107, 0.25)",
+                  fontSize: "0.825rem",
                   "&:hover": {
-                    background: isDark
-                      ? "linear-gradient(90deg, #4a3f6b 0%, #5a4c82 100%)"
-                      : "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)",
+                    borderColor: isDark ? "#a78bfa" : "#372e54",
+                    bgcolor: "rgba(74, 63, 107, 0.04)",
                   },
                 }}
               >
@@ -691,20 +869,21 @@ export default function MemberDashboard({
             );
           }
 
-          if (isPendingVerif) {
+          if (info.isPendingVerif) {
             return (
               <Button
                 variant="outlined"
                 size="small"
-                onClick={() => toast.info("Your payment is currently being reviewed by organizers/admin.")}
+                onClick={() => handleOpenStatusModal(row)}
+                startIcon={<VisibilityRoundedIcon sx={{ fontSize: 18 }} />}
                 sx={{
-                  borderColor: "#c4b5fd",
-                  color: "#7c3aed",
-                  fontWeight: 600,
+                  borderColor: isDark ? "rgba(255,255,255,0.2)" : "#cbd5e1",
+                  color: isDark ? "#c4b5fd" : "#4a3f6b",
+                  fontWeight: 700,
                   textTransform: "none",
                   borderRadius: "8px",
-                  px: 1.75,
-                  py: 0.6,
+                  px: 2,
+                  py: 0.65,
                   fontSize: "0.825rem",
                   "&:hover": {
                     borderColor: "#7c3aed",
@@ -717,7 +896,7 @@ export default function MemberDashboard({
             );
           }
 
-          if (isPaid || isApproved) {
+          if (info.isPaid) {
             return (
               <Button
                 variant="contained"
@@ -739,7 +918,7 @@ export default function MemberDashboard({
             );
           }
 
-          if (isRejected) {
+          if (info.isRejected) {
             return (
               <Button
                 variant="contained"
@@ -763,20 +942,21 @@ export default function MemberDashboard({
         },
       },
     ],
-    [isDark, toast]
+    [isDark]
   );
 
   return (
     <Box sx={{ width: "100%", pb: 6 }}>
-      {/* ── Two Column Layout (Matching Exact Reference Screenshot) ── */}
+      {/* ── Two Column Responsive Layout ── */}
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: {
             xs: "1fr",
-            lg: "minmax(0, 1fr) 375px",
+            lg: "minmax(0, 1.25fr) minmax(420px, 480px)",
+            xl: "minmax(0, 1.35fr) minmax(480px, 540px)",
           },
-          gap: 2.5,
+          gap: { xs: 2.5, lg: 3 },
           alignItems: "start",
           width: "100%",
         }}
@@ -800,7 +980,7 @@ export default function MemberDashboard({
               label="Total Paid"
               value={formatWholeCurrency(summary.totalPaid || 0)}
               accent="#10b981"
-              actionText={summary.totalPaid > 0 ? "View Paid →" : undefined}
+              actionText={summary.totalPaid > 0 ? (statusFilter === "PAID" ? "Show All →" : "View Paid →") : undefined}
               onClick={summary.totalPaid > 0 ? () => setStatusFilter((p) => (p === "PAID" ? "ALL" : "PAID")) : undefined}
             />
 
@@ -809,7 +989,7 @@ export default function MemberDashboard({
               label="Total Pending"
               value={formatWholeCurrency(summary.totalPending || 0)}
               accent="#f43f5e"
-              actionText={summary.totalPending > 0 ? "View Unpaid →" : undefined}
+              actionText={summary.totalPending > 0 ? (statusFilter === "UNPAID" ? "Show All →" : "View Unpaid →") : undefined}
               onClick={summary.totalPending > 0 ? () => setStatusFilter((p) => (p === "UNPAID" ? "ALL" : "UNPAID")) : undefined}
             />
 
@@ -819,7 +999,7 @@ export default function MemberDashboard({
               value={summary.totalEvents || 0}
               accent="#8b5cf6"
               actionText={summary.totalEvents > 0 ? "View Events →" : undefined}
-              onClick={summary.totalEvents > 0 ? () => setStatusFilter("ALL") : undefined}
+              onClick={summary.totalEvents > 0 ? () => navigate("/events") : undefined}
             />
           </Box>
 
@@ -829,6 +1009,7 @@ export default function MemberDashboard({
               title="My Contributions"
               columns={contributionColumns}
               data={displayedContributions}
+              rowKey={(row, idx) => row.id || row.contributionId || (row.eventId && row.memberId ? `${row.memberId}_${row.eventId}` : row.eventId) || `row_${idx}`}
               loading={loading}
               emptyMessage="No contributions found for this period."
               allowPagination={true}
@@ -840,10 +1021,11 @@ export default function MemberDashboard({
         </Box>
 
         {/* ── Right Column: Recent Payments (Matching Screenshot Design) ── */}
+        {/* ── Right Column: Recent Payments (Matching Modern Fintech / SaaS Best Practices) ── */}
         <Paper
           elevation={0}
           sx={{
-            p: { xs: 2.25, sm: 2.75 },
+            p: { xs: 2.25, sm: 2.75, md: 3 },
             borderRadius: "16px",
             bgcolor: isDark ? "background.paper" : "#ffffff",
             border: `1.5px solid ${isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0"}`,
@@ -853,16 +1035,27 @@ export default function MemberDashboard({
             display: "flex",
             flexDirection: "column",
             width: "100%",
+            transition: "box-shadow 0.25s ease",
           }}
         >
           {/* Header */}
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1.5,
+              mb: 2.5,
+              pb: 2,
+              borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#f1f5f9"}`,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
               <Box
                 sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: "10px",
+                  width: 42,
+                  height: 42,
+                  borderRadius: "12px",
                   background: isDark
                     ? "linear-gradient(135deg, #5a4c82 0%, #6f5ea0 100%)"
                     : "linear-gradient(135deg, #4a3f6b 0%, #5d528b 100%)",
@@ -870,67 +1063,116 @@ export default function MemberDashboard({
                   display: "grid",
                   placeItems: "center",
                   boxShadow: isDark
-                    ? "0 4px 12px rgba(0, 0, 0, 0.35)"
-                    : "0 4px 12px rgba(74, 63, 107, 0.25)",
+                    ? "0 4px 14px rgba(0, 0, 0, 0.4)"
+                    : "0 4px 14px rgba(74, 63, 107, 0.25)",
                 }}
               >
-                <HistoryRoundedIcon sx={{ fontSize: 22 }} />
+                <HistoryRoundedIcon sx={{ fontSize: 24 }} />
               </Box>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 800,
-                  fontSize: "1.1rem",
-                  color: isDark ? "#ffffff" : "#1e1b4b",
-                }}
-              >
-                Recent Payments
-              </Typography>
+              <Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: "1.125rem",
+                      color: isDark ? "#ffffff" : "#1e1b4b",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    Recent Payments
+                  </Typography>
+                  {completedRecentPayments.length > 0 && (
+                    <Chip
+                      label={`${completedRecentPayments.length} Approved`}
+                      size="small"
+                      sx={{
+                        height: 22,
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        bgcolor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ecfdf5",
+                        color: "#059669",
+                        border: "1px solid",
+                        borderColor: isDark ? "rgba(16, 185, 129, 0.3)" : "#a7f3d0",
+                      }}
+                    />
+                  )}
+                </Box>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: isDark ? "text.secondary" : "#64748b",
+                    fontSize: "0.825rem",
+                    mt: 0.25,
+                  }}
+                >
+                  Latest verified payment transactions
+                </Typography>
+              </Box>
             </Box>
-            <Typography
-              variant="body2"
+
+            <ButtonBase
+              onClick={() => navigate("/payments")}
               sx={{
-                color: isDark ? "text.secondary" : "#64748b",
-                fontSize: "0.85rem",
-                mt: 0.5,
+                display: { xs: "none", sm: "inline-flex" },
+                alignItems: "center",
+                gap: 0.5,
+                px: 1.5,
+                py: 0.7,
+                borderRadius: "8px",
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                color: isDark ? "#c4b5fd" : "#6d28d9",
+                bgcolor: isDark ? "rgba(196, 181, 253, 0.08)" : "rgba(109, 40, 217, 0.05)",
+                border: `1px solid ${isDark ? "rgba(196, 181, 253, 0.2)" : "rgba(109, 40, 217, 0.15)"}`,
+                transition: "all 0.2s ease",
+                "&:hover": {
+                  bgcolor: isDark ? "rgba(196, 181, 253, 0.16)" : "rgba(109, 40, 217, 0.12)",
+                  transform: "translateX(2px)",
+                },
               }}
             >
-              Your last 5 payment transactions.
-            </Typography>
+              View All
+              <ArrowForwardRoundedIcon sx={{ fontSize: 15 }} />
+            </ButtonBase>
           </Box>
 
           {/* Table View of 5 transactions */}
-          <TableContainer sx={{ flex: 1, borderRadius: "10px", overflow: "hidden" }}>
+          <TableContainer sx={{ flex: 1, borderRadius: "12px", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#f1f5f9"}` }}>
             <Table size="small" sx={{ width: "100%", tableLayout: "fixed" }}>
               <TableHead>
                 <TableRow
                   sx={{
                     bgcolor: isDark
                       ? alpha(theme.palette.primary.main, 0.16)
-                      : alpha(theme.palette.primary.main, 0.08),
+                      : alpha(theme.palette.primary.main, 0.06),
                   }}
                 >
                   <TableCell
                     sx={{
-                      fontWeight: 700,
+                      fontWeight: 800,
                       fontSize: "0.75rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
                       color: isDark ? "#c4b5fd" : "#4a3f6b",
-                      py: 1,
-                      pl: 1.5,
-                      width: "44%",
+                      py: 1.25,
+                      pl: 2,
+                      width: "48%",
                       borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0"}`,
                     }}
                   >
-                    Event
+                    Event Details
                   </TableCell>
                   <TableCell
                     align="right"
                     sx={{
-                      fontWeight: 700,
+                      fontWeight: 800,
                       fontSize: "0.75rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
                       color: isDark ? "#c4b5fd" : "#4a3f6b",
-                      py: 1,
-                      width: "24%",
+                      py: 1.25,
+                      width: "26%",
                       borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0"}`,
                     }}
                   >
@@ -939,12 +1181,14 @@ export default function MemberDashboard({
                   <TableCell
                     align="center"
                     sx={{
-                      fontWeight: 700,
+                      fontWeight: 800,
                       fontSize: "0.75rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
                       color: isDark ? "#c4b5fd" : "#4a3f6b",
-                      py: 1,
-                      pr: 1.5,
-                      width: "32%",
+                      py: 1.25,
+                      pr: 2,
+                      width: "26%",
                       borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0"}`,
                     }}
                   >
@@ -958,60 +1202,116 @@ export default function MemberDashboard({
                     <TableCell
                       colSpan={3}
                       align="center"
-                      sx={{ py: 4, color: "text.secondary", fontSize: "0.85rem", borderBottom: "none" }}
+                      sx={{ py: 6, borderBottom: "none" }}
                     >
-                      No completed payment transactions recorded.
+                      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.25 }}>
+                        <Box
+                          sx={{
+                            width: 52,
+                            height: 52,
+                            borderRadius: "50%",
+                            bgcolor: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc",
+                            border: `1px dashed ${isDark ? "rgba(255,255,255,0.15)" : "#cbd5e1"}`,
+                            display: "grid",
+                            placeItems: "center",
+                            color: "text.secondary",
+                          }}
+                        >
+                          <HistoryRoundedIcon sx={{ fontSize: 26, opacity: 0.6 }} />
+                        </Box>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: isDark ? "#ffffff" : "#1e293b" }}>
+                          No Verified Payments Yet
+                        </Typography>
+                        
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ) : (
                   completedRecentPayments.slice(0, 5).map((item, idx) => {
-                    const rawSt = String(item.verificationStatus || item.status || "").trim();
-                    const st = rawSt.toLowerCase();
-                    const displayLabel = st === "completed" ? "Completed" : (st === "approved" ? "Approved" : "Completed");
+                    const visuals = getCategoryVisuals(item.eventTypeName);
+                    const CategoryIcon = visuals.icon;
 
                     return (
                       <TableRow
                         key={item.paymentId || idx}
                         hover
                         sx={{
+                          transition: "all 0.18s ease",
+                          "&:hover": {
+                            bgcolor: isDark ? "rgba(255,255,255,0.03)" : "rgba(74, 63, 107, 0.03)",
+                          },
                           "&:last-child td": { borderBottom: "none" },
-                          transition: "background-color 0.15s ease",
                         }}
                       >
-                        {/* Event Name & Date */}
-                        <TableCell sx={{ py: 1.15, pl: 1.5 }}>
-                          <AppOverflowTooltip
-                            text={item.eventName || "Event Payment"}
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: "0.825rem",
-                              color: isDark ? "#ffffff" : "#1e293b",
-                              display: "block",
-                              lineHeight: 1.3,
-                            }}
-                          />
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              color: isDark ? "text.secondary" : "#64748b",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              display: "block",
-                              mt: 0.25,
-                            }}
-                          >
-                            {dayjs(item.paymentDate).format("DD MMM YYYY")}
-                          </Typography>
+                        {/* Event Name, Category & Date */}
+                        <TableCell sx={{ py: 1.4, pl: 2 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+                            <Box
+                              sx={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: "8px",
+                                bgcolor: visuals.bg,
+                                color: visuals.color,
+                                display: "grid",
+                                placeItems: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <CategoryIcon sx={{ fontSize: 18 }} />
+                            </Box>
+                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                              <AppOverflowTooltip
+                                text={item.eventName || "Event Payment"}
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: "0.85rem",
+                                  color: isDark ? "#ffffff" : "#0f172a",
+                                  display: "block",
+                                  lineHeight: 1.3,
+                                }}
+                              />
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mt: 0.35, flexWrap: "wrap" }}>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: isDark ? "text.secondary" : "#64748b",
+                                    fontSize: "0.735rem",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  {dayjs(item.paymentDate).format("DD MMM YYYY")}
+                                </Typography>
+                                {item.paymentMode && item.paymentMode !== "--" && (
+                                  <Box
+                                    component="span"
+                                    sx={{
+                                      fontSize: "0.68rem",
+                                      fontWeight: 600,
+                                      px: 0.7,
+                                      py: 0.15,
+                                      borderRadius: "4px",
+                                      bgcolor: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
+                                      color: isDark ? "#cbd5e1" : "#475569",
+                                    }}
+                                  >
+                                    {item.paymentMode}
+                                  </Box>
+                                )}
+                              </Box>
+                            </Box>
+                          </Box>
                         </TableCell>
 
                         {/* Amount */}
-                        <TableCell align="right" sx={{ py: 1.15, whiteSpace: "nowrap" }}>
+                        <TableCell align="right" sx={{ py: 1.4, whiteSpace: "nowrap" }}>
                           <Typography
                             variant="body2"
                             sx={{
                               fontWeight: 800,
-                              fontSize: "0.875rem",
-                              color: isDark ? "#ffffff" : "#0f172a",
+                              fontSize: "0.95rem",
+                              color: isDark ? "#34d399" : "#059669",
+                              letterSpacing: "-0.01em",
                             }}
                           >
                             {formatWholeCurrency(item.paymentAmount || 0)}
@@ -1019,19 +1319,20 @@ export default function MemberDashboard({
                         </TableCell>
 
                         {/* Status Chip */}
-                        <TableCell align="center" sx={{ py: 1.15, pr: 1.5, whiteSpace: "nowrap" }}>
+                        <TableCell align="center" sx={{ py: 1.4, pr: 2, whiteSpace: "nowrap" }}>
                           <Chip
-                            label={displayLabel}
+                            icon={<CheckCircleRoundedIcon sx={{ fontSize: "14px !important", color: "#16a34a !important" }} />}
+                            label="Approved"
                             size="small"
                             sx={{
                               fontWeight: 700,
-                              fontSize: "0.72rem",
-                              height: 22,
+                              fontSize: "0.75rem",
+                              height: 24,
                               px: 0.75,
-                              borderRadius: "12px",
-                              bgcolor: "#ecfdf5",
-                              color: "#059669",
-                              border: "1px solid #d1fae5",
+                              borderRadius: "16px",
+                              bgcolor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ecfdf5",
+                              color: isDark ? "#34d399" : "#059669",
+                              border: `1px solid ${isDark ? "rgba(16, 185, 129, 0.3)" : "#a7f3d0"}`,
                             }}
                           />
                         </TableCell>
@@ -1042,6 +1343,52 @@ export default function MemberDashboard({
               </TableBody>
             </Table>
           </TableContainer>
+
+          {/* Footer Bar */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mt: 2.25,
+              pt: 1.75,
+              borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#f1f5f9"}`,
+            }}
+          >
+            <Typography
+              variant="caption"
+              sx={{
+                color: isDark ? "text.secondary" : "#64748b",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+              }}
+            >
+              Recent Total:{" "}
+              <Box component="span" sx={{ fontWeight: 800, color: isDark ? "#ffffff" : "#1e1b4b" }}>
+                {formatWholeCurrency(totalRecentAmount)}
+              </Box>
+            </Typography>
+
+            <ButtonBase
+              onClick={() => navigate("/payments")}
+              sx={{
+                color: isDark ? "#c4b5fd" : "#6d28d9",
+                fontWeight: 700,
+                fontSize: "0.825rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.6,
+                transition: "all 0.2s ease",
+                "&:hover": {
+                  color: isDark ? "#ddd6fe" : "#4c1d95",
+                  transform: "translateX(2px)",
+                },
+              }}
+            >
+              Full Payment History
+              <ArrowForwardRoundedIcon sx={{ fontSize: 14 }} />
+            </ButtonBase>
+          </Box>
         </Paper>
       </Box>
 
@@ -1161,6 +1508,114 @@ export default function MemberDashboard({
           initialStatus={activePaymentRow.paymentStatus}
         />
       )}
+
+      {/* ── View Status Dialog for Pending Verification ── */}
+      <Dialog
+        open={statusModalOpen}
+        onClose={() => {
+          setStatusModalOpen(false);
+          setActiveStatusRow(null);
+        }}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "16px",
+            p: 1,
+            boxShadow: "0 10px 40px rgba(0, 0, 0, 0.15)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+          <HourglassEmptyRoundedIcon sx={{ color: "#d97706", fontSize: 24 }} />
+          Payment Status
+        </DialogTitle>
+        <DialogContent dividers sx={{ py: 2 }}>
+          {activeStatusRow && (
+            <Stack spacing={2}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="body2" color="text.secondary">
+                  Event
+                </Typography>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {activeStatusRow.eventName || "--"}
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="body2" color="text.secondary">
+                  Event Date
+                </Typography>
+                <Typography variant="body2" fontWeight={600}>
+                  {activeStatusRow.eventDate ? dayjs(activeStatusRow.eventDate).format("DD MMM YYYY") : "--"}
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="body2" color="text.secondary">
+                  Amount
+                </Typography>
+                <Typography variant="subtitle2" fontWeight={800} color="primary.main">
+                  {formatWholeCurrency(activeStatusRow.contributionAmount || 0)}
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="body2" color="text.secondary">
+                  Status
+                </Typography>
+                <Chip
+                  icon={<Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#d97706", mr: "4px !important" }} />}
+                  label="Pending Verification"
+                  size="small"
+                  sx={{
+                    bgcolor: "#fffbeb",
+                    color: "#d97706",
+                    fontWeight: 700,
+                    borderRadius: "16px",
+                    fontSize: "0.785rem",
+                    border: "1px solid #fde68a",
+                  }}
+                />
+              </Box>
+              <Box
+                sx={{
+                  bgcolor: "#fffbeb",
+                  borderRadius: "10px",
+                  p: 1.5,
+                  border: "1px solid #fde68a",
+                  display: "flex",
+                  gap: 1.25,
+                  alignItems: "flex-start",
+                }}
+              >
+                <InfoRoundedIcon sx={{ color: "#d97706", fontSize: 20, mt: 0.2 }} />
+                <Typography variant="caption" sx={{ color: "#92400e", lineHeight: 1.45, fontWeight: 500 }}>
+                  Your payment details and proof have been submitted and are currently awaiting review by an administrator. Once approved, this event will be settled and moved to Recent Payments.
+                </Typography>
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1.5 }}>
+          <Button
+            onClick={() => {
+              setStatusModalOpen(false);
+              setActiveStatusRow(null);
+            }}
+            variant="contained"
+            sx={{
+              background: isDark
+                ? "linear-gradient(90deg, #5a4c82 0%, #6f5ea0 100%)"
+                : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+              color: "#ffffff",
+              fontWeight: 700,
+              textTransform: "none",
+              borderRadius: "8px",
+              px: 3,
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Birthday Celebration Modal */}
       <BirthdayCelebrationModal

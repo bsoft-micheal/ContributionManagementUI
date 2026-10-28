@@ -159,7 +159,7 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
   // Filter all members to only active, non-exited accounts
   const rawMembers = members && members.length > 0 ? members : internalMembers;
   const allMembers = (rawMembers || []).filter(
-    (m) => m && m.isActive !== false && !m.isExited && !m.isDeleted
+    (m) => m && m.isActive !== false && !m.isDeleted
   );
 
   const allocatedAmt = (activeEvent?.useAvailableBalance || event?.useAvailableBalance)
