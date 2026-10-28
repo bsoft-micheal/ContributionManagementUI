@@ -366,7 +366,9 @@ export default function ViewContributionModal({
     row.utrNumber ||
     row.referenceNo ||
     row.utr ||
+    row.txnNumber ||
     matchedTx?.utr ||
+    matchedTx?.txnNumber ||
     matchedTx?.referenceNo ||
     matchedTx?.transactionRef ||
     "";
@@ -874,14 +876,6 @@ export default function ViewContributionModal({
                 </Typography>
               </Grid>
 
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {isPaid ? "Total Received Amount" : "Received Amount"}
-                </Typography>
-                <Typography variant="body2" fontWeight={800} sx={{ color: isPaid ? "#16a34a" : "text.secondary", fontSize: "0.95rem" }}>
-                  {formatWholeCurrency(actualPaidAmount)}
-                </Typography>
-              </Grid>
 
               {arrears > 0 && (
                 <Grid size={{ xs: 12, sm: 6 }}>
@@ -1092,13 +1086,13 @@ export default function ViewContributionModal({
                 </Grid>
               )}
 
-              {row.createdBy && (
+              {(row.createdBy || row.submittedBy || matchedTx?.createdBy || matchedTx?.submittedBy) && (
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography variant="caption" color="text.secondary">
                     Submitted By
                   </Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    {row.createdBy}
+                    {row.createdBy || row.submittedBy || matchedTx?.createdBy || matchedTx?.submittedBy}
                   </Typography>
                 </Grid>
               )}
