@@ -185,3 +185,42 @@ export function canAddAdditionalExpenseRow({
   // Must reach expected budget and remaining budget must be 0
   return main >= effectiveExpected && remaining === 0;
 }
+
+/**
+ * Resolves the planned budget of an event for expense tracking.
+ * Takes into account:
+ * 1) originalPlannedBudget (if set during creation or adjustment)
+ * 2) baseAmount (which stores the event's planned budget in Event entity)
+ * 3) sponsor contributions + allocated amount in hand + expected member collections
+ *
+ * This ensures that when sponsor contribution is required (e.g. ₹5,000 sponsor out of ₹10,000 planned budget),
+ * the Expense page displays the total ₹10,000 planned budget rather than just the member-only collection requirement (₹5,000).
+ *
+ * @param {Object} ev Event object or DTO
+ * @returns {number} The resolved planned budget as a rounded whole number
+ */
+export function getEventPlannedBudget(ev) {
+  if (!ev) return 0;
+
+  const orig = Number(ev.originalPlannedBudget ?? 0);
+  const base = Number(ev.baseAmount ?? 0);
+
+  const sponsorAmt = Number(ev.sponsorContributionAmount || 0) ||
+    (Array.isArray(ev.sponsors)
+      ? ev.sponsors.reduce((sum, s) => sum + (Number(s.contributionAmount || s.amount) || 0), 0)
+      : 0);
+
+  const memberCollection = Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.expectedCollection ?? 0);
+  const allocated = ev.useAvailableBalance ? Number(ev.allocatedAmount || 0) : 0;
+  const combinedTotal = memberCollection + sponsorAmt + allocated;
+
+  // If deficit recovery was applied, originalPlannedBudget preserves the pure event planned budget
+  if (ev.usePreviousEventBalance && ev.previousEventAdjustmentType === "DeficitRecovery" && orig > 0) {
+    return Math.round(orig);
+  }
+
+  const result = Math.max(orig, base, combinedTotal);
+  if (result > 0) return Math.round(result);
+
+  return Math.round(memberCollection || 0);
+}

@@ -34,6 +34,7 @@ dayjs.extend(customParseFormat);
 import { useLocation } from "react-router-dom";
 import { formatGridDate, formatViewDate } from "../../utils/dateHelper";
 import { roundToWhole, formatWholeCurrency } from "../../utils/roundingHelper";
+import { getEventPlannedBudget } from "../../utils/expenseBudgetCalculations";
 
 import { useAppToast } from "../../components/common/AppToast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -573,7 +574,7 @@ export default function ExpensePage() {
     });
     if (!ev) return null;
 
-    const expected = roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.expectedCollection ?? ev.baseAmount ?? 0));
+    const expected = roundToWhole(getEventPlannedBudget(ev));
     const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
     const relevantExpenses = expenses
       .filter((ex) =>
@@ -603,7 +604,7 @@ export default function ExpensePage() {
   const pageBudgetSummary = useMemo(() => {
     const targetEventName = appliedEvent !== "ALL" ? appliedEvent : null;
     if (!targetEventName) {
-      let validEvents = eventsList.filter((e) => e && (e.totalExpectedAmount || e.expectedAmount || e.baseAmount));
+      let validEvents = eventsList.filter((e) => e && (getEventPlannedBudget(e) > 0 || e.totalExpectedAmount || e.expectedAmount || e.baseAmount));
       if (appliedCategory !== "ALL") {
         validEvents = validEvents.filter((e) => {
           const cat = e.eventTypeName || e.category;
@@ -611,7 +612,7 @@ export default function ExpensePage() {
         });
       }
       const expected = roundToWhole(validEvents.reduce(
-        (sum, e) => sum + Number(e.totalExpectedAmount ?? e.expectedAmount ?? e.baseAmount ?? 0),
+        (sum, e) => sum + getEventPlannedBudget(e),
         0
       ));
       // Only count Approved expenses in Total Spent, Remaining Budget, and Extra Amount Spent
@@ -634,7 +635,7 @@ export default function ExpensePage() {
       // Extra spent calculated per individual event that exceeded its expected budget
       const perEventExtra = validEvents.reduce((sum, ev) => {
         const evName = (ev.name || ev.eventName || "").trim().toLowerCase();
-        const evExpected = roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0));
+        const evExpected = roundToWhole(getEventPlannedBudget(ev));
         const evSpent = roundToWhole(relevantExpenses
           .filter((ex) => (ex.eventName || "").trim().toLowerCase() === evName)
           .reduce((s, ex) => s + (Number(ex.amount) || 0), 0));
@@ -653,7 +654,7 @@ export default function ExpensePage() {
     }
 
     const ev = eventsList.find((e) => (e.name || e.eventName || "").trim().toLowerCase() === targetEventName.trim().toLowerCase());
-    const expected = ev ? roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0)) : 0;
+    const expected = ev ? roundToWhole(getEventPlannedBudget(ev)) : 0;
     const isApprovedStatus = (status) => {
       const s = (status || "").toLowerCase().trim();
       return s === "approved" || s === "verified" || s.includes("approv") || s.includes("verif");
@@ -1644,7 +1645,7 @@ export default function ExpensePage() {
                 }}
               >
                 <MetricCard
-                  label="Expected Budget"
+                  label={COMMON_STRINGS.EXPENSES?.PLANNED_BUDGET || COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Planned Budget"}
                   value={formatWholeCurrency(pageBudgetSummary.expected)}
                   accent="#6366f1"
                 />
