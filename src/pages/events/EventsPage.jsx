@@ -323,12 +323,20 @@ export default function EventsPage() {
         });
 
         const expAmount = Math.max(Number(e.expenseAmount || 0), eventExpenseTotal);
+        const baseBudget = Number(e.originalPlannedBudget ?? e.baseAmount ?? 0);
+        const sponsorDeduction = Boolean(e.requireSponsorContribution)
+          ? Number(
+              e.sponsorContributionAmount ??
+              (Array.isArray(e.sponsors)
+                ? e.sponsors.filter((s) => s.isActive).reduce((sum, s) => sum + (Number(s.contributionAmount) || 0), 0)
+                : 0)
+            )
+          : 0;
+        const remainingFunding = Math.max(0, baseBudget - sponsorDeduction);
         const allocatedAmt = e.useAvailableBalance ? Number(e.allocatedAmount || 0) : 0;
-        const rawBudget = Number(e.totalExpectedAmount || 0) > 0 ? Number(e.totalExpectedAmount) : Number(e.baseAmount || 0);
-        // If event was funded from Amount in Hand, member collection expected is reduced by allocatedAmt
-        const expectedAmt = allocatedAmt > 0 && Number(e.totalExpectedAmount || 0) <= (rawBudget - allocatedAmt)
+        const expectedAmt = Number(e.totalExpectedAmount) > 0
           ? Number(e.totalExpectedAmount)
-          : (allocatedAmt > 0 ? Math.max(0, rawBudget - allocatedAmt) : (Number(e.totalExpectedAmount) || rawBudget));
+          : Math.max(0, remainingFunding - allocatedAmt);
         const paidAmt = Number(e.collectedAmount ?? e.totalPaidAmount ?? 0);
         const pendingAmt = Number(e.pendingAmount !== undefined ? e.pendingAmount : Math.max(0, expectedAmt - paidAmt));
         const remainingAmt = paidAmt - expAmount;
@@ -1176,14 +1184,28 @@ export default function EventsPage() {
         key: "totalExpectedAmount",
         align: "right",
         exportValue: (row) => {
+          const base = Number(row.originalPlannedBudget ?? row.baseAmount ?? 0);
+          const sp = Boolean(row.requireSponsorContribution)
+            ? Number(
+                row.sponsorContributionAmount ??
+                (Array.isArray(row.sponsors) ? row.sponsors.reduce((sum, s) => sum + (Number(s.contributionAmount || s.amount) || 0), 0) : 0)
+              )
+            : 0;
+          const rem = Math.max(0, base - sp);
           const allocated = row.useAvailableBalance ? Number(row.allocatedAmount || 0) : 0;
-          const raw = Number(row.totalExpectedAmount || 0) > 0 ? Number(row.totalExpectedAmount) : Number(row.baseAmount || 0);
-          return roundToWhole(allocated > 0 ? Math.max(0, raw - allocated) : raw);
+          return roundToWhole(Number(row.totalExpectedAmount) > 0 ? Number(row.totalExpectedAmount) : Math.max(0, rem - allocated));
         },
         render: (row) => {
+          const base = Number(row.originalPlannedBudget ?? row.baseAmount ?? 0);
+          const sp = Boolean(row.requireSponsorContribution)
+            ? Number(
+                row.sponsorContributionAmount ??
+                (Array.isArray(row.sponsors) ? row.sponsors.reduce((sum, s) => sum + (Number(s.contributionAmount || s.amount) || 0), 0) : 0)
+              )
+            : 0;
+          const rem = Math.max(0, base - sp);
           const allocated = row.useAvailableBalance ? Number(row.allocatedAmount || 0) : 0;
-          const raw = Number(row.totalExpectedAmount || 0) > 0 ? Number(row.totalExpectedAmount) : Number(row.baseAmount || 0);
-          const val = allocated > 0 ? Math.max(0, raw - allocated) : raw;
+          const val = Number(row.totalExpectedAmount) > 0 ? Number(row.totalExpectedAmount) : Math.max(0, rem - allocated);
           const sponsorAmt = Number(row.sponsorContributionAmount || 0) ||
             (Array.isArray(row.sponsors) ? row.sponsors.reduce((sum, s) => sum + (Number(s.contributionAmount || s.amount) || 0), 0) : 0);
           const hasSponsor = Boolean(row.requireSponsorContribution) && sponsorAmt > 0;

@@ -157,7 +157,7 @@ export default function EventDetailsPage() {
                 eventDetails.sponsors.map((sp, idx) => (
                   <Chip
                     key={sp.sponsorId || idx}
-                    label={`Sponsor: ${sp.sponsorName} (₹${formatWholeCurrency(sp.contributionAmount || 0)})`}
+                    label={`Sponsor: ${sp.sponsorName} (${formatWholeCurrency(sp.contributionAmount || 0)})`}
                     size="small"
                     sx={{
                       bgcolor: "rgba(139, 92, 246, 0.12)",
@@ -170,7 +170,7 @@ export default function EventDetailsPage() {
                 ))
               ) : eventDetails.sponsorName ? (
                 <Chip
-                  label={`Sponsor: ${eventDetails.sponsorName} (₹${formatWholeCurrency(eventDetails.sponsorContributionAmount || 0)})`}
+                  label={`Sponsor: ${eventDetails.sponsorName} (${formatWholeCurrency(eventDetails.sponsorContributionAmount || 0)})`}
                   size="small"
                   sx={{
                     bgcolor: "rgba(139, 92, 246, 0.12)",
@@ -246,9 +246,11 @@ export default function EventDetailsPage() {
           <MetricCard
             label="Expected Amount"
             value={formatWholeCurrency(
-              eventDetails.useAvailableBalance && Number(eventDetails.allocatedAmount) > 0
-                ? Math.max(0, (Number(eventDetails.baseAmount) || Number(eventDetails.totalExpectedAmount) || 0) - Number(eventDetails.allocatedAmount))
-                : (eventDetails.totalExpectedAmount || 0)
+              Number(eventDetails.totalExpectedAmount) > 0
+                ? Number(eventDetails.totalExpectedAmount)
+                : (eventDetails.useAvailableBalance && Number(eventDetails.allocatedAmount) > 0
+                    ? Math.max(0, (Number(eventDetails.originalPlannedBudget ?? eventDetails.baseAmount ?? 0) - (Boolean(eventDetails.requireSponsorContribution) ? Number(eventDetails.sponsorContributionAmount || 0) : 0)) - Number(eventDetails.allocatedAmount))
+                    : Math.max(0, Number(eventDetails.originalPlannedBudget ?? eventDetails.baseAmount ?? 0) - (Boolean(eventDetails.requireSponsorContribution) ? Number(eventDetails.sponsorContributionAmount || 0) : 0)))
             )}
           />
         </Grid>
