@@ -570,15 +570,31 @@ export default function SubmitPaymentPage() {
       .filter((m) => m.isActive !== false)
       .forEach((m) => {
         const name = m.paymentModeName || m.name || m.modeName;
-        if (name && !set.has(name.toLowerCase())) {
-          set.add(name.toLowerCase());
+        const lower = String(name || "").trim().toLowerCase();
+        if (name && !set.has(lower) && !["upi", "online", "none"].includes(lower)) {
+          set.add(lower);
           list.push({
             label: name,
             value: name,
+            paymentModeId: m.paymentModeId,
             color: getModeColor(name),
           });
         }
       });
+
+    if (list.length === 0) {
+      const defaultModes = [
+        { label: "Gpay", value: "Gpay", color: "#2563eb" },
+        { label: "Cash", value: "Cash", color: "#16a34a" },
+        { label: "Phonepe", value: "Phonepe", color: "#7c3aed" },
+      ];
+      defaultModes.forEach((d) => {
+        if (!set.has(d.value.toLowerCase())) {
+          set.add(d.value.toLowerCase());
+          list.push(d);
+        }
+      });
+    }
 
     return list;
   }, [dbPaymentModes]);

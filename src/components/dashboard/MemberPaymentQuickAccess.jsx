@@ -324,8 +324,9 @@ export default function MemberPaymentQuickAccess({
         hasCashOrUpi
       );
 
-      const amount = Number(c.amount || c.Amount) || 0;
-      const resolvedPaymentMode = (c.paymentMode ?? c.PaymentMode) || matchedTx?.paymentMode || (cashAmt > 0 && upiAmt > 0 ? "Split" : (cashAmt > 0 ? "Cash" : (upiAmt > 0 ? "UPI" : "--")));
+      const rawMode = (c.paymentMode ?? c.PaymentMode) || matchedTx?.paymentMode;
+      const normalizedRaw = String(rawMode || "").trim();
+      const resolvedPaymentMode = (normalizedRaw && !["upi", "2", "online"].includes(normalizedRaw.toLowerCase()) ? normalizedRaw : null) || (cashAmt > 0 && upiAmt > 0 ? "Split" : (cashAmt > 0 ? "Cash" : (upiAmt > 0 || normalizedRaw ? "Gpay" : "--")));
 
       list.push({
         id: cId || `${mId}-${cEventId}`,

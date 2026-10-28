@@ -351,15 +351,13 @@ export default function ViewContributionModal({
     if (str.includes("bank") || str.includes("transfer") || str.includes("neft") || str.includes("imps")) return "Bank Transfer";
     if (str.includes("card")) return "Card";
 
-    if (str === "upi" || str === "online" || !str || str === "none") {
-      if (utrStr.includes("gpay") || notesStr.includes("gpay") || notesStr.includes("google pay")) return "GPay";
-      if (utrStr.includes("phonepe") || notesStr.includes("phonepe") || notesStr.includes("phone pe")) return "PhonePe";
-      if (utrStr.includes("paytm") || notesStr.includes("paytm")) return "Paytm";
+    if (str === "upi" || str === "online" || !str || str === "none" || str === "2" || str === "0") {
+      if (utrStr.includes("phonepe") || notesStr.includes("phonepe") || notesStr.includes("phone pe")) return "Phonepe";
       if (utrStr.includes("cash") || notesStr.includes("cash")) return "Cash";
-      if (str === "upi" || str === "online") return "UPI";
+      return "Gpay";
     }
 
-    return String(modeRaw || "Cash").trim();
+    return String(modeRaw || "Gpay").trim();
   };
 
   // Payment Mode and Breakdown parsing
@@ -514,7 +512,7 @@ export default function ViewContributionModal({
   }
 
   if (splitUtrMap.size === 0 && rawUtr && rawUtr !== "--" && rawUtr.toUpperCase() !== "SPLIT" && rawUtr.toUpperCase() !== "CASH") {
-    const singleDigitalMode = singleMethodName && !singleMethodName.toLowerCase().includes("cash") ? singleMethodName : "UPI";
+    const singleDigitalMode = singleMethodName && !singleMethodName.toLowerCase().includes("cash") ? singleMethodName : "Gpay";
     splitUtrMap.set(singleDigitalMode, rawUtr);
   }
 
@@ -539,7 +537,7 @@ export default function ViewContributionModal({
     const upiAmt = Number(row.upiAmount || matchedTx?.upiAmount || 0);
     if (cashAmt > 0 || upiAmt > 0) {
       if (cashAmt > 0) splitsList.push({ mode: "Cash", amount: cashAmt });
-      if (upiAmt > 0) splitsList.push({ mode: resolvePaymentMethodName("UPI", rawUtr, rawNotes), amount: upiAmt });
+      if (upiAmt > 0) splitsList.push({ mode: resolvePaymentMethodName(matchedTx?.paymentMode || "Gpay", rawUtr, rawNotes), amount: upiAmt });
     }
   }
 

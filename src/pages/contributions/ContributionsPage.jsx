@@ -350,7 +350,8 @@ export default function ContributionsPage() {
           if (Array.isArray(fetched) && fetched.length > 0) {
             targetEvents = fetched.filter((e) => !e.isDeleted && isEventPublished(e));
           } else {
-            targetEvents = (events || []).filter((e) => {
+            const pool = filterLookupEvents.length > 0 ? filterLookupEvents : (events || []);
+            targetEvents = pool.filter((e) => {
               if (e.isDeleted || !isEventPublished(e)) return false;
               const d = e.eventDate || e.createdOn || e.date;
               if (!d) return false;
@@ -361,7 +362,8 @@ export default function ContributionsPage() {
             });
           }
         } catch {
-          targetEvents = (events || []).filter((e) => {
+          const pool = filterLookupEvents.length > 0 ? filterLookupEvents : (events || []);
+          targetEvents = pool.filter((e) => {
             if (e.isDeleted || !isEventPublished(e)) return false;
             const d = e.eventDate || e.createdOn || e.date;
             if (!d) return false;
@@ -372,7 +374,16 @@ export default function ContributionsPage() {
           });
         }
       } else {
-        targetEvents = (events || []).filter((e) => !e.isDeleted && isEventPublished(e));
+        const pool = filterLookupEvents.length > 0 ? filterLookupEvents : (events || []);
+        targetEvents = pool.filter((e) => !e.isDeleted && isEventPublished(e));
+        if (targetEvents.length === 0) {
+          try {
+            const fetched = await getEventsAsync();
+            if (Array.isArray(fetched)) {
+              targetEvents = fetched.filter((e) => !e.isDeleted && isEventPublished(e));
+            }
+          } catch { }
+        }
       }
 
       if (eventType && eventType !== "ALL") {
@@ -388,7 +399,7 @@ export default function ContributionsPage() {
           .filter(Boolean)
       );
 
-      return (freshAll || []).filter((c) => {
+      let matchedContributions = (freshAll || []).filter((c) => {
         const cEvId = String(c.eventId || "").toLowerCase();
         const cEvName = String(c.eventName || "").trim().toLowerCase();
         return (
@@ -396,8 +407,86 @@ export default function ContributionsPage() {
           (cEvName && matchingEventNames.has(cEvName))
         );
       });
+
+      // Ensure any event in targetEvents that doesn't have contribution records in freshAll is retrieved or generated
+      const coveredEventIds = new Set(
+        matchedContributions.map((c) => String(c.eventId || "").toLowerCase()).filter(Boolean)
+      );
+      const coveredEventNames = new Set(
+        matchedContributions.map((c) => String(c.eventName || "").trim().toLowerCase()).filter(Boolean)
+      );
+
+      const missingEvents = targetEvents.filter((ev) => {
+        const eId = String(ev.eventId || ev.id || "").toLowerCase();
+        const eName = String(ev.eventName || ev.title || ev.name || "").trim().toLowerCase();
+        return (!eId || !coveredEventIds.has(eId)) && (!eName || !coveredEventNames.has(eName));
+      });
+
+      if (missingEvents.length > 0) {
+        const fetchedMissing = await Promise.all(
+          missingEvents.map(async (ev) => {
+            const evId = ev.eventId || ev.id;
+            if (!evId) return [];
+            try {
+              const res = await getContributionsByEventAsync(evId);
+              return Array.isArray(res) ? res : [];
+            } catch {
+              return [];
+            }
+          })
+        );
+        const newlyFetchedContribs = fetchedMissing.flat();
+        if (newlyFetchedContribs.length > 0) {
+          matchedContributions = [...matchedContributions, ...newlyFetchedContribs];
+          setAllContributions((prev) => {
+            const existingIds = new Set((prev || []).map((p) => String(p.contributionId || `${p.memberId}_${p.eventId}`)));
+            const uniqueNew = newlyFetchedContribs.filter(
+              (n) => !existingIds.has(String(n.contributionId || `${n.memberId}_${n.eventId}`))
+            );
+            return [...(prev || []), ...uniqueNew];
+          });
+        }
+      }
+
+      // Fallback synthesis for any remaining missing event to guarantee all events in dropdown appear in grid
+      const finalCoveredIds = new Set(
+        matchedContributions.map((c) => String(c.eventId || "").toLowerCase()).filter(Boolean)
+      );
+      const finalCoveredNames = new Set(
+        matchedContributions.map((c) => String(c.eventName || "").trim().toLowerCase()).filter(Boolean)
+      );
+
+      const stillMissing = targetEvents.filter((ev) => {
+        const eId = String(ev.eventId || ev.id || "").toLowerCase();
+        const eName = String(ev.eventName || ev.title || ev.name || "").trim().toLowerCase();
+        return (!eId || !finalCoveredIds.has(eId)) && (!eName || !finalCoveredNames.has(eName));
+      });
+
+      if (stillMissing.length > 0) {
+        const currentMemberId = authState?.memberId || authState?.user?.userId || "";
+        const currentMemberName = authState?.user?.fullName || authState?.user?.username || authState?.name || "Member";
+        const fallbackRows = stillMissing.map((ev) => {
+          const resolvedAmt = getMemberEventAmount(null, ev);
+          return {
+            contributionId: `synthetic_${ev.eventId || ev.id}_${currentMemberId}`,
+            eventId: ev.eventId || ev.id,
+            eventName: ev.eventName || ev.title || ev.name || "Event",
+            categoryName: ev.eventTypeName || ev.categoryName || ev.eventType || "",
+            memberId: currentMemberId,
+            memberName: currentMemberName,
+            amount: resolvedAmt > 0 ? resolvedAmt : Number(ev.baseAmount || 0),
+            paymentStatus: "Pending",
+            statusName: "Pending",
+            paymentMode: "None",
+            createdAt: ev.eventDate || ev.createdOn || ev.date || new Date().toISOString(),
+          };
+        });
+        matchedContributions = [...matchedContributions, ...fallbackRows];
+      }
+
+      return matchedContributions;
     },
-    [selectedEventId, appliedYear, appliedMonth, appliedEventType, events, isMatchingEventType, reloadAllContributions]
+    [selectedEventId, appliedYear, appliedMonth, appliedEventType, events, filterLookupEvents, isMatchingEventType, reloadAllContributions, authState]
   );
 
   // --- Effects & Memos (all state is declared above, so no TDZ errors) ---
@@ -411,7 +500,7 @@ export default function ContributionsPage() {
     async function loadContributions() {
       try {
         let freshAll = allContributions;
-        if (!freshAll || freshAll.length === 0) {
+        if (!freshAll || freshAll.length === 0 || selectedEventId === "ALL") {
           freshAll = await reloadAllContributions();
         }
 
@@ -637,67 +726,62 @@ export default function ContributionsPage() {
     const trimmed = String(mode).trim();
     const lower = trimmed.toLowerCase();
 
-    // Match against dynamic DB payment modes first
+    // Match against dynamic DB payment modes first (excluding generic upi/online)
     if (Array.isArray(paymentModes) && paymentModes.length > 0) {
       const matched = paymentModes.find(
         (m) =>
-          (m.paymentModeName && m.paymentModeName.trim().toLowerCase() === lower) ||
-          (m.name && m.name.trim().toLowerCase() === lower) ||
-          (m.paymentModeId && String(m.paymentModeId).toLowerCase() === lower)
+          !["upi", "online", "none"].includes(String(m.paymentModeName || m.name || "").trim().toLowerCase()) &&
+          ((m.paymentModeName && m.paymentModeName.trim().toLowerCase() === lower) ||
+            (m.name && m.name.trim().toLowerCase() === lower) ||
+            (m.paymentModeId && String(m.paymentModeId).toLowerCase() === lower))
       );
       if (matched) {
         return matched.paymentModeName || matched.name;
       }
     }
 
-    if (lower.includes("gpay") || lower.includes("google")) return "GPay";
     if (lower.includes("phonepe") || lower.includes("phone")) return "PhonePe";
-    if (lower.includes("paytm")) return "Paytm";
+    if (lower.includes("gpay") || lower.includes("google")) return "GPay";
     if (lower.includes("cash")) return "Cash";
     if (lower.includes("split")) return "Split";
-    if (lower.includes("upi")) return "UPI";
+    if (lower.includes("paytm")) return "PhonePe";
+    // Only GPay, PhonePe, and Cash exist: Never return generic "UPI"
+    if (lower.includes("upi") || lower.includes("online") || lower === "2" || lower === "0") {
+      return "GPay";
+    }
 
     return trimmed;
   };
 
   const getModeColor = (name) => {
     const lower = String(name || "").toLowerCase().replace(/[\s\-_/]+/g, "");
-    if (lower.includes("gpay") || lower.includes("google")) return "#2563eb";
-    if (lower.includes("phonepe") || lower.includes("phone")) return "#7c3aed";
-    if (lower.includes("paytm")) return "#0284c7";
-    if (lower.includes("upi") || lower.includes("bhim")) return "#ea580c";
-    if (lower.includes("bank") || lower.includes("transfer") || lower.includes("neft") || lower.includes("imps")) return "#059669";
+    if (lower.includes("phonepe") || lower.includes("phone") || lower.includes("paytm")) return "#7c3aed";
+    if (lower.includes("gpay") || lower.includes("google") || lower.includes("upi")) return "#2563eb";
     if (lower.includes("cash")) return "#16a34a";
-    return "#4a3f6b";
+    if (lower.includes("split")) return "#6366f1";
+    return "#2563eb";
   };
 
   const resolvePaymentMethodName = (modeRaw, utrRaw = "", notesRaw = "") => {
     if (modeRaw === 1 || modeRaw === "1") return "Cash";
     if (modeRaw === 5 || modeRaw === "5") return "Split";
-    if (modeRaw === 3 || modeRaw === "3") return "Bank Transfer";
-    if (modeRaw === 4 || modeRaw === "4") return "Card";
 
     const str = String(modeRaw || "").trim().toLowerCase();
     const utrStr = String(utrRaw || "").toLowerCase();
     const notesStr = String(notesRaw || "").toLowerCase();
 
     if (str.includes("split")) return "Split";
-    if (str.includes("cash")) return "Cash";
-    if (str.includes("gpay") || str.includes("google")) return "GPay";
-    if (str.includes("phonepe") || str.includes("phone")) return "PhonePe";
-    if (str.includes("paytm")) return "Paytm";
-    if (str.includes("bank") || str.includes("transfer") || str.includes("neft") || str.includes("imps")) return "Bank Transfer";
-    if (str.includes("card")) return "Card";
+    if (str.includes("cash") || utrStr.includes("cash") || notesStr.includes("cash")) return "Cash";
+    if (str.includes("phonepe") || str.includes("phone") || utrStr.includes("phonepe") || notesStr.includes("phonepe") || notesStr.includes("phone pe") || str.includes("paytm")) return "PhonePe";
+    if (str.includes("gpay") || str.includes("google") || utrStr.includes("gpay") || notesStr.includes("gpay") || notesStr.includes("google pay")) return "GPay";
 
+    // Only GPay, PhonePe, and Cash exist: resolve digital payments to PhonePe if indicated, else GPay
     if (str === "upi" || str === "online" || !str || str === "none" || str === "2" || str === "0") {
-      if (utrStr.includes("gpay") || notesStr.includes("gpay") || notesStr.includes("google pay")) return "GPay";
-      if (utrStr.includes("phonepe") || notesStr.includes("phonepe") || notesStr.includes("phone pe")) return "PhonePe";
-      if (utrStr.includes("paytm") || notesStr.includes("paytm")) return "Paytm";
-      if (utrStr.includes("cash") || notesStr.includes("cash")) return "Cash";
-      if (str === "upi" || str === "online" || str === "2") return "UPI";
+      if (utrStr.includes("phonepe") || notesStr.includes("phonepe")) return "PhonePe";
+      return "GPay";
     }
 
-    return String(modeRaw || "Cash").trim();
+    return normalizeModeName(modeRaw) || "GPay";
   };
 
   const isGenericMode = (m) => {
@@ -1008,8 +1092,8 @@ export default function ContributionsPage() {
   };
 
   const enrichContributions = (rawData, allList = allContributions, evList = events, txList = transactions) => {
-    // Only published events are eligible for contributions, collections, and arrears
-    const publishedEvList = (evList || []).filter((e) => !e.isDeleted && isEventPublished(e));
+    const baseEvPool = (evList && evList.length > 0) ? evList : (filterLookupEvents && filterLookupEvents.length > 0 ? filterLookupEvents : events);
+    const publishedEvList = (baseEvPool || []).filter((e) => !e.isDeleted && isEventPublished(e));
     let enriched = (rawData || [])
       .filter((c) => {
         const evIdToMatch = String(c.eventId || (selectedEventId !== "ALL" ? selectedEventId : "")).toLowerCase();
@@ -1181,6 +1265,7 @@ export default function ContributionsPage() {
           previousUnpaid,
           previousUnpaidItems: isArrearsCleared || previousUnpaid === 0 ? [] : previousUnpaidItems,
           totalAccumulated: currentOutstanding + previousUnpaid,
+          totalDue: currentOutstanding + previousUnpaid,
           screenshot: currentContribution.screenshot || matchedTx?.screenshot || (allTxns.find((t) => t.screenshot)?.screenshot) || null,
           screenshots: currentContribution.screenshots || matchedTx?.screenshots || (allTxns.find((t) => t.screenshots)?.screenshots) || null,
         };
@@ -1206,322 +1291,6 @@ export default function ContributionsPage() {
   const contributions = useMemo(() => {
     const enriched = enrichContributions(rawContributions, allContributions, events, transactions);
 
-    if (selectedEventId === "ALL") {
-      const memberMap = new Map();
-
-      (enriched || []).forEach((c) => {
-        const memberKey = String(c.memberId || c.userId || c.memberName || "").toLowerCase().trim();
-        if (!memberKey) return;
-
-        const ev = (events || []).find(
-          (e) => String(e.eventId || e.id).toLowerCase() === String(c.eventId || "").toLowerCase()
-        );
-        const eventName = c.eventName || ev?.eventName || ev?.title || ev?.name || "Event";
-        const eventAmount = Number(c.amount) || 0;
-        const matchedTx = findContributionTransaction(c, transactions, c.eventId);
-        const isVerified = isContributionVerified(c, matchedTx);
-        const isRejected =
-          String(matchedTx?.status || "").toLowerCase() === "rejected" ||
-          String(c.paymentStatus || "").toLowerCase() === "rejected" ||
-          String(c.statusName || "").toLowerCase() === "rejected";
-        const isApproved =
-          String(matchedTx?.status || "").toLowerCase() === "approved" ||
-          String(c.paymentStatus || "").toLowerCase() === "approved" ||
-          String(c.statusName || "").toLowerCase() === "approved" ||
-          (isContributionApproved(c, matchedTx) && !isRejected);
-        const isPaid =
-          isContributionPaid(c, matchedTx) ||
-          (!isRejected && (
-            isApproved ||
-            isVerified ||
-            c.paymentStatus === 2 ||
-            String(c.paymentStatus || "").toLowerCase() === "paid"
-          ));
-
-        const rawTxAmt = Number(c.rawTotalPaid) || Number(c.paidAmount) || 0;
-        // Event contribution paid cannot exceed this event's expected amount
-        const eventPaid = eventAmount > 0
-          ? (isPaid ? (rawTxAmt > 0 ? Math.min(rawTxAmt, eventAmount) : eventAmount) : 0)
-          : (isPaid ? rawTxAmt : 0);
-        const arrearsPaid = eventAmount > 0 ? Math.max(0, rawTxAmt - eventAmount) : 0;
-
-        const eventDetail = {
-          contributionId: c.contributionId,
-          eventId: c.eventId,
-          eventName,
-          amount: eventAmount,
-          paidAmount: eventPaid,
-          rawTxAmount: rawTxAmt,
-          arrearsPaid,
-          paymentStatus: c.paymentStatus || (isPaid ? "Paid" : "Pending"),
-          paymentMode: getResolvedPaymentMode(c, matchedTx) || c.paymentMode || "",
-          paymentDate: c.paymentDate || matchedTx?.paymentDate || null,
-          isPaid,
-          isApproved,
-          isVerified,
-          isRejected,
-          rawContribution: c,
-        };
-
-        if (!memberMap.has(memberKey)) {
-          memberMap.set(memberKey, {
-            ...c,
-            isGrouped: true,
-            memberEvents: [eventDetail],
-            totalAmount: eventAmount,
-            totalPaid: eventPaid,
-            totalArrearsPaid: arrearsPaid,
-            allMemberTransactions: findAllContributionTransactions(c, transactions),
-          });
-        } else {
-          const existing = memberMap.get(memberKey);
-          const alreadyHasEvent = existing.memberEvents.some(
-            (e) => String(e.eventId).toLowerCase() === String(c.eventId).toLowerCase()
-          );
-          if (!alreadyHasEvent) {
-            existing.memberEvents.push(eventDetail);
-            existing.totalAmount += eventAmount;
-            existing.totalPaid += eventPaid;
-            existing.totalArrearsPaid = (existing.totalArrearsPaid || 0) + arrearsPaid;
-          } else {
-            const idx = existing.memberEvents.findIndex(
-              (e) => String(e.eventId).toLowerCase() === String(c.eventId).toLowerCase()
-            );
-            if (eventPaid > (existing.memberEvents[idx].paidAmount || 0)) {
-              existing.totalPaid += eventPaid - (existing.memberEvents[idx].paidAmount || 0);
-              existing.totalArrearsPaid = (existing.totalArrearsPaid || 0) + (arrearsPaid - (existing.memberEvents[idx].arrearsPaid || 0));
-              existing.memberEvents[idx] = eventDetail;
-            }
-          }
-          const moreTxns = findAllContributionTransactions(c, transactions);
-          existing.allMemberTransactions = [...existing.allMemberTransactions, ...moreTxns];
-        }
-      });
-
-      const groupedList = Array.from(memberMap.values()).map((row) => {
-        const currentEventIds = new Set(
-          (row.memberEvents || []).map((e) => String(e.eventId || "").toLowerCase().trim()).filter(Boolean)
-        );
-        const currentEventNames = new Set(
-          (row.memberEvents || []).map((e) => String(e.eventName || "").toLowerCase().trim()).filter(Boolean)
-        );
-
-        const memberIdKey = String(row.memberId || row.userId || "").toLowerCase().trim();
-        const memberNameKey = String(row.memberName || "").toLowerCase().trim();
-
-        const memberTxns = (transactions || []).filter((t) => {
-          const tMemId = String(t.userId || t.memberId || "").toLowerCase().trim();
-          const tMemName = String(t.memberName || "").toLowerCase().trim();
-          const isMember = (memberIdKey && tMemId && memberIdKey === tMemId) ||
-            (memberNameKey && tMemName && memberNameKey === tMemName);
-          if (!isMember) return false;
-          const tEvId = String(t.eventId || "").toLowerCase().trim();
-          const tEvName = String(t.eventName || "").toLowerCase().trim();
-          return (tEvId && currentEventIds.has(tEvId)) || (tEvName && currentEventNames.has(tEvName));
-        });
-
-        // Calculate excess payment strictly from events in this active group
-        let excessPool = (row.memberEvents || []).reduce((sum, e) => sum + (e.arrearsPaid || 0), 0);
-        const validTxns = memberTxns.filter((t) => String(t.status || "").toLowerCase() !== "rejected");
-        const sourceTx =
-          validTxns.find((t) => Number(t.amount) > 0) ||
-          row.allMemberTransactions?.[0];
-
-        // Allocate excessPool across unpaid events of this member ONLY if it can fully cover the event amount
-        if (excessPool > 0) {
-          row.memberEvents.forEach((ev) => {
-            const needed = Number(ev.amount || 0) - Number(ev.paidAmount || 0);
-            if (needed > 0 && excessPool > 0) {
-              // Chronological check: a transaction cannot pay for an event created after transaction date
-              if (sourceTx) {
-                const txDate = sourceTx.paymentDate || sourceTx.createdOn || sourceTx.createdAt;
-                const evDate = ev.rawContribution?.createdAt || ev.rawContribution?.createdOn || ev.createdOn || ev.createdAt;
-                if (txDate && evDate && new Date(evDate).getTime() > new Date(txDate).getTime()) {
-                  return;
-                }
-              }
-
-              // STRICT RULE: No partial payments on events!
-              // An event can ONLY be settled if the remaining excessPool fully covers the event's required amount.
-              if (excessPool < needed) {
-                return; // Cannot partially pay an event!
-              }
-
-              const alloc = needed;
-              ev.paidAmount = (Number(ev.paidAmount) || 0) + alloc;
-              excessPool -= alloc;
-
-              if (ev.paidAmount >= Number(ev.amount || 0)) {
-                ev.isPaid = true;
-                const isTxApproved = String(sourceTx?.status || "").toLowerCase() === "approved";
-                const isTxVerified = String(sourceTx?.status || "").toLowerCase() === "verified";
-                ev.isApproved = ev.isApproved || isTxApproved;
-                ev.isVerified = ev.isVerified || isTxVerified;
-                ev.paymentStatus = ev.isApproved ? "Approved" : (ev.isVerified ? "Verified" : (sourceTx?.status || "Paid"));
-                ev.paymentMode = (ev.paymentMode && !isGenericMode(ev.paymentMode))
-                  ? ev.paymentMode
-                  : (getResolvedPaymentMode(sourceTx) || sourceTx?.paymentMode || "");
-                ev.paymentDate = ev.paymentDate || sourceTx?.paymentDate || sourceTx?.createdOn || null;
-              }
-            }
-          });
-        }
-
-        // If excess was consumed by memberEvents, reset individual arrearsPaid on events
-        row.memberEvents.forEach((ev) => {
-          if (excessPool <= 0) {
-            ev.arrearsPaid = 0;
-          }
-        });
-
-        // Ensure paid events in this member group have their specific payment mode resolved
-        // (e.g. GPay, PhonePe, Cash rather than falling back to generic UPI)
-        const specificGroupMode = sourceTx
-          ? (getResolvedPaymentMode(sourceTx) || resolvePaymentMethodName(sourceTx.paymentMode, sourceTx.utr, sourceTx.notes))
-          : (row.memberEvents.find((e) => e.paymentMode && !isGenericMode(e.paymentMode))?.paymentMode || "");
-
-        if (specificGroupMode && !isGenericMode(specificGroupMode)) {
-          row.memberEvents.forEach((ev) => {
-            const hasPayment = ev.isPaid || (Number(ev.paidAmount) || 0) > 0;
-            if (hasPayment && isGenericMode(ev.paymentMode)) {
-              ev.paymentMode = specificGroupMode;
-              if (!ev.paymentDate && (sourceTx?.paymentDate || sourceTx?.createdOn)) {
-                ev.paymentDate = sourceTx.paymentDate || sourceTx.createdOn;
-              }
-            }
-          });
-        }
-
-        // Recalculate member totals
-        const totalAmount = (row.memberEvents || []).reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        const totalPaid = (row.memberEvents || []).reduce((sum, e) => sum + Number(e.paidAmount || 0), 0);
-        const trueArrearsPaid = Math.max(0, excessPool);
-        row.totalAmount = totalAmount;
-        row.totalPaid = totalPaid;
-        row.totalArrearsPaid = trueArrearsPaid;
-
-        const previousUnpaidItems = (allContributions || []).filter((prev) => {
-          const prevMemberId = String(prev.memberId || prev.userId || "").toLowerCase().trim();
-          const prevMemberName = String(prev.memberName || "").toLowerCase().trim();
-          const isSameMember =
-            (memberIdKey && prevMemberId && memberIdKey === prevMemberId) ||
-            (memberNameKey && prevMemberName && memberNameKey === prevMemberName);
-          if (!isSameMember) return false;
-
-          const prevEvId = String(prev.eventId || "").toLowerCase().trim();
-          if (!prevEvId || currentEventIds.has(prevEvId)) return false;
-
-          if (isContributionPaid(prev)) return false;
-
-          return (events || []).some((e) => String(e.eventId || e.id).toLowerCase().trim() === prevEvId);
-        });
-
-        const rawPreviousUnpaid = previousUnpaidItems.reduce((sum, prev) => {
-          const prevEv = (events || []).find((e) => String(e.eventId || e.id) === String(prev.eventId));
-          const prevAmt = getMemberEventAmount(prev, prevEv);
-          return sum + (prevAmt > 0 ? prevAmt : Number(prev.amount) || 0);
-        }, 0);
-
-        const matchedTx = row.allMemberTransactions?.[0] || findContributionTransaction(row, transactions);
-        const scope = String(row.paymentScope || row.scope || matchedTx?.notes || "").toLowerCase();
-        const isAllOutstandingScope =
-          scope.includes("alloutstanding") ||
-          scope.includes("all outstanding") ||
-          scope.includes("scope: all") ||
-          scope.includes("scope:all") ||
-          scope.includes("arrear");
-        const isCurrentEventOnly =
-          scope.includes("currentevent") ||
-          scope.includes("current event") ||
-          scope.includes("scope: current");
-        const isArrearsCleared =
-          (isAllOutstandingScope && !isCurrentEventOnly && (hasSubmittedPayment(row, matchedTx) || isContributionPaid(row))) ||
-          (trueArrearsPaid > 0 && trueArrearsPaid >= rawPreviousUnpaid);
-
-        const truePreviousUnpaid = isArrearsCleared ? 0 : Math.max(0, rawPreviousUnpaid - trueArrearsPaid);
-        const remainingCurrentDue = Math.max(0, totalAmount - totalPaid);
-        const totalDue = remainingCurrentDue + truePreviousUnpaid;
-
-        const allApproved = row.memberEvents.length > 0 && row.memberEvents.every((e) => e.isApproved);
-        const allVerified = row.memberEvents.length > 0 && row.memberEvents.every((e) => e.isVerified || e.isApproved);
-        const allPaid =
-          (row.memberEvents.length > 0 && row.memberEvents.every((e) => e.isPaid)) ||
-          (totalPaid >= totalAmount && totalAmount > 0);
-        const somePaid =
-          row.memberEvents.some((e) => e.isPaid || e.paidAmount > 0) || (totalPaid > 0 && totalPaid < totalAmount);
-        const allRejected = row.memberEvents.length > 0 && row.memberEvents.every((e) => e.isRejected);
-
-        let aggregateStatus = "Pending";
-        if (allRejected) {
-          aggregateStatus = "Rejected";
-        } else if (allApproved) {
-          aggregateStatus = "Approved";
-        } else if (allVerified) {
-          aggregateStatus = "Verified";
-        } else if (allPaid) {
-          aggregateStatus = "Paid";
-        } else if (somePaid) {
-          aggregateStatus = "Partial";
-        }
-
-        const joinedEventNames = row.memberEvents.map((e) => e.eventName).filter(Boolean).join(", ");
-
-        return {
-          ...row,
-          eventName: joinedEventNames,
-          amount: totalAmount,
-          paidAmount: totalPaid,
-          previousUnpaid: truePreviousUnpaid,
-          previousUnpaidItems: isArrearsCleared ? [] : previousUnpaidItems,
-          totalDue,
-          totalAccumulated: totalDue,
-          paymentStatus: aggregateStatus,
-        };
-      });
-
-      const filterLower = String(appliedStatus || "").toLowerCase();
-      const filteredGrouped = (!appliedStatus || appliedStatus === "ALL")
-        ? groupedList
-        : groupedList.filter((c) => {
-          const statusLower = String(c.paymentStatus || "").toLowerCase();
-          if (filterLower === "paid") {
-            return statusLower === "paid" || statusLower === "verified" || statusLower === "approved";
-          }
-          if (filterLower === "approved") {
-            return statusLower === "approved";
-          }
-          if (filterLower === "verified") {
-            return statusLower === "verified";
-          }
-          if (filterLower === "pending") {
-            return statusLower === "pending" || statusLower === "partial";
-          }
-          if (filterLower === "partial") {
-            return statusLower === "partial";
-          }
-          if (filterLower === "rejected") {
-            return statusLower === "rejected";
-          }
-          return statusLower === filterLower;
-        });
-
-      return [...filteredGrouped].sort((a, b) => {
-        const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || "";
-        const dateB = b.createdAt || b.CreatedAt || b.createdOn || b.CreatedOn || "";
-        const dayA = dateA ? dayjs(dateA).format("YYYY-MM-DD") : "";
-        const dayB = dateB ? dayjs(dateB).format("YYYY-MM-DD") : "";
-        if (dayA !== dayB) {
-          return dayB.localeCompare(dayA);
-        }
-        const nameA = String(a.memberName || a.name || "").trim();
-        const nameB = String(b.memberName || b.name || "").trim();
-        if (!nameA && !nameB) return 0;
-        if (!nameA) return 1;
-        if (!nameB) return -1;
-        return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
-      });
-    }
-
     const filterLower = String(appliedStatus || "").toLowerCase();
     const filteredEnriched = (!appliedStatus || appliedStatus === "ALL")
       ? enriched
@@ -1537,7 +1306,10 @@ export default function ContributionsPage() {
           return statusLower === "verified";
         }
         if (filterLower === "pending") {
-          return statusLower === "pending";
+          return statusLower === "pending" || statusLower === "partial";
+        }
+        if (filterLower === "partial") {
+          return statusLower === "partial";
         }
         if (filterLower === "rejected") {
           return (
@@ -1550,6 +1322,12 @@ export default function ContributionsPage() {
       });
 
     return [...filteredEnriched].sort((a, b) => {
+      const nameA = String(a.memberName || a.name || "").trim();
+      const nameB = String(b.memberName || b.name || "").trim();
+      const memberCompare = nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+      if (memberCompare !== 0) {
+        return memberCompare;
+      }
       const dateA = a.createdAt || a.CreatedAt || a.createdOn || a.CreatedOn || "";
       const dateB = b.createdAt || b.CreatedAt || b.createdOn || b.CreatedOn || "";
       const dayA = dateA ? dayjs(dateA).format("YYYY-MM-DD") : "";
@@ -1557,12 +1335,7 @@ export default function ContributionsPage() {
       if (dayA !== dayB) {
         return dayB.localeCompare(dayA);
       }
-      const nameA = String(a.memberName || a.name || "").trim();
-      const nameB = String(b.memberName || b.name || "").trim();
-      if (!nameA && !nameB) return 0;
-      if (!nameA) return 1;
-      if (!nameB) return -1;
-      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+      return String(a.eventName || "").localeCompare(String(b.eventName || ""));
     });
   }, [rawContributions, allContributions, events, transactions, appliedStatus, selectedEventId]);
 
@@ -1673,7 +1446,7 @@ export default function ContributionsPage() {
       activeCategory = row?.categoryName || activeEv?.eventTypeName || activeEv?.categoryName || "";
     }
 
-    const defaultScope = isGrouped || prevArrears > 0 ? "AllOutstanding" : "CurrentEvent";
+    const defaultScope = prevArrears > 0 ? "AllOutstanding" : "CurrentEvent";
     const initialAmt = !hasRemainingDues || totalDue === 0 ? 0 : (defaultScope === "AllOutstanding" ? totalDue : (activeDue > 0 ? activeDue : (totalDue > 0 ? totalDue : 0)));
 
     setPaymentModalContext({
@@ -1691,7 +1464,7 @@ export default function ContributionsPage() {
       arrearBreakdown: combinedArrearBreakdown,
       paymentScope: defaultScope,
       allMemberEvents: isGrouped && Array.isArray(row.memberEvents) ? row.memberEvents : [],
-      isAllEventsFilter: Boolean(isGrouped || selectedEventId === "ALL"),
+      isAllEventsFilter: false,
     });
     setSubmitPaymentModalOpen(true);
   };
@@ -1712,7 +1485,7 @@ export default function ContributionsPage() {
         screenshots: matchedTx?.screenshots || (Array.isArray(foundScreenshot) ? foundScreenshot : (foundScreenshot ? [foundScreenshot] : null)),
         splits: allTxns.map((t) => ({
           id: t.txnNumber || t.id,
-          mode: normalizeModeName(t.paymentMode) || t.paymentMode || "UPI",
+          mode: normalizeModeName(t.paymentMode) || t.paymentMode || "GPay",
           amount: Number(t.amount) || 0,
           utr: t.utr || "-",
           notes: t.notes || "",
@@ -4119,7 +3892,7 @@ export default function ContributionsPage() {
                     });
                   } else if (cashAmt > 0 && upiAmt > 0) {
                     splitsList.push({ mode: "Cash", amount: cashAmt, utr: "" });
-                    splitsList.push({ mode: resolvePaymentMethodName("UPI", utrVal, notesVal), amount: upiAmt, utr: utrVal });
+                    splitsList.push({ mode: resolvePaymentMethodName(matchedTx?.paymentMode || "GPay", utrVal, notesVal), amount: upiAmt, utr: utrVal });
                   }
                 }
 
@@ -4199,7 +3972,7 @@ export default function ContributionsPage() {
                 });
 
                 if (splitUtrMap.size === 0 && utrVal && utrVal !== "--" && utrVal.toUpperCase() !== "SPLIT" && utrVal.toUpperCase() !== "CASH") {
-                  const singleDigitalMode = singleMethodName && !singleMethodName.toLowerCase().includes("cash") ? singleMethodName : "UPI";
+                  const singleDigitalMode = singleMethodName && !singleMethodName.toLowerCase().includes("cash") ? singleMethodName : "GPay";
                   splitUtrMap.set(singleDigitalMode, utrVal);
                 }
 
