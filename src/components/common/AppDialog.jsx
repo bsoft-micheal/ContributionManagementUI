@@ -53,8 +53,8 @@ export default function AppDialog({
       <Box
         sx={{
           background: theme.palette.mode === "dark"
-            ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
-            : "#4a3f6b",
+            ? "linear-gradient(90deg, #143557 0%, #1e5183 100%)"
+            : "linear-gradient(90deg, #1e5183 0%, #2968a2 100%)",
           borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
           px: 2.5,
           py: 1.25,

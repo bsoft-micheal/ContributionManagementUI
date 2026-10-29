@@ -167,7 +167,7 @@ function CustomActionBar({ onSetToday, onCancel, onAccept, onSelectToday, classN
             fontWeight: 700,
             fontSize: "0.82rem",
             color: (theme) =>
-              theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+              theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
             bgcolor: (theme) =>
               theme.palette.mode === "dark"
                 ? "rgba(255, 255, 255, 0.12)"
@@ -706,7 +706,7 @@ export default function AppDateInput({
                       ? (theme.palette.mode === "dark" ? "#f87171" : "#ef4444")
                       : theme.palette.mode === "dark"
                         ? "rgba(157, 140, 230, 0.75)"
-                        : "#6f5bd3",
+                        : "#2563a6",
                   borderWidth: "1.5px",
                 },
                 "&.Mui-focused fieldset": {
@@ -714,8 +714,8 @@ export default function AppDateInput({
                     error
                       ? (theme.palette.mode === "dark" ? "#f87171" : "#ef4444")
                       : theme.palette.mode === "dark"
-                        ? "#9d8ce6"
-                        : "#6f5bd3",
+                        ? "#5b93d3"
+                        : "#2563a6",
                   borderWidth: "2px",
                 },
               },

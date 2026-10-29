@@ -1,4 +1,5 @@
 import React from "react";
+import CloseIcon from "@mui/icons-material/Close";
 import AppButton from "./AppButton";
 import { hasActiveFilters } from "../../utils/filterHelper";
 
@@ -14,6 +15,7 @@ import { hasActiveFilters } from "../../utils/filterHelper";
  * 2. `disabled={!isFilterActive}` (explicit control)
  */
 export default function AppClearFilterButton({
+  startIcon = <CloseIcon sx={{ fontSize: 16 }} />,
   children = "Clear Filter",
   filters,
   defaultValues,
@@ -31,6 +33,7 @@ export default function AppClearFilterButton({
   return (
     <AppButton
       variant={variant}
+      startIcon={startIcon}
       size={size}
       disabled={isFinalDisabled}
       disabledTooltip={disabledTooltip}

@@ -351,9 +351,9 @@ export default function ContributionCalculationPage() {
                     fontSize: "0.75rem",
                     px: 2,
                     whiteSpace: "nowrap",
-                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important",
                     border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
-                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important" },
                   }}
                 >
                   Filter

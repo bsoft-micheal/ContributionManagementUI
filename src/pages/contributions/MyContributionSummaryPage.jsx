@@ -262,8 +262,8 @@ export default function MyContributionSummaryPage() {
         <Box
           sx={{
             background: theme.palette.mode === "dark"
-              ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
-              : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+              ? "linear-gradient(90deg, #162538 0%, #1e3a5f 100%)"
+              : "linear-gradient(90deg, #1e5183 0%, #2968a2 100%)",
             borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
             color: "#fff",
             px: 2.5,

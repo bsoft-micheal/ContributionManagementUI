@@ -404,7 +404,7 @@ export default function PendingDuesReport({
             .header-right strong { color: #1e1a2e; }
             table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 12px; margin-bottom: 20px; }
             th {
-              background-color: #4a3f6b !important; color: #ffffff !important;
+              background-color: #2563a6 !important; color: #ffffff !important;
               font-weight: 700; text-align: left; padding: 9px 10px; border: 1px solid #4a3f6b;
               letter-spacing: 0.03em; font-size: 10px;
             }
@@ -548,10 +548,10 @@ export default function PendingDuesReport({
               px: 2,
               borderRadius: "8px",
               bgcolor: (theme) =>
-                theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important",
               "&:hover": {
                 bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important",
+                  theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important",
               },
             }}
           >
@@ -740,12 +740,12 @@ export default function PendingDuesReport({
               borderRadius: "8px",
               whiteSpace: "nowrap",
               bgcolor: (theme) =>
-                theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important",
               border: (theme) =>
                 theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
               "&:hover": {
                 bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important",
+                  theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important",
               },
             }}
           >

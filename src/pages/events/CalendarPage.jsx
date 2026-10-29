@@ -1025,8 +1025,8 @@ export default function CalendarPage({ isEmbedded = false }) {
             sx={{
               background: (theme) =>
                 theme.palette.mode === "dark"
-                  ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
-                  : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+                  ? "linear-gradient(90deg, #162538 0%, #1e3a5f 100%)"
+                  : "linear-gradient(90deg, #1e5183 0%, #2968a2 100%)",
               borderBottom: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
               color: "#ffffff",
               px: { xs: 2.5, sm: 3 },
@@ -1138,9 +1138,9 @@ export default function CalendarPage({ isEmbedded = false }) {
                     fontSize: "0.75rem",
                     px: 2,
                     whiteSpace: "nowrap",
-                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important",
                     border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
-                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important" },
                   }}
                 >
                   Filter

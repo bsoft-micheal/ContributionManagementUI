@@ -565,19 +565,19 @@ function SegmentedTab({ label, icon: Icon, isActive, onClick }) {
         fontWeight: isActive ? 700 : 600,
         color: isActive ? "#ffffff" : isDark ? "text.secondary" : "#334155",
         bgcolor: isActive
-          ? "#31275d"
+          ? "#2563a6"
           : isDark ? "transparent" : "#ffffff",
         boxShadow: isActive
           ? "0 2px 8px rgba(49, 39, 93, 0.3)"
           : isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.04)",
         border: isActive
-          ? "1px solid #31275d"
+          ? "1px solid #2563a6"
           : `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0"}`,
         transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
         "&:hover": {
           color: isActive ? "#ffffff" : "text.primary",
           bgcolor: isActive
-            ? "#31275d"
+            ? "#2563a6"
             : isDark
               ? "rgba(255, 255, 255, 0.06)"
               : "#f8fafc",
@@ -1501,12 +1501,12 @@ export default function DashboardPage() {
           borderRadius: "12px",
           border: (theme) =>
             theme.palette.mode === "dark"
-              ? "1.5px solid rgba(124, 58, 237, 0.5)"
-              : "1.5px solid rgba(74, 63, 107, 0.35)",
+              ? "1.5px solid rgba(37, 99, 166, 0.4)"
+              : "1.5px solid rgba(25, 59, 91, 0.2)",
           boxShadow: (theme) =>
             theme.palette.mode === "dark"
               ? "0 4px 20px rgba(0, 0, 0, 0.4)"
-              : "0 4px 20px rgba(74, 63, 107, 0.1)",
+              : "0 4px 20px rgba(25, 59, 91, 0.08)",
           mb: 3,
         }}
       >
@@ -1515,8 +1515,8 @@ export default function DashboardPage() {
           sx={{
             background: (theme) =>
               theme.palette.mode === "dark"
-                ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
-                : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+                ? "linear-gradient(90deg, #162538 0%, #1e3a5f 100%)"
+                : "linear-gradient(90deg, #1e5183 0%, #2968a2 100%)",
             borderBottom: (theme) =>
               theme.palette.mode === "dark"
                 ? "1px solid rgba(255, 255, 255, 0.15)"

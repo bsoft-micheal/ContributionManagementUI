@@ -170,7 +170,7 @@ export const ToastProvider = ({ children }) => {
 
   const bgColor = severity === "success" ? "#16a34a" : // Sightly deeper green
     severity === "error" ? "#dc2626" :
-      severity === "warning" ? "#ca8a04" : "#4a3f6b";
+      severity === "warning" ? "#ca8a04" : "#2563a6";
 
   return (
     <ToastContext.Provider value={{ showToast }}>
