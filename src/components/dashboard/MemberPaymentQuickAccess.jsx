@@ -328,6 +328,8 @@ export default function MemberPaymentQuickAccess({
       const normalizedRaw = String(rawMode || "").trim();
       const resolvedPaymentMode = (normalizedRaw && !["upi", "2", "online"].includes(normalizedRaw.toLowerCase()) ? normalizedRaw : null) || (cashAmt > 0 && upiAmt > 0 ? "Split" : (cashAmt > 0 ? "Cash" : (upiAmt > 0 || normalizedRaw ? "Gpay" : "--")));
 
+      const amount = Number(c.amount || c.Amount || c.contributionAmount) || (hasCashOrUpi ? (cashAmt + upiAmt) : txAmt) || 0;
+
       list.push({
         id: cId || `${mId}-${cEventId}`,
         contributionId: c.contributionId || c.ContributionId,
@@ -736,20 +738,6 @@ export default function MemberPaymentQuickAccess({
                   >
                     ₹{formatAmount(stats.totalAmount)}
                   </Typography>
-                  <Typography
-                    variant="caption"
-                    fontWeight={400}
-                    color="text.secondary"
-                    sx={{
-                      fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      display: "block",
-                      mt: 0.25,
-                      fontSize: "0.7rem",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {stats.totalCount} Members
-                  </Typography>
                 </Box>
               </Paper>
             </Grid>
@@ -803,20 +791,6 @@ export default function MemberPaymentQuickAccess({
                 >
                   ₹{formatAmount(stats.pendingAmount)}
                 </Typography>
-                <Typography
-                  variant="caption"
-                  fontWeight={400}
-                  color="warning.main"
-                  sx={{
-                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    display: "block",
-                    mt: 0.25,
-                    fontSize: "0.7rem",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {stats.pendingCount} Members
-                </Typography>
               </Box>
             </Paper>
           </Grid>
@@ -868,20 +842,6 @@ export default function MemberPaymentQuickAccess({
                   }}
                 >
                   ₹{formatAmount(stats.paidAmount)}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  fontWeight={400}
-                  color="success.main"
-                  sx={{
-                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    display: "block",
-                    mt: 0.25,
-                    fontSize: "0.7rem",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {stats.paidCount} Members
                 </Typography>
               </Box>
             </Paper>
