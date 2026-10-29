@@ -185,7 +185,22 @@ export default function ContributionCalculationPage() {
       };
     });
 
-    const totalAmount = roundToWhole(selectedEventDetails.baseAmount || 0);
+    const baseBudget = Number(selectedEventDetails.originalPlannedBudget ?? selectedEventDetails.baseAmount ?? 0);
+    const sponsorDeduction = Boolean(selectedEventDetails.requireSponsorContribution)
+      ? Number(
+          selectedEventDetails.sponsorContributionAmount ??
+          (Array.isArray(selectedEventDetails.sponsors)
+            ? selectedEventDetails.sponsors.filter((s) => s.isActive).reduce((sum, s) => sum + (Number(s.contributionAmount) || 0), 0)
+            : 0)
+        )
+      : 0;
+    const remainingFunding = Math.max(0, baseBudget - sponsorDeduction);
+    const allocatedFromHand = Boolean(selectedEventDetails.useAvailableBalance) ? Number(selectedEventDetails.allocatedAmount || 0) : 0;
+    const totalAmount = roundToWhole(
+      Number(selectedEventDetails.totalExpectedAmount) > 0
+        ? Number(selectedEventDetails.totalExpectedAmount)
+        : Math.max(0, remainingFunding - allocatedFromHand)
+    );
     let standardFullShare = 0;
     let equalShare = 0;
 
@@ -351,9 +366,9 @@ export default function ContributionCalculationPage() {
                     fontSize: "0.75rem",
                     px: 2,
                     whiteSpace: "nowrap",
-                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                    bgcolor: (theme) => theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important",
                     border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
-                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                    "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important" },
                   }}
                 >
                   Filter
@@ -386,7 +401,7 @@ export default function ContributionCalculationPage() {
                     <Stack spacing={0.5}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Event Cost:</Typography>
-                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{formatWholeCurrency(selectedEventDetails?.baseAmount || 0)}</Typography>
+                        <Typography variant="caption" fontWeight={800} sx={{ fontSize: "0.68rem" }}>{formatWholeCurrency(selectedEventDetails?.originalPlannedBudget || selectedEventDetails?.baseAmount || 0)}</Typography>
                       </Box>
                       <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: "0.68rem" }}>Total Participants:</Typography>

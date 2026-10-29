@@ -132,7 +132,7 @@ export default function RolesPage() {
                 disabled={!hasWriteAccess}
                 onClick={() => { setForm(row); setErrors({}); setDialogOpen(true); }}
               >
-                <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8") }} />
+                <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8") }} />
               </IconButton>
             </span>
           </Tooltip>
@@ -144,7 +144,7 @@ export default function RolesPage() {
                 disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)}
                 onClick={() => handleDeleteRequest(row.roleId ?? row.RoleId ?? row.id)}
               >
-                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess && !(row.isReferred || row.IsReferred) ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8") }} />
+                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess && !(row.isReferred || row.IsReferred) ? (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8") }} />
               </IconButton>
             </span>
           </Tooltip>

@@ -714,7 +714,7 @@ export default function PaymentsPage() {
         return (
           <Tooltip
             arrow
-            interactive
+            disableInteractive={false}
             enterDelay={100}
             leaveDelay={200}
             placement="right-start"
@@ -1056,7 +1056,7 @@ export default function PaymentsPage() {
                           variant="body2"
                           fontWeight={700}
                           sx={{
-                            color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                            color: (t) => (t.palette.mode === "dark" ? "#8bb8ec" : "#2563a6"),
                             fontFamily: "monospace",
                             fontSize: "0.84rem",
                           }}
@@ -1086,7 +1086,7 @@ export default function PaymentsPage() {
                     variant="body2"
                     fontWeight={700}
                     sx={{
-                      color: (t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                      color: (t) => (t.palette.mode === "dark" ? "#8bb8ec" : "#2563a6"),
                       fontFamily: "monospace",
                       fontSize: "0.85rem",
                       mt: 0.5,
@@ -1127,7 +1127,7 @@ export default function PaymentsPage() {
                 <Typography
                   variant="subtitle1"
                   fontWeight={800}
-                  color={(t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")}
+                  color={(t) => (t.palette.mode === "dark" ? "#8bb8ec" : "#2563a6")}
                 >
                   {formatWholeCurrency(selectedTxn.amount)}
                 </Typography>

@@ -539,7 +539,7 @@ export default function AnnualMemberMatrix({
             .header-right { text-align: right; font-size: 11px; color: #4b5563; line-height: 1.5; }
             table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 12px; margin-bottom: 16px; }
             th {
-              background-color: #4a3f6b !important; color: #ffffff !important;
+              background-color: #2563a6 !important; color: #ffffff !important;
               font-weight: 700; text-align: left; padding: 7px 8px; border: 1px solid #4a3f6b;
               font-size: 10px;
             }
@@ -764,7 +764,7 @@ export default function AnnualMemberMatrix({
         placement="top"
         enterDelay={150}
         leaveDelay={250}
-        interactive
+        disableInteractive={false}
         slotProps={{
           popper: {
             sx: {
@@ -1054,9 +1054,9 @@ export default function AnnualMemberMatrix({
                 px: 2,
                 borderRadius: "8px",
                 whiteSpace: "nowrap",
-                bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                bgcolor: (theme) => theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important",
                 border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
-                "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important" },
               }}
             >
               Filter

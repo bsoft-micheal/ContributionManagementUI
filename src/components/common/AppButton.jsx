@@ -7,6 +7,7 @@ import AppAddButton, { AddButton } from "./AppAddButton";
 import AppSaveButton, { SaveButton } from "./AppSaveButton";
 import AppCancelButton, { CancelButton } from "./AppCancelButton";
 import AppClearFilterButton, { ClearFilterButton } from "./AppClearFilterButton";
+import AppFilterButton, { FilterButton } from "./AppFilterButton";
 import { hasActiveFilters } from "../../utils/filterHelper";
 
 export {
@@ -18,6 +19,8 @@ export {
   CancelButton,
   AppClearFilterButton,
   ClearFilterButton,
+  AppFilterButton,
+  FilterButton,
 };
 
 export default function AppButton({
@@ -73,6 +76,22 @@ export default function AppButton({
     resolvedStartIcon = null;
   }
 
+  // Clean up legacy purple overrides if passed in sx
+  const cleanSx = { ...sx };
+  if (cleanSx.bgcolor) {
+    const bgStr = String(cleanSx.bgcolor);
+    if (bgStr.includes("4a3f6b") || bgStr.includes("6d5ca0") || bgStr.includes("3b325c") || bgStr.includes("31275d")) {
+      delete cleanSx.bgcolor;
+    }
+  }
+  if (cleanSx["&:hover"] && cleanSx["&:hover"].bgcolor) {
+    const hovStr = String(cleanSx["&:hover"].bgcolor);
+    if (hovStr.includes("3b325c") || hovStr.includes("7d6bb3") || hovStr.includes("2d2550") || hovStr.includes("4a3f6b")) {
+      cleanSx["&:hover"] = { ...cleanSx["&:hover"] };
+      delete cleanSx["&:hover"].bgcolor;
+    }
+  }
+
   const buttonElement = (
     <Button
       variant={variant}
@@ -98,14 +117,14 @@ export default function AppButton({
           borderRadius: "8px",
           whiteSpace: "nowrap",
           bgcolor: isBtnDisabled
-            ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12) !important" : "rgba(74, 63, 107, 0.3) !important")
-            : (theme) => (theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important"),
+            ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12) !important" : "rgba(37, 99, 166, 0.3) !important")
+            : (theme) => (theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important"),
           color: isBtnDisabled
             ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.7) !important" : "#ffffff !important")
             : "#ffffff !important",
           border: (theme) => (theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none"),
           "&:hover": {
-            bgcolor: isBtnDisabled ? undefined : (theme) => (theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important"),
+            bgcolor: isBtnDisabled ? undefined : (theme) => (theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important"),
           },
         }),
         ...(isClearFilterBtn && {
@@ -122,10 +141,10 @@ export default function AppButton({
           border: isBtnDisabled
             ? (theme) => (theme.palette.mode === "dark" ? "1.5px solid rgba(255, 255, 255, 0.12) !important" : "1.5px solid rgba(0, 0, 0, 0.14) !important")
             : "1.5px solid rgba(239, 68, 68, 0.4) !important",
-          bgcolor: "transparent !important",
+          bgcolor: isBtnDisabled ? "transparent !important" : (theme) => (theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.08) !important" : "#fef2f2 !important"),
           "&:hover": {
             border: isBtnDisabled ? undefined : "1.5px solid #ef4444 !important",
-            bgcolor: isBtnDisabled ? undefined : (theme) => (theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.12) !important" : "rgba(239, 68, 68, 0.05) !important"),
+            bgcolor: isBtnDisabled ? undefined : (theme) => (theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.16) !important" : "rgba(239, 68, 68, 0.1) !important"),
             color: isBtnDisabled ? undefined : "#ef4444 !important",
           },
         }),
@@ -175,20 +194,20 @@ export default function AppButton({
         }),
         ...(!isFilterBtn && variant === "contained" && {
           bgcolor: isBtnDisabled
-            ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12) !important" : "rgba(74, 63, 107, 0.3) !important")
-            : (theme) => (theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important"),
+            ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12) !important" : "rgba(37, 99, 166, 0.3) !important")
+            : (theme) => (theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important"),
           color: isBtnDisabled
             ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.7) !important" : "#ffffff !important")
             : "#ffffff !important",
           border: (theme) => (theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none"),
           "&:hover": {
-            bgcolor: isBtnDisabled ? undefined : (theme) => (theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important"),
+            bgcolor: isBtnDisabled ? undefined : (theme) => (theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important"),
           },
         }),
         ...(!isClearFilterBtn && !isCancelBtn && variant === "outlined" && {
           border: (theme) =>
             isBtnDisabled
-              ? `1.5px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25)" : "rgba(74, 63, 107, 0.3)"} !important`
+              ? `1.5px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25)" : "rgba(25, 59, 91, 0.25)"} !important`
               : `1.5px solid ${theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.28)" : "#cbd5e1"}`,
           color: (theme) =>
             isBtnDisabled
@@ -210,7 +229,7 @@ export default function AppButton({
           cursor: "not-allowed !important",
           pointerEvents: "none",
         },
-        ...sx,
+        ...cleanSx,
       }}
       {...props}
     >

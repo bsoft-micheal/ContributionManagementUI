@@ -61,7 +61,7 @@ import { useThemeMode } from "../../contexts/ThemeModeContext";
 import { useNavigationLoading } from "../../contexts/NavigationLoadingContext";
 import AppPageLoader from "../common/AppPageLoader";
 import dayjs from "dayjs";
-import logo from "../../assets/logo_image.png";
+import logo from "../../assets/logo_team_contribution.png";
 
 export default function AppLayout() {
   const theme = useTheme();
@@ -80,11 +80,11 @@ export default function AppLayout() {
   const NAVBAR = React.useMemo(() => {
     if (theme.palette.mode === "dark") {
       return {
-        bg: "#101426",
+        bg: "#0d1b2a",
         border: "rgba(255, 255, 255, 0.08)",
-        active: "#c4b5fd",
-        activeBg: "rgba(196, 181, 253, 0.16)",
-        activeBorder: "rgba(196, 181, 253, 0.35)",
+        active: "#2d6bb3",
+        activeBg: "rgba(45, 107, 179, 0.35)",
+        activeBorder: "rgba(91, 147, 211, 0.4)",
         hover: "rgba(255, 255, 255, 0.05)",
         text: "#b3bdd6",
         activeText: "#ffffff",
@@ -94,27 +94,27 @@ export default function AppLayout() {
         dropdownBorder: "rgba(255, 255, 255, 0.08)",
         divider: "rgba(255, 255, 255, 0.08)",
         cardBg: "rgba(255, 255, 255, 0.04)",
-        avatarBg: "#c4b5fd",
-        avatarColor: "#101426",
+        avatarBg: "#2d6bb3",
+        avatarColor: "#ffffff",
       };
     }
 
     return {
-      bg: "#1e1a2e", // Original very dark purple-navy
-      border: "rgba(255, 255, 255, 0.08)",
-      active: "#4a3f6b", // Original mid-purple (matches table header)
-      activeBg: "rgba(74, 63, 107, 0.35)", // Original active purple background
-      activeBorder: "rgba(167, 139, 250, 0.35)",
-      hover: "rgba(255, 255, 255, 0.05)",
-      text: "#c4bde0", // Original muted lavender
+      bg: "#193b5b", // Exact Deep Corporate Navy from the design image (#193B5B)
+      border: "rgba(255, 255, 255, 0.10)",
+      active: "#425e79", // Exact Active Menu pill color from the design image (#425E79)
+      activeBg: "#425e79", // Active button/pill background matching "Savings" menu
+      activeBorder: "rgba(255, 255, 255, 0.25)",
+      hover: "rgba(255, 255, 255, 0.10)",
+      text: "rgba(255, 255, 255, 0.88)",
       activeText: "#ffffff",
-      icon: "#7b72a8", // Original faded purple icon
-      activeIcon: "#c4bde0",
-      dropdownBg: "#1e1a2e", // Original flyout background
-      dropdownBorder: "rgba(255, 255, 255, 0.08)",
-      divider: "rgba(255, 255, 255, 0.08)",
-      cardBg: "rgba(255, 255, 255, 0.04)",
-      avatarBg: "#4a3f6b", // Original purple avatar
+      icon: "rgba(255, 255, 255, 0.80)",
+      activeIcon: "#ffffff",
+      dropdownBg: "#193b5b",
+      dropdownBorder: "rgba(255, 255, 255, 0.12)",
+      divider: "rgba(255, 255, 255, 0.12)",
+      cardBg: "rgba(255, 255, 255, 0.06)",
+      avatarBg: "#2563a6",
       avatarColor: "#ffffff",
     };
   }, [theme.palette.mode]);
@@ -972,7 +972,7 @@ export default function AppLayout() {
                   variant="body2"
                   sx={{
                     fontWeight: 800,
-                    color: theme.palette.mode === "dark" ? "#b3bdd6" : "#a78bfa",
+                    color: "#ffffff",
                     lineHeight: 1.3,
                     fontSize: "0.82rem",
                     letterSpacing: "0.01em",

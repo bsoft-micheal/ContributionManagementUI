@@ -115,14 +115,14 @@ function printTable(title, columns, data) {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            border-bottom: 2px solid #4a3f6b;
+            border-bottom: 2px solid #2563a6;
             padding-bottom: 12px;
             margin-bottom: 16px;
           }
           .header-left h1 {
             margin: 0;
             font-size: 22px;
-            color: #4a3f6b;
+            color: #2563a6;
             font-weight: 800;
           }
           .header-left p {
@@ -148,12 +148,12 @@ function printTable(title, columns, data) {
             margin-bottom: 20px;
           }
           th {
-            background-color: #4a3f6b !important;
+            background-color: #2563a6 !important;
             color: #ffffff !important;
             font-weight: 700;
             text-align: left;
             padding: 9px 10px;
-            border: 1px solid #4a3f6b;
+            border: 1px solid #2563a6;
             letter-spacing: 0.03em;
             text-transform: none;
             font-size: 10px;
@@ -702,8 +702,8 @@ export default function AppDataTable({
         <Box
           sx={{
             background: theme.palette.mode === "dark"
-              ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
-              : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+              ? "linear-gradient(90deg, #143557 0%, #1e5183 100%)"
+              : "linear-gradient(90deg, #1e5183 0%, #2968a2 100%)",
             borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
             color: "#ffffff",
             px: 3,
@@ -726,9 +726,9 @@ export default function AppDataTable({
             <Box
               sx={{
                 "& .MuiButton-root": {
-                  bgcolor: theme.palette.mode === "dark" ? "#5a4c82 !important" : "#2a1b4d !important",
+                  bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15) !important" : "#ffffff !important",
                   border: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.25) !important" : "none",
-                  color: "#ffffff !important",
+                  color: theme.palette.mode === "dark" ? "#ffffff !important" : "#1e5183 !important",
                   borderRadius: "4px !important",
                   fontSize: "0.75rem !important",
                   fontWeight: 700,
@@ -740,7 +740,7 @@ export default function AppDataTable({
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 0.5,
-                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6a5c96 !important" : "#1a1033 !important" },
+                  "&:hover": { bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25) !important" : "#f1f5f9 !important" },
                 },
                 "& .MuiButton-root.Mui-disabled, & .MuiButton-root:disabled": {
                   bgcolor: "rgba(255, 255, 255, 0.08) !important",
@@ -806,7 +806,7 @@ export default function AppDataTable({
               : (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1"),
             "&:hover": {
               color: isExportAllowed
-                ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")
+                ? (theme.palette.mode === "dark" ? "#ffffff" : "#2563a6")
                 : (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1"),
             },
           };
@@ -875,7 +875,7 @@ export default function AppDataTable({
             onClick={handleColumnsClick}
             startIcon={<ColumnsIcon sx={{ fontSize: "1rem" }} />}
             sx={{
-              color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+              color: theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
               borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.3)" : "rgba(74, 63, 107, 0.45)",
               borderWidth: "1.5px",
               fontSize: "0.75rem",
@@ -885,7 +885,7 @@ export default function AppDataTable({
               px: 1.5,
               borderRadius: "4px",
               "&:hover": {
-                borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                 borderWidth: "1.5px",
                 bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
               },
@@ -898,14 +898,14 @@ export default function AppDataTable({
             <IconButton
               size="small"
               sx={{
-                color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                color: theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                 p: 0.6,
                 border: theme.palette.mode === "dark" ? "1.5px solid rgba(255, 255, 255, 0.3)" : "1.5px solid rgba(74, 63, 107, 0.45)",
                 borderRadius: "4px",
                 height: 32,
                 width: 32,
                 "&:hover": {
-                  borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                   bgcolor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(74, 63, 107, 0.04)",
                 },
               }}
@@ -927,7 +927,7 @@ export default function AppDataTable({
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <SearchIcon sx={{ fontSize: "1.1rem", color: theme.palette.mode === "dark" ? "#a78bfa" : "#4a3f6b" }} />
+                  <SearchIcon sx={{ fontSize: "1.1rem", color: theme.palette.mode === "dark" ? "#a78bfa" : "#2563a6" }} />
                 </InputAdornment>
               ),
               sx: {
@@ -950,11 +950,11 @@ export default function AppDataTable({
                   borderWidth: "1.5px",
                 },
                 "&:hover fieldset": {
-                  borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                   borderWidth: "1.5px",
                 },
                 "&.Mui-focused fieldset": {
-                  borderColor: theme.palette.mode === "dark" ? theme.palette.primary.main : "#4a3f6b",
+                  borderColor: theme.palette.mode === "dark" ? theme.palette.primary.main : "#2563a6",
                   borderWidth: "2px",
                 },
               },
@@ -980,7 +980,7 @@ export default function AppDataTable({
           sx: { p: 2, maxWidth: 240, maxHeight: 320, overflowY: "auto", borderRadius: "6px" }
         }}
       >
-        <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1, fontSize: "0.8rem", color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b" }}>
+        <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1, fontSize: "0.8rem", color: theme.palette.mode === "dark" ? "#ffffff" : "#2563a6" }}>
           Toggle Columns
         </Typography>
         <Stack spacing={0.5}>
@@ -1408,14 +1408,14 @@ export default function AppDataTable({
                   height: 28,
                   fontSize: "0.75rem",
                   fontWeight: 700,
-                  color: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  color: theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                   "& .MuiSelect-select": { py: 0.5, px: 1 },
                   "& fieldset": {
                     borderColor: theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.3)" : "rgba(74, 63, 107, 0.45)",
                     borderWidth: "1.5px",
                   },
                   "&:hover fieldset": {
-                    borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                    borderColor: theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                     borderWidth: "1.5px",
                   },
                 }}
@@ -1430,7 +1430,7 @@ export default function AppDataTable({
                 </MenuItem>
               </Select>
             </Box>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: theme.palette.mode === "dark" ? "#d6dbef" : "#4a3f6b", fontSize: "0.75rem" }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: theme.palette.mode === "dark" ? "#d6dbef" : "#2563a6", fontSize: "0.75rem" }}>
               Rows {totalRows} • Page {page + 1} of {totalPages}
             </Typography>
           </Stack>
@@ -1445,11 +1445,11 @@ export default function AppDataTable({
                 border: (theme) =>
                   theme.palette.mode === "dark"
                     ? "1.5px solid rgba(255, 255, 255, 0.4)"
-                    : "1.5px solid #4a3f6b",
+                    : "1.5px solid #2563a6",
                 borderRadius: "6px",
                 p: 0.5,
                 color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                 "&:hover": {
                   borderColor: (theme) =>
                     theme.palette.mode === "dark" ? "#ffffff" : "#3b325c",
@@ -1481,10 +1481,10 @@ export default function AppDataTable({
                 border: (theme) =>
                   theme.palette.mode === "dark"
                     ? "1.5px solid rgba(255, 255, 255, 0.4)"
-                    : "1.5px solid #4a3f6b",
+                    : "1.5px solid #2563a6",
                 borderRadius: "6px",
                 color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                 fontSize: "0.78rem",
                 fontWeight: 900,
                 textTransform: "none",
@@ -1535,10 +1535,10 @@ export default function AppDataTable({
                 border: (theme) =>
                   theme.palette.mode === "dark"
                     ? "1.5px solid rgba(255, 255, 255, 0.4)"
-                    : "1.5px solid #4a3f6b",
+                    : "1.5px solid #2563a6",
                 borderRadius: "6px",
                 color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                 fontSize: "0.78rem",
                 fontWeight: 800,
                 textTransform: "none",
@@ -1576,11 +1576,11 @@ export default function AppDataTable({
                 border: (theme) =>
                   theme.palette.mode === "dark"
                     ? "1.5px solid rgba(255, 255, 255, 0.4)"
-                    : "1.5px solid #4a3f6b",
+                    : "1.5px solid #2563a6",
                 borderRadius: "6px",
                 p: 0.5,
                 color: (theme) =>
-                  theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b",
+                  theme.palette.mode === "dark" ? "#ffffff" : "#2563a6",
                 "&:hover": {
                   borderColor: (theme) =>
                     theme.palette.mode === "dark" ? "#ffffff" : "#3b325c",

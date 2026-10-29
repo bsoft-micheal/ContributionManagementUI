@@ -184,7 +184,7 @@ export default function UsersPage() {
   const [appliedStatus, setAppliedStatus] = useState("");
 
   const toast = useAppToast();
-  const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
+  const actionIconColor = theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6";
 
   // Dynamic user roles from database
   const userRolesList = useMemo(() => {
@@ -1220,9 +1220,9 @@ export default function UsersPage() {
               sx={{
                 borderColor: (theme) =>
                   theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(74, 63, 107, 0.3)",
-                color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                color: (theme) => (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6"),
                 "&:hover": {
-                  borderColor: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                  borderColor: (theme) => (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6"),
                   bgcolor: (theme) =>
                     theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(74, 63, 107, 0.04)",
                 },
@@ -1299,9 +1299,9 @@ export default function UsersPage() {
                   fontSize: "0.75rem",
                   px: 2,
                   whiteSpace: "nowrap",
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important",
                   border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
-                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important" },
                 }}
               >
                 Filter

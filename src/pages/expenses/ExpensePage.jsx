@@ -573,7 +573,7 @@ export default function ExpensePage() {
     });
     if (!ev) return null;
 
-    const expected = roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.expectedCollection ?? ev.baseAmount ?? 0));
+    const expected = roundToWhole(Number(ev.originalPlannedBudget ?? ev.baseAmount ?? ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.expectedCollection ?? 0));
     const currentExpenseId = editingExpense ? (editingExpense.expenseId || editingExpense.id) : null;
     const relevantExpenses = expenses
       .filter((ex) =>
@@ -603,7 +603,7 @@ export default function ExpensePage() {
   const pageBudgetSummary = useMemo(() => {
     const targetEventName = appliedEvent !== "ALL" ? appliedEvent : null;
     if (!targetEventName) {
-      let validEvents = eventsList.filter((e) => e && (e.totalExpectedAmount || e.expectedAmount || e.baseAmount));
+      let validEvents = eventsList.filter((e) => e && (e.originalPlannedBudget || e.baseAmount || e.totalExpectedAmount || e.expectedAmount));
       if (appliedCategory !== "ALL") {
         validEvents = validEvents.filter((e) => {
           const cat = e.eventTypeName || e.category;
@@ -611,7 +611,7 @@ export default function ExpensePage() {
         });
       }
       const expected = roundToWhole(validEvents.reduce(
-        (sum, e) => sum + Number(e.totalExpectedAmount ?? e.expectedAmount ?? e.baseAmount ?? 0),
+        (sum, e) => sum + Number(e.originalPlannedBudget ?? e.baseAmount ?? e.totalExpectedAmount ?? e.expectedAmount ?? 0),
         0
       ));
       // Only count Approved expenses in Total Spent, Remaining Budget, and Extra Amount Spent
@@ -634,7 +634,7 @@ export default function ExpensePage() {
       // Extra spent calculated per individual event that exceeded its expected budget
       const perEventExtra = validEvents.reduce((sum, ev) => {
         const evName = (ev.name || ev.eventName || "").trim().toLowerCase();
-        const evExpected = roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0));
+        const evExpected = roundToWhole(Number(ev.originalPlannedBudget ?? ev.baseAmount ?? ev.totalExpectedAmount ?? ev.expectedAmount ?? 0));
         const evSpent = roundToWhole(relevantExpenses
           .filter((ex) => (ex.eventName || "").trim().toLowerCase() === evName)
           .reduce((s, ex) => s + (Number(ex.amount) || 0), 0));
@@ -653,7 +653,7 @@ export default function ExpensePage() {
     }
 
     const ev = eventsList.find((e) => (e.name || e.eventName || "").trim().toLowerCase() === targetEventName.trim().toLowerCase());
-    const expected = ev ? roundToWhole(Number(ev.totalExpectedAmount ?? ev.expectedAmount ?? ev.baseAmount ?? 0)) : 0;
+    const expected = ev ? roundToWhole(Number(ev.originalPlannedBudget ?? ev.baseAmount ?? ev.totalExpectedAmount ?? ev.expectedAmount ?? 0)) : 0;
     const isApprovedStatus = (status) => {
       const s = (status || "").toLowerCase().trim();
       return s === "approved" || s === "verified" || s.includes("approv") || s.includes("verif");
@@ -1200,7 +1200,7 @@ export default function ExpensePage() {
                       fontSize: "1.05rem",
                       color: (theme) =>
                         canViewExpense
-                          ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")
+                          ? (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6")
                           : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
                     }}
                   />
@@ -1644,7 +1644,7 @@ export default function ExpensePage() {
                 }}
               >
                 <MetricCard
-                  label="Expected Budget"
+                  label={COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Total Amount"}
                   value={formatWholeCurrency(pageBudgetSummary.expected)}
                   accent="#6366f1"
                 />
@@ -1748,7 +1748,7 @@ export default function ExpensePage() {
                   <Typography
                     variant="subtitle1"
                     fontWeight={800}
-                    color={(t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")}
+                    color={(t) => (t.palette.mode === "dark" ? "#8bb8ec" : "#2563a6")}
                   >
                     {selectedExpense.id}
                   </Typography>

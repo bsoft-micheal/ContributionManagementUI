@@ -163,17 +163,24 @@ export default function EventDetailsDialog({ open, onClose, event, members = [],
     (m) => m && m.isActive !== false && !m.isDeleted
   );
 
-  const allocatedAmt = (activeEvent?.useAvailableBalance || event?.useAvailableBalance)
-    ? Number(activeEvent?.allocatedAmount ?? event?.allocatedAmount ?? 0)
+  const targetEventObj = activeEvent || event;
+  const allocatedAmt = (targetEventObj?.useAvailableBalance)
+    ? Number(targetEventObj?.allocatedAmount ?? 0)
     : 0;
-  const rawBudget = Math.max(
-    Number(activeEvent?.baseAmount ?? event?.baseAmount ?? 0),
-    Number(activeEvent?.totalExpectedAmount ?? event?.totalExpectedAmount ?? 0) + allocatedAmt
-  );
+  const rawBudget = Number(targetEventObj?.originalPlannedBudget ?? targetEventObj?.baseAmount ?? 0);
+  const sponsorDeduction = Boolean(targetEventObj?.requireSponsorContribution)
+    ? Number(
+        targetEventObj?.sponsorContributionAmount ??
+        (Array.isArray(targetEventObj?.sponsors)
+          ? targetEventObj.sponsors.filter((s) => s.isActive).reduce((sum, s) => sum + (Number(s.contributionAmount) || 0), 0)
+          : 0)
+      )
+    : 0;
+  const remainingFunding = Math.max(0, rawBudget - sponsorDeduction);
   const totalExpected = roundToWhole(
-    allocatedAmt > 0
-      ? Math.max(0, (Number(activeEvent?.baseAmount ?? event?.baseAmount ?? 0) || rawBudget) - allocatedAmt)
-      : (Number(activeEvent?.totalExpectedAmount ?? event?.totalExpectedAmount) || rawBudget)
+    Number(targetEventObj?.totalExpectedAmount) > 0
+      ? Number(targetEventObj.totalExpectedAmount)
+      : Math.max(0, remainingFunding - allocatedAmt)
   );
 
   const isContributionPaid = (c) => {
