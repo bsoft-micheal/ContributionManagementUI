@@ -1310,8 +1310,8 @@ export default function SettingsPage() {
         <Box
           sx={{
             background: theme.palette.mode === "dark"
-              ? "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)"
-              : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+              ? "linear-gradient(90deg, #162538 0%, #1e3a5f 100%)"
+              : "linear-gradient(90deg, #1e5183 0%, #2968a2 100%)",
             borderBottom: theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
             color: "#ffffff",
             px: 3,
@@ -2352,7 +2352,7 @@ export default function SettingsPage() {
                                       variant="contained"
                                       fullWidth
                                       sx={{
-                                        bgcolor: "#4a3f6b !important",
+                                        bgcolor: "#2563a6 !important",
                                         "&:hover": { bgcolor: "#2d2550 !important" },
                                         py: 1.2,
                                         fontWeight: 700,

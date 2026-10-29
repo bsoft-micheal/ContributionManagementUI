@@ -314,7 +314,7 @@ export default function AppInput({
                 ? (theme.palette.mode === "dark" ? "#f87171" : "#ef4444")
                 : theme.palette.mode === "dark"
                   ? "rgba(231, 235, 247, 0.25)"
-                  : "rgba(74, 63, 107, 0.28)",
+                  : "rgba(25, 59, 91, 0.25)",
               borderWidth: "1.5px",
             },
             "&:hover fieldset": {
@@ -322,15 +322,15 @@ export default function AppInput({
                 ? (theme.palette.mode === "dark" ? "#f87171" : "#ef4444")
                 : theme.palette.mode === "dark"
                   ? "rgba(157, 140, 230, 0.75)"
-                  : "#6f5bd3",
+                  : "#2563a6",
               borderWidth: "1.5px",
             },
             "&.Mui-focused fieldset": {
               borderColor: (theme) => error
                 ? (theme.palette.mode === "dark" ? "#f87171" : "#ef4444")
                 : theme.palette.mode === "dark"
-                  ? "#9d8ce6"
-                  : "#6f5bd3",
+                  ? "#5b93d3"
+                  : "#2563a6",
               borderWidth: "2px",
             },
             "&.Mui-disabled": {

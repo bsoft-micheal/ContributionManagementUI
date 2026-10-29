@@ -1200,7 +1200,7 @@ export default function ExpensePage() {
                       fontSize: "1.05rem",
                       color: (theme) =>
                         canViewExpense
-                          ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")
+                          ? (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6")
                           : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8"),
                     }}
                   />
@@ -1748,7 +1748,7 @@ export default function ExpensePage() {
                   <Typography
                     variant="subtitle1"
                     fontWeight={800}
-                    color={(t) => (t.palette.mode === "dark" ? "#ffffff" : "#4a3f6b")}
+                    color={(t) => (t.palette.mode === "dark" ? "#8bb8ec" : "#2563a6")}
                   >
                     {selectedExpense.id}
                   </Typography>

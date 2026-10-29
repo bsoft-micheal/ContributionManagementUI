@@ -259,7 +259,7 @@ export default function ContributionsPage() {
   const [paymentModes, setPaymentModes] = useState([]);
   const [errors, setErrors] = useState({});
   const toast = useAppToast();
-  const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
+  const actionIconColor = theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6";
 
   // View Contribution Details Modal State
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -2452,7 +2452,7 @@ export default function ContributionsPage() {
                     onClick={() => handleOpenSubmitPaymentModal(row)}
                     sx={{
                       p: 0.4,
-                      color: isPaidMember ? "#9ca3af" : (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                      color: isPaidMember ? "#9ca3af" : (theme) => (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6"),
                       bgcolor: isPaidMember
                         ? "rgba(156, 163, 175, 0.08)"
                         : (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(74, 63, 107, 0.08)"),
@@ -3298,9 +3298,9 @@ export default function ContributionsPage() {
                   fontSize: "0.75rem",
                   px: 2,
                   whiteSpace: "nowrap",
-                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#6d5ca0 !important" : "#4a3f6b !important",
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "#2d6bb3 !important" : "#2563a6 !important",
                   border: (theme) => theme.palette.mode === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
-                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#7d6bb3 !important" : "#3b325c !important" },
+                  "&:hover": { bgcolor: (theme) => theme.palette.mode === "dark" ? "#3b7fc7 !important" : "#1d5083 !important" },
                 }}
               >
                 Filter
@@ -3341,8 +3341,8 @@ export default function ContributionsPage() {
                 )
               }
               sx={{
-                bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#4a3f6b !important",
-                "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#3b325c !important" }
+                bgcolor: theme.palette.mode === "dark" ? "#5e6783 !important" : "#2563a6 !important",
+                "&:hover": { bgcolor: theme.palette.mode === "dark" ? "#6b7390 !important" : "#1d5083 !important" }
               }}
             >
               Save

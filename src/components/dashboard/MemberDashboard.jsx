@@ -1005,7 +1005,7 @@ export default function MemberDashboard({
                 sx={{
                   background: isDark
                     ? "linear-gradient(90deg, #5a4c82 0%, #6f5ea0 100%)"
-                    : "linear-gradient(90deg, #4a3f6b 0%, #5d528b 100%)",
+                    : "linear-gradient(90deg, #1e5183 0%, #2968a2 100%)",
                   color: "#ffffff",
                   fontWeight: 700,
                   textTransform: "none",
@@ -1019,7 +1019,7 @@ export default function MemberDashboard({
                   "&:hover": {
                     background: isDark
                       ? "linear-gradient(90deg, #4a3f6b 0%, #5a4c82 100%)"
-                      : "linear-gradient(90deg, #372e54 0%, #4a3f6b 100%)",
+                      : "linear-gradient(90deg, #162538 0%, #1e3a5f 100%)",
                     boxShadow: isDark
                       ? "0 6px 16px rgba(0, 0, 0, 0.45)"
                       : "0 6px 16px rgba(74, 63, 107, 0.35)",

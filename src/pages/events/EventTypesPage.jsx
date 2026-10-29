@@ -465,14 +465,14 @@ export default function EventTypesPage() {
           <Tooltip title={hasWriteAccess ? "Edit Category" : "Disabled"}>
             <span style={{ display: "inline-flex", cursor: !hasWriteAccess ? "not-allowed" : "pointer" }}>
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess} onClick={() => handleOpenEditDialog(row)}>
-                <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8") }} />
+                <EditIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess ? (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8") }} />
               </IconButton>
             </span>
           </Tooltip>
           <Tooltip title={row.isReferred || row.IsReferred ? TOAST_MESSAGES.GENERAL.RECORD_IN_USE : (hasWriteAccess ? "Delete Category" : "Disabled")}>
             <span style={{ display: "inline-flex", cursor: (!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)) ? "not-allowed" : "pointer" }}>
               <IconButton size="small" sx={{ p: 0.3 }} disabled={!hasWriteAccess || Boolean(row.isReferred || row.IsReferred)} onClick={() => handleDeleteRequest(row.eventTypeId)}>
-                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess && !(row.isReferred || row.IsReferred) ? (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8") }} />
+                <DeleteIcon sx={{ fontSize: "1.1rem", color: (theme) => hasWriteAccess && !(row.isReferred || row.IsReferred) ? (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6") : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.45)" : "#94a3b8") }} />
               </IconButton>
             </span>
           </Tooltip>
@@ -664,7 +664,7 @@ export default function EventTypesPage() {
                 transform: "scale(0.85)",
                 color: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.6)" : "#4a3f6b"),
                 "&.Mui-checked": {
-                  color: (theme) => (theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b"),
+                  color: (theme) => (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6"),
                 },
               }}
             />
@@ -833,7 +833,7 @@ export default function EventTypesPage() {
                               size="small"
                               onClick={() => handleDeleteRowRequest(idx)}
                               sx={{
-                                color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                                color: (theme) => (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6"),
                                 p: 0.5,
                                 "&:hover": {
                                   bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74, 63, 107, 0.08)"),
@@ -884,7 +884,7 @@ export default function EventTypesPage() {
                         py: 0.5,
                         fontSize: "0.8rem",
                         borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.3)" : "#4a3f6b"),
-                        color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b"),
+                        color: (theme) => (theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6"),
                         "&:hover": {
                           borderColor: "#4a3f6b",
                           bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(74, 63, 107, 0.04)"),

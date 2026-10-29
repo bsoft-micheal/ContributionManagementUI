@@ -110,7 +110,7 @@ export default function AppPageLoader({ fullScreen = false, text = "Loading...",
             sx={{
               fontSize: "0.75rem",
               fontWeight: 600,
-              color: isDark ? "#e2e8f0" : "#4a3f6b",
+              color: isDark ? "#e2e8f0" : "#193b5b",
               letterSpacing: "0.02em",
             }}
           >

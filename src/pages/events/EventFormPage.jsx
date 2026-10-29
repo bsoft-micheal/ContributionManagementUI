@@ -3469,7 +3469,10 @@ export default function EventFormPage({
       {/* Top Header Banner */}
       <Box
         sx={{
-          bgcolor: "#45386d",
+          background: (theme) =>
+          theme.palette.mode === "dark"
+            ? "linear-gradient(90deg, #162538 0%, #1e3a5f 100%)"
+            : "linear-gradient(90deg, #1e5183 0%, #2968a2 100%)",
           color: "#ffffff",
           px: { xs: 2, sm: 3 },
           py: 1.4,
@@ -5716,7 +5719,7 @@ export default function EventFormPage({
           border:
             theme.palette.mode === "dark"
               ? `1px solid ${theme.palette.divider}`
-              : "1px solid rgba(74, 63, 107, 0.08)",
+              : "1px solid rgba(25, 59, 91, 0.12)",
           borderRadius: "14px",
           overflow: "hidden",
           bgcolor: (theme) => (theme.palette.mode === "dark" ? "background.paper" : "#f8f7fc"),

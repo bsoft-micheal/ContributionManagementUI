@@ -151,8 +151,8 @@ export default function AppMultiSelect({
             error
               ? `1.5px solid ${theme.palette.mode === "dark" ? "#f87171" : "#ef4444"}`
               : open && !disabled
-              ? `2px solid ${theme.palette.mode === "dark" ? "#9d8ce6" : "#6f5bd3"}`
-              : `1.5px solid ${theme.palette.mode === "dark" ? "rgba(231, 235, 247, 0.25)" : "rgba(74, 63, 107, 0.28)"}`,
+              ? `2px solid ${theme.palette.mode === "dark" ? "#5b93d3" : "#2563a6"}`
+              : `1.5px solid ${theme.palette.mode === "dark" ? "rgba(231, 235, 247, 0.25)" : "rgba(25, 59, 91, 0.25)"}`,
           cursor: disabled ? "not-allowed" : "pointer",
           opacity: disabled ? 0.75 : 1,
           transition: "all 0.15s ease",
@@ -162,7 +162,7 @@ export default function AppMultiSelect({
                 ? undefined
                 : error
                 ? theme.palette.mode === "dark" ? "#f87171" : "#ef4444"
-                : theme.palette.mode === "dark" ? "rgba(157, 140, 230, 0.75)" : "#6f5bd3",
+                : theme.palette.mode === "dark" ? "rgba(157, 140, 230, 0.75)" : "#2563a6",
           },
         }}
       >
@@ -219,7 +219,7 @@ export default function AppMultiSelect({
                       bgcolor: (theme) =>
                         theme.palette.mode === "dark"
                           ? "rgba(124, 58, 237, 0.35)"
-                          : "#4a3f6b",
+                          : "#2563a6",
                       color: "#ffffff",
                       borderRadius: "50px",
                       px: 1.4,
@@ -460,7 +460,7 @@ export default function AppMultiSelect({
                           : "rgba(74, 63, 107, 0.4)",
                       "&.Mui-checked, &.MuiCheckbox-indeterminate": {
                         color: (theme) =>
-                          theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                          theme.palette.mode === "dark" ? "#c4b5fd" : "#2563a6",
                       },
                     }}
                   />
@@ -507,7 +507,7 @@ export default function AppMultiSelect({
                               : "rgba(74, 63, 107, 0.4)",
                           "&.Mui-checked": {
                             color: (theme) =>
-                              theme.palette.mode === "dark" ? "#c4b5fd" : "#4a3f6b",
+                              theme.palette.mode === "dark" ? "#c4b5fd" : "#2563a6",
                           },
                         }}
                       />

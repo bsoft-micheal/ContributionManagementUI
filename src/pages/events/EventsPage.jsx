@@ -214,7 +214,7 @@ export default function EventsPage() {
 
   const navigate = useNavigate();
   const toast = useAppToast();
-  const actionIconColor = theme.palette.mode === "dark" ? "#ffffff" : "#4a3f6b";
+  const actionIconColor = theme.palette.mode === "dark" ? "#8bb8ec" : "#2563a6";
 
   async function loadData(targetFilters) {
     const activeFilters = targetFilters || filters;
