@@ -244,18 +244,18 @@ export function getPaymentQrConfig(eventTypeOrEvent) {
   // If no per-event-type config exists or not configured, return default fallback state
   return {
     eventType: norm || "Event",
-    receiverName: "Unit 1A Residents Association",
-    upiId: "danielrobertanto604@okicici",
-    qrReceiverName: "Unit 1A Residents Association",
-    qrUpiId: "danielrobertanto604@okicici",
+    receiverName: "",
+    upiId: "",
+    qrReceiverName: "",
+    qrUpiId: "",
     accountLabel: "",
     remarks: "",
     qrMode: "generated",
     qrImage: null,
     previewAmount: "",
     isActive: true,
-    isConfigured: true,
-    message: "",
+    isConfigured: false,
+    message: "Payment QR is not configured for this event type.",
   };
 }
 
@@ -290,14 +290,19 @@ export function generateDynamicPaymentQr({ amount, note, customConfig, eventType
   }
 
   // Dynamic UPI mode
-  const effectiveUpiId = (config.upiId || config.qrUpiId || "").trim() || "danielrobertanto604@okicici";
-  const effectiveReceiver = (config.receiverName || config.qrReceiverName || "").trim() || "Unit 1A Residents Association";
+  const effectiveUpiId = (config.upiId || config.qrUpiId || "").trim() || "";
+  const effectiveReceiver = (config.receiverName || config.qrReceiverName || "").trim() || "";
   const isConfigured = Boolean(effectiveUpiId && effectiveReceiver);
 
+  const fallbackUpiId = "payments@upi";
+  const fallbackReceiver = "Contribution Management";
+  const displayUpiId = effectiveUpiId || fallbackUpiId;
+  const displayReceiver = effectiveReceiver || fallbackReceiver;
+
   const upiUri = buildUpiPaymentUri({
-    upiId: effectiveUpiId,
-    receiverName: effectiveReceiver,
-    amount: numAmount,
+    upiId: displayUpiId,
+    receiverName: displayReceiver,
+    amount: numAmount > 0 ? numAmount : undefined,
     note: note || "Contribution Due",
   });
 
@@ -313,12 +318,12 @@ export function generateDynamicPaymentQr({ amount, note, customConfig, eventType
   return {
     upiUri,
     qrImageUrl,
-    receiverName: effectiveReceiver,
-    upiId: effectiveUpiId,
+    receiverName: effectiveReceiver || displayReceiver,
+    upiId: effectiveUpiId || displayUpiId,
     amount: numAmount,
     mode: "generated",
-    isConfigured: true,
-    message: "",
+    isConfigured,
+    message: isConfigured ? "" : "Payment QR is not configured for this event type.",
   };
 }
 
@@ -346,7 +351,7 @@ export function buildPaymentReminderEmailHtml({
   qrImageUrl,
   customSubject,
   customBody,
-  orgName = "Unit 1A Residents Association",
+  orgName = "Organization",
   eventDates,
   totalAmount,
   celebrants = [],

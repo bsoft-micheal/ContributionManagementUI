@@ -1228,7 +1228,7 @@ export default function EventsPage() {
               )}
               {row.usePreviousEventBalance && row.previousEventAdjustmentType === "DeficitRecovery" && (
                 <Typography variant="caption" sx={{ color: "#d97706", fontSize: "0.7rem", display: "block" }}>
-                  (Planned: {formatWholeCurrency(row.originalPlannedBudget || (row.baseAmount - (row.previousEventAdjustment || 0)))} + {formatWholeCurrency(row.previousEventAdjustment || 0)} Deficit)
+                  (Planned: {formatWholeCurrency(row.originalPlannedBudget || (row.baseAmount - (row.previousEventAdjustment || 0)))} + {formatWholeCurrency(row.previousEventAdjustment || 0)} Extra Amount Spend)
                 </Typography>
               )}
             </Box>

@@ -17,16 +17,87 @@ export const EMAIL_LOGS_STORAGE_KEY = "cm_email_reminder_logs";
 export const SETTINGS_STORAGE_KEY = "cm_system_settings";
 
 /**
+ * Builds HTML table for Event Details matching the UI specification.
+ */
+export function buildEventDetailsTableHtml({
+  eventName = "",
+  categoryName = "Event",
+  eventDate = "",
+  totalAmount = 0,
+  eventDescription = "",
+  contributionAmount = 0,
+  isBirthday = false,
+  celebrants = [],
+} = {}) {
+  const displayCategory = categoryName || "Event";
+  const displayEventName =
+    eventName ||
+    (displayCategory.toLowerCase().includes("birthday") || isBirthday
+      ? "Birthday Celebration"
+      : displayCategory + " Celebration");
+  const displayDate = eventDate || dayjs().endOf("month").format("DD/MM/YYYY");
+  const formattedTotal = typeof totalAmount === "number" ? formatWholeCurrency(totalAmount) : (totalAmount || "₹0");
+  const formattedContribution =
+    typeof contributionAmount === "number" ? formatWholeCurrency(contributionAmount) : (contributionAmount || "₹0");
+
+  let celebrantsHtml = "";
+  if (Array.isArray(celebrants) && celebrants.length > 0) {
+    const listHtml = celebrants
+      .map(
+        (c) =>
+          '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;color:#4a3f6b;"><span>🎂 <strong>' +
+          c.name +
+          '</strong></span><span style="color:#c026d3;">' +
+          (c.date || "") +
+          '</span></div>'
+      )
+      .join("");
+    celebrantsHtml =
+      '<div class="detail-row" style="margin-bottom:14px;border-bottom:1px dashed rgba(74,63,107,0.1);padding-bottom:14px;">' +
+      '<span class="detail-label" style="font-weight:700;color:#5b5280;display:block;margin-bottom:6px;">Birthday Celebrants &amp; Dates:</span>' +
+      '<div style="background:#fbfaff;border:1px solid #ece8f8;border-radius:6px;padding:8px 12px;">' +
+      listHtml +
+      '</div></div>';
+  }
+
+  return [
+    '<div class="details-card" style="background-color:#faf9fd;border:1px solid rgba(74,63,107,0.12);border-radius:10px;padding:18px 20px;margin:20px 0;font-size:14px;">',
+    '  <div class="detail-row" style="margin-bottom:12px;border-bottom:1px dashed rgba(74,63,107,0.1);padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;">',
+    '    <span class="detail-label" style="font-weight:700;color:#5b5280;">Event Name:</span>',
+    '    <span class="detail-value" style="font-weight:700;color:#1e1a2e;">' + displayEventName + '</span>',
+    '  </div>',
+    celebrantsHtml,
+    '  <div class="detail-row" style="margin-bottom:12px;border-bottom:1px dashed rgba(74,63,107,0.1);padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;">',
+    '    <span class="detail-label" style="font-weight:700;color:#5b5280;">Event Date:</span>',
+    '    <span class="detail-value" style="font-weight:600;color:#1e1a2e;">' + displayDate + '</span>',
+    '  </div>',
+    '  <div class="detail-row" style="margin-bottom:12px;border-bottom:1px dashed rgba(74,63,107,0.1);padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;">',
+    '    <span class="detail-label" style="font-weight:700;color:#5b5280;">Total Amount:</span>',
+    '    <span class="detail-value" style="font-weight:700;color:#1e1a2e;">' + formattedTotal + '</span>',
+    '  </div>',
+    '  <div class="detail-row" style="margin-bottom:12px;border-bottom:1px dashed rgba(74,63,107,0.1);padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;">',
+    '    <span class="detail-label" style="font-weight:700;color:#5b5280;">Description:</span>',
+    '    <span class="detail-value" style="color:#1e1a2e;">' + (eventDescription || "Sample event description entered during event creation") + '</span>',
+    '  </div>',
+    '  <div class="detail-row" style="display:flex;justify-content:space-between;align-items:center;">',
+    '    <span class="detail-label" style="font-weight:700;color:#5b5280;">Contribution Amount:</span>',
+    '    <span class="amount-highlight" style="font-size:16px;color:#2d2550;font-weight:800;background-color:#f0ecf9;padding:4px 10px;border-radius:6px;display:inline-block;">' + formattedContribution + '</span>',
+    '  </div>',
+    '</div>'
+  ].filter(Boolean).join('\n');
+}
+
+/**
  * Standard default templates per category
  */
 export const DEFAULT_CATEGORY_TEMPLATES = {
   all: {
     initialSubject: "Contribution Notice - {categoryName}",
     initialDescription:
-      "Dear {memberName},\n\nThis is a notification regarding your contribution for {categoryName} of {amount}, due by {dueDate}.\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a notification regarding your contribution for {categoryName} of {amount}, due by {dueDate}.\n\n{eventDetails}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
     reminderSubject: "Payment Reminder: Pending Contribution for {categoryName}",
     reminderDescription:
-      "Dear {memberName},\n\nThis is a friendly reminder that your contribution of {amount} for {categoryName} is still pending.\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
+      "Dear {memberName},\n\nThis is a friendly reminder that your contribution of {amount} for {categoryName} is still pending.\nDue Date: {dueDate}\n\n{eventDetails}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\n{paymentLink}\n\nThank you,\n{orgName}",
   },
 };
 
@@ -88,25 +159,41 @@ export function interpolatePlaceholders(text, data = {}) {
   const {
     memberName = "Member",
     categoryName = "Event Category",
+    eventName = "",
     eventDescription = "",
     amount = 0,
     dueDate = "",
-    orgName = "Unit 1A Residents Association",
+    orgName = "Organization",
     paymentLink = "",
     qrImageUrl = "",
+    eventDetailsHtml = "",
   } = data;
 
-  const formattedAmount = formatWholeCurrency(amount);
+  const formattedAmount = typeof amount === "number" ? formatWholeCurrency(amount) : (amount || "₹0");
   const effectiveDueDate = dueDate ? (dayjs(dueDate).isValid() ? dayjs(dueDate).format("DD/MM/YYYY") : dueDate) : "End of Month";
 
   const qrHtmlTag = qrImageUrl
     ? `<img src="${qrImageUrl}" alt="UPI Payment QR Code" width="220" height="220" style="display:block;margin:12px auto;border-radius:10px;border:1px solid #e2e8f0;" />`
     : "";
 
+  const effectiveDetailsHtml =
+    eventDetailsHtml ||
+    buildEventDetailsTableHtml({
+      eventName: eventName || categoryName,
+      categoryName,
+      eventDate: effectiveDueDate,
+      totalAmount: amount,
+      eventDescription,
+      contributionAmount: amount,
+      isBirthday: String(categoryName).toLowerCase().includes("birthday"),
+    });
+
   return text
     .replace(/\{memberName\}/g, memberName)
     .replace(/\{categoryName\}/g, categoryName)
-    .replace(/\{eventName\}/g, categoryName) // Backward compatibility
+    .replace(/\{eventName\}/g, eventName || categoryName) // Backward compatibility
+    .replace(/\{eventDetails\}/gi, effectiveDetailsHtml)
+    .replace(/\{eventTable\}/gi, effectiveDetailsHtml)
     .replace(/\{eventDescription\}/g, eventDescription)
     .replace(/\{amount\}/g, formattedAmount)
     .replace(/\{dueDate\}/g, effectiveDueDate)
@@ -187,7 +274,7 @@ export async function sendTestEmail({
   templateType = "initial",
 }) {
   const rawSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-  let orgName = "Unit 1A Residents Association";
+  let orgName = "Organization";
   try {
     if (rawSettings) {
       const parsed = JSON.parse(rawSettings);
@@ -205,106 +292,95 @@ export async function sendTestEmail({
 
   const template = resolveCategoryTemplate(categoryId, categoryName, templateType);
 
+  const isBirthday = String(categoryName || "").toLowerCase().includes("birthday");
+  const eventDatesDisplay = dayjs().add(15, "day").format("DD/MM/YYYY");
+  const formattedAmount = formatWholeCurrency(testAmount);
+
+  const eventDetailsHtml = buildEventDetailsTableHtml({
+    eventName: isBirthday ? "Birthday Celebration" : ((categoryName || "Event") + " Celebration"),
+    categoryName,
+    eventDate: eventDatesDisplay,
+    totalAmount: testAmount,
+    eventDescription: "Sample event description entered during event creation",
+    contributionAmount: testAmount,
+    isBirthday,
+  });
+
   const placeholderData = {
-    memberName: "Alex Morgan",
-    categoryName: categoryName || "Birthday",
+    memberName: "Member",
+    categoryName: categoryName || "Event",
     eventDescription: "Sample event description entered during event creation",
     amount: testAmount,
-    dueDate: dayjs().add(15, "day").format("DD/MM/YYYY"),
+    dueDate: eventDatesDisplay,
     orgName,
     paymentLink: upiUri,
     qrImageUrl,
+    eventDetailsHtml,
   };
 
   const subject = interpolatePlaceholders(template.subject, placeholderData);
   const bodyText = interpolatePlaceholders(template.description, placeholderData);
 
-  const formattedAmount = formatWholeCurrency(testAmount);
-  const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${subject}</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; color: #1e293b; }
-    .email-container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
-    .header { background: linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%); padding: 24px; text-align: center; color: #ffffff; }
-    .content { padding: 26px 22px; }
-    .details-card { background-color: #faf9fd; border: 1px solid rgba(74, 63, 107, 0.12); border-radius: 10px; padding: 20px; margin-bottom: 22px; font-size: 14px; }
-    .detail-row { margin-bottom: 14px; border-bottom: 1px dashed rgba(74, 63, 107, 0.1); padding-bottom: 14px; }
-    .detail-row:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
-    .detail-label { font-weight: 700; color: #5b5280; display: inline-block; width: 160px; }
-    .detail-value { color: #1e1a2e; display: inline-block; }
-    .amount-highlight { font-size: 18px; color: #2d2550; font-weight: 800; background-color: #f0ecf9; padding: 4px 10px; border-radius: 6px; display: inline-block; }
-  </style>
-</head>
-<body>
-  <div class="email-container">
-    <div class="header">
-      <span style="display:inline-block;padding:3px 10px;background:rgba(255,255,255,0.2);border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">TEST EMAIL PREVIEW</span>
-      <h2 style="margin:0;font-size:19px;font-weight:700;">${subject}</h2>
-      <p style="margin:4px 0 0 0;font-size:12px;opacity:0.9;">Category: <strong>${categoryName || "Category"}</strong> | ${orgName}</p>
-    </div>
-    <div class="content">
-      <div style="font-size:14px;line-height:1.7;color:#334155;white-space:pre-line;margin-bottom:20px;">
-        ${bodyText}
-      </div>
+  const hasEmbeddedDetails = /\{eventDetails\}|\{eventTable\}/i.test(template.description || "");
+  const qrEmbedded = /\{qrCode\}/i.test(template.description || "");
+  const paymentLinkEmbedded = /\{paymentLink\}/i.test(template.description || "");
 
-      <div class="details-card">
-        <div class="detail-row">
-          <span class="detail-label">Event Name:</span>
-          <span class="detail-value" style="font-weight: 700;">${isBirthday ? "Birthday Celebration" : `${categoryName} Celebration`}</span>
-        </div>
-        ${celebrantsHtml}
-        <div class="detail-row">
-          <span class="detail-label">${isBirthday ? "Event Date:" : "Event Date:"}</span>
-          <span class="detail-value" style="font-weight: 600;">${eventDatesDisplay}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Total Amount:</span>
-          <span class="detail-value" style="font-weight: 700;">${totalAmountDisplay}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Description:</span>
-          <span class="detail-value">${placeholderData.eventDescription || ""}</span>
-        </div>
-        <div class="detail-row" style="display: flex; justify-content: space-between; align-items: center;">
-          <span class="detail-label">Contribution Amount:</span>
-          <span class="amount-highlight">${displayAmount}</span>
-        </div>
-      </div>
+  const fallbackQrBlock = qrEmbedded ? "" : (
+    '<div style="text-align:center;margin-bottom:20px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:14px;padding:18px;">' +
+    '<p style="margin:0 0 10px 0;font-size:13px;font-weight:700;color:#4a3f6b;">Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm):</p>' +
+    '<div style="display:inline-block;padding:10px;background:#ffffff;border:2px solid #7c3aed;border-radius:12px;box-shadow:0 4px 12px rgba(124,58,237,0.12);">' +
+    '<img src="' + qrImageUrl + '" alt="Payment QR Code" width="170" height="170" style="display:block;margin:0 auto;border-radius:6px;" />' +
+    '</div>' +
+    '<p style="margin:6px 0 0 0;font-size:11px;color:#64748b;">UPI ID: <strong>' + upiId + '</strong> (' + receiverName + ')</p>' +
+    '</div>'
+  );
 
-      ${!qrEmbedded ? `
-      <div style="text-align:center;margin-bottom:20px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:14px;padding:18px;">
-        <p style="margin:0 0 10px 0;font-size:13px;font-weight:700;color:#4a3f6b;">Scan QR to Pay via Any UPI App (GPay / PhonePe / Paytm):</p>
-        <div style="display:inline-block;padding:10px;background:#ffffff;border:2px solid #7c3aed;border-radius:12px;box-shadow:0 4px 12px rgba(124,58,237,0.12);">
-          <img src="${qrImageUrl}" alt="Payment QR Code" width="170" height="170" style="display:block;margin:0 auto;border-radius:6px;" />
-        </div>
-        <p style="margin:6px 0 0 0;font-size:11px;color:#64748b;">UPI ID: <strong>${upiId}</strong> (${receiverName})</p>
-      </div>
-      ` : ''}
+  const fallbackPayLinkBlock = paymentLinkEmbedded ? "" : (
+    '<div style="text-align:center;margin: 20px 0 10px 0;">' +
+    '<a href="' + upiUri + '" style="background:linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%);color:#ffffff !important;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Go to Contribution Page &amp; Pay</a>' +
+    '</div>'
+  );
 
-      ${!paymentLinkEmbedded ? `
-      <div style="text-align:center;margin: 20px 0 10px 0;">
-        <a href="${upiUri}" style="background:linear-gradient(135deg, #4a3f6b 0%, #2d2550 100%);color:#ffffff !important;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Go to Contribution Page &amp; Pay</a>
-      </div>
-      ` : ''}
-    </div>
-    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px;text-align:center;font-size:11px;color:#94a3b8;">
-      This is a test notification generated from System Settings (${templateType === "initial" ? "Initial Template" : "Reminder Template"}).
-    </div>
-  </div>
-</body>
-</html>
-  `.trim();
+  const htmlContent = [
+    '<!DOCTYPE html>',
+    '<html>',
+    '<head>',
+    '  <meta charset="utf-8">',
+    '  <title>' + subject + '</title>',
+    '  <style>',
+    '    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; color: #1e293b; }',
+    '    .email-container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }',
+    '    .header { background: linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%); padding: 24px; text-align: center; color: #ffffff; }',
+    '    .content { padding: 26px 22px; }',
+    '  </style>',
+    '</head>',
+    '<body>',
+    '  <div class="email-container">',
+    '    <div class="header">',
+    '      <span style="display:inline-block;padding:3px 10px;background:rgba(255,255,255,0.2);border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">TEST EMAIL PREVIEW</span>',
+    '      <h2 style="margin:0;font-size:19px;font-weight:700;">' + subject + '</h2>',
+    '      <p style="margin:4px 0 0 0;font-size:12px;opacity:0.9;">Category: <strong>' + (categoryName || "Category") + '</strong> | ' + orgName + '</p>',
+    '    </div>',
+    '    <div class="content">',
+    '      <div style="font-size:14px;line-height:1.7;color:#334155;white-space:pre-line;margin-bottom:20px;">' + bodyText + '</div>',
+    hasEmbeddedDetails ? '' : eventDetailsHtml,
+    fallbackQrBlock,
+    fallbackPayLinkBlock,
+    '    </div>',
+    '    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px;text-align:center;font-size:11px;color:#94a3b8;">',
+    '      This is a test notification generated from System Settings (' + (templateType === "initial" ? "Initial Template" : "Reminder Template") + ').',
+    '    </div>',
+    '  </div>',
+    '</body>',
+    '</html>'
+  ].filter(Boolean).join('\n').trim();
 
   // Dispatch via sendPaymentReminder API
   const res = await sendPaymentReminder({
     memberId: "test-preview-id",
-    memberName: "Alex Morgan (Test)",
+    memberName: "Member (Test)",
     recipientEmail: recipientEmail || "admin@example.com",
-    categoryName: categoryName || "Birthday",
+    categoryName: categoryName || "Event",
     amount: testAmount,
     upiId,
     receiverName,
@@ -318,9 +394,9 @@ export async function sendTestEmail({
   logEmailReminder({
     contributionId: "test",
     memberId: "test-preview-id",
-    memberName: "Alex Morgan",
+    memberName: "Member",
     recipientEmail: recipientEmail || "admin@example.com",
-    categoryName: categoryName || "Birthday",
+    categoryName: categoryName || "Event",
     eventName: "Test Event",
     amount: testAmount,
     stage: templateType === "initial" ? "Initial Email (Test)" : "Reminder (Test)",
@@ -351,7 +427,7 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
     enableReminderEmail: true,
     reminderIntervalDays: 10,
     maxReminders: 3,
-    orgName: "Unit 1A Residents Association",
+    orgName: "Organization",
   };
 
   try {
@@ -506,6 +582,16 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
       .replace(/<!--contrib:[\s\S]*?-->/gi, "")
       .trim();
 
+    const eventDetailsHtml = buildEventDetailsTableHtml({
+      eventName: evt?.eventName || (categoryName + " Celebration"),
+      categoryName,
+      eventDate: evt?.eventDate || dayjs().endOf("month").format("DD/MM/YYYY"),
+      totalAmount: evt?.baseAmount || amount,
+      eventDescription: cleanEventDescription,
+      contributionAmount: amount,
+      isBirthday: String(categoryName).toLowerCase().includes("birthday"),
+    });
+
     const placeholderData = {
       memberName,
       categoryName,
@@ -515,46 +601,54 @@ export async function evaluateAndRunScheduler(forcedDay = null) {
       orgName: settings.orgName,
       paymentLink: upiUri,
       qrImageUrl,
+      eventDetailsHtml,
     };
 
     const subject = interpolatePlaceholders(template.subject, placeholderData);
     const bodyText = interpolatePlaceholders(template.description, placeholderData);
 
-    const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>${subject}</title></head>
-<body style="font-family:'Segoe UI',Arial,sans-serif;background-color:#f4f6f9;margin:0;padding:24px;color:#1e293b;">
-  <div style="max-width:540px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">
-    <div style="background:linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%);padding:22px;text-align:center;color:#ffffff;">
-      <h2 style="margin:0;font-size:19px;font-weight:700;">${subject}</h2>
-      <p style="margin:4px 0 0 0;font-size:12px;opacity:0.9;">${settings.orgName}</p>
-    </div>
-    <div style="padding:26px 22px;">
-      <div style="font-size:14px;line-height:1.7;color:#334155;white-space:pre-line;margin-bottom:20px;">
-        ${bodyText}
-      </div>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px;">
-        <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:4px;">Pending Amount</span>
-        <span style="font-size:26px;font-weight:800;color:#0284c7;">${formatWholeCurrency(amount)}</span>
-      </div>
-      <div style="text-align:center;margin-bottom:20px;">
-        <div style="display:inline-block;padding:10px;background:#ffffff;border:2px solid #0284c7;border-radius:12px;box-shadow:0 4px 12px rgba(2,132,199,0.1);">
-          <img src="${qrImageUrl}" alt="Payment QR Code" width="180" height="180" style="display:block;margin:0 auto;" />
-        </div>
-        <p style="margin:6px 0 0 0;font-size:11px;color:#64748b;">UPI ID: <strong>${upiId}</strong> (${receiverName})</p>
-      </div>
-      <div style="text-align:center;">
-        <a href="${upiUri}" style="background-color:#0284c7;color:#ffffff;text-decoration:none;padding:11px 24px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Pay ${formatWholeCurrency(amount)} via UPI</a>
-      </div>
-    </div>
-    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px;text-align:center;font-size:11px;color:#94a3b8;">
-      Please ignore this email if you have already completed payment.
-    </div>
-  </div>
-</body>
-</html>
-    `.trim();
+    const hasEmbeddedDetails = /\{eventDetails\}|\{eventTable\}/i.test(template.description || "");
+    const qrEmbedded = /\{qrCode\}/i.test(template.description || "");
+    const paymentLinkEmbedded = /\{paymentLink\}/i.test(template.description || "");
+
+    const fallbackDetails = hasEmbeddedDetails ? "" : eventDetailsHtml;
+    const fallbackQr = qrEmbedded ? "" : (
+      '<div style="text-align:center;margin-bottom:20px;">' +
+      '<div style="display:inline-block;padding:10px;background:#ffffff;border:2px solid #0284c7;border-radius:12px;box-shadow:0 4px 12px rgba(2,132,199,0.1);">' +
+      '<img src="' + qrImageUrl + '" alt="Payment QR Code" width="180" height="180" style="display:block;margin:0 auto;" />' +
+      '</div>' +
+      '<p style="margin:6px 0 0 0;font-size:11px;color:#64748b;">UPI ID: <strong>' + upiId + '</strong> (' + receiverName + ')</p>' +
+      '</div>'
+    );
+    const fallbackLink = paymentLinkEmbedded ? "" : (
+      '<div style="text-align:center;">' +
+      '<a href="' + upiUri + '" style="background-color:#0284c7;color:#ffffff;text-decoration:none;padding:11px 24px;border-radius:8px;font-weight:700;font-size:13px;display:inline-block;">Pay ' + formatWholeCurrency(amount) + ' via UPI</a>' +
+      '</div>'
+    );
+
+    const emailHtml = [
+      '<!DOCTYPE html>',
+      '<html>',
+      '<head><meta charset="utf-8"><title>' + subject + '</title></head>',
+      '<body style="font-family:\'Segoe UI\',Arial,sans-serif;background-color:#f4f6f9;margin:0;padding:24px;color:#1e293b;">',
+      '  <div style="max-width:540px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">',
+      '    <div style="background:linear-gradient(135deg, #1e1a2e 0%, #4a3f6b 100%);padding:22px;text-align:center;color:#ffffff;">',
+      '      <h2 style="margin:0;font-size:19px;font-weight:700;">' + subject + '</h2>',
+      '      <p style="margin:4px 0 0 0;font-size:12px;opacity:0.9;">' + settings.orgName + '</p>',
+      '    </div>',
+      '    <div style="padding:26px 22px;">',
+      '      <div style="font-size:14px;line-height:1.7;color:#334155;white-space:pre-line;margin-bottom:20px;">' + bodyText + '</div>',
+      fallbackDetails,
+      fallbackQr,
+      fallbackLink,
+      '    </div>',
+      '    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px;text-align:center;font-size:11px;color:#94a3b8;">',
+      '      Please ignore this email if you have already completed payment.',
+      '    </div>',
+      '  </div>',
+      '</body>',
+      '</html>'
+    ].filter(Boolean).join('\n');
 
     try {
       await sendPaymentReminder({

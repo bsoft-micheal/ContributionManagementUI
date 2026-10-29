@@ -4798,19 +4798,6 @@ export default function EventFormPage({
                           >
                             Adjust using previous event balance
                           </Typography>
-                          <Chip
-                            size="small"
-                            label={prevAdjType === "DeficitRecovery" ? "Deficit Recovery" : "Surplus Credit"}
-                            sx={{
-                              height: 20,
-                              fontSize: "0.68rem",
-                              fontWeight: 700,
-                              bgcolor: prevAdjType === "DeficitRecovery" ? "#fef3c7" : "#dcfce7",
-                              color: prevAdjType === "DeficitRecovery" ? "#92400e" : "#166534",
-                              border: "1px solid",
-                              borderColor: prevAdjType === "DeficitRecovery" ? "#fde68a" : "#bbf7d0",
-                            }}
-                          />
                         </Box>
                         <Typography
                           sx={{
@@ -4821,7 +4808,7 @@ export default function EventFormPage({
                           }}
                         >
                           {prevAdjType === "DeficitRecovery"
-                            ? `The net Amount In Hand is negative (-₹${formatWholeNumber(Math.abs(rawHandAmt))}) from previous spending${prevEventName ? ` (${prevEventName})` : ""}. Checking this adds the ₹${formatWholeNumber(eligibleAdjAmount)} deficit to this event's budget so it is recovered from member contributions.`
+                            ? `The net Amount In Hand is negative (-₹${formatWholeNumber(Math.abs(rawHandAmt))}) from previous spending${prevEventName ? ` (${prevEventName})` : ""}. Checking this adds the ₹${formatWholeNumber(eligibleAdjAmount)} extra amount spend to this event's budget so it is recovered from member contributions.`
                             : `A net surplus of ₹${formatWholeNumber(eligibleAdjAmount)} is available from collections exceeding pending dues. Checking this applies the surplus credit to reduce member contributions.`}
                         </Typography>
                       </Box>
@@ -4885,7 +4872,7 @@ export default function EventFormPage({
                         {/* Adjustment Amount */}
                         <Box sx={{ textAlign: "center" }}>
                           <Typography sx={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 500, mb: 0.2 }}>
-                            {prevAdjType === "DeficitRecovery" ? "Previous Deficit" : "Surplus Credit"}
+                            {prevAdjType === "DeficitRecovery" ? "Extra Amount Spend" : "Surplus Credit"}
                           </Typography>
                           <Typography
                             sx={{

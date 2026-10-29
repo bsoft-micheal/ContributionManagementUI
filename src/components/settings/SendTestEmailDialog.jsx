@@ -27,6 +27,7 @@ import {
   generateDynamicPaymentQr,
 } from "../../utils/upiQrHelper";
 import { validateEmail } from "../../utils/validation";
+import { formatWholeCurrency } from "../../utils/roundingHelper";
 
 export default function SendTestEmailDialog({
   open,
@@ -62,7 +63,7 @@ export default function SendTestEmailDialog({
 
   // Selected category name
   const currentCategoryOption = categoryOptions.find((c) => String(c.value) === String(categoryId));
-  const categoryName = currentCategoryOption?.label?.replace(" (Default Template)", "") || "Birthday";
+  const categoryName = currentCategoryOption?.label?.replace(" (Default Template)", "") || "Event";
 
   // Resolve template
   const template = resolveCategoryTemplate(categoryId, categoryName, templateType);
@@ -77,12 +78,12 @@ export default function SendTestEmailDialog({
   });
 
   const previewData = {
-    memberName: "Alex Morgan",
+    memberName: "Member",
     categoryName,
     eventDescription: "Sample event description entered during event creation",
     amount: testAmount,
     dueDate: "15th of this month",
-    orgName: "Unit 1A Residents Association",
+    orgName: "Organization",
     paymentLink: upiUri,
     qrImageUrl,
   };
@@ -291,10 +292,7 @@ export default function SendTestEmailDialog({
                     }}
                   >
                     {[
-                      { name: "Leo Albert L", date: "October 05, 2026" },
-                      { name: "Kaviarasan K", date: "October 08, 2026" },
-                      { name: "Christy Chandran R", date: "October 09, 2026" },
-                      { name: "testerr", date: "October 18, 2026" },
+                      { name: previewData.memberName || "Sample Member", date: previewData.dueDate || "End of Month" },
                     ].map((c, i, arr) => (
                       <Box
                         key={c.name}
@@ -325,7 +323,7 @@ export default function SendTestEmailDialog({
                   Event Date:
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? "#ffffff" : "#1e1a2e" }}>
-                  {categoryName.toLowerCase().includes("birthday") ? "5 Oct, 10 Oct (2), 19 Oct" : previewData.dueDate}
+                  {previewData.dueDate}
                 </Typography>
               </Box>
 
@@ -335,7 +333,7 @@ export default function SendTestEmailDialog({
                   Total Amount:
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#ffffff" : "#1e1a2e" }}>
-                  {categoryName.toLowerCase().includes("birthday") ? "Rs.6250.00 (4 celebrants combined)" : "Rs.5000.00"}
+                  {formatWholeCurrency(testAmount)}
                 </Typography>
               </Box>
 
@@ -366,7 +364,7 @@ export default function SendTestEmailDialog({
                     letterSpacing: "0.02em",
                   }}
                 >
-                  {categoryName.toLowerCase().includes("birthday") ? "₹135.87" : `₹${testAmount}`}
+                  {formatWholeCurrency(testAmount)}
                 </Box>
               </Box>
             </Box>
