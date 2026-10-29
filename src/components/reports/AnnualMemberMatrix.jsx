@@ -764,7 +764,7 @@ export default function AnnualMemberMatrix({
         placement="top"
         enterDelay={150}
         leaveDelay={250}
-        interactive
+        disableInteractive={false}
         slotProps={{
           popper: {
             sx: {

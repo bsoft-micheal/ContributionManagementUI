@@ -64,7 +64,7 @@ export const COMMON_STRINGS = {
     REMAINING_AMOUNT: "Amount In Hand",
   },
   EXPENSES: {
-    EXPECTED_BUDGET: "Expected Budget",
+    EXPECTED_BUDGET: "Total Amount",
     TOTAL_SPENT: "Total Spent",
     ALREADY_SPENT: "Already Spent",
     REMAINING_BUDGET: "Remaining Budget",

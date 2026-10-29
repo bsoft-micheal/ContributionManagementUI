@@ -404,10 +404,11 @@ export default function ExpenseFormDialog({
 
     const expected = roundToWhole(
       Number(
+        targetEv.originalPlannedBudget ??
+        targetEv.baseAmount ??
         targetEv.totalExpectedAmount ??
         targetEv.expectedAmount ??
         targetEv.expectedCollection ??
-        targetEv.baseAmount ??
         0
       )
     );
@@ -1052,7 +1053,7 @@ export default function ExpenseFormDialog({
                       color="text.secondary"
                       sx={{ display: "block", fontSize: "0.7rem", fontWeight: 700 }}
                     >
-                      {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Expected Budget"}
+                      {COMMON_STRINGS.EXPENSES?.EXPECTED_BUDGET || "Total Amount"}
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.main" }}>
                       {formatWholeCurrency(liveBudgetMetrics.expected)}
