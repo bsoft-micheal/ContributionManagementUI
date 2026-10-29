@@ -52,6 +52,7 @@ import {
   savePaymentQrConfigForEventType,
   normalizeEventTypeName,
   getPaymentQrConfig,
+  EVENT_QR_STORAGE_KEY,
 } from "../../utils/upiQrHelper";
 import { formatGridDate } from "../../utils/dateHelper";
 
@@ -77,9 +78,18 @@ import {
 } from "../../services/settingsService";
 import { getEventTypesAsync } from "../../services/eventTypeService";
 import { getUsersAsync } from "../../services/userService";
+import { getHangfireDashboardUrl } from "../../services/apiClient";
 import SendTestEmailDialog from "../../components/settings/SendTestEmailDialog";
 import EmailReminderLogsDialog from "../../components/settings/EmailReminderLogsDialog";
-import { TOAST_MESSAGES, COMMON_STRINGS } from "../../constants";
+import {
+  TOAST_MESSAGES,
+  COMMON_STRINGS,
+  MENU_FEATURE_IDS,
+  SETTINGS_STORAGE_KEYS,
+  SETTINGS_VALIDATION_LIMITS,
+  SETTINGS_DEFAULTS,
+} from "../../constants";
+import defaultPaymentQrPlaceholder from "../../assets/defaultPaymentQr";
 import {
   DEFAULT_CATEGORY_TEMPLATES,
   getCategoryTemplates,
@@ -88,42 +98,13 @@ import {
   interpolatePlaceholders,
 } from "../../services/emailReminderScheduler";
 
-const defaultPaymentQr = `data:image/svg+xml;utf8,${encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <rect width="100" height="100" fill="#ffffff"/>
-  <rect x="10" y="10" width="28" height="28" fill="#1e1a2e" rx="4"/>
-  <rect x="14" y="14" width="20" height="20" fill="#ffffff" rx="2"/>
-  <rect x="18" y="18" width="12" height="12" fill="#0284c7" rx="2"/>
-  <rect x="62" y="10" width="28" height="28" fill="#1e1a2e" rx="4"/>
-  <rect x="66" y="14" width="20" height="20" fill="#ffffff" rx="2"/>
-  <rect x="70" y="18" width="12" height="12" fill="#0284c7" rx="2"/>
-  <rect x="10" y="62" width="28" height="28" fill="#1e1a2e" rx="4"/>
-  <rect x="14" y="66" width="20" height="20" fill="#ffffff" rx="2"/>
-  <rect x="18" y="70" width="12" height="12" fill="#0284c7" rx="2"/>
-  <rect x="44" y="12" width="6" height="6" fill="#1e1a2e"/>
-  <rect x="52" y="12" width="5" height="10" fill="#1e1a2e"/>
-  <rect x="44" y="24" width="10" height="6" fill="#0284c7"/>
-  <rect x="12" y="44" width="6" height="10" fill="#1e1a2e"/>
-  <rect x="22" y="44" width="8" height="6" fill="#0284c7"/>
-  <rect x="34" y="44" width="12" height="12" fill="#1e1a2e"/>
-  <rect x="50" y="40" width="10" height="10" fill="#1e1a2e"/>
-  <rect x="64" y="44" width="8" height="6" fill="#0284c7"/>
-  <rect x="76" y="44" width="12" height="10" fill="#1e1a2e"/>
-  <rect x="44" y="62" width="6" height="14" fill="#0284c7"/>
-  <rect x="54" y="62" width="8" height="8" fill="#1e1a2e"/>
-  <rect x="66" y="60" width="10" height="12" fill="#1e1a2e"/>
-  <rect x="80" y="62" width="8" height="8" fill="#0284c7"/>
-  <rect x="44" y="80" width="12" height="8" fill="#1e1a2e"/>
-  <rect x="60" y="76" width="14" height="6" fill="#0284c7"/>
-  <rect x="78" y="76" width="10" height="12" fill="#1e1a2e"/>
-</svg>
-`)}`;
+const defaultPaymentQr = defaultPaymentQrPlaceholder;
 
 const isGuid = (val) => Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val).trim()));
 
 const initialSettings = {
   // General & Notifications
-  orgName: "Unit 1A Residents Association",
+  orgName: "",
   birthdayMembersExempt: false,
   allowedMultipleEvent: false,
   allowMultipleEvents: false,
@@ -138,21 +119,21 @@ const initialSettings = {
   categoryTemplates: DEFAULT_CATEGORY_TEMPLATES,
   enableMonthlyEmail: true,
   enableReminderEmail: true,
-  reminderIntervalDays: "10",
-  reminderIntervalValue: "10",
-  reminderIntervalUnit: "Days",
-  maxReminders: "3",
+  reminderIntervalDays: SETTINGS_DEFAULTS.REMINDER_INTERVAL_DAYS,
+  reminderIntervalValue: SETTINGS_DEFAULTS.REMINDER_INTERVAL_VALUE,
+  reminderIntervalUnit: SETTINGS_DEFAULTS.REMINDER_INTERVAL_UNIT,
+  maxReminders: SETTINGS_DEFAULTS.MAX_REMINDERS,
 
   // OTP / 2FA
-  otpExpiry: "10",
-  maxRetry: "3",
+  otpExpiry: SETTINGS_DEFAULTS.OTP_EXPIRY,
+  maxRetry: SETTINGS_DEFAULTS.MAX_RETRY,
   enableOtpLogin: true,
   enable2faAdmin: false,
 
   // Payment QR
   qrReceiverName: "",
   qrUpiId: "",
-  qrMode: "generated", // "generated" | "uploaded"
+  qrMode: SETTINGS_DEFAULTS.QR_MODE_GENERATED, // "generated" | "uploaded"
   qrPreviewAmount: "",
   qrImage: null,
   paymentQrConfigs: {},
@@ -164,12 +145,12 @@ export default function SettingsPage() {
   const isDark = theme.palette.mode === "dark";
   const { authState } = useAuth();
   const { canEdit } = useAccessByLocation();
-  const canUpdateSettings = hasActionPermission("Update Settings", 80, authState?.role).canExecute;
+  const canUpdateSettings = hasActionPermission("Update Settings", MENU_FEATURE_IDS.SETTINGS, authState?.role).canExecute;
   const hasWriteAccess = canUpdateSettings && canEdit;
   const isMemberRole = String(authState?.role || authState?.user?.role || "").toLowerCase().trim() === "member";
 
   const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem("cm_system_settings");
+    const saved = localStorage.getItem(SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -203,7 +184,7 @@ export default function SettingsPage() {
   const [categoriesList, setCategoriesList] = useState([]);
   const [usersList, setUsersList] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(() => {
-    const saved = localStorage.getItem("cm_system_settings");
+    const saved = localStorage.getItem(SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -251,13 +232,8 @@ export default function SettingsPage() {
     try {
       const raw = localStorage.getItem(EVENT_QR_STORAGE_KEY);
       if (raw) {
-        // Purge any legacy hardcoded mock configs if present
-        if (raw.includes("johnsycharles3") || raw.includes("sylvester@okicici") || raw.includes("Michael@okicici")) {
-          localStorage.removeItem(EVENT_QR_STORAGE_KEY);
-          return {};
-        }
         const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") {
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           return parsed;
         }
       }
@@ -293,7 +269,7 @@ export default function SettingsPage() {
       return {
         receiverName: "",
         upiId: "",
-        qrMode: "generated",
+        qrMode: SETTINGS_DEFAULTS.QR_MODE_GENERATED,
         qrImage: null,
         accountLabel: "",
         remarks: "",
@@ -303,7 +279,7 @@ export default function SettingsPage() {
     }
     const found = eventPaymentQrConfigs[selectedQrEventType];
     if (found) {
-      const mode = (found.qrMode || "generated").toLowerCase() === "uploaded" ? "uploaded" : "generated";
+      const mode = (found.qrMode || SETTINGS_DEFAULTS.QR_MODE_GENERATED).toLowerCase() === "uploaded" ? "uploaded" : "generated";
       return {
         receiverName: mode === "uploaded" ? "" : (found.receiverName || ""),
         upiId: mode === "uploaded" ? "" : (found.upiId || ""),
@@ -311,14 +287,14 @@ export default function SettingsPage() {
         qrImage: mode === "uploaded" ? (found.qrImage || null) : null,
         accountLabel: found.accountLabel || "",
         remarks: found.remarks || "",
-        previewAmount: found.previewAmount === "100" ? "" : (found.previewAmount || ""),
+        previewAmount: found.previewAmount ? String(found.previewAmount).trim() : "",
         isActive: found.isActive !== undefined ? found.isActive : true,
       };
     }
     return {
       receiverName: "",
       upiId: "",
-      qrMode: "generated",
+      qrMode: SETTINGS_DEFAULTS.QR_MODE_GENERATED,
       qrImage: null,
       accountLabel: "",
       remarks: "",
@@ -327,7 +303,7 @@ export default function SettingsPage() {
     };
   }, [eventPaymentQrConfigs, selectedQrEventType]);
 
-  const isUploadedMode = (currentQrConfig.qrMode || "generated") === "uploaded";
+  const isUploadedMode = (currentQrConfig.qrMode || SETTINGS_DEFAULTS.QR_MODE_GENERATED) === "uploaded";
 
   const isCurrentConfigured = isUploadedMode
     ? Boolean(currentQrConfig.qrImage)
@@ -344,8 +320,8 @@ export default function SettingsPage() {
     ? ""
     : !currentQrConfig.upiId?.trim()
       ? (COMMON_STRINGS?.VALIDATION?.REQUIRED_FIELD || "This field is required")
-      : currentQrConfig.upiId.length > 50
-        ? "UPI ID cannot exceed 50 characters."
+      : currentQrConfig.upiId.length > SETTINGS_VALIDATION_LIMITS.UPI_ID_MAX_LENGTH
+        ? `UPI ID cannot exceed ${SETTINGS_VALIDATION_LIMITS.UPI_ID_MAX_LENGTH} characters.`
         : !upiValidation.isValid
           ? (upiValidation.error || "Enter a valid UPI ID.")
           : "";
@@ -354,8 +330,8 @@ export default function SettingsPage() {
     ? ""
     : !currentQrConfig.receiverName?.trim()
       ? (COMMON_STRINGS?.VALIDATION?.REQUIRED_FIELD || "This field is required")
-      : currentQrConfig.receiverName.length > 150
-        ? "Receiver name cannot exceed 150 characters."
+      : currentQrConfig.receiverName.length > SETTINGS_VALIDATION_LIMITS.RECEIVER_NAME_MAX_LENGTH
+        ? `Receiver name cannot exceed ${SETTINGS_VALIDATION_LIMITS.RECEIVER_NAME_MAX_LENGTH} characters.`
         : "";
 
   const liveUpiUri = !isUploadedMode && isCurrentConfigured
@@ -395,8 +371,15 @@ export default function SettingsPage() {
   }, [usersList]);
 
   const currentUserName = useMemo(() => {
-    return authState?.fullName || authState?.username || authState?.name || authState?.user?.fullName || authState?.user?.username || "Daniel";
-  }, [authState]);
+    return (
+      authState?.fullName?.trim() ||
+      authState?.username?.trim() ||
+      authState?.name?.trim() ||
+      authState?.user?.fullName?.trim() ||
+      authState?.user?.username?.trim() ||
+      (isMemberRole ? SETTINGS_DEFAULTS.FALLBACK_USER_NAME : "Admin")
+    );
+  }, [authState, isMemberRole]);
 
   const resolveUserName = (rawCreatedBy) => {
     if (!rawCreatedBy || rawCreatedBy === "--") {
@@ -661,28 +644,36 @@ export default function SettingsPage() {
     [selectedQrEventType]
   );
 
+  const sanitizeTemplateDesc = (desc) => {
+    if (!desc) return desc;
+    if (desc.includes("{eventDescription}") && !desc.includes("{eventDetails}") && !desc.includes("{eventTable}")) {
+      return desc.replace("{eventDescription}", "{eventDetails}");
+    }
+    return desc;
+  };
+
   // Helper to load template for given category and type
   const loadTemplateForCategoryAndType = (catId, tType, currentSettings = settings, catList = categoriesList) => {
-    const foundCat = catList.find((c) => String(c.eventTypeId) === String(catId));
+    const foundCat = catList.find((c) => String(c.eventTypeId || c.id) === String(catId));
     const catName = foundCat?.eventTypeName || "";
 
     const custom = currentSettings.categoryTemplates?.[catId];
     if (custom) {
       if (tType === "initial" && (custom.initialSubject || custom.initialDescription)) {
         setTemplateSubject(custom.initialSubject || "");
-        setTemplateDescription(custom.initialDescription || "");
+        setTemplateDescription(sanitizeTemplateDesc(custom.initialDescription || ""));
         return;
       }
       if (tType === "reminder" && (custom.reminderSubject || custom.reminderDescription)) {
         setTemplateSubject(custom.reminderSubject || "");
-        setTemplateDescription(custom.reminderDescription || "");
+        setTemplateDescription(sanitizeTemplateDesc(custom.reminderDescription || ""));
         return;
       }
     }
 
     const resolved = resolveCategoryTemplate(catId, catName, tType);
     setTemplateSubject(resolved.subject);
-    setTemplateDescription(resolved.description);
+    setTemplateDescription(sanitizeTemplateDesc(resolved.description));
   };
 
   // Load categories list for the Email Template selector
@@ -722,8 +713,8 @@ export default function SettingsPage() {
       try {
         const data = await getSystemSettingsAsync();
         if (data && typeof data === "object") {
-          const localSaved = localStorage.getItem("cm_system_settings");
-          let localMode = "generated";
+          const localSaved = localStorage.getItem(SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS);
+          let localMode = SETTINGS_DEFAULTS.QR_MODE_GENERATED;
           let backendCategoryTemplates = null;
           if (data.categoryTemplates) {
             try {
@@ -738,10 +729,10 @@ export default function SettingsPage() {
               ? { ...DEFAULT_CATEGORY_TEMPLATES, ...backendCategoryTemplates }
               : DEFAULT_CATEGORY_TEMPLATES;
 
-          let localReminderIntervalDays = data.reminderIntervalDays ? String(data.reminderIntervalDays) : "10";
+          let localReminderIntervalDays = data.reminderIntervalDays ? String(data.reminderIntervalDays) : SETTINGS_DEFAULTS.REMINDER_INTERVAL_DAYS;
           let localReminderIntervalValue = data.reminderIntervalValue ? String(data.reminderIntervalValue) : localReminderIntervalDays;
-          let localReminderIntervalUnit = data.reminderIntervalUnit || "Days";
-          let localMaxReminders = data.maxReminders ? String(data.maxReminders) : "3";
+          let localReminderIntervalUnit = data.reminderIntervalUnit || SETTINGS_DEFAULTS.REMINDER_INTERVAL_UNIT;
+          let localMaxReminders = data.maxReminders ? String(data.maxReminders) : SETTINGS_DEFAULTS.MAX_REMINDERS;
           let localBirthdayMembersExempt = undefined;
           let localAllowedMultipleEvent = undefined;
           let localSelectedCategoryId = data.selectedTemplateCategoryId || "all";
@@ -823,7 +814,7 @@ export default function SettingsPage() {
           setSettings(merged);
           setSelectedCategoryId(localSelectedCategoryId);
           loadTemplateForCategoryAndType(localSelectedCategoryId, "initial", merged, categoriesList);
-          localStorage.setItem("cm_system_settings", JSON.stringify(merged));
+          localStorage.setItem(SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS, JSON.stringify(merged));
 
           // Fetch per-event-type QR settings from backend database system settings
           let loadedMap = {};
@@ -841,7 +832,7 @@ export default function SettingsPage() {
           }
           setEventPaymentQrConfigs(loadedMap);
           try {
-            localStorage.setItem("cm_event_payment_qr_configs", JSON.stringify(loadedMap));
+            localStorage.setItem(SETTINGS_STORAGE_KEYS.EVENT_PAYMENT_QR, JSON.stringify(loadedMap));
           } catch (e) { }
         }
       } catch {
@@ -861,9 +852,9 @@ export default function SettingsPage() {
     setSettings(updated);
 
     try {
-      const saved = localStorage.getItem("cm_system_settings");
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS);
       const parsed = saved ? JSON.parse(saved) : {};
-      localStorage.setItem("cm_system_settings", JSON.stringify({ ...parsed, ...updated, birthdayMembersExempt: checked }));
+      localStorage.setItem(SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS, JSON.stringify({ ...parsed, ...updated, birthdayMembersExempt: checked }));
     } catch (e) { }
 
     try {
@@ -883,10 +874,10 @@ export default function SettingsPage() {
     setSettings(updated);
 
     try {
-      const saved = localStorage.getItem("cm_system_settings");
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS);
       const parsed = saved ? JSON.parse(saved) : {};
       localStorage.setItem(
-        "cm_system_settings",
+        SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS,
         JSON.stringify({
           ...parsed,
           ...updated,
@@ -910,12 +901,12 @@ export default function SettingsPage() {
       const finalState = { ...updated, ...savedRes };
       setSettings(finalState);
       setLastUpdated(dayjs().format("DD MMM YYYY"));
-      localStorage.setItem("cm_system_settings", JSON.stringify(finalState));
+      localStorage.setItem(SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS, JSON.stringify(finalState));
       return finalState;
     } catch {
       setSettings(updated);
       setLastUpdated(dayjs().format("DD MMM YYYY"));
-      localStorage.setItem("cm_system_settings", JSON.stringify(updated));
+      localStorage.setItem(SETTINGS_STORAGE_KEYS.SYSTEM_SETTINGS, JSON.stringify(updated));
       return updated;
     }
   };
@@ -927,8 +918,8 @@ export default function SettingsPage() {
 
     if (!settings.orgName || !settings.orgName.trim()) {
       newErrors.orgName = requiredMsg;
-    } else if (settings.orgName.length > 250) {
-      newErrors.orgName = "Organization Name cannot exceed 250 characters.";
+    } else if (settings.orgName.length > SETTINGS_VALIDATION_LIMITS.ORG_NAME_MAX_LENGTH) {
+      newErrors.orgName = `Organization Name cannot exceed ${SETTINGS_VALIDATION_LIMITS.ORG_NAME_MAX_LENGTH} characters.`;
     }
 
     if (!settings.otpExpiry || !String(settings.otpExpiry).trim()) {
@@ -994,7 +985,7 @@ export default function SettingsPage() {
     }
 
     const intervalVal = Number(settings.reminderIntervalValue || settings.reminderIntervalDays);
-    const unit = settings.reminderIntervalUnit || "Days";
+    const unit = settings.reminderIntervalUnit || SETTINGS_DEFAULTS.REMINDER_INTERVAL_UNIT;
 
     if (!settings.reminderIntervalValue && !settings.reminderIntervalDays) {
       newErrors.reminderInterval = requiredMsg;
@@ -1005,8 +996,8 @@ export default function SettingsPage() {
     const maxRemindersNum = Number(settings.maxReminders);
     if (!settings.maxReminders) {
       newErrors.maxReminders = requiredMsg;
-    } else if (isNaN(maxRemindersNum) || maxRemindersNum < 1 || maxRemindersNum > 50) {
-      newErrors.maxReminders = "Please enter a valid Maximum Reminders limit between 1 and 50.";
+    } else if (isNaN(maxRemindersNum) || maxRemindersNum < 1 || maxRemindersNum > SETTINGS_VALIDATION_LIMITS.MAX_REMINDERS_MAX) {
+      newErrors.maxReminders = `Please enter a valid Maximum Reminders limit between 1 and ${SETTINGS_VALIDATION_LIMITS.MAX_REMINDERS_MAX}.`;
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -1029,7 +1020,7 @@ export default function SettingsPage() {
 
       updatedCategoryTemplates[selectedCategoryId] = currentEntry;
 
-      const foundCat = categoriesList.find((c) => String(c.eventTypeId) === String(selectedCategoryId));
+      const foundCat = categoriesList.find((c) => String(c.eventTypeId || c.id) === String(selectedCategoryId));
       const catName = foundCat?.eventTypeName?.toLowerCase().trim();
       if (catName) {
         updatedCategoryTemplates[catName] = currentEntry;
@@ -1042,9 +1033,19 @@ export default function SettingsPage() {
           defaultSub = templateSubject;
           defaultDesc = templateDescription;
         }
-        delete updatedCategoryTemplates["birthday"];
-        delete updatedCategoryTemplates["team dinner"];
-        delete updatedCategoryTemplates["farewell"];
+        // Dynamically clear overrides matching registered categories instead of hardcoded strings
+        if (Array.isArray(categoriesList)) {
+          categoriesList.forEach((cat) => {
+            const catNameKey = (cat.eventTypeName || cat.name || "").toLowerCase().trim();
+            if (catNameKey && updatedCategoryTemplates[catNameKey]) {
+              delete updatedCategoryTemplates[catNameKey];
+            }
+            const catIdKey = String(cat.eventTypeId || cat.id || "").toLowerCase().trim();
+            if (catIdKey && updatedCategoryTemplates[catIdKey]) {
+              delete updatedCategoryTemplates[catIdKey];
+            }
+          });
+        }
       }
 
       const updated = {
@@ -1065,7 +1066,7 @@ export default function SettingsPage() {
       const targetLabel =
         selectedCategoryId === "all"
           ? "All Categories (Default)"
-          : categoriesList.find((c) => String(c.eventTypeId) === String(selectedCategoryId))?.eventTypeName || "Selected Category";
+          : categoriesList.find((c) => String(c.eventTypeId || c.id) === String(selectedCategoryId))?.eventTypeName || "Selected Category";
       toast.success(`"${targetLabel}" (${templateType === "initial" ? "Initial Email" : "Reminder Email"}) saved successfully!`);
     } catch {
       toast.error("Failed to save email template settings");
@@ -1140,7 +1141,7 @@ export default function SettingsPage() {
 
   const handleSavePaymentQr = async () => {
     const configToSave = currentQrConfig;
-    const isUploaded = (configToSave.qrMode || "generated").toLowerCase() === "uploaded";
+    const isUploaded = (configToSave.qrMode || SETTINGS_DEFAULTS.QR_MODE_GENERATED).toLowerCase() === "uploaded";
 
     if (isUploaded) {
       if (!configToSave.qrImage) {
@@ -1150,7 +1151,7 @@ export default function SettingsPage() {
       if (!configToSave.receiverName || !configToSave.receiverName.trim()) {
         return;
       }
-      if (configToSave.receiverName.length > 150) {
+      if (configToSave.receiverName.length > SETTINGS_VALIDATION_LIMITS.RECEIVER_NAME_MAX_LENGTH) {
         return;
       }
       if (!configToSave.upiId || !configToSave.upiId.trim()) {
@@ -1160,7 +1161,7 @@ export default function SettingsPage() {
       if (!upiCheck.isValid) {
         return;
       }
-      if (configToSave.upiId && configToSave.upiId.length > 50) {
+      if (configToSave.upiId && configToSave.upiId.length > SETTINGS_VALIDATION_LIMITS.UPI_ID_MAX_LENGTH) {
         return;
       }
     }
@@ -1264,7 +1265,7 @@ export default function SettingsPage() {
     try {
       const file = e.target.files?.[0];
       if (!file) return;
-      if (file.size > 2 * 1024 * 1024) {
+      if (file.size > SETTINGS_VALIDATION_LIMITS.MAX_QR_IMAGE_SIZE_BYTES) {
         toast.error("File size must be under 2MB");
         return;
       }
@@ -1422,15 +1423,15 @@ export default function SettingsPage() {
                         <AppInput
                           label="Organization Name"
                           value={settings.orgName}
-                          maxLength={250}
+                          maxLength={SETTINGS_VALIDATION_LIMITS.ORG_NAME_MAX_LENGTH}
                           onChange={(e) => {
-                            const val = e.target.value.slice(0, 250);
+                            const val = e.target.value.slice(0, SETTINGS_VALIDATION_LIMITS.ORG_NAME_MAX_LENGTH);
                             handleChange("orgName", val);
                             if (val.trim()) {
                               setGeneralErrors((prev) => ({ ...prev, orgName: "" }));
                             }
                           }}
-                          placeholder="e.g. Unit 1A Residents Association"
+                          placeholder="Enter Organization Name"
                           required
                           error={Boolean(generalErrors.orgName)}
                           helperText={generalErrors.orgName}
@@ -1471,16 +1472,16 @@ export default function SettingsPage() {
                             <AppInput
                               label="Forgot Password OTP Expiry (minutes)"
                               value={settings.otpExpiry}
-                              maxLength={2}
+                              maxLength={SETTINGS_VALIDATION_LIMITS.OTP_EXPIRY_MAX_LENGTH}
                               onChange={(e) => {
-                                const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
+                                const val = e.target.value.replace(/[^0-9]/g, "").slice(0, SETTINGS_VALIDATION_LIMITS.OTP_EXPIRY_MAX_LENGTH);
                                 handleChange("otpExpiry", val);
                                 if (val.trim()) {
                                   setGeneralErrors((prev) => ({ ...prev, otpExpiry: "" }));
                                 }
                               }}
                               restrictType="numberonly"
-                              placeholder="e.g. 10"
+                              placeholder={`e.g. ${SETTINGS_DEFAULTS.OTP_EXPIRY}`}
                               required
                               error={Boolean(generalErrors.otpExpiry)}
                               helperText={generalErrors.otpExpiry}
@@ -1495,16 +1496,16 @@ export default function SettingsPage() {
                             <AppInput
                               label="Max Retry Attempts"
                               value={settings.maxRetry}
-                              maxLength={2}
+                              maxLength={SETTINGS_VALIDATION_LIMITS.MAX_RETRY_MAX_LENGTH}
                               onChange={(e) => {
-                                const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
+                                const val = e.target.value.replace(/[^0-9]/g, "").slice(0, SETTINGS_VALIDATION_LIMITS.MAX_RETRY_MAX_LENGTH);
                                 handleChange("maxRetry", val);
                                 if (val.trim()) {
                                   setGeneralErrors((prev) => ({ ...prev, maxRetry: "" }));
                                 }
                               }}
                               restrictType="numberonly"
-                              placeholder="e.g. 3"
+                              placeholder={`e.g. ${SETTINGS_DEFAULTS.MAX_RETRY}`}
                               required
                               error={Boolean(generalErrors.maxRetry)}
                               helperText={generalErrors.maxRetry}
@@ -1577,18 +1578,23 @@ export default function SettingsPage() {
             const currentCategoryLabel =
               selectedCategoryId === "all"
                 ? "All Categories (General)"
-                : categoriesList.find((c) => String(c.eventTypeId) === String(selectedCategoryId))?.eventTypeName || "Birthday";
+                : categoriesList.find((c) => String(c.eventTypeId || c.id) === String(selectedCategoryId))?.eventTypeName || SETTINGS_DEFAULTS.FALLBACK_CATEGORY_NAME;
 
             const previewDueDate = dayjs().endOf("month").format("DD/MM/YYYY");
             const currentCatQrConfig = getPaymentQrConfig(currentCategoryLabel);
             const previewIsUploaded = (currentCatQrConfig.qrMode || "").toLowerCase() === "uploaded";
             const previewUpiId = currentCatQrConfig.upiId || currentQrConfig.upiId || "";
-            const previewReceiverName = currentCatQrConfig.receiverName || currentQrConfig.receiverName || settings.orgName || "Unit 1A";
+            const displayOrgName = settings.orgName?.trim() || SETTINGS_DEFAULTS.FALLBACK_ORG_NAME;
+            const previewReceiverName = currentCatQrConfig.receiverName || currentQrConfig.receiverName || displayOrgName;
+            const previewAmountNum = Number(currentCatQrConfig.previewAmount) > 0
+              ? Number(currentCatQrConfig.previewAmount)
+              : (Number(currentQrConfig.previewAmount) > 0 ? Number(currentQrConfig.previewAmount) : SETTINGS_DEFAULTS.PREVIEW_AMOUNT);
+
             const previewUpiUri = !previewIsUploaded && previewUpiId
               ? buildUpiPaymentUri({
                   upiId: previewUpiId,
                   receiverName: previewReceiverName,
-                  amount: 500,
+                  amount: previewAmountNum,
                   note: `Contribution for ${currentCategoryLabel}`,
                 })
               : "";
@@ -1596,22 +1602,23 @@ export default function SettingsPage() {
               ? (currentCatQrConfig.qrImage || dynamicQrUrl || defaultPaymentQr)
               : (previewUpiUri ? generateQrPngDataUrl(previewUpiUri, 300) : (dynamicQrUrl || defaultPaymentQr));
 
+            const defaultCategoryName = categoriesList[0]?.eventTypeName || SETTINGS_DEFAULTS.FALLBACK_CATEGORY_NAME;
             const livePreviewData = {
-              memberName: "Daniel",
-              categoryName: selectedCategoryId === "all" ? "Birthday" : currentCategoryLabel,
+              memberName: currentUserName,
+              categoryName: selectedCategoryId === "all" ? defaultCategoryName : currentCategoryLabel,
               eventDescription: "Sample event description entered during event creation",
-              amount: 500,
+              amount: previewAmountNum,
               dueDate: previewDueDate,
-              orgName: settings.orgName || "Unit 1A",
+              orgName: displayOrgName,
               paymentLink: previewUpiUri,
               qrImageUrl: previewQrUrl,
             };
 
-            const rawSubject = templateSubject || "Contribution Notice - {categoryName}";
+            const rawSubject = templateSubject || `Contribution Notice - {categoryName}`;
             const liveSubject = interpolatePlaceholders(rawSubject, livePreviewData);
 
             const defaultDesc =
-              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\n{eventDescription}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\nThank You,\n{orgName}";
+              "Dear {memberName},\n\nThis is a notification regarding your {categoryName} contribution of {amount}.\n\nDue Date: {dueDate}\n\n{eventDetails}\n\nPlease scan the dynamic UPI QR code below or log in to the portal to complete your contribution payment.\n\n{qrCode}\n\nThank You,\n{orgName}";
             const rawDesc = templateDescription || defaultDesc;
 
             return (
@@ -1723,8 +1730,8 @@ export default function SettingsPage() {
                             </ToggleButton>
                             <ToggleButton value="reminder">
                               {(() => {
-                                const intVal = Math.max(1, Number(settings.reminderIntervalDays) || 10);
-                                const maxVal = Math.max(1, Number(settings.maxReminders) || 3);
+                                const intVal = Math.max(1, Number(settings.reminderIntervalDays) || Number(SETTINGS_DEFAULTS.REMINDER_INTERVAL_DAYS));
+                                const maxVal = Math.max(1, Number(settings.maxReminders) || Number(SETTINGS_DEFAULTS.MAX_REMINDERS));
                                 const days = Array.from({ length: maxVal }, (_, i) => `Day ${1 + (i + 1) * intVal}`).join(", ");
                                 return `Reminder Email Template (${days})`;
                               })()}
@@ -1808,6 +1815,7 @@ export default function SettingsPage() {
                           {[
                             "{memberName}",
                             "{categoryName}",
+                            "{eventDetails}",
                             "{eventDescription}",
                             "{amount}",
                             "{dueDate}",
@@ -1821,6 +1829,23 @@ export default function SettingsPage() {
                               onClick={() => {
                                 setTemplateDescription((prev) => {
                                   if (!prev) return token;
+                                  if (token === "{eventDetails}") {
+                                    if (prev.includes("{eventDescription}")) {
+                                      return prev.replace("{eventDescription}", token);
+                                    }
+                                    const scanIdx = prev.search(/please\s+scan/i);
+                                    if (scanIdx !== -1) {
+                                      return `${prev.slice(0, scanIdx).trimEnd()}\n\n${token}\n\n${prev.slice(scanIdx).trimStart()}`;
+                                    }
+                                    const qrIdx = prev.indexOf("{qrCode}");
+                                    if (qrIdx !== -1) {
+                                      return `${prev.slice(0, qrIdx).trimEnd()}\n\n${token}\n\n${prev.slice(qrIdx).trimStart()}`;
+                                    }
+                                    const thankIdx = prev.search(/thank\s*you/i);
+                                    if (thankIdx !== -1) {
+                                      return `${prev.slice(0, thankIdx).trimEnd()}\n\n${token}\n\n${prev.slice(thankIdx).trimStart()}`;
+                                    }
+                                  }
                                   if (token === "{qrCode}") {
                                     const thankIdx = prev.search(/thank\s*you/i);
                                     if (thankIdx !== -1) {
@@ -1835,13 +1860,50 @@ export default function SettingsPage() {
                                 fontWeight: 700,
                                 height: 22,
                                 cursor: "pointer",
-                                bgcolor: token === "{qrCode}" ? "rgba(124, 58, 237, 0.1)" : "rgba(74, 63, 107, 0.08)",
+                                bgcolor: token === "{qrCode}" ? "rgba(124, 58, 237, 0.1)" : token === "{eventDetails}" ? "rgba(74, 63, 107, 0.14)" : "rgba(74, 63, 107, 0.08)",
                                 color: token === "{qrCode}" ? "#7c3aed" : "#4a3f6b",
-                                border: token === "{qrCode}" ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(74, 63, 107, 0.2)",
+                                border: token === "{qrCode}" ? "1px solid rgba(124, 58, 237, 0.3)" : token === "{eventDetails}" ? "1px solid rgba(74, 63, 107, 0.4)" : "1px solid rgba(74, 63, 107, 0.2)",
                                 "&:hover": { bgcolor: "rgba(74, 63, 107, 0.16)" },
                               }}
                             />
                           ))}
+                          <Chip
+                            label="+ Insert Event Table"
+                            size="small"
+                            onClick={() => {
+                              setTemplateDescription((prev) => {
+                                const current = prev || "";
+                                if (current.includes("{eventDetails}") || current.includes("{eventTable}")) return current;
+                                if (current.includes("{eventDescription}")) {
+                                  return current.replace("{eventDescription}", "{eventDetails}");
+                                }
+                                const scanIdx = current.search(/please\s+scan/i);
+                                if (scanIdx !== -1) {
+                                  return `${current.slice(0, scanIdx).trimEnd()}\n\n{eventDetails}\n\n${current.slice(scanIdx).trimStart()}`;
+                                }
+                                const qrIdx = current.indexOf("{qrCode}");
+                                if (qrIdx !== -1) {
+                                  return `${current.slice(0, qrIdx).trimEnd()}\n\n{eventDetails}\n\n${current.slice(qrIdx).trimStart()}`;
+                                }
+                                const thankIdx = current.search(/thank\s*you/i);
+                                if (thankIdx !== -1) {
+                                  return `${current.slice(0, thankIdx).trimEnd()}\n\n{eventDetails}\n\n${current.slice(thankIdx).trimStart()}`;
+                                }
+                                return `${current.trimEnd()}\n\n{eventDetails}`;
+                              });
+                              setTemplateErrors((prev) => ({ ...prev, templateDescription: "" }));
+                            }}
+                            sx={{
+                              fontSize: "0.68rem",
+                              fontWeight: 750,
+                              height: 22,
+                              cursor: "pointer",
+                              bgcolor: "rgba(74, 63, 107, 0.12)",
+                              color: "#4a3f6b",
+                              border: "1px dashed #4a3f6b",
+                              "&:hover": { bgcolor: "rgba(74, 63, 107, 0.22)" },
+                            }}
+                          />
                           <Chip
                             label="+ Insert QR Code"
                             size="small"
@@ -1889,7 +1951,7 @@ export default function SettingsPage() {
                               </Typography>
                             </Box>
                             <Chip
-                              label={`Cadence: Every ${settings.reminderIntervalValue || settings.reminderIntervalDays || "10"} ${(settings.reminderIntervalUnit || "Days").toLowerCase()}`}
+                              label={`Cadence: Every ${settings.reminderIntervalValue || settings.reminderIntervalDays || SETTINGS_DEFAULTS.REMINDER_INTERVAL_DAYS} ${(settings.reminderIntervalUnit || SETTINGS_DEFAULTS.REMINDER_INTERVAL_UNIT).toLowerCase()}`}
                               size="small"
                               sx={{
                                 height: 22,
@@ -1918,17 +1980,17 @@ export default function SettingsPage() {
                                 onChange={(e) => handleChange("enableReminderEmail", e.target.checked)}
                               />
                               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", display: "block", pl: 0.5 }}>
-                                Send reminders every {settings.reminderIntervalValue || settings.reminderIntervalDays || "10"} {(settings.reminderIntervalUnit || "Days").toLowerCase()} for unpaid contributions (stops once paid).
+                                Send reminders every {settings.reminderIntervalValue || settings.reminderIntervalDays || SETTINGS_DEFAULTS.REMINDER_INTERVAL_DAYS} ${(settings.reminderIntervalUnit || SETTINGS_DEFAULTS.REMINDER_INTERVAL_UNIT).toLowerCase()} for unpaid contributions (stops once paid).
                               </Typography>
                             </Grid>
 
                             <Grid size={{ xs: 12, sm: 4 }}>
                               <AppInput
                                 label="Reminder Interval"
-                                value={settings.reminderIntervalValue !== undefined && settings.reminderIntervalValue !== null ? settings.reminderIntervalValue : (settings.reminderIntervalDays ?? "10")}
-                                maxLength={8}
+                                value={settings.reminderIntervalValue !== undefined && settings.reminderIntervalValue !== null ? settings.reminderIntervalValue : (settings.reminderIntervalDays ?? SETTINGS_DEFAULTS.REMINDER_INTERVAL_DAYS)}
+                                maxLength={SETTINGS_VALIDATION_LIMITS.REMINDER_INTERVAL_MAX_LENGTH}
                                 onChange={(e) => {
-                                  const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
+                                  const val = e.target.value.replace(/[^0-9]/g, "").slice(0, SETTINGS_VALIDATION_LIMITS.REMINDER_INTERVAL_MAX_LENGTH);
                                   handleChange("reminderIntervalValue", val);
                                   handleChange("reminderIntervalDays", val);
                                   if (val.trim()) {
@@ -1936,7 +1998,7 @@ export default function SettingsPage() {
                                   }
                                 }}
                                 restrictType="numberonly"
-                                placeholder="e.g. 10"
+                                placeholder={`e.g. ${SETTINGS_DEFAULTS.REMINDER_INTERVAL_DAYS}`}
                                 required
                                 error={Boolean(templateErrors.reminderInterval)}
                                 helperText={templateErrors.reminderInterval}
@@ -1945,7 +2007,7 @@ export default function SettingsPage() {
                             <Grid size={{ xs: 12, sm: 4 }}>
                               <AppSelect
                                 label="Interval Unit"
-                                value={settings.reminderIntervalUnit || "Days"}
+                                value={settings.reminderIntervalUnit || SETTINGS_DEFAULTS.REMINDER_INTERVAL_UNIT}
                                 onChange={(e) => handleChange("reminderIntervalUnit", e.target.value)}
                                 options={[
                                   { label: "Minutes", value: "Minutes" },
@@ -1957,17 +2019,17 @@ export default function SettingsPage() {
                             <Grid size={{ xs: 12, sm: 4 }}>
                               <AppInput
                                 label="Maximum Reminders Allowed"
-                                value={settings.maxReminders !== undefined && settings.maxReminders !== null ? settings.maxReminders : "3"}
-                                maxLength={2}
+                                value={settings.maxReminders !== undefined && settings.maxReminders !== null ? settings.maxReminders : SETTINGS_DEFAULTS.MAX_REMINDERS}
+                                maxLength={SETTINGS_VALIDATION_LIMITS.MAX_RETRY_MAX_LENGTH}
                                 onChange={(e) => {
-                                  const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
+                                  const val = e.target.value.replace(/[^0-9]/g, "").slice(0, SETTINGS_VALIDATION_LIMITS.MAX_RETRY_MAX_LENGTH);
                                   handleChange("maxReminders", val);
                                   if (val.trim()) {
                                     setTemplateErrors((prev) => ({ ...prev, maxReminders: "" }));
                                   }
                                 }}
                                 restrictType="numberonly"
-                                placeholder="e.g. 3"
+                                placeholder={`e.g. ${SETTINGS_DEFAULTS.MAX_REMINDERS}`}
                                 required
                                 error={Boolean(templateErrors.maxReminders)}
                                 helperText={templateErrors.maxReminders}
@@ -1977,29 +2039,12 @@ export default function SettingsPage() {
                           {/* Manual Scheduler & Hangfire Action */}
                           <Box sx={{ mt: 2.5, pt: 1.5, borderTop: `1px dashed ${theme.palette.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                              {/* <AppButton
-                                variant="contained"
-                                startIcon={triggeringHangfire ? <CircularProgress size={16} color="inherit" /> : <PlayArrowOutlinedIcon />}
-                                disabled={triggeringHangfire}
-                                onClick={handleTriggerHangfireJob}
-                                sx={{
-                                  bgcolor: "#059669 !important",
-                                  "&:hover": { bgcolor: "#047857 !important" },
-                                  fontSize: "0.8rem",
-                                  py: 0.8,
-                                  px: 2,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {triggeringHangfire ? "Dispatching Reminders..." : "Run Hangfire Reminders Now"}
-                              </AppButton> */}
-   
                             </Box>
                             <AppButton
                               variant="outlined"
                               size="small"
                               startIcon={<OpenInNewOutlinedIcon sx={{ fontSize: 16 }} />}
-                              onClick={() => window.open(window.location.protocol + "//" + window.location.hostname + ":5111/hangfire", "_blank")}
+                              onClick={() => window.open(getHangfireDashboardUrl(), "_blank")}
                               sx={{
                                 borderColor: "#4a3f6b",
                                 color: "#4a3f6b",
@@ -2088,7 +2133,7 @@ export default function SettingsPage() {
                         fontWeight={750}
                         sx={{ mt: 0.3, color: "#4a3f6b", wordBreak: "break-word" }}
                       >
-                        {liveSubject || "Contribution Notice - Birthday"}
+                        {liveSubject || `Contribution Notice - ${currentCategoryLabel}`}
                       </Typography>
                     </Box>
 
@@ -2105,10 +2150,10 @@ export default function SettingsPage() {
                       {/* Simulated Email Headers */}
                       <Box sx={{ pb: 1.2, mb: 1.5, borderBottom: (t) => `1px dashed ${t.palette.divider}` }}>
                         <Typography variant="caption" sx={{ display: "block", color: "text.secondary", fontSize: "0.7rem" }}>
-                          <strong>From:</strong> {settings.orgName || "Unit 1A"} &lt;notifications@unit1a.org&gt;
+                          <strong>From:</strong> {displayOrgName} &lt;{settings.fromEmail?.trim() || "notifications@system.local"}&gt;
                         </Typography>
                         <Typography variant="caption" sx={{ display: "block", color: "text.secondary", fontSize: "0.7rem", mt: 0.2 }}>
-                          <strong>To:</strong> Daniel &lt;daniel@example.com&gt;
+                          <strong>To:</strong> {currentUserName} &lt;{authState?.email || authState?.user?.email || "member@system.local"}&gt;
                         </Typography>
                       </Box>
 
@@ -2119,21 +2164,109 @@ export default function SettingsPage() {
 
                         // Replace standard text placeholders
                         let processed = effectiveDesc
-                          .replace(/\{memberName\}/g, livePreviewData.memberName || "Daniel")
-                          .replace(/\{categoryName\}/g, livePreviewData.categoryName || "Birthday")
-                          .replace(/\{eventName\}/g, livePreviewData.categoryName || "Birthday")
+                          .replace(/\{memberName\}/g, livePreviewData.memberName || SETTINGS_DEFAULTS.FALLBACK_USER_NAME)
+                          .replace(/\{categoryName\}/g, livePreviewData.categoryName || SETTINGS_DEFAULTS.FALLBACK_CATEGORY_NAME)
+                          .replace(/\{eventName\}/g, livePreviewData.categoryName || SETTINGS_DEFAULTS.FALLBACK_CATEGORY_NAME)
                           .replace(/\{eventDescription\}/g, livePreviewData.eventDescription || "")
-                          .replace(/\{amount\}/g, typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || "₹500"))
+                          .replace(/\{amount\}/g, typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || `₹${SETTINGS_DEFAULTS.PREVIEW_AMOUNT}`))
                           .replace(/\{dueDate\}/g, livePreviewData.dueDate || previewDueDate || "End of Month")
-                          .replace(/\{orgName\}/g, livePreviewData.orgName || settings.orgName || "Unit 1A Residents Association");
+                          .replace(/\{orgName\}/g, livePreviewData.orgName || displayOrgName);
 
-                        // Tokenize on {qrCode} and {paymentLink}
-                        const parts = processed.split(/(\{qrCode\}|\{paymentLink\})/gi);
+                        // Tokenize on {eventDetails}, {eventTable}, {qrCode}, and {paymentLink}
+                        const parts = processed.split(/(\{eventDetails\}|\{eventTable\}|\{qrCode\}|\{paymentLink\})/gi);
 
                         return (
                           <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                             {parts.map((part, index) => {
                               const trimmed = part.trim();
+                              if (trimmed.toLowerCase() === "{eventdetails}" || trimmed.toLowerCase() === "{eventtable}") {
+                                return (
+                                  <Box
+                                    key={`event-details-${index}`}
+                                    sx={{
+                                      bgcolor: isDark ? "rgba(74, 63, 107, 0.08)" : "#faf9fd",
+                                      border: "1px solid rgba(74, 63, 107, 0.12)",
+                                      borderRadius: "10px",
+                                      p: 2,
+                                      my: 1.5,
+                                    }}
+                                  >
+                                    {/* Event Name */}
+                                    <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                        Event Name:
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#ffffff" : "#1e1a2e" }}>
+                                        {selectedCategoryId === "all" ? "{eventName}" : `${currentCategoryLabel} Celebration`}
+                                      </Typography>
+                                    </Box>
+
+                                    {/* Birthday Celebrants row if Birthday category specifically selected */}
+                                    {currentCategoryLabel.toLowerCase().includes("birthday") && selectedCategoryId !== "all" && (
+                                      <Box sx={{ pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", display: "block", mb: 0.4 }}>
+                                          Celebrants &amp; Dates:
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: "#7c3aed", fontWeight: 700 }}>
+                                          {"{celebrantNames & dates}"}
+                                        </Typography>
+                                      </Box>
+                                    )}
+
+                                    {/* Event Date */}
+                                    <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                        Event Date:
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? "#ffffff" : "#1e1a2e" }}>
+                                        {previewDueDate || dayjs().format("DD/MM/YYYY")}
+                                      </Typography>
+                                    </Box>
+
+                                    {/* Total Amount */}
+                                    <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                        Total Amount:
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#ffffff" : "#1e1a2e" }}>
+                                        {typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || `₹${SETTINGS_DEFAULTS.PREVIEW_AMOUNT}`)}
+                                      </Typography>
+                                    </Box>
+
+                                    {/* Description */}
+                                    <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                        Description:
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ color: isDark ? "#cbd5e1" : "#1e1a2e" }}>
+                                        {livePreviewData.eventDescription || "Sample event description entered during event creation"}
+                                      </Typography>
+                                    </Box>
+
+                                    {/* Contribution Amount */}
+                                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
+                                        Contribution Amount:
+                                      </Typography>
+                                      <Box
+                                        sx={{
+                                          bgcolor: "#f0ecf9",
+                                          color: "#2d2550",
+                                          fontWeight: 800,
+                                          fontSize: "0.88rem",
+                                          px: 1.2,
+                                          py: 0.4,
+                                          borderRadius: "6px",
+                                          letterSpacing: "0.02em",
+                                        }}
+                                      >
+                                        {typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || `₹${SETTINGS_DEFAULTS.PREVIEW_AMOUNT}`)}
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                );
+                              }
+
                               if (trimmed.toLowerCase() === "{qrcode}") {
                                 return (
                                   <Box
@@ -2183,10 +2316,10 @@ export default function SettingsPage() {
                                       <strong>Payee:</strong> {previewReceiverName}
                                     </Typography>
                                     <Typography variant="caption" sx={{ display: "block", fontSize: "0.72rem", color: "#7c3aed", fontWeight: 700 }}>
-                                      <strong>UPI ID:</strong> {previewUpiId}
+                                      <strong>UPI ID:</strong> {previewUpiId || "Not Configured"}
                                     </Typography>
                                     <Typography variant="caption" sx={{ display: "block", fontSize: "0.66rem", color: "#64748b", mt: 0.5 }}>
-                                      Amount is pre-filled automatically when scanned (₹500)
+                                      Amount is pre-filled automatically when scanned (₹{previewAmountNum})
                                     </Typography>
 
                                     {previewUpiUri && (
@@ -2204,7 +2337,7 @@ export default function SettingsPage() {
                                             borderRadius: "8px",
                                           }}
                                         >
-                                          Pay ₹500 via UPI
+                                          Pay ₹{previewAmountNum} via UPI
                                         </AppButton>
                                       </Box>
                                     )}
@@ -2238,110 +2371,19 @@ export default function SettingsPage() {
                               if (!part) return null;
 
                               return (
-                                <React.Fragment key={`frag-${index}`}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      whiteSpace: "pre-line",
-                                      color: "text.primary",
-                                      fontSize: "0.82rem",
-                                      lineHeight: 1.6,
-                                      mb: 1.5,
-                                    }}
-                                  >
-                                    {part}
-                                  </Typography>
-
-                                  {/* Event Details Card (as shown in user design) */}
-                                  {index === 0 && (
-                                    <Box
-                                      sx={{
-                                        bgcolor: isDark ? "rgba(74, 63, 107, 0.08)" : "#faf9fd",
-                                        border: "1px solid rgba(74, 63, 107, 0.12)",
-                                        borderRadius: "10px",
-                                        p: 2,
-                                        my: 1.5,
-                                      }}
-                                    >
-                                      {/* Event Name */}
-                                      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
-                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
-                                          Event Name:
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#1e1a2e" }}>
-                                          {selectedCategoryId === "all"
-                                            ? "{eventName}"
-                                            : `${currentCategoryLabel} Celebration`}
-                                        </Typography>
-                                      </Box>
-
-                                      {/* Celebrants row (only if Birthday category specifically selected) */}
-                                      {currentCategoryLabel.toLowerCase().includes("birthday") && selectedCategoryId !== "all" && (
-                                        <Box sx={{ pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
-                                          <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", display: "block", mb: 0.4 }}>
-                                            Celebrants &amp; Dates:
-                                          </Typography>
-                                          <Typography variant="caption" sx={{ color: "#7c3aed", fontWeight: 700 }}>
-                                            {"{celebrantNames & dates}"}
-                                          </Typography>
-                                        </Box>
-                                      )}
-
-                                      {/* Event Date */}
-                                      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
-                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
-                                          Event Date:
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ fontWeight: 600, color: "#1e1a2e" }}>
-                                          {previewDueDate || dayjs().format("DD/MM/YYYY")}
-                                        </Typography>
-                                      </Box>
-
-                                      {/* Total Amount */}
-                                      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
-                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
-                                          Total Amount:
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#1e1a2e" }}>
-                                          {typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || "₹500")}
-                                        </Typography>
-                                      </Box>
-
-                                      {/* Description (only shown when entered) */}
-                                      {Boolean(livePreviewData.eventDescription) && (
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", pb: 1.2, mb: 1.2, borderBottom: "1px dashed rgba(74, 63, 107, 0.15)" }}>
-                                          <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
-                                            Description:
-                                          </Typography>
-                                          <Typography variant="caption" sx={{ color: "#1e1a2e" }}>
-                                            {livePreviewData.eventDescription}
-                                          </Typography>
-                                        </Box>
-                                      )}
-
-                                      {/* Contribution Amount */}
-                                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <Typography variant="caption" sx={{ fontWeight: 700, color: "#5b5280", minWidth: 140 }}>
-                                          Contribution Amount:
-                                        </Typography>
-                                        <Box
-                                          sx={{
-                                            bgcolor: "#f0ecf9",
-                                            color: "#2d2550",
-                                            fontWeight: 800,
-                                            fontSize: "0.88rem",
-                                            px: 1.2,
-                                            py: 0.4,
-                                            borderRadius: "6px",
-                                            letterSpacing: "0.02em",
-                                          }}
-                                        >
-                                          {typeof livePreviewData.amount === "number" ? `₹${livePreviewData.amount}` : (livePreviewData.amount || "₹500")}
-                                        </Box>
-                                      </Box>
-                                    </Box>
-                                  )}
-                                </React.Fragment>
+                                <Typography
+                                  key={`frag-${index}`}
+                                  variant="body2"
+                                  sx={{
+                                    whiteSpace: "pre-line",
+                                    color: "text.primary",
+                                    fontSize: "0.82rem",
+                                    lineHeight: 1.6,
+                                    mb: 1.5,
+                                  }}
+                                >
+                                  {part}
+                                </Typography>
                               );
                             })}
                           </Box>
@@ -2353,8 +2395,6 @@ export default function SettingsPage() {
               </Grid>
             );
           })()}
-
-
 
           {/* ── 4. Payment QR Settings (Per-Event-Type) ────────────────────────── */}
           {!isMemberRole && activeTab === "paymentQr" && (
@@ -2493,7 +2533,7 @@ export default function SettingsPage() {
                           </Typography>
                           <Box sx={{ maxWidth: { xs: "100%", sm: 440 } }}>
                             <ToggleButtonGroup
-                              value={currentQrConfig.qrMode || "generated"}
+                              value={currentQrConfig.qrMode || SETTINGS_DEFAULTS.QR_MODE_GENERATED}
                               exclusive
                               onChange={(e, val) => {
                                 if (val) handleQrFieldChange("qrMode", val);
@@ -2534,8 +2574,8 @@ export default function SettingsPage() {
                               <AppInput
                                 label={`Receiver Name (${selectedQrEventType})`}
                                 value={currentQrConfig.receiverName || ""}
-                                maxLength={150}
-                                onChange={(e) => handleQrFieldChange("receiverName", e.target.value.slice(0, 150))}
+                                maxLength={SETTINGS_VALIDATION_LIMITS.RECEIVER_NAME_MAX_LENGTH}
+                                onChange={(e) => handleQrFieldChange("receiverName", e.target.value.slice(0, SETTINGS_VALIDATION_LIMITS.RECEIVER_NAME_MAX_LENGTH))}
                                 placeholder={`e.g. ${selectedQrEventType} Lead`}
                                 required
                                 size="small"
@@ -2547,8 +2587,8 @@ export default function SettingsPage() {
                               <AppInput
                                 label={`UPI ID (${selectedQrEventType})`}
                                 value={currentQrConfig.upiId || ""}
-                                maxLength={50}
-                                onChange={(e) => handleQrFieldChange("upiId", e.target.value.slice(0, 50))}
+                                maxLength={SETTINGS_VALIDATION_LIMITS.UPI_ID_MAX_LENGTH}
+                                onChange={(e) => handleQrFieldChange("upiId", e.target.value.slice(0, SETTINGS_VALIDATION_LIMITS.UPI_ID_MAX_LENGTH))}
                                 placeholder={`e.g. name@okaxis`}
                                 required
                                 size="small"
@@ -2674,8 +2714,8 @@ export default function SettingsPage() {
                                 <AppInput
                                   label={`Account Label (Optional)`}
                                   value={currentQrConfig.accountLabel || ""}
-                                  maxLength={100}
-                                  onChange={(e) => handleQrFieldChange("accountLabel", e.target.value.slice(0, 100))}
+                                  maxLength={SETTINGS_VALIDATION_LIMITS.ACCOUNT_LABEL_MAX_LENGTH}
+                                  onChange={(e) => handleQrFieldChange("accountLabel", e.target.value.slice(0, SETTINGS_VALIDATION_LIMITS.ACCOUNT_LABEL_MAX_LENGTH))}
                                   placeholder={`e.g. ${selectedQrEventType} Account`}
                                   size="small"
                                 />
@@ -2684,8 +2724,8 @@ export default function SettingsPage() {
                                 <AppInput
                                   label={`Remarks (Optional)`}
                                   value={currentQrConfig.remarks || ""}
-                                  maxLength={150}
-                                  onChange={(e) => handleQrFieldChange("remarks", e.target.value.slice(0, 150))}
+                                  maxLength={SETTINGS_VALIDATION_LIMITS.REMARKS_MAX_LENGTH}
+                                  onChange={(e) => handleQrFieldChange("remarks", e.target.value.slice(0, SETTINGS_VALIDATION_LIMITS.REMARKS_MAX_LENGTH))}
                                   placeholder="e.g. Scan with any UPI app"
                                   size="small"
                                 />
@@ -2955,7 +2995,7 @@ export default function SettingsPage() {
         onClose={() => setDeleteQrEventType(null)}
         onConfirm={handleConfirmDeleteQr}
         title="Confirm"
-        content={`Are you sure you want to delete `}
+        content={`Are you sure you want to delete the payment QR configuration for "${deleteQrEventType}"?`}
         confirmText="Delete"
         cancelText="Cancel"
         confirmColor="error"

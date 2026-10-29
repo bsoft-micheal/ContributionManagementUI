@@ -76,15 +76,31 @@ apiClient.interceptors.response.use(
   }
 );
 
+export const getBackendBaseUrl = () => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://localhost:5112/api/v1";
+  return baseUrl.replace(/\/api\/v\d+$/i, "").replace(/\/api$/i, "");
+};
+
 export const getImageUrl = (path) => {
   if (!path) return "";
   if (path.startsWith("data:") || path.startsWith("http:") || path.startsWith("https:")) return path;
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://localhost:5112/api/v1";
-  const backendBaseUrl = baseUrl.replace(/\/api\/v\d+$/i, "").replace(/\/api$/i, "");
-
+  const backendBaseUrl = getBackendBaseUrl();
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${backendBaseUrl}${cleanPath}`;
+};
+
+export const getHangfireDashboardUrl = () => {
+  const customUrl = import.meta.env.VITE_HANGFIRE_DASHBOARD_URL;
+  if (customUrl && typeof customUrl === "string" && customUrl.trim()) {
+    const trimmed = customUrl.trim();
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+    const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${getBackendBaseUrl()}${cleanPath}`;
+  }
+  return `${getBackendBaseUrl()}/hangfire`;
 };
 
 export default apiClient;
