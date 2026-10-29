@@ -512,10 +512,6 @@ export default function EventFormPage({
         const handAmt = balanceObj.availableAmountInHand ?? 0;
         setAvailableAmountInHand(Number(handAmt) || 0);
 
-        if (!id && Number(balanceObj?.eligibleAdjustmentAmount || 0) > 0) {
-          setUsePreviousEventBalance(true);
-        }
-
         const normalizedMembers = (usersData || [])
           .filter((u) => {
             const email = (u.email || "").toLowerCase().trim();
@@ -4847,10 +4843,12 @@ export default function EventFormPage({
                           gap: 1,
                         }}
                       >
-                        {/* Planned Budget */}
+                        {/* Planned Budget / Remaining Funding */}
                         <Box sx={{ textAlign: "left" }}>
                           <Typography sx={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 500, mb: 0.2 }}>
-                            Planned Event Budget
+                            {requireSponsorContribution && totalSponsorContributionAmount > 0
+                              ? "Remaining Funding"
+                              : "Planned Event Budget"}
                           </Typography>
                           <Typography
                             sx={{
@@ -4859,7 +4857,11 @@ export default function EventFormPage({
                               color: (theme) => (theme.palette.mode === "dark" ? "#f1f5f9" : "#0f172a"),
                             }}
                           >
-                            ₹{formatWholeNumber(plannedBudget)}
+                            ₹{formatWholeNumber(
+                              requireSponsorContribution && totalSponsorContributionAmount > 0
+                                ? remainingFundingRequirement
+                                : plannedBudget,
+                            )}
                           </Typography>
                         </Box>
 
