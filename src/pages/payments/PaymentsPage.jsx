@@ -714,7 +714,7 @@ export default function PaymentsPage() {
         return (
           <Tooltip
             arrow
-            interactive
+            disableInteractive={false}
             enterDelay={100}
             leaveDelay={200}
             placement="right-start"

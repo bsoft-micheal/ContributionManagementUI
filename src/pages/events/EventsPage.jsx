@@ -324,6 +324,7 @@ export default function EventsPage() {
 
         const expAmount = Math.max(Number(e.expenseAmount || 0), eventExpenseTotal);
         const baseBudget = Number(e.originalPlannedBudget ?? e.baseAmount ?? 0);
+        const rawBudget = baseBudget;
         const sponsorDeduction = Boolean(e.requireSponsorContribution)
           ? Number(
               e.sponsorContributionAmount ??
@@ -1197,6 +1198,7 @@ export default function EventsPage() {
         },
         render: (row) => {
           const base = Number(row.originalPlannedBudget ?? row.baseAmount ?? 0);
+          const raw = base;
           const sp = Boolean(row.requireSponsorContribution)
             ? Number(
                 row.sponsorContributionAmount ??
@@ -1209,7 +1211,7 @@ export default function EventsPage() {
           const sponsorAmt = Number(row.sponsorContributionAmount || 0) ||
             (Array.isArray(row.sponsors) ? row.sponsors.reduce((sum, s) => sum + (Number(s.contributionAmount || s.amount) || 0), 0) : 0);
           const hasSponsor = Boolean(row.requireSponsorContribution) && sponsorAmt > 0;
-          const totalBudget = Number(row.originalPlannedBudget || row.baseAmount || raw);
+          const totalBudget = base;
 
           return (
             <Box sx={{ textAlign: "right" }}>
@@ -1250,13 +1252,13 @@ export default function EventsPage() {
         key: "extraAmountSpent",
         align: "right",
         exportValue: (row) => {
-          const exp = Number(row.totalExpectedAmount || 0) > 0 ? Number(row.totalExpectedAmount) : Number(row.baseAmount || 0);
+          const exp = Number(row.originalPlannedBudget ?? row.baseAmount ?? row.totalExpectedAmount ?? 0);
           const spent = Number(row.expenseAmount || 0);
           const extra = row.extraAmountSpent !== undefined ? Number(row.extraAmountSpent) : Math.max(0, spent - exp);
           return roundToWhole(extra);
         },
         render: (row) => {
-          const exp = Number(row.totalExpectedAmount || 0) > 0 ? Number(row.totalExpectedAmount) : Number(row.baseAmount || 0);
+          const exp = Number(row.originalPlannedBudget ?? row.baseAmount ?? row.totalExpectedAmount ?? 0);
           const spent = Number(row.expenseAmount || 0);
           const extra = row.extraAmountSpent !== undefined ? Number(row.extraAmountSpent) : Math.max(0, spent - exp);
           const isOver = extra > 0;
