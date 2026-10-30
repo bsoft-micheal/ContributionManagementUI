@@ -1,54 +1,65 @@
 import axios from "axios";
 import { showAppToast } from "../components/common/AppToast";
 
+const DEFAULT_API_BASE_URL = "https://localhost:5200/tcms/api/v1";
+const configuredApiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "https://localhost:5112/api/v1",
+  baseURL: import.meta.env.DEV
+    ? new URL(configuredApiBaseUrl, DEFAULT_API_BASE_URL).pathname.replace(/\/+$/, "")
+    : configuredApiBaseUrl,
 });
 
-apiClient.interceptors.request.use((config) => {
-  const url = (config.url || "").toLowerCase();
-  const currentPath = (window.location.pathname || "").toLowerCase();
+apiClient.interceptors.request.use(
+  (config) => {
+    const url = (config.url || "").toLowerCase();
+    const currentPath = (window.location.pathname || "").toLowerCase();
 
-  const isAuthPageOrEndpoint =
-    Boolean(config.hideLoader) ||
-    currentPath === "/login" ||
-    currentPath.startsWith("/forgot-password") ||
-    url.includes("/auth/login") ||
-    url.includes("/auth/forgot-password") ||
-    url.includes("/auth/verify-2fa") ||
-    url.includes("/logout") ||
-    url.includes("switchrole") ||
-    url.includes("switchroleasync");
+    const isAuthPageOrEndpoint =
+      Boolean(config.hideLoader) ||
+      currentPath === "/login" ||
+      currentPath.startsWith("/forgot-password") ||
+      url.includes("/auth/login") ||
+      url.includes("/auth/forgot-password") ||
+      url.includes("/auth/verify-2fa") ||
+      url.includes("/logout") ||
+      url.includes("switchrole") ||
+      url.includes("switchroleasync");
 
-  if (isAuthPageOrEndpoint) {
-    config.hideLoader = true;
-  }
-
-  if (!config.hideLoader) {
-    window.dispatchEvent(new CustomEvent("app:api-start"));
-  }
-
-  const authState = sessionStorage.getItem("teamContributionAuth") || localStorage.getItem("teamContributionAuth");
-  if (authState) {
-    try {
-      const parsed = JSON.parse(authState);
-      if (parsed.token) {
-        config.headers.Authorization = `Bearer ${parsed.token}`;
-      }
-      const activeRole = parsed.role || parsed.activeRole;
-      if (activeRole) {
-        config.headers["X-Active-Role"] = activeRole;
-      }
-    } catch {
-      // ignore parse error
+    if (isAuthPageOrEndpoint) {
+      config.hideLoader = true;
     }
-  }
 
-  return config;
-}, (error) => {
-  window.dispatchEvent(new CustomEvent("app:api-end"));
-  return Promise.reject(error);
-});
+    if (!config.hideLoader) {
+      window.dispatchEvent(new CustomEvent("app:api-start"));
+    }
+
+    const authState =
+      sessionStorage.getItem("teamContributionAuth") ||
+      localStorage.getItem("teamContributionAuth");
+    if (authState) {
+      try {
+        const parsed = JSON.parse(authState);
+        if (parsed.token) {
+          config.headers.Authorization = `Bearer ${parsed.token}`;
+        }
+        const activeRole = parsed.role || parsed.activeRole;
+        if (activeRole) {
+          config.headers["X-Active-Role"] = activeRole;
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+
+    return config;
+  },
+  (error) => {
+    window.dispatchEvent(new CustomEvent("app:api-end"));
+    return Promise.reject(error);
+  },
+);
 
 apiClient.interceptors.response.use(
   (response) => {
@@ -66,24 +77,36 @@ apiClient.interceptors.response.use(
       localStorage.removeItem("teamContributionAuth");
       localStorage.removeItem("teamContributionRememberMe");
       const currentPath = window.location.pathname;
-      if (!currentPath.startsWith("/forgot-password") && currentPath !== "/login") {
+      if (
+        !currentPath.startsWith("/forgot-password") &&
+        currentPath !== "/login"
+      ) {
         window.location.href = "/login";
       }
     } else if (!error.response) {
-      showAppToast("Unable to reach the server. Please check your network connection.", "error");
+      showAppToast(
+        "Unable to reach the server. Please check your network connection.",
+        "error",
+      );
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export const getBackendBaseUrl = () => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://localhost:5112/api/v1";
+  const baseUrl =
+    import.meta.env.VITE_API_BASE_URL || "https://localhost:5200/tcms/api/v1";
   return baseUrl.replace(/\/api\/v\d+$/i, "").replace(/\/api$/i, "");
 };
 
 export const getImageUrl = (path) => {
   if (!path) return "";
-  if (path.startsWith("data:") || path.startsWith("http:") || path.startsWith("https:")) return path;
+  if (
+    path.startsWith("data:") ||
+    path.startsWith("http:") ||
+    path.startsWith("https:")
+  )
+    return path;
 
   const backendBaseUrl = getBackendBaseUrl();
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
